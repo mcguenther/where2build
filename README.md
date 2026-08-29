@@ -28,6 +28,26 @@ takes to get to work, school and the station.
 
 Requires Node 22+ and Python 3.11+.
 
+On Windows, use PowerShell paths and the Python launcher:
+
+```powershell
+# Backend — FastAPI, proxy and cache in front of the official services
+py -m venv backend\.venv
+backend\.venv\Scripts\python -m pip install -e "backend[dev]"
+Copy-Item backend\.env.example backend\.env    # then fill in LLM_API_KEY
+backend\.venv\Scripts\python -m uvicorn app.main:app --reload --app-dir backend
+
+# Frontend — Vite + Vue 3, Options API
+Set-Location frontend
+npm install
+npm run dev                                    # proxies /api to 127.0.0.1:8000
+```
+
+If venv creation was interrupted and `backend\.venv` only contains a partial
+environment, remove it first with `Remove-Item -Recurse -Force backend\.venv`.
+
+On Linux and macOS:
+
 ```bash
 # Backend — FastAPI, proxy and cache in front of the official services
 python3 -m venv backend/.venv
