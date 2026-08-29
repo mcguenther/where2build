@@ -122,15 +122,27 @@ from the user directly. Reopen only if the user asks.
   `findPlacement` copy their input once at the door. Any new hot loop over
   geometry must do the same; the symptom is a frozen tab with no error.
 - **Cap the grid, do not fix the step.** A district address resolves to a field:
-  1583 x 198 m with 159 boundary points is two million cells at 0.4 m. The step
-  now grows to hold the cell count, which stays safe because the inward bias is
-  derived from the step — a coarser grid gives a smaller envelope, never a more
-  permissive one.
+  its axis-aligned box is 1583 x 198 m with 159 boundary points, which is two
+  million cells at 0.4 m. The step now grows to hold the cell count, which stays
+  safe because the inward bias is derived from the step — a coarser grid gives a
+  smaller envelope, never a more permissive one.
+  Use the **minimum rotated rectangle**, not the bounding box, to describe a
+  shape: that same parcel is a 1594 x 30 m ribbon running diagonally, and the
+  axis-aligned box hides exactly the elongation you are looking for.
 - **The Geoportal shows the Gemarkungsschlüssel two ways.** The 'Flurstueck'
   layer prints the four-digit form (`3044`), the 'Gemarkung' layer the
-  six-digit one (`143044`, where `14` is Saxony). Both must resolve, and the
-  name (`Moritzburg`) as well — a user who only sees the short key otherwise
-  hits a dead end.
+  six-digit one (`143044`). Both resolve, and the name (`Moritzburg`) as well.
+  Checked against all **5 339** Saxon Gemarkungen pulled from
+  `ave:KatasterBezirk`: every key is six digits, every one starts with `14`,
+  and all four-digit tails are distinct — so the short form expands uniquely.
+  183 districts have a leading zero (`0101`), which a spreadsheet eats, and no
+  valid number is below `0101`; padding a one-to-three-digit input can therefore
+  only turn a dead input into the right one.
+- **An address is not a plot.** A district address ("Plaußig-Portitz, 04349
+  Leipzig") geocodes to a point in a field, and the parcel under it is not the
+  one in the listing. `/api/parcels/resolve` takes `expected_area_m2` and
+  answers with a `plausibility` block; MOTIS's `type: PLACE` versus `ADDRESS`
+  is the sharpest of the three signals, and works even with no listing area.
 - **Real parcels are frequently concave.** Half-plane clipping is only a correct
   inward offset for convex rings; on an L-shaped plot it returns an empty
   envelope. `buildableArea` falls back to a grid contour, biased inward so an
@@ -170,7 +182,7 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 189
+- `pytest`: 227
 - `vitest`: 144 (plus `npm run test:integration`, 10 against a running backend)
 - `scripts/screenshots.mjs`: 32 images. It fails on console errors, on
   horizontal overflow, and if not a single vector tile arrived.

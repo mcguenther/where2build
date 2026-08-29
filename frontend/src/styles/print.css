@@ -67,6 +67,14 @@
 
   .nur-drucken{ display: block; }
 
+  /* Two of these are not controls but content that happens to be clickable, and
+     the blanket `button` rule above swallows them: a printed list of plots
+     without names or outlines is not a list of plots. The compare checkbox
+     beside them really is a control and stays gone. */
+  .karte__titel{ display: inline !important; }
+  .karte__riss{ display: block !important; }
+  .karte__wahl{ display: none !important; }
+
   /* ---------- Fields are values on paper, not controls ----------
      The reason this file exists in its current form: Firefox draws the stepper
      inside every `input[type=number]` on the printed sheet, and a stepper on
