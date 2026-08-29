@@ -115,13 +115,25 @@ hingehört, und ordnet den Rest neu. So gibt es keinen zweiten Renderpfad, der
 dieselben Maße noch einmal berechnen müsste.
 
 Was im Druck gilt:
-- A4 quer für die Grundstücksseite, `break-after: page` je Kandidat im Vergleich
+- **A4 hoch** für die Grundstücksseite — eine Seite, zwei sobald Wege gerechnet
+  sind; `break-after: page` je Kandidat im Vergleich
 - Navigation, Umschalter, Regler und Schaltflächen verschwinden
 - `print-color-adjust: exact`, sonst fallen die Flächenfarben weg
 - Nordpfeil und Maßstabsleiste bleiben sichtbar — bei gedrehter Karte sind sie
   das Einzige, was die Orientierung rettet
 - Quellenangabe und der Hinweis, dass dies keine bauordnungsrechtliche Prüfung
-  ist, stehen in der Fußzeile jeder Seite
+  ist, stehen in der Fußzeile
+- Formularschmuck verschwindet: keine Zahlenfeld-Pfeile, keine Rahmen, keine
+  Fokusringe. Die Abstandstiefen lesen sich als Werte in einer Tabelle, mit
+  ihrer Einheit — nicht als Bedienelemente, die auf Papier nichts tun
+- Kein Panel bricht mitten durch: jede Tafel, Tabellenzeile und Wegekarte trägt
+  `break-inside: avoid`, damit die Seite an einer Kante umbricht, nicht im Satz
+
+Zwei Fallen, die das gekostet hat: Komponentenstile sind **scoped** und tragen
+darum ein `[data-v-…]`-Attribut — eine nackte Klasse in `print.css` verliert
+gegen sie, weshalb dort jede Layoutregel `!important` braucht. Und die Hülle ist
+eine `100vh`-Flexspalte; auf Papier ist `100vh` genau ein Blatt, und die Fußzeile
+landete auf einem eigenen.
 
 ## Bewegung
 

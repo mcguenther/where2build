@@ -112,6 +112,16 @@ from the user directly. Reopen only if the user asks.
   one — and so mounting in jsdom does not reach for the network.
 - Setback depth is **per boundary segment**, not one global value. § 6 SächsBO
   measures it from wall height; 3 m is the floor, not the rule.
+- **Scoped component styles outrank `print.css`.** A `<style scoped>` selector
+  carries a `[data-v-…]` attribute, so a bare class in the print stylesheet
+  loses to it and the print layout silently never applies. Every layout rule in
+  `print.css` therefore carries `!important`.
+- **`100vh` costs a sheet.** The shell is a `100vh` flex column; on paper that
+  is exactly one page, and the footer gets pushed onto a page of its own.
+- **Both dark-palette routes outrank a bare `:root` in the print block**
+  (`:root[data-theme="dark"]` and the guarded media query are both specificity
+  0,2,0). Printing from dark mode gave an invisible boundary line and a black
+  halo round every stroke until the print block was made to win.
 - **MapLibre zoom is defined against 512-pixel tiles.** The widely quoted
   156543.034 metres-per-pixel constant assumes 256, and putting it in the
   camera renders the basemap at exactly twice the drawing's scale.
