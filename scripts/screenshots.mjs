@@ -135,8 +135,28 @@ for (const [modus, breite, hoehe, schmal] of [["hell", 1440, 1000, false], ["dun
   await seite.click('.orte button:nth-child(2)');               // Haustypen
   await schuss(seite, "haustypen", modus, schmal ? "-schmal" : "");
   if (!schmal) {
+    // A destination, looked up for real: the picker is the point here, because
+    // this geocoder answers "Am Kirschberg" with Bavaria as readily as Saxony.
     await seite.click('.orte button:nth-child(3)');             // Ziele
+    await seite.getByRole("button", { name: /Ziel hinzufügen|Erstes Ziel anlegen/ }).first().click();
+    const felder = await seite.locator("input[type=text]").all();
+    await felder[0].fill("Bahnhof");
+    await felder[1].fill("Bahnhof Wurzen");
+    await seite.getByRole("button", { name: "Nachschlagen" }).click();
+    await seite.waitForSelector(".trefferliste__wahl", { timeout: 60000 });
+    await schuss(seite, "ziele-treffer", modus);
+    await seite.locator(".trefferliste__wahl").first().click();
     await schuss(seite, "ziele", modus);
+
+    // And the routes that follow from it, drawn from the geometry MOTIS sends.
+    await seite.click('.orte button:nth-child(1)');
+    await seite.click(".karte .knopf");
+    await seite.getByRole("button", { name: "Wege berechnen" }).click();
+    await seite.waitForSelector(".weg-karte polyline", { timeout: 60000 });
+    await seite.waitForTimeout(600);
+    await schuss(seite, "grundstueck-wege", modus);
+    await seite.click(".krume button");
+
     await seite.click('.orte button:nth-child(4)');             // Daten
     await schuss(seite, "daten", modus);
   }

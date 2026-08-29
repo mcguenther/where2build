@@ -48,19 +48,27 @@ lives in `localStorage`; **Daten** exports and imports it as JSON.
 ## Tests
 
 ```bash
-backend/.venv/bin/python -m pytest backend/tests -q   # 121 tests
-cd frontend && npm run test                           # 86 tests
-node scripts/screenshots.mjs                          # every view, both themes, and print
+backend/.venv/bin/python -m pytest backend/tests -q   # 189 tests
+cd frontend && npm run test                           # 144 tests
+cd frontend && npm run test:integration               # 10, against a running backend
+node scripts/screenshots.mjs                          # 32 images, both themes, narrow and print
 ```
 
-No test touches the network. The backend suite stubs ALKIS, BORIS, MOTIS and
-the model with `respx` against fixtures whose shapes come from the research in
-[`docs/research/`](docs/research/). The frontend suite mounts the real
-components, so a plan that renders `NaN` or a violation that fails to flag is
-a failing test, not a screenshot someone has to notice.
+The backend suite touches no network: ALKIS, BORIS, MOTIS, OpenFreeMap and the
+model are stubbed with `respx` against fixtures whose shapes come from the
+research in [`docs/research/`](docs/research/).
 
-`scripts/screenshots.mjs` writes to `docs/screenshots/` and fails on any
-console error. Look at the images — tests do not catch a collapsed layout.
+The frontend suite mounts the real components against **recorded real service
+responses** in `frontend/tests/fixtures/`: two parcels (one convex, one
+markedly concave), the ELK house-type sheet, and a MOTIS answer for
+Liebertwolkwitz → Leipzig Hbf and → the local primary school. Nothing in a
+test is a number someone chose to make an assertion pass. `test:integration`
+is the same questions asked of a backend that is actually running.
+
+`scripts/screenshots.mjs` writes to `docs/screenshots/`. It builds its state
+through the real add flow — ALKIS, Liebertwolkwitz 85/1 — and fails on a
+console error, on horizontal overflow, and if not a single vector tile
+arrived. Look at the images: tests do not catch a collapsed layout.
 
 ## Layout
 
@@ -69,7 +77,7 @@ backend/          FastAPI. Proxy, cache and schema validation. Owns no geometry.
   app/services/   alkis, boris, llm, motis, tiles
   app/routers/    one per endpoint group
 frontend/
-  src/lib/        geometry, store, api, formatting, sample data
+  src/lib/        geometry, projection, routes, store, api, formatting
   src/components/ SitePlan (the drawing), PlotCard, RouteCards
   src/views/      Plots, Plot, Wizard, Compare, HouseTypes, Destinations, Data
   src/styles/     tokens, base, print
@@ -131,17 +139,29 @@ Each of these is verified, not assumed — the details are in
   `fes:Filter` expressions need the `ave:` namespace prefix.
 - **Use the official area** for anything price-related. The area computed from
   the polygon differs by a few square metres; both are shown side by side.
+- **MapLibre's worker must be pointed at explicitly.** It resolves
+  `./maplibre-gl-worker.mjs` next to its own module, which after bundling is
+  the app chunk — a file the bundler never emits. The request 404s, vector
+  tiles are never parsed, and the map stays blank **without one error
+  anywhere**, while raster layers keep working. `frontend/src/main.js` imports
+  the worker with `?worker&url` and calls `setWorkerUrl`.
+- **MapLibre rejects a relative `sprite` URL** while accepting relative glyph
+  and tile URLs, and it does not resolve the relative `tiles[]` inside a
+  TileJSON against the source URL. The proxy answers relative — only the
+  browser knows which origin it reached the API on — and the frontend expands
+  them and inlines the TileJSON.
+- **Never show example data.** There is no sample state and no fallback. A
+  derived figure whose input is missing stays a dash; computing it anyway is
+  where "0,00 €" and "−100 % under the land value" came from.
 
 ## Not done yet
 
 - **No persistence on the server.** Plots live in the browser. PostGIS and the
   ALKIS/Hauskoordinaten import (step 1 of the plan) are still open, so address
   lookup currently borrows the MOTIS geocoder and says so in its response.
-- **Basemap tiles are a stand-in.** The plan draws its own context; the WMS
-  proxy exists and is cached but is not yet wired into the drawing.
-- **Reachability figures in the sample data are illustrative.** The endpoint is
-  real; the four sample plots ship with plausible numbers so the interface has
-  something to show on first run.
+- **The basemap cache has no size limit.** Vector tiles are up to ~1 MB and the
+  TTL is seven days; real traffic would need a sweeper.
+- **The vector style is a light one, in dark mode too.**
 
 ## Attribution
 

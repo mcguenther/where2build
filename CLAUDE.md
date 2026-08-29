@@ -148,5 +148,5 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 - `pytest`: 189
 - `vitest`: 144 (plus `npm run test:integration`, 10 against a running backend)
-- `scripts/screenshots.mjs`: 28 images. It fails on console errors, on
+- `scripts/screenshots.mjs`: 32 images. It fails on console errors, on
   horizontal overflow, and if not a single vector tile arrived.
