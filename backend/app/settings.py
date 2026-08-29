@@ -14,7 +14,10 @@ from typing import Literal
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-_ENV_FILE = ".env"
+# Anchored to the backend package, not the working directory: the documented
+# start command runs uvicorn from the repository root, and a CWD-relative path
+# would silently leave every key unset there.
+_ENV_FILE = (Path(__file__).resolve().parent.parent / ".env", ".env")
 
 
 class AppSettings(BaseSettings):
@@ -113,6 +116,32 @@ class TilesSettings(BaseSettings):
     max_zoom: int = 21
 
 
+class BasemapSettings(BaseSettings):
+    """Vector basemap proxy (env prefix ``BASEMAP_``).
+
+    MapLibre would otherwise talk to OpenFreeMap directly, which fails in a
+    sealed network and behind a corporate firewall. With this proxy in front,
+    the browser only ever addresses our own origin.
+    """
+
+    model_config = SettingsConfigDict(env_prefix="BASEMAP_", env_file=_ENV_FILE, extra="ignore")
+
+    upstream_url: str = "https://tiles.openfreemap.org"
+    # Path of the style document below the upstream, without a leading slash.
+    style_path: str = "styles/liberty"
+    # Prefix the rewritten URLs point at. Same-origin on purpose: the browser
+    # must not need any host but ours.
+    public_prefix: str = "/api/basemap"
+    # Additional hosts whose absolute URLs are rewritten onto the proxy. The
+    # upstream's own host is always rewritten; this list covers a self-hosted
+    # upstream still serving a style that names OpenFreeMap.
+    rewrite_hosts: list[str] = Field(default=["tiles.openfreemap.org"])
+    # Tiles are immutable in practice -- OpenFreeMap serves them with a ten
+    # year max-age. A week is a conservative floor.
+    cache_ttl_s: int = 7 * 24 * 3600
+    timeout_s: float = 30.0
+
+
 class LLMSettings(BaseSettings):
     """OpenAI-compatible extraction provider (env prefix ``LLM_``)."""
 
@@ -140,6 +169,7 @@ class Settings(BaseSettings):
     boris: BorisSettings = Field(default_factory=BorisSettings)
     motis: MotisSettings = Field(default_factory=MotisSettings)
     tiles: TilesSettings = Field(default_factory=TilesSettings)
+    basemap: BasemapSettings = Field(default_factory=BasemapSettings)
     llm: LLMSettings = Field(default_factory=LLMSettings)
 
 

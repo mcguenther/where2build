@@ -24,6 +24,7 @@ BORIS_URL = "https://boris.example.org/wms"
 MOTIS_URL = "https://motis.example.org"
 LLM_URL = "https://llm.example.org/v1"
 DOP_URL = "https://wms.example.org/dop"
+BASEMAP_URL = "https://tiles.openfreemap.org"
 
 
 def fixture_bytes(name: str) -> bytes:
@@ -47,6 +48,7 @@ def isolated_settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("BORIS_WMS_URL", BORIS_URL)
     monkeypatch.setenv("MOTIS_BASE_URL", MOTIS_URL)
     monkeypatch.setenv("TILES_DOP_URL", DOP_URL)
+    monkeypatch.setenv("BASEMAP_UPSTREAM_URL", BASEMAP_URL)
     monkeypatch.setenv("LLM_BASE_URL", LLM_URL)
     monkeypatch.setenv("LLM_API_KEY", "test-key")
     monkeypatch.setenv("LLM_MODEL", "test/model")
@@ -57,9 +59,14 @@ def isolated_settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
 @pytest.fixture
 def without_llm(monkeypatch: pytest.MonkeyPatch):
-    """A deployment without an extraction provider configured."""
+    """A deployment without an extraction provider configured.
 
-    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    Set to empty rather than deleted: a developer's own ``backend/.env`` would
+    otherwise supply a real key and the test would silently stop testing
+    anything.
+    """
+
+    monkeypatch.setenv("LLM_API_KEY", "")
     reset_services()
     yield
 

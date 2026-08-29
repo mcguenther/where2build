@@ -50,6 +50,21 @@ from the user directly. Reopen only if the user asks.
 - **Fonts come from npm (Fontsource)**, never from a CDN.
 - **No separate print view.** `print.css` restyles the live page.
 - Region is Saxony only; ALKIS and BORIS are state-specific.
+- **Never show example data.** There is no sample state and no fallback: when a
+  service fails, the German `detail` from the backend is shown instead. Tests
+  run on recorded real responses in `frontend/tests/fixtures/`, not on invented
+  numbers. A derived figure with a missing input stays `—`; it is never
+  computed from `null` (that is where "0,00 €" and "−100 %" came from).
+
+## Working rules
+
+- **Keep the pull request description current.** After every push, the PR body
+  must describe what is actually on the branch. A description that still talks
+  about the previous step is worse than none.
+- **Verify, do not relay.** Statements about an external service belong in the
+  repo only after a request has been made and its answer read. `HEAD` is not a
+  substitute for `GET` — several of these services answer 404 to a HEAD they
+  serve happily on GET.
 
 ## Traps that already cost time
 
@@ -65,10 +80,40 @@ from the user directly. Reopen only if the user asks.
   tested. Its adapter goes straight to the paste field.
 - **kleinanzeigen.de carries `og:latitude`/`og:longitude`** in its meta tags —
   parse those instead of geocoding, and skip the model call entirely.
-- **Authority WFS/WMS do not allow cross-origin requests.** Everything goes
-  through the FastAPI proxy, which is also the right place to cache.
+- **The authority services DO send CORS headers** — checked with `GET` and an
+  `Origin` header on 2026-08-29: the ALKIS WFS, the GeoSN WMS layers and the
+  BORIS WMS all answer with `Access-Control-Allow-Origin`. The pre-project note
+  says otherwise. The proxy still earns its place — disk cache, one contract,
+  no key in the browser — but not for the reason stated there.
+- **MapLibre's worker must be pointed at explicitly.** It resolves
+  `./maplibre-gl-worker.mjs` next to its own module, which after bundling is
+  the app chunk — a file Vite never emits. The request 404s, vector tiles are
+  never parsed, and the map stays blank **without one error anywhere**. Raster
+  layers keep working, which makes it look like a style problem.
+  `main.js` imports the worker with `?worker&url` and calls `setWorkerUrl`.
+- **MapLibre rejects a relative `sprite` URL** ("must be absolute") but accepts
+  relative glyph and tile URLs. It also does not resolve the relative `tiles[]`
+  inside a TileJSON against the source URL. The proxy therefore answers with
+  relative URLs — only the browser knows the origin it reached the API on —
+  and `SitePlan.vektorStil()` expands them and inlines the TileJSON.
+- **One failed sprite or tile must not tear the map down.** MapLibre's `error`
+  event fires for missing icons; treating it as fatal removed the container and
+  made the backdrop look permanently unavailable.
+- **A backdrop is a MapLibre instance.** `SitePlan`'s `grund` defaults to
+  `"ohne"` so the thumbnails on cards and in the comparison do not each start
+  one — and so mounting in jsdom does not reach for the network.
 - Setback depth is **per boundary segment**, not one global value. § 6 SächsBO
   measures it from wall height; 3 m is the floor, not the rule.
+- **MapLibre zoom is defined against 512-pixel tiles.** The widely quoted
+  156543.034 metres-per-pixel constant assumes 256, and putting it in the
+  camera renders the basemap at exactly twice the drawing's scale.
+- **Real parcels are frequently concave.** Half-plane clipping is only a correct
+  inward offset for convex rings; on an L-shaped plot it returns an empty
+  envelope. `buildableArea` falls back to a grid contour, biased inward so an
+  approximation is never more permissive than the law.
+- **The sandbox browser has no route to the internet**, only the shell has.
+  Basemap tiles therefore cannot be verified by screenshot here; the camera
+  maths is covered by `tests/projection.test.js` instead.
 
 ## Commands
 
@@ -101,7 +146,7 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 121
-- `vitest`: 89
-- `scripts/screenshots.mjs`: 23 images, and it fails on console errors or
-  horizontal overflow.
+- `pytest`: 189
+- `vitest`: 144 (plus `npm run test:integration`, 10 against a running backend)
+- `scripts/screenshots.mjs`: 28 images. It fails on console errors, on
+  horizontal overflow, and if not a single vector tile arrived.

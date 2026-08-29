@@ -9,6 +9,7 @@ from __future__ import annotations
 from functools import lru_cache
 
 from .services.alkis import AlkisService
+from .services.basemap import BasemapService
 from .services.boris import BorisService
 from .services.llm import LLMClient
 from .services.motis import MotisService
@@ -41,6 +42,12 @@ def tile_service() -> TileService:
 
 
 @lru_cache(maxsize=1)
+def basemap_service() -> BasemapService:
+    settings = get_settings()
+    return BasemapService(settings.basemap, settings.app)
+
+
+@lru_cache(maxsize=1)
 def llm_client() -> LLMClient:
     settings = get_settings()
     return LLMClient(settings.llm, settings.app)
@@ -54,5 +61,12 @@ def reset_services() -> None:
     """Drop cached settings and services (used when tests change the env)."""
 
     get_settings.cache_clear()
-    for factory in (alkis_service, boris_service, motis_service, tile_service, llm_client):
+    for factory in (
+        alkis_service,
+        boris_service,
+        motis_service,
+        tile_service,
+        basemap_service,
+        llm_client,
+    ):
         factory.cache_clear()

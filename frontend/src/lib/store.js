@@ -7,8 +7,9 @@
  * failure degrades to an in-memory session rather than breaking the app.
  */
 import { reactive } from "vue";
-import { sampleState, sampleHouseTypes, sampleDestinations } from "./sample.js";
+import { emptyState } from "./sample.js";
 import { polygonCentroid, footprintFromArea } from "./geometry.js";
+import { coordinatesOf } from "./routes.js";
 
 /** Centre of a ring in the shape a placement expects. The centroid returns
  *  {x, y}; spreading that into a placement silently yields cx/cy of undefined. */
@@ -21,11 +22,11 @@ const STORAGE_KEY = "where2build.v1";
 const THEME_KEY = "where2build.theme";
 
 export const state = reactive({
-  daten: sampleState(),
+  daten: emptyState(),
   ansicht: "grundstuecke",   // grundstuecke | grundstueck | aufnahme | vergleich | haustypen | ziele | daten
   offenesGrundstueck: null,
   darstellung: "system",
-  plan: { grund: "karte", genordet: false, nachbarn: true, masse: true, saum: true }
+  plan: { grund: "karte", genordet: true, masse: true, saum: true, messen: false }
 });
 
 /* ---------- Validation ----------
@@ -44,10 +45,21 @@ export function validate(input) {
     throw new Error("Kein Grundstück mit brauchbarer Geometrie gefunden.");
   }
 
+  // Same plausibility window the extraction schema uses.
   const houseTypes = Array.isArray(input.haustypen)
     ? input.haustypen.filter(h => h && h.id && h.bebauteFlaeche >= 30 && h.bebauteFlaeche <= 400)
     : [];
-  const destinations = Array.isArray(input.ziele) ? input.ziele.filter(z => z && z.id && z.name) : [];
+  const destinations = (Array.isArray(input.ziele) ? input.ziele.filter(z => z && z.id && z.name) : [])
+    .map(z => {
+      const ziel = { id: z.id, name: z.name, adresse: typeof z.adresse === "string" ? z.adresse : "" };
+      // A destination only counts as located once both coordinates survived.
+      if (Number.isFinite(z.lat) && Number.isFinite(z.lon)) {
+        ziel.lat = z.lat;
+        ziel.lon = z.lon;
+        if (typeof z.treffer === "string") ziel.treffer = z.treffer;
+      }
+      return ziel;
+    });
 
   plots.forEach(p => {
     p.id ||= `gs-${Math.random().toString(36).slice(2, 9)}`;
@@ -67,17 +79,65 @@ export function validate(input) {
     }
     p.wandhoehe = Math.min(12, Math.max(2.5, Number(p.wandhoehe) || 6.4));
     p.nordVersatz = Number(p.nordVersatz) || 0;
+    p.strassenkante = Number.isInteger(p.strassenkante) && p.strassenkante < p.polygon.length ? p.strassenkante : 0;
+    if (p.anker && Number.isFinite(p.anker.lat) && Number.isFinite(p.anker.lon)) {
+      p.anker = { lat: p.anker.lat, lon: p.anker.lon };
+    } else {
+      delete p.anker;   // no georeference: the plan falls back to its synthetic surroundings
+    }
     p.flurstuecke = Array.isArray(p.flurstuecke) ? p.flurstuecke : [];
-    p.wege = p.wege && typeof p.wege === "object" ? p.wege : {};
+    p.wege = pruefeWege(p.wege, destinations);
   });
 
   return {
     version: 1,
     grundstuecke: plots,
-    haustypen: houseTypes.length ? houseTypes : sampleHouseTypes(),
-    ziele: destinations.length ? destinations : sampleDestinations(),
+    haustypen: houseTypes,
+    ziele: destinations,
     auswahl: Array.isArray(input.auswahl) ? input.auswahl.filter(id => plots.some(p => p.id === id)) : []
   };
+}
+
+/**
+ * Routes are kept exactly as the backend answered, minus anything that cannot
+ * be trusted after a round trip through a JSON file a user may have edited.
+ * A route to a destination that no longer exists is dropped rather than kept
+ * as an orphan.
+ */
+function pruefeWege(wege, destinations) {
+  if (!wege || typeof wege !== "object") return {};
+  const bekannt = new Set(destinations.map(z => z.id));
+  const sauber = {};
+
+  Object.entries(wege).forEach(([zielId, weg]) => {
+    if (!bekannt.has(zielId) || !weg || typeof weg !== "object") return;
+    // The mockup stored an array of invented minutes here. It is not a route
+    // and cannot be repaired into one; it goes.
+    if (Array.isArray(weg) || !weg.modi || typeof weg.modi !== "object") return;
+
+    const modi = {};
+    Object.entries(weg.modi).forEach(([art, m]) => {
+      if (!m || typeof m !== "object") return;
+      const eintrag = { erreichbar: m.erreichbar === true };
+      if (Number.isFinite(m.duration_s) && m.duration_s >= 0) eintrag.duration_s = Math.round(m.duration_s);
+      if (Number.isInteger(m.umstiege) && m.umstiege >= 0) eintrag.umstiege = m.umstiege;
+      if (typeof m.hinweis === "string") eintrag.hinweis = m.hinweis;
+      const linie = coordinatesOf(m.geometry);
+      if (linie) eintrag.geometry = { type: "LineString", coordinates: linie };
+      // Without a duration there is nothing to show and nothing to compare.
+      if (eintrag.erreichbar && eintrag.duration_s === undefined) return;
+      modi[art] = eintrag;
+    });
+
+    if (!Object.keys(modi).length) return;
+    sauber[zielId] = {
+      modi,
+      berechnet_am: typeof weg.berechnet_am === "string" ? weg.berechnet_am : null,
+      quelle: typeof weg.quelle === "string" ? weg.quelle : null
+    };
+  });
+
+  return sauber;
 }
 
 export function load() {
@@ -111,9 +171,10 @@ export function applyTheme(choice) {
   try { localStorage.setItem(THEME_KEY, choice); } catch { /* not essential */ }
 }
 
-export function resetToSample() {
+/** Clears everything this browser holds. There is nothing to fall back to. */
+export function leeren() {
   try { localStorage.removeItem(STORAGE_KEY); } catch { /* not essential */ }
-  state.daten = sampleState();
+  state.daten = emptyState();
   save();
 }
 
@@ -196,6 +257,42 @@ export function removeHouseType(id) {
   // Plots pointing at the removed type fall back to the first one left.
   const fallback = state.daten.haustypen[0]?.id ?? null;
   state.daten.grundstuecke.forEach(p => { if (p.haustypId === id) p.haustypId = fallback; });
+  save();
+}
+
+/** Attach a looked-up coordinate to a destination; `treffer` is what the
+ *  geocoder actually matched, which the user needs to see to judge it. */
+export function locateDestination(id, { lat, lon, treffer }) {
+  const ziel = state.daten.ziele.find(z => z.id === id);
+  if (!ziel) return null;
+  ziel.lat = lat;
+  ziel.lon = lon;
+  ziel.treffer = treffer || null;
+  // The old routes started somewhere else; they are no longer this route.
+  state.daten.grundstuecke.forEach(p => { delete p.wege[id]; });
+  save();
+  return ziel;
+}
+
+/** Drop a coordinate again — used when the address is edited. */
+export function unlocateDestination(id) {
+  const ziel = state.daten.ziele.find(z => z.id === id);
+  if (!ziel || ziel.lat === undefined) return;
+  delete ziel.lat;
+  delete ziel.lon;
+  delete ziel.treffer;
+  state.daten.grundstuecke.forEach(p => { delete p.wege[id]; });
+  save();
+}
+
+/** Store what the routing service answered for one plot. */
+export function setRoutes(plotId, wege, quelle) {
+  const plot = state.daten.grundstuecke.find(p => p.id === plotId);
+  if (!plot) return;
+  const stempel = new Date().toISOString();
+  Object.entries(wege).forEach(([zielId, modi]) => {
+    plot.wege[zielId] = { modi, berechnet_am: stempel, quelle: quelle || null };
+  });
   save();
 }
 

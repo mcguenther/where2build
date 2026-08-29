@@ -52,13 +52,14 @@
     </div>
 
     <section class="tafel">
-      <div class="tafel__kopf"><h3>Zurücksetzen</h3></div>
+      <div class="tafel__kopf"><h3>Alles löschen</h3></div>
       <div class="tafel__leib reihe">
         <p class="hinweis" style="flex:1; min-width: 260px">
-          Löscht den Browser-Speicher und stellt die vier Beispielgrundstücke wieder her.
+          Leert den Browser-Speicher: alle Grundstücke, Haustypen und Ziele. Vorher
+          ausgeben, wenn der Stand noch gebraucht wird.
         </p>
-        <button type="button" class="knopf knopf--still" @click="zuruecksetzen">
-          Auf Beispieldaten zurücksetzen
+        <button type="button" class="knopf knopf--still" @click="alleLoeschen">
+          Alles löschen
         </button>
       </div>
     </section>
@@ -66,7 +67,7 @@
 </template>
 
 <script>
-import { state, exportJson, importJson, resetToSample } from "../lib/store.js";
+import { state, exportJson, importJson, leeren } from "../lib/store.js";
 
 export default {
   name: "DataView",
@@ -125,11 +126,11 @@ export default {
       }
       ereignis.target.value = "";
     },
-    zuruecksetzen() {
-      if (!window.confirm("Alles zurücksetzen? Der jetzige Stand geht verloren.")) return;
-      resetToSample();
+    alleLoeschen() {
+      if (!window.confirm("Alles löschen? Der jetzige Stand geht verloren.")) return;
+      leeren();
       this.stand++;
-      this.melden("ein", "Auf die vier Beispielgrundstücke zurückgesetzt.");
+      this.melden("ein", "Der Speicher ist geleert.");
     },
     melden(wo, text, fehler = false) {
       if (wo === "aus") { this.meldungAus = text; this.fehlerAus = fehler; }

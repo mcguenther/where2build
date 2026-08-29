@@ -35,7 +35,13 @@ from ..settings import AlkisSettings, AppSettings
 from ..upstream import request
 
 AVE_NS = "http://repository.gdi-de.org/schemas/adv/produkt/alkis-vereinfacht/2.0"
-SERVICE_NAME = "Der ALKIS-Dienst des GeoSN"
+SERVICE_NAME = "Der Katasterdienst (ALKIS) des GeoSN"
+# Appended to every ALKIS failure: the parcel is the one thing a user can
+# supply without us.
+ADVICE = (
+    "Das Flurstück lässt sich auch von Hand eintragen: Fläche und Grenzen "
+    "stehen im Kaufvertrag oder im Auszug aus dem Liegenschaftskataster."
+)
 
 STORED_QUERY_BY_KENNZEICHEN = (
     "http://repository.gdi-de.org/query/adv/produkt/alkis-vereinfacht/2.0/flst-by-kennzeichen"
@@ -76,7 +82,9 @@ def _axis_swapped(srs_name: str | None) -> bool:
 def _coords(text: str, swap: bool) -> list[tuple[float, float]]:
     numbers = [float(value) for value in text.split()]
     if len(numbers) % 2:
-        raise UpstreamError(f"{SERVICE_NAME} hat eine unvollständige Geometrie geliefert.")
+        raise UpstreamError(
+            f"{SERVICE_NAME} hat eine unvollständige Geometrie geliefert. {ADVICE}"
+        )
     pairs = list(zip(numbers[0::2], numbers[1::2]))
     return [(b, a) for a, b in pairs] if swap else pairs
 
@@ -129,7 +137,9 @@ def _parse_geometry(feature: ElementTree.Element, default_srs: str | None) -> Po
             if polygon is not None and not polygon.is_empty:
                 polygons.append(polygon)
     if not polygons:
-        raise UpstreamError(f"{SERVICE_NAME} hat ein Flurstück ohne Geometrie geliefert.")
+        raise UpstreamError(
+            f"{SERVICE_NAME} hat ein Flurstück ohne Geometrie geliefert. {ADVICE}"
+        )
     # A single ring stays a Polygon; only genuinely split parcels become multi.
     return polygons[0] if len(polygons) == 1 else MultiPolygon(polygons)
 
@@ -177,10 +187,10 @@ def parse_feature_collection(xml: bytes | str) -> list[Flurstueck]:
     try:
         root = ElementTree.fromstring(xml if isinstance(xml, bytes) else xml.encode("utf-8"))
     except ElementTree.ParseError as exc:
-        raise UpstreamError(f"{SERVICE_NAME} hat kein gültiges GML geliefert.") from exc
+        raise UpstreamError(f"{SERVICE_NAME} hat kein gültiges GML geliefert. {ADVICE}") from exc
 
     if _local(root.tag) in ("ServiceExceptionReport", "ExceptionReport", "html"):
-        raise UpstreamError(f"{SERVICE_NAME} hat die Anfrage abgelehnt.")
+        raise UpstreamError(f"{SERVICE_NAME} hat die Anfrage abgelehnt. {ADVICE}")
 
     default_srs = root.get("srsName")
     parcels: list[Flurstueck] = []
@@ -214,7 +224,11 @@ def to_collection(parcels: Iterable[Flurstueck], hinweis: str | None = None) -> 
 
     parcels = list(parcels)
     if not parcels:
-        raise NotFoundError("Zu dieser Angabe wurde kein Flurstück gefunden.")
+        raise NotFoundError(
+            "Zu dieser Angabe wurde kein Flurstück gefunden. Bitte Gemarkung und "
+            "Flurstücksnummer prüfen (Schreibweise wie im Geoportal, etwa „85/1“) "
+            "oder die Lage auf der Karte anklicken."
+        )
 
     features: list[ParcelFeature] = []
     official_total = 0.0
@@ -287,6 +301,7 @@ class AlkisService:
             "GET",
             self.settings.wfs_url,
             service=SERVICE_NAME,
+            advice=ADVICE,
             timeout_s=self.app_settings.http_timeout_s,
             user_agent=self.app_settings.user_agent,
             params=params,
@@ -302,6 +317,7 @@ class AlkisService:
             "POST",
             self.settings.wfs_url,
             service=SERVICE_NAME,
+            advice=ADVICE,
             timeout_s=self.app_settings.http_timeout_s,
             user_agent=self.app_settings.user_agent,
             content=body.encode("utf-8"),
@@ -348,13 +364,14 @@ class AlkisService:
         return parse_feature_collection(await self._get(params))
 
     async def by_gemarkung(
-        self, gemarkung: str, zaehler: int, nenner: int | None = None
+        self, gemarkung: str, zaehler: int, nenner: int | str | None = None
     ) -> list[Flurstueck]:
         """Parcels by cadastral district plus numerator (and denominator).
 
         There is no stored query for this combination, hence the ad-hoc filter.
         A purely numeric district is matched against the district number,
-        anything else against the district name.
+        anything else against the district name. The denominator is compared as
+        text because ALKIS stores it as text -- 41/e is a valid parcel number.
         """
 
         district_attribute = "gemaschl" if gemarkung.strip().isdigit() else "gemarkung"
@@ -362,8 +379,8 @@ class AlkisService:
             (district_attribute, gemarkung.strip()),
             ("flstnrzae", str(zaehler)),
         ]
-        if nenner is not None:
-            conditions.append(("flstnrnen", str(nenner)))
+        if nenner is not None and str(nenner).strip():
+            conditions.append(("flstnrnen", str(nenner).strip()))
 
         comparisons = "".join(
             "<fes:PropertyIsEqualTo>"

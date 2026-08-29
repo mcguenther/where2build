@@ -56,7 +56,28 @@ function sammle(req) {
 }
 const adresse = "http://127.0.0.1:4173/";
 
-const browser = await chromium.launch();
+const browser = await chromium.launch({
+  // Software WebGL: the sandbox has no GPU, and MapLibre needs a context.
+  args: ["--use-gl=swiftshader", "--enable-unsafe-swiftshader"]
+});
+
+/* The basemap goes through our own /api/basemap proxy, like in production —
+ * so a tile that never arrives is a real defect, not a sandbox quirk. */
+let vektorkacheln = 0;
+const kachelnZaehlen = seite =>
+  seite.on("response", r => { if (/\/api\/basemap\/.*\.pbf/.test(r.url()) && r.status() < 400) vektorkacheln++; });
+
+/* There is no example data any more: every screenshot needs a plot that was
+ * really resolved through ALKIS first. This is the app's own add flow. */
+async function grundstueckAnlegen(seite) {
+  await seite.click(".seitenkopf .knopf");
+  await seite.getByText("Flurstück direkt").click();
+  await seite.fill("#q-gemarkung", "Liebertwolkwitz");
+  await seite.fill("#q-nummer", "85/1");
+  await seite.getByRole("button", { name: "Nachschlagen" }).click();
+  await seite.waitForSelector(".assistent__vorschau, .lageplan", { timeout: 60000 });
+}
+
 const gemacht = [];
 const fehler = [];
 
@@ -74,6 +95,7 @@ async function schuss(seite, name, modus, zusatz = "") {
 for (const [modus, breite, hoehe, schmal] of [["hell", 1440, 1000, false], ["dunkel", 1440, 1000, false], ["dunkel", 402, 900, true]]) {
   const ctx = await browser.newContext({ viewport: { width: breite, height: hoehe }, deviceScaleFactor: 2 });
   const seite = await ctx.newPage();
+  kachelnZaehlen(seite);
   seite.on("pageerror", e => fehler.push(`${modus}/${breite}: ${e.message}`));
   const erwartet = t => /Failed to load resource/.test(t);   // /api/* 404 when the backend is down — the documented fallback
   seite.on("console", m => { if (m.type() === "error" && !erwartet(m.text())) fehler.push(`${modus}/${breite}: ${m.text()}`); });
@@ -82,31 +104,40 @@ for (const [modus, breite, hoehe, schmal] of [["hell", 1440, 1000, false], ["dun
   await seite.click(`.darstellung button:nth-child(${modus === "hell" ? 1 : 2})`);
   await seite.waitForTimeout(200);
 
-  await schuss(seite, "uebersicht", modus, schmal ? "-schmal" : "");
-  await seite.click('.seitenkopf .knopf');                      // Grundstück hinzufügen
+  // The empty state is a real state and worth a picture: this is what the app
+  // looks like before anything has been resolved.
+  await schuss(seite, "uebersicht-leer", modus, schmal ? "-schmal" : "");
+
+  await seite.click(".seitenkopf .knopf");                      // Grundstück hinzufügen
   await schuss(seite, "assistent-1", modus, schmal ? "-schmal" : "");
-  if (!schmal) {
-    await seite.click('.tafel__leib .knopf');                   // Lesen
-    await seite.waitForSelector(".vorschlag", { timeout: 30000 });
-    await schuss(seite, "assistent-2", modus);
-    await seite.click('.reihe .knopf');                         // Werte übernehmen
-    await schuss(seite, "assistent-3", modus);
-  }
-  await seite.click('.krume button');                           // zurück
-  await seite.click(".karte .knopf");                           // erstes Grundstück
+  await seite.getByText("Flurstück direkt").click();
+  await seite.fill("#q-gemarkung", "Liebertwolkwitz");
+  await seite.fill("#q-nummer", "85/1");
+  await schuss(seite, "assistent-2", modus, schmal ? "-schmal" : "");
+  await seite.getByRole("button", { name: "Nachschlagen" }).click();
+  await seite.waitForSelector(".lageplan", { timeout: 60000 });
+  await schuss(seite, "assistent-3", modus, schmal ? "-schmal" : "");
+  await seite.getByRole("button", { name: "Passt" }).click();
+  await schuss(seite, "assistent-4", modus, schmal ? "-schmal" : "");
+  await seite.getByRole("button", { name: "Anlegen und öffnen" }).click();
+
+  await seite.waitForTimeout(6000);                             // Kacheln laden lassen
   await schuss(seite, "grundstueck", modus, schmal ? "-schmal" : "");
-  await seite.click('.krume button');
   if (!schmal) {
-    await seite.click(".auswahlleiste .knopf:last-of-type");    // vergleichen
-    await schuss(seite, "vergleich", modus);
-    await seite.click('.krume button');
+    await seite.getByRole("button", { name: "Luftbild" }).click();
+    await seite.waitForTimeout(4000);
+    await schuss(seite, "grundstueck-luftbild", modus);
+    await seite.getByRole("button", { name: "Karte" }).click();
+    await seite.waitForTimeout(2000);
   }
+  await seite.click(".krume button");
+
   await seite.click('.orte button:nth-child(2)');               // Haustypen
   await schuss(seite, "haustypen", modus, schmal ? "-schmal" : "");
   if (!schmal) {
-    await seite.click('.orte button:nth-child(3)');
+    await seite.click('.orte button:nth-child(3)');             // Ziele
     await schuss(seite, "ziele", modus);
-    await seite.click('.orte button:nth-child(4)');
+    await seite.click('.orte button:nth-child(4)');             // Daten
     await schuss(seite, "daten", modus);
   }
   await ctx.close();
@@ -115,10 +146,13 @@ for (const [modus, breite, hoehe, schmal] of [["hell", 1440, 1000, false], ["dun
 /* The print rendering, as the browser would lay it out on paper. */
 const ctx = await browser.newContext({ viewport: { width: 1240, height: 1754 }, deviceScaleFactor: 2 });
 const seite = await ctx.newPage();
+kachelnZaehlen(seite);
 await seite.goto(adresse, { waitUntil: "load" });
 await seite.evaluate(() => document.fonts.ready);
-await seite.click(".karte .knopf");
-await seite.waitForTimeout(400);
+await grundstueckAnlegen(seite);
+await seite.getByRole("button", { name: "Passt" }).click();
+await seite.getByRole("button", { name: "Anlegen und öffnen" }).click();
+await seite.waitForTimeout(6000);
 await seite.emulateMedia({ media: "print" });
 await seite.waitForTimeout(300);
 await seite.screenshot({ path: resolve(ausgabe, "grundstueck-druck.png"), fullPage: true });
@@ -127,6 +161,12 @@ await ctx.close();
 
 await browser.close();
 server.close();
+
+// A blank basemap is the defect this project spent the longest on: MapLibre
+// asks for no tile at all when its worker is missing, and says nothing.
+if (!vektorkacheln) {
+  fehler.push("Keine einzige Vektorkachel geladen — der Kartenhintergrund ist blind.");
+}
 
 if (fehler.length) {
   console.error("Skriptfehler:\n  " + [...new Set(fehler)].join("\n  "));

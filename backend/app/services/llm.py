@@ -35,6 +35,9 @@ from ..settings import AppSettings, LLMSettings
 from ..upstream import request
 
 SERVICE_NAME = "Der Extraktionsdienst"
+# Extraction only ever produces suggestions, so its failure never blocks
+# anything -- the same fields can be typed in.
+ADVICE = "Die Angaben lassen sich von Hand eintragen."
 
 M = TypeVar("M", bound=BaseModel)
 
@@ -163,6 +166,7 @@ class LLMClient:
             "POST",
             f"{self.settings.base_url.rstrip('/')}/chat/completions",
             service=SERVICE_NAME,
+            advice=ADVICE,
             timeout_s=self.settings.timeout_s,
             user_agent=self.app_settings.user_agent,
             headers={
@@ -174,16 +178,20 @@ class LLMClient:
         try:
             return response.json()
         except ValueError as exc:
-            raise UpstreamError(f"{SERVICE_NAME} hat kein gültiges JSON geliefert.") from exc
+            raise UpstreamError(
+                f"{SERVICE_NAME} hat kein gültiges JSON geliefert. {ADVICE}"
+            ) from exc
 
     @staticmethod
     def _message_content(payload: dict[str, Any]) -> str:
         try:
             content = payload["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError) as exc:
-            raise UpstreamError(f"{SERVICE_NAME} hat eine unerwartete Antwort geliefert.") from exc
+            raise UpstreamError(
+                f"{SERVICE_NAME} hat eine unerwartete Antwort geliefert. {ADVICE}"
+            ) from exc
         if not isinstance(content, str) or not content.strip():
-            raise UpstreamError(f"{SERVICE_NAME} hat eine leere Antwort geliefert.")
+            raise UpstreamError(f"{SERVICE_NAME} hat eine leere Antwort geliefert. {ADVICE}")
         return content
 
     async def fetch_page_text(self, url: str, auftrag: str) -> str:
@@ -260,7 +268,7 @@ class LLMClient:
             data = json.loads(content)
         except ValueError as exc:
             raise UpstreamError(
-                f"{SERVICE_NAME} hat kein auswertbares JSON geliefert."
+                f"{SERVICE_NAME} hat kein auswertbares JSON geliefert. {ADVICE}"
             ) from exc
         try:
             return model.model_validate(data)

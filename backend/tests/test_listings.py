@@ -158,7 +158,8 @@ def test_request_without_url_or_text_is_a_422(client: TestClient):
     answer = client.post("/api/listings/extract", json={})
 
     assert answer.status_code == 422
-    assert answer.json()["detail"] == "Die Anfrage ist unvollständig oder ungültig."
+    # The frontend shows `detail`, so `detail` has to say what is missing.
+    assert answer.json()["detail"] == "Entweder eine URL oder ein eingefügter Text wird benötigt."
 
 
 @respx.mock

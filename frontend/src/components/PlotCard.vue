@@ -19,12 +19,13 @@
         <dt>Kaufpreis</dt><dd>{{ euro(plot.kaufpreis) }}</dd>
         <dt>Je m²</dt><dd>{{ euroPerSqm(kennzahlen.jeQuadratmeter) }}</dd>
         <dt v-if="erstesZiel">{{ erstesZiel.name }} · ÖPNV</dt>
-        <dd v-if="erstesZiel">{{ minutes(erstesZielZeit) }}</dd>
+        <dd v-if="erstesZiel">{{ duration(erstesZielZeit) }}</dd>
       </dl>
 
       <div class="karte__marken">
         <span class="chip" :class="`chip--${kennzahlen.abweichungKlasse}`">
-          {{ percent(kennzahlen.abweichung) }} ggü. BRW
+          <template v-if="kennzahlen.abweichung !== null">{{ percent(kennzahlen.abweichung) }} ggü. BRW</template>
+          <template v-else>kein Kaufpreis</template>
         </span>
         <span class="chip chip--gut">{{ kennzahlen.formklasse }}</span>
       </div>
@@ -42,7 +43,7 @@
 import SitePlan from "./SitePlan.vue";
 import { plotMetrics } from "../lib/metrics.js";
 import { placement, state } from "../lib/store.js";
-import { area, euro, euroPerSqm, percent, minutes } from "../lib/format.js";
+import { area, euro, euroPerSqm, percent, duration } from "../lib/format.js";
 
 export default {
   name: "PlotCard",
@@ -54,11 +55,11 @@ export default {
     kennzahlen() { return plotMetrics(this.plot); },
     erstesZiel() { return state.daten.ziele[0] || null; },
     erstesZielZeit() {
-      const w = this.erstesZiel && this.plot.wege[this.erstesZiel.id];
-      return w ? w[2] : null;
+      const m = this.erstesZiel && this.plot.wege[this.erstesZiel.id]?.modi?.transit;
+      return m && m.erreichbar ? m.duration_s : null;
     }
   },
-  methods: { area, euro, euroPerSqm, percent, minutes }
+  methods: { area, euro, euroPerSqm, percent, duration }
 };
 </script>
 

@@ -16,6 +16,8 @@
       </button>
     </div>
 
+    <p v-if="fehler" class="band band--fehler" role="alert">{{ fehler }}</p>
+
     <section v-if="aufnahme" class="aufnahme">
       <div class="tafel">
         <div class="tafel__kopf"><h3>Vom Hersteller lesen</h3></div>
@@ -66,9 +68,16 @@
       </div>
     </section>
 
-    <p class="massstab-hinweis">Alle Grundrisse im gleichen Maßstab gezeichnet.</p>
+    <p v-if="typen.length" class="massstab-hinweis">Alle Grundrisse im gleichen Maßstab gezeichnet.</p>
 
-    <div class="katalog">
+    <div v-if="!typen.length" class="leerstelle">
+      <h3>Noch kein Haustyp im Katalog</h3>
+      <p>Einen Link zu einer Haustyp-Seite einlesen lassen oder die Maße von Hand eintragen.
+        Erst dann lässt sich ein Baukörper auf ein Grundstück legen.</p>
+      <button type="button" class="knopf knopf--zweit" @click="aufnahme = true">Haustyp hinzufügen</button>
+    </div>
+
+    <div v-else class="katalog">
       <article v-for="typ in typen" :key="typ.id" class="typkarte tafel">
         <svg viewBox="0 0 300 130" class="typkarte__riss" role="img" :aria-label="`Grundriss ${typ.name}`">
           <rect x="0" y="0" width="300" height="130" fill="var(--w2b-karte-grund)" />
@@ -124,6 +133,7 @@
 import { state, addHouseType, removeHouseType, newId, save } from "../lib/store.js";
 import { buildableArea, findPlacement, footprintFromArea } from "../lib/geometry.js";
 import { haustypLesen } from "../lib/api.js";
+import { haustypAusAntwort } from "../lib/houseTypes.js";
 import { area, euro, num, date } from "../lib/format.js";
 
 export default {
@@ -132,6 +142,7 @@ export default {
     return {
       aufnahme: false,
       laeuft: false,
+      fehler: "",
       url: "https://www.schwoererhaus.de/haeuser/bungalow-128",
       eigen: { name: "Eigener Entwurf", laenge: 12, breite: 9 }
     };
@@ -188,17 +199,13 @@ export default {
     },
     async lesen() {
       this.laeuft = true;
+      this.fehler = "";
       try {
-        const gelesen = await haustypLesen(this.url);
-        addHouseType({
-          id: newId("ht"), hersteller: gelesen.hersteller, name: gelesen.name,
-          bebauteFlaeche: gelesen.bebauteFlaeche, wohnflaeche: gelesen.wohnflaeche,
-          wohnflaecheEg: gelesen.wohnflaecheEg, wohnflaecheOg: gelesen.wohnflaecheOg,
-          laenge: gelesen.laenge, breite: gelesen.breite, dachform: gelesen.dachform,
-          preisAb: gelesen.preisAb, verhaeltnis: gelesen.verhaeltnis,
-          quelle: gelesen.quelle, gelesenAm: new Date().toISOString().slice(0, 10), eigen: false
-        });
+        const typ = haustypAusAntwort(await haustypLesen(this.url.trim()));
+        addHouseType(typ);
         this.aufnahme = false;
+      } catch (fehler) {
+        this.fehler = fehler.message;
       } finally {
         this.laeuft = false;
       }
@@ -206,7 +213,7 @@ export default {
     eigenAnlegen() {
       const { name, laenge, breite } = this.eigen;
       addHouseType({
-        id: newId("ht"), hersteller: "Eigene Maße", name,
+        id: newId("ht"), hersteller: "Von Hand eingetragen", name,
         bebauteFlaeche: Math.round(laenge * breite * 100) / 100, wohnflaeche: null,
         wohnflaecheEg: null, wohnflaecheOg: null, laenge, breite,
         dachform: "offen", preisAb: null, verhaeltnis: laenge / breite,
@@ -232,6 +239,13 @@ export default {
 @media (max-width: 560px){ .drei{ grid-template-columns: 1fr; } }
 
 .massstab-hinweis{ font-size: var(--w2b-schrift-xs); color: var(--w2b-gedaempft); }
+.leerstelle{
+  border: 1px dashed var(--w2b-linie); border-radius: var(--w2b-radius-m);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--w2b-raum-3); padding: var(--w2b-raum-7) var(--w2b-raum-5); text-align: center;
+}
+.leerstelle h3{ color: var(--w2b-graphit); font-size: var(--w2b-schrift-l); }
+.leerstelle p{ color: var(--w2b-gedaempft); font-size: var(--w2b-schrift-s); max-width: 46ch; }
 .katalog{ display: grid; grid-template-columns: repeat(auto-fill, minmax(304px, 1fr)); gap: var(--w2b-raum-4); }
 .typkarte{ display: flex; flex-direction: column; }
 .typkarte__riss{ display: block; width: 100%; height: auto; border-bottom: 1px solid var(--w2b-linie); }

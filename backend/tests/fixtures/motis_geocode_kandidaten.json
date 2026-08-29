@@ -1,0 +1,72 @@
+[
+  {
+    "type": "STOP",
+    "name": "Wurzen, Bahnhof (Bus)",
+    "id": "de-DELFI_de:14729:11576::01_G",
+    "lat": 51.364662,
+    "lon": 12.737755,
+    "country": "DE",
+    "zip": "04808",
+    "areas": [
+      {"name": "Deutschland", "adminLevel": 2},
+      {"name": "Sachsen", "adminLevel": 4},
+      {"name": "Landkreis Leipzig", "adminLevel": 6},
+      {"name": "Wurzen", "adminLevel": 8},
+      {"name": "Wurzen", "adminLevel": 9}
+    ],
+    "score": -22.6
+  },
+  {
+    "type": "ADDRESS",
+    "name": "Alte Dorfstraße 12",
+    "street": "Alte Dorfstraße",
+    "houseNumber": "12",
+    "lat": 51.350145,
+    "lon": 12.7335395,
+    "country": "DE",
+    "zip": "04808",
+    "areas": [
+      {"name": "Sachsen", "adminLevel": 4},
+      {"name": "Landkreis Leipzig", "adminLevel": 6},
+      {"name": "Wurzen", "adminLevel": 8},
+      {"name": "Dehnitz", "adminLevel": 10}
+    ],
+    "score": -39.0
+  },
+  {
+    "type": "PLACE",
+    "name": "Am Kirschberg",
+    "lat": 48.6804648,
+    "lon": 12.4876661,
+    "country": "DE",
+    "areas": [
+      {"name": "Bayern", "adminLevel": 4},
+      {"name": "Moosthenning", "adminLevel": 8}
+    ],
+    "score": -12.0
+  },
+  {"type": "ADDRESS", "name": "Ohne Koordinate", "areas": []},
+  {"type": "ADDRESS", "name": "", "lat": 51.0, "lon": 12.0},
+  {
+    "type": "STOP",
+    "name": "Bennewitz (b. Wurzen), S-Bahnhof",
+    "lat": 51.35577,
+    "lon": 12.709502,
+    "zip": "04828",
+    "areas": [{"name": "Sachsen", "adminLevel": 4}, {"name": "Bennewitz", "adminLevel": 8}]
+  },
+  {
+    "type": "STOP",
+    "name": "Leipzig, Am Kirschberg",
+    "lat": 51.320377,
+    "lon": 12.282553,
+    "areas": [{"name": "Sachsen", "adminLevel": 4}]
+  },
+  {
+    "type": "STOP",
+    "name": "Sechster Treffer, wird nicht mehr gezeigt",
+    "lat": 51.1,
+    "lon": 12.1,
+    "areas": []
+  }
+]

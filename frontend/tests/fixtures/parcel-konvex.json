@@ -1,0 +1,100 @@
+{
+  "type": "FeatureCollection",
+  "crs_hinweis": "EPSG:4326 (WGS84); Längen und Flächen wurden in EPSG:25833 gerechnet.",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "DESNALK0v90005KEFL",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              12.439951099455564,
+              51.32995479277619
+            ],
+            [
+              12.440051860970646,
+              51.33004224101972
+            ],
+            [
+              12.439688458751274,
+              51.33020658153966
+            ],
+            [
+              12.439645763717495,
+              51.330225884116146
+            ],
+            [
+              12.439545003098264,
+              51.33013842654768
+            ],
+            [
+              12.439951099455564,
+              51.32995479277619
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kennzeichen": "145592___00476____02",
+        "gemarkung": "Mölkau",
+        "gemarkungsnummer": "145592",
+        "flur": null,
+        "zaehler": "476",
+        "nenner": null,
+        "flaeche_amtlich_m2": 420,
+        "flaeche_berechnet_m2": 418.87,
+        "lagebezeichnung": "Sommerfelder Straße 125",
+        "gemeinde": "Stadt Leipzig",
+        "aktualitaet": "2019-07-09"
+      }
+    }
+  ],
+  "grundstueck": {
+    "type": "Feature",
+    "geometry": {
+      "type": "Polygon",
+      "coordinates": [
+        [
+          [
+            12.439951099455564,
+            51.32995479277619
+          ],
+          [
+            12.440051860970646,
+            51.33004224101972
+          ],
+          [
+            12.439688458751274,
+            51.33020658153966
+          ],
+          [
+            12.439645763717495,
+            51.330225884116146
+          ],
+          [
+            12.439545003098264,
+            51.33013842654768
+          ],
+          [
+            12.439951099455564,
+            51.32995479277619
+          ]
+        ]
+      ]
+    },
+    "properties": {
+      "anzahl_flurstuecke": 1,
+      "kennzeichen": [
+        "145592___00476____02"
+      ],
+      "flaeche_amtlich_m2": 420,
+      "flaeche_berechnet_m2": 418.87,
+      "gemarkung": "Mölkau",
+      "gemeinde": "Stadt Leipzig"
+    }
+  },
+  "quelle": "Landesamt für Geobasisinformation Sachsen (GeoSN), dl-de/by-2-0",
+  "hinweis": null
+}

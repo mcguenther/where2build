@@ -106,6 +106,8 @@ a{ color: var(--w2b-primaer); text-underline-offset: 2px; text-decoration-thickn
 .chip--warn{ background: var(--w2b-warnung-flaeche); color: var(--w2b-warnung-text); }
 .chip--fehler{ background: var(--w2b-fehler-flaeche); color: var(--w2b-fehler); }
 .chip--messing{ background: var(--w2b-sekundaer-hell); color: var(--w2b-sekundaer-text); }
+/* A missing figure is not a verdict: no traffic-light colour for it. */
+.chip--unbekannt{ background: var(--w2b-flaeche-tief); color: var(--w2b-gedaempft); }
 
 /* ---------- Form fields ---------- */
 .feld{ display: flex; flex-direction: column; gap: var(--w2b-raum-1); }

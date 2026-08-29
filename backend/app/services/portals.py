@@ -27,6 +27,10 @@ from ..upstream import request
 from .llm import domain_of
 
 SERVICE_NAME = "Die Anzeigenseite"
+ADVICE = (
+    "Bitte die Anzeige im Browser öffnen, den Seiteninhalt kopieren und in "
+    "das Einfügefeld einsetzen."
+)
 
 # Domains whose server-side retrieval is known to fail; the paste field (F-12)
 # is the only reliable way in.
@@ -193,6 +197,7 @@ async def fetch_page(url: str, app_settings: AppSettings) -> Seite:
         "GET",
         url,
         service=SERVICE_NAME,
+        advice=ADVICE,
         timeout_s=app_settings.http_timeout_s,
         user_agent=app_settings.portal_user_agent,
         headers={"Accept": "text/html,application/xhtml+xml"},
@@ -201,6 +206,6 @@ async def fetch_page(url: str, app_settings: AppSettings) -> Seite:
     if "html" not in content_type and "text" not in content_type:
         raise UpstreamError(
             "Unter dieser Adresse liegt keine lesbare Seite "
-            f"({content_type or 'ohne Angabe'})."
+            f"({content_type or 'ohne Angabe'}). {ADVICE}"
         )
     return parse_page(url, response.text)

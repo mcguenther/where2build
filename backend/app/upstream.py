@@ -10,6 +10,12 @@ import httpx
 from .errors import UpstreamError, UpstreamTimeout
 
 
+def _sentence(*parts: str | None) -> str:
+    """Join the parts of a message, dropping the ones a caller left out."""
+
+    return " ".join(part.strip() for part in parts if part and part.strip())
+
+
 async def request(
     method: str,
     url: str,
@@ -18,6 +24,7 @@ async def request(
     timeout_s: float,
     user_agent: str,
     expect: str | None = None,
+    advice: str | None = None,
     **kwargs: Any,
 ) -> httpx.Response:
     """Perform one upstream request.
@@ -25,6 +32,10 @@ async def request(
     ``expect`` narrows the accepted content type; authority services answer a
     rejected request with a generic HTML error page and HTTP 400, so a wrong
     content type is as much a failure as a wrong status code.
+
+    ``advice`` is the sentence appended to every failure: what the user can do
+    now that this service is unavailable. Every caller passes one -- an error
+    that only states the fault leaves the user stuck.
     """
 
     headers = {"User-Agent": user_agent, **(kwargs.pop("headers", None) or {})}
@@ -33,18 +44,24 @@ async def request(
             response = await client.request(method, url, headers=headers, **kwargs)
     except httpx.TimeoutException as exc:
         raise UpstreamTimeout(
-            f"{service} hat nicht rechtzeitig geantwortet. Bitte später erneut versuchen."
+            _sentence(f"{service} hat nicht rechtzeitig geantwortet.", advice)
         ) from exc
     except httpx.HTTPError as exc:
-        raise UpstreamError(f"{service} ist derzeit nicht erreichbar.") from exc
+        raise UpstreamError(_sentence(f"{service} ist derzeit nicht erreichbar.", advice)) from exc
 
     if response.status_code >= 400:
         raise UpstreamError(
-            f"{service} hat die Anfrage mit Status {response.status_code} abgelehnt."
+            _sentence(
+                f"{service} hat die Anfrage mit Status {response.status_code} abgelehnt.",
+                advice,
+            )
         )
     if expect and expect not in response.headers.get("content-type", ""):
         raise UpstreamError(
-            f"{service} hat ein unerwartetes Format geliefert "
-            f"({response.headers.get('content-type', 'ohne Angabe')})."
+            _sentence(
+                f"{service} hat ein unerwartetes Format geliefert "
+                f"({response.headers.get('content-type', 'ohne Angabe')}).",
+                advice,
+            )
         )
     return response

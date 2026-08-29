@@ -14,20 +14,41 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import __version__
 from .errors import AppError
-from .routers import housetypes, landvalue, listings, parcels, reachability, tiles
+from .routers import (
+    basemap,
+    geocode,
+    housetypes,
+    landvalue,
+    listings,
+    parcels,
+    reachability,
+    tiles,
+)
 from .schemas import DienstStatus, HealthResponse
 from .settings import get_settings
+from .validation import readable_validation_error
 
 logger = logging.getLogger(__name__)
 
 DESCRIPTION = (
     "Datendienste für den Grundstücks-Check Sachsen: amtliche Flurstücke (ALKIS), "
     "Bodenrichtwerte (BORIS), multimodale Erreichbarkeit (MOTIS), Kartenkacheln "
-    "der GeoSN-WMS sowie das Auslesen von Inseraten und Haustypen."
+    "der GeoSN-WMS, die Vektor-Hintergrundkarte sowie das Auslesen von Inseraten "
+    "und Haustypen."
 )
+
+# The framework answers these itself, in English; the browser shows whatever is
+# in `detail`, so they get a German sentence like every other error.
+FRAMEWORK_MESSAGES = {
+    404: "Diese Adresse gibt es auf dem Server nicht.",
+    405: "Diese Adresse nimmt diese Anfrageart nicht entgegen.",
+    413: "Die Anfrage ist zu groß.",
+    422: "Die Anfrage ist unvollständig oder ungültig.",
+}
 
 
 def create_app() -> FastAPI:
@@ -51,19 +72,21 @@ def create_app() -> FastAPI:
     async def _app_error(_: Request, exc: AppError) -> JSONResponse:
         return JSONResponse(status_code=exc.status_code, content={"detail": exc.message})
 
+    @app.exception_handler(StarletteHTTPException)
+    async def _http_error(_: Request, exc: StarletteHTTPException) -> JSONResponse:
+        # Starlette's own answers ("Not Found", "Method Not Allowed") are
+        # English and reach the browser like any other error would.
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": FRAMEWORK_MESSAGES.get(exc.status_code, str(exc.detail))},
+            headers=getattr(exc, "headers", None),
+        )
+
     @app.exception_handler(RequestValidationError)
     async def _validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:
-        # Keep the machine-readable part, but lead with a sentence a user can read.
-        return JSONResponse(
-            status_code=422,
-            content={
-                "detail": "Die Anfrage ist unvollständig oder ungültig.",
-                "felder": [
-                    {"pfad": [str(part) for part in error.get("loc", [])], "meldung": error.get("msg")}
-                    for error in exc.errors()
-                ],
-            },
-        )
+        # The frontend shows `detail`, so `detail` carries the sentence that
+        # says what to change; `felder` keeps the machine-readable part.
+        return JSONResponse(status_code=422, content=readable_validation_error(exc.errors()))
 
     @app.exception_handler(Exception)
     async def _unhandled(_: Request, exc: Exception) -> JSONResponse:
@@ -96,13 +119,28 @@ def create_app() -> FastAPI:
                     name="motis",
                     konfiguriert=bool(current.motis.base_url),
                     endpunkt=f"{current.motis.base_url.rstrip('/')}/api/v6/plan",
-                    hinweis="Routing und Geocoding; öffentliche Instanz nur für den Prototyp.",
+                    hinweis=(
+                        "Routing (/api/reachability) und Adresssuche (/api/geocode); "
+                        "öffentliche Instanz nur für den Prototyp."
+                    ),
                 ),
                 DienstStatus(
                     name="tiles",
                     konfiguriert=bool(current.tiles.dop_url),
                     endpunkt=current.tiles.dop_url,
                     hinweis="Ebenen: dop, webatlas, alkis.",
+                ),
+                DienstStatus(
+                    name="basemap",
+                    konfiguriert=bool(current.basemap.upstream_url),
+                    endpunkt=(
+                        f"{current.basemap.upstream_url.rstrip('/')}/"
+                        f"{current.basemap.style_path.lstrip('/')}"
+                    ),
+                    hinweis=(
+                        "Vektor-Hintergrundkarte über /api/basemap/style.json; der Browser "
+                        "spricht nur mit diesem Backend."
+                    ),
                 ),
                 DienstStatus(
                     name="llm",
@@ -117,7 +155,16 @@ def create_app() -> FastAPI:
             ],
         )
 
-    for module in (parcels, listings, housetypes, landvalue, reachability, tiles):
+    for module in (
+        parcels,
+        listings,
+        housetypes,
+        landvalue,
+        geocode,
+        reachability,
+        tiles,
+        basemap,
+    ):
         app.include_router(module.router)
 
     return app

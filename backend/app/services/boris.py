@@ -18,7 +18,7 @@ from ..schemas import LandValue
 from ..settings import AppSettings, BorisSettings
 from ..upstream import request
 
-SERVICE_NAME = "Der BORIS-Dienst des GeoSN"
+SERVICE_NAME = "Der Bodenrichtwert-Dienst (BORIS Sachsen)"
 
 _FIELD_PATTERN = re.compile(r"^\s*([A-Z0-9_]+)\s*=\s*'(.*)'\s*$")
 # Half-edge of the query window in metres; the pixel we ask about is its centre.
@@ -68,6 +68,15 @@ class BorisService:
         self.app_settings = app_settings
         self.cache = DiskCache(app_settings.cache_dir / "boris", ttl_s=settings.cache_ttl_s)
 
+    @property
+    def _advice(self) -> str:
+        """What to do when BORIS is unavailable -- the portal is public."""
+
+        return (
+            f"Der Bodenrichtwert lässt sich unter {self.settings.portal_url} "
+            "nachschlagen und von Hand eintragen."
+        )
+
     def _params(self, lat: float, lon: float) -> dict[str, str]:
         easting, northing = geo.wgs84_to_utm33(lon, lat)
         centre = (_PIXELS - 1) // 2
@@ -102,13 +111,16 @@ class BorisService:
                 "GET",
                 self.settings.wms_url,
                 service=SERVICE_NAME,
+                advice=self._advice,
                 timeout_s=self.app_settings.http_timeout_s,
                 user_agent=self.app_settings.user_agent,
                 params=params,
             )
             body = response.text
             if "ServiceException" in body:
-                raise UpstreamError(f"{SERVICE_NAME} hat die Anfrage abgelehnt.")
+                raise UpstreamError(
+                    f"{SERVICE_NAME} hat die Anfrage abgelehnt. {self._advice}"
+                )
             self.cache.set_bytes(source_url, response.content)
 
         for feature in parse_feature_info(body):
@@ -126,5 +138,8 @@ class BorisService:
             )
 
         raise NotFoundError(
-            "Für diese Koordinate liegt in BORIS Sachsen kein Bodenrichtwert vor."
+            "Für diese Koordinate liegt in BORIS Sachsen kein Bodenrichtwert vor. "
+            "Das kommt in Außenbereichen und über Verkehrsflächen vor — bitte einen "
+            "Punkt innerhalb des Grundstücks wählen oder den Wert der Nachbarzone "
+            f"unter {self.settings.portal_url} von Hand eintragen."
         )

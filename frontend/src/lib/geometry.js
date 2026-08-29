@@ -66,17 +66,172 @@ export function clipToHalfPlane(ring, point, normal) {
   return out;
 }
 
+/** Douglas–Peucker. The marching-squares contour has a vertex per cell edge;
+ *  this brings it down to something a renderer and a person can handle. */
+export function simplify(ring, tolerance) {
+  if (ring.length < 3) return ring;
+  const abstand = (p, a, b) => {
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len = Math.hypot(dx, dy);
+    if (len < 1e-12) return Math.hypot(p.x - a.x, p.y - a.y);
+    return Math.abs((p.x - a.x) * dy - (p.y - a.y) * dx) / len;
+  };
+  const teile = (von, bis, behalten) => {
+    let schlimmster = 0, index = -1;
+    for (let i = von + 1; i < bis; i++) {
+      const d = abstand(ring[i], ring[von], ring[bis]);
+      if (d > schlimmster) { schlimmster = d; index = i; }
+    }
+    if (schlimmster > tolerance) { teile(von, index, behalten); behalten.add(index); teile(index, bis, behalten); }
+  };
+  const behalten = new Set([0, ring.length - 1]);
+  teile(0, ring.length - 1, behalten);
+  return [...behalten].sort((a, b) => a - b).map(i => ring[i]);
+}
+
+/** True when every turn goes the same way. Half-plane clipping is only a
+ *  correct inward offset for convex rings. */
+export function isConvex(ring) {
+  if (ring.length < 4) return true;
+  let sign = 0;
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i], b = ring[(i + 1) % ring.length], c = ring[(i + 2) % ring.length];
+    const cross = (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
+    if (Math.abs(cross) < 1e-9) continue;
+    const s = Math.sign(cross);
+    if (!sign) sign = s;
+    else if (s !== sign) return false;
+  }
+  return true;
+}
+
+/** Clearance at a point: how much room is left beyond the required setback,
+ *  negative outside the parcel or inside any setback strip. */
+function clearance(point, ring, edges, depths) {
+  if (!pointInPolygon(point, ring)) return -1;
+  let worst = Infinity;
+  for (let i = 0; i < edges.length; i++) {
+    const slack = distanceToSegment(point, edges[i].a, edges[i].b) - (depths[i] ?? 3);
+    if (slack < worst) worst = slack;
+  }
+  return worst;
+}
+
+/**
+ * Marching squares over the clearance field. Used for concave parcels, where
+ * clipping half-planes would cut away far too much — an L-shaped plot comes out
+ * empty. Accuracy follows the grid step, which is well inside what the
+ * pre-project note asks of this drawing: the binding numbers come from ALKIS.
+ */
+function insetByGrid(ring, depths, step, sicherheit) {
+  const box = boundingBox(ring);
+  const edges = polygonEdges(ring);
+  const cols = Math.ceil(box.width / step) + 3;
+  const rows = Math.ceil(box.height / step) + 3;
+  const x0 = box.minX - step, y0 = box.minY - step;
+  const at = (i, j) => ({ x: x0 + i * step, y: y0 + j * step });
+
+  const field = new Float64Array(cols * rows);
+  for (let j = 0; j < rows; j++)
+    for (let i = 0; i < cols; i++) field[j * cols + i] = clearance(at(i, j), ring, edges, depths) - sicherheit;
+
+  // One segment per cell crossing, then chained into a ring.
+  const segments = [];
+  const between = (pa, pb, va, vb) => {
+    const t = va / (va - vb);
+    return { x: pa.x + t * (pb.x - pa.x), y: pa.y + t * (pb.y - pa.y) };
+  };
+  for (let j = 0; j < rows - 1; j++) {
+    for (let i = 0; i < cols - 1; i++) {
+      const v = [field[j * cols + i], field[j * cols + i + 1],
+                 field[(j + 1) * cols + i + 1], field[(j + 1) * cols + i]];
+      const p = [at(i, j), at(i + 1, j), at(i + 1, j + 1), at(i, j + 1)];
+      const kreuzungen = [];
+      for (let k = 0; k < 4; k++) {
+        const a = k, b = (k + 1) % 4;
+        if ((v[a] > 0) !== (v[b] > 0)) kreuzungen.push(between(p[a], p[b], v[a], v[b]));
+      }
+      if (kreuzungen.length === 2) segments.push(kreuzungen);
+    }
+  }
+  if (!segments.length) return [];
+
+  // Chain segments end to end; keep the longest closed ring.
+  const schluessel = q => `${Math.round(q.x / (step / 8))},${Math.round(q.y / (step / 8))}`;
+  const offen = new Map();
+  segments.forEach((s, idx) => {
+    for (const ende of [0, 1]) {
+      const k = schluessel(s[ende]);
+      if (!offen.has(k)) offen.set(k, []);
+      offen.get(k).push({ idx, ende });
+    }
+  });
+  const benutzt = new Set();
+  let beste = [];
+  for (let start = 0; start < segments.length; start++) {
+    if (benutzt.has(start)) continue;
+    const kette = [segments[start][0], segments[start][1]];
+    benutzt.add(start);
+    for (let schritt = 0; schritt < segments.length; schritt++) {
+      const k = schluessel(kette[kette.length - 1]);
+      const weiter = (offen.get(k) || []).find(e => !benutzt.has(e.idx));
+      if (!weiter) break;
+      benutzt.add(weiter.idx);
+      kette.push(segments[weiter.idx][1 - weiter.ende]);
+    }
+    if (kette.length > beste.length) beste = kette;
+  }
+  const vereinfacht = simplify(beste, step * 0.6);
+  return vereinfacht.length >= 3 ? vereinfacht : [];
+}
+
 /**
  * The envelope a building may occupy: the parcel inset by a setback depth that
  * is given **per boundary segment**. § 6 SächsBO measures the depth from wall
  * height and treats 3 m as a floor rather than a rule, so a single global inset
  * would be wrong for most plots.
  *
+ * Convex parcels take the exact half-plane route; concave ones — L-shapes and
+ * flag lots, both common in a real cadastre — go through the grid, because
+ * clipping half-planes there would cut away most of the plot.
+ *
  * Returns `[]` when the setbacks consume the parcel entirely.
  */
-export function buildableArea(ring, depths) {
+/* The envelope is asked for by the plan, the key figures, the comparison and the
+ * house-type fit check, all for the same plot. On a concave parcel each answer
+ * costs a grid sweep, so the last few are kept. */
+const fensterCache = new Map();
+const CACHE_GRENZE = 64;
+
+function cacheSchluessel(ring, depths, options) {
+  const p = ring.map(v => `${v.x.toFixed(2)},${v.y.toFixed(2)}`).join(";");
+  const d = Array.isArray(depths) ? depths.join(",") : String(depths);
+  return `${p}|${d}|${options.step ?? ""}|${options.sicherheit ?? ""}`;
+}
+
+export function buildableArea(ring, depths, options = {}) {
+  const schluessel = cacheSchluessel(ring, depths, options);
+  const gemerkt = fensterCache.get(schluessel);
+  if (gemerkt) return gemerkt;
+  const ergebnis = berechneBuildableArea(ring, depths, options);
+  if (fensterCache.size >= CACHE_GRENZE) fensterCache.delete(fensterCache.keys().next().value);
+  fensterCache.set(schluessel, ergebnis);
+  return ergebnis;
+}
+
+function berechneBuildableArea(ring, depths, options) {
   const poly = asCounterClockwise(ring);
   const offsets = Array.isArray(depths) ? depths : poly.map(() => depths);
+
+  if (!isConvex(poly)) {
+    /* The grid and the simplification both carry error. Bias the contour inward
+       by the same order of magnitude, so an approximate envelope is always a
+       little too strict rather than a little too permissive — being generous
+       here would let a house sit closer to the boundary than the law allows. */
+    const step = options.step ?? 0.4;
+    return insetByGrid(poly, offsets, step, options.sicherheit ?? step * 0.55);
+  }
+
   let envelope = poly;
   polygonEdges(poly).forEach((edge, i) => {
     if (envelope.length < 3) return;
@@ -198,10 +353,29 @@ export function footprintFromArea(builtArea, ratio) {
  * centre so an existing house does not jump across the plot. Returns `null`
  * when nothing fits.
  */
+/* Same reasoning as the envelope cache: the catalogue asks the same question
+ * for every render of the same plot. */
+const lageCache = new Map();
+
 export function findPlacement(envelope, width, depth, options = {}) {
   if (!envelope.length) return null;
-  const { rotation, near, step = 0.5, angleStep = 5 } = options;
+  const schluessel = `${envelope.map(v => `${v.x.toFixed(1)},${v.y.toFixed(1)}`).join(";")}|${width.toFixed(2)}|${depth.toFixed(2)}|${options.rotation ?? ""}|${options.near ? `${options.near.x.toFixed(1)},${options.near.y.toFixed(1)}` : ""}|${options.step ?? ""}`;
+  if (lageCache.has(schluessel)) return lageCache.get(schluessel);
+  const ergebnis = sucheLage(envelope, width, depth, options);
+  if (lageCache.size >= CACHE_GRENZE) lageCache.delete(lageCache.keys().next().value);
+  lageCache.set(schluessel, ergebnis);
+  return ergebnis;
+}
+
+function sucheLage(envelope, width, depth, options) {
+  const { rotation, near, step = 0.75, angleStep = 6 } = options;
   const box = boundingBox(envelope);
+
+  /* Two cheap impossibilities first. Real parcels are large and their envelopes
+     carry many vertices, so a full sweep costs millions of point-in-polygon
+     tests; most "does it fit" questions are answered without one. */
+  if (width * depth > polygonArea(envelope) + 1e-9) return null;
+  if (Math.min(width, depth) > Math.min(box.width, box.height) + 1e-9) return null;
   const angles = Number.isFinite(rotation)
     ? [rotation]
     : Array.from({ length: Math.ceil(180 / angleStep) }, (_, i) => i * angleStep);
@@ -210,6 +384,9 @@ export function findPlacement(envelope, width, depth, options = {}) {
   for (const angle of angles) {
     for (let cx = box.minX; cx <= box.maxX; cx += step) {
       for (let cy = box.minY; cy <= box.maxY; cy += step) {
+        // The centre of a rectangle inside a polygon is inside it too, and one
+        // test costs a quarter of four.
+        if (!pointInPolygon({ x: cx, y: cy }, envelope)) continue;
         const placement = { cx, cy, width, depth, rotation: angle };
         if (cornersOutside(placement, envelope)) continue;
         if (!near) return placement;

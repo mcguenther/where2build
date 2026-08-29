@@ -25,7 +25,18 @@ export const degrees = value =>
 export const percent = (value, digits = 1) =>
   Number.isFinite(value) ? `${value > 0 ? "+" : value < 0 ? "−" : ""}${num(Math.abs(value), digits)} %` : "—";
 
-export const minutes = value => (Number.isFinite(value) ? `${value} min` : "—");
+/**
+ * A travel time, from the seconds the routing service returns. Minutes are the
+ * unit people compare commutes in; below one minute the number says nothing
+ * useful, above an hour it stops being readable.
+ */
+export const duration = seconds => {
+  if (!Number.isFinite(seconds) || seconds < 0) return "—";
+  const min = Math.round(seconds / 60);
+  if (min < 1) return "unter 1 min";
+  if (min < 90) return `${min} min`;
+  return `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, "0")} min`;
+};
 
 export const date = iso => {
   const d = iso instanceof Date ? iso : new Date(iso);

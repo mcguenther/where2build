@@ -1,0 +1,78 @@
+{
+  "felder": {
+    "hersteller": {
+      "wert": "ELK",
+      "quelle_url": "https://www.elkhaus.de/einfamilienhaus/all-in-one-159/",
+      "bestaetigt": false
+    },
+    "typenbezeichnung": {
+      "wert": "All in One 159",
+      "quelle_url": "https://www.elkhaus.de/einfamilienhaus/all-in-one-159/",
+      "bestaetigt": false
+    },
+    "bebaute_flaeche_m2": {
+      "wert": 96.88,
+      "quelle_url": "https://www.elkhaus.de/einfamilienhaus/all-in-one-159/",
+      "bestaetigt": false
+    },
+    "wohnflaeche_gesamt_m2": {
+      "wert": 159.21,
+      "quelle_url": "https://www.elkhaus.de/einfamilienhaus/all-in-one-159/",
+      "bestaetigt": false
+    },
+    "wohnflaeche_eg_m2": {
+      "wert": 79.9,
+      "quelle_url": "https://www.elkhaus.de/einfamilienhaus/all-in-one-159/",
+      "bestaetigt": false
+    },
+    "wohnflaeche_og_m2": {
+      "wert": 79.31,
+      "quelle_url": "https://www.elkhaus.de/einfamilienhaus/all-in-one-159/",
+      "bestaetigt": false
+    },
+    "aussenmass_laenge_m": {
+      "wert": null,
+      "quelle_url": "https://www.elkhaus.de/einfamilienhaus/all-in-one-159/",
+      "bestaetigt": false
+    },
+    "aussenmass_breite_m": {
+      "wert": null,
+      "quelle_url": "https://www.elkhaus.de/einfamilienhaus/all-in-one-159/",
+      "bestaetigt": false
+    },
+    "dachformen": {
+      "wert": [
+        "walmdach",
+        "satteldach"
+      ],
+      "quelle_url": "https://www.elkhaus.de/einfamilienhaus/all-in-one-159/",
+      "bestaetigt": false
+    },
+    "traufhoehe_m": {
+      "wert": null,
+      "quelle_url": "https://www.elkhaus.de/einfamilienhaus/all-in-one-159/",
+      "bestaetigt": false
+    },
+    "firsthoehe_m": {
+      "wert": null,
+      "quelle_url": "https://www.elkhaus.de/einfamilienhaus/all-in-one-159/",
+      "bestaetigt": false
+    },
+    "grundstueck_ab_m2": {
+      "wert": 504,
+      "quelle_url": "https://www.elkhaus.de/einfamilienhaus/all-in-one-159/",
+      "bestaetigt": false
+    },
+    "preis_ab_eur": {
+      "wert": 449800,
+      "quelle_url": "https://www.elkhaus.de/einfamilienhaus/all-in-one-159/",
+      "bestaetigt": false
+    }
+  },
+  "quelle_url": "https://www.elkhaus.de/einfamilienhaus/all-in-one-159/",
+  "gelesen_am": "2026-08-29T19:17:07.774270Z",
+  "abgeleitete_laenge_m": 11.44,
+  "abgeleitete_breite_m": 8.47,
+  "weg": "llm",
+  "hinweis": "Außenmaße wurden aus der bebauten Fläche mit Seitenverhältnis 1,35 geschätzt und sind im Frontend korrigierbar."
+}

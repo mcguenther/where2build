@@ -1,0 +1,11 @@
+{
+  "tilejson": "3.0.0",
+  "tiles": ["https://tiles.openfreemap.org/planet/20260823_080002_pt/{z}/{x}/{y}.pbf"],
+  "attribution": "<a href=\"https://openfreemap.org\">OpenFreeMap</a> Data from <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a>",
+  "description": "https://openfreemap.org",
+  "bounds": [-180.0, -85.05113, 180.0, 85.05113],
+  "maxzoom": 14,
+  "minzoom": 0,
+  "name": "OpenFreeMap",
+  "version": "3.16.0"
+}

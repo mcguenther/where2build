@@ -1,24 +1,24 @@
 /** State, persistence and the JSON exchange. */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
-  state, validate, load, save, resetToSample, exportJson, importJson,
+  state, validate, load, save, leeren, exportJson, importJson,
   plotById, houseTypeById, houseFootprint, placement, centreOf,
   addPlot, removePlot, toggleSelection, addHouseType, removeHouseType,
   addDestination, removeDestination, applyTheme, EIGENMASS
 } from "../src/lib/store.js";
-import { sampleState } from "../src/lib/sample.js";
+import { echterStand, echtesGrundstueck, echterHaustyp } from "./hilfe.js";
 
 const quadrat = [{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 30 }, { x: 0, y: 30 }];
 
 beforeEach(() => {
   localStorage.clear();
-  state.daten = sampleState();
+  state.daten = echterStand();
 });
 
 describe("Prüfung beim Einlesen", () => {
   it("nimmt einen vollständigen Stand an", () => {
-    const d = validate(sampleState());
-    expect(d.grundstuecke).toHaveLength(4);
+    const d = validate(echterStand());
+    expect(d.grundstuecke).toHaveLength(2);
     expect(d.haustypen.length).toBeGreaterThan(0);
     expect(d.ziele.length).toBeGreaterThan(0);
   });
@@ -76,20 +76,20 @@ describe("Ausgeben und Einlesen", () => {
   it("übersteht eine Runde ohne Verlust", () => {
     const vorher = exportJson();
     importJson(vorher);
-    expect(JSON.parse(exportJson()).grundstuecke).toHaveLength(4);
+    expect(JSON.parse(exportJson()).grundstuecke).toHaveLength(2);
   });
 
   it("meldet unbrauchbares JSON auf Deutsch und lässt den Stand unberührt", () => {
     for (const muell of ["kein json", "{}", '{"grundstuecke":"nein"}', ""]) {
       expect(() => importJson(muell)).toThrow();
     }
-    expect(state.daten.grundstuecke).toHaveLength(4);
+    expect(state.daten.grundstuecke).toHaveLength(2);
   });
 
   it("ersetzt den Stand bei gültiger Eingabe", () => {
-    const klein = { ...sampleState(), grundstuecke: sampleState().grundstuecke.slice(0, 2) };
+    const klein = { ...echterStand(), grundstuecke: [echtesGrundstueck("konvex")] };
     importJson(JSON.stringify(klein));
-    expect(state.daten.grundstuecke).toHaveLength(2);
+    expect(state.daten.grundstuecke).toHaveLength(1);
   });
 });
 
@@ -97,7 +97,7 @@ describe("Speicher im Browser", () => {
   it("legt ab und liest zurück", () => {
     state.daten.grundstuecke[0].wandhoehe = 7.7;
     save();
-    state.daten = sampleState();
+    state.daten = echterStand();
     load();
     expect(state.daten.grundstuecke[0].wandhoehe).toBe(7.7);
   });
@@ -105,7 +105,7 @@ describe("Speicher im Browser", () => {
   it("überlebt einen kaputten Eintrag", () => {
     localStorage.setItem("where2build.v1", "{kaputt");
     load();
-    expect(state.daten.grundstuecke).toHaveLength(4);
+    expect(state.daten.grundstuecke).toHaveLength(2);
   });
 
   it("läuft weiter, wenn der Speicher verweigert wird", () => {
@@ -116,24 +116,19 @@ describe("Speicher im Browser", () => {
     Storage.prototype.setItem = original;
   });
 
-  it("stellt die Beispieldaten wieder her", () => {
-    removePlot(state.daten.grundstuecke[0].id);
-    expect(state.daten.grundstuecke).toHaveLength(3);
-    resetToSample();
-    expect(state.daten.grundstuecke).toHaveLength(4);
-  });
 });
 
 describe("Baukörper aus dem Haustyp", () => {
   it("nimmt die Außenmaße, wenn das Datenblatt sie liefert", () => {
-    const plot = plotById("gs-zuckelhausen");
-    plot.haustypId = "ht-stadt134";
-    const k = houseFootprint(plot);
-    expect(k).toMatchObject({ width: 10.4, depth: 7.5, estimated: false });
+    const plot = plotById("gs-konvex");
+    addHouseType({ id: "ht-mass", hersteller: "Von Hand eingetragen", name: "12 × 9 m",
+      bebauteFlaeche: 108, laenge: 12, breite: 9, verhaeltnis: 12 / 9, eigen: true });
+    plot.haustypId = "ht-mass";
+    expect(houseFootprint(plot)).toMatchObject({ width: 12, depth: 9, estimated: false });
   });
 
   it("schätzt aus der bebauten Fläche, wenn nicht", () => {
-    const plot = plotById("gs-liebertwolkwitz");
+    const plot = plotById("gs-konkav");
     const k = houseFootprint(plot);          // ELK All in One 159, ohne Außenmaße
     expect(k.estimated).toBe(true);
     expect(k.width * k.depth).toBeCloseTo(96.88, 6);
@@ -141,15 +136,16 @@ describe("Baukörper aus dem Haustyp", () => {
   });
 
   it("nimmt eigene Maße, wenn welche eingetragen sind", () => {
-    const plot = plotById("gs-liebertwolkwitz");
+    const plot = plotById("gs-konkav");
     plot.haustypId = EIGENMASS;
     plot.eigenmass = { laenge: 13, breite: 9 };
     expect(houseFootprint(plot)).toMatchObject({ width: 13, depth: 9, eigen: true });
   });
 
   it("setzt die Platzierung aus Maßen und Lage zusammen", () => {
-    const p = placement(plotById("gs-liebertwolkwitz"));
-    expect(p).toMatchObject({ cx: 10.8, cy: 15, rotation: -4 });
+    const plot = plotById("gs-konkav");
+    const p = placement(plot);
+    expect(p).toMatchObject({ cx: plot.haus.cx, cy: plot.haus.cy, rotation: plot.haus.rotation });
     expect(Number.isFinite(p.width) && Number.isFinite(p.depth)).toBe(true);
   });
 
@@ -162,36 +158,44 @@ describe("Grundstücke, Haustypen und Ziele verwalten", () => {
   it("nimmt ein Grundstück auf und wählt es gleich aus", () => {
     const neu = { ...validate({ grundstuecke: [{ polygon: quadrat, id: "gs-neu" }] }).grundstuecke[0] };
     addPlot(neu);
-    expect(state.daten.grundstuecke).toHaveLength(5);
+    expect(state.daten.grundstuecke).toHaveLength(3);
     expect(state.daten.auswahl).toContain("gs-neu");
   });
 
   it("entfernt ein Grundstück samt Auswahl", () => {
-    removePlot("gs-holzhausen");
-    expect(plotById("gs-holzhausen")).toBeNull();
-    expect(state.daten.auswahl).not.toContain("gs-holzhausen");
+    removePlot("gs-konvex");
+    expect(plotById("gs-konvex")).toBeNull();
+    expect(state.daten.auswahl).not.toContain("gs-konvex");
   });
 
   it("nimmt Kandidaten in die Auswahl und wieder heraus", () => {
-    toggleSelection("gs-holzhausen", false);
-    expect(state.daten.auswahl).not.toContain("gs-holzhausen");
-    toggleSelection("gs-holzhausen", true);
-    expect(state.daten.auswahl).toContain("gs-holzhausen");
-    toggleSelection("gs-holzhausen", true);   // doppelt bleibt einfach
-    expect(state.daten.auswahl.filter(id => id === "gs-holzhausen")).toHaveLength(1);
+    toggleSelection("gs-konvex", false);
+    expect(state.daten.auswahl).not.toContain("gs-konvex");
+    toggleSelection("gs-konvex", true);
+    expect(state.daten.auswahl).toContain("gs-konvex");
+    toggleSelection("gs-konvex", true);   // doppelt bleibt einfach
+    expect(state.daten.auswahl.filter(id => id === "gs-konvex")).toHaveLength(1);
   });
 
   it("lässt Grundstücke auf einen übrigen Haustyp zurückfallen", () => {
-    const plot = plotById("gs-liebertwolkwitz");
-    expect(plot.haustypId).toBe("ht-elk159");
-    removeHouseType("ht-elk159");
-    expect(houseTypeById("ht-elk159")).toBeNull();
-    expect(plot.haustypId).toBe(state.daten.haustypen[0].id);
+    addHouseType({ id: "ht-zweit", hersteller: "Von Hand eingetragen", name: "10 × 8 m",
+      bebauteFlaeche: 80, laenge: 10, breite: 8, verhaeltnis: 1.25, eigen: true });
+    const plot = plotById("gs-konkav");
+    expect(plot.haustypId).toBe("ht-elk");
+    removeHouseType("ht-elk");
+    expect(houseTypeById("ht-elk")).toBeNull();
+    expect(plot.haustypId).toBe("ht-zweit");
+  });
+
+  it("setzt den Haustyp auf nichts, wenn der letzte entfernt wird", () => {
+    removeHouseType("ht-elk");
+    expect(state.daten.haustypen).toEqual([]);
+    expect(plotById("gs-konkav").haustypId).toBeNull();
   });
 
   it("löscht mit einem Ziel auch die Wege dorthin", () => {
-    const plot = plotById("gs-liebertwolkwitz");
-    expect(plot.wege["zl-arbeit"]).toBeTruthy();
+    const plot = plotById("gs-konkav");
+    plot.wege["zl-arbeit"] = { auto: 12, rad: 20 };   // wie sie das Routing ablegt
     removeDestination("zl-arbeit");
     expect(plot.wege["zl-arbeit"]).toBeUndefined();
   });

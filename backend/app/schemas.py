@@ -7,10 +7,11 @@ those fields in the first place.
 
 from __future__ import annotations
 
+import re
 from datetime import date, datetime, timezone
 from typing import Any, Generic, Literal, TypeVar
 
-from pydantic import BaseModel, Field, HttpUrl, model_validator
+from pydantic import BaseModel, Field, HttpUrl, field_validator, model_validator
 
 Dachform = Literal["satteldach", "walmdach", "pultdach", "flachdach", "zeltdach"]
 
@@ -64,7 +65,13 @@ class Flurstueckskennung(BaseModel):
     gemarkung: str | None = None  # name or number, derivable from the location
     flur: str | None = None  # frequently unused in Saxony
     zaehler: int
-    nenner: int | None = None
+    # Text, not a number: letter denominators (41/e, 207/b) are in regular use.
+    nenner: str | None = None
+
+    @field_validator("nenner", mode="before")
+    @classmethod
+    def _denominator_as_text(cls, value: Any) -> Any:
+        return str(value) if isinstance(value, int) else value
 
 
 class InseratFelder(BaseModel):
@@ -209,31 +216,92 @@ class HousetypeExtractResponse(BaseModel):
 # --------------------------------------------------------------------------
 
 
+# The official geoportal shows one "Flurstücksnummer" per parcel -- 476, 85/1,
+# 41/e -- while ALKIS stores numerator and denominator in two attributes. The
+# denominator is not always a number: letter denominators such as 41/e or 207/b
+# are in regular use and valid.
+_FLURSTUECKSNUMMER = re.compile(r"^(\d{1,6})(?:\s*/\s*([0-9A-Za-zÄÖÜäöüß]{1,6}))?$")
+_NENNER = re.compile(r"^[0-9A-Za-zÄÖÜäöüß]{1,6}$")
+
+FLURSTUECKSNUMMER_HINT = (
+    "Erwartet wird eine Zahl wie „476“ oder eine Zahl mit Nenner wie „85/1“ oder „41/e“."
+)
+
+
+def parse_flurstuecksnummer(value: str) -> tuple[int, str | None]:
+    """Split a parcel number into numerator and denominator.
+
+    ``85/1`` -> ``(85, "1")``, ``476`` -> ``(476, None)``, ``41/e`` -> ``(41, "e")``.
+    The denominator stays a string: ALKIS compares it as text and letters occur.
+    """
+
+    match = _FLURSTUECKSNUMMER.match(" ".join(str(value).split()))
+    if not match:
+        raise ValueError(
+            f"„{value}“ ist keine gültige Flurstücksnummer. {FLURSTUECKSNUMMER_HINT}"
+        )
+    return int(match.group(1)), match.group(2) or None
+
+
 class ParcelResolveRequest(BaseModel):
-    """One of three ways in: address, coordinate, or cadastral identifier."""
+    """One of three ways in: address, coordinate, or cadastral identifier.
+
+    The cadastral way in accepts both spellings: the two ALKIS attributes
+    (``zaehler`` plus optional ``nenner``) and the single ``flurstuecksnummer``
+    the official geoportal prints.
+    """
 
     address: str | None = Field(default=None, max_length=300)
     lat: float | None = Field(default=None, ge=-90, le=90)
     lon: float | None = Field(default=None, ge=-180, le=180)
     gemarkung: str | None = Field(default=None, max_length=120)
     zaehler: int | None = Field(default=None, ge=0)
-    nenner: int | None = Field(default=None, ge=0)
+    # A denominator may be a letter (41/e), so it travels as text; an integer
+    # is accepted and normalised for callers that send one.
+    nenner: int | str | None = Field(default=None)
+    flurstuecksnummer: str | None = Field(
+        default=None,
+        max_length=20,
+        description="Flurstücksnummer wie im Geoportal, etwa „85/1“, „476“ oder „41/e“.",
+    )
 
     @model_validator(mode="after")
     def _exactly_one_way_in(self) -> "ParcelResolveRequest":
+        if self.flurstuecksnummer is not None and self.flurstuecksnummer.strip():
+            if self.zaehler is not None or self.nenner is not None:
+                raise ValueError(
+                    "Bitte entweder die Flurstücksnummer oder Zähler und Nenner angeben, "
+                    "nicht beides."
+                )
+            self.zaehler, self.nenner = parse_flurstuecksnummer(self.flurstuecksnummer)
+        elif self.nenner is not None:
+            nenner = str(self.nenner).strip()
+            if not _NENNER.match(nenner):
+                raise ValueError(
+                    f"„{self.nenner}“ ist kein gültiger Nenner einer Flurstücksnummer. "
+                    "Erlaubt sind bis zu sechs Ziffern oder Buchstaben, etwa „1“ oder „e“."
+                )
+            self.nenner = nenner
+
         by_address = bool(self.address and self.address.strip())
         by_point = self.lat is not None and self.lon is not None
         by_parcel = bool(self.gemarkung and self.zaehler is not None)
         if (self.lat is None) != (self.lon is None):
             raise ValueError("lat und lon müssen gemeinsam angegeben werden.")
+        if self.zaehler is not None and not self.gemarkung:
+            raise ValueError(
+                "Zu einer Flurstücksnummer wird die Gemarkung benötigt — "
+                "dieselbe Nummer gibt es in jeder Gemarkung."
+            )
         chosen = [by_address, by_point, by_parcel]
         if sum(chosen) == 0:
             raise ValueError(
-                "Bitte Adresse, Koordinate (lat/lon) oder Gemarkung mit Zähler angeben."
+                "Bitte Adresse, Koordinate (lat/lon) oder Gemarkung mit Flurstücksnummer angeben."
             )
         if sum(chosen) > 1:
             raise ValueError(
-                "Bitte nur einen Weg angeben: Adresse, Koordinate oder Gemarkung mit Zähler."
+                "Bitte nur einen Weg angeben: Adresse, Koordinate oder Gemarkung "
+                "mit Flurstücksnummer."
             )
         return self
 
@@ -330,6 +398,57 @@ class Koordinate(BaseModel):
 class Ziel(Koordinate):
     id: str = Field(min_length=1, max_length=120)
     name: str | None = Field(default=None, max_length=200)
+
+
+Geocodeart = Literal["adresse", "haltestelle", "ort", "sonstiges"]
+
+GEOCODE_HINWEIS = (
+    "Die Koordinaten stammen aus dem Routing-Geocoder (Transitous, OpenStreetMap "
+    "und Fahrplandaten), nicht aus den amtlichen Hauskoordinaten des GeoSN. Bitte "
+    "den gefundenen Ort auf der Karte prüfen und gegebenenfalls einen anderen "
+    "Treffer wählen."
+)
+
+
+class GeocodeRequest(BaseModel):
+    """Free text to coordinates.
+
+    ``lat``/``lon`` are an optional bias: results near that point rank higher.
+    Passing the plot's coordinate turns "Am Kirschberg" from a village in
+    Bavaria into the stop around the corner.
+    """
+
+    text: str = Field(min_length=2, max_length=200)
+    lat: float | None = Field(default=None, ge=-90, le=90)
+    lon: float | None = Field(default=None, ge=-180, le=180)
+
+    @model_validator(mode="after")
+    def _bias_needs_both_halves(self) -> "GeocodeRequest":
+        if (self.lat is None) != (self.lon is None):
+            raise ValueError(
+                "lat und lon müssen gemeinsam angegeben werden — sie sind nur ein "
+                "Bezugspunkt, damit nahe Treffer vorn stehen."
+            )
+        return self
+
+
+class GeocodeTreffer(Koordinate):
+    """One candidate, with the label the geocoder actually matched.
+
+    The label matters as much as the coordinate: this geocoder answers
+    "Am Kirschberg" with a village 300 km away and does so with confidence, so
+    the user has to be able to see what was found.
+    """
+
+    name: str
+    beschreibung: str | None = None  # place context that tells two hits apart
+    art: Geocodeart = "sonstiges"
+
+
+class GeocodeResponse(BaseModel):
+    treffer: list[GeocodeTreffer]
+    hinweis: str = GEOCODE_HINWEIS
+    quelle: str = "MOTIS / Transitous (DELFI-GTFS, OpenStreetMap)"
 
 
 class ReachabilityRequest(BaseModel):

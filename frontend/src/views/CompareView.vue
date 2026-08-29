@@ -43,8 +43,8 @@
                 <span class="chip chip--gut">{{ kennzahl(p).formklasse }}</span>
                 <span class="zart daten"> {{ num(kennzahl(p).rechteckigkeit, 2) }}</span>
               </td>
-              <td v-if="ziel1" class="zahl">{{ zeit(p, ziel1.id, 2) }}</td>
-              <td v-if="ziel2" class="zahl">{{ zeit(p, ziel2.id, 1) }}</td>
+              <td v-if="ziel1" class="zahl">{{ zeit(p, ziel1.id, "transit") }}</td>
+              <td v-if="ziel2" class="zahl">{{ zeit(p, ziel2.id, "bike") }}</td>
               <td class="nicht-drucken">
                 <button type="button" class="knopf knopf--still knopf--klein" @click="oeffnen(p.id)">Öffnen</button>
               </td>
@@ -85,7 +85,7 @@ import SitePlan from "../components/SitePlan.vue";
 import { state, placement } from "../lib/store.js";
 import { plotMetrics } from "../lib/metrics.js";
 import { fitScale } from "../lib/geometry.js";
-import { area, euro, euroPerSqm, percent, num, minutes } from "../lib/format.js";
+import { area, euro, euroPerSqm, percent, num, duration } from "../lib/format.js";
 
 export default {
   name: "CompareView",
@@ -114,9 +114,12 @@ export default {
     area, euro, euroPerSqm, percent, num,
     kennzahl(p) { return plotMetrics(p); },
     koerper(p) { return placement(p); },
-    zeit(plot, zielId, index) {
-      const w = plot.wege[zielId];
-      return w ? minutes(w[index]) : "—";
+    /** One mode's travel time to one destination, or a dash when the routing
+     *  service found nothing. Modes are addressed by name — the mockup's
+     *  positional array is gone. */
+    zeit(plot, zielId, modus) {
+      const m = plot.wege[zielId]?.modi?.[modus];
+      return m && m.erreichbar ? duration(m.duration_s) : "—";
     },
     zurueck() { state.ansicht = "grundstuecke"; window.scrollTo({ top: 0 }); },
     oeffnen(id) { state.offenesGrundstueck = id; state.ansicht = "grundstueck"; window.scrollTo({ top: 0 }); },

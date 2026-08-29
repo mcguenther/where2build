@@ -1,8 +1,10 @@
 <template>
-  <svg
+  <div class="lageplan-huelle">
+    <div v-if="hintergrund" ref="karte" class="lageplan__karte" aria-hidden="true"></div>
+    <svg
     ref="flaeche"
     class="lageplan"
-    :class="{ 'lageplan--zieht': ziehen }"
+    :class="{ 'lageplan--zieht': ziehen, 'lageplan--messen': messen }"
     :viewBox="`0 0 ${breite} ${hoehe}`"
     role="img"
     :aria-label="beschriftung"
@@ -21,33 +23,11 @@
       </marker>
     </defs>
 
-    <rect x="0" y="0" :width="breite" :height="hoehe" :fill="grundfarbe" />
+    <rect v-if="!hintergrund" x="0" y="0" :width="breite" :height="hoehe" :fill="grundfarbe" />
 
     <g :transform="`rotate(${drehung}, ${breite / 2}, ${hoehe / 2})`">
-      <!-- Basemap stand-in. Real tiles arrive through the backend proxy later. -->
-      <g v-if="grund === 'luftbild'" opacity=".55">
-        <ellipse v-for="(b, i) in gruenflaechen" :key="`g${i}`"
-                 :cx="b[0]" :cy="b[1]" :rx="b[2]" :ry="b[3]" fill="var(--w2b-salbei)" :opacity="i % 2 ? .3 : .2" />
-      </g>
-      <g v-else-if="grund === 'kataster'" stroke="var(--w2b-karte-nachbar)" stroke-width="1" opacity=".16">
-        <line v-for="l in raster" :key="l.k" :x1="l.x1" :y1="l.y1" :x2="l.x2" :y2="l.y2" />
-      </g>
-
-      <!-- Street: brass edge along the carriageway, as in the legend -->
-      <polygon :points="pfad(umfeld.street)" fill="var(--w2b-karte-strasse-flaeche)" />
-      <line :x1="strassenkante.x1" :y1="strassenkante.y1" :x2="strassenkante.x2" :y2="strassenkante.y2"
-            stroke="var(--w2b-karte-strasse)" :stroke-width="kompakt ? 2 : 3" />
-
-      <!-- Neighbouring parcels and their buildings -->
-      <polygon v-for="(n, i) in umfeld.parcels" :key="`n${i}`" :points="pfad(n)"
-               fill="none" stroke="var(--w2b-karte-nachbar)" stroke-width="1.1" stroke-dasharray="5 4" />
-      <template v-if="nachbarn">
-        <polygon v-for="(b, i) in umfeld.buildings" :key="`b${i}`" :points="pfad(ecken(b))"
-                 :fill="`url(#nachbar-${uid})`" stroke="var(--w2b-karte-nachbar)" stroke-width="1.1" />
-      </template>
-
-      <!-- The plot -->
-      <polygon :points="pfad(plot.polygon)" fill="var(--w2b-karte-flaeche)" />
+      <polygon :points="pfad(plot.polygon)" fill="var(--w2b-karte-flaeche)"
+               :fill-opacity="hintergrund ? 0.42 : 1" />
 
       <!-- The setback strip is what gets colour: marked is what may NOT be built on. -->
       <template v-if="saum && fenster.length">
@@ -81,6 +61,22 @@
                  :stroke-width="verstoss ? 2.4 : (kompakt ? 1.2 : 1.7)" />
         <circle v-for="(e, i) in ausreisser" :key="`a${i}`" :cx="p(e).x" :cy="p(e).y" r="4.5"
                 fill="none" stroke="var(--w2b-karte-verstoss)" stroke-width="1.7" />
+      </g>
+
+      <!-- Measuring tape: click sets a point, a second click closes the run. -->
+      <g v-if="messen && messpunkte.length" class="lageplan__messen">
+        <polyline v-if="messpunkte.length > 1" :points="messLinie" fill="none"
+                  stroke="var(--w2b-karte-verstoss)" stroke-width="1.8" stroke-dasharray="6 4" />
+        <line v-if="messpunkte.length === 1 && messZeiger"
+              :x1="p(messpunkte[0]).x" :y1="p(messpunkte[0]).y"
+              :x2="p(messZeiger).x" :y2="p(messZeiger).y"
+              stroke="var(--w2b-karte-verstoss)" stroke-width="1.4" stroke-dasharray="4 4" opacity=".7" />
+        <circle v-for="(m, i) in messpunkte" :key="`m${i}`" :cx="p(m).x" :cy="p(m).y" r="4"
+                fill="var(--w2b-karte-halo)" stroke="var(--w2b-karte-verstoss)" stroke-width="2" />
+        <text v-for="(t, i) in messBeschriftung" :key="`mt${i}`" :x="t.x" :y="t.y"
+              :transform="`rotate(${-drehung}, ${t.x}, ${t.y})`" class="lageplan__mass lageplan__mass--messen">
+          {{ t.text }}
+        </text>
       </g>
 
       <!-- Dimension chains -->
@@ -129,16 +125,90 @@
         <text :x="zehnMeter * 2" y="15" class="lageplan__leiste" text-anchor="end">20 m</text>
       </g>
     </g>
-  </svg>
+    </svg>
+  </div>
 </template>
 
 <script>
 import {
   buildableArea, polygonEdges, rectangleCorners, pointInPolygon,
-  closestBoundaryPoint, boundingBox, fitScale
+  closestBoundaryPoint, boundingBox, fitScale, alignmentToEdge
 } from "../lib/geometry.js";
-import { neighbourhood } from "../lib/neighbourhood.js";
+import { cameraFor } from "../lib/projection.js";
 import { num } from "../lib/format.js";
+// MapLibre 6 ships named exports only — there is no default.
+// Its worker URL is set once in main.js; see the note there.
+import { Map as MapLibreKarte } from "maplibre-gl";
+
+/* Every backdrop comes through our own backend. The vector style is rewritten
+ * server-side so each URL inside it points back at /api/basemap/; the raster
+ * layers are the authority's own WMS behind /api/tiles/. The browser therefore
+ * needs no route to the internet, which is what makes this work behind a
+ * firewall — and what stopped it working when the style was loaded directly. */
+const KARTENSTIL = "/api/basemap/style.json";
+
+/**
+ * The proxy answers with relative URLs, because only the browser knows which
+ * origin it reached this API on. MapLibre needs them expanded before it can
+ * use them: it rejects a relative `sprite` outright ("must be absolute"), and
+ * handed a style object it has no base to resolve a source's TileJSON — and
+ * then the relative tile URLs inside that TileJSON go nowhere, which is a
+ * silent failure: the style never finishes loading and no tile is ever asked
+ * for. So every URL is made absolute here, against this page.
+ */
+async function vektorStil() {
+  // A style that does not arrive means no backdrop, not a page that waits
+  // forever: the drawing is what matters and it needs no network at all.
+  const abbruch = AbortSignal.timeout ? AbortSignal.timeout(15000) : undefined;
+  const antwort = await fetch(KARTENSTIL, { signal: abbruch });
+  if (!antwort.ok) throw new Error(`Kartenstil nicht ladbar (HTTP ${antwort.status})`);
+  const stil = await antwort.json();
+  const her = window.location.origin;
+  const absolut = wert => (typeof wert === "string" && wert.startsWith("/") ? `${her}${wert}` : wert);
+
+  if (stil.glyphs) stil.glyphs = absolut(stil.glyphs);
+  if (stil.sprite) {
+    stil.sprite = Array.isArray(stil.sprite)
+      ? stil.sprite.map(e => ({ ...e, url: absolut(e.url) }))
+      : absolut(stil.sprite);
+  }
+  // A source that points at a TileJSON is resolved here instead of by MapLibre:
+  // the tile URLs inside that document are relative too, and MapLibre does not
+  // resolve those against the source URL. Inlining them ends the guesswork.
+  await Promise.all(Object.values(stil.sources || {}).map(async quelle => {
+    if (Array.isArray(quelle.tiles)) quelle.tiles = quelle.tiles.map(absolut);
+    if (!quelle.url) return;
+    const tilejson = await fetch(absolut(quelle.url), { signal: abbruch }).then(a => (a.ok ? a.json() : null));
+    if (!tilejson || !Array.isArray(tilejson.tiles)) return;
+    delete quelle.url;
+    Object.assign(quelle, tilejson, { type: quelle.type, tiles: tilejson.tiles.map(absolut) });
+  }));
+  return stil;
+}
+
+/** A minimal raster style around one of the proxied WMS layers. */
+const rasterStil = (ebene, zuschreibung) => ({
+  version: 8,
+  sources: {
+    [ebene]: {
+      type: "raster",
+      tiles: [`${window.location.origin}/api/tiles/${ebene}/{z}/{x}/{y}.png`],
+      tileSize: 256,
+      maxzoom: 20,
+      attribution: zuschreibung
+    }
+  },
+  layers: [{ id: ebene, type: "raster", source: ebene }]
+});
+
+const GEOSN = "© GeoSN, dl-de/by-2-0";
+
+/** What each ground offers. `ohne` keeps the drawing on plain paper. */
+const HINTERGRUENDE = {
+  karte: vektorStil,
+  luftbild: async () => rasterStil("dop", GEOSN),
+  kataster: async () => rasterStil("alkis", GEOSN)
+};
 
 let laufendeNummer = 0;
 
@@ -151,17 +221,21 @@ export default {
     hoehe: { type: Number, default: 620 },
     interaktiv: { type: Boolean, default: false },
     kompakt: { type: Boolean, default: false },
-    grund: { type: String, default: "karte" },
+    // "ohne" by default: a backdrop is a MapLibre instance, and the small
+    // plans on cards and in the comparison must not each start one.
+    grund: { type: String, default: "ohne" },
     genordet: { type: Boolean, default: false },
-    nachbarn: { type: Boolean, default: true },
     masse: { type: Boolean, default: true },
     saum: { type: Boolean, default: true },
     /** Fixed pixels per metre. Without it each plan fits its own frame. */
-    massstab: { type: Number, default: null }
+    massstab: { type: Number, default: null },
+    /** Put a real basemap under the drawing. Needs `plot.anker`. */
+    /** Measuring mode: clicks add points, the run is measured segment by segment. */
+    messen: { type: Boolean, default: false }
   },
-  emits: ["verschieben"],
+  emits: ["verschieben", "gemessen"],
   data() {
-    return { uid: ++laufendeNummer, ziehen: null };
+    return { uid: ++laufendeNummer, ziehen: null, karteFehlt: false, messpunkte: [], messZeiger: null };
   },
   computed: {
     beschriftung() {
@@ -169,10 +243,20 @@ export default {
     },
     /** Dimension chains are noise at thumbnail size. */
     zeigeMasse() { return this.masse && !this.kompakt; },
-    drehung() { return this.genordet ? this.plot.nordVersatz : 0; },
-    nordWinkel() { return -this.plot.nordVersatz + this.drehung; },
+    /* Real outlines arrive already oriented: local +y is north. "Genordet"
+       therefore means no rotation, and "straßenparallel" turns the drawing by
+       the angle of the street front. */
+    drehung() {
+      if (this.genordet) return 0;
+      // Normalised to (-90°, 90°]: the raw edge angle would turn the plan upside
+      // down whenever the ring happens to run the other way round the boundary.
+      return alignmentToEdge(this.plot.polygon, this.plot.strassenkante ?? 0);
+    },
+    nordWinkel() { return this.drehung; },
+    /** A backdrop needs a ground that is not "ohne" and a georeference to put
+     *  it under. Without the anchor there is nothing to align a map to. */
+    hintergrund() { return this.grund !== "ohne" && Boolean(this.plot.anker) && !this.karteFehlt; },
     grundfarbe() { return this.grund === "luftbild" ? "var(--w2b-karte-gruen)" : "var(--w2b-karte-grund)"; },
-    umfeld() { return neighbourhood(this.plot.polygon, this.plot.flaecheAmtlich || 1, 0); },
 
     /* Frame the plot with a margin, then stretch the box to the frame's aspect
        so the drawing fills the panel instead of floating in it. */
@@ -200,24 +284,6 @@ export default {
       return this.hausEcken.filter(e => !pointInPolygon(e, this.fenster));
     },
     verstoss() { return this.ausreisser.length > 0; },
-    strassenkante() {
-      const [a, b] = [this.umfeld.street[0], this.umfeld.street[1]];
-      return { x1: this.p(a).x, y1: this.p(a).y, x2: this.p(b).x, y2: this.p(b).y };
-    },
-    raster() {
-      const linien = [];
-      for (let m = -160; m <= 220; m += 10) {
-        linien.push({ k: `x${m}`, x1: this.px(m), y1: -400, x2: this.px(m), y2: this.hoehe + 400 });
-        linien.push({ k: `y${m}`, x1: -400, y1: this.py(m), x2: this.breite + 400, y2: this.py(m) });
-      }
-      return linien;
-    },
-    gruenflaechen() {
-      const w = this.breite, h = this.hoehe;
-      return [[w * .18, h * .22, w * .11, h * .1], [w * .74, h * .3, w * .09, h * .08],
-              [w * .3, h * .78, w * .13, h * .07], [w * .82, h * .7, w * .08, h * .11],
-              [w * .12, h * .58, w * .07, h * .07]];
-    },
     ketten() {
       const kanten = polygonEdges(this.plot.polygon);
       const h = this.hausEcken;
@@ -229,6 +295,26 @@ export default {
         { a: h[1], b: h[2], off: -3.1, wert: this.koerper.depth }
       ];
       return liste.map(k => this.kette(k.a, k.b, k.off, `${num(k.wert)} m`));
+    },
+    messLinie() {
+      return this.messpunkte.map(m => { const q = this.p(m); return `${q.x.toFixed(1)},${q.y.toFixed(1)}`; }).join(" ");
+    },
+    /** One label per segment, plus the running total once there are three points. */
+    messBeschriftung() {
+      const texte = [];
+      let summe = 0;
+      for (let i = 1; i < this.messpunkte.length; i++) {
+        const a = this.messpunkte[i - 1], b = this.messpunkte[i];
+        const laenge = Math.hypot(b.x - a.x, b.y - a.y);
+        summe += laenge;
+        const A = this.p(a), B = this.p(b);
+        texte.push({ x: (A.x + B.x) / 2, y: (A.y + B.y) / 2 - 7, text: `${num(laenge)} m` });
+      }
+      if (this.messpunkte.length > 2) {
+        const letzter = this.p(this.messpunkte[this.messpunkte.length - 1]);
+        texte.push({ x: letzter.x, y: letzter.y + 18, text: `gesamt ${num(summe)} m` });
+      }
+      return texte;
     },
     engstelle() {
       if (!this.plot.polygon.length) return null;
@@ -248,7 +334,76 @@ export default {
       };
     }
   },
+  created() { this._kartenLauf = 0; },
+  mounted() { this.karteAufbauen(); },
+  beforeUnmount() { this.karteAbbauen(); },
+  watch: {
+    // A different ground means a different style; MapLibre cannot swap sources
+    // underneath itself, so the map is torn down and rebuilt.
+    hintergrund() { this.karteNeuAufbauen(); },
+    grund() { this.karteNeuAufbauen(); },
+    messen(an) { if (!an) this.messungLoeschen(); },
+    "plot.id"() {
+      this.messungLoeschen();
+      this.karteNeuAufbauen();
+    },
+    drehung() { this.kameraSetzen(); },
+    sicht() { this.kameraSetzen(); }
+  },
   methods: {
+    /** MapLibre needs WebGL and a network; neither is guaranteed. Any failure
+     *  leaves the drawing alone rather than taking the page down with it. */
+    karteNeuAufbauen() {
+      this.karteAbbauen();
+      this.karteFehlt = false;
+      // The container only exists once `hintergrund` has re-rendered it.
+      this.$nextTick(() => this.karteAufbauen());
+    },
+    async karteAufbauen() {
+      if (!this.hintergrund || !this.plot.anker || this._karte) return;
+      const bau = ++this._kartenLauf;
+      try {
+        const stil = await HINTERGRUENDE[this.grund]();
+        // The ground may have changed again while the style was in flight.
+        if (bau !== this._kartenLauf || !this.$refs.karte || this._karte) return;
+        this._karte = new MapLibreKarte({
+          container: this.$refs.karte,
+          style: stil,
+          center: [this.plot.anker.lon, this.plot.anker.lat],
+          zoom: 17,
+          interactive: false,
+          attributionControl: false,
+          // Set at construction or the map prints blank — it cannot be added later.
+          preserveDrawingBuffer: true
+        });
+        this._karte.on("load", () => this.kameraSetzen());
+        // A single missing icon or tile is not a broken map. Tearing the
+        // backdrop down for one of those is what made it look permanently
+        // unavailable; only a style that never loads counts as a failure.
+        this._karte.on("error", e => console.warn("Karte:", e?.error?.message || e));
+        this.kameraSetzen();
+      } catch (fehler) {
+        // A missing basemap must not take the drawing down, but staying silent
+        // about it would hide a broken build.
+        console.warn("Kartenhintergrund nicht verfügbar:", fehler);
+        if (bau === this._kartenLauf) this.karteFehlt = true;
+      }
+    },
+    karteAbbauen() {
+      if (this._karte) { this._karte.remove(); this._karte = null; }
+    },
+    /** Put the camera exactly where the drawing is, so overlay and ground agree. */
+    kameraSetzen() {
+      if (!this._karte || !this.plot.anker) return;
+      const breitePx = this.$refs.flaeche?.getBoundingClientRect().width || this.breite;
+      this._karte.jumpTo(cameraFor({
+        anchor: this.plot.anker,
+        centreMetres: { x: this.sicht.mx, y: this.sicht.my },
+        metresPerPixel: 1 / (this.sicht.scale * (breitePx / this.breite)),
+        rotation: this.drehung
+      }));
+      this._karte.resize();
+    },
     px(x) { return this.breite / 2 + (x - this.sicht.mx) * this.sicht.scale; },
     py(y) { return this.hoehe / 2 - (y - this.sicht.my) * this.sicht.scale; },
     p(v) {
@@ -285,7 +440,27 @@ export default {
       const uy = dx * Math.sin(-r) + dy * Math.cos(-r);
       return { x: this.sicht.mx + ux / this.sicht.scale, y: this.sicht.my - uy / this.sicht.scale };
     },
+    /** In measuring mode a click adds a point; a double click ends the run. */
+    messKlick(event) {
+      const punkt = this.inMeter(event);
+      this.messpunkte = [...this.messpunkte, punkt];
+      this.$emit("gemessen", { punkte: this.messpunkte, laenge: this.messLaenge() });
+    },
+    messLaenge() {
+      let summe = 0;
+      for (let i = 1; i < this.messpunkte.length; i++) {
+        summe += Math.hypot(this.messpunkte[i].x - this.messpunkte[i - 1].x,
+                            this.messpunkte[i].y - this.messpunkte[i - 1].y);
+      }
+      return summe;
+    },
+    messungLoeschen() {
+      this.messpunkte = [];
+      this.messZeiger = null;
+      this.$emit("gemessen", { punkte: [], laenge: 0 });
+    },
     griffFassen(event) {
+      if (this.messen) { this.messKlick(event); return; }
       if (!this.interaktiv || !event.target.closest("[data-haus]")) return;
       const point = this.inMeter(event);
       this.ziehen = { dx: this.koerper.cx - point.x, dy: this.koerper.cy - point.y };
@@ -293,6 +468,7 @@ export default {
       event.preventDefault();
     },
     griffZiehen(event) {
+      if (this.messen) { if (this.messpunkte.length) this.messZeiger = this.inMeter(event); return; }
       if (!this.ziehen) return;
       const point = this.inMeter(event);
       this.$emit("verschieben", { cx: point.x + this.ziehen.dx, cy: point.y + this.ziehen.dy });
@@ -314,8 +490,12 @@ export default {
 </script>
 
 <style scoped>
-.lageplan{ display: block; width: 100%; height: auto; touch-action: none; }
+.lageplan-huelle{ position: relative; }
+.lageplan__karte{ position: absolute; inset: 0; }
+.lageplan{ display: block; width: 100%; height: auto; touch-action: none; position: relative; }
 .lageplan--zieht{ cursor: grabbing; }
+.lageplan--messen{ cursor: crosshair; }
+.lageplan__mass--messen{ fill: var(--w2b-karte-verstoss); }
 .plan-griff{ cursor: grab; }
 .lageplan__mass{
   font-family: var(--w2b-daten); font-size: 10.5px; font-weight: 500;

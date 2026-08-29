@@ -15,6 +15,10 @@ from ..errors import BadRequestError, UpstreamError
 from ..settings import AppSettings, TilesSettings
 
 SERVICE_NAME = "Der Kartendienst des GeoSN"
+ADVICE = (
+    "Die Kartenebene bleibt leer; auf eine andere Ebene umschalten hilft meist. "
+    "Fläche, Bodenrichtwert und Bebauungsplanung sind davon nicht betroffen."
+)
 
 
 @dataclass(frozen=True)
@@ -83,6 +87,7 @@ class TileService:
             "GET",
             config.url,
             service=SERVICE_NAME,
+            advice=ADVICE,
             timeout_s=self.app_settings.http_timeout_s,
             user_agent=self.app_settings.user_agent,
             params=self._params(config, z, x, y),
@@ -90,6 +95,8 @@ class TileService:
         content_type = response.headers.get("content-type", "")
         if not content_type.startswith("image/"):
             # WMS reports errors as XML with HTTP 200.
-            raise UpstreamError(f"{SERVICE_NAME} hat statt einer Kachel eine Fehlermeldung geliefert.")
+            raise UpstreamError(
+                f"{SERVICE_NAME} hat statt einer Kachel eine Fehlermeldung geliefert. {ADVICE}"
+            )
         self.cache.set_bytes(cache_key, response.content)
         return response.content, False

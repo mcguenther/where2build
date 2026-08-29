@@ -30,6 +30,8 @@
           <span class="planleiste__schild">Grund</span>
           <div class="schaltgruppe" role="group" aria-label="Kartenhintergrund">
             <button v-for="g in gruende" :key="g.id" type="button"
+                    :disabled="g.id !== 'ohne' && !hatAnker"
+                    :title="g.id !== 'ohne' && !hatAnker ? 'Ohne Koordinate lässt sich keine Karte darunterlegen.' : null"
                     :aria-pressed="String(state.plan.grund === g.id)"
                     @click="state.plan.grund = g.id">{{ g.name }}</button>
           </div>
@@ -41,12 +43,12 @@
                     @click="state.plan.genordet = false">Straßenparallel</button>
           </div>
           <div class="dehnen"></div>
-          <button type="button" class="schalter" :aria-pressed="String(state.plan.nachbarn)"
-                  @click="state.plan.nachbarn = !state.plan.nachbarn">Nachbarn</button>
           <button type="button" class="schalter" :aria-pressed="String(state.plan.masse)"
                   @click="state.plan.masse = !state.plan.masse">Maße</button>
           <button type="button" class="schalter" :aria-pressed="String(state.plan.saum)"
                   @click="state.plan.saum = !state.plan.saum">Abstandsflächen</button>
+          <button type="button" class="schalter" :aria-pressed="String(state.plan.messen)"
+                  @click="messenUmschalten">Messen</button>
         </div>
 
         <p class="band" :class="verstoss ? 'band--fehler' : 'band--gut'" role="status">
@@ -60,9 +62,18 @@
           </span>
         </p>
 
-        <SitePlan :plot="plot" :koerper="koerper" interaktiv
+        <p v-if="state.plan.messen" class="band messband">
+          <span v-if="!messung.punkte.length">Auf den Plan klicken, um zu messen. Jeder weitere Klick verlängert den Streckenzug.</span>
+          <span v-else><b>{{ metres(messung.laenge) }}</b> über {{ messung.punkte.length - 1 }}
+            {{ messung.punkte.length === 2 ? "Abschnitt" : "Abschnitte" }}.</span>
+          <button v-if="messung.punkte.length" type="button" class="knopf knopf--still knopf--klein"
+                  style="margin-left:auto" @click="messungLoeschen">Zurücksetzen</button>
+        </p>
+
+        <SitePlan ref="plan" :plot="plot" :koerper="koerper" interaktiv
+                  :messen="state.plan.messen" @gemessen="m => (messung = m)"
                   :grund="state.plan.grund" :genordet="state.plan.genordet"
-                  :nachbarn="state.plan.nachbarn" :masse="state.plan.masse" :saum="state.plan.saum"
+                  :masse="state.plan.masse" :saum="state.plan.saum"
                   @verschieben="verschieben" />
 
         <div class="planfuss">
@@ -106,12 +117,13 @@
             <dt>Bodenrichtwert</dt><dd>{{ euroPerSqm(plot.bodenrichtwert) }} <span class="zart">Zone {{ plot.brwZone }}</span></dd>
             <dt>Stichtag</dt><dd>{{ date(plot.brwStichtag) }}</dd>
           </dl>
-          <div class="preisband">
+          <div v-if="Number.isFinite(plot.bodenrichtwert)" class="preisband">
             <div class="preisband__skala">
               <div class="preisband__achse"></div>
               <div class="preisband__spanne" :style="{ left: pos(plot.bodenrichtwert * .85) + '%', width: (pos(plot.bodenrichtwert * 1.15) - pos(plot.bodenrichtwert * .85)) + '%' }"></div>
               <div class="preisband__brw" :style="{ left: pos(plot.bodenrichtwert) + '%' }"></div>
-              <div class="preisband__marke" :style="{ left: pos(kennzahlen.jeQuadratmeter) + '%' }"
+              <div v-if="kennzahlen.jeQuadratmeter !== null" class="preisband__marke"
+                   :style="{ left: pos(kennzahlen.jeQuadratmeter) + '%' }"
                    :title="`Angebot ${euroPerSqm(kennzahlen.jeQuadratmeter)}/m²`"></div>
             </div>
             <div class="preisband__achsentext">
@@ -119,9 +131,13 @@
               <span>{{ Math.round(plot.bodenrichtwert) }} €</span>
               <span>{{ Math.round(spanne.hi) }} €</span>
             </div>
-            <p class="preisband__aussage">
+            <p v-if="kennzahlen.abweichung !== null" class="preisband__aussage">
               Das Angebot liegt <b>{{ percent(kennzahlen.abweichung) }}
               {{ kennzahlen.abweichung > 0 ? "über" : "unter" }} dem Bodenrichtwert</b> der Zone.
+            </p>
+            <p v-else class="preisband__aussage">
+              Ohne Kaufpreis lässt sich das Angebot nicht mit dem Bodenrichtwert vergleichen.
+              Der Preis steht im Inserat und kann oben eingetragen werden.
             </p>
           </div>
         </section>
@@ -243,15 +259,28 @@
           <p class="marke-klein">Erreichbarkeiten</p>
           <h2>Wege von hier</h2>
           <p class="seitenkopf__unter">
-            Für jedes hinterlegte Ziel Auto, Rad, ÖPNV und die beste Kombination.
+            Für jedes hinterlegte Ziel Auto, Rad und ÖPNV, gerechnet vom Grundstück aus.
             Ziele gelten für alle Grundstücke.
           </p>
         </div>
         <div class="dehnen"></div>
+        <button type="button" class="knopf nicht-drucken"
+                :disabled="!wegeMoeglich || wegeLaufen" @click="wegeBerechnen">
+          {{ wegeLaufen ? "Rechnet…" : "Wege berechnen" }}
+        </button>
         <button type="button" class="knopf knopf--still nicht-drucken" @click="state.ansicht = 'ziele'">
           Ziele bearbeiten
         </button>
       </div>
+
+      <p v-if="wegeFehler" class="band band--fehler">{{ wegeFehler }}</p>
+      <p v-else-if="!plot.anker" class="band">
+        Dieses Grundstück hat keine Koordinate — ohne sie gibt es keinen Startpunkt für eine Route.
+      </p>
+      <p v-else-if="!verortteZiele.length && state.daten.ziele.length" class="band">
+        Keines der Ziele ist verortet. Unter „Ziele bearbeiten“ die Adressen nachschlagen lassen.
+      </p>
+
       <RouteCards :plot="plot" />
     </section>
   </div>
@@ -260,8 +289,9 @@
 <script>
 import SitePlan from "../components/SitePlan.vue";
 import RouteCards from "../components/RouteCards.vue";
-import { state, plotById, placement, houseTypeById, houseFootprint, save, addHouseType, newId, EIGENMASS }
+import { state, plotById, placement, houseTypeById, houseFootprint, save, addHouseType, newId, setRoutes, EIGENMASS }
   from "../lib/store.js";
+import { erreichbarkeit } from "../lib/api.js";
 import { plotMetrics } from "../lib/metrics.js";
 import {
   polygonEdges, edgeCompass, buildableArea, cornersOutside, smallestSetback,
@@ -275,11 +305,25 @@ export default {
   data() {
     return {
       state, EIGENMASS,
-      gruende: [{ id: "karte", name: "Karte" }, { id: "luftbild", name: "Luftbild" }, { id: "kataster", name: "Kataster" }]
+      messung: { punkte: [], laenge: 0 },
+      wegeLaufen: false,
+      wegeFehler: null,
+      gruende: [
+        { id: "ohne", name: "Ohne" },
+        { id: "karte", name: "Karte" },
+        { id: "luftbild", name: "Luftbild" },
+        { id: "kataster", name: "Kataster" }
+      ]
     };
   },
   computed: {
+    /** Only destinations that carry a coordinate can be routed to. */
+    verortteZiele() {
+      return state.daten.ziele.filter(z => Number.isFinite(z.lat) && Number.isFinite(z.lon));
+    },
+    wegeMoeglich() { return Boolean(this.plot.anker) && this.verortteZiele.length > 0; },
     plot() { return plotById(state.offenesGrundstueck) || state.daten.grundstuecke[0] || null; },
+    hatAnker() { return Boolean(this.plot?.anker); },
     koerper() { return placement(this.plot); },
     haustyp() { return houseTypeById(this.plot.haustypId); },
     istEigenmass() { return this.plot.haustypId === EIGENMASS; },
@@ -293,7 +337,7 @@ export default {
     ausreisser() { return cornersOutside(this.koerper, this.fenster); },
     verstoss() { return this.ausreisser > 0; },
     engsterAbstand() { return smallestSetback(this.koerper, this.plot.polygon); },
-    strassenwinkel() { return alignmentToEdge(this.plot.polygon, 0); },
+    strassenwinkel() { return alignmentToEdge(this.plot.polygon, this.plot.strassenkante ?? 0); },
     seitenverhaeltnis() {
       const m = this.kennzahlen.mrr;
       return Math.max(m.width, m.height) / Math.min(m.width, m.height);
@@ -301,7 +345,7 @@ export default {
     spanne() { return { lo: this.plot.bodenrichtwert * 0.7, hi: this.plot.bodenrichtwert * 1.45 }; },
     grenzen() {
       return polygonEdges(this.plot.polygon).map((kante, i) => ({
-        name: `${edgeCompass(this.plot.polygon, i, this.plot.nordVersatz)} — ${i === 0 ? "zur Straße" : "Nachbar"}`,
+        name: `${edgeCompass(this.plot.polygon, i, this.plot.nordVersatz)} — ${i === (this.plot.strassenkante ?? 0) ? "zur Straße" : "Nachbar"}`,
         laenge: kante.length
       }));
     },
@@ -310,6 +354,39 @@ export default {
     naechstes() { return this.reihenfolge < state.daten.grundstuecke.length - 1; }
   },
   methods: {
+    /** Ask the routing service for every located destination at once and keep
+     *  what it answers. Nothing is filled in when a mode has no connection —
+     *  the card then says so instead of showing a plausible number. */
+    async wegeBerechnen() {
+      this.wegeLaufen = true;
+      this.wegeFehler = null;
+      try {
+        const antwort = await erreichbarkeit(
+          { lat: this.plot.anker.lat, lon: this.plot.anker.lon },
+          this.verortteZiele.map(z => ({ id: z.id, name: z.name, lat: z.lat, lon: z.lon })),
+          ["car", "bike", "transit"]
+        );
+        const wege = {};
+        (antwort.ergebnisse || []).forEach(e => {
+          (wege[e.destination_id] ||= {})[e.mode] = {
+            erreichbar: e.erreichbar,
+            duration_s: e.duration_s,
+            umstiege: e.umstiege,
+            geometry: e.geometry,
+            hinweis: e.hinweis
+          };
+        });
+        if (!Object.keys(wege).length) {
+          this.wegeFehler = "Der Routendienst hat keine einzige Verbindung zurückgegeben.";
+        } else {
+          setRoutes(this.plot.id, wege, antwort.quelle);
+        }
+      } catch (fehler) {
+        this.wegeFehler = fehler.message;
+      } finally {
+        this.wegeLaufen = false;
+      }
+    },
     area, euro, euroPerSqm, metres, num, percent, degrees, date,
     zurueck() { state.ansicht = "grundstuecke"; window.scrollTo({ top: 0 }); },
     blaettern(schritt) {
@@ -317,6 +394,14 @@ export default {
       if (ziel) { state.offenesGrundstueck = ziel.id; window.scrollTo({ top: 0 }); }
     },
     drucken() { window.print(); },
+    messenUmschalten() {
+      state.plan.messen = !state.plan.messen;
+      if (!state.plan.messen) this.messung = { punkte: [], laenge: 0 };
+    },
+    messungLoeschen() {
+      this.$refs.plan?.messungLoeschen();
+      this.messung = { punkte: [], laenge: 0 };
+    },
     pos(wert) {
       const { lo, hi } = this.spanne;
       return Math.max(0, Math.min(100, ((wert - lo) / (hi - lo)) * 100));
@@ -368,7 +453,7 @@ export default {
       save();
     },
     anStrasseAusrichten() {
-      const neu = alignToEdge(this.plot.polygon, this.fenster, this.koerper, 0);
+      const neu = alignToEdge(this.plot.polygon, this.fenster, this.koerper, this.plot.strassenkante ?? 0);
       this.plot.haus = { cx: neu.cx, cy: neu.cy, rotation: Math.round(neu.rotation * 10) / 10 };
       save();
     }
@@ -410,6 +495,7 @@ export default {
   background: var(--w2b-primaer); color: var(--w2b-primaer-auf);
 }
 .band{ border-radius: 0; }
+.messband{ display: flex; align-items: center; gap: var(--w2b-raum-3); border-bottom: 1px solid var(--w2b-linie); }
 .planfuss{
   display: flex; justify-content: space-between; gap: var(--w2b-raum-3); flex-wrap: wrap;
   padding: var(--w2b-raum-2) var(--w2b-raum-3); border-top: 1px solid var(--w2b-linie);

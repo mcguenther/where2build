@@ -13,6 +13,11 @@
       <button type="button" class="knopf" @click="aufnehmen">Grundstück hinzufügen</button>
     </div>
 
+    <p v-if="!backendDa" class="band band--fehler" role="alert">
+      Das Backend antwortet nicht. Ohne es lassen sich weder Flurstücke nachschlagen noch
+      Seiten auslesen — gespeicherte Grundstücke bleiben aber sichtbar.
+    </p>
+
     <div v-if="hatGrundstuecke" class="auswahlleiste tafel nicht-drucken">
       <span class="auswahlleiste__zahl daten">{{ auswahlText }}</span>
       <button type="button" class="knopf knopf--still knopf--klein" @click="alle">Alle auswählen</button>
@@ -32,7 +37,8 @@
 
       <div class="leerkarte">
         <h3>{{ hatGrundstuecke ? "Noch ein Kandidat?" : "Noch nichts in der Prüfung" }}</h3>
-        <p>Link einer Anzeige, eingefügte Seite oder Gemarkung mit Zähler und Nenner — drei Wege hinein.</p>
+        <p>Link einer Anzeige, eingefügte Seite oder Gemarkung mit Flurstücksnummer —
+          drei Wege hinein. Umriss und Fläche kommen aus dem Liegenschaftskataster.</p>
         <button type="button" class="knopf knopf--zweit" @click="aufnehmen">Grundstück hinzufügen</button>
       </div>
     </div>
@@ -42,11 +48,12 @@
 <script>
 import PlotCard from "../components/PlotCard.vue";
 import { state, toggleSelection, removePlot } from "../lib/store.js";
+import { backendZustand } from "../lib/api.js";
 
 export default {
   name: "PlotsView",
   components: { PlotCard },
-  data() { return { state }; },
+  data() { return { state, backendDa: true }; },
   computed: {
     gewaehlt() { return state.daten.auswahl; },
     hatGrundstuecke() { return state.daten.grundstuecke.length > 0; },
@@ -55,6 +62,9 @@ export default {
       if (n === 0) return "Nichts ausgewählt";
       return n === 1 ? "1 Grundstück ausgewählt" : `${n} Grundstücke ausgewählt`;
     }
+  },
+  async created() {
+    this.backendDa = Boolean(await backendZustand());
   },
   methods: {
     toggleSelection,

@@ -1,0 +1,22 @@
+{
+  "version": 8,
+  "name": "Liberty",
+  "sprite": [
+    {"id": "default", "url": "https://tiles.openfreemap.org/sprites/ofm_f384/ofm"},
+    {"id": "extra", "url": "https://tiles.openfreemap.org/sprites/ofm_f384/extra"}
+  ],
+  "glyphs": "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
+  "sources": {
+    "openmaptiles": {"type": "vector", "url": "https://tiles.openfreemap.org/planet"},
+    "ne2_shaded": {
+      "type": "raster",
+      "maxzoom": 6,
+      "tileSize": 256,
+      "tiles": ["https://tiles.openfreemap.org/natural_earth/ne2sr/{z}/{x}/{y}.png"]
+    }
+  },
+  "layers": [
+    {"id": "background", "type": "background", "paint": {"background-color": "#f8f4f0"}},
+    {"id": "water", "type": "fill", "source": "openmaptiles", "source-layer": "water"}
+  ]
+}
