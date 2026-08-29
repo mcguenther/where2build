@@ -24,7 +24,18 @@
   /* Without this the setback strip, the envelope and the footprint all print white. */
   *{ print-color-adjust: exact; -webkit-print-color-adjust: exact; }
 
-  :root{
+  /* Paper has no dark mode, and the sheet must not depend on which one the
+     screen was in. Both routes into the dark palette are written as
+     `:root[data-theme="dark"]` and `:root:not([data-theme="light"])` — both
+     (0,2,0), both stronger than a bare `:root` here, so without the second
+     selector below a printout from dark mode comes out with near-white ink and
+     a black halo around every boundary: legible on screen, blank on paper.
+     The values repeated here are the light ones from `tokens.css`. They can go
+     the day the two dark blocks there are wrapped in `@media screen`, which is
+     where they belong — the dark palette is a screen palette. */
+  :root, :root:not([data-theme="light"]){
+    color-scheme: light;
+
     --w2b-papier: #FFFFFF;
     --w2b-flaeche: #FFFFFF;
     --w2b-flaeche-tief: #FFFFFF;
@@ -37,6 +48,36 @@
        the row rules are what makes a printed list readable as a table. */
     --w2b-linie:      #8E877D;
     --w2b-linie-zart: #BDB6AB;
+
+    --w2b-tinte:      #1E1A16;
+    --w2b-graphit:    #4A443C;
+    --w2b-gedaempft:  #6F675C;
+
+    --w2b-primaer:          #2F4A3A;
+    --w2b-primaer-hell:     #456B52;
+    --w2b-primaer-schleier: rgba(47,74,58,.10);
+    --w2b-sekundaer:        #B5813C;
+    --w2b-sekundaer-text:   #7C5620;
+    --w2b-salbei:           #9DB39A;
+
+    --w2b-warnung:      #BE8524;
+    --w2b-warnung-text: #7C5620;
+    --w2b-fehler:       #A8402C;
+    --w2b-gut:          #2F4A3A;
+
+    --w2b-karte-grenze:          #1E1A16;
+    --w2b-karte-halo:            #FFFFFF;
+    --w2b-karte-fenster:         #2F4A3A;
+    --w2b-karte-saum:            rgba(47,74,58,.17);
+    --w2b-karte-entwurf:         #B5813C;
+    --w2b-karte-entwurf-rand:    #7C5620;
+    --w2b-karte-bestand:         #4A443C;
+    --w2b-karte-nachbar:         #9A9184;
+    --w2b-karte-strasse:         #B5813C;
+    --w2b-karte-strasse-flaeche: #D6D2CA;
+    --w2b-karte-verstoss:        #A8402C;
+    --w2b-karte-auswahl:         #456B52;
+    --w2b-karte-gruen:           #DCE4DA;
 
     /* Paper is not a screen: both scales come down a step. This is what turns
        seven loose sheets into one, and it costs nothing — every component
@@ -95,7 +136,7 @@
     padding: 0 !important;
     color: inherit !important;
     font: inherit !important;
-    font-variant-numeric: tabular-nums;
+    font-variant-numeric: tabular-nums !important;   /* `font: inherit` above resets it */
     resize: none;
   }
   input[type="number"]::-webkit-outer-spin-button,
