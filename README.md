@@ -79,10 +79,10 @@ lives in `localStorage`; **Daten** exports and imports it as JSON.
 ## Tests
 
 ```bash
-backend/.venv/bin/python -m pytest backend/tests -q   # 189 tests
-cd frontend && npm run test                           # 144 tests
+backend/.venv/bin/python -m pytest backend/tests -q   # 278 tests
+cd frontend && npm run test                           # 179 tests
 cd frontend && npm run test:integration               # 10, against a running backend
-node scripts/screenshots.mjs                          # 32 images, both themes, narrow and print
+node scripts/screenshots.mjs                          # 35 images and a print PDF
 ```
 
 The backend suite touches no network: ALKIS, BORIS, MOTIS, OpenFreeMap and the
@@ -131,6 +131,7 @@ nothing else.
 | `GET` | `/api/landvalue` | `?lat=&lon=` → €/m², zone, reference date |
 | `POST` | `/api/reachability` | origin + destinations + modes → durations and route geometry |
 | `GET` | `/api/tiles/{layer}/{z}/{x}/{y}.png` | cached proxy for the GeoSN WMS layers |
+| `POST` | `/api/nearby` | one coordinate → the nearest school, park, tram stop and so on, ranked by walking time |
 | `GET` | `/api/health` | which services are configured |
 
 ## Configuration

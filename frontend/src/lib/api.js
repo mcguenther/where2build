@@ -82,3 +82,12 @@ export const geocode = (text, near) =>
     method: "POST",
     body: JSON.stringify(near ? { text, lat: near.lat, lon: near.lon } : { text })
   });
+
+/**
+ * The nearest school, park, tram stop and so on, ranked by walking time —
+ * never by air distance, which is misleading wherever a railway or a river
+ * lies between. Categories the server has no data for come back marked as
+ * such, so "not configured" never reads as "there is none nearby".
+ */
+export const nearby = (origin, options = {}) =>
+  request("/nearby", { method: "POST", body: JSON.stringify({ origin, ...options }) });

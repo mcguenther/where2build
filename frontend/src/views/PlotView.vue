@@ -287,6 +287,8 @@
       </p>
 
       <RouteCards :plot="plot" />
+
+      <NearbyPanel :plot="plot" />
     </section>
   </div>
 </template>
@@ -294,6 +296,7 @@
 <script>
 import SitePlan from "../components/SitePlan.vue";
 import RouteCards from "../components/RouteCards.vue";
+import NearbyPanel from "../components/NearbyPanel.vue";
 import { state, plotById, placement, houseTypeById, houseFootprint, save, addHouseType, newId, setRoutes, CUSTOM_SIZE }
   from "../lib/store.js";
 import { reachability } from "../lib/api.js";
@@ -306,7 +309,7 @@ import { area, euro, euroPerSqm, metres, num, percent, degrees, date } from "../
 
 export default {
   name: "PlotView",
-  components: { SitePlan, RouteCards },
+  components: { SitePlan, RouteCards, NearbyPanel },
   data() {
     return {
       state, CUSTOM_SIZE,

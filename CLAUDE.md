@@ -148,6 +148,24 @@ from the user directly. Reopen only if the user asks.
   183 districts have a leading zero (`0101`), which a spreadsheet eats, and no
   valid number is below `0101`; padding a one-to-three-digit input can therefore
   only turn a dead input into the right one.
+- **`one-to-many` is a POST.** On a GET, repeated `many=` parameters are
+  silently collapsed — three destinations came back as one duration, and
+  reordering the same three turned it into a missing-parameter error. A GET
+  with a *single* destination looks like it works, which is how this survived
+  a check. `maxMatchingDistance` is required in the body, not optional. The
+  matrix takes 128 destinations and refuses the 129th.
+- **No OSM tag identifies an S-Bahn stop in Saxony** (`service=suburban`: zero
+  objects), and `school:DE` does not exist there either. So transit stops come
+  from MOTIS, whose modes are derived from the actual timetable, and the school
+  type is only derivable from the name string.
+- **The public Overpass instances forbid this use case** in their own manual,
+  which lists "setting up an app … and relying on the public instances as
+  backend" under problematic behaviour. Caching does not fix it; the rate limit
+  is per-IP, the worst case for a shared proxy. Schools, parks and the rest
+  therefore need a local Saxony extract, built by
+  `backend/scripts/build_poi_index.py`.
+- **Rank by walking time, never air distance.** Detour ratios reach 2.88x, and
+  the nearest thing by air can be unwalkable altogether.
 - **An address is not a plot.** A district address ("Plaußig-Portitz, 04349
   Leipzig") geocodes to a point in a field, and the parcel under it is not the
   one in the listing. `/api/parcels/resolve` takes `expected_area_m2` and
@@ -192,7 +210,7 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 227
-- `vitest`: 144 (plus `npm run test:integration`, 10 against a running backend)
-- `scripts/screenshots.mjs`: 32 images. It fails on console errors, on
+- `pytest`: 278
+- `vitest`: 179 (plus `npm run test:integration`, 10 against a running backend)
+- `scripts/screenshots.mjs`: 35 images plus a print PDF. It fails on console errors, on
   horizontal overflow, and if not a single vector tile arrived.

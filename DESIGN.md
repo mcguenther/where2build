@@ -218,6 +218,24 @@ gefunden." bricht dort auf vier Zeilen und schiebt die Fahrzeiten aus dem Bild.
 In der Karte steht „keine Verbindung"; der ganze Satz bleibt im `title`. Text
 wird für seinen Platz geschrieben, nicht einmal für alle Plätze.
 
+## Zwei Arten von Schweigen
+
+Eine leere Liste kann zweierlei heißen, und die zu verwechseln wäre gelogen:
+*hier gibt es nichts* oder *danach wurde gar nicht gesucht*. Die Umgebungstafel
+sagt beides getrennt — „Nichts gefunden für S-Bahn" gegen „Kein Datenbestand
+für Schule, Kita, Park … Das heißt nicht, dass es dort nichts gibt."
+
+Das gilt überall, wo ein Dienst nur teilweise antwortet: was nicht abgefragt
+wurde, ist `null`, nicht `[]`.
+
+## Entfernung heißt Fußweg
+
+In der Umgebungstafel steht die Gehzeit vorn und die Weglänge daneben, die
+Luftlinie nur im `title`. Eine Schule 400 m entfernt, aber jenseits der
+Bahnlinie, ist ein Kilometer Weg — und an einem Ufergrundstück ist das nach
+Luftlinie Nächstgelegene mitunter überhaupt nicht zu Fuß erreichbar. Sortiert
+wird deshalb nach dem, was man geht, nicht nach dem, was man misst.
+
 ## Was extrahiert wurde, ist ein Vorschlag
 
 Werte, die ein Modell aus einer Seite gelesen hat, erscheinen sichtbar anders

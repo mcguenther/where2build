@@ -154,7 +154,11 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
     await page.getByRole("button", { name: "Wege berechnen" }).click();
     await page.waitForSelector(".weg-karte polyline", { timeout: 60000 });
     await page.waitForTimeout(600);
-    await shot(page, "grundstueck-wege", mode);
+    // And the surroundings: transit stops are live, the OSM categories say
+    // plainly that this server has no index for them.
+    await page.getByRole("button", { name: "Nachsehen" }).click();
+    await page.waitForSelector(".umgebung__liste tbody tr", { timeout: 60000 });
+    await shot(page, "grundstueck-umgebung", mode);
     await page.click(".krume button");
 
     await page.click('.orte button:nth-child(4)');             // Daten
