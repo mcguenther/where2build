@@ -8,6 +8,8 @@ import {
   findPlacement, fitsAnywhere, alignmentToEdge, alignToEdge, edgeCompass
 } from "../src/lib/geometry.js";
 
+import { echtesGrundstueck } from "./hilfe.js";
+
 const ring = pairs => pairs.map(([x, y]) => ({ x, y }));
 const SQUARE = ring([[0, 0], [10, 0], [10, 10], [0, 10]]);
 const LIEBERTWOLKWITZ = ring([[0, 0], [22.6, 0.9], [24.3, 34.9], [1.6, 36.2]]);
@@ -216,5 +218,48 @@ describe("Punkt im Polygon", () => {
   it("unterscheidet innen und außen", () => {
     expect(pointInPolygon({ x: 5, y: 5 }, SQUARE)).toBe(true);
     expect(pointInPolygon({ x: 15, y: 5 }, SQUARE)).toBe(false);
+  });
+});
+
+describe("Große und vielgliedrige Flurstücke", () => {
+  /**
+   * Two parcels that ALKIS really returned. The strip is what a district
+   * address resolves to — 21 585 m² and 159 boundary points across a
+   * 1583 × 198 m ribbon. At a fixed 0.4 m grid that is two million cells and
+   * 314 million distance computations: the tab locks up long enough for the
+   * browser to offer to stop the script.
+   */
+  const parcels = {
+    "Streifen, 159 Ecken": echtesGrundstueck("vielecken"),
+    "Feld, 34 799 m²": echtesGrundstueck("gross")
+  };
+
+  for (const [name, plot] of Object.entries(parcels)) {
+    it(`${name}: das Fenster steht in vertretbarer Zeit`, () => {
+      const begonnen = Date.now();
+      buildableArea(plot.polygon, plot.tiefen);
+      // Well under a second on any machine that can run the app at all. The
+      // point is the bound, not the number: uncapped this took 2.7 s in Node.
+      expect(Date.now() - begonnen).toBeLessThan(900);
+    });
+
+    it(`${name}: das Fenster hält den Abstand trotz gröberem Raster`, () => {
+      const fenster = buildableArea(plot.polygon, plot.tiefen);
+      expect(fenster.length).toBeGreaterThanOrEqual(3);
+      const soll = Math.min(...plot.tiefen);
+      // Coarsening the grid must never buy area: every corner of the envelope
+      // stays at least the required distance from the boundary.
+      fenster.forEach(ecke => {
+        expect(distanceToBoundary(ecke, plot.polygon)).toBeGreaterThanOrEqual(soll);
+        expect(pointInPolygon(ecke, plot.polygon)).toBe(true);
+      });
+    });
+  }
+
+  it("lässt ein normales Grundstück beim feinen Raster", () => {
+    // The cap must not cost precision where precision is what people plan on.
+    const klein = echtesGrundstueck("konkav");
+    const fein = buildableArea(klein.polygon, klein.tiefen, { step: 0.4 });
+    expect(polygonArea(fein)).toBeGreaterThan(polygonArea(klein.polygon) * 0.6);
   });
 });

@@ -264,6 +264,17 @@ class ParcelResolveRequest(BaseModel):
         max_length=20,
         description="Flurstücksnummer wie im Geoportal, etwa „85/1“, „476“ oder „41/e“.",
     )
+    # What the listing says the plot measures. Only ever used to judge the
+    # answer, never to filter it -- see app/plausibility.py.
+    expected_area_m2: int | None = Field(
+        default=None,
+        ge=1,
+        le=10_000_000,
+        description=(
+            "Erwartete Grundstücksfläche in m², etwa aus dem Inserat. Wird nur zur "
+            "Plausibilitätsprüfung der Antwort verwendet."
+        ),
+    )
 
     @model_validator(mode="after")
     def _exactly_one_way_in(self) -> "ParcelResolveRequest":
@@ -351,6 +362,37 @@ class GrundstueckFeature(BaseModel):
     properties: GrundstueckProperties
 
 
+PlausibilityIssue = Literal[
+    "area_too_large",
+    "area_too_small",
+    "shape_atypical",
+    "address_is_not_a_street_address",
+]
+
+
+class Plausibility(BaseModel):
+    """Whether the answer can be the plot the caller expected.
+
+    Never an error and never a filter: the parcel is returned either way. The
+    frontend needs to tell "this is your plot" from "this is the field your
+    district address landed in", and that is what ``issues`` is for --
+    ``warning`` is the same finding as one German sentence to show.
+    """
+
+    plausible: bool
+    issues: list[PlausibilityIssue] = Field(default_factory=list)
+    # The listing's area as it came in, so the frontend can show both sides.
+    expected_area_m2: int | None = None
+    # The official ALKIS area of the whole plot, the number the factor uses.
+    flaeche_amtlich_m2: float | None = None
+    area_factor: float | None = None
+    # Sides of the tightest (rotated) rectangle around the plot, in metres.
+    longest_extent_m: float | None = None
+    shortest_extent_m: float | None = None
+    elongation: float | None = None
+    warning: str | None = None
+
+
 class ParcelCollection(BaseModel):
     type: Literal["FeatureCollection"] = "FeatureCollection"
     crs_hinweis: str = "EPSG:4326 (WGS84); Längen und Flächen wurden in EPSG:25833 gerechnet."
@@ -358,6 +400,7 @@ class ParcelCollection(BaseModel):
     grundstueck: GrundstueckFeature
     quelle: str = "Landesamt für Geobasisinformation Sachsen (GeoSN), dl-de/by-2-0"
     hinweis: str | None = None
+    plausibility: Plausibility | None = None
 
 
 # --------------------------------------------------------------------------

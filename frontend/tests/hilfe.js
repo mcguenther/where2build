@@ -1,6 +1,8 @@
 /** Test helpers: real plots and house types, built from the recorded fixtures. */
 import konvex from "./fixtures/parcel-konvex.json";
 import konkav from "./fixtures/parcel-konkav.json";
+import gross from "./fixtures/parcel-gross.json";
+import vielecken from "./fixtures/parcel-vielecken.json";
 import elk from "./fixtures/housetype-elk.json";
 import wege from "./fixtures/reachability-liebertwolkwitz.json";
 import { plotAusKataster } from "../src/lib/plots.js";
@@ -8,8 +10,12 @@ import { haustypAusAntwort } from "../src/lib/houseTypes.js";
 
 export const echterHaustyp = () => ({ ...haustypAusAntwort(elk), id: "ht-elk" });
 
+/* Four parcels ALKIS really returned. "gross" is 34 799 m² in Moritzburg;
+   "vielecken" is the 1583 x 198 m strip a district address resolves to. */
+const FLURSTUECKE = { konvex, konkav, gross, vielecken };
+
 export const echtesGrundstueck = (form = "konvex", zusatz = {}) => ({
-  ...plotAusKataster(form === "konvex" ? konvex : konkav, {
+  ...plotAusKataster(FLURSTUECKE[form] ?? konvex, {
     kaufpreis: 349000, bodenrichtwert: 210, brwZone: "5417", brwStichtag: "2026-01-01", ...zusatz
   }),
   id: `gs-${form}`,

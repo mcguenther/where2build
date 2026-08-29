@@ -30,6 +30,7 @@ from ..schemas import (
     ParcelCollection,
     ParcelFeature,
     ParcelProperties,
+    Plausibility,
 )
 from ..settings import AlkisSettings, AppSettings
 from ..upstream import request
@@ -63,8 +64,43 @@ _TEXT_FIELDS = (
 )
 
 
+# Saxony's Land prefix in the six-digit Gemarkungsschlüssel. Verified against
+# the service on 29.08.2026: all 5 339 ``ave:KatasterBezirk`` features of art
+# "Gemarkung" carry a six-digit ``schluessel``, every one of them starting
+# with 14, and their four-digit tails are all distinct -- so expanding a short
+# key is unambiguous.
+LAND_PREFIX = "14"
+GEMARKUNG_NUMBER_LENGTH = 4
+
+
 def _local(tag: str) -> str:
     return tag.rsplit("}", 1)[-1]
+
+
+def expand_gemarkung_key(value: str) -> str:
+    """A short cadastral district number to the six-digit key ALKIS stores.
+
+    The Geoportal prints the same district two ways: its 'Gemarkung' layer
+    shows the full key (Moritzburg: 143044), its 'Flurstueck' layer shows only
+    the four-digit Gemarkungsnummer out of the parcel key (3044). A user
+    reading the second one has no way to know the first exists, so the short
+    form is expanded here rather than answering 404.
+
+    Expanded up front instead of retried after an empty result: no six-digit
+    key can be confused with a short one -- they all start with 14 -- so there
+    is nothing to disambiguate and no reason to spend a request finding out.
+
+    Numbers below four digits are zero-padded. The service always presents the
+    four digits padded ('0101' for Borna, 183 of 5 339 districts start with a
+    zero), but a key that has been through a spreadsheet or a number field has
+    lost the padding, and no valid Gemarkungsnummer is below 0101 -- so padding
+    can only ever turn a dead input into the right one.
+    """
+
+    key = value.strip()
+    if not key.isdigit() or len(key) > GEMARKUNG_NUMBER_LENGTH:
+        return key
+    return LAND_PREFIX + key.zfill(GEMARKUNG_NUMBER_LENGTH)
 
 
 def _axis_swapped(srs_name: str | None) -> bool:
@@ -215,7 +251,11 @@ def parse_feature_collection(xml: bytes | str) -> list[Flurstueck]:
     return parcels
 
 
-def to_collection(parcels: Iterable[Flurstueck], hinweis: str | None = None) -> ParcelCollection:
+def to_collection(
+    parcels: Iterable[Flurstueck],
+    hinweis: str | None = None,
+    plausibility: Plausibility | None = None,
+) -> ParcelCollection:
     """Build the API answer: every parcel plus their union.
 
     A plot is a set of parcels -- geometries are unioned and the *official*
@@ -277,6 +317,7 @@ def to_collection(parcels: Iterable[Flurstueck], hinweis: str | None = None) -> 
             ),
         ),
         hinweis=hinweis,
+        plausibility=plausibility,
     )
 
 
@@ -374,9 +415,10 @@ class AlkisService:
         text because ALKIS stores it as text -- 41/e is a valid parcel number.
         """
 
-        district_attribute = "gemaschl" if gemarkung.strip().isdigit() else "gemarkung"
+        district = expand_gemarkung_key(gemarkung)
+        district_attribute = "gemaschl" if district.isdigit() else "gemarkung"
         conditions = [
-            (district_attribute, gemarkung.strip()),
+            (district_attribute, district),
             ("flstnrzae", str(zaehler)),
         ]
         if nenner is not None and str(nenner).strip():

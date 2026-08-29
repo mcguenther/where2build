@@ -1,0 +1,117 @@
+[
+  {
+    "type": "PLACE",
+    "category": "suburb",
+    "tokens": [
+      [
+        0.0,
+        17.0
+      ],
+      [
+        18.0,
+        5.0
+      ],
+      [
+        24.0,
+        7.0
+      ]
+    ],
+    "name": "Plaußig-Portitz",
+    "id": "node/[250737665]",
+    "lat": 51.3832189,
+    "lon": 12.4630253,
+    "country": "DE",
+    "zip": "04349",
+    "tz": "Europe/Berlin",
+    "areas": [
+      {
+        "name": "Deutschland",
+        "adminLevel": 2.0,
+        "matched": false,
+        "unique": false,
+        "default": false
+      },
+      {
+        "name": "Sachsen",
+        "adminLevel": 4.0,
+        "matched": false,
+        "unique": false,
+        "default": false
+      },
+      {
+        "name": "Leipzig",
+        "adminLevel": 6.0,
+        "matched": true,
+        "unique": true,
+        "default": true
+      },
+      {
+        "name": "Nordost",
+        "adminLevel": 9.0,
+        "matched": false,
+        "unique": false,
+        "default": false
+      }
+    ],
+    "score": -37.75
+  },
+  {
+    "type": "STOP",
+    "tokens": [
+      [
+        0.0,
+        17.0
+      ],
+      [
+        18.0,
+        5.0
+      ],
+      [
+        24.0,
+        7.0
+      ]
+    ],
+    "name": "Plaußig (Leipzig), Portitzmühlweg",
+    "id": "de-DELFI_de:14713:12814::01",
+    "lat": 51.39189,
+    "lon": 12.443473,
+    "country": "DE",
+    "zip": "04349",
+    "tz": "Europe/Berlin",
+    "areas": [
+      {
+        "name": "Deutschland",
+        "adminLevel": 2.0,
+        "matched": false,
+        "unique": false,
+        "default": false
+      },
+      {
+        "name": "Sachsen",
+        "adminLevel": 4.0,
+        "matched": false,
+        "unique": false,
+        "default": false
+      },
+      {
+        "name": "Leipzig",
+        "adminLevel": 6.0,
+        "matched": true,
+        "unique": true,
+        "default": true
+      },
+      {
+        "name": "Nordost",
+        "adminLevel": 9.0,
+        "matched": false,
+        "unique": false,
+        "default": false
+      }
+    ],
+    "score": -31.100000381469727,
+    "modes": [
+      "BUS"
+    ],
+    "importance": 4.944822194374865e-06
+  }
+]

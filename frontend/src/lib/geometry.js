@@ -123,7 +123,25 @@ function clearance(point, ring, edges, depths) {
  * empty. Accuracy follows the grid step, which is well inside what the
  * pre-project note asks of this drawing: the binding numbers come from ALKIS.
  */
-function insetByGrid(ring, depths, step, sicherheit) {
+/* The clearance field costs one point-to-edge distance per cell per boundary
+ * segment, so the work grows with area times vertex count. A real cadastral
+ * parcel can be a 1583 x 198 m strip with 159 boundary points: at 0.4 m that is
+ * two million cells and 314 million distance computations, which locks the tab
+ * up long enough for the browser to offer to stop the script.
+ *
+ * Cap the cell count and let the step grow instead. Coarsening stays safe by
+ * construction: the inward bias is derived from the step, so a coarser grid
+ * yields a smaller envelope, never a more permissive one. A plot of ordinary
+ * size stays at the requested resolution — the cap only bites on land nobody
+ * plans a house on to the decimetre. */
+const MAX_GRID_CELLS = 120_000;
+
+function gridStep(box, wanted) {
+  const cells = (box.width / wanted) * (box.height / wanted);
+  return cells <= MAX_GRID_CELLS ? wanted : wanted * Math.sqrt(cells / MAX_GRID_CELLS);
+}
+
+function insetByGrid(ring, depths, step, safety) {
   const box = boundingBox(ring);
   const edges = polygonEdges(ring);
   const cols = Math.ceil(box.width / step) + 3;
@@ -133,7 +151,7 @@ function insetByGrid(ring, depths, step, sicherheit) {
 
   const field = new Float64Array(cols * rows);
   for (let j = 0; j < rows; j++)
-    for (let i = 0; i < cols; i++) field[j * cols + i] = clearance(at(i, j), ring, edges, depths) - sicherheit;
+    for (let i = 0; i < cols; i++) field[j * cols + i] = clearance(at(i, j), ring, edges, depths) - safety;
 
   // One segment per cell crossing, then chained into a ring.
   const segments = [];
@@ -206,14 +224,46 @@ const CACHE_GRENZE = 64;
 function cacheSchluessel(ring, depths, options) {
   const p = ring.map(v => `${v.x.toFixed(2)},${v.y.toFixed(2)}`).join(";");
   const d = Array.isArray(depths) ? depths.join(",") : String(depths);
-  return `${p}|${d}|${options.step ?? ""}|${options.sicherheit ?? ""}`;
+  return `${p}|${d}|${options.step ?? ""}|${options.safety ?? ""}`;
+}
+
+/**
+ * A plain copy of a ring.
+ *
+ * Vue hands components their props as reactive proxies, and a proxy charges a
+ * trap for every single property read. The clearance field reads two numbers
+ * per cell per boundary segment — hundreds of millions of reads on a real
+ * parcel — and measured 23.5x slower through a proxy than on plain objects:
+ * 26 seconds instead of one. That is what froze the tab.
+ *
+ * One O(n) copy at the door buys it all back, and keeps the geometry module
+ * free of any dependency on the framework that happens to own the data.
+ */
+function plainRing(ring) {
+  const out = new Array(ring.length);
+  for (let i = 0; i < ring.length; i++) {
+    const v = ring[i];
+    out[i] = Array.isArray(v) ? { x: v[0], y: v[1] } : { x: v.x, y: v.y };
+  }
+  return out;
+}
+
+/** The same, for the per-segment setback depths. */
+function plainDepths(depths, length) {
+  if (!Array.isArray(depths)) return Number(depths);
+  const out = new Array(depths.length);
+  for (let i = 0; i < depths.length; i++) out[i] = Number(depths[i]);
+  void length;
+  return out;
 }
 
 export function buildableArea(ring, depths, options = {}) {
   const schluessel = cacheSchluessel(ring, depths, options);
   const gemerkt = fensterCache.get(schluessel);
   if (gemerkt) return gemerkt;
-  const ergebnis = berechneBuildableArea(ring, depths, options);
+  const ergebnis = berechneBuildableArea(
+    plainRing(ring), plainDepths(depths, ring.length), options
+  );
   if (fensterCache.size >= CACHE_GRENZE) fensterCache.delete(fensterCache.keys().next().value);
   fensterCache.set(schluessel, ergebnis);
   return ergebnis;
@@ -228,8 +278,8 @@ function berechneBuildableArea(ring, depths, options) {
        by the same order of magnitude, so an approximate envelope is always a
        little too strict rather than a little too permissive — being generous
        here would let a house sit closer to the boundary than the law allows. */
-    const step = options.step ?? 0.4;
-    return insetByGrid(poly, offsets, step, options.sicherheit ?? step * 0.55);
+    const step = gridStep(boundingBox(poly), options.step ?? 0.4);
+    return insetByGrid(poly, offsets, step, options.safety ?? step * 0.55);
   }
 
   let envelope = poly;
@@ -361,7 +411,7 @@ export function findPlacement(envelope, width, depth, options = {}) {
   if (!envelope.length) return null;
   const schluessel = `${envelope.map(v => `${v.x.toFixed(1)},${v.y.toFixed(1)}`).join(";")}|${width.toFixed(2)}|${depth.toFixed(2)}|${options.rotation ?? ""}|${options.near ? `${options.near.x.toFixed(1)},${options.near.y.toFixed(1)}` : ""}|${options.step ?? ""}`;
   if (lageCache.has(schluessel)) return lageCache.get(schluessel);
-  const ergebnis = sucheLage(envelope, width, depth, options);
+  const ergebnis = sucheLage(plainRing(envelope), width, depth, options);
   if (lageCache.size >= CACHE_GRENZE) lageCache.delete(lageCache.keys().next().value);
   lageCache.set(schluessel, ergebnis);
   return ergebnis;

@@ -284,3 +284,235 @@ def test_a_unique_parcel_gets_no_such_hint(client: TestClient):
     )
 
     assert answer.json()["hinweis"] is None
+
+
+# --------------------------------------------------------------------------
+# Gemarkungsschlüssel: the Geoportal shows the same district two ways
+# --------------------------------------------------------------------------
+
+
+@respx.mock
+def test_a_four_digit_gemarkung_key_reaches_the_wfs_as_six(client: TestClient):
+    # The 'Flurstueck' layer prints 3044 for Moritzburg, the 'Gemarkung' layer
+    # 143044. Only the second one is in ALKIS, and a user reading the first has
+    # no way to know that.
+    route = respx.post(ALKIS_URL).mock(
+        return_value=httpx.Response(200, content=fixture_bytes("alkis_flurstueck_moritzburg.gml"))
+    )
+
+    answer = client.post(
+        "/api/parcels/resolve", json={"gemarkung": "3044", "flurstuecksnummer": "1"}
+    )
+
+    assert answer.status_code == 200
+    body = route.calls[0].request.content.decode("utf-8")
+    assert "<fes:Literal>143044</fes:Literal>" in body
+    assert "<fes:ValueReference>ave:gemaschl</fes:ValueReference>" in body
+    grundstueck = answer.json()["grundstueck"]["properties"]
+    assert grundstueck["flaeche_amtlich_m2"] == 34799.0  # as in the Geoportal
+    assert grundstueck["gemarkung"] == "Moritzburg"
+
+
+@respx.mock
+def test_the_expanded_key_is_named_in_the_answer(client: TestClient):
+    respx.post(ALKIS_URL).mock(
+        return_value=httpx.Response(200, content=fixture_bytes("alkis_flurstueck_moritzburg.gml"))
+    )
+
+    answer = client.post(
+        "/api/parcels/resolve", json={"gemarkung": "3044", "flurstuecksnummer": "1"}
+    )
+
+    hinweis = answer.json()["hinweis"]
+    assert "3044" in hinweis and "143044" in hinweis
+
+
+@respx.mock
+def test_a_six_digit_key_is_left_alone(client: TestClient):
+    route = respx.post(ALKIS_URL).mock(
+        return_value=httpx.Response(200, content=fixture_bytes("alkis_flurstueck_moritzburg.gml"))
+    )
+
+    answer = client.post(
+        "/api/parcels/resolve", json={"gemarkung": "143044", "flurstuecksnummer": "1"}
+    )
+
+    assert "<fes:Literal>143044</fes:Literal>" in route.calls[0].request.content.decode("utf-8")
+    assert answer.json()["hinweis"] is None
+
+
+@respx.mock
+def test_a_district_name_is_never_expanded(client: TestClient):
+    route = respx.post(ALKIS_URL).mock(
+        return_value=httpx.Response(200, content=fixture_bytes("alkis_flurstueck_moritzburg.gml"))
+    )
+
+    answer = client.post(
+        "/api/parcels/resolve", json={"gemarkung": "Moritzburg", "flurstuecksnummer": "1"}
+    )
+
+    body = route.calls[0].request.content.decode("utf-8")
+    assert "<fes:ValueReference>ave:gemarkung</fes:ValueReference>" in body
+    assert "14Moritzburg" not in body
+    assert answer.json()["hinweis"] is None
+
+
+@respx.mock
+def test_a_key_below_four_digits_is_zero_padded(client: TestClient):
+    # 183 of Saxony's 5 339 districts have a leading zero (Borna is 140101);
+    # a key that has been through a number field has lost it.
+    route = respx.post(ALKIS_URL).mock(
+        return_value=httpx.Response(200, content=fixture_bytes("alkis_flurstueck_single.gml"))
+    )
+
+    client.post("/api/parcels/resolve", json={"gemarkung": "101", "flurstuecksnummer": "1"})
+
+    assert "<fes:Literal>140101</fes:Literal>" in route.calls[0].request.content.decode("utf-8")
+
+
+@respx.mock
+def test_a_wrong_key_is_a_404_that_names_the_key_it_searched(client: TestClient):
+    respx.post(ALKIS_URL).mock(
+        return_value=httpx.Response(200, content=fixture_bytes("alkis_leer.gml"))
+    )
+
+    answer = client.post(
+        "/api/parcels/resolve", json={"gemarkung": "9999", "flurstuecksnummer": "1"}
+    )
+
+    assert answer.status_code == 404
+    detail = answer.json()["detail"]
+    assert "9999" in detail and "149999" in detail
+    # The sentence teaches the rule that cost a user the guessing in the first place.
+    assert "sechsstellig" in detail
+
+
+@respx.mock
+def test_a_wrong_full_key_does_not_explain_an_expansion_that_did_not_happen(
+    client: TestClient,
+):
+    respx.post(ALKIS_URL).mock(
+        return_value=httpx.Response(200, content=fixture_bytes("alkis_leer.gml"))
+    )
+
+    answer = client.post(
+        "/api/parcels/resolve", json={"gemarkung": "149999", "flurstuecksnummer": "1"}
+    )
+
+    assert answer.status_code == 404
+    assert "sechsstellig" not in answer.json()["detail"]
+
+
+# --------------------------------------------------------------------------
+# Plausibility: an address alone is not a plot
+# --------------------------------------------------------------------------
+
+
+@respx.mock
+def test_a_district_address_lands_on_a_field_and_the_answer_says_so(client: TestClient):
+    # Recorded live: "Plaußig-Portitz, 04349 Leipzig" geocodes to a PLACE, and
+    # the parcel under that point is a 21 609 m2 field along Tauchaer Straße.
+    respx.get(GEOCODE_URL).mock(
+        return_value=httpx.Response(200, json=fixture_json("motis_geocode_ortsteil.json"))
+    )
+    respx.get(ALKIS_URL).mock(
+        return_value=httpx.Response(200, content=fixture_bytes("alkis_flurstueck_feldstreifen.gml"))
+    )
+
+    answer = client.post(
+        "/api/parcels/resolve",
+        json={"address": "Plaußig-Portitz, 04349 Leipzig", "expected_area_m2": 908},
+    )
+
+    assert answer.status_code == 200  # a warning, never an error
+    plausibility = answer.json()["plausibility"]
+    assert plausibility["plausible"] is False
+    assert set(plausibility["issues"]) == {
+        "area_too_large",
+        "shape_atypical",
+        "address_is_not_a_street_address",
+    }
+    assert plausibility["area_factor"] == pytest.approx(23.8, abs=0.1)
+    assert plausibility["expected_area_m2"] == 908
+    assert "21.609 m²" in plausibility["warning"]
+
+
+@respx.mock
+def test_the_flagged_parcel_is_still_returned_in_full(client: TestClient):
+    respx.get(GEOCODE_URL).mock(
+        return_value=httpx.Response(200, json=fixture_json("motis_geocode_ortsteil.json"))
+    )
+    respx.get(ALKIS_URL).mock(
+        return_value=httpx.Response(200, content=fixture_bytes("alkis_flurstueck_feldstreifen.gml"))
+    )
+
+    body = client.post(
+        "/api/parcels/resolve",
+        json={"address": "Plaußig-Portitz, 04349 Leipzig", "expected_area_m2": 908},
+    ).json()
+
+    # A caller who really wants this parcel keeps it.
+    assert body["features"][0]["properties"]["kennzeichen"] == "140428___00165000101"
+    assert body["grundstueck"]["properties"]["flaeche_amtlich_m2"] == 21609.0
+
+
+@respx.mock
+def test_a_house_address_on_a_matching_plot_is_plausible(client: TestClient):
+    respx.get(GEOCODE_URL).mock(
+        return_value=httpx.Response(200, json=fixture_json("motis_geocode.json"))
+    )
+    respx.get(ALKIS_URL).mock(
+        return_value=httpx.Response(
+            200, content=fixture_bytes("alkis_flurstueck_baugrundstueck.gml")
+        )
+    )
+
+    answer = client.post(
+        "/api/parcels/resolve",
+        json={"address": "Plaußiger Dorfstraße 21, 04349 Leipzig", "expected_area_m2": 911},
+    )
+
+    plausibility = answer.json()["plausibility"]
+    assert plausibility["plausible"] is True
+    assert plausibility["issues"] == []
+    assert plausibility["warning"] is None
+
+
+@respx.mock
+def test_the_plausibility_block_travels_without_an_expected_area(client: TestClient):
+    respx.post(ALKIS_URL).mock(
+        return_value=httpx.Response(200, content=fixture_bytes("alkis_flurstueck_feldstreifen.gml"))
+    )
+
+    plausibility = client.post(
+        "/api/parcels/resolve", json={"gemarkung": "140428", "flurstuecksnummer": "165/1"}
+    ).json()["plausibility"]
+
+    assert plausibility["issues"] == ["shape_atypical"]
+    assert plausibility["area_factor"] is None
+    assert plausibility["longest_extent_m"] > 1500
+
+
+@respx.mock
+def test_an_expected_area_works_on_the_coordinate_way_in_too(client: TestClient):
+    respx.get(ALKIS_URL).mock(
+        return_value=httpx.Response(200, content=fixture_bytes("alkis_flurstueck_feldstreifen.gml"))
+    )
+
+    plausibility = client.post(
+        "/api/parcels/resolve",
+        json={"lat": 51.3866, "lon": 12.4485, "expected_area_m2": 908},
+    ).json()["plausibility"]
+
+    assert "area_too_large" in plausibility["issues"]
+    # No geocoder was involved, so nothing is claimed about the address.
+    assert "address_is_not_a_street_address" not in plausibility["issues"]
+
+
+def test_an_expected_area_of_zero_is_refused(client: TestClient):
+    answer = client.post(
+        "/api/parcels/resolve", json={"lat": 51.3, "lon": 12.3, "expected_area_m2": 0}
+    )
+
+    assert answer.status_code == 422
+    assert answer.json()["felder"][0]["pfad"] == ["body", "expected_area_m2"]
