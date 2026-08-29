@@ -8,7 +8,7 @@ import respx
 
 from app.deps import alkis_service
 from app.errors import NotFoundError, UpstreamError
-from app.services.alkis import parse_feature_collection, to_collection
+from app.services.alkis import expand_gemarkung_key, parse_feature_collection, to_collection
 
 from .conftest import ALKIS_URL, fixture_bytes
 
@@ -147,3 +147,35 @@ async def test_second_identical_query_is_served_from_the_cache():
     await service.by_kennzeichen("140415___00604000202")
 
     assert route.call_count == 1
+
+
+# --------------------------------------------------------------------------
+# Gemarkungsschlüssel -- verified against the WFS on 29.08.2026: all 5 339
+# districts have a six-digit key, every one starts with 14, and their
+# four-digit tails are distinct.
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("eingabe", "erwartet"),
+    [
+        ("3044", "143044"),  # Moritzburg, as the 'Flurstueck' layer prints it
+        ("143044", "143044"),  # already the full key
+        ("0101", "140101"),  # Borna, four digits with the leading zero kept
+        ("101", "140101"),  # the same key after a number field ate the zero
+        ("1", "140001"),  # padded; no district is that low, so this 404s
+        (" 3044 ", "143044"),
+        ("Moritzburg", "Moritzburg"),  # a name is never a key
+        ("14304", "14304"),  # five digits: a typo, not a short key
+        ("1430441", "1430441"),  # seven: likewise
+        ("30-44", "30-44"),
+    ],
+)
+def test_a_short_district_key_expands_to_the_six_digit_one(eingabe: str, erwartet: str):
+    assert expand_gemarkung_key(eingabe) == erwartet
+
+
+def test_expanding_an_already_expanded_key_changes_nothing():
+    once = expand_gemarkung_key("3044")
+
+    assert expand_gemarkung_key(once) == once

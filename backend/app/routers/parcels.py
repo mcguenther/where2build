@@ -19,19 +19,19 @@ GEOCODING_HINT = (
 )
 
 SHORT_KEY_HINT = (
-    "Der Gemarkungsschlüssel „{eingegeben}“ wurde als „{vollstaendig}“ gesucht: in "
+    "Der Gemarkungsschlüssel „{entered}“ wurde als „{full_key}“ gesucht: in "
     "Sachsen ist er sechsstellig und beginnt mit der Landesnummer 14. Die Kartenebene "
     "„Flurstück“ im Geoportal zeigt nur die letzten vier Stellen."
 )
 
 NOT_FOUND_BY_IDENTIFIER = (
-    "In der Gemarkung „{gemarkung}“ wurde die Flurstücksnummer {nummer} nicht "
-    "gefunden. {schluessel}Bitte Gemarkung und Nummer prüfen (Schreibweise wie im "
+    "In der Gemarkung „{district}“ wurde die Flurstücksnummer {number} nicht "
+    "gefunden. {explanation}Bitte Gemarkung und Nummer prüfen (Schreibweise wie im "
     "Geoportal, etwa „85/1“) oder die Lage auf der Karte anklicken."
 )
 
 SHORT_KEY_EXPLANATION = (
-    "Gesucht wurde mit dem vollständigen Schlüssel „{vollstaendig}“, denn in Sachsen "
+    "Gesucht wurde mit dem vollständigen Schlüssel „{full_key}“, denn in Sachsen "
     "ist der Gemarkungsschlüssel sechsstellig und beginnt mit der Landesnummer 14. "
 )
 
@@ -68,15 +68,15 @@ async def resolve(
     alkis: AlkisService = Depends(alkis_service),
     motis: MotisService = Depends(motis_service),
 ) -> ParcelCollection:
-    hinweise: list[str] = []
+    hints: list[str] = []
     address_match: GeocodeTreffer | None = None
 
     if payload.gemarkung and payload.zaehler is not None:
         expanded = expand_gemarkung_key(payload.gemarkung)
         if expanded != payload.gemarkung.strip():
-            hinweise.append(
+            hints.append(
                 SHORT_KEY_HINT.format(
-                    eingegeben=payload.gemarkung.strip(), vollstaendig=expanded
+                    entered=payload.gemarkung.strip(), full_key=expanded
                 )
             )
         parcels = await alkis.by_gemarkung(payload.gemarkung, payload.zaehler, payload.nenner)
@@ -85,10 +85,10 @@ async def resolve(
             # which is what the short key cost one already.
             raise NotFoundError(
                 NOT_FOUND_BY_IDENTIFIER.format(
-                    gemarkung=payload.gemarkung.strip(),
-                    nummer=_parcel_number(payload.zaehler, payload.nenner),
-                    schluessel=(
-                        SHORT_KEY_EXPLANATION.format(vollstaendig=expanded)
+                    district=payload.gemarkung.strip(),
+                    number=_parcel_number(payload.zaehler, payload.nenner),
+                    explanation=(
+                        SHORT_KEY_EXPLANATION.format(full_key=expanded)
                         if expanded != payload.gemarkung.strip()
                         else ""
                     ),
@@ -97,7 +97,7 @@ async def resolve(
         if payload.nenner is None:
             hint = _ambiguous_number_hint(parcels, payload.zaehler)
             if hint:
-                hinweise.append(hint)
+                hints.append(hint)
     elif payload.lat is not None and payload.lon is not None:
         parcels = await alkis.by_point(payload.lat, payload.lon)
     else:
@@ -105,15 +105,15 @@ async def resolve(
         # The candidate rather than the bare coordinate: what the geocoder
         # matched -- a place, a stop, a house number -- decides whether the
         # answer can be a plot at all.
-        treffer = await motis.geocode_candidates(payload.address, limit=1)
-        if not treffer:
+        candidates = await motis.geocode_candidates(payload.address, limit=1)
+        if not candidates:
             raise NotFoundError("Zu dieser Adresse wurde keine Koordinate gefunden.")
-        address_match = treffer[0]
+        address_match = candidates[0]
         parcels = await alkis.by_point(address_match.lat, address_match.lon)
-        hinweise.append(GEOCODING_HINT)
+        hints.append(GEOCODING_HINT)
 
     return to_collection(
         parcels,
-        hinweis=" ".join(hinweise) or None,
+        hinweis=" ".join(hints) or None,
         plausibility=assess(parcels, payload.expected_area_m2, address_match),
     )

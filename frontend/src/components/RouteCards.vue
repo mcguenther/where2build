@@ -26,7 +26,7 @@
           <tr v-for="m in modi(ziel)" :key="m.art">
             <td><span class="modus"><i :class="`modus__punkt modus__punkt--${m.art}`"></i>{{ m.name }}</span></td>
             <td class="zahl">{{ m.erreichbar ? duration(m.duration_s) : "—" }}</td>
-            <td class="zahl weg-karte__notiz">{{ m.notiz }}</td>
+            <td class="zahl weg-karte__notiz" :title="m.titel">{{ m.notiz }}</td>
           </tr>
         </tbody>
       </table>
@@ -36,7 +36,7 @@
       </p>
       <p v-else-if="!plot.wege[ziel.id]" class="weg-karte__leer">Noch nicht berechnet.</p>
       <p v-else-if="!modi(ziel).some(m => m.erreichbar)" class="weg-karte__leer">
-        Der Routendienst hat für keinen Verkehrsmittel eine Verbindung gefunden.
+        Keine Verbindung gefunden — mit keinem Verkehrsmittel.
       </p>
       <p v-if="plot.wege[ziel.id] && plot.wege[ziel.id].berechnet_am" class="weg-karte__stand">
         Berechnet {{ datum(plot.wege[ziel.id].berechnet_am) }}<span v-if="plot.wege[ziel.id].quelle"> · {{ plot.wege[ziel.id].quelle }}</span>
@@ -84,8 +84,12 @@ export default {
         if (Number.isInteger(daten.umstiege)) {
           notizen.push(daten.umstiege === 0 ? "ohne Umstieg" : `${daten.umstiege}× umsteigen`);
         }
-        if (daten.hinweis) notizen.push(daten.hinweis);
-        return { ...m, ...daten, notiz: notizen.join(" · ") };
+        // The service's own sentence is written for a wide context; in a
+        // 292 px card it wraps to four lines and pushes the times off screen.
+        // The short form carries the same fact; the full one stays in the title.
+        if (!daten.erreichbar) notizen.push("keine Verbindung");
+        else if (daten.hinweis) notizen.push(daten.hinweis);
+        return { ...m, ...daten, notiz: notizen.join(" · "), titel: daten.hinweis || "" };
       }).filter(Boolean);
     },
     /**

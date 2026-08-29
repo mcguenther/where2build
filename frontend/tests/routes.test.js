@@ -126,9 +126,16 @@ describe("Wegekarten mit echten Daten", () => {
     expect(t).toContain("41 min");     // Rad 2489 s
   });
 
-  it("sagt beim Verkehrsmittel ohne Verbindung, dass keine gefunden wurde", () => {
-    const t = mount(RouteCards, { props: { plot: plot() } }).text();
-    expect(t).toContain("keine Verbindung gefunden");
+  it("sagt beim Verkehrsmittel ohne Verbindung kurz, dass keine gefunden wurde", () => {
+    const w = mount(RouteCards, { props: { plot: plot() } });
+    expect(w.text()).toContain("keine Verbindung");
+    // A 292 px card has no room for the service's full sentence; it wrapped to
+    // four lines and pushed the times out of view. The long form lives in the
+    // title attribute instead, so nothing is lost.
+    const notizen = w.findAll(".weg-karte__notiz").map(z => z.text());
+    notizen.forEach(n => expect(n.length).toBeLessThan(28));
+    const lang = w.findAll(".weg-karte__notiz").map(z => z.attributes("title")).filter(Boolean);
+    expect(lang.some(t => t.includes("keine Verbindung gefunden"))).toBe(true);
   });
 
   it("hebt das schnellste Verkehrsmittel hervor und zeichnet es zuletzt", () => {

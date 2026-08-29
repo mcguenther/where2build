@@ -23,8 +23,9 @@
         <div class="tafel__kopf"><h3>Vom Hersteller lesen</h3></div>
         <div class="tafel__leib stapel">
           <p class="hinweis">
-            Link zu einem Haustyp. Der Abruf ist auf die Herstellerdomain begrenzt,
-            das Ergebnis je URL dauerhaft zwischengespeichert.
+            Link zu einem Haustyp — von jedem Hersteller, es gibt keine Liste
+            erlaubter Anbieter. Gelesen wird nur die Seite, die hier steht; das
+            Ergebnis je Adresse dauerhaft zwischengespeichert.
           </p>
           <div class="feld">
             <label for="ht-url">Adresse der Haustyp-Seite</label>

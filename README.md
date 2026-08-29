@@ -9,7 +9,18 @@ takes to get to work, school and the station.
 > are English. See [`CLAUDE.md`](CLAUDE.md) for the rule and
 > [`DESIGN.md`](DESIGN.md) for the visual system.
 
-![Overview](docs/screenshots/uebersicht-hell.png)
+> **How this was built.** Spec-driven development with Claude. The requirements
+> were written first — as a pre-project note and then a clickable mock that was
+> reviewed and approved before any application code existed — and the
+> implementation was carried out by [Claude](https://claude.ai/code) working
+> against that specification, under review at every step. `CLAUDE.md` is the
+> working agreement that fell out of it: the decisions that are settled, the
+> traps that already cost time, and what has to be true before a change counts
+> as done. Statements in this repository about an external service are there
+> because a request was made and its answer read, not because a model believed
+> them.
+
+![Plot page](docs/screenshots/grundstueck-hell.png)
 
 ## What it does
 

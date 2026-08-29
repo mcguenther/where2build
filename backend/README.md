@@ -48,7 +48,7 @@ in `../docs/research/`.
 
 | Method | Path | Purpose |
 |---|---|---|
-| POST | `/api/parcels/resolve` | Address, coordinate, or `gemarkung` + `flurstuecksnummer` (or `zaehler`/`nenner`) → parcels as GeoJSON (EPSG:4326) plus their union |
+| POST | `/api/parcels/resolve` | Address, coordinate, or `gemarkung` + `flurstuecksnummer` (or `zaehler`/`nenner`) → parcels as GeoJSON (EPSG:4326), their union, and a plausibility verdict |
 | POST | `/api/listings/extract` | `{url}` or `{text}` → listing fields as suggestions |
 | POST | `/api/housetypes/extract` | `{url}` → house-type fields as suggestions |
 | GET | `/api/landvalue?lat=&lon=` | Land reference value, zone, reference date, source |
@@ -92,10 +92,45 @@ The official geoportal prints one **Flurstücksnummer** per parcel -- `476`,
 { "gemarkung": "140415", "zaehler": 604, "nenner": "2" }  // as ALKIS stores it
 ```
 
-`gemarkung` is the district name or its six-digit number; the same parcel
-number exists in every district, so it is required. Sending both spellings at
-once is a 422, as is a number that does not parse -- with a German message that
-shows what a valid one looks like.
+`gemarkung` is the district name or its number; the same parcel number exists
+in every district, so it is required. Sending both spellings at once is a 422,
+as is a number that does not parse -- with a German message that shows what a
+valid one looks like.
+
+### The Gemarkungsschlüssel has two spellings, and only one is in ALKIS
+
+The Geoportal prints the same district two different ways depending on the
+layer being queried. For Moritzburg, parcel 1:
+
+| Kartenebene | Gemarkungsschlüssel |
+|---|---|
+| `Flurstueck` | `3044` |
+| `Gemarkung` | `143044`, Gemarkungsname Moritzburg |
+
+ALKIS only knows the second. **A four-digit key is therefore expanded to six
+before the request goes out** — `14` is Saxony's Land prefix — and the answer
+says so in `hinweis`. Verified against `ave:KatasterBezirk` on 29.08.2026: all
+**5 339** Saxon Gemarkungen have a six-digit `schluessel`, every single one
+begins with `14`, and their four-digit tails are all distinct, so the expansion
+is unambiguous and is done up front rather than as a retry after an empty
+result.
+
+Keys **shorter** than four digits do not occur officially — the service pads
+them (Borna is `0101`, and 183 of the 5 339 districts start with a zero) — but
+a key that has been through a spreadsheet or a number field has lost the
+padding, so one to three digits are zero-padded as well. No valid
+Gemarkungsnummer is below `0101`, so padding can only ever turn a dead input
+into the right one. Five or more digits, and anything non-numeric, are passed
+through untouched.
+
+```jsonc
+{ "gemarkung": "3044",       "flurstuecksnummer": "1" }  // -> 143044, 34 799 m²
+{ "gemarkung": "101",        "flurstuecksnummer": "1/3" } // -> 140101, Borna
+{ "gemarkung": "Moritzburg", "flurstuecksnummer": "1" }  // name, never expanded
+```
+
+A wrong key still 404s, and the German sentence names the key that was actually
+searched plus the six-digit rule, so the next attempt is an informed one.
 
 **The denominator is text, not a number.** Letter denominators are in regular
 use: Gemarkung 140415, number 604 answers with `604/1`, `604/2`, `604/3`,
@@ -106,6 +141,79 @@ A number **without** a denominator does not filter on one, so `604` finds all
 five of those parcels and unions them. That union is real -- a plot is a set of
 parcels -- but here it is an artefact of an incomplete key, so the answer
 carries a `hinweis` naming the parcels it found and asking for the full number.
+
+
+## An address alone is not a plot
+
+Resolving an address hands ALKIS one point and keeps whatever parcel covers it.
+For a street address that parcel is the plot. For a **district** address it is
+whatever the geocoder's point fell on, and the answer looks exactly as official
+either way:
+
+```console
+$ curl -s -X POST http://127.0.0.1:8000/api/parcels/resolve \
+    -H 'content-type: application/json' \
+    -d '{"address":"Plaußig-Portitz, 04349 Leipzig"}'
+```
+
+lands on parcel `140428___00165000101`: 21 609 m², 163 boundary points, a
+1 594 × 30 m strip along Tauchaer Straße. The listing that address came from
+describes a **908 m²** building plot.
+
+`/api/parcels/resolve` therefore takes an optional **`expected_area_m2`** — the
+plot area the listing states — and every answer carries a `plausibility` block.
+It is never an error and never a filter: a caller who really wants that parcel
+still gets it, in full.
+
+```jsonc
+{ "address": "Plaußig-Portitz, 04349 Leipzig", "expected_area_m2": 908 }
+```
+
+```jsonc
+"plausibility": {
+  "plausible": false,
+  "issues": ["area_too_large", "shape_atypical", "address_is_not_a_street_address"],
+  "expected_area_m2": 908,
+  "flaeche_amtlich_m2": 21609.0,
+  "area_factor": 23.8,
+  "longest_extent_m": 1594.4,
+  "shortest_extent_m": 30.3,
+  "elongation": 52.67,
+  "warning": "Das gefundene Flurstück ist mit 21.609 m² rund 24-mal so groß wie …"
+}
+```
+
+`issues` is what the frontend switches on; `warning` is the same finding as one
+German sentence to show prominently. `plausible: true` with an empty `issues`
+is the "this is your plot" case. Nothing is derived from a missing input:
+without `expected_area_m2`, `area_factor` stays `null` — the shape and the kind
+of geocoder match still answer on their own, which is what catches a district
+address that arrives without a listing area.
+
+### The three checks and where their thresholds come from
+
+Not from taste: from a live ALKIS sample of **14 286 parcels** across six Saxon
+places (Plaußig-Portitz, Moritzburg, Leipzig-Holzhausen, Wurzen, Radebeul,
+Freiberg), each joined to its official land use from `ave:NutzungFlurstueck`,
+taken 29.08.2026. 7 947 of them are used purely as `Wohnbaufläche` — building
+land.
+
+| Check | Fires when | Grounding |
+|---|---|---|
+| `area_too_large` | official area ≥ **4 ×** `expected_area_m2` | Real building parcels: median 572 m², 95 % under 1 790 m², 99 % under 4 384 m². Against a 908 m² listing the rule fires on 1.5 % of them but on 65 % of the parcels a random point hits. |
+| `area_too_small` | official area ≤ **0.5 ×** `expected_area_m2` | Weaker evidence on purpose: a plot is a set of parcels, so an address resolving to one of several is normal. Worded as "parcels may be missing", not as "wrong land". |
+| `shape_atypical` | longest extent > **200 m** *and* > **5 ×** the width | Building parcels have a median longest extent of 36 m, a 99th percentile of 111 m, and **none of the 7 947 exceeds 464 m**. Only 4 (0.05 %) meet both conditions, three of them 440–520 m² slivers along a street. |
+| `address_is_not_a_street_address` | the geocoder matched a place or a stop, not a house number | MOTIS answers "Plaußig-Portitz, 04349 Leipzig" with `type: PLACE`. An Ortsteil is not a plot, and this needs no listing area to say so. |
+
+The extents are the sides of the **minimum rotated rectangle**, not of the
+axis-aligned envelope: the Portitz field runs diagonally and measures
+1 583 × 198 m as an envelope, which hides the strip, against 1 594 × 30 m
+rotated. A result in several pieces is measured on its largest piece.
+
+Why a district address lands on a field at all: in the same sample, a point
+dropped at random hits a parcel of **9 631 m² median** area — fifteen times the
+unweighted median of 630 m². What a coordinate hits is decided by area, not by
+count.
 
 
 ## The basemap proxy
@@ -200,6 +308,21 @@ rare in practice. Treat `treffer` as candidates to be confirmed, never as a
 match -- show the picker, and offer setting the point on the map instead. The
 coordinate is not an official Hauskoordinate either way; that is what `hinweis`
 says.
+
+### This is also the picker for a listing address
+
+The listing flow needs nothing beyond this endpoint. `POST /api/geocode` with
+the listing's address, show the five candidates, then
+`POST /api/parcels/resolve` with `{lat, lon, expected_area_m2}` for the one the
+user picks. `art` already separates a house number (`adresse`) from an Ortsteil
+(`ort`) or a stop (`haltestelle`), which is exactly the distinction a district
+address turns on, and `beschreibung` carries the federal state.
+
+Resolving the parcels under all five candidates up front was considered and
+dropped: it costs five ALKIS requests to throw four of them away, and the
+parcel under a candidate does not help pick between candidates -- the label and
+the state do. The plausibility block on the one chosen candidate is where the
+parcel gets judged.
 
 Live check against Transitous, 29.08.2026 (cold cache):
 

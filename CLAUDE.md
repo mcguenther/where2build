@@ -12,11 +12,19 @@ destinations.
 - **The user interface is German.** Every string a user reads: labels, buttons,
   headings, error messages, chart captions, `DESIGN.md`.
 
-A German identifier in the code or an English label in the UI is a bug. The one
-deliberate exception: German domain terms that have no English equivalent worth
-using stay German in identifiers when they name a legal concept
-(`Flurstueckskennung`, `bodenrichtwert`) — these mirror the official schemas and
-translating them would obscure what they map to.
+A German identifier in the code or an English label in the UI is a bug. This is
+strict: variables, parameters, functions, methods, computed properties, props,
+constants and comments are English, always, including local variables nobody
+else will read.
+
+Two things are **data**, not identifiers, and stay German:
+
+- **The field names of the API and of the stored document** — `gemarkung`,
+  `flaeche_amtlich_m2`, `bodenrichtwert`, `flurstuecksnummer`. They mirror the
+  German authorities' own schemas and are the wire format. Read them with an
+  English variable name: `const officialArea = props.flaeche_amtlich_m2;`.
+- **CSS class names** — `lageplan`, `tafel`, `nicht-drucken`, `weg-karte`. An
+  established vocabulary shared with the stylesheets; renaming buys nothing.
 
 Keep comments sparse and about *why*, not *what*.
 
@@ -107,6 +115,22 @@ from the user directly. Reopen only if the user asks.
 - **MapLibre zoom is defined against 512-pixel tiles.** The widely quoted
   156543.034 metres-per-pixel constant assumes 256, and putting it in the
   camera renders the basemap at exactly twice the drawing's scale.
+- **A Vue prop is a reactive proxy, and a proxy charges per property read.**
+  The clearance field reads two numbers per grid cell per boundary segment —
+  hundreds of millions on a real parcel — and measured **23.5x slower** through
+  a proxy than on plain objects: 26 seconds against one. `buildableArea` and
+  `findPlacement` copy their input once at the door. Any new hot loop over
+  geometry must do the same; the symptom is a frozen tab with no error.
+- **Cap the grid, do not fix the step.** A district address resolves to a field:
+  1583 x 198 m with 159 boundary points is two million cells at 0.4 m. The step
+  now grows to hold the cell count, which stays safe because the inward bias is
+  derived from the step — a coarser grid gives a smaller envelope, never a more
+  permissive one.
+- **The Geoportal shows the Gemarkungsschlüssel two ways.** The 'Flurstueck'
+  layer prints the four-digit form (`3044`), the 'Gemarkung' layer the
+  six-digit one (`143044`, where `14` is Saxony). Both must resolve, and the
+  name (`Moritzburg`) as well — a user who only sees the short key otherwise
+  hits a dead end.
 - **Real parcels are frequently concave.** Half-plane clipping is only a correct
   inward offset for convex rings; on an L-shaped plot it returns an empty
   envelope. `buildableArea` falls back to a grid contour, biased inward so an

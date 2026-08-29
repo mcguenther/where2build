@@ -80,6 +80,19 @@ Elementen gilt: innerer Radius = äußerer minus Innenabstand.
 
 ## Die Karte
 
+Vier Gründe zur Wahl: **Ohne, Karte, Luftbild, Kataster.** „Ohne" zeichnet den
+Plan auf leeres Papier — das ist kein Notbehelf, sondern die Ansicht, in der
+nur zählt, was das Kataster sagt. Die drei anderen legen echte Daten darunter:
+die Vektorkarte von OpenFreeMap, das Orthofoto und die Katasterdarstellung des
+GeoSN. Ohne Koordinate sind sie gesperrt, denn es gibt nichts, worauf man den
+Plan legen könnte, und ein Hintergrund, der nicht deckungsgleich ist, wäre
+schlimmer als keiner.
+
+Jeder Hintergrund läuft über das eigene Backend, nie direkt zum Kachelserver.
+Das ist eine Gestaltungsentscheidung so gut wie eine technische: die Anwendung
+funktioniert hinter einer Firewall, in der der Browser nur diesen einen Server
+erreicht, und der Nutzer merkt keinen Unterschied.
+
 Die Kartenfläche bleibt neutral (`--w2b-karte-grund: #E6E3DC`), nicht creme.
 Warme Untergründe konkurrieren mit Luftbild und Katasterdarstellung und machen
 Grenzen schlechter lesbar. Warm ist die Oberfläche drumherum.
@@ -128,6 +141,70 @@ Flurstück lässt sich auch von Hand eintragen.“
 
 Amtliche Begriffe bleiben amtlich: Flurstück, Gemarkung, Bodenrichtwert,
 Abstandsfläche. Sie sind das Vokabular der Sache, nicht Jargon.
+
+Wo der Nutzer eine amtliche Angabe eintippen soll, steht daneben, wie sie
+aussieht — die Flurstücksnummer „so, wie sie im Geoportal steht: 85/1, 476
+oder 41/e". Das Geoportal zeigt denselben Gemarkungsschlüssel je nach Ebene
+vier- oder sechsstellig; beide werden angenommen, ohne dass jemand den
+Unterschied kennen muss.
+
+**Der Quelltext dagegen ist durchgehend Englisch** — Bezeichner, Funktionsnamen,
+Kommentare. Deutsch ist die Oberfläche, nicht der Code. Die einzige Ausnahme
+sind die Feldnamen der Schnittstellen (`gemarkung`, `flaeche_amtlich_m2`,
+`bodenrichtwert`): sie sind das Vokabular der Ämter und damit Daten, keine
+selbstgewählten Namen.
+
+## Nie erfundene Daten
+
+Die härteste Regel im Projekt, und die, gegen die am leichtesten verstoßen wird.
+
+Es gibt **keine Beispieldaten** — keinen Startzustand mit vier hübschen
+Grundstücken, keine Rückfallebene, wenn ein Dienst schweigt. Wer die Anwendung
+zum ersten Mal öffnet, sieht einen leeren Zustand mit genau einer Handlung.
+Antwortet ein Dienst nicht, steht dort seine Fehlermeldung und ein Weg weiter,
+nicht ein Platzhalter, der wie ein Ergebnis aussieht.
+
+Das gilt auch für Zeichnungen. Die Wegekarten zeigten einmal ein aus IDs
+gesätes Straßennetz mit einer erfundenen Route darin — hübsch und vollständig
+gelogen. Sie zeigen jetzt die Geometrie, die der Routendienst liefert, oder
+gar nichts.
+
+**Eine abgeleitete Größe mit fehlender Eingabe bleibt ein Gedankenstrich.**
+Ein Grundstück aus ALKIS hat Fläche und Grenzen, aber keinen Angebotspreis —
+den kennt nur das Inserat. Wird trotzdem gerechnet, kommt „0,00 €" und
+„−100 % unter dem Bodenrichtwert" heraus, und das liest sich wie ein Befund,
+nicht wie eine Lücke.
+
+## Wo ein Dienst unscharf ist, entscheidet der Mensch
+
+Der Routing-Geocoder findet zu „Bahnhof Wurzen" auch Würenlos im Aargau, und zu
+„Am Kirschberg" ein Dorf in Niederbayern. Solche Dienste liefern keinen Treffer,
+sondern Kandidaten — also zeigt die Oberfläche Kandidaten: bis zu fünf, jeder
+mit Postleitzahl, Ort **und Bundesland**, denn genau daran erkennt man den
+Fehlgriff. Der beste Vorschlag steht oben, ausgewählt wird er nicht von selbst.
+
+Dasselbe gilt für ein Flurstück, das über eine Adresse gefunden wurde: eine
+Stadtteiladresse landet auf dem Feld nebenan. Was nicht sicher ist, wird als
+unsicher gezeigt.
+
+## Antwortzeit ist Gestaltung
+
+Ein Plan, der beim Öffnen eine halbe Minute steht, ist kein langsamer Plan,
+sondern ein kaputter — der Browser bietet an, das Skript anzuhalten, und der
+Nutzer glaubt, die Anwendung sei abgestürzt. Echte Flurstücke sind mitunter
+34 000 m² groß und haben 159 Grenzpunkte; die Zeichnung muss auch dann in
+Sekundenbruchteilen stehen.
+
+Wo eine Näherung nötig wird, um das zu halten, geht sie immer zur strengeren
+Seite: das Bebauungsfenster darf kleiner ausfallen als das Gesetz erlaubt,
+niemals größer.
+
+## Kurz, wo es eng ist
+
+Eine Wegekarte ist 292 px breit. „Für dieses Ziel wurde keine Verbindung
+gefunden." bricht dort auf vier Zeilen und schiebt die Fahrzeiten aus dem Bild.
+In der Karte steht „keine Verbindung"; der ganze Satz bleibt im `title`. Text
+wird für seinen Platz geschrieben, nicht einmal für alle Plätze.
 
 ## Was extrahiert wurde, ist ein Vorschlag
 
