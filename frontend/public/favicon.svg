@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink" width="1000" height="1000"><metadata><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dc="http://purl.org/dc/elements/1.1/"><rdf:Description><dc:creator>RealFaviconGenerator</dc:creator><dc:source>https://realfavicongenerator.net</dc:source></rdf:Description></rdf:RDF></metadata><style>
+    #light-icon {
+      display: inline;
+    }
+    #dark-icon {
+      display: none;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      #light-icon {
+        display: none;
+      }
+      #dark-icon {
+        display: inline;
+      }
+    }
+  </style><g id="light-icon"><svg xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink" width="1000" height="1000"><g><g transform="matrix(20.833333333333332,0,0,20.833333333333332,0,0)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" role="img" aria-labelledby="w2b-titel"><title id="w2b-titel">where2build</title><rect x="5.5" y="5.5" width="37" height="37" rx="3.5" fill="none" stroke="#2F4A3A" stroke-width="3"></rect><rect x="14.5" y="14.5" width="19" height="19" rx="2" fill="#B5813C" transform="rotate(15 24 24)"></rect></svg></g></g></svg></g><g id="dark-icon"><svg xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink" width="1000" height="1000"><g><g transform="matrix(20.833333333333332,0,0,20.833333333333332,0,0)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" role="img" aria-labelledby="w2b-titel-inv"><title id="w2b-titel-inv">where2build</title><rect x="5.5" y="5.5" width="37" height="37" rx="3.5" fill="none" stroke="#F1EBE1" stroke-width="3"></rect><rect x="14.5" y="14.5" width="19" height="19" rx="2" fill="#B5813C" transform="rotate(15 24 24)"></rect></svg></g></g></svg></g></svg>

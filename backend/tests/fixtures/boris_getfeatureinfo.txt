@@ -1,0 +1,23 @@
+GetFeatureInfo results:
+
+Layer 'brw_bauland_2026'
+  Feature 1367487:
+    BODENRICHTWERT_TEXT = '2400'
+    BODENRICHTWERTNUMMER = '71300402'
+    ENTWICKLUNGSZUSTAND_K = 'B'
+    ENTWICKLUNGSZUSTAND_TEXT = 'Baureifes Land'
+    NUTZUNG = 'MK'
+    NUTZUNG_TEXT = 'Kerngebiet'
+    STICHTAG_TXT = '01.01.2026'
+    BRZ_TEXT = 'beitragsfrei'
+    BRZ_KURZTEXT = '(frei)'
+    BAUWEISE_K = 'g'
+    BAUWEISE_TEXT = 'geschlossene Bauweise'
+    WRGESCHOSSFLAECHENZAHL_TEXT = 'WGFZ5,0'
+    ACKERZAHL = ''
+    GRUENLANDZAHL = ''
+    GA_POST_NAME = 'Gutachterausschuss für Grundstückswerte in der Stadt Leipzig'
+    GA_POST_ADRESSE = 'Burgplatz 1, 04109 Leipzig'
+    GA_TELEFON = '+49341 1235072'
+    GA_EMAIL = 'gutachterausschuss@leipzig.de'
+    BEMERKUNGEN = '---'

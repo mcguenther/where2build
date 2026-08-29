@@ -1,0 +1,219 @@
+/* Design tokens.
+ *
+ * Colour values come from the project's own `farben.css` and are reproduced
+ * verbatim. Everything the supplied file left open — the full dark palette, the
+ * `[data-theme]` route into it, spacing and type scales — is added here and
+ * explained in DESIGN.md.
+ *
+ * Colour has a role, and the role decides the value: neutral for anything
+ * official, Loden for anything the tool computes, brass for anything the user
+ * designs, brick red for violations.
+ */
+
+:root{
+  /* ---------- Primary: Loden ---------- */
+  --w2b-primaer:            #2F4A3A;
+  --w2b-primaer-hell:       #456B52;
+  --w2b-primaer-dunkel:     #1C2E23;
+  --w2b-primaer-schleier:   rgba(47,74,58,.10);
+  --w2b-primaer-auf:        #F7F4EE;   /* text on a Loden surface */
+
+  /* ---------- Secondary: brass ---------- */
+  --w2b-sekundaer:          #B5813C;   /* areas and graphics only — 2.9 on paper */
+  --w2b-sekundaer-text:     #7C5620;   /* same hue, safe for text */
+  --w2b-sekundaer-hell:     #E8D4B0;
+  --w2b-sekundaer-schleier: rgba(181,129,60,.16);
+
+  /* ---------- Support: sage ---------- */
+  --w2b-salbei:             #9DB39A;
+  --w2b-salbei-hell:        #DCE4DA;
+
+  /* ---------- Neutrals, all warm ---------- */
+  --w2b-tinte:              #1E1A16;
+  --w2b-graphit:            #4A443C;
+  --w2b-gedaempft:          #6F675C;
+  --w2b-linie:              #DCD3C6;
+  --w2b-linie-zart:         #EBE4D9;
+  --w2b-flaeche:            #FAF7F1;
+  --w2b-flaeche-tief:       #F3EFE6;   /* inputs, sunken rows */
+  --w2b-papier:             #F1EBE1;
+  --w2b-weiss:              #FFFFFF;
+
+  /* ---------- Signals ---------- */
+  --w2b-warnung:            #BE8524;
+  --w2b-warnung-text:       #7C5620;
+  --w2b-warnung-flaeche:    #F6E9CE;
+  --w2b-fehler:             #A8402C;
+  --w2b-fehler-flaeche:     #F2DED8;
+  --w2b-gut:                #2F4A3A;
+  --w2b-gut-flaeche:        #DEE7DF;
+
+  /* ---------- Map layers ----------
+     The map stays neutral, not cream: warm ground competes with orthophotos
+     and cadastral rendering. Warm belongs to the interface around it. */
+  --w2b-karte-grund:         #E6E3DC;
+  --w2b-karte-flaeche:       #EFEDE7;   /* the parcel itself */
+  --w2b-karte-grenze:        #1E1A16;
+  --w2b-karte-halo:          #FFFFFF;
+  --w2b-karte-fenster:       #2F4A3A;
+  --w2b-karte-saum:          rgba(47,74,58,.17);  /* the strip that may NOT be built on */
+  --w2b-karte-entwurf:       #B5813C;
+  --w2b-karte-entwurf-rand:  #7C5620;
+  --w2b-karte-bestand:       #4A443C;
+  --w2b-karte-nachbar:       #9A9184;
+  --w2b-karte-strasse:       #B5813C;
+  --w2b-karte-strasse-flaeche:#D6D2CA;
+  --w2b-karte-verstoss:      #A8402C;
+  --w2b-karte-auswahl:       #456B52;
+  --w2b-karte-gruen:         #DCE4DA;
+
+  /* ---------- Corner radii: one per order of magnitude ---------- */
+  --w2b-radius-xs:   5px;
+  --w2b-radius-s:    8px;
+  --w2b-radius-m:   12px;
+  --w2b-radius-l:   18px;
+  --w2b-radius-voll: 999px;
+
+  /* ---------- Spacing ---------- */
+  --w2b-raum-1:  4px;
+  --w2b-raum-2:  8px;
+  --w2b-raum-3: 12px;
+  --w2b-raum-4: 16px;
+  --w2b-raum-5: 24px;
+  --w2b-raum-6: 32px;
+  --w2b-raum-7: 48px;
+  --w2b-raum-8: 72px;
+
+  /* ---------- Type ---------- */
+  --w2b-anzeige: "Archivo", system-ui, -apple-system, sans-serif;
+  --w2b-text:    "Public Sans", system-ui, -apple-system, sans-serif;
+  --w2b-daten:   "IBM Plex Mono", ui-monospace, Menlo, monospace;
+
+  --w2b-schrift-xs:  11.5px;
+  --w2b-schrift-s:   13px;
+  --w2b-schrift-m:   15px;
+  --w2b-schrift-l:   17px;
+  --w2b-schrift-xl:  21px;
+
+  /* ---------- Elevation: only for things that really float ---------- */
+  --w2b-schatten:      0 1px 2px rgba(30,26,22,.05), 0 10px 24px -18px rgba(30,26,22,.45);
+  --w2b-schatten-hoch: 0 2px 6px rgba(30,26,22,.10), 0 24px 48px -24px rgba(30,26,22,.55);
+
+  color-scheme: light;
+}
+
+/* The supplied file switched on `prefers-color-scheme` alone. The interface has
+ * its own toggle, so the media query is guarded — otherwise the operating system
+ * would override a deliberate choice — and every value is repeated under
+ * `[data-theme="dark"]` so the toggle wins in both directions. */
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --w2b-primaer:            #7FA98A;
+    --w2b-primaer-hell:       #9BC0A4;
+    --w2b-primaer-dunkel:     #24382C;
+    --w2b-primaer-schleier:   rgba(127,169,138,.14);
+    --w2b-primaer-auf:        #12211A;
+
+    --w2b-sekundaer:          #D9A55E;
+    --w2b-sekundaer-text:     #DBB273;
+    --w2b-sekundaer-hell:     #3E3021;
+    --w2b-sekundaer-schleier: rgba(217,165,94,.18);
+
+    --w2b-salbei:             #6E8470;
+    --w2b-salbei-hell:        #26302A;
+
+    --w2b-tinte:              #F1EBE1;
+    --w2b-graphit:            #C4BCB0;
+    --w2b-gedaempft:          #948B7E;
+    --w2b-linie:              #3A342C;
+    --w2b-linie-zart:         #2A2620;
+    --w2b-flaeche:            #201C17;
+    --w2b-flaeche-tief:       #191510;
+    --w2b-papier:             #16130F;
+    --w2b-weiss:              #FFFFFF;
+
+    --w2b-warnung:            #D8A340;
+    --w2b-warnung-text:       #E3BC72;
+    --w2b-warnung-flaeche:    #3A2E19;
+    --w2b-fehler:             #E0705A;
+    --w2b-fehler-flaeche:     #3B211B;
+    --w2b-gut:                #7FA98A;
+    --w2b-gut-flaeche:        #1F2C24;
+
+    --w2b-karte-grund:         #1A1917;
+    --w2b-karte-flaeche:       #23211D;
+    --w2b-karte-grenze:        #F1EBE1;
+    --w2b-karte-halo:          #16130F;
+    --w2b-karte-fenster:       #7FA98A;
+    --w2b-karte-saum:          rgba(127,169,138,.34);
+    --w2b-karte-entwurf:       #D9A55E;
+    --w2b-karte-entwurf-rand:  #F0C688;
+    --w2b-karte-bestand:       #6B6459;
+    --w2b-karte-nachbar:       #5A544B;
+    --w2b-karte-strasse:       #8A6A3A;
+    --w2b-karte-strasse-flaeche:#242220;
+    --w2b-karte-verstoss:      #E0705A;
+    --w2b-karte-auswahl:       #9BC0A4;
+    --w2b-karte-gruen:         #26302A;
+
+    --w2b-schatten:      0 1px 2px rgba(0,0,0,.5), 0 12px 28px -20px rgba(0,0,0,.85);
+    --w2b-schatten-hoch: 0 2px 8px rgba(0,0,0,.6), 0 28px 56px -26px rgba(0,0,0,.95);
+
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"]{
+  --w2b-primaer:            #7FA98A;
+  --w2b-primaer-hell:       #9BC0A4;
+  --w2b-primaer-dunkel:     #24382C;
+  --w2b-primaer-schleier:   rgba(127,169,138,.14);
+  --w2b-primaer-auf:        #12211A;
+
+  --w2b-sekundaer:          #D9A55E;
+  --w2b-sekundaer-text:     #DBB273;
+  --w2b-sekundaer-hell:     #3E3021;
+  --w2b-sekundaer-schleier: rgba(217,165,94,.18);
+
+  --w2b-salbei:             #6E8470;
+  --w2b-salbei-hell:        #26302A;
+
+  --w2b-tinte:              #F1EBE1;
+  --w2b-graphit:            #C4BCB0;
+  --w2b-gedaempft:          #948B7E;
+  --w2b-linie:              #3A342C;
+  --w2b-linie-zart:         #2A2620;
+  --w2b-flaeche:            #201C17;
+  --w2b-flaeche-tief:       #191510;
+  --w2b-papier:             #16130F;
+  --w2b-weiss:              #FFFFFF;
+
+  --w2b-warnung:            #D8A340;
+  --w2b-warnung-text:       #E3BC72;
+  --w2b-warnung-flaeche:    #3A2E19;
+  --w2b-fehler:             #E0705A;
+  --w2b-fehler-flaeche:     #3B211B;
+  --w2b-gut:                #7FA98A;
+  --w2b-gut-flaeche:        #1F2C24;
+
+  --w2b-karte-grund:         #1A1917;
+  --w2b-karte-flaeche:       #23211D;
+  --w2b-karte-grenze:        #F1EBE1;
+  --w2b-karte-halo:          #16130F;
+  --w2b-karte-fenster:       #7FA98A;
+  --w2b-karte-saum:          rgba(127,169,138,.34);
+  --w2b-karte-entwurf:       #D9A55E;
+  --w2b-karte-entwurf-rand:  #F0C688;
+  --w2b-karte-bestand:       #6B6459;
+  --w2b-karte-nachbar:       #5A544B;
+  --w2b-karte-strasse:       #8A6A3A;
+  --w2b-karte-strasse-flaeche:#242220;
+  --w2b-karte-verstoss:      #E0705A;
+  --w2b-karte-auswahl:       #9BC0A4;
+  --w2b-karte-gruen:         #26302A;
+
+  --w2b-schatten:      0 1px 2px rgba(0,0,0,.5), 0 12px 28px -20px rgba(0,0,0,.85);
+  --w2b-schatten-hoch: 0 2px 8px rgba(0,0,0,.6), 0 28px 56px -26px rgba(0,0,0,.95);
+
+  color-scheme: dark;
+}

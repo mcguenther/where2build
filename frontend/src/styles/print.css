@@ -1,0 +1,88 @@
+/* Print.
+ *
+ * There is no separate print view. The page on screen is the page that prints;
+ * this file hides what does not belong on paper and re-flows the rest. That
+ * keeps a single render path, so nothing recomputes the same dimensions twice.
+ *
+ * Mark anything that should vanish with `.nicht-drucken`, anything that only
+ * exists on paper with `.nur-drucken`.
+ */
+
+.nur-drucken{ display: none; }
+
+@media print{
+  @page{ size: A4 landscape; margin: 12mm 12mm 14mm; }
+
+  /* Without this the setback strip, the envelope and the footprint all print white. */
+  *{ print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+
+  :root{
+    --w2b-papier: #FFFFFF;
+    --w2b-flaeche: #FFFFFF;
+    --w2b-flaeche-tief: #FFFFFF;
+    --w2b-karte-grund: #FFFFFF;
+    --w2b-karte-flaeche: #FFFFFF;
+    --w2b-schatten: none;
+    --w2b-schatten-hoch: none;
+  }
+
+  body{ background: #fff; font-size: 10pt; line-height: 1.45; }
+  .bahn{ max-width: none; padding: 0; }
+
+  /* Controls, navigation and anything that only makes sense with a pointer. */
+  .nicht-drucken,
+  .kopfleiste, .fussleiste, .krume,
+  .knopf, button, input[type="range"], select,
+  .planleiste, .auswahlleiste, .schrittleiste{ display: none !important; }
+
+  .nur-drucken{ display: block; }
+
+  /* Panels become plain blocks — borders and rounding are screen furniture. */
+  .tafel{ border: 0; border-radius: 0; background: none; break-inside: avoid; }
+  .tafel__kopf{ border-bottom: 1px solid #000; padding: 0 0 4pt; margin-bottom: 6pt; background: none; }
+  .tafel__leib{ padding: 0; }
+
+  h1{ font-size: 19pt; }
+  h2{ font-size: 14pt; }
+  h3{ font-size: 11pt; }
+
+  /* One plot per sheet: plan on the left, figures on the right. */
+  .druckblatt{ display: grid; grid-template-columns: 1.5fr 1fr; gap: 8mm; align-items: start; }
+  .druckblatt__plan{ border: 0.6pt solid #000; }
+  .grundstueck-seite + .grundstueck-seite{ break-before: page; }
+
+  .plangitter{ display: block; }
+  .planrahmen{ position: static !important; border: 0.6pt solid #000; border-radius: 0; break-inside: avoid; }
+  .planrahmen svg{ width: 100%; height: auto; }
+
+  /* The north arrow and the scale bar stay: with the map rotated to the street
+     they are the only orientation left on paper.
+     Do NOT hide `.plan-griff` here — that class sits on the building footprint
+     itself and only carries a cursor; hiding it prints an empty envelope. */
+  .plan-hinweis{ display: none !important; }
+
+  .werkzeuge{ display: block; }
+  .werkzeuge .tafel + .tafel{ margin-top: 6mm; }
+  .abstands-tabelle input{ border: 0; background: none; padding: 0; width: auto; }
+
+  .wege-kartei{ grid-template-columns: repeat(2, 1fr) !important; }
+  .weg-karte__skizze{ display: none !important; }   /* route sketches cost ink and say little on paper */
+
+  .kennwerte{ grid-template-columns: repeat(2, 1fr) !important; }
+
+  table.liste{ font-size: 9pt; }
+  table.liste thead{ display: table-header-group; }
+  table.liste tr{ break-inside: avoid; }
+
+  a{ color: inherit; text-decoration: none; }
+  a[href^="http"]::after{ content: " (" attr(href) ")"; font-size: 7.5pt; color: #444; }
+
+  .druckfuss{
+    display: block;
+    margin-top: 6mm;
+    padding-top: 3mm;
+    border-top: 0.6pt solid #000;
+    font-size: 7.5pt;
+    color: #333;
+  }
+}

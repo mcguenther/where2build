@@ -1,0 +1,42 @@
+{
+  "requestParameters": {
+    "directModes": "CAR"
+  },
+  "from": {
+    "name": "START",
+    "lat": 51.3397,
+    "lon": 12.3731
+  },
+  "to": {
+    "name": "END",
+    "lat": 51.04,
+    "lon": 13.7322
+  },
+  "itineraries": [],
+  "direct": [
+    {
+      "duration": 4676,
+      "transfers": 0,
+      "startTime": "2026-08-31T06:00:00Z",
+      "endTime": "2026-08-31T07:17:56Z",
+      "legs": [
+        {
+          "mode": "CAR",
+          "duration": 4676,
+          "distance": 128400.0,
+          "from": {
+            "name": "START"
+          },
+          "to": {
+            "name": "END"
+          },
+          "legGeometry": {
+            "points": "gzo|`BweerVfenDgx`Y~}cH_qo]~dtBockY",
+            "precision": 6,
+            "length": 4
+          }
+        }
+      ]
+    }
+  ]
+}

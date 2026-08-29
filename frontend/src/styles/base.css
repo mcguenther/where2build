@@ -1,0 +1,188 @@
+/* Base typography and the small set of shared elements: buttons, panels,
+ * chips, form fields. Everything else lives in its component. */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body{
+  margin: 0;
+  background: var(--w2b-papier);
+  color: var(--w2b-tinte);
+  font-family: var(--w2b-text);
+  font-size: var(--w2b-schrift-m);
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4{
+  font-family: var(--w2b-anzeige);
+  font-weight: 700;
+  letter-spacing: -.024em;
+  line-height: 1.08;
+  margin: 0;
+  text-wrap: balance;
+}
+h1{ font-size: clamp(28px, 4.2vw, 40px); letter-spacing: -.028em; }
+h2{ font-size: clamp(22px, 2.6vw, 27px); }
+h3{ font-size: var(--w2b-schrift-xl); font-weight: 600; letter-spacing: -.014em; }
+h4{ font-size: var(--w2b-schrift-l); font-weight: 600; letter-spacing: -.01em; }
+p{ margin: 0; }
+
+a{ color: var(--w2b-primaer); text-underline-offset: 2px; text-decoration-thickness: 1px; }
+:focus-visible{ outline: 2px solid var(--w2b-primaer-hell); outline-offset: 2px; border-radius: var(--w2b-radius-xs); }
+[hidden]{ display: none !important; }
+
+.daten{ font-family: var(--w2b-daten); font-variant-numeric: tabular-nums; }
+
+/* Small uppercase section marker. Wide tracking, unlike headings. */
+.marke-klein{
+  font-family: var(--w2b-anzeige);
+  font-weight: 600;
+  font-size: var(--w2b-schrift-xs);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--w2b-gedaempft);
+}
+
+.bahn{ width: 100%; max-width: 1360px; margin: 0 auto; padding: 0 var(--w2b-raum-5) var(--w2b-raum-8); }
+.stapel{ display: flex; flex-direction: column; gap: var(--w2b-raum-5); }
+.reihe{ display: flex; align-items: center; gap: var(--w2b-raum-3); flex-wrap: wrap; }
+.dehnen{ flex: 1; }
+
+/* ---------- Buttons ---------- */
+.knopf{
+  font-family: var(--w2b-anzeige);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: .015em;
+  border: 1.5px solid transparent;
+  padding: 9px 17px;
+  cursor: pointer;
+  border-radius: var(--w2b-radius-s);
+  background: var(--w2b-primaer);
+  color: var(--w2b-primaer-auf);
+  white-space: nowrap;
+  transition: background-color .14s ease, border-color .14s ease, color .14s ease;
+}
+.knopf:hover:not(:disabled){ background: var(--w2b-primaer-hell); }
+.knopf--zweit{ background: transparent; color: var(--w2b-primaer); border-color: var(--w2b-primaer); }
+.knopf--zweit:hover:not(:disabled){ background: var(--w2b-primaer-schleier); }
+.knopf--dritt{ background: var(--w2b-sekundaer-hell); color: var(--w2b-sekundaer-text); }
+.knopf--dritt:hover:not(:disabled){ background: var(--w2b-sekundaer-schleier); }
+.knopf--still{ background: transparent; color: var(--w2b-graphit); border-color: var(--w2b-linie); }
+.knopf--still:hover:not(:disabled){ color: var(--w2b-tinte); border-color: var(--w2b-gedaempft); }
+.knopf--klein{ padding: 5px 11px; font-size: var(--w2b-schrift-s); }
+.knopf:disabled{ opacity: .42; cursor: not-allowed; }
+
+/* ---------- Panels ---------- */
+.tafel{
+  background: var(--w2b-flaeche);
+  border: 1px solid var(--w2b-linie);
+  border-radius: var(--w2b-radius-m);
+  overflow: hidden;   /* keeps map canvases from cutting the rounding away */
+}
+.tafel__kopf{
+  display: flex; align-items: center; gap: var(--w2b-raum-3);
+  padding: var(--w2b-raum-3) var(--w2b-raum-4);
+  border-bottom: 1px solid var(--w2b-linie);
+}
+.tafel__kopf h3{ font-size: var(--w2b-schrift-l); }
+.tafel__leib{ padding: var(--w2b-raum-4); }
+
+/* ---------- Chips ---------- */
+.chip{
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: var(--w2b-radius-voll);
+  font-family: var(--w2b-anzeige);
+  font-weight: 600;
+  font-size: var(--w2b-schrift-xs);
+  letter-spacing: .02em;
+  white-space: nowrap;
+  background: var(--w2b-linie-zart);
+  color: var(--w2b-graphit);
+}
+.chip--gut{ background: var(--w2b-gut-flaeche); color: var(--w2b-gut); }
+.chip--warn{ background: var(--w2b-warnung-flaeche); color: var(--w2b-warnung-text); }
+.chip--fehler{ background: var(--w2b-fehler-flaeche); color: var(--w2b-fehler); }
+.chip--messing{ background: var(--w2b-sekundaer-hell); color: var(--w2b-sekundaer-text); }
+
+/* ---------- Form fields ---------- */
+.feld{ display: flex; flex-direction: column; gap: var(--w2b-raum-1); }
+.feld > label, .feldname{
+  font-family: var(--w2b-anzeige);
+  font-weight: 600;
+  font-size: var(--w2b-schrift-xs);
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--w2b-gedaempft);
+}
+input[type="text"], input[type="number"], input[type="search"], textarea, select{
+  width: 100%;
+  padding: 9px 11px;
+  background: var(--w2b-flaeche-tief);
+  color: var(--w2b-tinte);
+  border: 1px solid var(--w2b-linie);
+  border-radius: var(--w2b-radius-s);
+  font-family: var(--w2b-daten);
+  font-size: var(--w2b-schrift-s);
+  font-variant-numeric: tabular-nums;
+}
+textarea{ min-height: 96px; resize: vertical; line-height: 1.55; }
+input:focus, textarea:focus, select:focus{ outline: none; border-color: var(--w2b-primaer); box-shadow: 0 0 0 3px var(--w2b-primaer-schleier); }
+input[type="range"]{ width: 100%; accent-color: var(--w2b-primaer); margin: 0; }
+input[type="checkbox"]{ accent-color: var(--w2b-primaer); }
+
+/* ---------- Note bands ---------- */
+.band{
+  display: flex; gap: var(--w2b-raum-2);
+  padding: 11px 15px;
+  border-radius: var(--w2b-radius-s);
+  font-size: var(--w2b-schrift-s);
+  background: var(--w2b-sekundaer-hell);
+  color: var(--w2b-sekundaer-text);
+}
+.band--fehler{ background: var(--w2b-fehler-flaeche); color: var(--w2b-fehler); }
+.band--gut{ background: var(--w2b-gut-flaeche); color: var(--w2b-gut); }
+
+.notiz{
+  border-left: 3px solid var(--w2b-sekundaer);
+  background: var(--w2b-flaeche);
+  border-top: 1px solid var(--w2b-linie);
+  border-right: 1px solid var(--w2b-linie);
+  border-bottom: 1px solid var(--w2b-linie);
+  border-radius: 0 var(--w2b-radius-m) var(--w2b-radius-m) 0;
+  padding: var(--w2b-raum-4) var(--w2b-raum-5);
+  font-size: var(--w2b-schrift-s);
+  color: var(--w2b-graphit);
+}
+.notiz h4{ color: var(--w2b-tinte); margin-bottom: var(--w2b-raum-1); }
+.notiz p + p{ margin-top: var(--w2b-raum-2); }
+.notiz--mahnung{ border-left-color: var(--w2b-fehler); }
+
+/* ---------- Tables ---------- */
+.tabelle-rollt{ overflow-x: auto; }
+table.liste{ border-collapse: collapse; width: 100%; font-size: var(--w2b-schrift-s); }
+table.liste th, table.liste td{
+  padding: 11px 14px; text-align: left; vertical-align: middle;
+  border-bottom: 1px solid var(--w2b-linie-zart);
+}
+table.liste thead th{
+  font-family: var(--w2b-anzeige); font-weight: 600; font-size: var(--w2b-schrift-xs);
+  letter-spacing: .1em; text-transform: uppercase; color: var(--w2b-gedaempft);
+  border-bottom: 1px solid var(--w2b-linie);
+}
+table.liste td.zahl, table.liste th.zahl{ text-align: right; font-family: var(--w2b-daten); font-variant-numeric: tabular-nums; }
+table.liste tbody tr:last-child td{ border-bottom: 0; }
+
+/* ---------- Key figures ---------- */
+.kennwerte{ display: grid; gap: var(--w2b-raum-4); }
+.kennwert .zahl{ font-family: var(--w2b-daten); font-size: var(--w2b-schrift-xl); font-weight: 500; font-variant-numeric: tabular-nums; }
+.kennwert .schild{
+  font-family: var(--w2b-anzeige); font-size: 10.5px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--w2b-gedaempft);
+}
+
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{ animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}

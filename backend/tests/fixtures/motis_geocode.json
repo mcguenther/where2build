@@ -1,0 +1,21 @@
+[
+  {
+    "type": "ADDRESS",
+    "name": "Muldentalstra\u00dfe 12",
+    "id": "osm:way/1",
+    "lat": 51.2783,
+    "lon": 12.4819,
+    "country": "DE",
+    "zip": "04288",
+    "areas": [
+      {
+        "name": "Sachsen",
+        "adminLevel": 4
+      },
+      {
+        "name": "Leipzig",
+        "adminLevel": 6
+      }
+    ]
+  }
+]

@@ -1,0 +1,58 @@
+"""Service instances shared across requests.
+
+Cached rather than rebuilt per request so the MOTIS concurrency limit and the
+cache handles stay process-wide. ``reset_services`` exists for tests.
+"""
+
+from __future__ import annotations
+
+from functools import lru_cache
+
+from .services.alkis import AlkisService
+from .services.boris import BorisService
+from .services.llm import LLMClient
+from .services.motis import MotisService
+from .services.tiles import TileService
+from .settings import Settings, get_settings
+
+
+@lru_cache(maxsize=1)
+def alkis_service() -> AlkisService:
+    settings = get_settings()
+    return AlkisService(settings.alkis, settings.app)
+
+
+@lru_cache(maxsize=1)
+def boris_service() -> BorisService:
+    settings = get_settings()
+    return BorisService(settings.boris, settings.app)
+
+
+@lru_cache(maxsize=1)
+def motis_service() -> MotisService:
+    settings = get_settings()
+    return MotisService(settings.motis, settings.app)
+
+
+@lru_cache(maxsize=1)
+def tile_service() -> TileService:
+    settings = get_settings()
+    return TileService(settings.tiles, settings.app)
+
+
+@lru_cache(maxsize=1)
+def llm_client() -> LLMClient:
+    settings = get_settings()
+    return LLMClient(settings.llm, settings.app)
+
+
+def settings_dep() -> Settings:
+    return get_settings()
+
+
+def reset_services() -> None:
+    """Drop cached settings and services (used when tests change the env)."""
+
+    get_settings.cache_clear()
+    for factory in (alkis_service, boris_service, motis_service, tile_service, llm_client):
+        factory.cache_clear()

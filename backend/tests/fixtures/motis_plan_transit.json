@@ -1,0 +1,73 @@
+{
+  "requestParameters": {
+    "fromPlace": "51.3397,12.3731",
+    "toPlace": "51.0400,13.7322"
+  },
+  "from": {
+    "name": "START",
+    "lat": 51.3397,
+    "lon": 12.3731
+  },
+  "to": {
+    "name": "END",
+    "lat": 51.04,
+    "lon": 13.7322
+  },
+  "direct": [],
+  "itineraries": [
+    {
+      "duration": 4860,
+      "transfers": 1,
+      "startTime": "2026-08-31T06:25:00Z",
+      "endTime": "2026-08-31T07:46:00Z",
+      "legs": [
+        {
+          "mode": "WALK",
+          "duration": 240,
+          "from": {
+            "name": "START"
+          },
+          "to": {
+            "name": "Leipzig Markt"
+          },
+          "legGeometry": {
+            "points": "gzo|`BweerVgY_q@wVgw@",
+            "precision": 6,
+            "length": 3
+          }
+        },
+        {
+          "mode": "HIGHSPEED_RAIL",
+          "duration": 3960,
+          "from": {
+            "name": "Leipzig Hbf"
+          },
+          "to": {
+            "name": "Dresden Hauptbahnhof"
+          },
+          "routeShortName": "ICE 1656",
+          "legGeometry": {
+            "points": "_d{|`BisvrV~p`Futr^~{|F_qo]xltBggfS",
+            "precision": 6,
+            "length": 4
+          }
+        },
+        {
+          "mode": "WALK",
+          "duration": 180,
+          "from": {
+            "name": "Dresden Hauptbahnhof"
+          },
+          "to": {
+            "name": "END"
+          },
+          "legGeometry": {
+            "points": "egfj`BgcbeYyFgq@",
+            "precision": 6,
+            "length": 2
+          }
+        }
+      ]
+    }
+  ]
+}
