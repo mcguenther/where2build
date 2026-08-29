@@ -1,0 +1,1492 @@
+<title>Grundstücks-Check Sachsen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Public+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   GRUNDSTÜCKS-CHECK SACHSEN — Oberflächen-Mockup
+   Bildsprache fortgeführt aus der Vorprojekt-Notiz:
+   Lageplan / technische Zeichnung. Hell = Papier, Dunkel = Lichtpause im Negativ.
+   ============================================================ */
+
+:root{
+  /* --- Papier (hell) --- */
+  --paper:#E7EBE7;
+  --paper-2:#DDE3DD;
+  --card:#FBFCFA;
+  --sunk:#F1F4F0;
+  --ink:#0D1315;
+  --ink-2:#4B5559;
+  --ink-3:#77827F;
+  --rule:#B6C0BA;
+  --rule-soft:#CCD4CE;
+
+  --mass:#C0301C;        /* Maßketten, Verstöße */
+  --mass-soft:rgba(192,48,28,.10);
+  --kat:#1C5F58;         /* Katasterdaten, Quellen */
+  --kat-soft:rgba(28,95,88,.10);
+  --ocker:#C68B33;       /* Gebäude */
+  --ocker-soft:rgba(198,139,51,.16);
+  --rad:#7C9A2E;         /* Verkehrsmittel Rad */
+  --gut:#2F7D4F;         /* semantisch: in Ordnung */
+  --gut-soft:rgba(47,125,79,.12);
+
+  --plan-bg:#FFFFFF;     /* Zeichenfläche */
+  --plan-line:#0D1315;   /* Flurstücksgrenze */
+  --plan-grid:rgba(13,19,21,.055);
+  --plan-fill:#FFFFFF;
+  --plan-nachbar:#9AA6A1;
+  --plan-strasse:#E4E7E2;
+
+  --shadow:0 1px 0 rgba(13,19,21,.05), 0 14px 30px -22px rgba(13,19,21,.55);
+  --focus:var(--mass);
+  color-scheme:light;
+}
+
+/* --- Lichtpause (dunkel). Zwei Wege hinein: OS-Einstellung ... --- */
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#080B0C;
+    --paper-2:#0E1315;
+    --card:#11181A;
+    --sunk:#0B1012;
+    --ink:#DFE7E2;
+    --ink-2:#93A29D;
+    --ink-3:#6B7A76;
+    --rule:#24302E;
+    --rule-soft:#1A2325;
+
+    --mass:#F2725A;
+    --mass-soft:rgba(242,114,90,.14);
+    --kat:#54C4AA;
+    --kat-soft:rgba(84,196,170,.13);
+    --ocker:#DDA653;
+    --ocker-soft:rgba(221,166,83,.16);
+    --rad:#A8CB5A;
+    --gut:#5FBE84;
+    --gut-soft:rgba(95,190,132,.14);
+
+    --plan-bg:#0B1113;
+    --plan-line:#E4ECE7;
+    --plan-grid:rgba(223,231,226,.055);
+    --plan-fill:#121A1C;
+    --plan-nachbar:#4C5B57;
+    --plan-strasse:#151D1F;
+
+    --shadow:0 1px 0 rgba(0,0,0,.5), 0 18px 40px -24px rgba(0,0,0,.9);
+    color-scheme:dark;
+  }
+}
+/* ... und der Schalter oben rechts. */
+:root[data-theme="dark"]{
+  --paper:#080B0C;
+  --paper-2:#0E1315;
+  --card:#11181A;
+  --sunk:#0B1012;
+  --ink:#DFE7E2;
+  --ink-2:#93A29D;
+  --ink-3:#6B7A76;
+  --rule:#24302E;
+  --rule-soft:#1A2325;
+
+  --mass:#F2725A;
+  --mass-soft:rgba(242,114,90,.14);
+  --kat:#54C4AA;
+  --kat-soft:rgba(84,196,170,.13);
+  --ocker:#DDA653;
+  --ocker-soft:rgba(221,166,83,.16);
+  --rad:#A8CB5A;
+  --gut:#5FBE84;
+  --gut-soft:rgba(95,190,132,.14);
+
+  --plan-bg:#0B1113;
+  --plan-line:#E4ECE7;
+  --plan-grid:rgba(223,231,226,.055);
+  --plan-fill:#121A1C;
+  --plan-nachbar:#4C5B57;
+  --plan-strasse:#151D1F;
+
+  --shadow:0 1px 0 rgba(0,0,0,.5), 0 18px 40px -24px rgba(0,0,0,.9);
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:var(--paper);
+  background-image:
+    linear-gradient(var(--plan-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--plan-grid) 1px, transparent 1px);
+  background-size:28px 28px;
+  color:var(--ink);
+  font-family:"Public Sans", system-ui, -apple-system, sans-serif;
+  font-size:15px;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4,.disp{
+  font-family:"Barlow Condensed","Arial Narrow",sans-serif;
+  font-weight:700;letter-spacing:.045em;text-transform:uppercase;
+  line-height:1.05;margin:0;text-wrap:balance;
+}
+.mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
+a{color:var(--kat);text-underline-offset:2px;text-decoration-thickness:1px}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+button{font:inherit;color:inherit}
+
+/* ---------- Rahmen ---------- */
+.blatt{max-width:1360px;margin:0 auto;padding:0 20px 40px}
+
+/* ---------- Kopfleiste ---------- */
+.topbar{
+  display:flex;align-items:flex-end;gap:22px;flex-wrap:wrap;
+  padding:22px 0 14px;border-bottom:1px solid var(--ink);margin-bottom:0;
+}
+.marke h1{font-size:29px;letter-spacing:.03em}
+.marke .sub{
+  font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--ink-2);margin-top:5px;
+}
+.marke .sub b{color:var(--mass);font-weight:500}
+.topbar .spacer{flex:1}
+
+.themeswitch{display:flex;border:1px solid var(--rule);background:var(--card);box-shadow:var(--shadow)}
+.themeswitch button{
+  background:none;border:0;cursor:pointer;padding:7px 11px;
+  font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--ink-2);
+}
+.themeswitch button + button{border-left:1px solid var(--rule)}
+.themeswitch button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+
+/* ---------- Reiter ---------- */
+.reiter{display:flex;gap:0;flex-wrap:wrap;border-bottom:1px solid var(--rule);margin-bottom:22px}
+.reiter button{
+  background:none;border:0;border-bottom:2px solid transparent;cursor:pointer;
+  padding:12px 17px 10px;display:flex;align-items:baseline;gap:9px;
+  font-family:"Barlow Condensed",sans-serif;text-transform:uppercase;
+  letter-spacing:.07em;font-size:16px;font-weight:600;color:var(--ink-2);
+}
+.reiter button .nr{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.1em;color:var(--ink-3)}
+.reiter button:hover{color:var(--ink);background:var(--sunk)}
+.reiter button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--mass)}
+.reiter button[aria-selected="true"] .nr{color:var(--mass)}
+
+.tafel[hidden]{display:none}
+
+/* ---------- Karten / Panels ---------- */
+.panel{background:var(--card);border:1px solid var(--rule);box-shadow:var(--shadow)}
+.panel > .kopf{
+  display:flex;align-items:center;gap:10px;padding:11px 15px;
+  border-bottom:1px solid var(--rule);background:var(--paper-2);
+}
+.panel > .kopf h3{font-size:16px}
+.panel > .kopf .id{
+  font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.12em;color:var(--mass);
+}
+.panel > .kopf .spacer{flex:1}
+.panel > .leib{padding:15px}
+
+/* ---------- Lageplan-Layout ---------- */
+.plangitter{display:grid;grid-template-columns:minmax(0,1fr) 372px;gap:18px;align-items:start}
+@media (max-width:1120px){.plangitter{grid-template-columns:1fr}}
+.werkzeuge{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:18px;align-items:start}
+
+.planrahmen{position:sticky;top:12px;background:var(--card);border:1px solid var(--rule);box-shadow:var(--shadow)}
+@media (max-width:1120px){.planrahmen{position:static}}
+.planleiste{
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+  padding:9px 12px;border-bottom:1px solid var(--rule);background:var(--paper-2);
+}
+.planleiste .gruppe{display:flex;border:1px solid var(--rule);background:var(--card)}
+.planleiste .gruppe button, .schalter{
+  background:var(--card);border:1px solid var(--rule);cursor:pointer;padding:5px 10px;
+  font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--ink-2);white-space:nowrap;
+}
+.planleiste .gruppe button{border:0}
+.planleiste .gruppe button + button{border-left:1px solid var(--rule)}
+.planleiste .gruppe button[aria-pressed="true"], .schalter[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.planleiste .gruppe button:hover, .schalter:hover{color:var(--ink)}
+.planleiste .gruppe button[aria-pressed="true"]:hover, .schalter[aria-pressed="true"]:hover{color:var(--paper)}
+.planleiste .label{
+  font-family:"Barlow Condensed",sans-serif;text-transform:uppercase;letter-spacing:.09em;
+  font-size:12px;color:var(--ink-3);margin-left:4px;
+}
+.planleiste .spacer{flex:1}
+
+#buehne{display:block;width:100%;height:auto;background:var(--plan-bg);touch-action:none;cursor:default}
+#buehne.zieht{cursor:grabbing}
+.plan-fuss{
+  display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;
+  padding:9px 13px;border-top:1px solid var(--rule);
+  font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.07em;color:var(--ink-2);
+}
+
+/* Statusstreifen über der Zeichnung */
+.verstoss{
+  display:flex;align-items:center;gap:10px;padding:9px 14px;
+  background:var(--mass-soft);border-bottom:1px solid var(--rule);
+  border-left:3px solid var(--mass);
+}
+.verstoss.ok{background:var(--gut-soft);border-left-color:var(--gut)}
+.verstoss .punkt{width:8px;height:8px;background:var(--mass);flex:none}
+.verstoss.ok{border-color:var(--gut)}
+.verstoss.ok .punkt{background:var(--gut)}
+.verstoss p{margin:0;font-size:13px;color:var(--ink-2)}
+.verstoss b{color:var(--ink);font-weight:600}
+
+/* ---------- Prüfprotokoll (rechte Spalte) ---------- */
+.protokoll{display:flex;flex-direction:column;gap:14px}
+.kennliste{display:grid;grid-template-columns:1fr auto;gap:0}
+.kennliste > div{padding:9px 15px;border-bottom:1px solid var(--rule-soft);display:flex;align-items:center}
+.kennliste > div:nth-child(2n){justify-content:flex-end}
+.kennliste .k{
+  font-family:"Barlow Condensed",sans-serif;text-transform:uppercase;letter-spacing:.07em;
+  font-size:13.5px;color:var(--ink-2);
+}
+.kennliste .v{font-family:"IBM Plex Mono",monospace;font-size:13.5px;font-variant-numeric:tabular-nums;gap:8px}
+.kennliste .v small{color:var(--ink-3);font-size:11px}
+.kennliste > div:nth-last-child(-n+2){border-bottom:0}
+
+.chip{
+  display:inline-block;padding:2px 7px;font-family:"IBM Plex Mono",monospace;
+  font-size:10px;letter-spacing:.09em;text-transform:uppercase;border:1px solid currentColor;
+}
+.chip.gut{color:var(--gut);background:var(--gut-soft)}
+.chip.warn{color:var(--ocker);background:var(--ocker-soft)}
+.chip.krit{color:var(--mass);background:var(--mass-soft)}
+.chip.kat{color:var(--kat);background:var(--kat-soft)}
+
+/* Balken für die Preiseinordnung */
+.preisband{padding:15px}
+.preisband .skala{position:relative;height:34px;margin:16px 0 8px}
+.preisband .achse{position:absolute;left:0;right:0;top:17px;height:1px;background:var(--rule)}
+.preisband .brw{position:absolute;top:6px;width:1px;height:23px;background:var(--kat)}
+.preisband .brw::after{
+  content:"BRW";position:absolute;top:-13px;left:50%;transform:translateX(-50%);
+  font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.1em;color:var(--kat);
+}
+.preisband .marke{
+  position:absolute;top:11px;width:11px;height:11px;transform:translateX(-50%) rotate(45deg);
+  background:var(--mass);
+}
+.preisband .spanne{position:absolute;top:16px;height:3px;background:var(--kat-soft);border-top:1px solid var(--kat)}
+.preisband .beschriftung{
+  display:flex;justify-content:space-between;
+  font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.08em;color:var(--ink-3);
+}
+.preisband .aussage{margin:12px 0 0;font-size:13.5px;color:var(--ink-2)}
+.preisband .aussage b{color:var(--ink)}
+
+/* Abstandsflächen-Tabelle */
+.segmente{width:100%;border-collapse:collapse;font-size:13px}
+.segmente th{
+  font-family:"Barlow Condensed",sans-serif;text-transform:uppercase;letter-spacing:.08em;
+  font-size:12px;font-weight:600;text-align:left;color:var(--ink-2);
+  padding:7px 15px;border-bottom:1px solid var(--rule);background:var(--paper-2);
+}
+.segmente td{padding:6px 15px;border-bottom:1px solid var(--rule-soft);vertical-align:middle}
+.segmente tr:last-child td{border-bottom:0}
+.segmente td.n{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;text-align:right}
+.segmente input[type="number"]{
+  width:62px;padding:3px 6px;text-align:right;
+  font-family:"IBM Plex Mono",monospace;font-size:12.5px;
+  background:var(--sunk);color:var(--ink);border:1px solid var(--rule);
+}
+.segmente .kante{display:inline-flex;align-items:center;gap:7px}
+.segmente .kante i{width:14px;height:2px;background:var(--mass);flex:none;font-style:normal}
+
+/* Regler */
+.regler{display:grid;grid-template-columns:1fr auto;gap:5px 12px;align-items:center;padding:13px 15px;border-bottom:1px solid var(--rule-soft)}
+.regler:last-child{border-bottom:0}
+.regler label{
+  font-family:"Barlow Condensed",sans-serif;text-transform:uppercase;letter-spacing:.07em;
+  font-size:13.5px;color:var(--ink-2);
+}
+.regler output{font-family:"IBM Plex Mono",monospace;font-size:13px;font-variant-numeric:tabular-nums}
+.regler input[type="range"]{grid-column:1/-1;width:100%;accent-color:var(--mass);margin:0}
+.regler .hinweis{grid-column:1/-1;font-size:12px;color:var(--ink-3);margin:0}
+
+/* ---------- Vorschlag-Karten (extrahierte Werte) ---------- */
+.vorschlaege{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:12px}
+.vorschlag{
+  background:var(--sunk);border:1px dashed var(--ocker);padding:11px 13px;
+  display:flex;flex-direction:column;gap:5px;
+}
+.vorschlag.bestaetigt{background:var(--card);border-style:solid;border-color:var(--rule)}
+.vorschlag .feld{
+  font-family:"Barlow Condensed",sans-serif;text-transform:uppercase;letter-spacing:.07em;
+  font-size:12.5px;color:var(--ink-2);display:flex;align-items:center;gap:7px;
+  flex-wrap:wrap;min-width:0;
+}
+.vorschlag .feld .gelesen{white-space:nowrap}
+.vorschlag .feld .gelesen{
+  font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:.1em;
+  color:var(--ocker);border:1px solid var(--ocker);padding:1px 5px;text-transform:uppercase;
+}
+.vorschlag.bestaetigt .gelesen{color:var(--gut);border-color:var(--gut)}
+.vorschlag input[type="text"]{
+  width:100%;padding:5px 8px;background:var(--card);color:var(--ink);
+  border:1px solid var(--rule);font-family:"IBM Plex Mono",monospace;font-size:13.5px;
+}
+.vorschlag .quelle{
+  font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--ink-3);
+  overflow-wrap:anywhere;word-break:normal;line-height:1.45;
+}
+.vorschlag .quelle a{color:var(--kat)}
+
+/* ---------- Eingabewege ---------- */
+.wege3{display:grid;grid-template-columns:repeat(auto-fit,minmax(268px,1fr));gap:16px}
+.eingabe{display:flex;flex-direction:column;gap:9px;padding:15px}
+.eingabe p.erklaerung{margin:0;font-size:13px;color:var(--ink-2)}
+.eingabe input[type="text"], .eingabe textarea, .eingabe select{
+  width:100%;padding:8px 10px;background:var(--sunk);color:var(--ink);
+  border:1px solid var(--rule);font-family:"IBM Plex Mono",monospace;font-size:13px;
+}
+.eingabe textarea{min-height:88px;resize:vertical;line-height:1.55}
+.drei{display:grid;grid-template-columns:1fr 62px 62px;gap:8px}
+.drei .feldchen{display:flex;flex-direction:column;gap:3px}
+.drei label, .eingabe > label{
+  font-family:"Barlow Condensed",sans-serif;text-transform:uppercase;letter-spacing:.07em;
+  font-size:12px;color:var(--ink-3);
+}
+.knopf{
+  background:var(--ink);color:var(--paper);border:1px solid var(--ink);cursor:pointer;
+  padding:8px 15px;font-family:"Barlow Condensed",sans-serif;text-transform:uppercase;
+  letter-spacing:.09em;font-size:14.5px;font-weight:600;align-self:flex-start;
+}
+.knopf.leise{background:transparent;color:var(--ink);border-color:var(--rule)}
+.knopf:hover{background:var(--mass);border-color:var(--mass);color:#fff}
+
+/* ---------- Wege / Erreichbarkeiten ---------- */
+.ziele{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px}
+.ziel .kopfzeile{display:flex;align-items:baseline;gap:9px;padding:12px 15px;border-bottom:1px solid var(--rule);background:var(--paper-2)}
+.ziel .kopfzeile h3{font-size:16px}
+.ziel .kopfzeile .adr{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--ink-3);margin-left:auto}
+.ziel svg.minikarte{display:block;width:100%;height:auto;background:var(--plan-bg);border-bottom:1px solid var(--rule)}
+.modi{display:grid;grid-template-columns:auto 1fr auto;gap:0}
+.modi > div{padding:7px 15px;border-bottom:1px solid var(--rule-soft);display:flex;align-items:center;gap:8px}
+.modi > div:nth-child(3n-1),.modi > div:nth-child(3n){justify-content:flex-end;font-family:"IBM Plex Mono",monospace;font-size:13px;font-variant-numeric:tabular-nums}
+.modi > div:nth-child(3n){color:var(--ink-3);font-size:11px;white-space:nowrap}
+.modi > div:nth-child(3n-1){justify-content:flex-start;padding-left:0;white-space:nowrap}
+.modi > div:nth-last-child(-n+3){border-bottom:0}
+.modi .m{font-family:"Barlow Condensed",sans-serif;text-transform:uppercase;letter-spacing:.07em;font-size:13.5px;color:var(--ink-2);white-space:nowrap}
+.modi .m i{width:12px;height:12px;flex:none;font-style:normal;border:1px solid currentColor}
+.modi .m i.auto{background:var(--ink-3);border-color:var(--ink-3)}
+.modi .m i.rad{background:var(--rad);border-color:var(--rad)}
+.modi .m i.oepnv{background:var(--kat);border-color:var(--kat)}
+.modi .m i.komb{background:linear-gradient(90deg,var(--rad) 50%,var(--kat) 50%);border-color:var(--kat)}
+
+/* ---------- Vergleich ---------- */
+.vgl-scroll{overflow-x:auto}
+table.vgl{border-collapse:collapse;width:100%;min-width:720px;font-size:13.5px}
+table.vgl th, table.vgl td{padding:11px 14px;border-bottom:1px solid var(--rule-soft);text-align:left;vertical-align:top}
+table.vgl thead th{
+  font-family:"Barlow Condensed",sans-serif;text-transform:uppercase;letter-spacing:.08em;
+  font-size:13px;font-weight:600;background:var(--paper-2);border-bottom:1px solid var(--ink);
+}
+table.vgl td.n{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;text-align:right}
+table.vgl tbody tr:hover{background:var(--sunk)}
+table.vgl tbody tr:last-child td{border-bottom:0}
+table.vgl .kand{display:flex;flex-direction:column;gap:2px}
+table.vgl .kand b{font-weight:600}
+table.vgl .kand span{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--ink-3)}
+
+/* ---------- Hinweisbalken ---------- */
+.hinweis-balken{
+  border-left:3px solid var(--kat);background:var(--card);
+  border-top:1px solid var(--rule);border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);
+  padding:13px 17px;box-shadow:var(--shadow);
+}
+.hinweis-balken.mahnung{border-left-color:var(--mass)}
+.hinweis-balken h4{font-size:15px;margin-bottom:4px}
+.hinweis-balken p{margin:0;font-size:13px;color:var(--ink-2)}
+.hinweis-balken p + p{margin-top:6px}
+
+/* ---------- Schriftfeld (Titelblock wie im Bauplan) ---------- */
+.schriftfeld{
+  margin-top:26px;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  border:1px solid var(--ink);background:var(--card);box-shadow:var(--shadow);
+}
+.schriftfeld > div{padding:10px 14px;border-right:1px solid var(--rule)}
+.schriftfeld > div:last-child{border-right:0}
+.schriftfeld dt{
+  font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--ink-3);margin-bottom:3px;
+}
+.schriftfeld dd{margin:0;font-family:"Barlow Condensed",sans-serif;text-transform:uppercase;letter-spacing:.05em;font-size:15px}
+.schriftfeld dd.klein{font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:0;text-transform:none;color:var(--ink-2)}
+
+/* ---------- Druckvorschau-Blatt ---------- */
+.a4{
+  background:var(--card);border:1px solid var(--rule);box-shadow:var(--shadow);
+  aspect-ratio:297/210;padding:24px;display:grid;
+  grid-template-columns:1.55fr 1fr;grid-template-rows:auto 1fr auto;gap:16px;
+}
+.a4 .kopf{grid-column:1/-1;display:flex;align-items:baseline;gap:14px;border-bottom:1px solid var(--ink);padding-bottom:9px}
+.a4 .kopf h3{font-size:20px}
+.a4 .kopf .mono{font-size:10.5px;color:var(--ink-2);margin-left:auto}
+.a4 .karte{border:1px solid var(--rule);background:var(--plan-bg);display:flex;overflow:hidden}
+.a4 .karte svg{width:100%;height:100%;display:block}
+.a4 .daten{display:flex;flex-direction:column;gap:9px;font-size:11.5px}
+.a4 .daten .zeile{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid var(--rule-soft);padding-bottom:4px}
+.a4 .daten .zeile span:first-child{font-family:"Barlow Condensed",sans-serif;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-2)}
+.a4 .daten .zeile span:last-child{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
+.a4 .fuss{grid-column:1/-1;border-top:1px solid var(--rule);padding-top:7px;font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:.06em;color:var(--ink-3);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+
+.stapel{display:flex;flex-direction:column;gap:18px}
+.zweispalt{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;align-items:start}
+
+.fussnote{
+  margin:30px 0 0;padding-top:14px;border-top:1px solid var(--ink);
+  font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.06em;color:var(--ink-3);
+  display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;
+}
+
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="blatt">
+
+<header class="topbar">
+  <div class="marke">
+    <h1>Grundstücks-Check Sachsen</h1>
+    <p class="sub">Oberflächen-Mockup · Stand <b>29.08.2026</b> · interner Prototyp · keine echten Dienste angebunden</p>
+  </div>
+  <div class="spacer"></div>
+  <div class="themeswitch" role="group" aria-label="Darstellung">
+    <button type="button" data-theme-set="light" aria-pressed="false">Papier</button>
+    <button type="button" data-theme-set="dark" aria-pressed="false">Lichtpause</button>
+    <button type="button" data-theme-set="system" aria-pressed="true">System</button>
+  </div>
+</header>
+
+<nav class="reiter" role="tablist" aria-label="Arbeitsschritte">
+  <button role="tab" id="tab-einwerfen" aria-controls="tafel-einwerfen" aria-selected="false"><span class="nr">F-01 · 11 · 12</span> Einwerfen</button>
+  <button role="tab" id="tab-lageplan"  aria-controls="tafel-lageplan"  aria-selected="true"><span class="nr">F-02 … F-07</span> Lageplan</button>
+  <button role="tab" id="tab-haustyp"   aria-controls="tafel-haustyp"   aria-selected="false"><span class="nr">F-10</span> Haustyp</button>
+  <button role="tab" id="tab-wege"      aria-controls="tafel-wege"      aria-selected="false"><span class="nr">F-08</span> Wege</button>
+  <button role="tab" id="tab-vergleich" aria-controls="tafel-vergleich" aria-selected="false"><span class="nr">F-09</span> Vergleich</button>
+  <button role="tab" id="tab-druck"     aria-controls="tafel-druck"     aria-selected="false"><span class="nr">F-15</span> Druckansicht</button>
+</nav>
+
+<!-- ═══════════════════ LAGEPLAN ═══════════════════ -->
+<section class="tafel" id="tafel-lageplan" role="tabpanel" aria-labelledby="tab-lageplan">
+ <div class="stapel">
+ <div class="plangitter">
+
+  <div class="planrahmen">
+    <div class="planleiste">
+      <span class="label">Grund</span>
+      <div class="gruppe" role="group" aria-label="Kartenhintergrund">
+        <button type="button" data-grund="karte"   aria-pressed="true">Karte</button>
+        <button type="button" data-grund="luftbild" aria-pressed="false">Luftbild</button>
+        <button type="button" data-grund="kataster" aria-pressed="false">Kataster</button>
+      </div>
+      <span class="label">Ausrichtung</span>
+      <div class="gruppe" role="group" aria-label="Kartenausrichtung">
+        <button type="button" data-nord="1" aria-pressed="false">Genordet</button>
+        <button type="button" data-nord="0" aria-pressed="true">Straßenparallel</button>
+      </div>
+      <div class="spacer"></div>
+      <button type="button" class="schalter" id="s-nachbarn" aria-pressed="true">Nachbarn</button>
+      <button type="button" class="schalter" id="s-masse"    aria-pressed="true">Maße</button>
+      <button type="button" class="schalter" id="s-fenster"  aria-pressed="true">Bebauungsfenster</button>
+    </div>
+
+    <div class="verstoss ok" id="statusbanner" role="status">
+      <span class="punkt"></span>
+      <p id="statustext"><b>Baukörper liegt im Bebauungsfenster.</b> Geringster Grenzabstand <span class="mono" id="minabstand">3,4 m</span>.</p>
+    </div>
+
+    <svg id="buehne" viewBox="0 0 820 620" role="img"
+         aria-label="Lageplan: Flurstücke 790 und 706 mit Bebauungsfenster und platziertem Baukörper. Haus mit Maus oder Tastatur verschiebbar."></svg>
+
+    <div class="plan-fuss">
+      <span>ETRS89 / UTM33N — EPSG:25833</span>
+      <span id="fuss-massstab">Maßstab ≈ 1:350</span>
+      <span>© GeoSN, dl-de/by-2-0</span>
+    </div>
+  </div>
+
+  <aside class="protokoll">
+
+    <div class="panel">
+      <div class="kopf"><span class="id">F-02</span><h3>Grundstück</h3><div class="spacer"></div><span class="chip kat">ALKIS</span></div>
+      <div class="kennliste">
+        <div class="k">Gemarkung</div>              <div class="v">Liebertwolkwitz</div>
+        <div class="k">Flurstücke</div>             <div class="v">790 · 706</div>
+        <div class="k">Kennzeichen</div>            <div class="v" style="font-size:11px">…00790___ · …00706___</div>
+        <div class="k">Fläche amtlich</div>         <div class="v">802 m²</div>
+        <div class="k">Fläche gerechnet</div>       <div class="v" id="k-flaeche-gerechnet">— <small>Polygon</small></div>
+        <div class="k">Grenzpunkte</div>            <div class="v" id="k-grenzpunkte">—</div>
+        <div class="k">Straßenfront</div>           <div class="v" id="k-front">—</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="kopf"><span class="id">F-03</span><h3>Form</h3></div>
+      <div class="kennliste">
+        <div class="k">Rechteckigkeit</div>   <div class="v" id="k-rechteckig">—</div>
+        <div class="k">Einstufung</div>       <div class="v" id="k-einstufung">—</div>
+        <div class="k">Seitenverhältnis</div> <div class="v" id="k-verhaeltnis">—</div>
+        <div class="k">Umschl. Rechteck</div> <div class="v" id="k-mrr">—</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="kopf"><span class="id">F-04</span><h3>Preis</h3><div class="spacer"></div><span class="chip kat">BORIS</span></div>
+      <div class="kennliste" style="border-bottom:1px solid var(--rule-soft)">
+        <div class="k">Kaufpreis</div>       <div class="v">189.000 €</div>
+        <div class="k">Angebot je m²</div>   <div class="v">235,66 €</div>
+        <div class="k">Bodenrichtwert</div>  <div class="v">210,00 € <small>Zone 5417</small></div>
+        <div class="k">Stichtag</div>        <div class="v">01.01.2026</div>
+      </div>
+      <div class="preisband">
+        <div class="skala">
+          <div class="achse"></div>
+          <div class="spanne" style="left:14%;width:52%"></div>
+          <div class="brw" style="left:40%"></div>
+          <div class="marke" style="left:63.2%" title="Angebot 235,66 €/m²"></div>
+        </div>
+        <div class="beschriftung"><span>150 €</span><span>210 €</span><span>300 €</span></div>
+        <p class="aussage">Das Angebot liegt <b>+12,2 % über dem Bodenrichtwert</b> der Zone.</p>
+      </div>
+    </div>
+
+  </aside>
+ </div>
+
+ <div class="werkzeuge">
+  <div class="panel">
+    <div class="kopf"><span class="id">F-05</span><h3>Abstandsflächen</h3><div class="spacer"></div><span class="chip warn">§ 6 SächsBO</span></div>
+    <table class="segmente">
+      <thead><tr><th>Grenze</th><th style="text-align:right">Länge</th><th style="text-align:right">Tiefe</th></tr></thead>
+      <tbody id="segment-zeilen"></tbody>
+    </table>
+    <div class="regler">
+      <label for="r-wandhoehe">Wandhöhe</label>
+      <output id="o-wandhoehe">6,40 m</output>
+      <input type="range" id="r-wandhoehe" min="3" max="12" step="0.1" value="6.4">
+      <p class="hinweis">0,4 · H = <b id="o-04h">2,56 m</b> — unter dem Mindestmaß von 3 m, deshalb greift der Mindestwert.</p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="kopf"><span class="id">F-06</span><h3>Baukörper</h3><div class="spacer"></div><span class="chip kat">ELK All in One 159</span></div>
+    <div class="kennliste" style="border-bottom:1px solid var(--rule-soft)">
+      <div class="k">Bebaute Fläche</div>  <div class="v">96,88 m²</div>
+      <div class="k">Wohnfläche ges.</div> <div class="v">159,21 m²</div>
+      <div class="k">Außenmaß</div>        <div class="v" id="k-hausmass">—</div>
+      <div class="k">Drehung</div>         <div class="v" id="k-drehung">—</div>
+      <div class="k">GRZ</div>             <div class="v" id="k-grz">—</div>
+    </div>
+    <div class="regler">
+      <label for="r-verhaeltnis">Seitenverhältnis</label>
+      <output id="o-verhaeltnis">1,35</output>
+      <input type="range" id="r-verhaeltnis" min="1" max="2.2" step="0.01" value="1.35">
+      <p class="hinweis">Aus der bebauten Fläche geschätzt — das Datenblatt-PDF liefert keine Außenmaße.</p>
+    </div>
+    <div class="regler">
+      <label for="r-drehung">Drehung</label>
+      <output id="o-drehung">−4°</output>
+      <input type="range" id="r-drehung" min="-90" max="90" step="1" value="-4">
+      <p class="hinweis">Haus mit der Maus ziehen, mit den Pfeiltasten fein verschieben.</p>
+    </div>
+  </div>
+
+  <div class="hinweis-balken mahnung">
+    <h4>Keine bauordnungsrechtliche Prüfung</h4>
+    <p>Die Abstandstiefe bemisst sich nach § 6 SächsBO grundsätzlich nach der Wandhöhe; 3 m sind der Mindestwert, nicht die Regel. Grenzgaragen sind privilegiert, ein Bebauungsplan kann abweichende Baugrenzen festsetzen.</p>
+    <p>Nach § 15 Abs. 2 ImmoWertV kann ein einzelnes Grundstück innerhalb der Richtwertzone eine abweichende Nutzungsart haben — dann gilt der Zonenwert nicht.</p>
+  </div>
+ </div>
+ </div>
+</section>
+
+<!-- ═══════════════════ EINWERFEN ═══════════════════ -->
+<section class="tafel" id="tafel-einwerfen" role="tabpanel" aria-labelledby="tab-einwerfen" hidden>
+ <div class="stapel">
+
+  <div class="wege3">
+    <div class="panel">
+      <div class="kopf"><span class="id">F-01</span><h3>Inserat einwerfen</h3></div>
+      <div class="eingabe">
+        <p class="erklaerung">Link oder Text eines Angebots. Das Modell holt die Seite und liest Adresse, Flurstück, Kaufpreis und Fläche heraus.</p>
+        <label for="e-url">Adresse der Anzeige</label>
+        <input type="text" id="e-url" value="https://www.kleinanzeigen.de/s-anzeige/baugrundstueck-leipzig-liebertwolkwitz/2947103821">
+        <button type="button" class="knopf">Seite lesen</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="kopf"><span class="id">F-11</span><h3>Flurstück direkt</h3></div>
+      <div class="eingabe">
+        <p class="erklaerung">Ohne Umweg über Adresse und Geocoding. Gemarkung als Autocomplete, Nachschlag sofort beim Absenden.</p>
+        <div class="drei">
+          <div class="feldchen"><label for="e-gemarkung">Gemarkung</label><input type="text" id="e-gemarkung" value="Liebertwolkwitz" list="gemarkungen"></div>
+          <div class="feldchen"><label for="e-zaehler">Zähler</label><input type="text" id="e-zaehler" value="790"></div>
+          <div class="feldchen"><label for="e-nenner">Nenner</label><input type="text" id="e-nenner" value=""></div>
+        </div>
+        <datalist id="gemarkungen">
+          <option value="Liebertwolkwitz"></option><option value="Holzhausen"></option>
+          <option value="Zuckelhausen"></option><option value="Baalsdorf"></option>
+        </datalist>
+        <button type="button" class="knopf">Nachschlagen</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="kopf"><span class="id">F-12</span><h3>Seite einfügen</h3></div>
+      <div class="eingabe">
+        <p class="erklaerung">Für Portale, die keinen Serverabruf zulassen — ImmoScout24 antwortet mit 401. Formatierter Einfügetext bewahrt Links und Struktur.</p>
+        <label for="e-paste">Anzeige hier einfügen</label>
+        <textarea id="e-paste" placeholder="Strg+V — die kopierte Anzeigenseite"></textarea>
+        <button type="button" class="knopf leise">Aus Einfügetext lesen</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="kopf">
+      <span class="id">Gelesen</span><h3>Was das Modell gefunden hat</h3>
+      <div class="spacer"></div>
+      <span class="chip warn">Vorschläge, nicht bestätigt</span>
+    </div>
+    <div class="leib" style="display:flex;flex-direction:column;gap:14px">
+      <p style="margin:0;font-size:13.5px;color:var(--ink-2);max-width:70ch">
+        Jedes Feld führt die Quelle mit, aus der es stammt. Erst nach Bestätigung wandern die Werte in die Planung — das Modell antwortet auch dann, wenn die Seite die Zahl gar nicht hergibt.
+      </p>
+      <div class="vorschlaege">
+        <div class="vorschlag bestaetigt">
+          <span class="feld">Adresse <span class="gelesen">bestätigt</span></span>
+          <input type="text" value="Muldentalstraße, 04288 Leipzig">
+          <span class="quelle">og:title · kleinanzeigen.de/s-anzeige/…821</span>
+        </div>
+        <div class="vorschlag bestaetigt">
+          <span class="feld">Koordinate <span class="gelesen">bestätigt</span></span>
+          <input type="text" value="51.24184, 12.48831">
+          <span class="quelle">og:latitude / og:longitude — kein Geocoding nötig</span>
+        </div>
+        <div class="vorschlag">
+          <span class="feld">Flurstücke <span class="gelesen">automatisch gelesen</span></span>
+          <input type="text" value="790, 706">
+          <span class="quelle">Beschreibungstext: „Gesamtfläche von ca. 802 m² (Flurstück 790 sowie 706)“</span>
+        </div>
+        <div class="vorschlag">
+          <span class="feld">Kaufpreis <span class="gelesen">automatisch gelesen</span></span>
+          <input type="text" value="189.000 €">
+          <span class="quelle">Preisangabe im Kopfbereich der Anzeige</span>
+        </div>
+        <div class="vorschlag">
+          <span class="feld">Grundstücksfläche <span class="gelesen">automatisch gelesen</span></span>
+          <input type="text" value="802 m²">
+          <span class="quelle">Beschreibungstext — durch ALKIS zu ersetzen</span>
+        </div>
+        <div class="vorschlag" style="border-color:var(--mass)">
+          <span class="feld">Baujahr <span class="gelesen" style="color:var(--mass);border-color:var(--mass)">nicht belegt</span></span>
+          <input type="text" value="" placeholder="steht nicht auf der Seite">
+          <span class="quelle">Kein Beleg gefunden — Feld bleibt leer statt geraten</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button type="button" class="knopf">Alle bestätigen und weiter</button>
+        <button type="button" class="knopf leise">Gegen ALKIS prüfen</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="zweispalt">
+    <div class="hinweis-balken">
+      <h4>Ein Grundstück sind oft mehrere Flurstücke</h4>
+      <p>Hier: 790 und 706. Das ist der Normalfall, nicht die Ausnahme. Polygone werden vereinigt, amtliche Flächen summiert, Formanalyse und Bebauungsfenster laufen über die Vereinigung.</p>
+    </div>
+    <div class="hinweis-balken">
+      <h4>Kontaktdaten werden nicht gespeichert</h4>
+      <p>Makler, Ansprechpartner und Telefonnummern führt das Extraktionsschema gar nicht erst — so landet kein Personenbezug in der Datenbank.</p>
+    </div>
+  </div>
+
+ </div>
+</section>
+
+<!-- ═══════════════════ HAUSTYP ═══════════════════ -->
+<section class="tafel" id="tafel-haustyp" role="tabpanel" aria-labelledby="tab-haustyp" hidden>
+ <div class="stapel">
+  <div class="zweispalt">
+    <div class="panel">
+      <div class="kopf"><span class="id">F-10</span><h3>Fertighaus einlesen</h3></div>
+      <div class="eingabe">
+        <p class="erklaerung">Link zu einem Haustyp beim Hersteller. Der Abruf ist auf die Herstellerdomain begrenzt, das Ergebnis wird je URL dauerhaft zwischengespeichert.</p>
+        <label for="h-url">Adresse der Haustyp-Seite</label>
+        <input type="text" id="h-url" value="https://www.elk.de/haeuser/elk-all-in-one-159">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <button type="button" class="knopf">Haustyp lesen</button>
+          <span class="chip kat">allowed_domains: elk.de</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="hinweis-balken mahnung">
+      <h4>Wohnfläche ist nicht Grundfläche</h4>
+      <p>Der häufigste Fehler beim Fertighaus. Beim ELK All in One 159 sind 159,21 m² die Netto-Raumfläche über alle Geschosse — die <em>bebaute</em> Fläche beträgt 96,88 m². Wer die falsche Zahl auf die Karte legt, zeichnet ein Haus mit fast doppelter Grundfläche.</p>
+      <p>Fehlen die Außenmaße im Datenblatt, wird aus der bebauten Fläche ein Rechteck mit Seitenverhältnis 1,35 abgeleitet — korrigierbar per Regler im Lageplan.</p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="kopf"><span class="id">Katalog</span><h3>Haustyp-Katalog</h3><div class="spacer"></div><span class="chip kat">3 Einträge zwischengespeichert</span></div>
+    <div class="vgl-scroll">
+      <table class="vgl">
+        <thead><tr>
+          <th>Typ</th><th style="text-align:right">Bebaut</th><th style="text-align:right">Wohnfl.</th>
+          <th style="text-align:right">Außenmaß</th><th>Dach</th><th style="text-align:right">Preis ab</th><th>Gelesen</th>
+        </tr></thead>
+        <tbody>
+          <tr>
+            <td><div class="kand"><b>ELK All in One 159</b><span>elk.de</span></div></td>
+            <td class="n">96,88 m²</td><td class="n">159,21 m²</td>
+            <td class="n">11,4 × 8,5 m <span style="color:var(--ocker)">≈</span></td>
+            <td>Satteldach</td><td class="n">289.900 €</td>
+            <td><span class="chip kat">29.08.2026</span></td>
+          </tr>
+          <tr>
+            <td><div class="kand"><b>Town &amp; Country Flair 134</b><span>hausausstellung.de</span></div></td>
+            <td class="n">78,20 m²</td><td class="n">134,00 m²</td>
+            <td class="n">10,4 × 7,5 m</td>
+            <td>Satteldach</td><td class="n">238.500 €</td>
+            <td><span class="chip kat">29.08.2026</span></td>
+          </tr>
+          <tr>
+            <td><div class="kand"><b>Schwörer Bungalow 128</b><span>schwoererhaus.de</span></div></td>
+            <td class="n">142,60 m²</td><td class="n">128,40 m²</td>
+            <td class="n">14,2 × 10,0 m</td>
+            <td>Walmdach</td><td class="n">341.000 €</td>
+            <td><span class="chip kat">29.08.2026</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="leib" style="border-top:1px solid var(--rule);padding-top:12px">
+      <p style="margin:0;font-size:12.5px;color:var(--ink-3)">
+        <span style="color:var(--ocker)">≈</span> geschätzt aus der bebauten Fläche · Plausibilitätsgrenzen: Kantenlänge 4–30 m, bebaute Fläche 30–400 m². Werte außerhalb gelten als Extraktionsfehler, nicht als Haus.
+      </p>
+    </div>
+  </div>
+ </div>
+</section>
+
+<!-- ═══════════════════ WEGE ═══════════════════ -->
+<section class="tafel" id="tafel-wege" role="tabpanel" aria-labelledby="tab-wege" hidden>
+ <div class="stapel">
+
+  <div class="panel">
+    <div class="kopf"><span class="id">F-08</span><h3>Ziele</h3><div class="spacer"></div><span class="chip kat">MOTIS · DELFI-GTFS</span></div>
+    <div class="leib" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <span class="chip kat">Arbeit — Leipzig, Nonnenstraße 39</span>
+      <span class="chip kat">Grundschule Liebertwolkwitz</span>
+      <span class="chip kat">Kita Kolibri</span>
+      <span class="chip kat">Bahnhof Leipzig Hbf</span>
+      <button type="button" class="knopf leise" style="padding:4px 11px;font-size:13px">Ziel hinzufügen</button>
+    </div>
+  </div>
+
+  <div class="ziele" id="ziele"></div>
+
+  <div class="hinweis-balken">
+    <h4>Im Prototyp läuft das gegen Transitous</h4>
+    <p>Öffentliche MOTIS-Instanz der Community — ideal, um diesen Bildschirm zu bauen, ohne vorher einen Server aufzusetzen. Für Produktionslast ungeeignet; die Betreiber weisen selbst auf begrenzte Ressourcen hin. Umstellung auf eine eigene Instanz ändert nur die Basis-Adresse.</p>
+  </div>
+ </div>
+</section>
+
+<!-- ═══════════════════ VERGLEICH ═══════════════════ -->
+<section class="tafel" id="tafel-vergleich" role="tabpanel" aria-labelledby="tab-vergleich" hidden>
+ <div class="stapel">
+  <div class="panel">
+    <div class="kopf"><span class="id">F-09</span><h3>Vier Kandidaten</h3><div class="spacer"></div><span class="chip kat">PostGIS</span></div>
+    <div class="vgl-scroll">
+      <table class="vgl">
+        <thead><tr>
+          <th style="width:230px">Grundstück</th>
+          <th style="text-align:right">Fläche</th>
+          <th style="text-align:right">Preis</th>
+          <th style="text-align:right">€/m²</th>
+          <th style="text-align:right">Δ Bodenrichtwert</th>
+          <th>Form</th>
+          <th style="text-align:right">Arbeit ÖPNV</th>
+          <th style="text-align:right">Schule Rad</th>
+        </tr></thead>
+        <tbody>
+          <tr>
+            <td><div class="kand"><b>Liebertwolkwitz, Muldentalstr.</b><span>Flst. 790 · 706</span></div></td>
+            <td class="n">802 m²</td><td class="n">189.000 €</td><td class="n">235,66 €</td>
+            <td class="n"><span class="chip warn">+12,2 %</span></td>
+            <td><span class="chip gut">rechteckig</span> <span class="mono" style="font-size:11px;color:var(--ink-3)">0,97</span></td>
+            <td class="n">42 min</td><td class="n">8 min</td>
+          </tr>
+          <tr>
+            <td><div class="kand"><b>Holzhausen, Am Kirschberg</b><span>Flst. 214/7</span></div></td>
+            <td class="n">641 m²</td><td class="n">198.000 €</td><td class="n">308,89 €</td>
+            <td class="n"><span class="chip krit">+22,6 %</span></td>
+            <td><span class="chip gut">rechteckig</span> <span class="mono" style="font-size:11px;color:var(--ink-3)">1,00</span></td>
+            <td class="n">29 min</td><td class="n">12 min</td>
+          </tr>
+          <tr>
+            <td><div class="kand"><b>Baalsdorf, Sommerfelder Weg</b><span>Flst. 61/3 · 61/4 · 62</span></div></td>
+            <td class="n">1.104 m²</td><td class="n">212.000 €</td><td class="n">192,03 €</td>
+            <td class="n"><span class="chip gut">−4,0 %</span></td>
+            <td><span class="chip warn">komplex</span> <span class="mono" style="font-size:11px;color:var(--ink-3)">0,73</span></td>
+            <td class="n">51 min</td><td class="n">15 min</td>
+          </tr>
+          <tr>
+            <td><div class="kand"><b>Zuckelhausen, Hoher Weg</b><span>Flst. 118</span></div></td>
+            <td class="n">733 m²</td><td class="n">165.000 €</td><td class="n">225,10 €</td>
+            <td class="n"><span class="chip gut">+2,3 %</span></td>
+            <td><span class="chip gut">fast rechteckig</span> <span class="mono" style="font-size:11px;color:var(--ink-3)">0,90</span></td>
+            <td class="n">38 min</td><td class="n">10 min</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="kopf"><span class="id">Alle</span><h3>Gleicher Maßstab, gleiche Ausrichtung</h3><div class="spacer"></div><span class="chip kat">1:500</span></div>
+    <div class="leib">
+      <div id="vergleichsgrundrisse" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px"></div>
+      <p style="margin:14px 0 0;font-size:12.5px;color:var(--ink-3)">R = Rechteckigkeit: Polygonfläche geteilt durch die Fläche des kleinsten gedrehten Umschließungsrechtecks. Über 0,95 rechteckig, 0,85–0,95 fast, darunter komplex.</p>
+    </div>
+  </div>
+ </div>
+</section>
+
+<!-- ═══════════════════ DRUCK ═══════════════════ -->
+<section class="tafel" id="tafel-druck" role="tabpanel" aria-labelledby="tab-druck" hidden>
+ <div class="stapel">
+  <div class="zweispalt">
+    <div class="hinweis-balken">
+      <h4>Ein Grundstück je Seite, A4 quer</h4>
+      <p>Gedruckt wird, was im Browser steht — kein PDF-Export, kein serverseitiges Kartenrendering. So gibt es keinen zweiten Renderpfad, der dieselben Maße nochmal berechnen müsste.</p>
+    </div>
+    <div class="hinweis-balken mahnung">
+      <h4>Der Knackpunkt ist die Karte</h4>
+      <p>MapLibre braucht <span class="mono">preserveDrawingBuffer: true</span> von Anfang an, sonst bleibt die Karte im Ausdruck leer — nachträglich lässt sich das nicht setzen. Vor dem Druck Kartencontainer auf Druckmaß setzen und <span class="mono">map.resize()</span> aufrufen.</p>
+      <p>Nordpfeil und Maßstabsleiste bleiben sichtbar: bei gedrehter Karte sind sie das Einzige, was die Orientierung rettet.</p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="kopf"><span class="id">F-15</span><h3>Vorschau — Blatt 1 von 4</h3><div class="spacer"></div><span class="chip kat">A4 quer · print-color-adjust: exact</span></div>
+    <div class="leib">
+      <div class="a4">
+        <div class="kopf">
+          <h3>Liebertwolkwitz · Flurstück 790 · 706</h3>
+          <span class="mono">Muldentalstraße, 04288 Leipzig · 802 m² · 189.000 €</span>
+        </div>
+        <div class="karte"><svg id="druckkarte" viewBox="0 0 820 620" role="img" aria-label="Lageplan für den Ausdruck"></svg></div>
+        <div class="daten">
+          <div class="zeile"><span>Fläche amtlich</span><span>802 m²</span></div>
+          <div class="zeile"><span>Angebot je m²</span><span>235,66 €</span></div>
+          <div class="zeile"><span>Bodenrichtwert</span><span>210,00 €</span></div>
+          <div class="zeile"><span>Abweichung</span><span>+12,2 %</span></div>
+          <div class="zeile"><span>Rechteckigkeit</span><span id="druck-rechteckig">—</span></div>
+          <div class="zeile"><span>Baukörper</span><span id="druck-hausmass">—</span></div>
+          <div class="zeile"><span>Geringster Abstand</span><span id="druck-abstand">—</span></div>
+          <div class="zeile"><span>Arbeit · ÖPNV</span><span>42 min</span></div>
+          <div class="zeile"><span>Schule · Rad</span><span>8 min</span></div>
+          <div class="zeile"><span>Hbf · Auto</span><span>21 min</span></div>
+        </div>
+        <div class="fuss">
+          <span>Amtliche Daten: © GeoSN, dl-de/by-2-0 · Bodenrichtwert: Gutachterausschuss, Stichtag 01.01.2026</span>
+          <span>Keine bauordnungsrechtliche Prüfung · keine Rechtsberatung</span>
+        </div>
+      </div>
+    </div>
+  </div>
+ </div>
+</section>
+
+<!-- ═══════════════════ SCHRIFTFELD ═══════════════════ -->
+<dl class="schriftfeld">
+  <div><dt>Vorhaben</dt><dd>Grundstücks-Check</dd></div>
+  <div><dt>Raum</dt><dd>Freistaat Sachsen</dd></div>
+  <div><dt>Stand</dt><dd>29.08.2026</dd></div>
+  <div><dt>Umfang</dt><dd>Interner Prototyp</dd></div>
+  <div><dt>Frontend</dt><dd class="klein">Vite + Vue 3 (Options API), MapLibre GL, Turf.js</dd></div>
+  <div><dt>Backend</dt><dd class="klein">FastAPI + PostGIS, Proxy vor WFS/WMS</dd></div>
+</dl>
+
+<p class="fussnote">
+  <span>Oberflächen-Mockup — keine echten Dienste angebunden, alle Zahlen aus der Vorprojekt-Notiz</span>
+  <span>Amtliche Daten: © GeoSN, dl-de/by-2-0 · Keine Rechtsberatung</span>
+</p>
+
+</div>
+
+<script>
+"use strict";
+/* ══════════════════════════════════════════════════════════════
+   Alle Geometrie läuft hier im Browser — genau wie in der Zielarchitektur
+   (dort Turf.js, hier von Hand, damit das Mockup ohne Abhängigkeit läuft).
+   Gerechnet wird in Metern; erst zur Anzeige wird transformiert.
+   ══════════════════════════════════════════════════════════════ */
+
+const SVGNS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs = {}, text) => {
+  const n = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) if (attrs[k] !== undefined && attrs[k] !== null) n.setAttribute(k, attrs[k]);
+  if (text !== undefined) n.textContent = text;
+  return n;
+};
+const nf = (v, d = 2) => v.toLocaleString("de-DE", { minimumFractionDigits: d, maximumFractionDigits: d });
+
+/* ---------- Polygon-Werkzeuge ---------- */
+const flaeche = p => { let s = 0; for (let i = 0; i < p.length; i++) { const q = p[(i + 1) % p.length]; s += p[i].x * q.y - q.x * p[i].y; } return Math.abs(s) / 2; };
+const umfang = p => { let s = 0; for (let i = 0; i < p.length; i++) { const q = p[(i + 1) % p.length]; s += Math.hypot(q.x - p[i].x, q.y - p[i].y); } return s; };
+const kanten = p => p.map((a, i) => { const b = p[(i + 1) % p.length]; return { a, b, laenge: Math.hypot(b.x - a.x, b.y - a.y), winkel: Math.atan2(b.y - a.y, b.x - a.x) }; });
+
+/* Halbebenen-Zuschnitt (Sutherland–Hodgman). Erlaubt eine eigene Tiefe je Grenze —
+   genau die Anforderung aus § 6 SächsBO: pro Grenzsegment einstellbar. */
+function schneideHalbebene(poly, punkt, normale) {
+  const drin = q => (q.x - punkt.x) * normale.x + (q.y - punkt.y) * normale.y >= -1e-9;
+  const kreuz = (a, b) => {
+    const da = (a.x - punkt.x) * normale.x + (a.y - punkt.y) * normale.y;
+    const db = (b.x - punkt.x) * normale.x + (b.y - punkt.y) * normale.y;
+    const t = da / (da - db);
+    return { x: a.x + t * (b.x - a.x), y: a.y + t * (b.y - a.y) };
+  };
+  const out = [];
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i], b = poly[(i + 1) % poly.length], ia = drin(a), ib = drin(b);
+    if (ia) out.push(a);
+    if (ia !== ib) out.push(kreuz(a, b));
+  }
+  return out;
+}
+
+/* Bebauungsfenster: Innenversatz mit eigener Tiefe je Kante. */
+function bebauungsfenster(poly, tiefen) {
+  let f = poly.slice();
+  kanten(poly).forEach((k, i) => {
+    const n = { x: -(k.b.y - k.a.y) / k.laenge, y: (k.b.x - k.a.x) / k.laenge }; // Innennormale (CCW)
+    const t = tiefen[i];
+    f = schneideHalbebene(f, { x: k.a.x + n.x * t, y: k.a.y + n.y * t }, n);
+    if (f.length < 3) return;
+  });
+  return f.length >= 3 ? f : [];
+}
+
+/* Kleinstes gedrehtes Umschließungsrechteck — die Kante gibt den Winkel vor. */
+function minRechteck(poly) {
+  let best = null;
+  for (const k of kanten(poly)) {
+    const c = Math.cos(-k.winkel), s = Math.sin(-k.winkel);
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (const p of poly) {
+      const x = p.x * c - p.y * s, y = p.x * s + p.y * c;
+      x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+    }
+    const a = (x1 - x0) * (y1 - y0);
+    if (!best || a < best.flaeche) best = { flaeche: a, breite: x1 - x0, hoehe: y1 - y0, winkel: k.winkel };
+  }
+  return best;
+}
+
+const imPolygon = (pt, poly) => {
+  let d = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    if ((poly[i].y > pt.y) !== (poly[j].y > pt.y) &&
+        pt.x < (poly[j].x - poly[i].x) * (pt.y - poly[i].y) / (poly[j].y - poly[i].y) + poly[i].x) d = !d;
+  }
+  return d;
+};
+function abstandZuStrecke(p, a, b) {
+  const dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
+  const t = l2 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2)) : 0;
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+const abstandZumRand = (p, poly) => Math.min(...kanten(poly).map(k => abstandZuStrecke(p, k.a, k.b)));
+
+const rechteckEcken = h => {
+  const c = Math.cos(h.rot * Math.PI / 180), s = Math.sin(h.rot * Math.PI / 180);
+  return [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sy]) => {
+    const x = sx * h.b / 2, y = sy * h.t / 2;
+    return { x: h.cx + x * c - y * s, y: h.cy + x * s + y * c };
+  });
+};
+
+/* ══════════════════ Der Fall: Liebertwolkwitz, Flst. 790 + 706 ══════════════════ */
+
+const FLURSTUECK = [ {x:0,y:0}, {x:22.6,y:0.9}, {x:24.3,y:34.9}, {x:1.6,y:36.2} ]; // Vereinigung, CCW
+const FLAECHE_AMTLICH = 802;                 // ALKIS-Attribut — maßgeblich für €/m²
+const TEILUNG = { von: {x:11.6,y:0.45}, bis: {x:12.95,y:35.55} }; // Grenze 790 | 706
+
+const NACHBARN = [
+  { poly:[{x:0,y:0},{x:1.6,y:36.2},{x:-9.9,y:35.7},{x:-11.5,y:-0.5}],       nr:"792" },
+  { poly:[{x:-11.5,y:-0.5},{x:-9.9,y:35.7},{x:-21.9,y:35.2},{x:-23.5,y:-1}], nr:"794" },
+  { poly:[{x:22.6,y:0.9},{x:35.6,y:1.5},{x:37.3,y:35.5},{x:24.3,y:34.9}],    nr:"704" },
+  { poly:[{x:35.6,y:1.5},{x:48.6,y:2.1},{x:50.3,y:36.1},{x:37.3,y:35.5}],    nr:"702" },
+  { poly:[{x:1.6,y:36.2},{x:24.3,y:34.9},{x:25.5,y:49},{x:2.5,y:50}],        nr:"788" }
+];
+const NACHBARBAUTEN = [
+  {cx:-5.6, cy:11.5, b:10.2, t:8.4, rot:-2.5}, {cx:-6.2, cy:27,  b:5.4,  t:4.2, rot:-2.5},
+  {cx:-17.6,cy:9.8,  b:9.4,  t:7.6, rot:-2.5},
+  {cx:29.8, cy:11.2, b:11.4, t:8.6, rot:2.8},  {cx:31.5, cy:26.5, b:6.2,  t:5,   rot:2.8},
+  {cx:43.4, cy:13.5, b:10.6, t:9.2, rot:2.8},
+  {cx:13.2, cy:43,   b:12.4, t:7.2, rot:-3.2}
+];
+const STRASSE = [{x:-30,y:-1.79},{x:55,y:1.59},{x:55,y:-5.41},{x:-30,y:-8.79}];
+
+/* Blickrichtung: die Straßenfront liegt in Wirklichkeit 17° gegen Nord verdreht. */
+const NORD_VERSATZ = 17;
+
+const zustand = {
+  haus: { cx: 10.8, cy: 15.0, b: 11.4, t: 8.5, rot: -4 },
+  bebauteFlaeche: 96.88,
+  verhaeltnis: 1.35,
+  wandhoehe: 6.4,
+  tiefen: [3, 3, 3, 3],          // je Grenze, Startwert 3 m
+  genordet: false,
+  nachbarn: true,
+  masse: true,
+  fenster: true,
+  grund: "karte"
+};
+
+/* ══════════════════ Zeichnen ══════════════════ */
+const MASSSTAB = 8.4;                       // px je Meter im viewBox
+const MITTE = { x: 410, y: 310 }, SCHWERPUNKT = { x: 12.1, y: 18.0 };
+const zx = x => MITTE.x + (x - SCHWERPUNKT.x) * MASSSTAB;
+const zy = y => MITTE.y - (y - SCHWERPUNKT.y) * MASSSTAB;
+const pfad = p => p.map(q => `${zx(q.x).toFixed(1)},${zy(q.y).toFixed(1)}`).join(" ");
+
+function defs() {
+  const d = el("defs");
+  const hatch = el("pattern", { id: "schraffur", width: 7, height: 7, patternTransform: "rotate(45)", patternUnits: "userSpaceOnUse" });
+  hatch.appendChild(el("line", { x1: 0, y1: 0, x2: 0, y2: 7, stroke: "var(--ocker)", "stroke-width": 2.4, opacity: .6 }));
+  d.appendChild(hatch);
+  const hatch2 = el("pattern", { id: "schraffur-nachbar", width: 6, height: 6, patternTransform: "rotate(45)", patternUnits: "userSpaceOnUse" });
+  hatch2.appendChild(el("line", { x1: 0, y1: 0, x2: 0, y2: 6, stroke: "var(--plan-nachbar)", "stroke-width": 1.6, opacity: .75 }));
+  d.appendChild(hatch2);
+  const tick = el("marker", { id: "strich", markerWidth: 10, markerHeight: 10, refX: 5, refY: 5, orient: "auto" });
+  tick.appendChild(el("line", { x1: 5, y1: 1.5, x2: 5, y2: 8.5, stroke: "var(--mass)", "stroke-width": 1.3 }));
+  d.appendChild(tick);
+  return d;
+}
+
+/* Beschriftung bleibt waagerecht, egal wie die Karte gedreht ist. */
+function beschriftung(gx, gy, text, extra = {}) {
+  const R = zustand.genordet ? NORD_VERSATZ : 0;
+  return el("text", Object.assign({
+    x: gx, y: gy, "font-family": "IBM Plex Mono, monospace", "font-size": 10.5,
+    fill: "var(--ink-2)", "text-anchor": "middle", transform: `rotate(${-R},${gx},${gy})`,
+    stroke: "var(--plan-bg)", "stroke-width": 3.2, "stroke-linejoin": "round", "paint-order": "stroke fill"
+  }, extra), text);
+}
+
+function masskette(g, a, b, off, text) {
+  const dx = b.x - a.x, dy = b.y - a.y, L = Math.hypot(dx, dy);
+  const n = { x: -dy / L, y: dx / L };
+  const a2 = { x: a.x + n.x * off, y: a.y + n.y * off }, b2 = { x: b.x + n.x * off, y: b.y + n.y * off };
+  const hilf = { stroke: "var(--mass)", "stroke-width": .7, opacity: .55 };
+  g.appendChild(el("line", Object.assign({ x1: zx(a.x), y1: zy(a.y), x2: zx(a2.x), y2: zy(a2.y) }, hilf)));
+  g.appendChild(el("line", Object.assign({ x1: zx(b.x), y1: zy(b.y), x2: zx(b2.x), y2: zy(b2.y) }, hilf)));
+  g.appendChild(el("line", {
+    x1: zx(a2.x), y1: zy(a2.y), x2: zx(b2.x), y2: zy(b2.y),
+    stroke: "var(--mass)", "stroke-width": 1, "marker-start": "url(#strich)", "marker-end": "url(#strich)"
+  }));
+  const m = { x: (a2.x + b2.x) / 2 + n.x * 1.5, y: (a2.y + b2.y) / 2 + n.y * 1.5 };
+  const t = beschriftung(zx(m.x), zy(m.y) + 3.5, text, { fill: "var(--mass)", "font-size": 10.5, "font-weight": 500 });
+  g.appendChild(t);
+}
+
+function zeichneSzene(ziel, { interaktiv = true } = {}) {
+  const R = zustand.genordet ? NORD_VERSATZ : 0;
+  ziel.replaceChildren();
+  ziel.appendChild(defs());
+
+  const szene = el("g", { transform: `rotate(${R},${MITTE.x},${MITTE.y})` });
+  ziel.appendChild(szene);
+
+  /* --- Grund --- */
+  if (zustand.grund === "luftbild") {
+    szene.appendChild(el("rect", { x: -300, y: -300, width: 1500, height: 1200, fill: "var(--plan-fill)" }));
+    szene.appendChild(el("rect", { x: -300, y: -300, width: 1500, height: 1200, fill: "var(--kat)", opacity: .13 }));
+    [[180,150,90,60],[560,190,70,50],[300,430,110,45],[650,400,60,70],[120,330,55,40],[430,90,80,35]]
+      .forEach(([x, y, rx, ry], i) => szene.appendChild(el("ellipse", { cx: x, cy: y, rx, ry, fill: "var(--gut)", opacity: i % 2 ? .16 : .11 })));
+  } else {
+    szene.appendChild(el("rect", { x: -300, y: -300, width: 1500, height: 1200, fill: "var(--plan-bg)" }));
+    const raster = el("g", { stroke: "var(--plan-line)", opacity: zustand.grund === "kataster" ? .10 : .055, "stroke-width": 1 });
+    for (let m = -40; m <= 90; m += 10) { raster.appendChild(el("line", { x1: zx(m), y1: -300, x2: zx(m), y2: 900 })); }
+    for (let m = -20; m <= 70; m += 10) { raster.appendChild(el("line", { x1: -300, y1: zy(m), x2: 1200, y2: zy(m) })); }
+    szene.appendChild(raster);
+  }
+
+  /* --- Straße (aus ALKIS-Nutzung: Verkehrsfläche) --- */
+  szene.appendChild(el("polygon", { points: pfad(STRASSE), fill: "var(--plan-strasse)", stroke: "var(--plan-nachbar)", "stroke-width": .8, opacity: zustand.grund === "luftbild" ? .55 : 1 }));
+  szene.appendChild(beschriftung(zx(-14), zy(-4.6), "MULDENTALSTRASSE", { fill: "var(--ink-3)", "font-size": 9, "letter-spacing": ".18em" }));
+
+  /* --- Nachbarflurstücke --- */
+  const nb = el("g");
+  NACHBARN.forEach(n => {
+    nb.appendChild(el("polygon", {
+      points: pfad(n.poly),
+      fill: zustand.grund === "luftbild" ? "none" : "var(--plan-fill)",
+      stroke: "var(--plan-nachbar)", "stroke-width": 1, "stroke-dasharray": zustand.grund === "kataster" ? "none" : "4 3"
+    }));
+    if (zustand.grund === "kataster") {
+      const c = n.poly.reduce((s, p) => ({ x: s.x + p.x / n.poly.length, y: s.y + p.y / n.poly.length }), { x: 0, y: 0 });
+      nb.appendChild(beschriftung(zx(c.x), zy(c.y) + 3, n.nr, { fill: "var(--ink-3)", "font-size": 9.5 }));
+    }
+  });
+  szene.appendChild(nb);
+
+  if (zustand.nachbarn) {
+    const gb = el("g");
+    NACHBARBAUTEN.forEach(h => gb.appendChild(el("polygon", {
+      points: pfad(rechteckEcken(h)),
+      fill: zustand.grund === "luftbild" ? "var(--plan-nachbar)" : "url(#schraffur-nachbar)",
+      stroke: "var(--plan-nachbar)", "stroke-width": 1.1
+    })));
+    szene.appendChild(gb);
+  }
+
+  /* --- Das Grundstück: zwei Flurstücke, eine Vereinigung --- */
+  szene.appendChild(el("polygon", { points: pfad(FLURSTUECK), fill: "var(--plan-fill)", stroke: "none" }));
+  szene.appendChild(el("line", {
+    x1: zx(TEILUNG.von.x), y1: zy(TEILUNG.von.y), x2: zx(TEILUNG.bis.x), y2: zy(TEILUNG.bis.y),
+    stroke: "var(--plan-line)", "stroke-width": 1, "stroke-dasharray": "6 4", opacity: .45
+  }));
+  szene.appendChild(el("polygon", { points: pfad(FLURSTUECK), fill: "none", stroke: "var(--plan-line)", "stroke-width": 2.2, "stroke-linejoin": "round" }));
+  FLURSTUECK.forEach(p => szene.appendChild(el("rect", { x: zx(p.x) - 2.5, y: zy(p.y) - 2.5, width: 5, height: 5, fill: "var(--plan-bg)", stroke: "var(--plan-line)", "stroke-width": 1.4 })));
+  szene.appendChild(beschriftung(zx(6.2), zy(31), "790", { fill: "var(--ink-2)", "font-size": 12, "font-weight": 500 }));
+  szene.appendChild(beschriftung(zx(19.2), zy(30.6), "706", { fill: "var(--ink-2)", "font-size": 12, "font-weight": 500 }));
+
+  /* --- Bebauungsfenster --- */
+  const fenster = bebauungsfenster(FLURSTUECK, zustand.tiefen);
+  if (zustand.fenster && fenster.length) {
+    szene.appendChild(el("polygon", { points: pfad(fenster), fill: "var(--mass)", opacity: .05 }));
+    szene.appendChild(el("polygon", { points: pfad(fenster), fill: "none", stroke: "var(--mass)", "stroke-width": 1.4, "stroke-dasharray": "7 5" }));
+  }
+
+  /* --- Baukörper --- */
+  const ecken = rechteckEcken(zustand.haus);
+  const draussen = fenster.length ? ecken.filter(e => !imPolygon(e, fenster)).length : 4;
+  const haus = el("g", interaktiv ? { id: "hauskoerper", tabindex: "0", style: "cursor:grab", role: "button", "aria-label": "Baukörper — ziehen oder mit den Pfeiltasten verschieben" } : {});
+  haus.appendChild(el("polygon", {
+    points: pfad(ecken), fill: "url(#schraffur)",
+    stroke: draussen ? "var(--mass)" : "var(--plan-line)", "stroke-width": draussen ? 2.4 : 1.8
+  }));
+  if (draussen) ecken.forEach(e => { if (!imPolygon(e, fenster)) haus.appendChild(el("circle", { cx: zx(e.x), cy: zy(e.y), r: 4.5, fill: "none", stroke: "var(--mass)", "stroke-width": 1.6 })); });
+  szene.appendChild(haus);
+
+  /* --- Maßketten --- */
+  if (zustand.masse) {
+    const k = kanten(FLURSTUECK);
+    const g = el("g");
+    masskette(g, FLURSTUECK[1], FLURSTUECK[0], 4.5, nf(k[0].laenge) + " m");
+    masskette(g, FLURSTUECK[0], FLURSTUECK[3], 4.5, nf(k[3].laenge) + " m");
+    masskette(g, ecken[0], ecken[1], -3.1, nf(zustand.haus.b) + " m");
+    masskette(g, ecken[1], ecken[2], -3.1, nf(zustand.haus.t) + " m");
+    szene.appendChild(g);
+    /* kürzester Abstand Haus → Grenze, als eigene Kote */
+    let min = { d: Infinity };
+    ecken.forEach(e => kanten(FLURSTUECK).forEach(kk => {
+      const dd = abstandZuStrecke(e, kk.a, kk.b);
+      if (dd < min.d) { const l2 = (kk.b.x - kk.a.x) ** 2 + (kk.b.y - kk.a.y) ** 2;
+        const t = Math.max(0, Math.min(1, ((e.x - kk.a.x) * (kk.b.x - kk.a.x) + (e.y - kk.a.y) * (kk.b.y - kk.a.y)) / l2));
+        min = { d: dd, von: e, bis: { x: kk.a.x + t * (kk.b.x - kk.a.x), y: kk.a.y + t * (kk.b.y - kk.a.y) } }; }
+    }));
+    if (min.von) {
+      szene.appendChild(el("line", { x1: zx(min.von.x), y1: zy(min.von.y), x2: zx(min.bis.x), y2: zy(min.bis.y),
+        stroke: min.d < Math.min(...zustand.tiefen) - .01 ? "var(--mass)" : "var(--gut)", "stroke-width": 1.4, "stroke-dasharray": "3 3" }));
+      szene.appendChild(beschriftung((zx(min.von.x) + zx(min.bis.x)) / 2, (zy(min.von.y) + zy(min.bis.y)) / 2 - 5,
+        nf(min.d) + " m", { fill: min.d < Math.min(...zustand.tiefen) - .01 ? "var(--mass)" : "var(--gut)", "font-size": 10 }));
+    }
+  }
+
+  /* --- Überlagerung: Nordpfeil und Maßstabsleiste drehen mit, bleiben aber lesbar --- */
+  const ueber = el("g");
+  const npx = 758, npy = 80, pfeilWinkel = -NORD_VERSATZ + R;
+  const np = el("g", { transform: `translate(${npx},${npy}) rotate(${pfeilWinkel})` });
+  np.appendChild(el("path", { d: "M0,-26 L8,14 L0,6 L-8,14 Z", fill: "var(--plan-line)" }));
+  np.appendChild(el("circle", { cx: 0, cy: 0, r: 30, fill: "none", stroke: "var(--plan-line)", "stroke-width": .8, opacity: .3 }));
+  ueber.appendChild(np);
+  ueber.appendChild(el("text", { x: npx, y: npy + 44, "font-family": "Barlow Condensed, sans-serif", "font-size": 15,
+    "letter-spacing": ".1em", fill: "var(--plan-line)", "text-anchor": "middle" }, "N"));
+
+  const lx = 44, ly = 578, zehn = 10 * MASSSTAB;
+  const leiste = el("g", { stroke: "var(--plan-line)", "stroke-width": 1.4 });
+  leiste.appendChild(el("line", { x1: lx, y1: ly, x2: lx + zehn * 2, y2: ly }));
+  leiste.appendChild(el("rect", { x: lx, y: ly - 5, width: zehn, height: 5, fill: "var(--plan-line)", stroke: "none" }));
+  leiste.appendChild(el("rect", { x: lx + zehn, y: ly - 5, width: zehn, height: 5, fill: "none" }));
+  [0, zehn, zehn * 2].forEach(o => leiste.appendChild(el("line", { x1: lx + o, y1: ly - 8, x2: lx + o, y2: ly + 4 })));
+  ueber.appendChild(leiste);
+  ["0", "10", "20 m"].forEach((t, i) => ueber.appendChild(el("text", {
+    x: lx + i * zehn, y: ly + 17, "font-family": "IBM Plex Mono, monospace", "font-size": 9.5,
+    fill: "var(--ink-2)", "text-anchor": i === 2 ? "end" : "middle"
+  }, t)));
+  ziel.appendChild(ueber);
+
+  return { fenster, ecken, draussen };
+}
+
+/* ══════════════════ Kennzahlen und Bedienung ══════════════════ */
+const $ = s => document.querySelector(s);
+const buehne = $("#buehne");
+
+function neuZeichnen() {
+  const { fenster, ecken, draussen } = zeichneSzene(buehne);
+  zeichneSzene($("#druckkarte"), { interaktiv: false });
+
+  /* F-02 Grundstück */
+  const A = flaeche(FLURSTUECK), k = kanten(FLURSTUECK);
+  $("#k-flaeche-gerechnet").innerHTML = nf(A, 1) + " m² <small>Polygon</small>";
+  $("#k-grenzpunkte").textContent = FLURSTUECK.length;
+  $("#k-front").textContent = nf(k[0].laenge) + " m";
+
+  /* F-03 Form */
+  const mrr = minRechteck(FLURSTUECK), r = A / mrr.flaeche;
+  const stufe = r > .95 ? ["rechteckig", "gut"] : r >= .85 ? ["fast rechteckig", "gut"] : ["komplex", "warn"];
+  $("#k-rechteckig").textContent = nf(r, 3);
+  $("#k-einstufung").innerHTML = `<span class="chip ${stufe[1]}">${stufe[0]}</span>`;
+  $("#k-verhaeltnis").textContent = "1 : " + nf(Math.max(mrr.breite, mrr.hoehe) / Math.min(mrr.breite, mrr.hoehe));
+  $("#k-mrr").textContent = nf(mrr.breite, 1) + " × " + nf(mrr.hoehe, 1) + " m";
+  $("#druck-rechteckig").textContent = nf(r, 3) + " · " + stufe[0];
+
+  /* F-06 Baukörper */
+  $("#k-hausmass").textContent = nf(zustand.haus.b, 1) + " × " + nf(zustand.haus.t, 1) + " m";
+  $("#k-drehung").textContent = (zustand.haus.rot > 0 ? "+" : "−") + Math.abs(Math.round(zustand.haus.rot)) + "°";
+  $("#k-grz").textContent = nf(zustand.bebauteFlaeche / FLAECHE_AMTLICH, 2);
+  $("#druck-hausmass").textContent = nf(zustand.haus.b, 1) + " × " + nf(zustand.haus.t, 1) + " m";
+
+  /* Status */
+  const minAbst = Math.min(...ecken.map(e => abstandZumRand(e, FLURSTUECK)));
+  const banner = $("#statusbanner");
+  banner.classList.toggle("ok", !draussen);
+  $("#statustext").innerHTML = draussen
+    ? `<b>${draussen} Gebäudeecke${draussen > 1 ? "n liegen" : " liegt"} außerhalb des Bebauungsfensters.</b> Geringster Grenzabstand <span class="mono">${nf(minAbst)} m</span>.`
+    : `<b>Baukörper liegt im Bebauungsfenster.</b> Geringster Grenzabstand <span class="mono">${nf(minAbst)} m</span>.`;
+  $("#druck-abstand").textContent = nf(minAbst) + " m";
+
+  /* Maßstab aus der tatsächlichen Anzeigebreite — nicht behauptet, gerechnet */
+  const px = buehne.getBoundingClientRect().width || 760;
+  const mmJeMeter = MASSSTAB * (px / 820) * 0.26458;
+  $("#fuss-massstab").textContent = "Maßstab ≈ 1:" + Math.round(1000 / mmJeMeter / 10) * 10;
+}
+
+/* --- Abstandsflächen je Grenzsegment --- */
+const GRENZNAMEN = ["Süd — zur Straße", "Ost — Flst. 704", "Nord — Flst. 788", "West — Flst. 792"];
+function baueSegmentzeilen() {
+  const tb = $("#segment-zeilen");
+  tb.replaceChildren();
+  kanten(FLURSTUECK).forEach((k, i) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td><span class="kante"><i></i>${GRENZNAMEN[i]}</span></td>
+      <td class="n">${nf(k.laenge)} m</td>
+      <td class="n"><input type="number" min="0" max="12" step="0.1" value="${zustand.tiefen[i]}" aria-label="Abstandstiefe ${GRENZNAMEN[i]}"></td>`;
+    tr.querySelector("input").addEventListener("input", e => {
+      const v = parseFloat(e.target.value);
+      zustand.tiefen[i] = isFinite(v) && v >= 0 ? v : 0;
+      neuZeichnen();
+    });
+    tb.appendChild(tr);
+  });
+}
+
+/* --- Regler --- */
+$("#r-wandhoehe").addEventListener("input", e => {
+  zustand.wandhoehe = parseFloat(e.target.value);
+  const h04 = zustand.wandhoehe * .4, tiefe = Math.max(3, h04);
+  $("#o-wandhoehe").textContent = nf(zustand.wandhoehe) + " m";
+  $("#o-04h").textContent = nf(h04) + " m";
+  $(".regler .hinweis").innerHTML = h04 < 3
+    ? `0,4 · H = <b id="o-04h">${nf(h04)} m</b> — unter dem Mindestmaß von 3 m, deshalb greift der Mindestwert.`
+    : `0,4 · H = <b id="o-04h">${nf(h04)} m</b> — maßgeblich, weil größer als das Mindestmaß von 3 m.`;
+  zustand.tiefen = zustand.tiefen.map(() => Math.round(tiefe * 10) / 10);
+  baueSegmentzeilen(); neuZeichnen();
+});
+$("#r-verhaeltnis").addEventListener("input", e => {
+  zustand.verhaeltnis = parseFloat(e.target.value);
+  $("#o-verhaeltnis").textContent = nf(zustand.verhaeltnis);
+  zustand.haus.b = Math.sqrt(zustand.bebauteFlaeche * zustand.verhaeltnis);
+  zustand.haus.t = zustand.bebauteFlaeche / zustand.haus.b;
+  neuZeichnen();
+});
+$("#r-drehung").addEventListener("input", e => {
+  zustand.haus.rot = parseFloat(e.target.value);
+  $("#o-drehung").textContent = (zustand.haus.rot > 0 ? "+" : "−") + Math.abs(Math.round(zustand.haus.rot)) + "°";
+  neuZeichnen();
+});
+
+/* --- Schalter in der Planleiste --- */
+function gruppe(sel, feld, umwandeln = v => v) {
+  document.querySelectorAll(sel).forEach(b => b.addEventListener("click", () => {
+    document.querySelectorAll(sel).forEach(o => o.setAttribute("aria-pressed", String(o === b)));
+    zustand[feld] = umwandeln(b.dataset[feld === "genordet" ? "nord" : "grund"]);
+    neuZeichnen();
+  }));
+}
+gruppe("[data-grund]", "grund");
+gruppe("[data-nord]", "genordet", v => v === "1");
+[["#s-nachbarn", "nachbarn"], ["#s-masse", "masse"], ["#s-fenster", "fenster"]].forEach(([sel, feld]) => {
+  $(sel).addEventListener("click", e => {
+    zustand[feld] = !zustand[feld];
+    e.currentTarget.setAttribute("aria-pressed", String(zustand[feld]));
+    neuZeichnen();
+  });
+});
+
+/* --- Haus ziehen. Bildschirmpixel → Meter, Kartendrehung herausgerechnet. --- */
+let zieht = null;
+function inMeter(ev) {
+  const r = buehne.getBoundingClientRect(), s = 820 / r.width;
+  const px = (ev.clientX - r.left) * s, py = (ev.clientY - r.top) * s;
+  const R = (zustand.genordet ? NORD_VERSATZ : 0) * Math.PI / 180;
+  const dx = px - MITTE.x, dy = py - MITTE.y;
+  const ux = dx * Math.cos(-R) - dy * Math.sin(-R), uy = dx * Math.sin(-R) + dy * Math.cos(-R);
+  return { x: SCHWERPUNKT.x + ux / MASSSTAB, y: SCHWERPUNKT.y - uy / MASSSTAB };
+}
+buehne.addEventListener("pointerdown", ev => {
+  if (!ev.target.closest("#hauskoerper")) return;
+  const p = inMeter(ev);
+  zieht = { dx: zustand.haus.cx - p.x, dy: zustand.haus.cy - p.y };
+  buehne.classList.add("zieht");
+  buehne.setPointerCapture(ev.pointerId);
+  ev.preventDefault();
+});
+buehne.addEventListener("pointermove", ev => {
+  if (!zieht) return;
+  const p = inMeter(ev);
+  zustand.haus.cx = p.x + zieht.dx;
+  zustand.haus.cy = p.y + zieht.dy;
+  neuZeichnen();
+});
+["pointerup", "pointercancel"].forEach(t => buehne.addEventListener(t, () => { zieht = null; buehne.classList.remove("zieht"); }));
+buehne.addEventListener("keydown", ev => {
+  if (!ev.target.closest("#hauskoerper")) return;
+  const s = ev.shiftKey ? 1 : 0.25;
+  const m = { ArrowLeft: [-s, 0], ArrowRight: [s, 0], ArrowUp: [0, s], ArrowDown: [0, -s] }[ev.key];
+  if (!m) return;
+  zustand.haus.cx += m[0]; zustand.haus.cy += m[1];
+  neuZeichnen();
+  document.getElementById("hauskoerper")?.focus();   // sonst bleibt es bei einem Tastendruck
+  ev.preventDefault();
+});
+
+/* ══════════════════ Reiter und Darstellung ══════════════════ */
+const reiter = [...document.querySelectorAll('[role="tab"]')];
+reiter.forEach(t => t.addEventListener("click", () => {
+  reiter.forEach(o => {
+    const an = o === t;
+    o.setAttribute("aria-selected", String(an));
+    document.getElementById(o.getAttribute("aria-controls")).hidden = !an;
+  });
+  if (t.id === "tab-lageplan" || t.id === "tab-druck") neuZeichnen();
+}));
+
+const schalter = [...document.querySelectorAll("[data-theme-set]")];
+function setzeDarstellung(w) {
+  if (w === "system") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.setAttribute("data-theme", w);
+  schalter.forEach(b => b.setAttribute("aria-pressed", String(b.dataset.themeSet === w)));
+  try { localStorage.setItem("gcs-darstellung", w); } catch (e) { /* Privates Fenster — dann eben nicht */ }
+}
+schalter.forEach(b => b.addEventListener("click", () => setzeDarstellung(b.dataset.themeSet)));
+let gemerkt = "system";
+try { gemerkt = localStorage.getItem("gcs-darstellung") || "system"; } catch (e) { /* egal */ }
+setzeDarstellung(gemerkt);
+
+/* ══════════════════ F-08 Erreichbarkeiten ══════════════════ */
+const ZIELE = [
+  { name:"Arbeit", adr:"Nonnenstraße 39, Leipzig", farbe:"komb",
+    zeiten:[["auto","Auto","24 min","18,4 km"],["rad","Rad","51 min","14,2 km"],["oepnv","ÖPNV","48 min","3× umsteigen"],["komb","Rad + Bahn","42 min","Rad bis Stötteritz"]],
+    strassen:[[[0,.63],[1,.60]],[[0,.38],[1,.41]],[[0,.17],[1,.16]],[[.11,0],[.09,1]],[[.31,0],[.33,1]],[[.60,0],[.57,1]],[[.84,0],[.86,1]],[[.09,.63],[.57,.16]]],
+    route:[[.11,.86],[.11,.63],[.32,.62],[.32,.40],[.58,.39],[.58,.17],[.85,.16]] },
+  { name:"Grundschule", adr:"Muldentalstraße 5, Liebertwolkwitz", farbe:"rad",
+    zeiten:[["auto","Auto","4 min","1,4 km"],["rad","Rad","8 min","1,4 km"],["oepnv","ÖPNV","19 min","1× umsteigen"],["komb","Zu Fuß","17 min","1,3 km"]],
+    strassen:[[[0,.72],[1,.69]],[[0,.44],[1,.46]],[[0,.22],[1,.21]],[[.15,0],[.13,1]],[[.42,0],[.44,1]],[[.72,0],[.70,1]],[[.13,.72],[.70,.46]]],
+    route:[[.15,.88],[.14,.71],[.43,.70],[.43,.45],[.71,.45]] },
+  { name:"Kita Kolibri", adr:"Am Kirschberg 2, Holzhausen", farbe:"rad",
+    zeiten:[["auto","Auto","9 min","5,1 km"],["rad","Rad","18 min","4,8 km"],["oepnv","ÖPNV","34 min","2× umsteigen"],["komb","Rad + Bus","27 min","Rad bis Holzhausen"]],
+    strassen:[[[0,.80],[1,.77]],[[0,.55],[1,.57]],[[0,.28],[1,.26]],[[.12,0],[.10,1]],[[.37,0],[.39,1]],[[.62,0],[.60,1]],[[.86,0],[.88,1]],[[.39,.79],[.87,.27]]],
+    route:[[.12,.90],[.11,.79],[.38,.78],[.38,.56],[.61,.56],[.61,.27],[.87,.27]] },
+  { name:"Leipzig Hbf", adr:"Willy-Brandt-Platz 7", farbe:"oepnv",
+    zeiten:[["auto","Auto","21 min","14,8 km"],["rad","Rad","44 min","12,6 km"],["oepnv","ÖPNV","38 min","1× umsteigen"],["komb","Rad + S-Bahn","31 min","Rad bis Stötteritz"]],
+    strassen:[[[0,.66],[1,.63]],[[0,.42],[1,.44]],[[0,.19],[1,.18]],[[.10,0],[.08,1]],[[.28,0],[.30,1]],[[.55,0],[.53,1]],[[.88,0],[.90,1]],[[.30,.65],[.89,.19]]],
+    route:[[.10,.88],[.09,.65],[.29,.64],[.29,.43],[.54,.42],[.54,.19],[.89,.19]] }
+];
+const MODUSFARBE = { auto:"var(--ink-3)", rad:"var(--rad)", oepnv:"var(--kat)", komb:"var(--kat)" };
+const P300 = pl => pl.map(([a,b]) => `${(a*300).toFixed(1)},${(b*150).toFixed(1)}`).join(" ");
+
+function baueZiele() {
+  const w = $("#ziele"); w.replaceChildren();
+  ZIELE.forEach(z => {
+    const p = document.createElement("div"); p.className = "panel ziel";
+    p.innerHTML = `<div class="kopfzeile"><h3>${z.name}</h3><span class="adr">${z.adr}</span></div>`;
+    const sv = el("svg", { class:"minikarte", viewBox:"0 0 300 150", role:"img", "aria-label":`Kartenskizze der Route nach ${z.name}` });
+    sv.appendChild(el("rect", { x:0, y:0, width:300, height:150, fill:"var(--plan-bg)" }));
+    /* Straßennetz aus OSM — trägt die Route, statt sie frei im Raum schweben zu lassen */
+    const netz = el("g", { stroke:"var(--plan-nachbar)", "stroke-width":3.2, opacity:.34, fill:"none", "stroke-linecap":"round" });
+    z.strassen.forEach(l => netz.appendChild(el("polyline", { points:P300(l) })));
+    sv.appendChild(netz);
+    /* ein paar Baublöcke, damit es nicht nach Diagramm aussieht */
+    const bl = el("g", { fill:"var(--plan-nachbar)", opacity:.13 });
+    [[24,18,44,26],[92,22,38,22],[196,14,52,24],[36,86,40,28],[118,96,46,24],[214,84,44,30],[150,52,34,20]]
+      .forEach(([x,y,bw,bh]) => bl.appendChild(el("rect", { x, y, width:bw, height:bh })));
+    sv.appendChild(bl);
+    sv.appendChild(el("polyline", { points:P300(z.route), fill:"none", stroke:MODUSFARBE[z.farbe],
+      "stroke-width":3.4, "stroke-linejoin":"round", "stroke-linecap":"round" }));
+    const a = z.route[0], b = z.route[z.route.length-1];
+    sv.appendChild(el("rect", { x:a[0]*300-4.5, y:a[1]*150-4.5, width:9, height:9, fill:"var(--plan-bg)", stroke:"var(--mass)", "stroke-width":2.2 }));
+    sv.appendChild(el("circle", { cx:b[0]*300, cy:b[1]*150, r:5.5, fill:MODUSFARBE[z.farbe], stroke:"var(--plan-bg)", "stroke-width":1.6 }));
+    sv.appendChild(el("text", { x:293, y:143, "font-family":"IBM Plex Mono, monospace", "font-size":8.5,
+      fill:"var(--ink-3)", "text-anchor":"end" }, "MOTIS · DELFI-GTFS"));
+    p.appendChild(sv);
+    const m = document.createElement("div"); m.className = "modi";
+    m.innerHTML = z.zeiten.map(([kl,name,zeit,zus]) =>
+      `<div class="m"><i class="${kl}"></i>${name}</div><div>${zeit}</div><div>${zus}</div>`).join("");
+    p.appendChild(m);
+    w.appendChild(p);
+  });
+}
+
+/* ══════════════════ F-09 Vergleich: gleicher Maßstab, gleiche Ausrichtung ══════════════════ */
+const KANDIDATEN = [
+  { name: "Liebertwolkwitz", poly: FLURSTUECK, haus: { cx: 10.8, cy: 15.0, b: 11.4, t: 8.5, rot: -4 } },
+  { name: "Holzhausen",      poly: [{x:0,y:0},{x:19.4,y:0},{x:19.4,y:33},{x:0,y:33}], haus: { cx: 9.7, cy: 14, b: 11.4, t: 8.5, rot: 0 } },
+  { name: "Baalsdorf",       poly: [{x:0,y:0},{x:26,y:2.4},{x:34,y:22},{x:21,y:38},{x:4,y:31}], haus: { cx: 16, cy: 17, b: 11.4, t: 8.5, rot: 9 } },
+  { name: "Zuckelhausen",    poly: [{x:0,y:0},{x:20.8,y:-1.4},{x:22.6,y:33},{x:11.5,y:29.4},{x:1.4,y:34.6}], haus: { cx: 11.4, cy: 14.5, b: 11.4, t: 8.5, rot: -2 } }
+];
+function baueVergleich() {
+  const w = $("#vergleichsgrundrisse"); w.replaceChildren();
+  KANDIDATEN.forEach(k => {
+    const box = document.createElement("figure");
+    box.style.cssText = "margin:0;display:flex;flex-direction:column;gap:6px";
+    const sv = el("svg", { viewBox: "0 0 200 260", role: "img", "aria-label": `Grundriss ${k.name}`, style: "width:100%;height:auto;background:var(--plan-bg);border:1px solid var(--rule)" });
+    const s = 5.2, xs = k.poly.map(p => p.x), ys = k.poly.map(p => p.y);
+    const ox = 100 - (Math.min(...xs) + Math.max(...xs)) / 2 * s, oy = 130 + (Math.min(...ys) + Math.max(...ys)) / 2 * s;
+    const P = p => p.map(q => `${(ox + q.x * s).toFixed(1)},${(oy - q.y * s).toFixed(1)}`).join(" ");
+    const f = bebauungsfenster(k.poly, [3, 3, 3, 3, 3].slice(0, k.poly.length));
+    sv.appendChild(el("polygon", { points: P(k.poly), fill: "var(--plan-fill)", stroke: "var(--plan-line)", "stroke-width": 1.8 }));
+    if (f.length) sv.appendChild(el("polygon", { points: P(f), fill: "none", stroke: "var(--mass)", "stroke-width": 1, "stroke-dasharray": "5 4" }));
+    sv.appendChild(el("polygon", { points: P(rechteckEcken(k.haus)), fill: "var(--ocker)", opacity: .45, stroke: "var(--plan-line)", "stroke-width": 1.2 }));
+    box.appendChild(sv);
+    const cap = document.createElement("figcaption");
+    cap.style.cssText = "font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.06em;color:var(--ink-2);display:flex;justify-content:space-between;gap:8px";
+    const A = flaeche(k.poly), mrr = minRechteck(k.poly);
+    cap.innerHTML = `<span>${k.name}</span><span>R ${nf(A / mrr.flaeche, 2)}</span>`;
+    box.appendChild(cap);
+    w.appendChild(box);
+  });
+}
+
+/* ══════════════════ Start ══════════════════ */
+baueSegmentzeilen();
+baueZiele();
+baueVergleich();
+neuZeichnen();
+addEventListener("resize", () => neuZeichnen());
+</script>

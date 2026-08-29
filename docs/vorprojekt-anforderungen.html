@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grundstücks-Check Sachsen — Anforderungen &amp; Datenquellen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Public+Sans:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#E7EBE7;
+  --card:#FBFCFA;
+  --ink:#0D1315;
+  --ink-2:#4B5559;
+  --rule:#B6C0BA;
+  --mass:#C0301C;      /* Maßketten, Kennzahlen */
+  --kat:#1C5F58;       /* Datenquellen, Lizenzen */
+  --ocker:#C68B33;     /* Gebäude, nur in Zeichnungen */
+  --shadow:0 1px 0 rgba(13,19,21,.06), 0 12px 28px -20px rgba(13,19,21,.5);
+}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;
+  background:var(--paper);
+  background-image:
+    linear-gradient(rgba(13,19,21,.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(13,19,21,.045) 1px, transparent 1px);
+  background-size:28px 28px;
+  color:var(--ink);
+  font-family:"Public Sans", system-ui, -apple-system, sans-serif;
+  font-size:16px;
+  line-height:1.62;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+
+/* ---------- Typo-Rollen ---------- */
+h1,h2,h3,.disp{
+  font-family:"Barlow Condensed", "Arial Narrow", sans-serif;
+  font-weight:700;
+  letter-spacing:.045em;
+  text-transform:uppercase;
+  line-height:1.05;
+  margin:0;
+}
+.mono{font-family:"IBM Plex Mono", ui-monospace, Menlo, monospace}
+
+/* ---------- Kopf ---------- */
+header{padding:56px 0 20px}
+.kennung{
+  font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--ink-2);
+  display:flex;flex-wrap:wrap;gap:6px 22px;margin-bottom:26px;
+}
+.kennung b{color:var(--mass);font-weight:500}
+h1{font-size:clamp(38px,7.4vw,76px);letter-spacing:.02em}
+h1 .zeile2{display:block;color:var(--ink-2)}
+.lead{
+  max-width:56ch;margin-top:22px;font-size:17.5px;color:var(--ink-2);
+}
+.lead strong{color:var(--ink);font-weight:600}
+
+/* ---------- Hero-Zeichnung ---------- */
+.hero{
+  display:grid;grid-template-columns:1.05fr .95fr;gap:38px;align-items:center;
+  margin:44px 0 8px;
+}
+.plan{
+  background:var(--card);border:1px solid var(--rule);box-shadow:var(--shadow);
+  padding:14px;position:relative;
+}
+.plan svg{display:block;width:100%;height:auto}
+.plan figcaption{
+  font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.08em;
+  color:var(--ink-2);border-top:1px solid var(--rule);margin-top:10px;padding-top:8px;
+  display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;
+}
+@media (max-width:860px){.hero{grid-template-columns:1fr;gap:26px}}
+
+/* Zeichnungs-Animation */
+.draw{stroke-dasharray:1400;stroke-dashoffset:1400;animation:draw 1.5s .25s cubic-bezier(.6,.05,.2,1) forwards}
+.fade{opacity:0;animation:fade .7s 1.35s ease forwards}
+.fade2{opacity:0;animation:fade .7s 1.7s ease forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+@keyframes fade{to{opacity:1}}
+@media (prefers-reduced-motion:reduce){
+  .draw{animation:none;stroke-dashoffset:0}
+  .fade,.fade2{animation:none;opacity:1}
+}
+
+/* ---------- Maßketten als Trenner ---------- */
+.masskette{margin:64px 0 30px;display:flex;align-items:center;gap:14px}
+.masskette .bar{
+  flex:1;height:1px;background:var(--ink);position:relative;
+}
+.masskette .bar::before,.masskette .bar::after{
+  content:"";position:absolute;top:-4px;width:1px;height:9px;background:var(--ink);
+}
+.masskette .bar::before{left:0}.masskette .bar::after{right:0}
+.masskette h2{font-size:clamp(22px,3vw,30px);white-space:nowrap}
+.masskette .nr{
+  font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.14em;
+  color:var(--mass);white-space:nowrap;
+}
+
+/* ---------- Anforderungs-Karten ---------- */
+.anf{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+.karte{
+  background:var(--card);border:1px solid var(--rule);padding:18px 20px 20px;
+  box-shadow:var(--shadow);display:flex;flex-direction:column;gap:8px;
+}
+.karte .id{
+  font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.12em;
+  color:var(--mass);
+}
+.karte h3{font-size:19px;letter-spacing:.03em}
+.karte p{margin:0;font-size:14.5px;color:var(--ink-2)}
+.karte .quelle{
+  margin-top:auto;padding-top:12px;border-top:1px dashed var(--rule);
+  font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--kat);
+  letter-spacing:.02em;
+}
+
+/* ---------- Tabelle ---------- */
+.tab-scroll{overflow-x:auto;border:1px solid var(--rule);background:var(--card);box-shadow:var(--shadow)}
+table{border-collapse:collapse;width:100%;min-width:760px;font-size:14.5px}
+th,td{text-align:left;padding:13px 16px;border-bottom:1px solid var(--rule);vertical-align:top}
+thead th{
+  font-family:"Barlow Condensed",sans-serif;text-transform:uppercase;letter-spacing:.08em;
+  font-size:14px;font-weight:600;background:#DDE3DD;border-bottom:1px solid var(--ink);
+}
+tbody tr:last-child td{border-bottom:none}
+td.wahl{font-weight:600}
+td .kosten{display:block;font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--kat);margin-top:3px}
+
+/* ---------- Quellen-Blöcke ---------- */
+.quellen{display:grid;gap:16px}
+.q{
+  background:var(--card);border:1px solid var(--rule);box-shadow:var(--shadow);
+  display:grid;grid-template-columns:190px 1fr;
+}
+.q .kopf{
+  padding:18px 20px;border-right:1px solid var(--rule);background:#DDE3DD;
+}
+.q .kopf h3{font-size:20px}
+.q .kopf .tag{
+  display:inline-block;margin-top:9px;font-family:"IBM Plex Mono",monospace;
+  font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--kat);border:1px solid var(--kat);padding:2px 7px;
+}
+.q .body{padding:18px 22px}
+.q .body p{margin:0 0 10px}
+.q .body p:last-child{margin-bottom:0}
+.q dl{margin:12px 0 0;display:grid;grid-template-columns:auto 1fr;gap:5px 14px;font-size:13.5px}
+.q dt{font-family:"Barlow Condensed",sans-serif;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-2)}
+.q dd{margin:0;word-break:break-word}
+.q a{color:var(--kat);text-decoration-thickness:1px;text-underline-offset:2px}
+.q .mono{font-size:12.5px}
+@media (max-width:760px){.q{grid-template-columns:1fr}.q .kopf{border-right:none;border-bottom:1px solid var(--rule)}}
+
+/* ---------- Hinweis-Blöcke ---------- */
+.risiko{
+  border-left:3px solid var(--mass);background:var(--card);border-top:1px solid var(--rule);
+  border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);
+  padding:16px 20px;margin-bottom:14px;box-shadow:var(--shadow);
+}
+.risiko h3{font-size:17px;margin-bottom:6px}
+.risiko p{margin:0;font-size:14.5px;color:var(--ink-2)}
+.risiko p + p{margin-top:8px}
+
+/* ---------- Stack-Skizze ---------- */
+.stack{
+  background:var(--card);border:1px solid var(--rule);box-shadow:var(--shadow);padding:24px;
+  overflow-x:auto;
+}
+.stack pre{
+  margin:0;font-family:"IBM Plex Mono",monospace;font-size:12.5px;line-height:1.75;
+  color:var(--ink);white-space:pre;
+}
+
+footer{
+  margin:76px 0 60px;padding-top:18px;border-top:1px solid var(--ink);
+  font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.06em;
+  color:var(--ink-2);display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;
+}
+a:focus-visible,summary:focus-visible{outline:2px solid var(--mass);outline-offset:2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kennung">
+    <span>Vorprojekt</span>
+    <span>Stand <b>29.08.2026</b></span>
+    <span>Umfang <b>interner Prototyp</b></span>
+    <span>Frontend <b>Vite + Vue 3 (Options API)</b></span>
+    <span>Backend <b>FastAPI + PostGIS</b></span>
+    <span>Raum <b>Freistaat Sachsen</b></span>
+  </div>
+  <h1>Grundstücks-Check<span class="zeile2">Anforderungen &amp; Datenquellen</span></h1>
+  <p class="lead">Eine Plattform, die aus einem <strong>Inseratstext</strong> das Flurstück findet, es <strong>amtlich vermisst</strong>, den Quadratmeterpreis <strong>gegen den Bodenrichtwert</strong> hält, ein Fertighaus aus dem Herstellerlink <strong>innerhalb der Abstandsflächen</strong> platzieren lässt und alle Wege zu Arbeit, Schule und Kita <strong>multimodal durchrechnet</strong>. Unten: was das Produkt können soll, und welcher Dienst jede Teilaufgabe am besten löst.</p>
+</header>
+
+<section class="hero">
+  <figure class="plan">
+    <svg viewBox="0 0 520 380" role="img" aria-label="Schematisches Flurstück mit 3 Meter Bebauungsfenster und platziertem Hauskörper">
+      <defs>
+        <pattern id="hatch" width="6" height="6" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+          <line x1="0" y1="0" x2="0" y2="6" stroke="#C68B33" stroke-width="2.2" opacity=".55"/>
+        </pattern>
+        <marker id="tick" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+          <line x1="4" y1="1" x2="4" y2="7" stroke="#C0301C" stroke-width="1.2"/>
+        </marker>
+      </defs>
+
+      <!-- Koordinatenkreuze -->
+      <g stroke="#B6C0BA" stroke-width="1">
+        <path d="M40 34h10M45 29v10M470 34h10M475 29v10M40 344h10M45 339v10"/>
+      </g>
+      <g font-family="IBM Plex Mono, monospace" font-size="8.5" fill="#4B5559" letter-spacing=".08em">
+        <text x="58" y="37">ETRS89 / UTM33N — EPSG:25833</text>
+      </g>
+
+      <!-- Flurstücksgrenze -->
+      <polygon class="draw" points="70,300 96,86 392,66 448,286 236,330"
+               fill="#fff" stroke="#0D1315" stroke-width="2"/>
+
+      <!-- Bebauungsfenster (3 m Abstand) -->
+      <polygon class="draw" style="animation-delay:.75s" points="102,283 124,112 366,96 414,268 240,302"
+               fill="none" stroke="#C0301C" stroke-width="1.4" stroke-dasharray="7 5"/>
+
+      <!-- Hauskörper -->
+      <g class="fade">
+        <rect x="168" y="150" width="150" height="104" transform="rotate(-4 243 202)"
+              fill="url(#hatch)" stroke="#0D1315" stroke-width="1.6"/>
+      </g>
+
+      <!-- Maßketten -->
+      <g class="fade2" stroke="#C0301C" stroke-width="1" marker-start="url(#tick)" marker-end="url(#tick)">
+        <line x1="168" y1="278" x2="318" y2="268"/>
+        <line x1="336" y1="146" x2="352" y2="248"/>
+      </g>
+      <g class="fade2" font-family="IBM Plex Mono, monospace" font-size="10" fill="#C0301C">
+        <text x="222" y="292">12,00 m</text>
+        <text x="358" y="200">9,50 m</text>
+        <text x="86" y="318" fill="#4B5559">3,00 m</text>
+      </g>
+
+      <!-- Nordpfeil -->
+      <g class="fade2" transform="translate(462,330)">
+        <path d="M0,-18 L6,10 L0,4 L-6,10 Z" fill="#0D1315"/>
+        <text x="-4" y="24" font-family="Barlow Condensed, sans-serif" font-size="13" fill="#0D1315">N</text>
+      </g>
+
+      <!-- Flurstücksnummer -->
+      <text class="fade" x="112" y="326" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#4B5559">Flst. 214/7 · 842 m²</text>
+    </svg>
+    <figcaption>
+      <span>Zielbild: ALKIS-Polygon + Bebauungsfenster + Hausentwurf</span>
+      <span>drehbar &amp; verschiebbar</span>
+    </figcaption>
+  </figure>
+
+  <div>
+    <h2 style="font-size:26px;margin-bottom:14px">Die Kurzfassung</h2>
+    <p style="margin:0 0 14px;color:var(--ink-2)">Für Sachsen gibt es die drei entscheidenden Datensätze <strong>kostenlos und amtlich</strong>: Flurstücksgeometrien und Gebäude aus ALKIS, georeferenzierte Adressen als Hauskoordinaten, Bodenrichtwerte aus BORIS. Alles unter Datenlizenz Deutschland – Namensnennung 2.0.</p>
+    <p style="margin:0 0 14px;color:var(--ink-2)">Beim Routing führt kein kommerzieller Anbieter besser als <strong>MOTIS</strong>: eine Engine, die Auto, Rad, Fuß und ÖPNV in einer Anfrage kombiniert, selbst hostbar, gespeist aus dem deutschlandweiten DELFI-Datensatz.</p>
+    <p style="margin:0;color:var(--ink-2)">Bezahlt wird genau ein Dienst: <strong>OpenRouter</strong> holt Inserate und Fertighaus-Seiten per Web-Fetch, damit niemand HTML parsen muss. Base-URL und Schlüssel sind konfigurierbar, ein Providerwechsel ist eine Zeile in der <span class="mono">.env</span>. Alles andere sind Serverkosten.</p>
+  </div>
+</section>
+
+<!-- ============ 1 ANFORDERUNGEN ============ -->
+<div class="masskette">
+  <h2>Was das Ding können soll</h2>
+  <div class="bar"></div>
+  <span class="nr">F-01 … F-09</span>
+</div>
+
+<div class="anf">
+  <article class="karte">
+    <span class="id">F-01</span>
+    <h3>Inserat einwerfen</h3>
+    <p>Nutzer fügt Text oder Link eines Angebots ein. Ein Modell mit Web-Fetch liest daraus Adresse oder Flurstückskennzeichen, Kaufpreis und Fläche heraus — inklusive Quellenangabe.</p>
+    <span class="quelle">OpenRouter web_fetch → Hauskoordinaten → ALKIS</span>
+  </article>
+
+  <article class="karte">
+    <span class="id">F-02</span>
+    <h3>Flurstück auflösen</h3>
+    <p>Aus Adresse, Koordinate oder Kennzeichen die amtlichen Flurstücke finden: Kennzeichen, Gemarkung, Flur, amtliche Fläche, Grenzpolygon. Mehrere Flurstücke bilden ein Grundstück.</p>
+    <span class="quelle">ALKIS-WFS · ave:Flurstueck</span>
+  </article>
+
+  <article class="karte">
+    <span class="id">F-03</span>
+    <h3>Form bewerten</h3>
+    <p>Rechteckig, fast rechteckig oder komplexes Polygon? Dazu Seitenverhältnis, Frontlänge zur Straße und Anzahl der Grenzpunkte.</p>
+    <span class="quelle">Turf.js · minimum rotated rectangle</span>
+  </article>
+
+  <article class="karte">
+    <span class="id">F-04</span>
+    <h3>Preis einordnen</h3>
+    <p>€/m² aus Kaufpreis und amtlicher Fläche, verglichen mit dem Bodenrichtwert der Zone. Ergebnis als Abweichung in Prozent, nicht als Bauchgefühl.</p>
+    <span class="quelle">BORIS Sachsen · VBORIS 2.0</span>
+  </article>
+
+  <article class="karte">
+    <span class="id">F-05</span>
+    <h3>Bebauungsfenster zeichnen</h3>
+    <p>Abstandsflächen als Innenversatz in das Flurstückspolygon einzeichnen, Tiefe pro Grenze einstellbar. Bestandsgebäude aus dem Kataster mit anzeigen.</p>
+    <span class="quelle">Turf.buffer (negativ) · ave:GebaeudeBauwerk</span>
+  </article>
+
+  <article class="karte">
+    <span class="id">F-06</span>
+    <h3>Haus platzieren</h3>
+    <p>Haustypen aus dem eigenen Katalog auf das Grundstück legen, verschieben, drehen. Verlässt der Baukörper das Fenster, schlägt die Prüfung an.</p>
+    <span class="quelle">Turf.transformRotate / booleanWithin</span>
+  </article>
+
+  <article class="karte">
+    <span class="id">F-10</span>
+    <h3>Fertighaus einlesen</h3>
+    <p>Link zu einem Haustyp beim Hersteller einwerfen. Zurück kommen bebaute Fläche, Wohnflächen je Geschoss, Dachform und Preis — daraus wird ein Baukörper für F-06.</p>
+    <span class="quelle">OpenRouter web_fetch → Haustyp-Katalog</span>
+  </article>
+
+  <article class="karte">
+    <span class="id">F-11</span>
+    <h3>Flurstück direkt eingeben</h3>
+    <p>Gemarkung, Zähler und Nenner als drei Felder — ohne Umweg über Adresse und Geocoding. Gemarkung als Autocomplete, Nachschlag sofort beim Absenden.</p>
+    <span class="quelle">ALKIS-WFS · Stored Query „Flurstücke anhand Kennzeichen“</span>
+  </article>
+
+  <article class="karte">
+    <span class="id">F-12</span>
+    <h3>Seite einfügen</h3>
+    <p>Ein Feld, in das der Nutzer die kopierte Anzeigenseite einfügt. Deckt Portale ab, die keinen Serverabruf zulassen — und alle, für die es keinen Adapter gibt.</p>
+    <span class="quelle">clipboardData text/html → Extraktion</span>
+  </article>
+
+  <article class="karte">
+    <span class="id">F-13</span>
+    <h3>Nachbarschaft einblenden</h3>
+    <p>Gebäude der angrenzenden Flurstücke als eigene Ebene zuschaltbar — für die Beurteilung nach § 34 BauGB und um zu sehen, wie die Nachbarn gebaut haben.</p>
+    <span class="quelle">ALKIS · GebaeudeBauwerk im Umkreis</span>
+  </article>
+
+  <article class="karte">
+    <span class="id">F-14</span>
+    <h3>Karte ausrichten</h3>
+    <p>Umschalter zwischen genordet und straßenparallel: die Zufahrtsstraße läuft waagerecht durchs Bild, wie auf einem Lageplan. Der Nordpfeil dreht mit.</p>
+    <span class="quelle">ALKIS Nutzung · Verkehrsfläche → map.setBearing()</span>
+  </article>
+
+  <article class="karte">
+    <span class="id">F-15</span>
+    <h3>Druckbare Ansicht</h3>
+    <p>Das Ergebnis ist eine Webseite, die sich sauber auf Papier bringen lässt: Lageplan mit Maßen, Kennzahlen, Preiseinordnung, Erreichbarkeiten. Ein Grundstück je Seite.</p>
+    <span class="quelle">@media print · kein serverseitiges Rendering</span>
+  </article>
+
+  <article class="karte">
+    <span class="id">F-07</span>
+    <h3>Maße anzeigen</h3>
+    <p>Kantenlängen des Flurstücks, Abstände Haus–Grenze und Gebäudemaße direkt in der Karte, wie in einem Lageplan.</p>
+    <span class="quelle">eigene Berechnung in EPSG:25833</span>
+  </article>
+
+  <article class="karte">
+    <span class="id">F-08</span>
+    <h3>Wege durchrechnen</h3>
+    <p>Für jedes hinterlegte Ziel — Arbeit, Schule, Bahnhof — Fahrzeit mit Auto, Rad, ÖPNV und in Kombination, jeweils mit eigenem Kartenausschnitt.</p>
+    <span class="quelle">MOTIS · DELFI-GTFS · OSM</span>
+  </article>
+
+  <article class="karte">
+    <span class="id">F-09</span>
+    <h3>Grundstücke vergleichen</h3>
+    <p>Mehrere Kandidaten nebeneinander: Fläche, Form, Preisabweichung, Erreichbarkeiten. Alle gleichzeitig auf einer Karte.</p>
+    <span class="quelle">eigene Datenhaltung (PostGIS)</span>
+  </article>
+</div>
+
+<!-- ============ 2 ENTSCHEIDUNGEN ============ -->
+<div class="masskette">
+  <h2>Dienst pro Aufgabe</h2>
+  <div class="bar"></div>
+  <span class="nr">Empfehlung</span>
+</div>
+
+<div class="tab-scroll">
+<table>
+  <thead>
+    <tr><th style="width:130px">Aufgabe</th><th style="width:190px">Empfehlung</th><th>Warum diese und nicht die naheliegende Alternative</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Inserat &amp; Haustyp auslesen</td>
+      <td class="wahl">OpenRouter, web_fetch<span class="kosten">einziger kostenpflichtiger Dienst</span></td>
+      <td>Gesetzt. Nicht die Websuche, sondern das serverseitige Web-Fetch-Tool: das Modell holt den vollständigen Inhalt einer konkreten URL. Mit <span class="mono">allowed_domains</span> auf die Herstellerdomain begrenzt, Antwort gegen ein Pydantic-Modell validiert, Ergebnis pro URL dauerhaft gecacht. Base-URL und Modell kommen aus der Konfiguration, ein Wechsel zu Perplexity oder direkt zu einem Anbieter ändert keinen Code.</td>
+    </tr>
+    <tr>
+      <td>Adresse → Koordinate</td>
+      <td class="wahl">Hauskoordinaten Sachsen<span class="kosten">Open Data · dl-de/by-2-0</span></td>
+      <td>Amtliche Gebäudeadressen mit Lagekoordinate, einmal heruntergeladen und in PostGIS gelegt. Kein Rate-Limit, keine Fremdanfrage pro Nutzer, exaktere Trefferquote bei Neubaugebieten als Nominatim. Photon oder Nominatim bleiben Fallback für Tippfehler und Freitext.</td>
+    </tr>
+    <tr>
+      <td>Koordinate → Flurstück</td>
+      <td class="wahl">ALKIS-WFS des GeoSN<span class="kosten">kostenfrei · wöchentlich aktualisiert</span></td>
+      <td>Direkter räumlicher Filter auf <span class="mono">ave:Flurstueck</span>. Für eine Plattform besser: das sachsenweite Flurstücks-GeoPackage einmalig importieren und monatlich nachziehen — dann ist die Abfrage ein PostGIS-Join statt eines HTTP-Requests.</td>
+    </tr>
+    <tr>
+      <td>Bestands- und Nachbargebäude</td>
+      <td class="wahl">ALKIS <span class="mono">GebaeudeBauwerk</span> / Hausumringe<span class="kosten">kostenfrei</span></td>
+      <td>Gebäudegrundrisse als Umringpolygone, Haupt- und Nebengebäude, auch auf den Nachbarflurstücken. Genauer als OSM-Gebäude und rechtlich sauber referenzierbar. Die Objektart <span class="mono">Nutzung</span> aus demselben Dienst liefert zusätzlich die Verkehrsflächen — daraus wird die Zufahrtsstraße für die Kartenausrichtung bestimmt.</td>
+    </tr>
+    <tr>
+      <td>Preisniveau</td>
+      <td class="wahl">BORIS Sachsen<span class="kosten">erlaubnis- und gebührenfrei</span></td>
+      <td>Der Bodenrichtwert ist der einzige belastbare Vergleichsmaßstab und kommt vom zuständigen Gutachterausschuss. Eine Pauschale wie „300 normal, 400 teuer" ist in Leipzig falsch und in der Lausitz absurd — die Zone weiß es besser.</td>
+    </tr>
+    <tr>
+      <td>Formanalyse</td>
+      <td class="wahl">Turf.js im Frontend<span class="kosten">MIT · 0 €</span></td>
+      <td>Kein Dienst nötig, und bewusst im Browser statt in Python: Puffer, Rotation und Kollisionsprüfung laufen beim Ziehen und Drehen ohne Roundtrip. Rechteckigkeit = Polygonfläche geteilt durch Fläche des kleinsten gedrehten Umschließungsrechtecks. Über 0,95 rechteckig, 0,85–0,95 fast, darunter komplex. Die Genauigkeit reicht für den optischen Eindruck — die verbindlichen Zahlen kommen ohnehin aus ALKIS.</td>
+    </tr>
+    <tr>
+      <td>Routing multimodal</td>
+      <td class="wahl">MOTIS, selbst gehostet<span class="kosten">MIT · Serverkosten</span></td>
+      <td>Kombiniert Fuß, Rad, Auto, Sharing und ÖPNV in einer Anfrage — genau die Frage „kann ich ein Stück mit dem Rad fahren und dann in die Bahn". Google Routes kann das auch, kostet aber pro Abfrage und verbietet das Zwischenspeichern der Ergebnisse.</td>
+    </tr>
+    <tr>
+      <td>Routing im Prototyp</td>
+      <td class="wahl">Transitous<span class="kosten">kostenlos, Usage Policy beachten</span></td>
+      <td>Öffentliche MOTIS-Instanz der Community. Ideal, um F-08 zu bauen, ohne vorher einen Server aufzusetzen. Für Produktionslast ungeeignet — die Betreiber weisen selbst auf begrenzte Ressourcen hin.</td>
+    </tr>
+    <tr>
+      <td>Fahrplandaten</td>
+      <td class="wahl">DELFI-GTFS<span class="kosten">Open Data</span></td>
+      <td>Deutschlandweit routingfähig, wöchentlich neu, enthält Bus, Bahn, Tram, S-Bahn aller Verbünde. Alternativ die aufbereiteten Feeds von gtfs.de.</td>
+    </tr>
+    <tr>
+      <td>Kartenhintergrund</td>
+      <td class="wahl">OpenFreeMap + MapLibre GL<span class="kosten">0 €</span></td>
+      <td>Wie von euch gesetzt. Vektorstyle als Basis, amtliche Ebenen als Raster-Overlay darüber.</td>
+    </tr>
+    <tr>
+      <td>Ebenen-Umschalter</td>
+      <td class="wahl">WMS-Dienste des GeoSN<span class="kosten">kostenfrei</span></td>
+      <td>Luftbild (DOP), Topographische Karten, ALKIS-Darstellung. Damit bekommt ihr den Google-Maps-Effekt „Karte / Satellit / Kataster" ohne Satellitenlizenz.</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<!-- ============ 3 QUELLEN ============ -->
+<div class="masskette">
+  <h2>Die Quellen im Detail</h2>
+  <div class="bar"></div>
+  <span class="nr">Endpunkte</span>
+</div>
+
+<div class="quellen">
+
+  <article class="q">
+    <div class="kopf">
+      <h3>ALKIS Sachsen</h3>
+      <span class="tag">dl-de/by-2-0</span>
+    </div>
+    <div class="body">
+      <p>Der WFS liefert Flurstücke, Gebäude, tatsächliche Nutzungen, Verwaltungseinheiten und Katasterbezirke im vereinfachten AdV-Schema — als Direktzugriffs-Downloaddienst bis maximal 20.000 Objekte pro Anfrage. Eigentümerdaten sind nicht enthalten, was für euren Fall genau richtig ist. Die zugrundeliegenden Daten werden wöchentlich aktualisiert.</p>
+      <p>Parallel gibt es die Flurstücke sachsenweit als GeoPackage zum Download. Für eine Plattform ist das der bessere Weg: einmal importieren, danach jede Abfrage lokal.</p>
+      <dl>
+        <dt>WFS</dt><dd class="mono">https://geodienste.sachsen.de/aaa/public_alkis/vereinf/wfs</dd>
+        <dt>INSPIRE</dt><dd class="mono">https://geodienste.sachsen.de/aaa/public_inspire/alkis/cp/dls/wfs</dd>
+        <dt>Portal</dt><dd><a href="https://www.geodaten.sachsen.de/liegenschaftskataster-3990.html">geodaten.sachsen.de — Liegenschaftskataster</a></dd>
+        <dt>Doku</dt><dd><a href="https://geoportal.sachsen.de/portal/dokumente/WFS_ALKIS_Anwendungsbeschreibung.pdf">Anwendungsbeschreibung ALKIS-WFS (PDF)</a></dd>
+        <dt>Quellvermerk</dt><dd>„Geodaten Sachsen" bzw. „Landesamt für Geobasisinformation Sachsen (GeoSN)"</dd>
+      </dl>
+    </div>
+  </article>
+
+  <article class="q">
+    <div class="kopf">
+      <h3>Hauskoordinaten &amp; Hausumringe</h3>
+      <span class="tag">Open Data</span>
+    </div>
+    <div class="body">
+      <p>Hauskoordinaten sind Postanschriften aus PLZ, Ort, Straße und Hausnummer, verbunden mit der Lagekoordinate des zugehörigen Gebäudes beziehungsweise der Flurstücksfläche. Das ist euer Geocoder für F-01 und F-02 — lokal, vollständig und ohne fremden Dienst in der Kette.</p>
+      <p>Hausumringe beschreiben die Gebäudegrundrisse als georeferenzierte Umringpolygone, abgeleitet aus dem Liegenschaftskataster.</p>
+      <dl>
+        <dt>Download</dt><dd><a href="https://www.geodaten.sachsen.de/downloadbereich-hauskoordinaten-4172.html">Hauskoordinaten</a> · <a href="https://www.geodaten.sachsen.de/downloadbereich-hausumringe-4174.html">Hausumringe</a></dd>
+        <dt>Ergänzung</dt><dd><a href="https://www.geodaten.sachsen.de/digitale-hoehenmodelle-3994.html">Höhen- und 3D-Stadtmodelle</a> — LoD2 liefert Gebäudehöhen für die 0,4-H-Rechnung</dd>
+      </dl>
+    </div>
+  </article>
+
+  <article class="q">
+    <div class="kopf">
+      <h3>BORIS Sachsen</h3>
+      <span class="tag">gebührenfrei</span>
+    </div>
+    <div class="body">
+      <p>Bodenrichtwerte werden nach § 196 BauGB von den örtlich zuständigen Gutachterausschüssen aus den Kaufpreissammlungen ermittelt; daraus entstehen Richtwertzonen, die Gebiete mit weitgehend übereinstimmender Art und Maß der Nutzung umfassen. Sachsen führt die Daten nach der AdV-Konzeption VBORIS 2.0, aktuelle und historische Stichtage ab 2011.</p>
+      <p>Der Kartendienst ist als WMS verfügbar. Für die Zahl hinter der Zone braucht ihr <span class="mono">GetFeatureInfo</span> — ob es zusätzlich einen Vektordownload gibt, klärt am schnellsten der Service Desk des GeoSN.</p>
+      <p><strong>Wichtige Einschränkung:</strong> Nach § 15 Abs. 2 ImmoWertV können einzelne Grundstücke innerhalb einer Zone eine abweichende Nutzungsart haben — für die gilt der Zonenwert nicht. Das gehört als Hinweis in die Oberfläche, sonst verkauft ihr eine Scheingenauigkeit.</p>
+      <dl>
+        <dt>Portal</dt><dd><a href="https://www.boris.sachsen.de/">boris.sachsen.de</a></dd>
+        <dt>Nutzung</dt><dd><a href="https://www.boris.sachsen.de/nutzungshinweise-4044.html">Nutzungshinweise</a></dd>
+        <dt>Kontext</dt><dd>Grundstücksmarktbericht und „Schlaglicht Markt" des Oberen Gutachterausschusses, kostenfrei</dd>
+      </dl>
+    </div>
+  </article>
+
+  <article class="q">
+    <div class="kopf">
+      <h3>MOTIS &amp; Transitous</h3>
+      <span class="tag">MIT / Community</span>
+    </div>
+    <div class="body">
+      <p>MOTIS ist eine multimodale Routing-Engine, die Fußweg, Rad, Auto und Sharing-Angebote mit dem Fahrplan verbindet und dabei planet-große Deployments auf bezahlbarer Hardware erlaubt. Sie bringt Geocoding, Reverse-Geocoding und Kartentiles gleich mit — damit deckt ein Dienst mehrere eurer Bausteine ab.</p>
+      <p>Transitous betreibt eine öffentliche MOTIS-Instanz mit internationaler Abdeckung. Vor der Integration die Usage Policy lesen; die Betreiber weisen ausdrücklich darauf hin, dass ihre Hosting-Ressourcen begrenzt sind.</p>
+      <dl>
+        <dt>Engine</dt><dd><a href="https://github.com/motis-project/motis">github.com/motis-project/motis</a></dd>
+        <dt>Öffentl. API</dt><dd><a href="https://transitous.org/api/">transitous.org/api</a> · <span class="mono">api.transitous.org</span></dd>
+        <dt>Fahrplan</dt><dd><a href="https://www.opendata-oepnv.de/">opendata-oepnv.de</a> (DELFI, montags neu) · <a href="https://gtfs.de/">gtfs.de</a></dd>
+        <dt>Straßennetz</dt><dd><a href="https://download.geofabrik.de/europe/germany.html">Geofabrik-Extract Sachsen</a></dd>
+      </dl>
+    </div>
+  </article>
+
+  <article class="q">
+    <div class="kopf">
+      <h3>OpenRouter</h3>
+      <span class="tag">kostenpflichtig</span>
+    </div>
+    <div class="body">
+      <p>Web Fetch lässt Modelle den vollständigen Seiteninhalt einer URL abrufen und unterstützt fünf Engines. Gebt ihr Exa, Parallel oder OpenRouter als Engine an, verhält sich das Fetching über alle Modelle gleich, inklusive <span class="mono">allowed_domains</span> und <span class="mono">blocked_domains</span> — bei den nativen Fetch-Funktionen der einzelnen Anbieter variiert das.</p>
+      <p>Der alte Weg über <span class="mono">plugins: {"id":"web"}</span> und den <span class="mono">:online</span>-Suffix gilt als veraltet; aktuell führt der Weg über das <span class="mono">tools</span>-Array. Websuche gibt es zusätzlich, wird hier aber nur als Rückfallebene gebraucht, wenn ein Link nichts hergibt.</p>
+      <p><strong>Zwei Aufrufe, zwei Schemata:</strong> eines für das Grundstücksinserat (Adresse, Flurstückskennzeichen, Kaufpreis, Grundstücksfläche), eines für den Haustyp (bebaute Fläche, Wohnfläche je Geschoss, Dachform, Preis). Beide Antworten mit Quell-URLs speichern.</p>
+      <dl>
+        <dt>Doku</dt><dd><a href="https://openrouter.ai/docs/guides/features/plugins/web-search">openrouter.ai/docs — Web-Tools</a></dd>
+        <dt>Kosten</dt><dd>Exa im Auto-Modus 0,007 $ je Anfrage inklusive bis zu zehn Ergebnissen, jedes weitere 0,001 $, dazu die Tokens. Web-Fetch-Engines separat — deshalb ist Caching pro URL Pflicht, keine Optimierung.</dd>
+        <dt>Aufruf</dt><dd class="mono">tools: [{ type: "openrouter:web_fetch", parameters: { engine: "openrouter", max_content_tokens: 50000, allowed_domains: ["…"] } }]</dd>
+        <dt>Cache-Key</dt><dd>normalisierte URL → extrahiertes Objekt, unbefristet gültig; ein Haustyp ändert sich nicht wöchentlich</dd>
+      </dl>
+    </div>
+  </article>
+
+  <article class="q">
+    <div class="kopf">
+      <h3>Karte &amp; Geometrie</h3>
+      <span class="tag">Frontend</span>
+    </div>
+    <div class="body">
+      <p>MapLibre GL JS rendert den OpenFreeMap-Style als Basis, die amtlichen WMS-Dienste kommen als Raster-Source darüber, eure Fachdaten als GeoJSON-Layer. Turf.js übernimmt Puffer, Rotation, Flächen und die Kollisionsprüfung — alles clientseitig, ohne Roundtrip.</p>
+      <dl>
+        <dt>Basiskarte</dt><dd><a href="https://openfreemap.org/">openfreemap.org</a></dd>
+        <dt>Renderer</dt><dd><a href="https://maplibre.org/">maplibre.org</a> — für Vue 3 Options API reicht ein Wrapper-Component mit <span class="mono">mounted()</span> / <span class="mono">beforeUnmount()</span></dd>
+        <dt>Geometrie</dt><dd><a href="https://turfjs.org/">turfjs.org</a></dd>
+        <dt>Projektion</dt><dd><a href="http://proj4js.org/">proj4js</a> für EPSG:25833 ↔ WGS84</dd>
+      </dl>
+    </div>
+  </article>
+
+</div>
+
+<!-- ============ 4 STOLPERSTEINE ============ -->
+<div class="masskette">
+  <h2>Woran es scheitern wird</h2>
+  <div class="bar"></div>
+  <span class="nr">vorab klären</span>
+</div>
+
+<div class="risiko">
+  <h3>Ein Grundstück sind oft mehrere Flurstücke</h3>
+  <p>Aus einem echten Inserat in Leipzig-Liebertwolkwitz: „Gesamtfläche von ca. 802 m² (Flurstück 790 sowie 706)". Das ist der Normalfall, nicht die Ausnahme. Das Datenmodell muss ein Grundstück daher von Anfang an als <em>Menge</em> von Flurstücken führen — Polygone vereinigen, amtliche Flächen summieren, Formanalyse über die Vereinigung, Bebauungsfenster aus dem Außenring der Vereinigung.</p>
+  <p>Wird das nachgerüstet, zieht es sich durch Datenbank, API und Frontend zugleich. Deshalb steht es hier und nicht im Backlog.</p>
+</div>
+
+<div class="risiko">
+  <h3>Nicht jedes Portal lässt sich abrufen</h3>
+  <p>Getestet am 29.08.2026: Kleinanzeigen liefert die Seite vollständig aus, inklusive <span class="mono">og:latitude</span> und <span class="mono">og:longitude</span> in den Meta-Tags — damit entfällt dort das Geocoding. ImmoScout24 antwortet einem Serverabruf mit <strong>401</strong>, unabhängig davon, wer die Anfrage stellt.</p>
+  <p>Ob eine der OpenRouter-Fetch-Engines durchkommt, ist offen und in einem kurzen Test je Engine geklärt. Selbst bei Erfolg sollte darauf nichts aufgebaut werden: ImmoScout untersagt automatisiertes Auslesen, und Blockaden ändern sich. Der Adapter fällt in dem Fall auf das Einfügefeld (F-12) zurück.</p>
+</div>
+
+<div class="risiko">
+  <h3>Die 3 Meter stimmen so nicht</h3>
+  <p>In Sachsen bemisst sich die Tiefe der Abstandsfläche nach § 6 SächsBO grundsätzlich nach der Wandhöhe — die pauschalen 3 Meter sind der Mindestwert, nicht die Regel. Bei einem zweigeschossigen Haus liegt der maßgebliche Abstand darüber. Dazu kommen Sonderfälle: Grenzgaragen sind privilegiert, ein Bebauungsplan kann abweichende Baugrenzen festsetzen, an Straßen gilt Anderes als zum Nachbarn.</p>
+  <p>Praktische Konsequenz: Die Abstandstiefe muss pro Grenzsegment einstellbar sein, mit 3 m als Startwert und einem Feld für die Wandhöhe. Und die Ausgabe braucht einen klaren Hinweis, dass sie keine bauordnungsrechtliche Prüfung ersetzt.</p>
+</div>
+
+<div class="risiko">
+  <h3>Amtliche Fläche ≠ gerechnete Fläche</h3>
+  <p>Nehmt die Flächenangabe aus dem ALKIS-Attribut, nicht die aus dem Polygon berechnete. Beide weichen regelmäßig um ein paar Quadratmeter ab, und für den €/m²-Vergleich zählt die amtliche Zahl. Die gerechnete Fläche nur intern für die Formanalyse verwenden.</p>
+</div>
+
+<div class="risiko">
+  <h3>Koordinatensysteme</h3>
+  <p>ALKIS liefert in ETRS89/UTM33 (EPSG:25833), MapLibre erwartet WGS84. Jede Längen- und Flächenberechnung gehört in die projizierten Koordinaten — Turf rechnet auf WGS84 mit Näherungen, die bei Grundstücksmaßen sichtbar danebenliegen. Also: rechnen in 25833, transformieren erst zur Anzeige.</p>
+</div>
+
+<div class="risiko">
+  <h3>CORS und Rate-Limits</h3>
+  <p>Behörden-WFS erlauben in der Regel keine Cross-Origin-Requests aus dem Browser. Der Weg führt über FastAPI als Proxy — das ist ohnehin die richtige Stelle für Caching, denn ein Flurstückspolygon ändert sich nicht zwischen zwei Seitenaufrufen. Gleiches gilt für BORIS- und Perplexity-Abfragen.</p>
+</div>
+
+<div class="risiko">
+  <h3>Wohnfläche ist nicht Grundfläche</h3>
+  <p>Der häufigste Fehler beim Fertighaus: Hersteller werben mit der Wohnfläche über alle Geschosse. Beim ELK All in One 159 heißt das 159,21 m² Netto-Raumfläche — die <em>bebaute</em> Fläche beträgt aber 96,88 m². Wer die falsche Zahl auf die Karte legt, zeichnet ein Haus mit fast doppelter Grundfläche.</p>
+  <p>Die bebaute Fläche steht im Seitentext, konkrete Außenmaße meist nur im verlinkten Datenblatt-PDF. Pragmatische Lösung, die zum Anspruch „optischer Eindruck" passt: aus der bebauten Fläche ein Rechteck mit Standardseitenverhältnis ableiten — 96,88 m² ergibt rund 11,4 × 8,5 m — und dem Nutzer einen Schieberegler für das Verhältnis geben. Wenn das Datenblatt echte Maße liefert, überschreiben sie den Schätzwert.</p>
+</div>
+
+<div class="risiko">
+  <h3>Extrahierte Werte sind Vorschläge, keine Fakten</h3>
+  <p>Das Modell antwortet auch dann, wenn die Seite die Zahl gar nicht hergibt. Jedes Feld braucht daher die Quell-URL, aus der es stammt, und die Oberfläche zeigt extrahierte Werte als bestätigungspflichtigen Vorschlag — editierbar, mit sichtbarem Hinweis „automatisch gelesen". Erst nach Bestätigung wandern sie in die Planung.</p>
+  <p>Ein zweiter Schutz kostet nichts: Plausibilitätsgrenzen im Pydantic-Modell. Ein Baukörper unter 4 m oder über 30 m Kantenlänge ist ein Extraktionsfehler, kein Haus.</p>
+</div>
+
+<!-- ============ 5 ARCHITEKTUR ============ -->
+<div class="masskette">
+  <h2>Wie es zusammenhängt</h2>
+  <div class="bar"></div>
+  <span class="nr">Skizze</span>
+</div>
+
+<div class="stack">
+<pre>
+  BROWSER — alle Geometrie                FASTAPI — nur Daten            QUELLEN
+  ─────────────────────────────────       ────────────────────────       ──────────────────────────
+
+  Vite + Vue 3 (Options API)
+  ├── MapLibre GL
+  │   ├── Basiskarte  ────────────────────  (direkt, kein Proxy) ──────  openfreemap.org
+  │   ├── WMS-Overlay  ──────────────────►  /tiles/{layer}/{z}/{x}/{y}   GeoSN WMS
+  │   │   Luftbild · TK · ALKIS             Proxy + Disk-Cache           (DOP, TK, ALKIS)
+  │   └── GeoJSON-Layer
+  │       Flurstück · Bebauungsfenster
+  │       Bestandsgebäude · Hausentwurf
+  │
+  ├── Turf.js          ← Rechenlast bewusst hier
+  │   buffer(-3 m)  Bebauungsfenster
+  │   transformRotate / transformTranslate
+  │   booleanWithin  Kollisionsprüfung
+  │   area · length · minimum rotated rect
+  │
+  ├── proj4js  25833 ◄──► 4326
+  │
+  └── Vergleichsansicht, n Grundstücke
+
+                                          POST /parcels/resolve  ──────  PostGIS
+                                            Adresse|Koordinate|Kennz.     ├─ ALKIS Flurstücke (GPKG)
+                                            → Polygon + amtl. Fläche      ├─ ALKIS Gebäude / Hausumringe
+                                                                          └─ Hauskoordinaten
+                                          POST /listings/extract  ─────  LLM_BASE_URL (OpenRouter)
+                                            {url|text} → Inserat           tools: openrouter:web_fetch
+                                                                           Cache: URL → JSON
+                                          POST /housetypes/extract ────  LLM_BASE_URL (OpenRouter)
+                                            {url} → Haustyp                allowed_domains: Hersteller
+                                          GET  /landvalue  ────────────  BORIS WMS
+                                            ?lat&amp;lon → €/m² + Zone        GetFeatureInfo + Cache
+
+                                          POST /reachability  ─────────  MOTIS
+                                            Start + n Ziele + Modi         ├─ DELFI GTFS (wöchentl.)
+                                            → Zeiten + Routen-GeoJSON      └─ OSM Sachsen
+</pre>
+</div>
+
+<!-- ============ 6 FÜR DIE UMSETZUNG ============ -->
+<div class="masskette">
+  <h2>Getroffene Entscheidungen</h2>
+  <div class="bar"></div>
+  <span class="nr">nicht neu verhandeln</span>
+</div>
+
+<div class="tab-scroll" style="margin-bottom:22px">
+<table>
+  <thead>
+    <tr><th style="width:200px">Frage</th><th style="width:190px">Entschieden</th><th>Begründung im Projekt</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Backend-Framework</td><td class="wahl">FastAPI (Python)</td><td>Ersetzt die zuerst angedachte Laravel-Variante. Async-Proxy vor WFS und WMS, Pydantic-Modelle als Validierung der Perplexity-Antworten.</td></tr>
+    <tr><td>Wo rechnet die Geometrie?</td><td class="wahl">Im Frontend, Turf.js</td><td>Bewusst nicht in Shapely. Es geht um den optischen Eindruck beim Ziehen und Drehen, nicht um Millimeter. Verbindliche Zahlen liefert ohnehin ALKIS.</td></tr>
+    <tr><td>Seiten auslesen</td><td class="wahl">OpenRouter web_fetch</td><td>Kein eigenes HTML-Scraping, kein PDF-Handling, keine Bot-Pflege. URL rein, JSON raus. Kein Provider fest verdrahtet: Base-URL, Schlüssel und Modell kommen aus der Konfiguration.</td></tr>
+    <tr><td>Frontend-Stack</td><td class="wahl">Vite + Vue 3, Options API</td><td>Gesetzt. Kein Composition-API-Umbau, kein Nuxt.</td></tr>
+    <tr><td>Basiskarte</td><td class="wahl">OpenFreeMap + MapLibre</td><td>Gesetzt. Amtliche Ebenen als Raster darüber.</td></tr>
+    <tr><td>Region</td><td class="wahl">nur Sachsen</td><td>Die Plattform ist auf sächsische Amtsdaten zugeschnitten; ALKIS und BORIS sind länderspezifisch.</td></tr>
+    <tr><td>Nutzerkreis</td><td class="wahl">interner Prototyp</td><td>Erste Ausbaustufe nur für das eigene Team. Keine Registrierung, keine Mandantentrennung, kein Rate-Limit pro Nutzer — das kommt erst, wenn daraus ein öffentliches Produkt wird. Zugriffsschutz reicht auf Infrastrukturebene.</td></tr>
+    <tr><td>Endgerät</td><td class="wahl">Desktop zuerst, responsiv</td><td>Gearbeitet wird am Rechner, nicht auf dem Grundstück. Kein GPS-Einstieg, keine Touch-Optimierung für das Drehen des Hauskörpers. Die Ansicht muss auf dem Handy trotzdem benutzbar bleiben, deshalb von Anfang an responsive Layouts statt späterem Nachrüsten.</td></tr>
+    <tr><td>Ausgabe</td><td class="wahl">druckbare Webseite</td><td>Kein PDF-Export, kein serverseitiges Kartenrendering. Damit bleibt die Entscheidung „Geometrie im Frontend" unangetastet — es gibt keinen zweiten Renderpfad, der dieselben Maße nochmal berechnen müsste.</td></tr>
+    <tr><td>Kontaktdaten</td><td class="wahl">werden nicht gespeichert</td><td>Inserate enthalten Makler, Ansprechpartner und Telefonnummern. Das Extraktionsschema führt diese Felder gar nicht erst, damit kein Personenbezug in der Datenbank landet.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="stack">
+<pre>
+  # Extraktionsschemata — Vertrag zwischen Perplexity-Antwort und Datenbank
+
+  class Flurstueckskennung(BaseModel):
+      gemarkung: str | None         # Name oder Nummer, aus Lage ableitbar
+      flur: str | None              # in Sachsen häufig unbelegt
+      zaehler: int
+      nenner: int | None
+
+  class Inserat(BaseModel):
+      adresse: str | None           # Straße + Hausnummer + PLZ + Ort
+      lat: float | None             # aus og:latitude, falls vorhanden
+      lon: float | None             # aus og:longitude
+      flurstuecke: list[Flurstueckskennung] = []   # ein Grundstück, mehrere Flurstücke
+      kaufpreis_eur: int | None
+      grundstuecksflaeche_m2: int | None
+      quelle_url: HttpUrl | None    # entfällt beim Einfügen per Zwischenablage
+      # mindestens adresse ODER lat/lon ODER flurstuecke muss gesetzt sein
+
+  class Haustyp(BaseModel):
+      hersteller: str
+      typenbezeichnung: str
+      bebaute_flaeche_m2: float      # Field(ge=30, le=400) — Grundfläche, NICHT Wohnfläche
+      wohnflaeche_gesamt_m2: float | None
+      wohnflaeche_eg_m2: float | None
+      wohnflaeche_og_m2: float | None
+      aussenmass_laenge_m: float | None   # Field(ge=4, le=30) — meist nur im Datenblatt-PDF
+      aussenmass_breite_m: float | None
+      dachformen: list[Literal["satteldach","walmdach","pultdach","flachdach","zeltdach"]]
+      traufhoehe_m: float | None     # falls vorhanden, für 0,4 H nach § 6 SächsBO
+      firsthoehe_m: float | None
+      grundstueck_ab_m2: int | None
+      preis_ab_eur: int | None
+      quelle_url: HttpUrl
+      gelesen_am: datetime
+
+  # Fehlen die Außenmaße: Rechteck aus bebaute_flaeche_m2 mit Seitenverhältnis 1,35
+  # ableiten (96,88 m² → 11,4 × 8,5 m) und im Frontend per Regler korrigierbar machen.
+  # Jedes Feld erreicht das Frontend als Vorschlag: {wert, quelle_url, bestaetigt: false}
+</pre>
+</div>
+
+<div class="stack" style="margin-top:16px">
+<pre>
+  # Provider-Konfiguration — kein Anbieter fest verdrahtet
+
+  # .env
+  LLM_BASE_URL=https://openrouter.ai/api/v1
+  LLM_API_KEY=sk-or-v1-...
+  LLM_MODEL=anthropic/claude-sonnet-4.6
+  LLM_FETCH_ENGINE=openrouter          # openrouter | exa | parallel | native
+  LLM_TIMEOUT_S=120
+
+  # settings.py
+  class LLMSettings(BaseSettings):
+      base_url: HttpUrl = "https://openrouter.ai/api/v1"
+      api_key: SecretStr
+      model: str = "anthropic/claude-sonnet-4.6"
+      fetch_engine: Literal["openrouter","exa","parallel","native"] = "openrouter"
+      timeout_s: int = 120
+      model_config = SettingsConfigDict(env_prefix="LLM_")
+
+  # client.py — OpenAI-kompatibel, deshalb austauschbar
+  client = AsyncOpenAI(base_url=str(s.base_url), api_key=s.api_key.get_secret_value())
+
+  await client.chat.completions.create(
+      model=s.model,
+      messages=[...],
+      tools=[{"type": "openrouter:web_fetch",
+              "parameters": {"engine": s.fetch_engine,
+                             "max_content_tokens": 50000,
+                             "allowed_domains": [domain_of(url)]}}],
+      response_format={"type": "json_schema",
+                       "json_schema": {"name": "haustyp",
+                                       "schema": Haustyp.model_json_schema(),
+                                       "strict": True}},
+  )
+</pre>
+</div>
+
+<div class="stack" style="margin-top:16px">
+<pre>
+  # Reihenfolge für die Implementierung — jeder Schritt ist für sich testbar
+
+  0  ENTSCHEIDUNGSEXPERIMENT — vor allem anderen, Ergebnis schriftlich festhalten
+
+     Frage: Kommt ein Serverabruf an immobilienscout24.de vorbei, und wenn ja, womit?
+     Stand 29.08.2026: direkter Abruf einer Exposé-Seite liefert HTTP 401.
+
+     Zu testen, je einmal gegen dieselbe Exposé-URL und dieselbe Kleinanzeigen-URL:
+       a) FastAPI mit httpx, realistischer User-Agent      → Quelltext ans Modell
+       b) OpenRouter web_fetch, engine = "openrouter"
+       c) OpenRouter web_fetch, engine = "exa"             (kann aus dem Crawl-Index kommen)
+       d) OpenRouter web_fetch, engine = "parallel"
+
+     Bestanden = Statuscode 200 UND der Beschreibungstext des Inserats ist enthalten,
+     nicht nur Navigation oder eine Challenge-Seite. Zweimal im Abstand von 24 Stunden
+     wiederholen: einmaliger Erfolg beweist nichts.
+
+     Ergebnis a) besteht  → Variante a nehmen, günstiger und kontrollierbar (Quelltext
+                            selbst holen, nur die Extraktion übers Modell)
+     nur b/c/d besteht    → diese Engine in LLM_FETCH_ENGINE eintragen
+     nichts besteht       → immobilienscout24.de fest auf das Einfügefeld (F-12) legen
+
+     In JEDEM Fall wird F-12 gebaut. Der Test entscheidet nur, ob es dort der Komfortweg
+     oder der einzige Weg ist. Ergebnis mit Datum in dieses Dokument zurückschreiben —
+     Blockaden ändern sich, und der nächste Bearbeiter muss wissen, was wann galt.
+
+  1  PostGIS aufsetzen, ALKIS-Flurstücke (GPKG) + Hauskoordinaten + Hausumringe importieren
+     ogr2ogr -f PostgreSQL ... -t_srs EPSG:25833     → danach ist F-02 eine SQL-Query
+
+  2  FastAPI: POST /parcels/resolve         Adresse | Koordinate | Gemarkung+Zähler+Nenner
+     Rückgabe als GeoJSON in 4326, amtliche Fläche als Attribut, mehrere Flurstücke vereinigt
+
+  3  Vue: Kartenkomponente mit OpenFreeMap, Flurstück als Layer, Ebenenumschalter
+     WMS-Overlays über den eigenen Tile-Proxy, nicht direkt aus dem Browser
+
+  4  Turf im Frontend: buffer(-3) zeichnen, Maße an die Kanten schreiben
+     Abstandstiefe pro Grenzsegment einstellbar, Startwert 3 m
+
+  5  Hauskörper platzieren: Rechteck aus Haustyp-Maßen, drag + rotate,
+     booleanWithin gegen das Bebauungsfenster, Verstoß rot markieren
+
+  6  POST /housetypes/extract  über LLM_BASE_URL, web_fetch auf die Herstellerdomain begrenzt,
+     Ergebnis in Haustyp-Katalog cachen; danach POST /listings/extract, gleiches Muster
+
+  7  GET /landvalue: BORIS GetFeatureInfo, €/m² gegen Kaufpreis, Abweichung in Prozent
+
+  8  POST /reachability gegen Transitous, je Ziel eine kleine Karte mit Routen-GeoJSON
+     erst bei Produktionslast auf eigene MOTIS-Instanz umstellen
+
+  9  Nachbarebene (F-13) und Kartenausrichtung (F-14)
+
+     Zufahrtsstraße bestimmen: aus der ALKIS-Objektart Nutzung die Verkehrsflächen holen,
+     die das Grundstück berühren. Das gemeinsame Grenzsegment ist die Straßenfront.
+     Azimut dieses Segments in EPSG:25833 berechnen, dann map.setBearing(azimut - 90),
+     damit die Front waagerecht liegt. Grenzt das Grundstück an mehrere Straßen: die
+     längste gemeinsame Kante gewinnt, Umschalter für die übrigen anbieten.
+     Nordpfeil und Maßbeschriftungen drehen mit, Texte bleiben lesbar ausgerichtet.
+
+ 10  Vergleichsansicht über n gespeicherte Grundstücke
+
+ 11  Druckansicht (F-15) — die Karte ist der Knackpunkt
+
+     WICHTIG: MapLibre muss mit preserveDrawingBuffer: true initialisiert werden,
+     sonst ist die Karte im Ausdruck leer. Das lässt sich nachträglich nicht setzen,
+     also von Schritt 3 an so anlegen — kostet etwas Leistung, ist hier vertretbar.
+
+     window.addEventListener('beforeprint', ...) → Kartencontainer auf Druckmaß setzen,
+     map.resize() aufrufen, sonst wird der sichtbare Ausschnitt beschnitten.
+
+     @media print:  A4 quer, Bedienelemente und Navigation ausblenden,
+                    print-color-adjust: exact  (sonst fallen Flächenfarben weg),
+                    break-after: page  je Grundstück in der Vergleichsansicht,
+                    Nordpfeil und Maßstabsleiste sichtbar lassen — bei gedrehter
+                    Karte (F-14) sind sie das Einzige, was die Orientierung rettet.
+
+     Nichts davon braucht den Server. Gedruckt wird, was im Browser steht.
+</pre>
+</div>
+
+<div class="stack" style="margin-top:16px">
+<pre>
+  # Portal-Adapter — Fallback-Kette pro Domain
+
+  kleinanzeigen.de       1. Meta-Tags deterministisch parsen
+                            og:latitude / og:longitude / og:title  → keine Geocodierung nötig
+                         2. Beschreibungstext ans Modell
+                            findet "Flurstück 790 sowie 706", Bodenrichtwert, § 34 BauGB
+                         3. bei Fetch-Fehler → Einfügefeld
+
+  immobilienscout24.de   1. entfällt — Serverabruf liefert 401
+                         2. direkt Einfügefeld (F-12)
+                            clipboardData.getData('text/html') bewahrt Links und Struktur
+
+  unbekannte Domain      1. web_fetch versuchen
+                         2. Meta-Tags + JSON-LD, falls vorhanden
+                         3. Volltext ans Modell
+                         4. bei Fehler → Einfügefeld
+
+  # Flurstückskennzeichen zusammensetzen (AdV-Bildungsregel, Sachsen: Land = 14)
+  # Land + Gemarkungsnummer + Flurnummer + Zähler + Nenner + Flurstücksfolge,
+  # rechtsbündig mit führenden Nullen; unbelegte optionale Stellen als "_".
+  # Feldlängen einmal an einem echten WFS-Feature verifizieren, nicht abschreiben.
+
+  # Nachschlagen: Stored Query "Flurstücke anhand Kennzeichen", alternativ Filter über
+  # Gemarkungsnummer + Flurstückszähler + Nenner. Mehrere Treffer → ST_Union, Flächen summieren.
+</pre>
+</div>
+
+<footer>
+  <span>Grundstücks-Check Sachsen · Vorprojekt-Notiz</span>
+  <span>Amtliche Daten: © GeoSN, dl-de/by-2-0 · Keine Rechtsberatung</span>
+</footer>
+
+</div>
+</body>
+</html>
