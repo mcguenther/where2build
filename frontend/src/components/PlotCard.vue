@@ -1,6 +1,6 @@
 <template>
   <article class="karte tafel" :class="{ 'karte--gewaehlt': selected }">
-    <label class="karte__wahl">
+    <label class="karte__wahl nicht-drucken">
       <input type="checkbox" :checked="selected" :aria-label="`${plot.name} für den Vergleich auswählen`"
              @change="$emit('select', $event.target.checked)">
       Vergleich

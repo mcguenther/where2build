@@ -15,9 +15,6 @@
     @keydown="onKeydown"
   >
     <defs>
-      <pattern :id="`nachbar-${uid}`" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-        <line x1="0" y1="0" x2="0" y2="6" stroke="var(--w2b-karte-nachbar)" stroke-width="1.6" opacity=".8" />
-      </pattern>
       <marker :id="`kote-${uid}`" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto">
         <line x1="5" y1="1.5" x2="5" y2="8.5" stroke="var(--w2b-karte-grenze)" stroke-width="1.2" />
       </marker>
@@ -267,7 +264,11 @@ export default {
       let bh = box.height * (1 + padding * 2);
       const aspect = (this.width - margin * 2) / (this.height - margin * 2);
       if (bw / bh < aspect) bw = bh * aspect; else bh = bw / aspect;
-      const scale = (this.width - margin * 2) / bw;
+      const fitted = (this.width - margin * 2) / bw;
+      /* A caller that hands us a scale is drawing several plots side by side
+         and needs them comparable, so its value wins over our own fit. It is
+         the smallest of the individual fits, so nothing overflows its frame. */
+      const scale = Number.isFinite(this.scale) && this.scale > 0 ? this.scale : fitted;
       return { scale, mx: (box.minX + box.maxX) / 2, my: (box.minY + box.maxY) / 2 };
     },
     tenMetres() { return 10 * this.view.scale; },
@@ -410,7 +411,6 @@ export default {
       return { x: this.px(point.x), y: this.py(point.y) };
     },
     path(ring) { return ring.map(v => { const q = this.p(v); return `${q.x.toFixed(1)},${q.y.toFixed(1)}`; }).join(" "); },
-    corners(rect) { return rectangleCorners(rect); },
     /** One dimension chain: two witness lines, the measure line, and a label. */
     dimensionChain(a, b, offset, label) {
       const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;

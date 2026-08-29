@@ -207,6 +207,11 @@
         </div>
 
         <dl class="werteliste">
+          <!-- On paper the <select> is hidden, so without this the printed
+               sheet never says which house type it is about. -->
+          <template v-if="houseType">
+            <dt>Haustyp</dt><dd>{{ houseType.manufacturer }} {{ houseType.name }}</dd>
+          </template>
           <dt>Bebaute Fläche</dt><dd>{{ area(builtArea, 2) }}</dd>
           <dt v-if="houseType">Wohnfläche ges.</dt><dd v-if="houseType">{{ area(houseType.livingArea, 2) }}</dd>
           <dt>Außenmaß</dt>

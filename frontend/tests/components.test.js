@@ -16,6 +16,7 @@ import { realState } from "./helpers.js";
 import { buildableArea, cornersOutside, alignmentToEdge, polygonArea, findPlacement } from "../src/lib/geometry.js";
 import { area } from "../src/lib/format.js";
 import { plotMetrics } from "../src/lib/metrics.js";
+import { boundingBox } from "../src/lib/geometry.js";
 
 beforeEach(() => {
   localStorage.clear();
@@ -342,12 +343,31 @@ describe("Haustypen", () => {
 });
 
 describe("Vergleich", () => {
-  it("zeichnet alle Grundrisse im selben Maßstab", () => {
+  it("zeichnet alle Grundrisse wirklich im selben Maßstab", () => {
+    // Passing the same prop is not the same as using it: SitePlan used to
+    // compute its own fit per plot and ignore the value, so the panel claimed
+    // a shared scale it did not have and the "rund 1 : N" chip was wrong.
     const w = mount(CompareView);
-    const scales = new Set(w.findAllComponents({ name: "SitePlan" }).map(p => p.props("scale")));
-    expect(scales.size).toBe(1);
-    expect(w.vm.sharedScale).toBeGreaterThan(0);
-    expect(w.text()).toMatch(/rund 1 : \d+/);
+    const plans = w.findAllComponents({ name: "SitePlan" });
+    expect(plans.length).toBeGreaterThan(1);
+
+    const given = new Set(plans.map(p => p.props("scale")));
+    expect(given.size).toBe(1);
+
+    // What actually reaches the drawing: viewBox units per metre.
+    const used = new Set(plans.map(p => p.vm.view.scale.toFixed(6)));
+    expect(used.size).toBe(1);
+    expect(Number([...used][0])).toBeCloseTo([...given][0], 6);
+  });
+
+  it("wählt den Maßstab so, dass auch das größte Grundstück hineinpasst", () => {
+    const w = mount(CompareView);
+    w.findAllComponents({ name: "SitePlan" }).forEach(plan => {
+      const box = boundingBox(plan.props("plot").polygon);
+      const scale = plan.vm.view.scale;
+      expect(box.width * scale).toBeLessThanOrEqual(plan.props("width"));
+      expect(box.height * scale).toBeLessThanOrEqual(plan.props("height"));
+    });
   });
 
   it("listet nur die ausgewählten Kandidaten", () => {

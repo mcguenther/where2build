@@ -251,9 +251,14 @@ function plainRing(ring) {
 /** The same, for the per-segment setback depths. */
 function plainDepths(depths, length) {
   if (!Array.isArray(depths)) return Number(depths);
-  const out = new Array(depths.length);
-  for (let i = 0; i < depths.length; i++) out[i] = Number(depths[i]);
-  void length;
+  /* One depth per boundary segment. A short array would silently leave the
+     remaining segments at NaN, and a NaN clearance makes the whole envelope
+     vanish, so the statutory 3 m fills any gap. */
+  const out = new Array(length);
+  for (let i = 0; i < length; i++) {
+    const value = Number(depths[i]);
+    out[i] = Number.isFinite(value) ? value : 3;
+  }
   return out;
 }
 

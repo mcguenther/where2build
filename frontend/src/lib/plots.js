@@ -103,8 +103,3 @@ function centrePlacement(ring) {
   };
 }
 
-/** The official area is what counts; the polygon area is for shape analysis. */
-export const areaComparison = plot => ({
-  official: plot.officialArea,
-  computed: polygonArea(plot.polygon)
-});

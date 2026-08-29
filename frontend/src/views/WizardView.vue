@@ -54,7 +54,7 @@
             <div class="zwei">
               <div class="feld">
                 <label for="q-gemarkung">Gemarkung</label>
-                <input id="q-gemarkung" type="text" v-model="gemarkung" placeholder="Liebertwolkwitz">
+                <input id="q-gemarkung" type="text" v-model="gemarkung" placeholder="Moritzburg oder 3044">
               </div>
               <div class="feld">
                 <label for="q-nummer">Flurstücksnummer</label>
@@ -62,9 +62,14 @@
               </div>
             </div>
             <p class="hinweis">
-              So, wie sie im Geoportal steht: <span class="daten">85/1</span>,
-              <span class="daten">476</span> oder <span class="daten">41/e</span>.
-              Der Nenner darf ein Buchstabe sein.
+              <b>Gemarkung:</b> der Name (<span class="daten">Moritzburg</span>) oder der
+              Gemarkungsschlüssel — die Sachdatenabfrage zeigt ihn je nach Kartenebene
+              vierstellig (<span class="daten">3044</span>) oder sechsstellig
+              (<span class="daten">143044</span>); beides wird angenommen.
+              <br>
+              <b>Flurstücksnummer:</b> so, wie sie im Geoportal steht —
+              <span class="daten">85/1</span>, <span class="daten">476</span> oder
+              <span class="daten">41/e</span>. Der Nenner darf ein Buchstabe sein.
             </p>
           </template>
 
@@ -119,6 +124,15 @@
         So liegt das Flurstück im Kataster. Stimmt der Zuschnitt, geht es weiter;
         sonst zurück und die Angaben korrigieren.
       </p>
+
+      <!-- The service found something implausible for this listing. Not an
+           error — the parcel is real — but the user has to see it before the
+           next click turns it into a plot they plan a house on. -->
+      <div v-if="doubt" class="band band--fehler zweifel">
+        <b>Das ist vermutlich nicht das richtige Flurstück.</b>
+        {{ doubt }}
+      </div>
+
       <div class="pruefgitter">
         <div class="tafel">
           <SitePlan :plot="draft" :building="draftBuilding" :width="640" :height="440" backdrop="map" north-up />
@@ -138,7 +152,9 @@
         </div>
       </div>
       <div class="reihe">
-        <button type="button" class="knopf" @click="step = 3">Passt</button>
+        <button type="button" :class="doubt ? 'knopf knopf--zweit' : 'knopf'" @click="step = 3">
+          {{ doubt ? "Trotzdem übernehmen" : "Passt" }}
+        </button>
         <button type="button" class="knopf knopf--still" @click="step = returnStep">Zurück</button>
       </div>
     </section>
@@ -225,6 +241,7 @@ export default {
       error: "",
       readFields: [],
       draft: null,
+      doubt: null,
       steps: [
         { id: "source", name: "Quelle" },
         { id: "fields", name: "Gelesene Werte" },
@@ -290,6 +307,12 @@ export default {
       else if (numbers.length) query = { gemarkung: this.gemarkung.trim() || undefined, flurstuecksnummer: numbers[0] };
       else if (read("adresse")) query = { address: read("adresse") };
 
+      // The listing's own plot area lets the service judge whether the parcel
+      // it found can plausibly be the one being sold. A district address lands
+      // in the field next door, and nothing else would say so.
+      const statedArea = numberFrom(read("grundstuecksflaeche_m2"));
+      if (query && Number.isFinite(statedArea)) query.expected_area_m2 = statedArea;
+
       if (!query) {
         this.error = "Aus der Seite ließ sich weder eine Koordinate noch ein Flurstück lesen. "
           + "Bitte den Weg „Flurstück direkt“ nehmen.";
@@ -310,7 +333,13 @@ export default {
     },
 
     async queryCadastre(query, extra = {}) {
-      const plot = plotFromCadastre(await resolveParcel(query), extra);
+      const answer = await resolveParcel(query);
+      const plot = plotFromCadastre(answer, extra);
+      // Not an error: the parcel is real and the user may still want it. It is
+      // a judgement they have to make, so it is put in front of them.
+      this.doubt = answer.plausibility?.plausible === false
+        ? answer.plausibility.warning
+        : null;
       // The land value is a separate register; a plot without one is still usable.
       try {
         const value = await landValue(plot.anchor.lat, plot.anchor.lon);
@@ -334,6 +363,8 @@ export default {
 </script>
 
 <style scoped>
+.zweifel{ display: block; line-height: 1.5; }
+.zweifel b{ display: block; margin-bottom: 2px; }
 .krume{ display: flex; align-items: center; gap: var(--w2b-raum-2); font-size: var(--w2b-schrift-xs); color: var(--w2b-gedaempft); }
 .krume button{ background: none; border: 0; padding: 0; cursor: pointer; color: var(--w2b-primaer); font: inherit; }
 .seitenkopf{ display: flex; align-items: flex-end; gap: var(--w2b-raum-4); flex-wrap: wrap; }
