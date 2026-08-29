@@ -10,36 +10,36 @@
         </p>
       </div>
       <div class="dehnen"></div>
-      <button type="button" class="knopf" @click="aufnehmen">Grundstück hinzufügen</button>
+      <button type="button" class="knopf" @click="startWizard">Grundstück hinzufügen</button>
     </div>
 
-    <p v-if="!backendDa" class="band band--fehler" role="alert">
+    <p v-if="!backendUp" class="band band--fehler" role="alert">
       Das Backend antwortet nicht. Ohne es lassen sich weder Flurstücke nachschlagen noch
       Seiten auslesen — gespeicherte Grundstücke bleiben aber sichtbar.
     </p>
 
-    <div v-if="hatGrundstuecke" class="auswahlleiste tafel nicht-drucken">
-      <span class="auswahlleiste__zahl daten">{{ auswahlText }}</span>
-      <button type="button" class="knopf knopf--still knopf--klein" @click="alle">Alle auswählen</button>
-      <button type="button" class="knopf knopf--still knopf--klein" @click="keine">Auswahl aufheben</button>
+    <div v-if="hasPlots" class="auswahlleiste tafel nicht-drucken">
+      <span class="auswahlleiste__zahl daten">{{ selectionLabel }}</span>
+      <button type="button" class="knopf knopf--still knopf--klein" @click="selectAll">Alle auswählen</button>
+      <button type="button" class="knopf knopf--still knopf--klein" @click="selectNone">Auswahl aufheben</button>
       <div class="dehnen"></div>
-      <button type="button" class="knopf" :disabled="gewaehlt.length < 2" @click="vergleichen">
-        {{ gewaehlt.length < 2 ? "Vergleichen" : `${gewaehlt.length} vergleichen` }}
+      <button type="button" class="knopf" :disabled="selected.length < 2" @click="compare">
+        {{ selected.length < 2 ? "Vergleichen" : `${selected.length} vergleichen` }}
       </button>
     </div>
 
     <div class="kartei">
-      <PlotCard v-for="plot in state.daten.grundstuecke" :key="plot.id"
-                :plot="plot" :gewaehlt="istGewaehlt(plot.id)"
-                @oeffnen="oeffnen(plot.id)"
-                @entfernen="entfernen(plot)"
-                @auswaehlen="an => toggleSelection(plot.id, an)" />
+      <PlotCard v-for="plot in state.data.plots" :key="plot.id"
+                :plot="plot" :selected="isSelected(plot.id)"
+                @open="open(plot.id)"
+                @remove="remove(plot)"
+                @select="on => toggleSelection(plot.id, on)" />
 
       <div class="leerkarte">
-        <h3>{{ hatGrundstuecke ? "Noch ein Kandidat?" : "Noch nichts in der Prüfung" }}</h3>
+        <h3>{{ hasPlots ? "Noch ein Kandidat?" : "Noch nichts in der Prüfung" }}</h3>
         <p>Link einer Anzeige, eingefügte Seite oder Gemarkung mit Flurstücksnummer —
           drei Wege hinein. Umriss und Fläche kommen aus dem Liegenschaftskataster.</p>
-        <button type="button" class="knopf knopf--zweit" @click="aufnehmen">Grundstück hinzufügen</button>
+        <button type="button" class="knopf knopf--zweit" @click="startWizard">Grundstück hinzufügen</button>
       </div>
     </div>
   </div>
@@ -48,35 +48,35 @@
 <script>
 import PlotCard from "../components/PlotCard.vue";
 import { state, toggleSelection, removePlot } from "../lib/store.js";
-import { backendZustand } from "../lib/api.js";
+import { backendHealth } from "../lib/api.js";
 
 export default {
   name: "PlotsView",
   components: { PlotCard },
-  data() { return { state, backendDa: true }; },
+  data() { return { state, backendUp: true }; },
   computed: {
-    gewaehlt() { return state.daten.auswahl; },
-    hatGrundstuecke() { return state.daten.grundstuecke.length > 0; },
-    auswahlText() {
-      const n = this.gewaehlt.length;
+    selected() { return state.data.selection; },
+    hasPlots() { return state.data.plots.length > 0; },
+    selectionLabel() {
+      const n = this.selected.length;
       if (n === 0) return "Nichts ausgewählt";
       return n === 1 ? "1 Grundstück ausgewählt" : `${n} Grundstücke ausgewählt`;
     }
   },
   async created() {
-    this.backendDa = Boolean(await backendZustand());
+    this.backendUp = Boolean(await backendHealth());
   },
   methods: {
     toggleSelection,
-    istGewaehlt(id) { return state.daten.auswahl.includes(id); },
-    oeffnen(id) { state.offenesGrundstueck = id; state.ansicht = "grundstueck"; window.scrollTo({ top: 0 }); },
-    aufnehmen() { state.ansicht = "aufnahme"; window.scrollTo({ top: 0 }); },
-    vergleichen() { state.ansicht = "vergleich"; window.scrollTo({ top: 0 }); },
-    alle() { state.daten.auswahl = state.daten.grundstuecke.map(p => p.id); },
-    keine() { state.daten.auswahl = []; },
-    entfernen(plot) {
-      const sicher = window.confirm(`„${plot.name}“ aus der Liste entfernen? Der Stand dieses Grundstücks geht verloren.`);
-      if (sicher) removePlot(plot.id);
+    isSelected(id) { return state.data.selection.includes(id); },
+    open(id) { state.openPlotId = id; state.view = "plot"; window.scrollTo({ top: 0 }); },
+    startWizard() { state.view = "wizard"; window.scrollTo({ top: 0 }); },
+    compare() { state.view = "compare"; window.scrollTo({ top: 0 }); },
+    selectAll() { state.data.selection = state.data.plots.map(p => p.id); },
+    selectNone() { state.data.selection = []; },
+    remove(plot) {
+      const confirmed = window.confirm(`„${plot.name}“ aus der Liste entfernen? Der Stand dieses Grundstücks geht verloren.`);
+      if (confirmed) removePlot(plot.id);
     }
   }
 };

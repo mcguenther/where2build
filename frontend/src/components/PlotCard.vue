@@ -1,40 +1,40 @@
 <template>
-  <article class="karte tafel" :class="{ 'karte--gewaehlt': gewaehlt }">
+  <article class="karte tafel" :class="{ 'karte--gewaehlt': selected }">
     <label class="karte__wahl">
-      <input type="checkbox" :checked="gewaehlt" :aria-label="`${plot.name} für den Vergleich auswählen`"
-             @change="$emit('auswaehlen', $event.target.checked)">
+      <input type="checkbox" :checked="selected" :aria-label="`${plot.name} für den Vergleich auswählen`"
+             @change="$emit('select', $event.target.checked)">
       Vergleich
     </label>
 
-    <button type="button" class="karte__riss" :aria-label="`Lageplan ${plot.name} öffnen`" @click="$emit('oeffnen')">
-      <SitePlan :plot="plot" :koerper="koerper" :breite="300" :hoehe="196" kompakt />
+    <button type="button" class="karte__riss" :aria-label="`Lageplan ${plot.name} öffnen`" @click="$emit('open')">
+      <SitePlan :plot="plot" :building="building" :width="300" :height="196" compact />
     </button>
 
     <div class="karte__rumpf">
-      <h3><button type="button" class="karte__titel" @click="$emit('oeffnen')">{{ plot.name }}</button></h3>
+      <h3><button type="button" class="karte__titel" @click="$emit('open')">{{ plot.name }}</button></h3>
       <p class="karte__ort">{{ plot.ort }} · Flst. {{ plot.flurstuecke.join(" · ") }}</p>
 
       <dl class="karte__werte">
-        <dt>Fläche</dt><dd>{{ area(plot.flaecheAmtlich) }}</dd>
-        <dt>Kaufpreis</dt><dd>{{ euro(plot.kaufpreis) }}</dd>
-        <dt>Je m²</dt><dd>{{ euroPerSqm(kennzahlen.jeQuadratmeter) }}</dd>
-        <dt v-if="erstesZiel">{{ erstesZiel.name }} · ÖPNV</dt>
-        <dd v-if="erstesZiel">{{ duration(erstesZielZeit) }}</dd>
+        <dt>Fläche</dt><dd>{{ area(plot.officialArea) }}</dd>
+        <dt>Kaufpreis</dt><dd>{{ euro(plot.askingPrice) }}</dd>
+        <dt>Je m²</dt><dd>{{ euroPerSqm(metrics.pricePerSqm) }}</dd>
+        <dt v-if="firstDestination">{{ firstDestination.name }} · ÖPNV</dt>
+        <dd v-if="firstDestination">{{ duration(firstDestinationTime) }}</dd>
       </dl>
 
       <div class="karte__marken">
-        <span class="chip" :class="`chip--${kennzahlen.abweichungKlasse}`">
-          <template v-if="kennzahlen.abweichung !== null">{{ percent(kennzahlen.abweichung) }} ggü. BRW</template>
+        <span class="chip" :class="`chip--${metrics.deviationClass}`">
+          <template v-if="metrics.deviation !== null">{{ percent(metrics.deviation) }} ggü. BRW</template>
           <template v-else>kein Kaufpreis</template>
         </span>
-        <span class="chip chip--gut">{{ kennzahlen.formklasse }}</span>
+        <span class="chip chip--gut">{{ metrics.shapeClass }}</span>
       </div>
     </div>
 
     <div class="karte__fuss">
-      <button type="button" class="knopf knopf--klein" @click="$emit('oeffnen')">Lageplan öffnen</button>
+      <button type="button" class="knopf knopf--klein" @click="$emit('open')">Lageplan öffnen</button>
       <div class="dehnen"></div>
-      <button type="button" class="knopf knopf--still knopf--klein" @click="$emit('entfernen')">Entfernen</button>
+      <button type="button" class="knopf knopf--still knopf--klein" @click="$emit('remove')">Entfernen</button>
     </div>
   </article>
 </template>
@@ -48,14 +48,14 @@ import { area, euro, euroPerSqm, percent, duration } from "../lib/format.js";
 export default {
   name: "PlotCard",
   components: { SitePlan },
-  props: { plot: { type: Object, required: true }, gewaehlt: { type: Boolean, default: false } },
-  emits: ["oeffnen", "entfernen", "auswaehlen"],
+  props: { plot: { type: Object, required: true }, selected: { type: Boolean, default: false } },
+  emits: ["open", "remove", "select"],
   computed: {
-    koerper() { return placement(this.plot); },
-    kennzahlen() { return plotMetrics(this.plot); },
-    erstesZiel() { return state.daten.ziele[0] || null; },
-    erstesZielZeit() {
-      const m = this.erstesZiel && this.plot.wege[this.erstesZiel.id]?.modi?.transit;
+    building() { return placement(this.plot); },
+    metrics() { return plotMetrics(this.plot); },
+    firstDestination() { return state.data.destinations[0] || null; },
+    firstDestinationTime() {
+      const m = this.firstDestination && this.plot.routes[this.firstDestination.id]?.modes?.transit;
       return m && m.erreichbar ? m.duration_s : null;
     }
   },

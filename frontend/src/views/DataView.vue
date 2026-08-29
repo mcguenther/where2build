@@ -14,18 +14,18 @@
 
     <div class="zweispalt">
       <section class="tafel">
-        <div class="tafel__kopf"><h3>Ausgeben</h3><div class="dehnen"></div><span class="chip">{{ groesse }}</span></div>
+        <div class="tafel__kopf"><h3>Ausgeben</h3><div class="dehnen"></div><span class="chip">{{ size }}</span></div>
         <div class="tafel__leib stapel">
           <p class="hinweis">
             Der vollständige Stand: Grundstücke samt Geometrie und Baukörperlage, Haustypen,
             Ziele und Wegezeiten.
           </p>
-          <textarea class="datenfeld" readonly :value="ausgabe" aria-label="Ausgegebene Daten als JSON"></textarea>
+          <textarea class="datenfeld" readonly :value="output" aria-label="Ausgegebene Daten als JSON"></textarea>
           <div class="reihe">
-            <button type="button" class="knopf" @click="kopieren">In die Zwischenablage</button>
-            <button type="button" class="knopf knopf--zweit" @click="alsDatei">Als Datei sichern</button>
+            <button type="button" class="knopf" @click="copyToClipboard">In die Zwischenablage</button>
+            <button type="button" class="knopf knopf--zweit" @click="downloadFile">Als Datei sichern</button>
           </div>
-          <p v-if="meldungAus" class="band" :class="{ 'band--fehler': fehlerAus, 'band--gut': !fehlerAus }">{{ meldungAus }}</p>
+          <p v-if="exportMessage" class="band" :class="{ 'band--fehler': exportFailed, 'band--gut': !exportFailed }">{{ exportMessage }}</p>
         </div>
       </section>
 
@@ -36,17 +36,17 @@
             JSON einfügen oder eine gesicherte Datei wählen. Der bisherige Stand wird ersetzt —
             vorher ausgeben, wenn er noch gebraucht wird.
           </p>
-          <textarea class="datenfeld" v-model="eingabe"
+          <textarea class="datenfeld" v-model="input"
                     placeholder="Hier den gesicherten JSON-Stand einfügen"
                     aria-label="Einzulesende Daten als JSON"></textarea>
           <div class="reihe">
-            <button type="button" class="knopf" @click="einlesen">Einlesen</button>
+            <button type="button" class="knopf" @click="runImport">Einlesen</button>
             <label class="knopf knopf--zweit dateiwahl">
               Datei wählen
-              <input type="file" accept="application/json,.json" @change="datei">
+              <input type="file" accept="application/json,.json" @change="pickFile">
             </label>
           </div>
-          <p v-if="meldungEin" class="band" :class="{ 'band--fehler': fehlerEin, 'band--gut': !fehlerEin }">{{ meldungEin }}</p>
+          <p v-if="importMessage" class="band" :class="{ 'band--fehler': importFailed, 'band--gut': !importFailed }">{{ importMessage }}</p>
         </div>
       </section>
     </div>
@@ -58,7 +58,7 @@
           Leert den Browser-Speicher: alle Grundstücke, Haustypen und Ziele. Vorher
           ausgeben, wenn der Stand noch gebraucht wird.
         </p>
-        <button type="button" class="knopf knopf--still" @click="alleLoeschen">
+        <button type="button" class="knopf knopf--still" @click="clearAll">
           Alles löschen
         </button>
       </div>
@@ -67,74 +67,74 @@
 </template>
 
 <script>
-import { state, exportJson, importJson, leeren } from "../lib/store.js";
+import { exportJson, importJson, clear } from "../lib/store.js";
 
 export default {
   name: "DataView",
   data() {
-    return { eingabe: "", meldungAus: "", fehlerAus: false, meldungEin: "", fehlerEin: false, stand: 0 };
+    return { input: "", exportMessage: "", exportFailed: false, importMessage: "", importFailed: false, revision: 0 };
   },
   computed: {
-    ausgabe() {
-      this.stand; // re-read after an import or reset
+    output() {
+      this.revision; // re-read after an import or reset
       return exportJson();
     },
-    groesse() { return `${(new Blob([this.ausgabe]).size / 1024).toFixed(1)} kB`; }
+    size() { return `${(new Blob([this.output]).size / 1024).toFixed(1)} kB`; }
   },
   methods: {
-    async kopieren() {
+    async copyToClipboard() {
       try {
-        await navigator.clipboard.writeText(this.ausgabe);
-        this.melden("aus", "In die Zwischenablage gelegt.");
+        await navigator.clipboard.writeText(this.output);
+        this.report("export", "In die Zwischenablage gelegt.");
       } catch {
-        this.melden("aus", "Der Browser lässt das Kopieren nicht zu — den Text im Feld markieren und Strg+C.", true);
+        this.report("export", "Der Browser lässt das Kopieren nicht zu — den Text im Feld markieren und Strg+C.", true);
       }
     },
-    alsDatei() {
+    downloadFile() {
       try {
         const a = document.createElement("a");
-        const blob = new Blob([this.ausgabe], { type: "application/json" });
+        const blob = new Blob([this.output], { type: "application/json" });
         a.href = URL.createObjectURL(blob);
         a.download = `where2build-${new Date().toISOString().slice(0, 10)}.json`;
         document.body.appendChild(a);
         a.click();
         a.remove();
         setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-        this.melden("aus", "Datei gesichert.");
+        this.report("export", "Datei gesichert.");
       } catch {
-        this.melden("aus", "Sichern hier nicht möglich — bitte über die Zwischenablage.", true);
+        this.report("export", "Sichern hier nicht möglich — bitte über die Zwischenablage.", true);
       }
     },
-    einlesen() {
+    runImport() {
       try {
-        const d = importJson(this.eingabe);
-        this.stand++;
-        this.eingabe = "";
-        this.melden("ein", `Übernommen: ${d.grundstuecke.length} Grundstücke, ${d.haustypen.length} Haustypen, ${d.ziele.length} Ziele.`);
-      } catch (fehler) {
-        this.melden("ein", `Nicht übernommen: ${fehler.message}`, true);
+        const d = importJson(this.input);
+        this.revision++;
+        this.input = "";
+        this.report("import", `Übernommen: ${d.plots.length} Grundstücke, ${d.houseTypes.length} Haustypen, ${d.destinations.length} Ziele.`);
+      } catch (error) {
+        this.report("import", `Nicht übernommen: ${error.message}`, true);
       }
     },
-    async datei(ereignis) {
-      const f = ereignis.target.files?.[0];
-      if (!f) return;
+    async pickFile(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
       try {
-        this.eingabe = await f.text();
-        this.einlesen();
+        this.input = await file.text();
+        this.runImport();
       } catch {
-        this.melden("ein", "Die Datei ließ sich nicht lesen.", true);
+        this.report("import", "Die Datei ließ sich nicht lesen.", true);
       }
-      ereignis.target.value = "";
+      event.target.value = "";
     },
-    alleLoeschen() {
+    clearAll() {
       if (!window.confirm("Alles löschen? Der jetzige Stand geht verloren.")) return;
-      leeren();
-      this.stand++;
-      this.melden("ein", "Der Speicher ist geleert.");
+      clear();
+      this.revision++;
+      this.report("import", "Der Speicher ist geleert.");
     },
-    melden(wo, text, fehler = false) {
-      if (wo === "aus") { this.meldungAus = text; this.fehlerAus = fehler; }
-      else { this.meldungEin = text; this.fehlerEin = fehler; }
+    report(where, text, failed = false) {
+      if (where === "export") { this.exportMessage = text; this.exportFailed = failed; }
+      else { this.importMessage = text; this.importFailed = failed; }
     }
   }
 };

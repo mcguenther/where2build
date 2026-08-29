@@ -12,34 +12,34 @@ import PlotView from "../src/views/PlotView.vue";
 import HouseTypesView from "../src/views/HouseTypesView.vue";
 import CompareView from "../src/views/CompareView.vue";
 import { state, placement, plotById } from "../src/lib/store.js";
-import { echterStand } from "./hilfe.js";
+import { realState } from "./helpers.js";
 import { buildableArea, cornersOutside, alignmentToEdge, polygonArea, findPlacement } from "../src/lib/geometry.js";
 import { area } from "../src/lib/format.js";
 import { plotMetrics } from "../src/lib/metrics.js";
 
 beforeEach(() => {
   localStorage.clear();
-  state.daten = echterStand();
-  state.offenesGrundstueck = "gs-konkav";
-  // "ohne": mounting must not reach for a basemap. The backdrop is verified in
+  state.data = realState();
+  state.openPlotId = "plot-concave";
+  // "none": mounting must not reach for a basemap. The backdrop is verified in
   // the browser by scripts/screenshots.mjs, which fails if no tile arrives.
-  state.plan = { grund: "ohne", genordet: true, masse: true, saum: true, messen: false };
+  state.plan = { backdrop: "none", northUp: true, showDimensions: true, showSetbacks: true, measuring: false };
 });
 
-const plot = () => plotById("gs-konkav");
+const plot = () => plotById("plot-concave");
 
 describe("Lageplan", () => {
-  const bauen = (props = {}) =>
-    mount(SitePlan, { props: { plot: plot(), koerper: placement(plot()), ...props } });
+  const build = (props = {}) =>
+    mount(SitePlan, { props: { plot: plot(), building: placement(plot()), ...props } });
 
   it("zeichnet ohne NaN und ohne undefined", () => {
-    const html = bauen().html();
+    const html = build().html();
     expect(html).not.toMatch(/NaN/);
     expect(html).not.toMatch(/undefined/);
   });
 
   it("färbt den Randstreifen, nicht den bebaubaren Bereich", () => {
-    const w = bauen();
+    const w = build();
     const ring = w.find("path[fill-rule='evenodd']");
     expect(ring.exists()).toBe(true);
     expect(ring.attributes("fill")).toBe("var(--w2b-karte-saum)");
@@ -48,130 +48,130 @@ describe("Lageplan", () => {
   });
 
   it("lässt den Randstreifen abschalten", () => {
-    expect(bauen({ saum: false }).find("path[fill-rule='evenodd']").exists()).toBe(false);
+    expect(build({ showSetbacks: false }).find("path[fill-rule='evenodd']").exists()).toBe(false);
   });
 
   it("verzichtet in der Miniatur auf Maßketten und Maßstabsleiste", () => {
-    const gross = bauen(), klein = bauen({ kompakt: true });
-    expect(gross.findAll("marker").length).toBeGreaterThan(0);
-    expect(gross.text()).toMatch(/\d+,\d\d m/);
-    expect(klein.text()).not.toMatch(/\d+,\d\d m/);
-    expect(klein.text()).not.toContain("20 m");
+    const large = build(), small = build({ compact: true });
+    expect(large.findAll("marker").length).toBeGreaterThan(0);
+    expect(large.text()).toMatch(/\d+,\d\d m/);
+    expect(small.text()).not.toMatch(/\d+,\d\d m/);
+    expect(small.text()).not.toContain("20 m");
   });
 
   it("steht genordet gerade und dreht auf die Straßenfront", () => {
-    expect(bauen({ genordet: true }).find("g[transform^='rotate']").attributes("transform")).toMatch(/^rotate\(0,/);
-    const parallel = bauen({ genordet: false });
-    const winkel = Number(parallel.find("g[transform^='rotate']").attributes("transform").match(/rotate\(([-\d.]+),/)[1]);
-    expect(winkel).toBeCloseTo(alignmentToEdge(plot().polygon, plot().strassenkante ?? 0), 1);
+    expect(build({ northUp: true }).find("g[transform^='rotate']").attributes("transform")).toMatch(/^rotate\(0,/);
+    const parallel = build({ northUp: false });
+    const angle = Number(parallel.find("g[transform^='rotate']").attributes("transform").match(/rotate\(([-\d.]+),/)[1]);
+    expect(angle).toBeCloseTo(alignmentToEdge(plot().polygon, plot().streetEdge ?? 0), 1);
   });
 
   it("markiert den Verstoß, sobald der Baukörper hinausragt", () => {
-    const fenster = buildableArea(plot().polygon, plot().tiefen);
-    const lage = findPlacement(fenster, 11.44, 8.47);
-    expect(lage).not.toBeNull();
-    const drin = bauen({ koerper: { ...lage, width: 11.44, depth: 8.47 } });
-    expect(drin.find("[data-haus] polygon").attributes("stroke")).toBe("var(--w2b-karte-entwurf-rand)");
-    const weit = { ...placement(plot()), width: 200, depth: 200 };
-    const raus = bauen({ koerper: weit });
-    expect(raus.find("[data-haus] polygon").attributes("stroke")).toBe("var(--w2b-karte-verstoss)");
-    expect(raus.findAll("[data-haus] circle").length).toBeGreaterThan(0);
+    const envelope = buildableArea(plot().polygon, plot().setbacks);
+    const fitting = findPlacement(envelope, 11.44, 8.47);
+    expect(fitting).not.toBeNull();
+    const inside = build({ building: { ...fitting, width: 11.44, depth: 8.47 } });
+    expect(inside.find("[data-haus] polygon").attributes("stroke")).toBe("var(--w2b-karte-entwurf-rand)");
+    const huge = { ...placement(plot()), width: 200, depth: 200 };
+    const outside = build({ building: huge });
+    expect(outside.find("[data-haus] polygon").attributes("stroke")).toBe("var(--w2b-karte-verstoss)");
+    expect(outside.findAll("[data-haus] circle").length).toBeGreaterThan(0);
   });
 
   it("meldet Verschiebungen per Pfeiltaste, grob und fein", async () => {
-    const w = bauen({ interaktiv: true });
+    const w = build({ interactive: true });
     await w.find("[data-haus]").trigger("keydown", { key: "ArrowUp" });
-    expect(w.emitted("verschieben")[0][0].cy).toBeCloseTo(placement(plot()).cy + 0.25, 6);
+    expect(w.emitted("move")[0][0].cy).toBeCloseTo(placement(plot()).cy + 0.25, 6);
     await w.find("[data-haus]").trigger("keydown", { key: "ArrowRight", shiftKey: true });
-    expect(w.emitted("verschieben")[1][0].cx).toBeCloseTo(placement(plot()).cx + 1, 6);
+    expect(w.emitted("move")[1][0].cx).toBeCloseTo(placement(plot()).cx + 1, 6);
   });
 
   it("ist ohne interaktiv nicht bedienbar", async () => {
-    const w = bauen();
+    const w = build();
     await w.find("[data-haus]").trigger("keydown", { key: "ArrowUp" });
-    expect(w.emitted("verschieben")).toBeUndefined();
+    expect(w.emitted("move")).toBeUndefined();
   });
 });
 
 describe("Messwerkzeug", () => {
-  const bauen = () => mount(SitePlan, {
-    props: { plot: plot(), koerper: placement(plot()), interaktiv: true, messen: true },
+  const build = () => mount(SitePlan, {
+    props: { plot: plot(), building: placement(plot()), interactive: true, measuring: true },
     attachTo: document.body
   });
 
   /** Dispatch a real pointer event: test-utils cannot set clientX on a MouseEvent. */
-  const klick = async (w, punkt) => {
-    const flaeche = w.vm.$refs.flaeche;
-    flaeche.getBoundingClientRect = () => ({ left: 0, top: 0, width: w.props("breite"), height: w.props("hoehe") });
-    flaeche.setPointerCapture = () => {};
-    flaeche.dispatchEvent(new MouseEvent("pointerdown", {
-      bubbles: true, clientX: w.vm.px(punkt.x), clientY: w.vm.py(punkt.y)
+  const click = async (w, point) => {
+    const svg = w.vm.$refs.svg;
+    svg.getBoundingClientRect = () => ({ left: 0, top: 0, width: w.props("width"), height: w.props("height") });
+    svg.setPointerCapture = () => {};
+    svg.dispatchEvent(new MouseEvent("pointerdown", {
+      bubbles: true, clientX: w.vm.px(point.x), clientY: w.vm.py(point.y)
     }));
     await w.vm.$nextTick();
   };
 
   it("misst die Strecke zwischen zwei angeklickten Punkten", async () => {
-    const w = bauen();
-    await klick(w, { x: 0, y: 0 });
-    await klick(w, { x: 30, y: 40 });     // 3-4-5, also 50 m
-    const [, zweite] = w.emitted("gemessen");
-    expect(zweite[0].punkte).toHaveLength(2);
-    expect(zweite[0].laenge).toBeCloseTo(50, 1);
+    const w = build();
+    await click(w, { x: 0, y: 0 });
+    await click(w, { x: 30, y: 40 });     // 3-4-5, also 50 m
+    const [, second] = w.emitted("measured");
+    expect(second[0].points).toHaveLength(2);
+    expect(second[0].length).toBeCloseTo(50, 1);
     expect(w.text()).toContain("50,0");
   });
 
   it("summiert einen Streckenzug über mehrere Abschnitte", async () => {
-    const w = bauen();
-    for (const p of [{ x: 0, y: 0 }, { x: 30, y: 40 }, { x: 30, y: 0 }]) await klick(w, p);
-    const letzte = w.emitted("gemessen").at(-1)[0];
-    expect(letzte.laenge).toBeCloseTo(90, 1);
+    const w = build();
+    for (const p of [{ x: 0, y: 0 }, { x: 30, y: 40 }, { x: 30, y: 0 }]) await click(w, p);
+    const last = w.emitted("measured").at(-1)[0];
+    expect(last.length).toBeCloseTo(90, 1);
     expect(w.text()).toContain("gesamt");
   });
 
   it("verschiebt beim Messen nicht den Baukörper", async () => {
-    const w = bauen();
-    await klick(w, { x: 0, y: 0 });
-    expect(w.emitted("verschieben")).toBeUndefined();
+    const w = build();
+    await click(w, { x: 0, y: 0 });
+    expect(w.emitted("move")).toBeUndefined();
   });
 
   it("räumt die Messung weg, sobald der Modus endet", async () => {
-    const w = bauen();
-    await klick(w, { x: 0, y: 0 });
-    expect(w.vm.messpunkte).toHaveLength(1);
-    await w.setProps({ messen: false });
-    expect(w.vm.messpunkte).toEqual([]);
+    const w = build();
+    await click(w, { x: 0, y: 0 });
+    expect(w.vm.measurePoints).toHaveLength(1);
+    await w.setProps({ measuring: false });
+    expect(w.vm.measurePoints).toEqual([]);
   });
 });
 
 describe("Grundstückskarte", () => {
   it("zeigt die amtlichen Zahlen des echten Flurstücks", () => {
-    const w = mount(PlotCard, { props: { plot: plot(), gewaehlt: true } });
+    const w = mount(PlotCard, { props: { plot: plot(), selected: true } });
     expect(w.text()).toContain("1.685 m²");
     expect(w.text()).toMatch(/\d+,\d\d €/);
     expect(w.text()).toMatch(/komplex|rechteckig/);
   });
 
   it("meldet Öffnen, Entfernen und Auswahl", async () => {
-    const w = mount(PlotCard, { props: { plot: plot(), gewaehlt: false } });
+    const w = mount(PlotCard, { props: { plot: plot(), selected: false } });
     await w.find(".karte__riss").trigger("click");
-    expect(w.emitted("oeffnen")).toBeTruthy();
+    expect(w.emitted("open")).toBeTruthy();
     await w.findAll(".karte__fuss button")[1].trigger("click");
-    expect(w.emitted("entfernen")).toBeTruthy();
+    expect(w.emitted("remove")).toBeTruthy();
     await w.find(".karte__wahl input").setValue(true);
-    expect(w.emitted("auswaehlen")[0]).toEqual([true]);
+    expect(w.emitted("select")[0]).toEqual([true]);
   });
 });
 
 describe("Leere Zustände", () => {
   it("bietet die Aufnahme an, wenn noch nichts da ist", () => {
-    state.daten = { version: 1, grundstuecke: [], haustypen: [], ziele: [], auswahl: [] };
+    state.data = { version: 2, plots: [], houseTypes: [], destinations: [], selection: [] };
     const t = mount(PlotsView).text();
     expect(t).toContain("Noch nichts in der Prüfung");
     expect(t).toContain("Grundstück hinzufügen");
   });
 
   it("sagt beim Haustyp-Katalog, dass er leer ist", () => {
-    state.daten.haustypen = [];
+    state.data.houseTypes = [];
     const t = mount(HouseTypesView).text();
     expect(t).toContain("Noch kein Haustyp im Katalog");
   });
@@ -185,8 +185,8 @@ describe("Leere Zustände", () => {
   });
 
   it("zeigt keine erfundenen Wege, wenn das Ziel verortet, aber nichts gerechnet ist", () => {
-    state.daten.ziele[0].lat = 51.3397;
-    state.daten.ziele[0].lon = 12.3731;
+    state.data.destinations[0].lat = 51.3397;
+    state.data.destinations[0].lon = 12.3731;
     const w = mount(RouteCards, { props: { plot: plot() } });
     expect(w.text()).toContain("Noch nicht berechnet");
     expect(w.text()).not.toMatch(/\d+ min/);
@@ -194,7 +194,7 @@ describe("Leere Zustände", () => {
   });
 
   it("sagt es, wenn keine Ziele hinterlegt sind", () => {
-    state.daten.ziele = [];
+    state.data.destinations = [];
     expect(mount(RouteCards, { props: { plot: plot() } }).text()).toContain("Noch keine Ziele");
   });
 });
@@ -203,25 +203,25 @@ describe("Kartenhintergrund", () => {
   it("legt ohne ausgewählten Grund gar keine Karte an", () => {
     // Every backdrop is a MapLibre instance. The small plans on cards and in
     // the comparison must not each start one.
-    const w = mount(SitePlan, { props: { plot: plot(), koerper: placement(plot()) } });
-    expect(w.props("grund")).toBe("ohne");
+    const w = mount(SitePlan, { props: { plot: plot(), building: placement(plot()) } });
+    expect(w.props("backdrop")).toBe("none");
     expect(w.find(".lageplan__karte").exists()).toBe(false);
   });
 
   it("bietet alle Gründe an, sperrt sie aber ohne Koordinate", async () => {
-    const ohneAnker = { ...plot() };
-    delete ohneAnker.anker;
-    state.daten.grundstuecke = [ohneAnker];
-    state.offenesGrundstueck = ohneAnker.id;
-    const knoepfe = mount(PlotView).findAll('[aria-label="Kartenhintergrund"] button');
-    expect(knoepfe.map(k => k.text())).toEqual(["Ohne", "Karte", "Luftbild", "Kataster"]);
-    expect(knoepfe[0].attributes("disabled")).toBeUndefined();
-    knoepfe.slice(1).forEach(k => expect(k.attributes("disabled")).toBeDefined());
+    const withoutAnchor = { ...plot() };
+    delete withoutAnchor.anchor;
+    state.data.plots = [withoutAnchor];
+    state.openPlotId = withoutAnchor.id;
+    const buttons = mount(PlotView).findAll('[aria-label="Kartenhintergrund"] button');
+    expect(buttons.map(b => b.text())).toEqual(["Ohne", "Karte", "Luftbild", "Kataster"]);
+    expect(buttons[0].attributes("disabled")).toBeUndefined();
+    buttons.slice(1).forEach(b => expect(b.attributes("disabled")).toBeDefined());
   });
 
   it("gibt die Gründe frei, sobald eine Koordinate da ist", () => {
-    const knoepfe = mount(PlotView).findAll('[aria-label="Kartenhintergrund"] button');
-    knoepfe.forEach(k => expect(k.attributes("disabled")).toBeUndefined());
+    const buttons = mount(PlotView).findAll('[aria-label="Kartenhintergrund"] button');
+    buttons.forEach(b => expect(b.attributes("disabled")).toBeUndefined());
   });
 });
 
@@ -229,15 +229,15 @@ describe("Preis ohne Kaufpreis", () => {
   it("rechnet nichts aus, was es nicht gibt", () => {
     // ALKIS knows the parcel; only the listing knows the asking price. Without
     // it the old code printed "0,00 €" and "-100 % under the land value".
-    const ohnePreis = { ...plot(), kaufpreis: null };
-    const werte = plotMetrics(ohnePreis);
-    expect(werte.jeQuadratmeter).toBeNull();
-    expect(werte.abweichung).toBeNull();
-    expect(werte.abweichungKlasse).toBe("unbekannt");
+    const withoutPrice = { ...plot(), askingPrice: null };
+    const metrics = plotMetrics(withoutPrice);
+    expect(metrics.pricePerSqm).toBeNull();
+    expect(metrics.deviation).toBeNull();
+    expect(metrics.deviationClass).toBe("unbekannt");
   });
 
   it("sagt auf der Seite, dass der Vergleich fehlt, statt −100 % zu zeigen", () => {
-    plot().kaufpreis = null;
+    plot().askingPrice = null;
     const t = mount(PlotView).text();
     expect(t).toContain("Ohne Kaufpreis lässt sich das Angebot nicht");
     expect(t).toContain("Kaufpreis—");        // an em dash, not a number
@@ -246,8 +246,8 @@ describe("Preis ohne Kaufpreis", () => {
   });
 
   it("beschriftet die Karte des Grundstücks entsprechend", () => {
-    plot().kaufpreis = null;
-    const t = mount(PlotCard, { props: { plot: plot(), gewaehlt: false } }).text();
+    plot().askingPrice = null;
+    const t = mount(PlotCard, { props: { plot: plot(), selected: false } }).text();
     expect(t).toContain("kein Kaufpreis");
   });
 });
@@ -273,85 +273,85 @@ describe("Grundstücksseite", () => {
   it("richtet den Baukörper an der Straße aus und lässt ihn im Fenster", async () => {
     const w = mount(PlotView);
     const p = plot();
-    p.haus.rotation = 40;
+    p.house.rotation = 40;
     await w.findAll("button").find(b => b.text().includes("An der Straße ausrichten")).trigger("click");
-    expect(p.haus.rotation).toBeCloseTo(alignmentToEdge(p.polygon, p.strassenkante ?? 0), 0);
-    expect(cornersOutside(placement(p), buildableArea(p.polygon, p.tiefen))).toBe(0);
+    expect(p.house.rotation).toBeCloseTo(alignmentToEdge(p.polygon, p.streetEdge ?? 0), 0);
+    expect(cornersOutside(placement(p), buildableArea(p.polygon, p.setbacks))).toBe(0);
   });
 
   it("koppelt die Abstandstiefe an die Wandhöhe, mit 3 m als Mindestmaß", async () => {
     const w = mount(PlotView);
     const p = plot();
     await w.find("#wandhoehe").setValue("10");
-    expect(p.tiefen.every(t => Math.abs(t - 4) < 0.05)).toBe(true);
+    expect(p.setbacks.every(d => Math.abs(d - 4) < 0.05)).toBe(true);
     await w.find("#wandhoehe").setValue("4");
-    expect(p.tiefen.every(t => t === 3)).toBe(true);
+    expect(p.setbacks.every(d => d === 3)).toBe(true);
   });
 
   it("erlaubt eigene Maße und hält sie in den Grenzen", async () => {
     const w = mount(PlotView);
-    await w.find("#haustyp").setValue("eigen");
-    expect(plot().haustypId).toBe("eigen");
+    await w.find("#haustyp").setValue("custom");
+    expect(plot().houseTypeId).toBe("custom");
     await w.find("#em-laenge").setValue("13");
     expect(placement(plot()).width).toBe(13);
     await w.find("#em-laenge").setValue("99");
-    expect(plot().eigenmass.laenge).toBe(30);
+    expect(plot().customSize.length).toBe(30);
     await w.find("#em-breite").setValue("1");
-    expect(plot().eigenmass.breite).toBe(4);
+    expect(plot().customSize.width).toBe(4);
   });
 
   it("schaltet das Messen ein und wieder aus", async () => {
     const w = mount(PlotView);
-    const knopf = w.findAll("button").find(b => b.text().trim() === "Messen");
-    await knopf.trigger("click");
-    expect(state.plan.messen).toBe(true);
+    const button = w.findAll("button").find(b => b.text().trim() === "Messen");
+    await button.trigger("click");
+    expect(state.plan.measuring).toBe(true);
     expect(w.text()).toContain("Auf den Plan klicken");
-    await knopf.trigger("click");
-    expect(state.plan.messen).toBe(false);
+    await button.trigger("click");
+    expect(state.plan.measuring).toBe(false);
   });
 });
 
 describe("Haustypen", () => {
   it("prüft je Grundstück, ob der Baukörper passt", () => {
     const w = mount(HouseTypesView);
-    const kopfzeilen = w.findAll(".passt__kopf").map(n => n.text());
-    expect(kopfzeilen).toHaveLength(state.daten.haustypen.length);
-    kopfzeilen.forEach(z => expect(z).toMatch(/^Passt auf \d von 2 Grundstücken$/));
+    const headings = w.findAll(".passt__kopf").map(n => n.text());
+    expect(headings).toHaveLength(state.data.houseTypes.length);
+    headings.forEach(h => expect(h).toMatch(/^Passt auf \d von 2 Grundstücken$/));
   });
 
   it("setzt einen Typ auf ein Grundstück und öffnet es zulässig", async () => {
     const w = mount(HouseTypesView);
-    const knopf = w.findAll(".passt__knopf")[0];
-    if (!knopf) return;                       // kein Typ passt auf ein Grundstück
-    await knopf.trigger("click");
-    expect(state.ansicht).toBe("grundstueck");
-    const p = plotById(state.offenesGrundstueck);
-    expect(cornersOutside(placement(p), buildableArea(p.polygon, p.tiefen))).toBe(0);
+    const button = w.findAll(".passt__knopf")[0];
+    if (!button) return;                      // kein Typ passt auf ein Grundstück
+    await button.trigger("click");
+    expect(state.view).toBe("plot");
+    const p = plotById(state.openPlotId);
+    expect(cornersOutside(placement(p), buildableArea(p.polygon, p.setbacks))).toBe(0);
   });
 
   it("nimmt von Hand eingetragene Maße auf", async () => {
     const w = mount(HouseTypesView);
-    const vorher = state.daten.haustypen.length;
+    const before = state.data.houseTypes.length;
     await w.findAll(".seitenkopf .knopf")[0].trigger("click");
     await w.find("#e-laenge").setValue(12);
     await w.find("#e-breite").setValue(9);
     await w.findAll("button").find(b => b.text().trim() === "In den Katalog").trigger("click");
-    expect(state.daten.haustypen).toHaveLength(vorher + 1);
-    expect(state.daten.haustypen.at(-1).bebauteFlaeche).toBe(108);
+    expect(state.data.houseTypes).toHaveLength(before + 1);
+    expect(state.data.houseTypes.at(-1).builtArea).toBe(108);
   });
 });
 
 describe("Vergleich", () => {
   it("zeichnet alle Grundrisse im selben Maßstab", () => {
     const w = mount(CompareView);
-    const massstaebe = new Set(w.findAllComponents({ name: "SitePlan" }).map(p => p.props("massstab")));
-    expect(massstaebe.size).toBe(1);
-    expect(w.vm.gemeinsamerMassstab).toBeGreaterThan(0);
+    const scales = new Set(w.findAllComponents({ name: "SitePlan" }).map(p => p.props("scale")));
+    expect(scales.size).toBe(1);
+    expect(w.vm.sharedScale).toBeGreaterThan(0);
     expect(w.text()).toMatch(/rund 1 : \d+/);
   });
 
   it("listet nur die ausgewählten Kandidaten", () => {
-    state.daten.auswahl = ["gs-konkav"];
+    state.data.selection = ["plot-concave"];
     expect(mount(CompareView).findAll("tbody tr")).toHaveLength(1);
   });
 });

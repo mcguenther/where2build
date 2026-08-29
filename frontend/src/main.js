@@ -20,11 +20,11 @@ import "./styles/print.css";
  * single error. Vite emits the worker as its own asset here, and MapLibre is
  * told where it landed. */
 import { setWorkerUrl } from "maplibre-gl";
-import kartenArbeiterUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
+import mapWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 
 import { createApp } from "vue";
 import App from "./App.vue";
 
-setWorkerUrl(kartenArbeiterUrl);
+setWorkerUrl(mapWorkerUrl);
 
 createApp(App).mount("#app");

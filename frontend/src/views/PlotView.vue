@@ -1,7 +1,7 @@
 <template>
   <div v-if="plot" class="stapel grundstueck-seite">
     <nav class="krume nicht-drucken" aria-label="Pfad">
-      <button type="button" @click="zurueck">Grundstücke</button>
+      <button type="button" @click="back">Grundstücke</button>
       <span aria-hidden="true">›</span>
       <span>{{ plot.name }}</span>
     </nav>
@@ -11,16 +11,16 @@
         <p class="marke-klein">Gemarkung {{ plot.gemarkung }} · {{ plot.flurstuecke.length }} Flurstück{{ plot.flurstuecke.length > 1 ? 'e' : '' }}</p>
         <h1>{{ plot.name }}</h1>
         <p class="seitenkopf__unter">
-          {{ plot.ort }} · Flurstück {{ plot.flurstuecke.join(" und ") }} ·
-          {{ area(plot.flaecheAmtlich) }} · {{ euro(plot.kaufpreis) }}
+          {{ plot.municipality }} · Flurstück {{ plot.flurstuecke.join(" und ") }} ·
+          {{ area(plot.officialArea) }} · {{ euro(plot.askingPrice) }}
         </p>
-        <p v-if="plot.notiz" class="seitenkopf__notiz">{{ plot.notiz }}</p>
+        <p v-if="plot.note" class="seitenkopf__notiz">{{ plot.note }}</p>
       </div>
       <div class="dehnen"></div>
       <div class="reihe nicht-drucken">
-        <button type="button" class="knopf knopf--still" :disabled="!vorheriges" @click="blaettern(-1)">‹ Voriges</button>
-        <button type="button" class="knopf knopf--still" :disabled="!naechstes" @click="blaettern(1)">Nächstes ›</button>
-        <button type="button" class="knopf knopf--zweit" @click="drucken">Drucken</button>
+        <button type="button" class="knopf knopf--still" :disabled="!hasPrevious" @click="step(-1)">‹ Voriges</button>
+        <button type="button" class="knopf knopf--still" :disabled="!hasNext" @click="step(1)">Nächstes ›</button>
+        <button type="button" class="knopf knopf--zweit" @click="print">Drucken</button>
       </div>
     </div>
 
@@ -29,52 +29,52 @@
         <div class="planleiste nicht-drucken">
           <span class="planleiste__schild">Grund</span>
           <div class="schaltgruppe" role="group" aria-label="Kartenhintergrund">
-            <button v-for="g in gruende" :key="g.id" type="button"
-                    :disabled="g.id !== 'ohne' && !hatAnker"
-                    :title="g.id !== 'ohne' && !hatAnker ? 'Ohne Koordinate lässt sich keine Karte darunterlegen.' : null"
-                    :aria-pressed="String(state.plan.grund === g.id)"
-                    @click="state.plan.grund = g.id">{{ g.name }}</button>
+            <button v-for="b in backdrops" :key="b.id" type="button"
+                    :disabled="b.id !== 'none' && !hasAnchor"
+                    :title="b.id !== 'none' && !hasAnchor ? 'Ohne Koordinate lässt sich keine Karte darunterlegen.' : null"
+                    :aria-pressed="String(state.plan.backdrop === b.id)"
+                    @click="state.plan.backdrop = b.id">{{ b.name }}</button>
           </div>
           <span class="planleiste__schild">Ausrichtung</span>
           <div class="schaltgruppe" role="group" aria-label="Kartenausrichtung">
-            <button type="button" :aria-pressed="String(state.plan.genordet)"
-                    @click="state.plan.genordet = true">Genordet</button>
-            <button type="button" :aria-pressed="String(!state.plan.genordet)"
-                    @click="state.plan.genordet = false">Straßenparallel</button>
+            <button type="button" :aria-pressed="String(state.plan.northUp)"
+                    @click="state.plan.northUp = true">Genordet</button>
+            <button type="button" :aria-pressed="String(!state.plan.northUp)"
+                    @click="state.plan.northUp = false">Straßenparallel</button>
           </div>
           <div class="dehnen"></div>
-          <button type="button" class="schalter" :aria-pressed="String(state.plan.masse)"
-                  @click="state.plan.masse = !state.plan.masse">Maße</button>
-          <button type="button" class="schalter" :aria-pressed="String(state.plan.saum)"
-                  @click="state.plan.saum = !state.plan.saum">Abstandsflächen</button>
-          <button type="button" class="schalter" :aria-pressed="String(state.plan.messen)"
-                  @click="messenUmschalten">Messen</button>
+          <button type="button" class="schalter" :aria-pressed="String(state.plan.showDimensions)"
+                  @click="state.plan.showDimensions = !state.plan.showDimensions">Maße</button>
+          <button type="button" class="schalter" :aria-pressed="String(state.plan.showSetbacks)"
+                  @click="state.plan.showSetbacks = !state.plan.showSetbacks">Abstandsflächen</button>
+          <button type="button" class="schalter" :aria-pressed="String(state.plan.measuring)"
+                  @click="toggleMeasuring">Messen</button>
         </div>
 
-        <p class="band" :class="verstoss ? 'band--fehler' : 'band--gut'" role="status">
-          <span v-if="verstoss">
-            <b>{{ ausreisser }} Gebäudeecke{{ ausreisser > 1 ? 'n liegen' : ' liegt' }} außerhalb des Bebauungsfensters.</b>
-            Geringster Grenzabstand {{ metres(engsterAbstand) }}.
+        <p class="band" :class="violation ? 'band--fehler' : 'band--gut'" role="status">
+          <span v-if="violation">
+            <b>{{ outliers }} Gebäudeecke{{ outliers > 1 ? 'n liegen' : ' liegt' }} außerhalb des Bebauungsfensters.</b>
+            Geringster Grenzabstand {{ metres(narrowestSetback) }}.
           </span>
           <span v-else>
             <b>Baukörper liegt im Bebauungsfenster.</b>
-            Geringster Grenzabstand {{ metres(engsterAbstand) }}.
+            Geringster Grenzabstand {{ metres(narrowestSetback) }}.
           </span>
         </p>
 
-        <p v-if="state.plan.messen" class="band messband">
-          <span v-if="!messung.punkte.length">Auf den Plan klicken, um zu messen. Jeder weitere Klick verlängert den Streckenzug.</span>
-          <span v-else><b>{{ metres(messung.laenge) }}</b> über {{ messung.punkte.length - 1 }}
-            {{ messung.punkte.length === 2 ? "Abschnitt" : "Abschnitte" }}.</span>
-          <button v-if="messung.punkte.length" type="button" class="knopf knopf--still knopf--klein"
-                  style="margin-left:auto" @click="messungLoeschen">Zurücksetzen</button>
+        <p v-if="state.plan.measuring" class="band messband">
+          <span v-if="!measurement.points.length">Auf den Plan klicken, um zu messen. Jeder weitere Klick verlängert den Streckenzug.</span>
+          <span v-else><b>{{ metres(measurement.length) }}</b> über {{ measurement.points.length - 1 }}
+            {{ measurement.points.length === 2 ? "Abschnitt" : "Abschnitte" }}.</span>
+          <button v-if="measurement.points.length" type="button" class="knopf knopf--still knopf--klein"
+                  style="margin-left:auto" @click="clearMeasurement">Zurücksetzen</button>
         </p>
 
-        <SitePlan ref="plan" :plot="plot" :koerper="koerper" interaktiv
-                  :messen="state.plan.messen" @gemessen="m => (messung = m)"
-                  :grund="state.plan.grund" :genordet="state.plan.genordet"
-                  :masse="state.plan.masse" :saum="state.plan.saum"
-                  @verschieben="verschieben" />
+        <SitePlan ref="plan" :plot="plot" :building="building" interactive
+                  :measuring="state.plan.measuring" @measured="m => (measurement = m)"
+                  :backdrop="state.plan.backdrop" :north-up="state.plan.northUp"
+                  :show-dimensions="state.plan.showDimensions" :show-setbacks="state.plan.showSetbacks"
+                  @move="moveHouse" />
 
         <div class="planfuss">
           <span>ETRS89 / UTM33N — EPSG:25833</span>
@@ -88,10 +88,10 @@
           <dl class="werteliste">
             <dt>Gemarkung</dt><dd>{{ plot.gemarkung }}</dd>
             <dt>Flurstücke</dt><dd>{{ plot.flurstuecke.join(" · ") }}</dd>
-            <dt>Fläche amtlich</dt><dd>{{ area(plot.flaecheAmtlich) }}</dd>
-            <dt>Fläche gerechnet</dt><dd>{{ area(kennzahlen.flaecheGerechnet, 1) }}</dd>
+            <dt>Fläche amtlich</dt><dd>{{ area(plot.officialArea) }}</dd>
+            <dt>Fläche gerechnet</dt><dd>{{ area(metrics.computedArea, 1) }}</dd>
             <dt>Grenzpunkte</dt><dd>{{ plot.polygon.length }}</dd>
-            <dt>Straßenfront</dt><dd>{{ metres(kennzahlen.strassenfront) }}</dd>
+            <dt>Straßenfront</dt><dd>{{ metres(metrics.streetFrontage) }}</dd>
           </dl>
           <p class="tafel__fussnote">
             Für den Preisvergleich zählt die amtliche Fläche. Die aus dem Polygon
@@ -102,38 +102,38 @@
         <section class="tafel">
           <div class="tafel__kopf"><h3>Form</h3></div>
           <dl class="werteliste">
-            <dt>Rechteckigkeit</dt><dd>{{ num(kennzahlen.rechteckigkeit, 3) }}</dd>
-            <dt>Einstufung</dt><dd><span class="chip chip--gut">{{ kennzahlen.formklasse }}</span></dd>
-            <dt>Seitenverhältnis</dt><dd>1 : {{ num(seitenverhaeltnis) }}</dd>
-            <dt>Umschl. Rechteck</dt><dd>{{ num(kennzahlen.mrr.width, 1) }} × {{ num(kennzahlen.mrr.height, 1) }} m</dd>
+            <dt>Rechteckigkeit</dt><dd>{{ num(metrics.rectangularity, 3) }}</dd>
+            <dt>Einstufung</dt><dd><span class="chip chip--gut">{{ metrics.shapeClass }}</span></dd>
+            <dt>Seitenverhältnis</dt><dd>1 : {{ num(aspectRatio) }}</dd>
+            <dt>Umschl. Rechteck</dt><dd>{{ num(metrics.mrr.width, 1) }} × {{ num(metrics.mrr.height, 1) }} m</dd>
           </dl>
         </section>
 
         <section class="tafel">
           <div class="tafel__kopf"><h3>Preis</h3><div class="dehnen"></div><span class="chip">BORIS</span></div>
           <dl class="werteliste">
-            <dt>Kaufpreis</dt><dd>{{ euro(plot.kaufpreis) }}</dd>
-            <dt>Angebot je m²</dt><dd>{{ euroPerSqm(kennzahlen.jeQuadratmeter) }}</dd>
+            <dt>Kaufpreis</dt><dd>{{ euro(plot.askingPrice) }}</dd>
+            <dt>Angebot je m²</dt><dd>{{ euroPerSqm(metrics.pricePerSqm) }}</dd>
             <dt>Bodenrichtwert</dt><dd>{{ euroPerSqm(plot.bodenrichtwert) }} <span class="zart">Zone {{ plot.brwZone }}</span></dd>
-            <dt>Stichtag</dt><dd>{{ date(plot.brwStichtag) }}</dd>
+            <dt>Stichtag</dt><dd>{{ date(plot.brwReferenceDate) }}</dd>
           </dl>
           <div v-if="Number.isFinite(plot.bodenrichtwert)" class="preisband">
             <div class="preisband__skala">
               <div class="preisband__achse"></div>
-              <div class="preisband__spanne" :style="{ left: pos(plot.bodenrichtwert * .85) + '%', width: (pos(plot.bodenrichtwert * 1.15) - pos(plot.bodenrichtwert * .85)) + '%' }"></div>
-              <div class="preisband__brw" :style="{ left: pos(plot.bodenrichtwert) + '%' }"></div>
-              <div v-if="kennzahlen.jeQuadratmeter !== null" class="preisband__marke"
-                   :style="{ left: pos(kennzahlen.jeQuadratmeter) + '%' }"
-                   :title="`Angebot ${euroPerSqm(kennzahlen.jeQuadratmeter)}/m²`"></div>
+              <div class="preisband__spanne" :style="{ left: pricePosition(plot.bodenrichtwert * .85) + '%', width: (pricePosition(plot.bodenrichtwert * 1.15) - pricePosition(plot.bodenrichtwert * .85)) + '%' }"></div>
+              <div class="preisband__brw" :style="{ left: pricePosition(plot.bodenrichtwert) + '%' }"></div>
+              <div v-if="metrics.pricePerSqm !== null" class="preisband__marke"
+                   :style="{ left: pricePosition(metrics.pricePerSqm) + '%' }"
+                   :title="`Angebot ${euroPerSqm(metrics.pricePerSqm)}/m²`"></div>
             </div>
             <div class="preisband__achsentext">
-              <span>{{ Math.round(spanne.lo) }} €</span>
+              <span>{{ Math.round(priceRange.lo) }} €</span>
               <span>{{ Math.round(plot.bodenrichtwert) }} €</span>
-              <span>{{ Math.round(spanne.hi) }} €</span>
+              <span>{{ Math.round(priceRange.hi) }} €</span>
             </div>
-            <p v-if="kennzahlen.abweichung !== null" class="preisband__aussage">
-              Das Angebot liegt <b>{{ percent(kennzahlen.abweichung) }}
-              {{ kennzahlen.abweichung > 0 ? "über" : "unter" }} dem Bodenrichtwert</b> der Zone.
+            <p v-if="metrics.deviation !== null" class="preisband__aussage">
+              Das Angebot liegt <b>{{ percent(metrics.deviation) }}
+              {{ metrics.deviation > 0 ? "über" : "unter" }} dem Bodenrichtwert</b> der Zone.
             </p>
             <p v-else class="preisband__aussage">
               Ohne Kaufpreis lässt sich das Angebot nicht mit dem Bodenrichtwert vergleichen.
@@ -150,25 +150,25 @@
         <table class="liste abstands-tabelle">
           <thead><tr><th>Grenze</th><th class="zahl">Länge</th><th class="zahl">Tiefe</th></tr></thead>
           <tbody>
-            <tr v-for="(grenze, i) in grenzen" :key="i">
-              <td>{{ grenze.name }}</td>
-              <td class="zahl">{{ metres(grenze.laenge) }}</td>
+            <tr v-for="(boundary, i) in boundaries" :key="i">
+              <td>{{ boundary.name }}</td>
+              <td class="zahl">{{ metres(boundary.length) }}</td>
               <td class="zahl">
                 <input type="number" min="0" max="20" step="0.1" class="tiefe"
-                       :value="plot.tiefen[i]" :aria-label="`Abstandstiefe ${grenze.name}`"
-                       @input="tiefeSetzen(i, $event.target.value)">
+                       :value="plot.setbacks[i]" :aria-label="`Abstandstiefe ${boundary.name}`"
+                       @input="setSetback(i, $event.target.value)">
               </td>
             </tr>
           </tbody>
         </table>
         <div class="regler nicht-drucken">
           <label for="wandhoehe">Wandhöhe</label>
-          <output class="daten">{{ metres(plot.wandhoehe) }}</output>
+          <output class="daten">{{ metres(plot.wallHeight) }}</output>
           <input id="wandhoehe" type="range" min="2.5" max="12" step="0.1"
-                 :value="plot.wandhoehe" @input="wandhoeheSetzen($event.target.value)">
+                 :value="plot.wallHeight" @input="setWallHeight($event.target.value)">
           <p class="regler__hinweis">
-            0,4 · H = <b>{{ metres(plot.wandhoehe * 0.4) }}</b>
-            <template v-if="plot.wandhoehe * 0.4 < 3"> — unter dem Mindestmaß von 3 m, deshalb greift der Mindestwert.</template>
+            0,4 · H = <b>{{ metres(plot.wallHeight * 0.4) }}</b>
+            <template v-if="plot.wallHeight * 0.4 < 3"> — unter dem Mindestmaß von 3 m, deshalb greift der Mindestwert.</template>
             <template v-else> — maßgeblich, weil größer als das Mindestmaß von 3 m.</template>
           </p>
         </div>
@@ -178,67 +178,67 @@
         <div class="tafel__kopf"><h3>Baukörper</h3></div>
         <div class="feld feld--gerahmt nicht-drucken">
           <label for="haustyp">Haustyp</label>
-          <select id="haustyp" :value="plot.haustypId" @change="haustypSetzen($event.target.value)">
-            <option v-for="h in state.daten.haustypen" :key="h.id" :value="h.id">
-              {{ h.hersteller }} {{ h.name }} — {{ num(h.bebauteFlaeche) }} m² bebaut
+          <select id="haustyp" :value="plot.houseTypeId" @change="setHouseType($event.target.value)">
+            <option v-for="h in state.data.houseTypes" :key="h.id" :value="h.id">
+              {{ h.manufacturer }} {{ h.name }} — {{ num(h.builtArea) }} m² bebaut
             </option>
-            <option :value="EIGENMASS">Eigene Maße …</option>
+            <option :value="CUSTOM_SIZE">Eigene Maße …</option>
           </select>
         </div>
 
-        <div v-if="istEigenmass" class="eigenmass nicht-drucken">
+        <div v-if="isCustomSize" class="eigenmass nicht-drucken">
           <div class="feld">
             <label for="em-laenge">Länge</label>
             <input id="em-laenge" type="number" min="4" max="30" step="0.1"
-                   :value="eigenmass.laenge" @input="eigenmassSetzen('laenge', $event.target.value)">
+                   :value="customSize.length" @input="setCustomSize('length', $event.target.value)">
           </div>
           <div class="feld">
             <label for="em-breite">Breite</label>
             <input id="em-breite" type="number" min="4" max="30" step="0.1"
-                   :value="eigenmass.breite" @input="eigenmassSetzen('breite', $event.target.value)">
+                   :value="customSize.width" @input="setCustomSize('width', $event.target.value)">
           </div>
           <p class="eigenmass__hinweis">
-            Ergibt {{ area(eigenmass.laenge * eigenmass.breite, 1) }} bebaute Fläche.
+            Ergibt {{ area(customSize.length * customSize.width, 1) }} bebaute Fläche.
             Kantenlängen unter 4 m oder über 30 m sind kein Haus, sondern ein Tippfehler.
           </p>
-          <button type="button" class="knopf knopf--zweit knopf--klein" @click="alsHaustypSichern">
+          <button type="button" class="knopf knopf--zweit knopf--klein" @click="saveAsHouseType">
             Als Haustyp in den Katalog
           </button>
         </div>
 
         <dl class="werteliste">
-          <dt>Bebaute Fläche</dt><dd>{{ area(bebauteFlaeche, 2) }}</dd>
-          <dt v-if="haustyp">Wohnfläche ges.</dt><dd v-if="haustyp">{{ area(haustyp.wohnflaeche, 2) }}</dd>
+          <dt>Bebaute Fläche</dt><dd>{{ area(builtArea, 2) }}</dd>
+          <dt v-if="houseType">Wohnfläche ges.</dt><dd v-if="houseType">{{ area(houseType.livingArea, 2) }}</dd>
           <dt>Außenmaß</dt>
-          <dd>{{ num(koerper.width, 1) }} × {{ num(koerper.depth, 1) }} m
-            <span v-if="koerper.estimated" class="zart" title="aus der bebauten Fläche geschätzt">≈</span></dd>
-          <dt>Drehung</dt><dd>{{ degrees(plot.haus.rotation) }}</dd>
-          <dt>GRZ</dt><dd>{{ num(bebauteFlaeche / plot.flaecheAmtlich, 2) }}</dd>
+          <dd>{{ num(building.width, 1) }} × {{ num(building.depth, 1) }} m
+            <span v-if="building.estimated" class="zart" title="aus der bebauten Fläche geschätzt">≈</span></dd>
+          <dt>Drehung</dt><dd>{{ degrees(plot.house.rotation) }}</dd>
+          <dt>GRZ</dt><dd>{{ num(builtArea / plot.officialArea, 2) }}</dd>
         </dl>
 
         <div class="ausrichten nicht-drucken">
-          <button type="button" class="knopf knopf--zweit" @click="anStrasseAusrichten">
+          <button type="button" class="knopf knopf--zweit" @click="alignToStreet">
             An der Straße ausrichten
           </button>
           <p class="regler__hinweis">
-            Dreht den Baukörper parallel zur Straßenfront ({{ degrees(strassenwinkel) }})
+            Dreht den Baukörper parallel zur Straßenfront ({{ degrees(streetAngle) }})
             und schiebt ihn zurück ins Fenster, falls er dabei herausrutscht.
           </p>
         </div>
 
-        <div v-if="koerper.estimated" class="regler nicht-drucken">
+        <div v-if="building.estimated" class="regler nicht-drucken">
           <label for="verhaeltnis">Seitenverhältnis</label>
-          <output class="daten">{{ num(plot.verhaeltnis) }}</output>
+          <output class="daten">{{ num(plot.ratio) }}</output>
           <input id="verhaeltnis" type="range" min="1" max="2.2" step="0.01"
-                 :value="plot.verhaeltnis" @input="verhaeltnisSetzen($event.target.value)">
+                 :value="plot.ratio" @input="setRatio($event.target.value)">
           <p class="regler__hinweis">Aus der bebauten Fläche geschätzt — das Datenblatt liefert keine Außenmaße.</p>
         </div>
 
         <div class="regler nicht-drucken">
           <label for="drehung">Drehung</label>
-          <output class="daten">{{ degrees(plot.haus.rotation) }}</output>
+          <output class="daten">{{ degrees(plot.house.rotation) }}</output>
           <input id="drehung" type="range" min="-90" max="90" step="1"
-                 :value="plot.haus.rotation" @input="drehungSetzen($event.target.value)">
+                 :value="plot.house.rotation" @input="setRotation($event.target.value)">
           <p class="regler__hinweis">Haus mit der Maus ziehen, mit den Pfeiltasten fein verschieben.</p>
         </div>
       </section>
@@ -265,19 +265,19 @@
         </div>
         <div class="dehnen"></div>
         <button type="button" class="knopf nicht-drucken"
-                :disabled="!wegeMoeglich || wegeLaufen" @click="wegeBerechnen">
-          {{ wegeLaufen ? "Rechnet…" : "Wege berechnen" }}
+                :disabled="!routesPossible || routesBusy" @click="computeRoutes">
+          {{ routesBusy ? "Rechnet…" : "Wege berechnen" }}
         </button>
-        <button type="button" class="knopf knopf--still nicht-drucken" @click="state.ansicht = 'ziele'">
+        <button type="button" class="knopf knopf--still nicht-drucken" @click="state.view = 'destinations'">
           Ziele bearbeiten
         </button>
       </div>
 
-      <p v-if="wegeFehler" class="band band--fehler">{{ wegeFehler }}</p>
-      <p v-else-if="!plot.anker" class="band">
+      <p v-if="routesError" class="band band--fehler">{{ routesError }}</p>
+      <p v-else-if="!plot.anchor" class="band">
         Dieses Grundstück hat keine Koordinate — ohne sie gibt es keinen Startpunkt für eine Route.
       </p>
-      <p v-else-if="!verortteZiele.length && state.daten.ziele.length" class="band">
+      <p v-else-if="!locatedDestinations.length && state.data.destinations.length" class="band">
         Keines der Ziele ist verortet. Unter „Ziele bearbeiten“ die Adressen nachschlagen lassen.
       </p>
 
@@ -289,9 +289,9 @@
 <script>
 import SitePlan from "../components/SitePlan.vue";
 import RouteCards from "../components/RouteCards.vue";
-import { state, plotById, placement, houseTypeById, houseFootprint, save, addHouseType, newId, setRoutes, EIGENMASS }
+import { state, plotById, placement, houseTypeById, houseFootprint, save, addHouseType, newId, setRoutes, CUSTOM_SIZE }
   from "../lib/store.js";
-import { erreichbarkeit } from "../lib/api.js";
+import { reachability } from "../lib/api.js";
 import { plotMetrics } from "../lib/metrics.js";
 import {
   polygonEdges, edgeCompass, buildableArea, cornersOutside, smallestSetback,
@@ -304,71 +304,71 @@ export default {
   components: { SitePlan, RouteCards },
   data() {
     return {
-      state, EIGENMASS,
-      messung: { punkte: [], laenge: 0 },
-      wegeLaufen: false,
-      wegeFehler: null,
-      gruende: [
-        { id: "ohne", name: "Ohne" },
-        { id: "karte", name: "Karte" },
-        { id: "luftbild", name: "Luftbild" },
-        { id: "kataster", name: "Kataster" }
+      state, CUSTOM_SIZE,
+      measurement: { points: [], length: 0 },
+      routesBusy: false,
+      routesError: null,
+      backdrops: [
+        { id: "none", name: "Ohne" },
+        { id: "map", name: "Karte" },
+        { id: "aerial", name: "Luftbild" },
+        { id: "cadastre", name: "Kataster" }
       ]
     };
   },
   computed: {
     /** Only destinations that carry a coordinate can be routed to. */
-    verortteZiele() {
-      return state.daten.ziele.filter(z => Number.isFinite(z.lat) && Number.isFinite(z.lon));
+    locatedDestinations() {
+      return state.data.destinations.filter(d => Number.isFinite(d.lat) && Number.isFinite(d.lon));
     },
-    wegeMoeglich() { return Boolean(this.plot.anker) && this.verortteZiele.length > 0; },
-    plot() { return plotById(state.offenesGrundstueck) || state.daten.grundstuecke[0] || null; },
-    hatAnker() { return Boolean(this.plot?.anker); },
-    koerper() { return placement(this.plot); },
-    haustyp() { return houseTypeById(this.plot.haustypId); },
-    istEigenmass() { return this.plot.haustypId === EIGENMASS; },
-    eigenmass() { return this.plot.eigenmass || { laenge: 11.4, breite: 8.5 }; },
-    bebauteFlaeche() {
-      const k = houseFootprint(this.plot);
-      return k.width * k.depth;
+    routesPossible() { return Boolean(this.plot.anchor) && this.locatedDestinations.length > 0; },
+    plot() { return plotById(state.openPlotId) || state.data.plots[0] || null; },
+    hasAnchor() { return Boolean(this.plot?.anchor); },
+    building() { return placement(this.plot); },
+    houseType() { return houseTypeById(this.plot.houseTypeId); },
+    isCustomSize() { return this.plot.houseTypeId === CUSTOM_SIZE; },
+    customSize() { return this.plot.customSize || { length: 11.4, width: 8.5 }; },
+    builtArea() {
+      const f = houseFootprint(this.plot);
+      return f.width * f.depth;
     },
-    kennzahlen() { return plotMetrics(this.plot); },
-    fenster() { return buildableArea(this.plot.polygon, this.plot.tiefen); },
-    ausreisser() { return cornersOutside(this.koerper, this.fenster); },
-    verstoss() { return this.ausreisser > 0; },
-    engsterAbstand() { return smallestSetback(this.koerper, this.plot.polygon); },
-    strassenwinkel() { return alignmentToEdge(this.plot.polygon, this.plot.strassenkante ?? 0); },
-    seitenverhaeltnis() {
-      const m = this.kennzahlen.mrr;
+    metrics() { return plotMetrics(this.plot); },
+    envelope() { return buildableArea(this.plot.polygon, this.plot.setbacks); },
+    outliers() { return cornersOutside(this.building, this.envelope); },
+    violation() { return this.outliers > 0; },
+    narrowestSetback() { return smallestSetback(this.building, this.plot.polygon); },
+    streetAngle() { return alignmentToEdge(this.plot.polygon, this.plot.streetEdge ?? 0); },
+    aspectRatio() {
+      const m = this.metrics.mrr;
       return Math.max(m.width, m.height) / Math.min(m.width, m.height);
     },
-    spanne() { return { lo: this.plot.bodenrichtwert * 0.7, hi: this.plot.bodenrichtwert * 1.45 }; },
-    grenzen() {
-      return polygonEdges(this.plot.polygon).map((kante, i) => ({
-        name: `${edgeCompass(this.plot.polygon, i, this.plot.nordVersatz)} — ${i === (this.plot.strassenkante ?? 0) ? "zur Straße" : "Nachbar"}`,
-        laenge: kante.length
+    priceRange() { return { lo: this.plot.bodenrichtwert * 0.7, hi: this.plot.bodenrichtwert * 1.45 }; },
+    boundaries() {
+      return polygonEdges(this.plot.polygon).map((edge, i) => ({
+        name: `${edgeCompass(this.plot.polygon, i, this.plot.northOffset)} — ${i === (this.plot.streetEdge ?? 0) ? "zur Straße" : "Nachbar"}`,
+        length: edge.length
       }));
     },
-    reihenfolge() { return state.daten.grundstuecke.findIndex(p => p.id === this.plot.id); },
-    vorheriges() { return this.reihenfolge > 0; },
-    naechstes() { return this.reihenfolge < state.daten.grundstuecke.length - 1; }
+    index() { return state.data.plots.findIndex(p => p.id === this.plot.id); },
+    hasPrevious() { return this.index > 0; },
+    hasNext() { return this.index < state.data.plots.length - 1; }
   },
   methods: {
     /** Ask the routing service for every located destination at once and keep
      *  what it answers. Nothing is filled in when a mode has no connection —
      *  the card then says so instead of showing a plausible number. */
-    async wegeBerechnen() {
-      this.wegeLaufen = true;
-      this.wegeFehler = null;
+    async computeRoutes() {
+      this.routesBusy = true;
+      this.routesError = null;
       try {
-        const antwort = await erreichbarkeit(
-          { lat: this.plot.anker.lat, lon: this.plot.anker.lon },
-          this.verortteZiele.map(z => ({ id: z.id, name: z.name, lat: z.lat, lon: z.lon })),
+        const response = await reachability(
+          { lat: this.plot.anchor.lat, lon: this.plot.anchor.lon },
+          this.locatedDestinations.map(d => ({ id: d.id, name: d.name, lat: d.lat, lon: d.lon })),
           ["car", "bike", "transit"]
         );
-        const wege = {};
-        (antwort.ergebnisse || []).forEach(e => {
-          (wege[e.destination_id] ||= {})[e.mode] = {
+        const routes = {};
+        (response.ergebnisse || []).forEach(e => {
+          (routes[e.destination_id] ||= {})[e.mode] = {
             erreichbar: e.erreichbar,
             duration_s: e.duration_s,
             umstiege: e.umstiege,
@@ -376,85 +376,85 @@ export default {
             hinweis: e.hinweis
           };
         });
-        if (!Object.keys(wege).length) {
-          this.wegeFehler = "Der Routendienst hat keine einzige Verbindung zurückgegeben.";
+        if (!Object.keys(routes).length) {
+          this.routesError = "Der Routendienst hat keine einzige Verbindung zurückgegeben.";
         } else {
-          setRoutes(this.plot.id, wege, antwort.quelle);
+          setRoutes(this.plot.id, routes, response.quelle);
         }
-      } catch (fehler) {
-        this.wegeFehler = fehler.message;
+      } catch (error) {
+        this.routesError = error.message;
       } finally {
-        this.wegeLaufen = false;
+        this.routesBusy = false;
       }
     },
     area, euro, euroPerSqm, metres, num, percent, degrees, date,
-    zurueck() { state.ansicht = "grundstuecke"; window.scrollTo({ top: 0 }); },
-    blaettern(schritt) {
-      const ziel = state.daten.grundstuecke[this.reihenfolge + schritt];
-      if (ziel) { state.offenesGrundstueck = ziel.id; window.scrollTo({ top: 0 }); }
+    back() { state.view = "plots"; window.scrollTo({ top: 0 }); },
+    step(by) {
+      const target = state.data.plots[this.index + by];
+      if (target) { state.openPlotId = target.id; window.scrollTo({ top: 0 }); }
     },
-    drucken() { window.print(); },
-    messenUmschalten() {
-      state.plan.messen = !state.plan.messen;
-      if (!state.plan.messen) this.messung = { punkte: [], laenge: 0 };
+    print() { window.print(); },
+    toggleMeasuring() {
+      state.plan.measuring = !state.plan.measuring;
+      if (!state.plan.measuring) this.measurement = { points: [], length: 0 };
     },
-    messungLoeschen() {
-      this.$refs.plan?.messungLoeschen();
-      this.messung = { punkte: [], laenge: 0 };
+    clearMeasurement() {
+      this.$refs.plan?.clearMeasurement();
+      this.measurement = { points: [], length: 0 };
     },
-    pos(wert) {
-      const { lo, hi } = this.spanne;
-      return Math.max(0, Math.min(100, ((wert - lo) / (hi - lo)) * 100));
+    pricePosition(value) {
+      const { lo, hi } = this.priceRange;
+      return Math.max(0, Math.min(100, ((value - lo) / (hi - lo)) * 100));
     },
-    verschieben({ cx, cy }) { this.plot.haus.cx = cx; this.plot.haus.cy = cy; save(); },
-    tiefeSetzen(i, wert) {
-      const v = parseFloat(wert);
-      this.plot.tiefen[i] = Number.isFinite(v) && v >= 0 ? v : 0;
+    moveHouse({ cx, cy }) { this.plot.house.cx = cx; this.plot.house.cy = cy; save(); },
+    setSetback(i, value) {
+      const v = parseFloat(value);
+      this.plot.setbacks[i] = Number.isFinite(v) && v >= 0 ? v : 0;
       save();
     },
-    wandhoeheSetzen(wert) {
-      this.plot.wandhoehe = parseFloat(wert);
+    setWallHeight(value) {
+      this.plot.wallHeight = parseFloat(value);
       // § 6 SächsBO: the depth follows wall height, with 3 m as the floor.
-      const tiefe = Math.round(Math.max(3, this.plot.wandhoehe * 0.4) * 10) / 10;
-      this.plot.tiefen = this.plot.tiefen.map(() => tiefe);
+      const depth = Math.round(Math.max(3, this.plot.wallHeight * 0.4) * 10) / 10;
+      this.plot.setbacks = this.plot.setbacks.map(() => depth);
       save();
     },
-    verhaeltnisSetzen(wert) { this.plot.verhaeltnis = parseFloat(wert); save(); },
-    drehungSetzen(wert) { this.plot.haus.rotation = parseFloat(wert); save(); },
-    haustypSetzen(id) {
-      this.plot.haustypId = id;
-      if (id === EIGENMASS) {
-        if (!this.plot.eigenmass) {
-          const k = this.koerper;
-          this.plot.eigenmass = { laenge: Math.round(k.width * 10) / 10, breite: Math.round(k.depth * 10) / 10 };
+    setRatio(value) { this.plot.ratio = parseFloat(value); save(); },
+    setRotation(value) { this.plot.house.rotation = parseFloat(value); save(); },
+    setHouseType(id) {
+      this.plot.houseTypeId = id;
+      if (id === CUSTOM_SIZE) {
+        if (!this.plot.customSize) {
+          const f = this.building;
+          this.plot.customSize = { length: Math.round(f.width * 10) / 10, width: Math.round(f.depth * 10) / 10 };
         }
       } else {
-        const typ = houseTypeById(id);
-        if (typ?.verhaeltnis) this.plot.verhaeltnis = typ.verhaeltnis;
+        const type = houseTypeById(id);
+        if (type?.ratio) this.plot.ratio = type.ratio;
       }
       save();
     },
-    eigenmassSetzen(feld, wert) {
-      const v = parseFloat(wert);
+    setCustomSize(field, value) {
+      const v = parseFloat(value);
       if (!Number.isFinite(v)) return;
-      this.plot.eigenmass = { ...this.eigenmass, [feld]: Math.min(30, Math.max(4, v)) };
+      this.plot.customSize = { ...this.customSize, [field]: Math.min(30, Math.max(4, v)) };
       save();
     },
-    alsHaustypSichern() {
-      const { laenge, breite } = this.eigenmass;
-      const typ = addHouseType({
-        id: newId("ht"), hersteller: "Eigene Maße", name: `${num(laenge, 1)} × ${num(breite, 1)} m`,
-        bebauteFlaeche: Math.round(laenge * breite * 100) / 100, wohnflaeche: null,
-        wohnflaecheEg: null, wohnflaecheOg: null, laenge, breite,
-        dachform: "offen", preisAb: null, verhaeltnis: laenge / breite,
-        quelle: null, gelesenAm: new Date().toISOString().slice(0, 10), eigen: true
+    saveAsHouseType() {
+      const { length, width } = this.customSize;
+      const type = addHouseType({
+        id: newId("house"), manufacturer: "Eigene Maße", name: `${num(length, 1)} × ${num(width, 1)} m`,
+        builtArea: Math.round(length * width * 100) / 100, livingArea: null,
+        livingAreaGround: null, livingAreaUpper: null, length, width,
+        roofShape: "offen", priceFrom: null, ratio: length / width,
+        source: null, readAt: new Date().toISOString().slice(0, 10), custom: true
       });
-      this.plot.haustypId = typ.id;
+      this.plot.houseTypeId = type.id;
       save();
     },
-    anStrasseAusrichten() {
-      const neu = alignToEdge(this.plot.polygon, this.fenster, this.koerper, this.plot.strassenkante ?? 0);
-      this.plot.haus = { cx: neu.cx, cy: neu.cy, rotation: Math.round(neu.rotation * 10) / 10 };
+    alignToStreet() {
+      const next = alignToEdge(this.plot.polygon, this.envelope, this.building, this.plot.streetEdge ?? 0);
+      this.plot.house = { cx: next.cx, cy: next.cy, rotation: Math.round(next.rotation * 10) / 10 };
       save();
     }
   }

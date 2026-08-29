@@ -1,45 +1,45 @@
 <template>
-  <div v-if="ziele.length" class="wege-kartei">
-    <article v-for="ziel in ziele" :key="ziel.id" class="weg-karte tafel">
+  <div v-if="destinations.length" class="wege-kartei">
+    <article v-for="destination in destinations" :key="destination.id" class="weg-karte tafel">
       <div class="weg-karte__kopf">
-        <h3>{{ ziel.name }}</h3>
-        <span class="weg-karte__adresse">{{ ziel.treffer || ziel.adresse || "ohne Adresse" }}</span>
+        <h3>{{ destination.name }}</h3>
+        <span class="weg-karte__adresse">{{ destination.match || destination.address || "ohne Adresse" }}</span>
       </div>
 
-      <svg v-if="bild(ziel)" viewBox="0 0 300 150" class="weg-karte__skizze"
-           role="img" :aria-label="`Gefahrener Weg nach ${ziel.name}`">
+      <svg v-if="sketch(destination)" viewBox="0 0 300 150" class="weg-karte__skizze"
+           role="img" :aria-label="`Gefahrener Weg nach ${destination.name}`">
         <rect x="0" y="0" width="300" height="150" fill="var(--w2b-karte-grund)" />
-        <polyline v-for="linie in bild(ziel).linien" :key="linie.art" :points="linie.punkte"
-                  fill="none" :stroke="MODUSFARBE[linie.art]"
-                  :stroke-width="linie.art === bild(ziel).schnellster ? 3.4 : 2"
-                  :opacity="linie.art === bild(ziel).schnellster ? 1 : 0.45"
+        <polyline v-for="line in sketch(destination).lines" :key="line.mode" :points="line.points"
+                  fill="none" :stroke="MODE_COLOURS[line.mode]"
+                  :stroke-width="line.mode === sketch(destination).fastest ? 3.4 : 2"
+                  :opacity="line.mode === sketch(destination).fastest ? 1 : 0.45"
                   stroke-linejoin="round" stroke-linecap="round" />
-        <rect :x="bild(ziel).start.x - 4.5" :y="bild(ziel).start.y - 4.5" width="9" height="9" rx="2"
+        <rect :x="sketch(destination).start.x - 4.5" :y="sketch(destination).start.y - 4.5" width="9" height="9" rx="2"
               fill="var(--w2b-karte-halo)" stroke="var(--w2b-karte-verstoss)" stroke-width="2.2" />
-        <circle :cx="bild(ziel).ende.x" :cy="bild(ziel).ende.y" r="5.5"
-                :fill="MODUSFARBE[bild(ziel).schnellster]" stroke="var(--w2b-karte-halo)" stroke-width="1.6" />
-        <text x="293" y="143" text-anchor="end" class="weg-karte__quelle">{{ bild(ziel).massstab }}</text>
+        <circle :cx="sketch(destination).end.x" :cy="sketch(destination).end.y" r="5.5"
+                :fill="MODE_COLOURS[sketch(destination).fastest]" stroke="var(--w2b-karte-halo)" stroke-width="1.6" />
+        <text x="293" y="143" text-anchor="end" class="weg-karte__quelle">{{ sketch(destination).scaleLabel }}</text>
       </svg>
 
-      <table v-if="modi(ziel).length" class="liste weg-karte__modi">
+      <table v-if="modes(destination).length" class="liste weg-karte__modi">
         <tbody>
-          <tr v-for="m in modi(ziel)" :key="m.art">
-            <td><span class="modus"><i :class="`modus__punkt modus__punkt--${m.art}`"></i>{{ m.name }}</span></td>
+          <tr v-for="m in modes(destination)" :key="m.mode">
+            <td><span class="modus"><i :class="`modus__punkt modus__punkt--${m.mode}`"></i>{{ m.name }}</span></td>
             <td class="zahl">{{ m.erreichbar ? duration(m.duration_s) : "—" }}</td>
-            <td class="zahl weg-karte__notiz" :title="m.titel">{{ m.notiz }}</td>
+            <td class="zahl weg-karte__notiz" :title="m.title">{{ m.note }}</td>
           </tr>
         </tbody>
       </table>
 
-      <p v-if="!ziel.lat" class="weg-karte__leer">
+      <p v-if="!destination.lat" class="weg-karte__leer">
         Adresse noch nicht verortet — unter „Ziele“ nachschlagen lassen.
       </p>
-      <p v-else-if="!plot.wege[ziel.id]" class="weg-karte__leer">Noch nicht berechnet.</p>
-      <p v-else-if="!modi(ziel).some(m => m.erreichbar)" class="weg-karte__leer">
+      <p v-else-if="!plot.routes[destination.id]" class="weg-karte__leer">Noch nicht berechnet.</p>
+      <p v-else-if="!modes(destination).some(m => m.erreichbar)" class="weg-karte__leer">
         Keine Verbindung gefunden — mit keinem Verkehrsmittel.
       </p>
-      <p v-if="plot.wege[ziel.id] && plot.wege[ziel.id].berechnet_am" class="weg-karte__stand">
-        Berechnet {{ datum(plot.wege[ziel.id].berechnet_am) }}<span v-if="plot.wege[ziel.id].quelle"> · {{ plot.wege[ziel.id].quelle }}</span>
+      <p v-if="plot.routes[destination.id] && plot.routes[destination.id].calculatedAt" class="weg-karte__stand">
+        Berechnet {{ formatDate(plot.routes[destination.id].calculatedAt) }}<span v-if="plot.routes[destination.id].source"> · {{ plot.routes[destination.id].source }}</span>
       </p>
     </article>
   </div>
@@ -49,11 +49,11 @@
 <script>
 import { state } from "../lib/store.js";
 import { duration } from "../lib/format.js";
-import { MODI, routeBounds, fitBounds, toPolyline, toScreen, coordinatesOf, fastestMode, groundWidth } from "../lib/routes.js";
+import { MODES, routeBounds, fitBounds, toPolyline, toScreen, coordinatesOf, fastestMode, groundWidth } from "../lib/routes.js";
 
 /** One colour per mode, shared by the dots in the table and the drawn line,
  *  so the sketch says which mode actually wins for that destination. */
-const MODUSFARBE = {
+const MODE_COLOURS = {
   car: "var(--w2b-graphit)",
   bike: "var(--w2b-sekundaer)",
   transit: "var(--w2b-primaer)"
@@ -62,34 +62,34 @@ const MODUSFARBE = {
 export default {
   name: "RouteCards",
   props: { plot: { type: Object, required: true } },
-  data() { return { MODUSFARBE }; },
+  data() { return { MODE_COLOURS }; },
   computed: {
-    ziele() { return state.daten.ziele; }
+    destinations() { return state.data.destinations; }
   },
   methods: {
     duration,
-    datum(iso) {
+    formatDate(iso) {
       const d = new Date(iso);
       return Number.isNaN(d.getTime())
         ? "unbekannt"
         : d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
     },
-    modi(ziel) {
-      const weg = this.plot.wege[ziel.id];
-      if (!weg) return [];
-      return MODI.map(m => {
-        const daten = weg.modi[m.art];
-        if (!daten) return null;
-        const notizen = [];
-        if (Number.isInteger(daten.umstiege)) {
-          notizen.push(daten.umstiege === 0 ? "ohne Umstieg" : `${daten.umstiege}× umsteigen`);
+    modes(destination) {
+      const route = this.plot.routes[destination.id];
+      if (!route) return [];
+      return MODES.map(m => {
+        const entry = route.modes[m.mode];
+        if (!entry) return null;
+        const notes = [];
+        if (Number.isInteger(entry.umstiege)) {
+          notes.push(entry.umstiege === 0 ? "ohne Umstieg" : `${entry.umstiege}× umsteigen`);
         }
         // The service's own sentence is written for a wide context; in a
         // 292 px card it wraps to four lines and pushes the times off screen.
         // The short form carries the same fact; the full one stays in the title.
-        if (!daten.erreichbar) notizen.push("keine Verbindung");
-        else if (daten.hinweis) notizen.push(daten.hinweis);
-        return { ...m, ...daten, notiz: notizen.join(" · "), titel: daten.hinweis || "" };
+        if (!entry.erreichbar) notes.push("keine Verbindung");
+        else if (entry.hinweis) notes.push(entry.hinweis);
+        return { ...m, ...entry, note: notes.join(" · "), title: entry.hinweis || "" };
       }).filter(Boolean);
     },
     /**
@@ -97,34 +97,34 @@ export default {
      * of one destination share a frame so their detours are comparable; a
      * destination without geometry gets no picture at all.
      */
-    bild(ziel) {
-      const weg = this.plot.wege[ziel.id];
-      if (!weg) return null;
-      const linien = MODI
-        .map(m => ({ art: m.art, koordinaten: coordinatesOf(weg.modi[m.art]?.geometry) }))
-        .filter(l => l.koordinaten);
-      if (!linien.length) return null;
+    sketch(destination) {
+      const route = this.plot.routes[destination.id];
+      if (!route) return null;
+      const lines = MODES
+        .map(m => ({ mode: m.mode, coordinates: coordinatesOf(route.modes[m.mode]?.geometry) }))
+        .filter(l => l.coordinates);
+      if (!lines.length) return null;
 
-      const bounds = routeBounds(linien.map(l => l.koordinaten));
+      const bounds = routeBounds(lines.map(l => l.coordinates));
       const fit = fitBounds(bounds, 300, 150);
       if (!fit) return null;
 
-      const schnellster = fastestMode(weg) || linien[0].art;
-      const leitlinie = linien.find(l => l.art === schnellster) || linien[0];
+      const fastest = fastestMode(route) || lines[0].mode;
+      const leading = lines.find(l => l.mode === fastest) || lines[0];
       return {
-        schnellster,
+        fastest,
         // The fastest mode is drawn last so it lies on top of the others.
-        linien: linien
-          .map(l => ({ art: l.art, punkte: toPolyline(l.koordinaten, fit) }))
-          .sort((a, b) => (a.art === schnellster) - (b.art === schnellster)),
-        start: toScreen(leitlinie.koordinaten[0], fit),
-        ende: toScreen(leitlinie.koordinaten[leitlinie.koordinaten.length - 1], fit),
-        massstab: this.massstab(bounds)
+        lines: lines
+          .map(l => ({ mode: l.mode, points: toPolyline(l.coordinates, fit) }))
+          .sort((a, b) => (a.mode === fastest) - (b.mode === fastest)),
+        start: toScreen(leading.coordinates[0], fit),
+        end: toScreen(leading.coordinates[leading.coordinates.length - 1], fit),
+        scaleLabel: this.scaleLabel(bounds)
       };
     },
     /** An honest scale bar beats a decorative one: the card is a few hundred
      *  metres wide for a school and tens of kilometres for a commute. */
-    massstab(bounds) {
+    scaleLabel(bounds) {
       const m = groundWidth(bounds);
       if (!(m > 0)) return "";
       return m >= 1000

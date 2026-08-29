@@ -10,7 +10,7 @@
         </p>
       </div>
       <div class="dehnen"></div>
-      <button type="button" class="knopf" @click="hinzufuegen">Ziel hinzufügen</button>
+      <button type="button" class="knopf" @click="add">Ziel hinzufügen</button>
     </div>
 
     <section class="tafel">
@@ -18,41 +18,41 @@
         <h3>Hinterlegte Ziele</h3><div class="dehnen"></div>
         <span class="chip">MOTIS · DELFI-GTFS</span>
       </div>
-      <div v-if="ziele.length" class="zielliste">
-        <div v-for="ziel in ziele" :key="ziel.id" class="zielzeile">
+      <div v-if="destinations.length" class="zielliste">
+        <div v-for="destination in destinations" :key="destination.id" class="zielzeile">
           <div class="zielzeile__felder">
             <div class="feld">
-              <label :for="`n-${ziel.id}`">Name</label>
-              <input :id="`n-${ziel.id}`" type="text" v-model="ziel.name" @input="save">
+              <label :for="`n-${destination.id}`">Name</label>
+              <input :id="`n-${destination.id}`" type="text" v-model="destination.name" @input="save">
             </div>
             <div class="feld">
-              <label :for="`a-${ziel.id}`">Adresse</label>
-              <input :id="`a-${ziel.id}`" type="text" v-model="ziel.adresse"
-                     @input="adresseGeaendert(ziel)" placeholder="Straße Hausnummer, Ort">
+              <label :for="`a-${destination.id}`">Adresse</label>
+              <input :id="`a-${destination.id}`" type="text" v-model="destination.address"
+                     @input="addressChanged(destination)" placeholder="Straße Hausnummer, Ort">
             </div>
             <button type="button" class="knopf knopf--zweit knopf--klein"
-                    :disabled="!ziel.adresse || laeuft === ziel.id" @click="nachschlagen(ziel)">
-              {{ laeuft === ziel.id ? "Sucht…" : "Nachschlagen" }}
+                    :disabled="!destination.address || busy === destination.id" @click="lookUp(destination)">
+              {{ busy === destination.id ? "Sucht…" : "Nachschlagen" }}
             </button>
-            <button type="button" class="knopf knopf--still knopf--klein" @click="entfernen(ziel)">Entfernen</button>
+            <button type="button" class="knopf knopf--still knopf--klein" @click="remove(destination)">Entfernen</button>
           </div>
 
-          <p v-if="fehler[ziel.id]" class="band band--fehler">{{ fehler[ziel.id] }}</p>
+          <p v-if="errors[destination.id]" class="band band--fehler">{{ errors[destination.id] }}</p>
 
-          <div v-else-if="treffer[ziel.id]" class="trefferliste">
+          <div v-else-if="matches[destination.id]" class="trefferliste">
             <p class="trefferliste__frage">Welcher Ort ist gemeint?</p>
-            <button v-for="(t, i) in treffer[ziel.id]" :key="i" type="button"
-                    class="trefferliste__wahl" @click="uebernehmen(ziel, t)">
-              <span class="trefferliste__name">{{ t.name }}</span>
-              <span class="trefferliste__wo">{{ t.beschreibung }}</span>
-              <span class="trefferliste__koord">{{ t.lat.toFixed(5) }}, {{ t.lon.toFixed(5) }}</span>
+            <button v-for="(m, i) in matches[destination.id]" :key="i" type="button"
+                    class="trefferliste__wahl" @click="accept(destination, m)">
+              <span class="trefferliste__name">{{ m.name }}</span>
+              <span class="trefferliste__wo">{{ m.beschreibung }}</span>
+              <span class="trefferliste__koord">{{ m.lat.toFixed(5) }}, {{ m.lon.toFixed(5) }}</span>
             </button>
-            <button type="button" class="knopf knopf--still knopf--klein" @click="verwerfen(ziel)">Abbrechen</button>
+            <button type="button" class="knopf knopf--still knopf--klein" @click="discard(destination)">Abbrechen</button>
           </div>
 
-          <p v-else-if="ziel.lat" class="zielzeile__stand">
-            Verortet auf <strong>{{ ziel.treffer || "gewählte Koordinate" }}</strong>
-            <span class="zart">{{ ziel.lat.toFixed(5) }}, {{ ziel.lon.toFixed(5) }}</span>
+          <p v-else-if="destination.lat" class="zielzeile__stand">
+            Verortet auf <strong>{{ destination.match || "gewählte Koordinate" }}</strong>
+            <span class="zart">{{ destination.lat.toFixed(5) }}, {{ destination.lon.toFixed(5) }}</span>
           </p>
           <p v-else class="zielzeile__stand zielzeile__stand--offen">
             Noch nicht verortet — ohne Koordinate lässt sich kein Weg berechnen.
@@ -61,7 +61,7 @@
       </div>
       <div v-else class="leer">
         <p>Noch keine Ziele. Ohne Ziele bleiben die Wege bei jedem Grundstück leer.</p>
-        <button type="button" class="knopf knopf--zweit" @click="hinzufuegen">Erstes Ziel anlegen</button>
+        <button type="button" class="knopf knopf--zweit" @click="add">Erstes Ziel anlegen</button>
       </div>
     </section>
 
@@ -79,70 +79,70 @@
 import {
   state, addDestination, removeDestination, save, locateDestination, unlocateDestination
 } from "../lib/store.js";
-import { geokodieren } from "../lib/api.js";
+import { geocode } from "../lib/api.js";
 
 export default {
   name: "DestinationsView",
   data() {
     return {
-      laeuft: null,        // id of the destination currently being looked up
-      treffer: {},         // id -> candidates awaiting a decision
-      fehler: {}
+      busy: null,       // id of the destination currently being looked up
+      matches: {},      // id -> candidates awaiting a decision
+      errors: {}
     };
   },
   computed: {
-    ziele() { return state.daten.ziele; },
-    bezugspunkt() { return state.daten.grundstuecke.find(p => p.anker)?.anker || null; }
+    destinations() { return state.data.destinations; },
+    referencePoint() { return state.data.plots.find(p => p.anchor)?.anchor || null; }
   },
   methods: {
     save,
-    hinzufuegen() { addDestination(); },
+    add() { addDestination(); },
 
     /** Editing the address invalidates the coordinate that was found for the
      *  old one — keeping it would route to the previous place in silence. */
-    adresseGeaendert(ziel) {
-      delete this.fehler[ziel.id];
-      delete this.treffer[ziel.id];
-      if (ziel.lat !== undefined) unlocateDestination(ziel.id);
+    addressChanged(destination) {
+      delete this.errors[destination.id];
+      delete this.matches[destination.id];
+      if (destination.lat !== undefined) unlocateDestination(destination.id);
       else save();
     },
 
-    async nachschlagen(ziel) {
-      this.laeuft = ziel.id;
-      delete this.fehler[ziel.id];
-      delete this.treffer[ziel.id];
+    async lookUp(destination) {
+      this.busy = destination.id;
+      delete this.errors[destination.id];
+      delete this.matches[destination.id];
       try {
         // The first plot's coordinate is the reference: destinations are
         // everyday places near the plots, and the geocoder is far more likely
         // to pick the right "Am Kirschberg" when it knows the region.
-        const antwort = await geokodieren(ziel.adresse, this.bezugspunkt);
-        const kandidaten = (antwort.treffer || []).filter(t => Number.isFinite(t.lat) && Number.isFinite(t.lon));
-        if (!kandidaten.length) {
-          this.fehler[ziel.id] = "Zu dieser Adresse wurde nichts gefunden. Bitte genauer schreiben, etwa mit Ort.";
-        } else if (kandidaten.length === 1) {
-          this.uebernehmen(ziel, kandidaten[0]);
+        const response = await geocode(destination.address, this.referencePoint);
+        const candidates = (response.treffer || []).filter(t => Number.isFinite(t.lat) && Number.isFinite(t.lon));
+        if (!candidates.length) {
+          this.errors[destination.id] = "Zu dieser Adresse wurde nichts gefunden. Bitte genauer schreiben, etwa mit Ort.";
+        } else if (candidates.length === 1) {
+          this.accept(destination, candidates[0]);
         } else {
           // Several matches: the user decides. This geocoder is imprecise
           // enough that picking the first silently would be a wrong answer.
-          this.treffer[ziel.id] = kandidaten.slice(0, 5);
+          this.matches[destination.id] = candidates.slice(0, 5);
         }
-      } catch (fehler) {
-        this.fehler[ziel.id] = fehler.message;
+      } catch (error) {
+        this.errors[destination.id] = error.message;
       } finally {
-        this.laeuft = null;
+        this.busy = null;
       }
     },
 
-    uebernehmen(ziel, wahl) {
-      locateDestination(ziel.id, { lat: wahl.lat, lon: wahl.lon, treffer: wahl.name });
-      delete this.treffer[ziel.id];
+    accept(destination, choice) {
+      locateDestination(destination.id, { lat: choice.lat, lon: choice.lon, match: choice.name });
+      delete this.matches[destination.id];
     },
 
-    verwerfen(ziel) { delete this.treffer[ziel.id]; },
+    discard(destination) { delete this.matches[destination.id]; },
 
-    entfernen(ziel) {
-      const sicher = window.confirm(`„${ziel.name}“ entfernen? Die berechneten Wege dorthin gehen bei allen Grundstücken verloren.`);
-      if (sicher) removeDestination(ziel.id);
+    remove(destination) {
+      const confirmed = window.confirm(`„${destination.name}“ entfernen? Die berechneten Wege dorthin gehen bei allen Grundstücken verloren.`);
+      if (confirmed) removeDestination(destination.id);
     }
   }
 };

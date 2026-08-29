@@ -21,66 +21,66 @@ import { mount } from "@vue/test-utils";
 import SitePlan from "../src/components/SitePlan.vue";
 import { buildableArea, distanceToBoundary, pointInPolygon, polygonArea } from "../src/lib/geometry.js";
 import { placement } from "../src/lib/store.js";
-import { echtesGrundstueck } from "./hilfe.js";
+import { realPlot } from "./helpers.js";
 
-/* Real ALKIS answers. "gross" is 34 799 m² in Moritzburg with 65 boundary
-   points; "vielecken" is the 21 585 m² strip along Tauchaer Straße with 159. */
-const GROSSE = ["gross", "vielecken"];
+/* Real ALKIS answers. "large" is 34 799 m² in Moritzburg with 65 boundary
+   points; "many-corners" is the 21 585 m² strip along Tauchaer Straße with 159. */
+const BIG_PARCELS = ["large", "many-corners"];
 
 describe("Rechenzeit auf echten Flurstücken", () => {
-  for (const form of GROSSE) {
-    it(`${form}: das Bebauungsfenster steht in unter einer Sekunde`, () => {
-      const plot = echtesGrundstueck(form);
-      const begonnen = Date.now();
-      const fenster = buildableArea(plot.polygon, plot.tiefen, { step: 0.4 + Math.random() * 1e-6 });
-      expect(Date.now() - begonnen).toBeLessThan(1000);
-      expect(fenster.length).toBeGreaterThanOrEqual(3);
+  for (const shape of BIG_PARCELS) {
+    it(`${shape}: das Bebauungsfenster steht in unter einer Sekunde`, () => {
+      const plot = realPlot(shape);
+      const started = Date.now();
+      const envelope = buildableArea(plot.polygon, plot.setbacks, { step: 0.4 + Math.random() * 1e-6 });
+      expect(Date.now() - started).toBeLessThan(1000);
+      expect(envelope.length).toBeGreaterThanOrEqual(3);
     });
 
-    it(`${form}: ein reaktives Polygon kostet nicht wesentlich mehr als ein rohes`, () => {
+    it(`${shape}: ein reaktives Polygon kostet nicht wesentlich mehr als ein rohes`, () => {
       // A proxy must not multiply the cost. Fresh cache keys on both sides, so
       // neither run can be answered from the memo.
-      const reaktiv = reactive(echtesGrundstueck(form));
+      const proxied = reactive(realPlot(shape));
       let t = Date.now();
-      buildableArea(reaktiv.polygon, reaktiv.tiefen, { step: 0.4 + Math.random() * 1e-6 });
-      const mitProxy = Date.now() - t;
+      buildableArea(proxied.polygon, proxied.setbacks, { step: 0.4 + Math.random() * 1e-6 });
+      const withProxy = Date.now() - t;
 
-      const roh = echtesGrundstueck(form);
+      const plain = realPlot(shape);
       t = Date.now();
-      buildableArea(roh.polygon, roh.tiefen, { step: 0.4 + Math.random() * 1e-6 });
-      const ohneProxy = Date.now() - t;
+      buildableArea(plain.polygon, plain.setbacks, { step: 0.4 + Math.random() * 1e-6 });
+      const withoutProxy = Date.now() - t;
 
-      expect(mitProxy).toBeLessThan(Math.max(ohneProxy, 20) * 4);
+      expect(withProxy).toBeLessThan(Math.max(withoutProxy, 20) * 4);
     });
 
-    it(`${form}: der Lageplan montiert in vertretbarer Zeit`, () => {
+    it(`${shape}: der Lageplan montiert in vertretbarer Zeit`, () => {
       // Through the props, so the plot really is reactive, as in the app.
-      const plot = reactive(echtesGrundstueck(form));
-      const begonnen = Date.now();
-      const w = mount(SitePlan, { props: { plot, koerper: placement(plot) } });
-      expect(Date.now() - begonnen).toBeLessThan(3000);
+      const plot = reactive(realPlot(shape));
+      const started = Date.now();
+      const w = mount(SitePlan, { props: { plot, building: placement(plot) } });
+      expect(Date.now() - started).toBeLessThan(3000);
       w.unmount();
     });
   }
 });
 
 describe("Das gröbere Raster bleibt auf der sicheren Seite", () => {
-  for (const form of GROSSE) {
-    it(`${form}: kein Punkt des Fensters unterschreitet den Abstand`, () => {
-      const plot = echtesGrundstueck(form);
-      const fenster = buildableArea(plot.polygon, plot.tiefen);
-      const soll = Math.min(...plot.tiefen);
-      fenster.forEach(ecke => {
-        expect(distanceToBoundary(ecke, plot.polygon)).toBeGreaterThanOrEqual(soll);
-        expect(pointInPolygon(ecke, plot.polygon)).toBe(true);
+  for (const shape of BIG_PARCELS) {
+    it(`${shape}: kein Punkt des Fensters unterschreitet den Abstand`, () => {
+      const plot = realPlot(shape);
+      const envelope = buildableArea(plot.polygon, plot.setbacks);
+      const required = Math.min(...plot.setbacks);
+      envelope.forEach(corner => {
+        expect(distanceToBoundary(corner, plot.polygon)).toBeGreaterThanOrEqual(required);
+        expect(pointInPolygon(corner, plot.polygon)).toBe(true);
       });
     });
   }
 
   it("ein normales Grundstück verliert durch den Deckel nichts", () => {
     // The cap only bites on land nobody plans a house on to the decimetre.
-    const klein = echtesGrundstueck("konkav");
-    const fenster = buildableArea(klein.polygon, klein.tiefen);
-    expect(polygonArea(fenster)).toBeGreaterThan(polygonArea(klein.polygon) * 0.6);
+    const ordinary = realPlot("concave");
+    const envelope = buildableArea(ordinary.polygon, ordinary.setbacks);
+    expect(polygonArea(envelope)).toBeGreaterThan(polygonArea(ordinary.polygon) * 0.6);
   });
 });

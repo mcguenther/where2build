@@ -12,60 +12,60 @@ import { state, validate } from "../src/lib/store.js";
 import {
   routeBounds, fitBounds, toScreen, toPolyline, coordinatesOf, fastestMode, groundWidth
 } from "../src/lib/routes.js";
-import { echtesGrundstueck, echteWege, echteZiele } from "./hilfe.js";
+import { realPlot, realRoutes, realDestinations } from "./helpers.js";
 
 const HBF = "zl-hbf";
-const SCHULE = "zl-schule";
+const SCHOOL = "zl-schule";
 
-const standMitWegen = () => {
-  const plot = { ...echtesGrundstueck("konvex"), wege: echteWege() };
-  return validate({ version: 1, grundstuecke: [plot], haustypen: [], ziele: echteZiele(), auswahl: [] });
+const stateWithRoutes = () => {
+  const plot = { ...realPlot("convex"), routes: realRoutes() };
+  return validate({ version: 2, plots: [plot], houseTypes: [], destinations: realDestinations(), selection: [] });
 };
 
-beforeEach(() => { state.daten = standMitWegen(); });
+beforeEach(() => { state.data = stateWithRoutes(); });
 
-const plot = () => state.daten.grundstuecke[0];
+const plot = () => state.data.plots[0];
 
 describe("Aufbereitung echter MOTIS-Geometrie", () => {
   it("übersteht die Prüfung des Speichers unbeschädigt", () => {
-    const weg = plot().wege[HBF];
-    expect(Object.keys(weg.modi).sort()).toEqual(["bike", "car", "transit"]);
-    expect(weg.modi.car.duration_s).toBe(754);
-    expect(weg.modi.car.geometry.coordinates.length).toBe(455);
+    const route = plot().routes[HBF];
+    expect(Object.keys(route.modes).sort()).toEqual(["bike", "car", "transit"]);
+    expect(route.modes.car.duration_s).toBe(754);
+    expect(route.modes.car.geometry.coordinates.length).toBe(455);
   });
 
   it("hält die Fahrzeiten in der Reihenfolge, die die Strecke erwarten lässt", () => {
-    const m = plot().wege[HBF].modi;
+    const m = plot().routes[HBF].modes;
     // 10 km in die Stadt: mit dem Auto am schnellsten, mit dem Rad am längsten.
     expect(m.car.duration_s).toBeLessThan(m.transit.duration_s);
     expect(m.transit.duration_s).toBeLessThan(m.bike.duration_s);
-    expect(fastestMode(plot().wege[HBF])).toBe("car");
+    expect(fastestMode(plot().routes[HBF])).toBe("car");
   });
 
   it("erkennt ein Ziel ohne Verbindung als solches", () => {
-    const transit = plot().wege[SCHULE].modi.transit;
+    const transit = plot().routes[SCHOOL].modes.transit;
     expect(transit.erreichbar).toBe(false);
     expect(transit.duration_s).toBeUndefined();
     expect(transit.geometry).toBeUndefined();
-    expect(fastestMode(plot().wege[SCHULE])).toBe("car");
+    expect(fastestMode(plot().routes[SCHOOL])).toBe("car");
   });
 
   it("liest Koordinaten nur aus einer echten Linie", () => {
     expect(coordinatesOf(null)).toBeNull();
     expect(coordinatesOf({ type: "Point", coordinates: [12, 51] })).toBeNull();
     expect(coordinatesOf({ type: "LineString", coordinates: [[12, 51]] })).toBeNull();
-    expect(coordinatesOf(plot().wege[HBF].modi.car.geometry)).toHaveLength(455);
+    expect(coordinatesOf(plot().routes[HBF].modes.car.geometry)).toHaveLength(455);
   });
 });
 
 describe("Einpassen in die Kartenfläche", () => {
-  const linien = () => ["car", "bike", "transit"]
-    .map(a => coordinatesOf(state.daten.grundstuecke[0].wege[HBF].modi[a]?.geometry))
+  const lines = () => ["car", "bike", "transit"]
+    .map(m => coordinatesOf(state.data.plots[0].routes[HBF].modes[m]?.geometry))
     .filter(Boolean);
 
   it("umfasst jeden Punkt jeder Linie", () => {
-    const b = routeBounds(linien());
-    linien().flat().forEach(([lon, lat]) => {
+    const b = routeBounds(lines());
+    lines().flat().forEach(([lon, lat]) => {
       expect(lon).toBeGreaterThanOrEqual(b.minLon - 1e-9);
       expect(lon).toBeLessThanOrEqual(b.maxLon + 1e-9);
       expect(lat).toBeGreaterThanOrEqual(b.minLat - 1e-9);
@@ -74,8 +74,8 @@ describe("Einpassen in die Kartenfläche", () => {
   });
 
   it("bleibt im Bild und hält den Rand ein", () => {
-    const fit = fitBounds(routeBounds(linien()), 300, 150, 12);
-    linien().flat().forEach(c => {
+    const fit = fitBounds(routeBounds(lines()), 300, 150, 12);
+    lines().flat().forEach(c => {
       const p = toScreen(c, fit);
       expect(p.x).toBeGreaterThanOrEqual(-0.01);
       expect(p.x).toBeLessThanOrEqual(300.01);
@@ -87,27 +87,27 @@ describe("Einpassen in die Kartenfläche", () => {
   it("verzerrt nicht: gleiche Strecke in Ost und Nord wird gleich lang gezeichnet", () => {
     // A square in Mercator units must stay square on screen, otherwise a
     // detour to the north would look longer than the same detour eastward.
-    const fit = fitBounds(routeBounds(linien()), 300, 150, 12);
-    const b = routeBounds(linien());
-    const mitte = [(b.minLon + b.maxLon) / 2, (b.minLat + b.maxLat) / 2];
-    const a = toScreen(mitte, fit);
-    const ost = toScreen([mitte[0] + 0.001, mitte[1]], fit);
-    const nord = toScreen([mitte[0], mitte[1] + 0.001 * Math.cos(mitte[1] * Math.PI / 180)], fit);
-    expect(Math.abs(ost.x - a.x)).toBeCloseTo(Math.abs(nord.y - a.y), 3);
+    const fit = fitBounds(routeBounds(lines()), 300, 150, 12);
+    const b = routeBounds(lines());
+    const centre = [(b.minLon + b.maxLon) / 2, (b.minLat + b.maxLat) / 2];
+    const a = toScreen(centre, fit);
+    const east = toScreen([centre[0] + 0.001, centre[1]], fit);
+    const north = toScreen([centre[0], centre[1] + 0.001 * Math.cos(centre[1] * Math.PI / 180)], fit);
+    expect(Math.abs(east.x - a.x)).toBeCloseTo(Math.abs(north.y - a.y), 3);
   });
 
   it("misst die Bildbreite in echten Metern", () => {
     // Liebertwolkwitz to the Hauptbahnhof spans about 5.5 km east-west.
-    const m = groundWidth(routeBounds(linien()));
+    const m = groundWidth(routeBounds(lines()));
     expect(m).toBeGreaterThan(4500);
     expect(m).toBeLessThan(7000);
   });
 
   it("macht aus einer Linie einen zeichenbaren Punktzug", () => {
-    const fit = fitBounds(routeBounds(linien()), 300, 150, 12);
-    const punkte = toPolyline(linien()[0], fit);
-    expect(punkte.split(" ")).toHaveLength(455);
-    expect(punkte).toMatch(/^[\d.,\s-]+$/);
+    const fit = fitBounds(routeBounds(lines()), 300, 150, 12);
+    const points = toPolyline(lines()[0], fit);
+    expect(points.split(" ")).toHaveLength(455);
+    expect(points).toMatch(/^[\d.,\s-]+$/);
     expect(toPolyline([[12, 51]], fit)).toBe("");
   });
 });
@@ -132,18 +132,18 @@ describe("Wegekarten mit echten Daten", () => {
     // A 292 px card has no room for the service's full sentence; it wrapped to
     // four lines and pushed the times out of view. The long form lives in the
     // title attribute instead, so nothing is lost.
-    const notizen = w.findAll(".weg-karte__notiz").map(z => z.text());
-    notizen.forEach(n => expect(n.length).toBeLessThan(28));
-    const lang = w.findAll(".weg-karte__notiz").map(z => z.attributes("title")).filter(Boolean);
-    expect(lang.some(t => t.includes("keine Verbindung gefunden"))).toBe(true);
+    const notes = w.findAll(".weg-karte__notiz").map(n => n.text());
+    notes.forEach(n => expect(n.length).toBeLessThan(28));
+    const long = w.findAll(".weg-karte__notiz").map(n => n.attributes("title")).filter(Boolean);
+    expect(long.some(t => t.includes("keine Verbindung gefunden"))).toBe(true);
   });
 
   it("hebt das schnellste Verkehrsmittel hervor und zeichnet es zuletzt", () => {
     const w = mount(RouteCards, { props: { plot: plot() } });
-    const ersteKarte = w.findAll("article")[0].findAll("polyline");
-    const dickste = ersteKarte[ersteKarte.length - 1];
-    expect(dickste.attributes("stroke-width")).toBe("3.4");
-    expect(dickste.attributes("opacity")).toBe("1");
+    const firstCard = w.findAll("article")[0].findAll("polyline");
+    const thickest = firstCard[firstCard.length - 1];
+    expect(thickest.attributes("stroke-width")).toBe("3.4");
+    expect(thickest.attributes("opacity")).toBe("1");
   });
 
   it("nennt den Stand der Berechnung und die Quelle", () => {
@@ -154,23 +154,23 @@ describe("Wegekarten mit echten Daten", () => {
 
   it("wirft erfundene Wege aus dem Mockup beim Laden weg", () => {
     // The mockup stored an array of made-up minutes under the same key.
-    const stand = validate({
-      version: 1,
-      grundstuecke: [{ ...echtesGrundstueck("konvex"), wege: { [HBF]: [14, 38, 29, 31, "a", "b", "c"] } }],
-      haustypen: [], ziele: echteZiele(), auswahl: []
+    const restored = validate({
+      version: 2,
+      plots: [{ ...realPlot("convex"), routes: { [HBF]: [14, 38, 29, 31, "a", "b", "c"] } }],
+      houseTypes: [], destinations: realDestinations(), selection: []
     });
-    expect(stand.grundstuecke[0].wege).toEqual({});
-    const t = mount(RouteCards, { props: { plot: stand.grundstuecke[0] } }).text();
+    expect(restored.plots[0].routes).toEqual({});
+    const t = mount(RouteCards, { props: { plot: restored.plots[0] } }).text();
     expect(t).toContain("Noch nicht berechnet");
     expect(t).not.toMatch(/\d+ min/);
   });
 
   it("vergisst Wege zu einem Ziel, das es nicht mehr gibt", () => {
-    const stand = validate({
-      version: 1,
-      grundstuecke: [{ ...echtesGrundstueck("konvex"), wege: echteWege() }],
-      haustypen: [], ziele: [echteZiele()[0]], auswahl: []
+    const restored = validate({
+      version: 2,
+      plots: [{ ...realPlot("convex"), routes: realRoutes() }],
+      houseTypes: [], destinations: [realDestinations()[0]], selection: []
     });
-    expect(Object.keys(stand.grundstuecke[0].wege)).toEqual([HBF]);
+    expect(Object.keys(restored.plots[0].routes)).toEqual([HBF]);
   });
 });

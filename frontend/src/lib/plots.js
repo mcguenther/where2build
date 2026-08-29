@@ -43,21 +43,21 @@ export function guessStreetEdge(ring) {
 
 /**
  * Turn a `/api/parcels/resolve` FeatureCollection into a plot.
- * `zusatz` carries what the cadastre cannot know: asking price, land value, name.
+ * `extra` carries what the cadastre cannot know: asking price, land value, name.
  */
-export function plotAusKataster(antwort, zusatz = {}) {
-  const merkmale = antwort?.features ?? [];
-  const vereinigt = antwort?.grundstueck ?? merkmale[0];
-  const wgs = outerRing(vereinigt?.geometry);
+export function plotFromCadastre(response, extra = {}) {
+  const features = response?.features ?? [];
+  const merged = response?.grundstueck ?? features[0];
+  const wgs = outerRing(merged?.geometry);
   if (wgs.length < 4) throw new Error("Die Antwort des Katasterdienstes enthält keine brauchbare Geometrie.");
 
-  const anker = anchorOf(wgs);
-  const polygon = tidyRing(toLocal(wgs, anker));
+  const anchor = anchorOf(wgs);
+  const polygon = tidyRing(toLocal(wgs, anchor));
   if (polygon.length < 3) throw new Error("Der Flurstücksumriss hat zu wenige Punkte.");
 
-  const amtlich = merkmale.reduce((summe, f) => summe + (f.properties?.flaeche_amtlich_m2 ?? 0), 0);
-  const erstes = merkmale[0]?.properties ?? {};
-  const nummern = merkmale
+  const officialArea = features.reduce((sum, f) => sum + (f.properties?.flaeche_amtlich_m2 ?? 0), 0);
+  const first = features[0]?.properties ?? {};
+  const numbers = features
     .map(f => {
       const p = f.properties ?? {};
       return p.nenner ? `${p.zaehler}/${p.nenner}` : String(p.zaehler ?? "");
@@ -65,36 +65,36 @@ export function plotAusKataster(antwort, zusatz = {}) {
     .filter(Boolean);
 
   return {
-    id: newId("gs"),
-    name: zusatz.name || (erstes.lagebezeichnung || "").split(";")[0].trim() || `Flurstück ${nummern[0] ?? ""}`.trim(),
-    ort: zusatz.ort || erstes.gemeinde || "",
-    gemarkung: erstes.gemarkung ?? "",
-    flurstuecke: nummern,
-    kennzeichen: erstes.kennzeichen ?? null,
-    lagebezeichnung: erstes.lagebezeichnung ?? null,
-    anker,
-    nordVersatz: 0,
-    flaecheAmtlich: Math.round(amtlich) || null,
-    kaufpreis: zusatz.kaufpreis ?? null,
-    bodenrichtwert: zusatz.bodenrichtwert ?? null,
-    brwZone: zusatz.brwZone ?? null,
-    brwStichtag: zusatz.brwStichtag ?? null,
+    id: newId("plot"),
+    name: extra.name || (first.lagebezeichnung || "").split(";")[0].trim() || `Flurstück ${numbers[0] ?? ""}`.trim(),
+    municipality: extra.municipality || first.gemeinde || "",
+    gemarkung: first.gemarkung ?? "",
+    flurstuecke: numbers,
+    kennzeichen: first.kennzeichen ?? null,
+    lagebezeichnung: first.lagebezeichnung ?? null,
+    anchor,
+    northOffset: 0,
+    officialArea: Math.round(officialArea) || null,
+    askingPrice: extra.askingPrice ?? null,
+    bodenrichtwert: extra.bodenrichtwert ?? null,
+    brwZone: extra.brwZone ?? null,
+    brwReferenceDate: extra.brwReferenceDate ?? null,
     polygon,
-    teilung: null,
-    strassenkante: guessStreetEdge(polygon),
-    haustypId: zusatz.haustypId ?? null,
-    haus: mittelpunktLage(polygon),
-    verhaeltnis: 1.35,
-    wandhoehe: 6.4,
-    tiefen: polygon.map(() => 3),
-    quelle: antwort?.quelle ?? "ALKIS",
-    gelesenAm: new Date().toISOString(),
-    notiz: zusatz.notiz ?? "",
-    wege: {}
+    divisionLine: null,
+    streetEdge: guessStreetEdge(polygon),
+    houseTypeId: extra.houseTypeId ?? null,
+    house: centrePlacement(polygon),
+    ratio: 1.35,
+    wallHeight: 6.4,
+    setbacks: polygon.map(() => 3),
+    source: response?.quelle ?? "ALKIS",
+    readAt: new Date().toISOString(),
+    note: extra.note ?? "",
+    routes: {}
   };
 }
 
-function mittelpunktLage(ring) {
+function centrePlacement(ring) {
   const n = ring.length;
   return {
     cx: ring.reduce((s, p) => s + p.x, 0) / n,
@@ -104,7 +104,7 @@ function mittelpunktLage(ring) {
 }
 
 /** The official area is what counts; the polygon area is for shape analysis. */
-export const flaechenVergleich = plot => ({
-  amtlich: plot.flaecheAmtlich,
-  gerechnet: polygonArea(plot.polygon)
+export const areaComparison = plot => ({
+  official: plot.officialArea,
+  computed: polygonArea(plot.polygon)
 });

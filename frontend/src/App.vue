@@ -2,7 +2,7 @@
   <div class="huelle">
     <header class="kopfleiste nicht-drucken">
       <div class="bahn kopfleiste__inhalt">
-        <button type="button" class="marke" @click="gehe('grundstuecke')" aria-label="Zur Übersicht">
+        <button type="button" class="marke" @click="goTo('plots')" aria-label="Zur Übersicht">
           <svg viewBox="0 0 48 48" width="30" height="30" aria-hidden="true">
             <rect x="5.5" y="5.5" width="37" height="37" rx="3.5" fill="none"
                   stroke="var(--w2b-primaer)" stroke-width="3" />
@@ -13,31 +13,31 @@
         </button>
 
         <nav class="orte" aria-label="Bereiche">
-          <button v-for="o in orte" :key="o.id" type="button"
-                  :aria-current="istHier(o.id) ? 'page' : null"
-                  @click="gehe(o.id)">
-            {{ o.name }}<span v-if="o.zahl !== null" class="orte__zahl">{{ o.zahl }}</span>
+          <button v-for="s in sections" :key="s.id" type="button"
+                  :aria-current="isCurrent(s.id) ? 'page' : null"
+                  @click="goTo(s.id)">
+            {{ s.name }}<span v-if="s.count !== null" class="orte__zahl">{{ s.count }}</span>
           </button>
         </nav>
 
         <div class="dehnen"></div>
 
         <div class="darstellung" role="group" aria-label="Darstellung">
-          <button v-for="d in darstellungen" :key="d.id" type="button"
-                  :aria-pressed="String(state.darstellung === d.id)"
-                  @click="applyTheme(d.id)">{{ d.name }}</button>
+          <button v-for="t in themes" :key="t.id" type="button"
+                  :aria-pressed="String(state.theme === t.id)"
+                  @click="applyTheme(t.id)">{{ t.name }}</button>
         </div>
       </div>
     </header>
 
     <main class="bahn">
-      <PlotsView        v-if="state.ansicht === 'grundstuecke'" />
-      <WizardView       v-else-if="state.ansicht === 'aufnahme'" />
-      <PlotView         v-else-if="state.ansicht === 'grundstueck'" />
-      <CompareView      v-else-if="state.ansicht === 'vergleich'" />
-      <HouseTypesView   v-else-if="state.ansicht === 'haustypen'" />
-      <DestinationsView v-else-if="state.ansicht === 'ziele'" />
-      <DataView         v-else-if="state.ansicht === 'daten'" />
+      <PlotsView        v-if="state.view === 'plots'" />
+      <WizardView       v-else-if="state.view === 'wizard'" />
+      <PlotView         v-else-if="state.view === 'plot'" />
+      <CompareView      v-else-if="state.view === 'compare'" />
+      <HouseTypesView   v-else-if="state.view === 'houseTypes'" />
+      <DestinationsView v-else-if="state.view === 'destinations'" />
+      <DataView         v-else-if="state.view === 'data'" />
     </main>
 
     <footer class="fussleiste nicht-drucken">
@@ -70,7 +70,7 @@ export default {
   data() {
     return {
       state,
-      darstellungen: [
+      themes: [
         { id: "light", name: "Hell" },
         { id: "dark", name: "Dunkel" },
         { id: "system", name: "System" }
@@ -78,28 +78,26 @@ export default {
     };
   },
   computed: {
-    orte() {
+    sections() {
       return [
-        { id: "grundstuecke", name: "Grundstücke", zahl: state.daten.grundstuecke.length },
-        { id: "haustypen", name: "Haustypen", zahl: state.daten.haustypen.length },
-        { id: "ziele", name: "Ziele", zahl: state.daten.ziele.length },
-        { id: "daten", name: "Daten", zahl: null }
+        { id: "plots", name: "Grundstücke", count: state.data.plots.length },
+        { id: "houseTypes", name: "Haustypen", count: state.data.houseTypes.length },
+        { id: "destinations", name: "Ziele", count: state.data.destinations.length },
+        { id: "data", name: "Daten", count: null }
       ];
     }
   },
   created() { load(); },
   methods: {
     applyTheme,
-    gehe(ort) {
-      state.ansicht = ort;
+    goTo(id) {
+      state.view = id;
       window.scrollTo({ top: 0, behavior: "instant" });
     },
     /** Detail, wizard and compare all live under "Grundstücke" in the navigation. */
-    istHier(id) {
-      const heim = ["grundstueck", "vergleich", "aufnahme"].includes(state.ansicht)
-        ? "grundstuecke"
-        : state.ansicht;
-      return heim === id;
+    isCurrent(id) {
+      const home = ["plot", "compare", "wizard"].includes(state.view) ? "plots" : state.view;
+      return home === id;
     }
   }
 };

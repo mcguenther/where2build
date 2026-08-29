@@ -8,7 +8,7 @@ import {
   findPlacement, fitsAnywhere, alignmentToEdge, alignToEdge, edgeCompass
 } from "../src/lib/geometry.js";
 
-import { echtesGrundstueck } from "./hilfe.js";
+import { realPlot } from "./helpers.js";
 
 const ring = pairs => pairs.map(([x, y]) => ({ x, y }));
 const SQUARE = ring([[0, 0], [10, 0], [10, 10], [0, 10]]);
@@ -21,15 +21,15 @@ describe("Flächen und Kanten", () => {
   });
 
   it("misst das Beispielflurstück und weicht plausibel von der amtlichen Fläche ab", () => {
-    const gerechnet = polygonArea(LIEBERTWOLKWITZ);
-    expect(gerechnet).toBeCloseTo(795.3, 1);
-    const abweichung = Math.abs(802 - gerechnet);
-    expect(abweichung).toBeGreaterThan(0);
-    expect(abweichung).toBeLessThan(15);
+    const computed = polygonArea(LIEBERTWOLKWITZ);
+    expect(computed).toBeCloseTo(795.3, 1);
+    const deviation = Math.abs(802 - computed);
+    expect(deviation).toBeGreaterThan(0);
+    expect(deviation).toBeLessThan(15);
   });
 
   it("liefert die Kantenlängen, die die Oberfläche anzeigt", () => {
-    expect(polygonEdges(LIEBERTWOLKWITZ).map(k => +k.length.toFixed(2)))
+    expect(polygonEdges(LIEBERTWOLKWITZ).map(e => +e.length.toFixed(2)))
       .toEqual([22.62, 34.04, 22.74, 36.24]);
   });
 
@@ -88,9 +88,9 @@ describe("Form", () => {
   });
 
   it("findet das kleinste gedrehte Umschließungsrechteck", () => {
-    const schraeg = ring([[0, 0], [10, 10], [8, 12], [-2, 2]]);
-    const mrr = minimumRotatedRectangle(schraeg);
-    expect(mrr.area).toBeCloseTo(polygonArea(schraeg), 6);   // ein gedrehtes Rechteck ist sein eigenes MRR
+    const tilted = ring([[0, 0], [10, 10], [8, 12], [-2, 2]]);
+    const mrr = minimumRotatedRectangle(tilted);
+    expect(mrr.area).toBeCloseTo(polygonArea(tilted), 6);   // ein gedrehtes Rechteck ist sein eigenes MRR
   });
 });
 
@@ -108,49 +108,49 @@ describe("Baukörper", () => {
   });
 
   it("schlägt an, sobald eine Ecke aus dem Fenster rutscht", () => {
-    const fenster = buildableArea(LIEBERTWOLKWITZ, [3, 3, 3, 3]);
-    const drin = { cx: 10.8, cy: 15, width: 11.4, depth: 8.5, rotation: -4 };
-    const raus = { cx: 10.8, cy: 32, width: 11.4, depth: 8.5, rotation: -4 };
-    expect(cornersOutside(drin, fenster)).toBe(0);
-    expect(cornersOutside(raus, fenster)).toBeGreaterThan(0);
+    const envelope = buildableArea(LIEBERTWOLKWITZ, [3, 3, 3, 3]);
+    const inside = { cx: 10.8, cy: 15, width: 11.4, depth: 8.5, rotation: -4 };
+    const outside = { cx: 10.8, cy: 32, width: 11.4, depth: 8.5, rotation: -4 };
+    expect(cornersOutside(inside, envelope)).toBe(0);
+    expect(cornersOutside(outside, envelope)).toBeGreaterThan(0);
   });
 
   it("misst den geringsten Grenzabstand", () => {
-    const mitte = { cx: 5, cy: 5, width: 4, depth: 4, rotation: 0 };
-    expect(smallestSetback(mitte, SQUARE)).toBeCloseTo(3, 9);
+    const centred = { cx: 5, cy: 5, width: 4, depth: 4, rotation: 0 };
+    expect(smallestSetback(centred, SQUARE)).toBeCloseTo(3, 9);
   });
 
   it("findet den nächsten Punkt auf der Grenze", () => {
-    const nah = closestBoundaryPoint({ x: 5, y: 8 }, SQUARE);
-    expect(nah.distance).toBeCloseTo(2, 9);
-    expect(nah.point).toEqual({ x: 5, y: 10 });
+    const near = closestBoundaryPoint({ x: 5, y: 8 }, SQUARE);
+    expect(near.distance).toBeCloseTo(2, 9);
+    expect(near.point).toEqual({ x: 5, y: 10 });
   });
 });
 
 describe("Passt der Baukörper?", () => {
-  const fenster = buildableArea(SQUARE, [1, 1, 1, 1]);   // 8 × 8 m
+  const envelope = buildableArea(SQUARE, [1, 1, 1, 1]);   // 8 × 8 m
 
   it("findet eine zulässige Lage", () => {
-    const lage = findPlacement(fenster, 7, 5);
-    expect(lage).not.toBeNull();
-    expect(cornersOutside({ ...lage, width: 7, depth: 5 }, fenster)).toBe(0);
+    const found = findPlacement(envelope, 7, 5);
+    expect(found).not.toBeNull();
+    expect(cornersOutside({ ...found, width: 7, depth: 5 }, envelope)).toBe(0);
   });
 
   it("meldet, wenn nichts passt", () => {
-    expect(findPlacement(fenster, 9, 9)).toBeNull();
-    expect(fitsAnywhere(fenster, 9, 9)).toBe(false);
+    expect(findPlacement(envelope, 9, 9)).toBeNull();
+    expect(fitsAnywhere(envelope, 9, 9)).toBe(false);
   });
 
   it("nutzt die Drehung — quer passt, was längs nicht passt", () => {
-    const schmal = buildableArea(ring([[0, 0], [9, 0], [9, 26], [0, 26]]), [0.5, 0.5, 0.5, 0.5]);
-    expect(findPlacement(schmal, 20, 6)).not.toBeNull();
-    expect(findPlacement(schmal, 20, 6, { rotation: 0 })).toBeNull();
+    const narrow = buildableArea(ring([[0, 0], [9, 0], [9, 26], [0, 26]]), [0.5, 0.5, 0.5, 0.5]);
+    expect(findPlacement(narrow, 20, 6)).not.toBeNull();
+    expect(findPlacement(narrow, 20, 6, { rotation: 0 })).toBeNull();
   });
 
   it("bleibt mit „near“ in der Nähe der bisherigen Lage", () => {
-    const nah = findPlacement(fenster, 3, 3, { near: { x: 3, y: 3 } });
-    const fern = findPlacement(fenster, 3, 3, { near: { x: 8, y: 8 } });
-    expect(Math.hypot(nah.cx - 3, nah.cy - 3)).toBeLessThan(Math.hypot(fern.cx - 3, fern.cy - 3));
+    const near = findPlacement(envelope, 3, 3, { near: { x: 3, y: 3 } });
+    const far = findPlacement(envelope, 3, 3, { near: { x: 8, y: 8 } });
+    expect(Math.hypot(near.cx - 3, near.cy - 3)).toBeLessThan(Math.hypot(far.cx - 3, far.cy - 3));
   });
 });
 
@@ -161,33 +161,33 @@ describe("An der Straße ausrichten", () => {
   });
 
   it("normiert auf (−90°, 90°]", () => {
-    const nachOben = ring([[0, 0], [0, 10], [-10, 10], [-10, 0]]);
-    const winkel = alignmentToEdge(nachOben, 0);
-    expect(winkel).toBeGreaterThan(-90);
-    expect(winkel).toBeLessThanOrEqual(90);
+    const upward = ring([[0, 0], [0, 10], [-10, 10], [-10, 0]]);
+    const angle = alignmentToEdge(upward, 0);
+    expect(angle).toBeGreaterThan(-90);
+    expect(angle).toBeLessThanOrEqual(90);
   });
 
   it("dreht den Baukörper parallel zur Front und lässt ihn im Fenster", () => {
-    const fenster = buildableArea(LIEBERTWOLKWITZ, [3, 3, 3, 3]);
-    const vorher = { cx: 10.8, cy: 15, width: 11.4, depth: 8.5, rotation: 40 };
-    const nachher = alignToEdge(LIEBERTWOLKWITZ, fenster, vorher, 0);
-    expect(nachher.rotation).toBeCloseTo(2.28, 2);
-    expect(cornersOutside(nachher, fenster)).toBe(0);
+    const envelope = buildableArea(LIEBERTWOLKWITZ, [3, 3, 3, 3]);
+    const before = { cx: 10.8, cy: 15, width: 11.4, depth: 8.5, rotation: 40 };
+    const after = alignToEdge(LIEBERTWOLKWITZ, envelope, before, 0);
+    expect(after.rotation).toBeCloseTo(2.28, 2);
+    expect(cornersOutside(after, envelope)).toBe(0);
   });
 
   it("schiebt zurück ins Fenster, wenn die Drehung herausführt", () => {
-    const fenster = buildableArea(LIEBERTWOLKWITZ, [3, 3, 3, 3]);
-    const amRand = { cx: 5.5, cy: 30, width: 11.4, depth: 8.5, rotation: 80 };
-    const nachher = alignToEdge(LIEBERTWOLKWITZ, fenster, amRand, 0);
-    expect(cornersOutside(nachher, fenster)).toBe(0);
-    expect(nachher.cx === amRand.cx && nachher.cy === amRand.cy).toBe(false);
+    const envelope = buildableArea(LIEBERTWOLKWITZ, [3, 3, 3, 3]);
+    const atEdge = { cx: 5.5, cy: 30, width: 11.4, depth: 8.5, rotation: 80 };
+    const after = alignToEdge(LIEBERTWOLKWITZ, envelope, atEdge, 0);
+    expect(cornersOutside(after, envelope)).toBe(0);
+    expect(after.cx === atEdge.cx && after.cy === atEdge.cy).toBe(false);
   });
 });
 
 describe("Himmelsrichtungen der Grenzen", () => {
   it("benennt die Grenzen statt sie durchzunummerieren", () => {
-    const namen = LIEBERTWOLKWITZ.map((_, i) => edgeCompass(LIEBERTWOLKWITZ, i, 17));
-    expect(namen).toEqual(["Süd", "Ost", "Nord", "West"]);
+    const names = LIEBERTWOLKWITZ.map((_, i) => edgeCompass(LIEBERTWOLKWITZ, i, 17));
+    expect(names).toEqual(["Süd", "Ost", "Nord", "West"]);
   });
 
   /* Der Nordversatz ist der Winkel, um den der Nordpfeil gegenüber "oben"
@@ -204,12 +204,12 @@ describe("Himmelsrichtungen der Grenzen", () => {
      Läuft Nord gegen den Uhrzeigersinn, wandert der Name der Kante im
      Uhrzeigersinn durch die Windrose. Von Hand nachprüfbar: */
   it("wandert im Uhrzeigersinn durch die Windrose, wenn Nord sich dreht", () => {
-    const erwartet = {
+    const expected = {
       0: "Süd", 45: "Südwest", 90: "West", 135: "Nordwest",
       180: "Nord", 225: "Nordost", 270: "Ost", 315: "Südost"
     };
-    for (const [versatz, name] of Object.entries(erwartet)) {
-      expect(edgeCompass(SQUARE, 0, Number(versatz))).toBe(name);
+    for (const [offset, name] of Object.entries(expected)) {
+      expect(edgeCompass(SQUARE, 0, Number(offset))).toBe(name);
     }
   });
 });
@@ -230,36 +230,36 @@ describe("Große und vielgliedrige Flurstücke", () => {
    * browser to offer to stop the script.
    */
   const parcels = {
-    "Streifen, 159 Ecken": echtesGrundstueck("vielecken"),
-    "Feld, 34 799 m²": echtesGrundstueck("gross")
+    "Streifen, 159 Ecken": realPlot("many-corners"),
+    "Feld, 34 799 m²": realPlot("large")
   };
 
   for (const [name, plot] of Object.entries(parcels)) {
     it(`${name}: das Fenster steht in vertretbarer Zeit`, () => {
-      const begonnen = Date.now();
-      buildableArea(plot.polygon, plot.tiefen);
+      const started = Date.now();
+      buildableArea(plot.polygon, plot.setbacks);
       // Well under a second on any machine that can run the app at all. The
       // point is the bound, not the number: uncapped this took 2.7 s in Node.
-      expect(Date.now() - begonnen).toBeLessThan(900);
+      expect(Date.now() - started).toBeLessThan(900);
     });
 
     it(`${name}: das Fenster hält den Abstand trotz gröberem Raster`, () => {
-      const fenster = buildableArea(plot.polygon, plot.tiefen);
-      expect(fenster.length).toBeGreaterThanOrEqual(3);
-      const soll = Math.min(...plot.tiefen);
+      const envelope = buildableArea(plot.polygon, plot.setbacks);
+      expect(envelope.length).toBeGreaterThanOrEqual(3);
+      const required = Math.min(...plot.setbacks);
       // Coarsening the grid must never buy area: every corner of the envelope
       // stays at least the required distance from the boundary.
-      fenster.forEach(ecke => {
-        expect(distanceToBoundary(ecke, plot.polygon)).toBeGreaterThanOrEqual(soll);
-        expect(pointInPolygon(ecke, plot.polygon)).toBe(true);
+      envelope.forEach(corner => {
+        expect(distanceToBoundary(corner, plot.polygon)).toBeGreaterThanOrEqual(required);
+        expect(pointInPolygon(corner, plot.polygon)).toBe(true);
       });
     });
   }
 
   it("lässt ein normales Grundstück beim feinen Raster", () => {
     // The cap must not cost precision where precision is what people plan on.
-    const klein = echtesGrundstueck("konkav");
-    const fein = buildableArea(klein.polygon, klein.tiefen, { step: 0.4 });
-    expect(polygonArea(fein)).toBeGreaterThan(polygonArea(klein.polygon) * 0.6);
+    const ordinary = realPlot("concave");
+    const fine = buildableArea(ordinary.polygon, ordinary.setbacks, { step: 0.4 });
+    expect(polygonArea(fine)).toBeGreaterThan(polygonArea(ordinary.polygon) * 0.6);
   });
 });

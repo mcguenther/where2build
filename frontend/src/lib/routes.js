@@ -7,13 +7,13 @@
  */
 
 /** Modes in the order the cards list them, with their German labels. */
-export const MODI = [
-  { art: "car", name: "Auto" },
-  { art: "bike", name: "Rad" },
-  { art: "transit", name: "ÖPNV" }
+export const MODES = [
+  { mode: "car", name: "Auto" },
+  { mode: "bike", name: "Rad" },
+  { mode: "transit", name: "ÖPNV" }
 ];
 
-const RAD = Math.PI / 180;
+const RADIANS_PER_DEGREE = Math.PI / 180;
 
 /**
  * Web Mercator, unscaled. Only ratios matter here, so the earth radius drops
@@ -21,8 +21,8 @@ const RAD = Math.PI / 180;
  * route that runs north.
  */
 function mercator([lon, lat]) {
-  const phi = Math.max(-85.05, Math.min(85.05, lat)) * RAD;
-  return { x: lon * RAD, y: Math.log(Math.tan(Math.PI / 4 + phi / 2)) };
+  const phi = Math.max(-85.05, Math.min(85.05, lat)) * RADIANS_PER_DEGREE;
+  return { x: lon * RADIANS_PER_DEGREE, y: Math.log(Math.tan(Math.PI / 4 + phi / 2)) };
 }
 
 /**
@@ -31,13 +31,13 @@ function mercator([lon, lat]) {
  * the first to draw and the second to label a scale.
  */
 export function routeBounds(lines) {
-  const koordinaten = lines.filter(Boolean).flat();
-  if (!koordinaten.length) return null;
-  const punkte = koordinaten.map(mercator);
-  const lons = koordinaten.map(c => c[0]);
-  const lats = koordinaten.map(c => c[1]);
-  const xs = punkte.map(p => p.x);
-  const ys = punkte.map(p => p.y);
+  const coordinates = lines.filter(Boolean).flat();
+  if (!coordinates.length) return null;
+  const points = coordinates.map(mercator);
+  const lons = coordinates.map(c => c[0]);
+  const lats = coordinates.map(c => c[1]);
+  const xs = points.map(p => p.x);
+  const ys = points.map(p => p.y);
   return {
     minX: Math.min(...xs), maxX: Math.max(...xs),
     minY: Math.min(...ys), maxY: Math.max(...ys),
@@ -49,8 +49,8 @@ export function routeBounds(lines) {
 /** How wide the drawn frame is on the ground, in metres. */
 export function groundWidth(bounds) {
   if (!bounds) return 0;
-  const mittlereBreite = ((bounds.minLat + bounds.maxLat) / 2) * RAD;
-  return (bounds.maxLon - bounds.minLon) * RAD * 6378137 * Math.cos(mittlereBreite);
+  const meanLatitude = ((bounds.minLat + bounds.maxLat) / 2) * RADIANS_PER_DEGREE;
+  return (bounds.maxLon - bounds.minLon) * RADIANS_PER_DEGREE * 6378137 * Math.cos(meanLatitude);
 }
 
 /**
@@ -92,18 +92,18 @@ export function coordinatesOf(geometry) {
     return geometry.coordinates.length >= 2 ? geometry.coordinates : null;
   }
   if (geometry.type === "MultiLineString" && Array.isArray(geometry.coordinates)) {
-    const zusammen = geometry.coordinates.flat();
-    return zusammen.length >= 2 ? zusammen : null;
+    const joined = geometry.coordinates.flat();
+    return joined.length >= 2 ? joined : null;
   }
   return null;
 }
 
 /** The fastest mode that was actually reached — it decides a card's colour. */
-export function fastestMode(weg) {
-  if (!weg || !weg.modi) return null;
-  const erreichbar = MODI
-    .map(m => ({ art: m.art, ...(weg.modi[m.art] || {}) }))
+export function fastestMode(route) {
+  if (!route || !route.modes) return null;
+  const reached = MODES
+    .map(m => ({ mode: m.mode, ...(route.modes[m.mode] || {}) }))
     .filter(m => m.erreichbar && Number.isFinite(m.duration_s));
-  if (!erreichbar.length) return null;
-  return erreichbar.reduce((a, b) => (b.duration_s < a.duration_s ? b : a)).art;
+  if (!reached.length) return null;
+  return reached.reduce((a, b) => (b.duration_s < a.duration_s ? b : a)).mode;
 }

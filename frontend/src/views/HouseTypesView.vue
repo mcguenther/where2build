@@ -11,14 +11,14 @@
         </p>
       </div>
       <div class="dehnen"></div>
-      <button type="button" class="knopf" @click="aufnahme = !aufnahme">
-        {{ aufnahme ? "Aufnahme schließen" : "Haustyp hinzufügen" }}
+      <button type="button" class="knopf" @click="adding = !adding">
+        {{ adding ? "Aufnahme schließen" : "Haustyp hinzufügen" }}
       </button>
     </div>
 
-    <p v-if="fehler" class="band band--fehler" role="alert">{{ fehler }}</p>
+    <p v-if="error" class="band band--fehler" role="alert">{{ error }}</p>
 
-    <section v-if="aufnahme" class="aufnahme">
+    <section v-if="adding" class="aufnahme">
       <div class="tafel">
         <div class="tafel__kopf"><h3>Vom Hersteller lesen</h3></div>
         <div class="tafel__leib stapel">
@@ -32,8 +32,8 @@
             <input id="ht-url" type="text" v-model="url">
           </div>
           <div class="reihe">
-            <button type="button" class="knopf" :disabled="laeuft" @click="lesen">
-              {{ laeuft ? "Wird gelesen …" : "Haustyp lesen" }}
+            <button type="button" class="knopf" :disabled="busy" @click="read">
+              {{ busy ? "Wird gelesen …" : "Haustyp lesen" }}
             </button>
             <span class="chip">allowed_domains: {{ domain }}</span>
           </div>
@@ -45,15 +45,15 @@
         <div class="tafel__leib stapel">
           <p class="hinweis">Wenn kein Datenblatt vorliegt oder ihr einfach Maße durchprobieren wollt.</p>
           <div class="drei">
-            <div class="feld"><label for="e-name">Bezeichnung</label><input id="e-name" type="text" v-model="eigen.name"></div>
-            <div class="feld"><label for="e-laenge">Länge</label><input id="e-laenge" type="number" min="4" max="30" step="0.1" v-model.number="eigen.laenge"></div>
-            <div class="feld"><label for="e-breite">Breite</label><input id="e-breite" type="number" min="4" max="30" step="0.1" v-model.number="eigen.breite"></div>
+            <div class="feld"><label for="e-name">Bezeichnung</label><input id="e-name" type="text" v-model="custom.name"></div>
+            <div class="feld"><label for="e-laenge">Länge</label><input id="e-laenge" type="number" min="4" max="30" step="0.1" v-model.number="custom.length"></div>
+            <div class="feld"><label for="e-breite">Breite</label><input id="e-breite" type="number" min="4" max="30" step="0.1" v-model.number="custom.width"></div>
           </div>
           <p class="hinweis">
-            Ergibt {{ area(eigen.laenge * eigen.breite, 1) }} bebaute Fläche.
+            Ergibt {{ area(custom.length * custom.width, 1) }} bebaute Fläche.
             Kantenlängen unter 4 m oder über 30 m sind kein Haus, sondern ein Tippfehler.
           </p>
-          <button type="button" class="knopf knopf--zweit" :disabled="!eigenGueltig" @click="eigenAnlegen">
+          <button type="button" class="knopf knopf--zweit" :disabled="!customValid" @click="addCustom">
             In den Katalog
           </button>
         </div>
@@ -69,61 +69,61 @@
       </div>
     </section>
 
-    <p v-if="typen.length" class="massstab-hinweis">Alle Grundrisse im gleichen Maßstab gezeichnet.</p>
+    <p v-if="types.length" class="massstab-hinweis">Alle Grundrisse im gleichen Maßstab gezeichnet.</p>
 
-    <div v-if="!typen.length" class="leerstelle">
+    <div v-if="!types.length" class="leerstelle">
       <h3>Noch kein Haustyp im Katalog</h3>
       <p>Einen Link zu einer Haustyp-Seite einlesen lassen oder die Maße von Hand eintragen.
         Erst dann lässt sich ein Baukörper auf ein Grundstück legen.</p>
-      <button type="button" class="knopf knopf--zweit" @click="aufnahme = true">Haustyp hinzufügen</button>
+      <button type="button" class="knopf knopf--zweit" @click="adding = true">Haustyp hinzufügen</button>
     </div>
 
     <div v-else class="katalog">
-      <article v-for="typ in typen" :key="typ.id" class="typkarte tafel">
-        <svg viewBox="0 0 300 130" class="typkarte__riss" role="img" :aria-label="`Grundriss ${typ.name}`">
+      <article v-for="type in types" :key="type.id" class="typkarte tafel">
+        <svg viewBox="0 0 300 130" class="typkarte__riss" role="img" :aria-label="`Grundriss ${type.name}`">
           <rect x="0" y="0" width="300" height="130" fill="var(--w2b-karte-grund)" />
-          <rect :x="riss(typ).x" :y="riss(typ).y" :width="riss(typ).w" :height="riss(typ).h" rx="2"
+          <rect :x="outline(type).x" :y="outline(type).y" :width="outline(type).w" :height="outline(type).h" rx="2"
                 fill="var(--w2b-karte-entwurf)" fill-opacity=".8"
                 stroke="var(--w2b-karte-entwurf-rand)" stroke-width="1.6" />
-          <line :x1="riss(typ).x" :y1="riss(typ).y + riss(typ).h + 13"
-                :x2="riss(typ).x + riss(typ).w" :y2="riss(typ).y + riss(typ).h + 13"
+          <line :x1="outline(type).x" :y1="outline(type).y + outline(type).h + 13"
+                :x2="outline(type).x + outline(type).w" :y2="outline(type).y + outline(type).h + 13"
                 stroke="var(--w2b-karte-grenze)" stroke-width="1" />
-          <text x="150" :y="riss(typ).y + riss(typ).h + 26" class="typkarte__mass">{{ num(masse(typ).laenge, 1) }} m</text>
-          <text :x="riss(typ).x - 11" y="62" class="typkarte__mass"
-                :transform="`rotate(-90, ${riss(typ).x - 11}, 62)`">{{ num(masse(typ).breite, 1) }} m</text>
+          <text x="150" :y="outline(type).y + outline(type).h + 26" class="typkarte__mass">{{ num(dimensions(type).length, 1) }} m</text>
+          <text :x="outline(type).x - 11" y="62" class="typkarte__mass"
+                :transform="`rotate(-90, ${outline(type).x - 11}, 62)`">{{ num(dimensions(type).width, 1) }} m</text>
         </svg>
 
         <div class="typkarte__rumpf">
-          <h3>{{ typ.name }}</h3>
-          <p class="typkarte__hersteller">{{ typ.hersteller }}</p>
+          <h3>{{ type.name }}</h3>
+          <p class="typkarte__hersteller">{{ type.manufacturer }}</p>
           <dl>
-            <dt>Bebaute Fläche</dt><dd>{{ area(typ.bebauteFlaeche, 2) }}</dd>
-            <dt>Wohnfläche</dt><dd>{{ typ.wohnflaeche ? area(typ.wohnflaeche, 2) : "—" }}</dd>
+            <dt>Bebaute Fläche</dt><dd>{{ area(type.builtArea, 2) }}</dd>
+            <dt>Wohnfläche</dt><dd>{{ type.livingArea ? area(type.livingArea, 2) : "—" }}</dd>
             <dt>Außenmaß</dt>
-            <dd>{{ num(masse(typ).laenge, 1) }} × {{ num(masse(typ).breite, 1) }} m
-              <span v-if="!typ.laenge" class="zart" title="aus der bebauten Fläche geschätzt">≈</span></dd>
-            <dt>Dach</dt><dd>{{ typ.dachform }}</dd>
-            <dt>Preis ab</dt><dd>{{ typ.preisAb ? euro(typ.preisAb) : "—" }}</dd>
+            <dd>{{ num(dimensions(type).length, 1) }} × {{ num(dimensions(type).width, 1) }} m
+              <span v-if="!type.length" class="zart" title="aus der bebauten Fläche geschätzt">≈</span></dd>
+            <dt>Dach</dt><dd>{{ type.roofShape }}</dd>
+            <dt>Preis ab</dt><dd>{{ type.priceFrom ? euro(type.priceFrom) : "—" }}</dd>
           </dl>
           <div class="typkarte__marken">
-            <span class="chip">gelesen {{ date(typ.gelesenAm) }}</span>
-            <span v-if="!typ.laenge" class="chip chip--warn">Maße geschätzt</span>
-            <span v-if="typ.eigen" class="chip chip--messing">eigene Maße</span>
+            <span class="chip">gelesen {{ date(type.readAt) }}</span>
+            <span v-if="!type.length" class="chip chip--warn">Maße geschätzt</span>
+            <span v-if="type.custom" class="chip chip--messing">eigene Maße</span>
           </div>
         </div>
 
         <div class="passt">
-          <p class="passt__kopf">Passt auf {{ treffer(typ).anzahl }} von {{ grundstuecke.length }} Grundstücken</p>
-          <div v-for="p in treffer(typ).zeilen" :key="p.plot.id" class="passt__zeile">
-            <span class="chip" :class="p.lage ? 'chip--gut' : 'chip--fehler'">{{ p.lage ? "passt" : "zu groß" }}</span>
-            <span class="passt__name">{{ p.plot.name }}</span>
-            <button v-if="p.lage" type="button" class="passt__knopf" @click="ausprobieren(typ, p)">Ausprobieren</button>
+          <p class="passt__kopf">Passt auf {{ fit(type).count }} von {{ plots.length }} Grundstücken</p>
+          <div v-for="row in fit(type).rows" :key="row.plot.id" class="passt__zeile">
+            <span class="chip" :class="row.placement ? 'chip--gut' : 'chip--fehler'">{{ row.placement ? "passt" : "zu groß" }}</span>
+            <span class="passt__name">{{ row.plot.name }}</span>
+            <button v-if="row.placement" type="button" class="passt__knopf" @click="tryOn(type, row)">Ausprobieren</button>
           </div>
         </div>
 
         <div class="typkarte__fuss">
           <div class="dehnen"></div>
-          <button type="button" class="knopf knopf--still knopf--klein" @click="entfernen(typ)">Entfernen</button>
+          <button type="button" class="knopf knopf--still knopf--klein" @click="remove(type)">Entfernen</button>
         </div>
       </article>
     </div>
@@ -133,98 +133,100 @@
 <script>
 import { state, addHouseType, removeHouseType, newId, save } from "../lib/store.js";
 import { buildableArea, findPlacement, footprintFromArea } from "../lib/geometry.js";
-import { haustypLesen } from "../lib/api.js";
-import { haustypAusAntwort } from "../lib/houseTypes.js";
+import { readHouseType } from "../lib/api.js";
+import { houseTypeFromResponse } from "../lib/houseTypes.js";
 import { area, euro, num, date } from "../lib/format.js";
 
 export default {
   name: "HouseTypesView",
   data() {
     return {
-      aufnahme: false,
-      laeuft: false,
-      fehler: "",
+      adding: false,
+      busy: false,
+      error: "",
       url: "https://www.schwoererhaus.de/haeuser/bungalow-128",
-      eigen: { name: "Eigener Entwurf", laenge: 12, breite: 9 }
+      custom: { name: "Eigener Entwurf", length: 12, width: 9 }
     };
   },
   computed: {
-    typen() { return state.daten.haustypen; },
-    grundstuecke() { return state.daten.grundstuecke; },
+    types() { return state.data.houseTypes; },
+    plots() { return state.data.plots; },
     domain() {
       try { return new URL(this.url).hostname.replace(/^www\./, ""); } catch { return "—"; }
     },
-    eigenGueltig() {
-      const { laenge, breite } = this.eigen;
-      return laenge >= 4 && laenge <= 30 && breite >= 4 && breite <= 30;
+    customValid() {
+      const { length, width } = this.custom;
+      return length >= 4 && length <= 30 && width >= 4 && width <= 30;
     },
-    katalogMassstab() {
-      const masse = this.typen.map(t => this.masse(t));
-      const laengste = Math.max(1, ...masse.map(m => m.laenge));
-      const breiteste = Math.max(1, ...masse.map(m => m.breite));
-      return Math.min(206 / laengste, 74 / breiteste);
+    catalogueScale() {
+      const all = this.types.map(t => this.dimensions(t));
+      const longest = Math.max(1, ...all.map(d => d.length));
+      const widest = Math.max(1, ...all.map(d => d.width));
+      return Math.min(206 / longest, 74 / widest);
     }
   },
   methods: {
     area, euro, num, date,
-    masse(typ) {
-      if (typ.laenge && typ.breite) return { laenge: typ.laenge, breite: typ.breite };
-      const f = footprintFromArea(typ.bebauteFlaeche, typ.verhaeltnis || 1.35);
-      return { laenge: f.width, breite: f.depth };
+    dimensions(type) {
+      if (type.length && type.width) return { length: type.length, width: type.width };
+      const f = footprintFromArea(type.builtArea, type.ratio || 1.35);
+      return { length: f.width, width: f.depth };
     },
     /** One scale for the whole catalogue, set by the largest type. Fitting each
      *  plan to its own box would draw a 14 × 14 m house the same size as a
      *  10 × 7 m one, which is exactly the comparison this page exists for. */
-    riss(typ) {
-      const { laenge, breite } = this.masse(typ);
-      const w = laenge * this.katalogMassstab, h = breite * this.katalogMassstab;
+    outline(type) {
+      const { length, width } = this.dimensions(type);
+      const w = length * this.catalogueScale, h = width * this.catalogueScale;
       return { x: 150 - w / 2, y: 60 - h / 2, w, h };
     },
     /** Does this footprint fit into each plot's setback envelope, in any rotation? */
-    treffer(typ) {
-      const { laenge, breite } = this.masse(typ);
-      const zeilen = this.grundstuecke.map(plot => ({
+    fit(type) {
+      const { length, width } = this.dimensions(type);
+      const rows = this.plots.map(plot => ({
         plot,
-        lage: findPlacement(buildableArea(plot.polygon, plot.tiefen), laenge, breite)
+        placement: findPlacement(buildableArea(plot.polygon, plot.setbacks), length, width)
       }));
-      return { zeilen, anzahl: zeilen.filter(z => z.lage).length };
+      return { rows, count: rows.filter(r => r.placement).length };
     },
-    ausprobieren(typ, { plot, lage }) {
-      plot.haustypId = typ.id;
-      if (typ.verhaeltnis) plot.verhaeltnis = typ.verhaeltnis;
-      plot.haus = { cx: lage.cx, cy: lage.cy, rotation: lage.rotation > 90 ? lage.rotation - 180 : lage.rotation };
+    tryOn(type, { plot, placement }) {
+      plot.houseTypeId = type.id;
+      if (type.ratio) plot.ratio = type.ratio;
+      plot.house = {
+        cx: placement.cx, cy: placement.cy,
+        rotation: placement.rotation > 90 ? placement.rotation - 180 : placement.rotation
+      };
       save();
-      state.offenesGrundstueck = plot.id;
-      state.ansicht = "grundstueck";
+      state.openPlotId = plot.id;
+      state.view = "plot";
       window.scrollTo({ top: 0 });
     },
-    async lesen() {
-      this.laeuft = true;
-      this.fehler = "";
+    async read() {
+      this.busy = true;
+      this.error = "";
       try {
-        const typ = haustypAusAntwort(await haustypLesen(this.url.trim()));
-        addHouseType(typ);
-        this.aufnahme = false;
-      } catch (fehler) {
-        this.fehler = fehler.message;
+        addHouseType(houseTypeFromResponse(await readHouseType(this.url.trim())));
+        this.adding = false;
+      } catch (error) {
+        this.error = error.message;
       } finally {
-        this.laeuft = false;
+        this.busy = false;
       }
     },
-    eigenAnlegen() {
-      const { name, laenge, breite } = this.eigen;
+    addCustom() {
+      const { name, length, width } = this.custom;
       addHouseType({
-        id: newId("ht"), hersteller: "Von Hand eingetragen", name,
-        bebauteFlaeche: Math.round(laenge * breite * 100) / 100, wohnflaeche: null,
-        wohnflaecheEg: null, wohnflaecheOg: null, laenge, breite,
-        dachform: "offen", preisAb: null, verhaeltnis: laenge / breite,
-        quelle: null, gelesenAm: new Date().toISOString().slice(0, 10), eigen: true
+        id: newId("house"), manufacturer: "Von Hand eingetragen", name,
+        builtArea: Math.round(length * width * 100) / 100, livingArea: null,
+        livingAreaGround: null, livingAreaUpper: null, length, width,
+        roofShape: "offen", priceFrom: null, ratio: length / width,
+        source: null, readAt: new Date().toISOString().slice(0, 10), custom: true
       });
-      this.aufnahme = false;
+      this.adding = false;
     },
-    entfernen(typ) {
-      const sicher = window.confirm(`„${typ.name}“ aus dem Katalog entfernen? Grundstücke mit diesem Typ fallen auf den ersten übrigen zurück.`);
-      if (sicher) removeHouseType(typ.id);
+    remove(type) {
+      const confirmed = window.confirm(`„${type.name}“ aus dem Katalog entfernen? Grundstücke mit diesem Typ fallen auf den ersten übrigen zurück.`);
+      if (confirmed) removeHouseType(type.id);
     }
   }
 };

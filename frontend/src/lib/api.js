@@ -7,78 +7,78 @@
  * because nothing on screen distinguishes them afterwards.
  */
 
-const BASIS = "/api";
-const ZEITGRENZE = 180000;   // the extraction model fetches a page first
+const BASE = "/api";
+const TIMEOUT_MS = 180000;   // the extraction model fetches a page first
 
 /** Error carrying the backend's own German explanation. */
-export class DienstFehler extends Error {
-  constructor(nachricht, status) {
-    super(nachricht);
-    this.name = "DienstFehler";
+export class ServiceError extends Error {
+  constructor(message, status) {
+    super(message);
+    this.name = "ServiceError";
     this.status = status;
   }
 }
 
-async function hole(pfad, optionen = {}) {
-  const abbruch = new AbortController();
-  const uhr = setTimeout(() => abbruch.abort(), ZEITGRENZE);
-  let antwort;
+async function request(path, options = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  let response;
   try {
-    antwort = await fetch(`${BASIS}${pfad}`, {
+    response = await fetch(`${BASE}${path}`, {
       headers: { "Content-Type": "application/json" },
-      signal: abbruch.signal,
-      ...optionen
+      signal: controller.signal,
+      ...options
     });
-  } catch (fehler) {
-    throw new DienstFehler(
-      fehler?.name === "AbortError"
+  } catch (error) {
+    throw new ServiceError(
+      error?.name === "AbortError"
         ? "Der Dienst hat zu lange nicht geantwortet."
         : "Das Backend ist nicht erreichbar. Läuft der Server?",
       0
     );
   } finally {
-    clearTimeout(uhr);
+    clearTimeout(timer);
   }
 
-  if (!antwort.ok) {
-    const koerper = await antwort.json().catch(() => null);
-    throw new DienstFehler(
-      koerper?.detail || `Der Dienst antwortete mit HTTP ${antwort.status}.`,
-      antwort.status
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new ServiceError(
+      body?.detail || `Der Dienst antwortete mit HTTP ${response.status}.`,
+      response.status
     );
   }
-  return antwort.json();
+  return response.json();
 }
 
-export async function backendZustand() {
+export async function backendHealth() {
   try {
-    return await hole("/health");
+    return await request("/health");
   } catch {
     return null;
   }
 }
 
-export const inseratLesen = url => hole("/listings/extract", { method: "POST", body: JSON.stringify({ url }) });
-export const seiteLesen = text => hole("/listings/extract", { method: "POST", body: JSON.stringify({ text }) });
-export const haustypLesen = url => hole("/housetypes/extract", { method: "POST", body: JSON.stringify({ url }) });
+export const readListing = url => request("/listings/extract", { method: "POST", body: JSON.stringify({ url }) });
+export const readPage = text => request("/listings/extract", { method: "POST", body: JSON.stringify({ text }) });
+export const readHouseType = url => request("/housetypes/extract", { method: "POST", body: JSON.stringify({ url }) });
 
 /** Address, coordinate, or Gemarkung plus the parcel number as written (`85/1`). */
-export const flurstueckSuchen = eingabe =>
-  hole("/parcels/resolve", { method: "POST", body: JSON.stringify(eingabe) });
+export const resolveParcel = query =>
+  request("/parcels/resolve", { method: "POST", body: JSON.stringify(query) });
 
-export const bodenrichtwert = (lat, lon) =>
-  hole(`/landvalue?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`);
+export const landValue = (lat, lon) =>
+  request(`/landvalue?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`);
 
-export const erreichbarkeit = (origin, destinations, modes) =>
-  hole("/reachability", { method: "POST", body: JSON.stringify({ origin, destinations, modes }) });
+export const reachability = (origin, destinations, modes) =>
+  request("/reachability", { method: "POST", body: JSON.stringify({ origin, destinations, modes }) });
 
 /**
  * Address to coordinate, via the routing geocoder. Returns candidates, not an
  * answer: the same street name matches in Thüringen, Bayern and Burgenland, so
  * the user picks. A reference point pulls nearby matches to the front.
  */
-export const geokodieren = (text, bezug) =>
-  hole("/geocode", {
+export const geocode = (text, near) =>
+  request("/geocode", {
     method: "POST",
-    body: JSON.stringify(bezug ? { text, lat: bezug.lat, lon: bezug.lon } : { text })
+    body: JSON.stringify(near ? { text, lat: near.lat, lon: near.lon } : { text })
   });

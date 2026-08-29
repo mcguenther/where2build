@@ -1,18 +1,18 @@
 <template>
   <div class="lageplan-huelle">
-    <div v-if="hintergrund" ref="karte" class="lageplan__karte" aria-hidden="true"></div>
+    <div v-if="hasBackdrop" ref="mapContainer" class="lageplan__karte" aria-hidden="true"></div>
     <svg
-    ref="flaeche"
+    ref="svg"
     class="lageplan"
-    :class="{ 'lageplan--zieht': ziehen, 'lageplan--messen': messen }"
-    :viewBox="`0 0 ${breite} ${hoehe}`"
+    :class="{ 'lageplan--zieht': dragging, 'lageplan--messen': measuring }"
+    :viewBox="`0 0 ${width} ${height}`"
     role="img"
-    :aria-label="beschriftung"
-    @pointerdown="griffFassen"
-    @pointermove="griffZiehen"
-    @pointerup="griffLoslassen"
-    @pointercancel="griffLoslassen"
-    @keydown="tastatur"
+    :aria-label="ariaLabel"
+    @pointerdown="pointerDown"
+    @pointermove="pointerMove"
+    @pointerup="pointerUp"
+    @pointercancel="pointerUp"
+    @keydown="onKeydown"
   >
     <defs>
       <pattern :id="`nachbar-${uid}`" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
@@ -23,84 +23,84 @@
       </marker>
     </defs>
 
-    <rect v-if="!hintergrund" x="0" y="0" :width="breite" :height="hoehe" :fill="grundfarbe" />
+    <rect v-if="!hasBackdrop" x="0" y="0" :width="width" :height="height" :fill="backgroundFill" />
 
-    <g :transform="`rotate(${drehung}, ${breite / 2}, ${hoehe / 2})`">
-      <polygon :points="pfad(plot.polygon)" fill="var(--w2b-karte-flaeche)"
-               :fill-opacity="hintergrund ? 0.42 : 1" />
+    <g :transform="`rotate(${rotation}, ${width / 2}, ${height / 2})`">
+      <polygon :points="path(plot.polygon)" fill="var(--w2b-karte-flaeche)"
+               :fill-opacity="hasBackdrop ? 0.42 : 1" />
 
       <!-- The setback strip is what gets colour: marked is what may NOT be built on. -->
-      <template v-if="saum && fenster.length">
-        <path :d="saumRing" fill-rule="evenodd" fill="var(--w2b-karte-saum)" />
-        <polygon :points="pfad(fenster)" fill="none" stroke="var(--w2b-karte-fenster)"
+      <template v-if="showSetbacks && envelope.length">
+        <path :d="setbackRing" fill-rule="evenodd" fill="var(--w2b-karte-saum)" />
+        <polygon :points="path(envelope)" fill="none" stroke="var(--w2b-karte-fenster)"
                  stroke-width="1.5" stroke-dasharray="6 4" />
       </template>
 
-      <line v-if="plot.teilung" :x1="p(plot.teilung[0]).x" :y1="p(plot.teilung[0]).y"
-            :x2="p(plot.teilung[1]).x" :y2="p(plot.teilung[1]).y"
+      <line v-if="plot.divisionLine" :x1="p(plot.divisionLine[0]).x" :y1="p(plot.divisionLine[0]).y"
+            :x2="p(plot.divisionLine[1]).x" :y2="p(plot.divisionLine[1]).y"
             stroke="var(--w2b-karte-grenze)" stroke-width="1" stroke-dasharray="6 4" opacity=".4" />
 
       <!-- Halo first, then the line: without it boundaries vanish in an orthophoto. -->
-      <polygon :points="pfad(plot.polygon)" fill="none" stroke="var(--w2b-karte-halo)"
-               :stroke-width="kompakt ? 3.5 : 6" stroke-linejoin="round" />
-      <polygon :points="pfad(plot.polygon)" fill="none" stroke="var(--w2b-karte-grenze)"
-               :stroke-width="kompakt ? 1.5 : 2.2" stroke-linejoin="round" />
-      <template v-if="!kompakt">
+      <polygon :points="path(plot.polygon)" fill="none" stroke="var(--w2b-karte-halo)"
+               :stroke-width="compact ? 3.5 : 6" stroke-linejoin="round" />
+      <polygon :points="path(plot.polygon)" fill="none" stroke="var(--w2b-karte-grenze)"
+               :stroke-width="compact ? 1.5 : 2.2" stroke-linejoin="round" />
+      <template v-if="!compact">
         <rect v-for="(v, i) in plot.polygon" :key="`v${i}`"
               :x="p(v).x - 2.5" :y="p(v).y - 2.5" width="5" height="5"
               fill="var(--w2b-karte-halo)" stroke="var(--w2b-karte-grenze)" stroke-width="1.4" />
       </template>
 
       <!-- The house: brass, because the user designed it -->
-      <g :class="{ 'plan-griff': interaktiv }" :tabindex="interaktiv ? 0 : null"
-         :role="interaktiv ? 'button' : null"
-         :aria-label="interaktiv ? 'Baukörper — ziehen oder mit den Pfeiltasten verschieben' : null"
+      <g :class="{ 'plan-griff': interactive }" :tabindex="interactive ? 0 : null"
+         :role="interactive ? 'button' : null"
+         :aria-label="interactive ? 'Baukörper — ziehen oder mit den Pfeiltasten verschieben' : null"
          data-haus>
-        <polygon :points="pfad(hausEcken)" fill="var(--w2b-karte-entwurf)" fill-opacity=".85"
-                 :stroke="verstoss ? 'var(--w2b-karte-verstoss)' : 'var(--w2b-karte-entwurf-rand)'"
-                 :stroke-width="verstoss ? 2.4 : (kompakt ? 1.2 : 1.7)" />
-        <circle v-for="(e, i) in ausreisser" :key="`a${i}`" :cx="p(e).x" :cy="p(e).y" r="4.5"
+        <polygon :points="path(houseCorners)" fill="var(--w2b-karte-entwurf)" fill-opacity=".85"
+                 :stroke="violation ? 'var(--w2b-karte-verstoss)' : 'var(--w2b-karte-entwurf-rand)'"
+                 :stroke-width="violation ? 2.4 : (compact ? 1.2 : 1.7)" />
+        <circle v-for="(e, i) in outliers" :key="`a${i}`" :cx="p(e).x" :cy="p(e).y" r="4.5"
                 fill="none" stroke="var(--w2b-karte-verstoss)" stroke-width="1.7" />
       </g>
 
       <!-- Measuring tape: click sets a point, a second click closes the run. -->
-      <g v-if="messen && messpunkte.length" class="lageplan__messen">
-        <polyline v-if="messpunkte.length > 1" :points="messLinie" fill="none"
+      <g v-if="measuring && measurePoints.length" class="lageplan__messen">
+        <polyline v-if="measurePoints.length > 1" :points="measureLine" fill="none"
                   stroke="var(--w2b-karte-verstoss)" stroke-width="1.8" stroke-dasharray="6 4" />
-        <line v-if="messpunkte.length === 1 && messZeiger"
-              :x1="p(messpunkte[0]).x" :y1="p(messpunkte[0]).y"
-              :x2="p(messZeiger).x" :y2="p(messZeiger).y"
+        <line v-if="measurePoints.length === 1 && measurePointer"
+              :x1="p(measurePoints[0]).x" :y1="p(measurePoints[0]).y"
+              :x2="p(measurePointer).x" :y2="p(measurePointer).y"
               stroke="var(--w2b-karte-verstoss)" stroke-width="1.4" stroke-dasharray="4 4" opacity=".7" />
-        <circle v-for="(m, i) in messpunkte" :key="`m${i}`" :cx="p(m).x" :cy="p(m).y" r="4"
+        <circle v-for="(m, i) in measurePoints" :key="`m${i}`" :cx="p(m).x" :cy="p(m).y" r="4"
                 fill="var(--w2b-karte-halo)" stroke="var(--w2b-karte-verstoss)" stroke-width="2" />
-        <text v-for="(t, i) in messBeschriftung" :key="`mt${i}`" :x="t.x" :y="t.y"
-              :transform="`rotate(${-drehung}, ${t.x}, ${t.y})`" class="lageplan__mass lageplan__mass--messen">
+        <text v-for="(t, i) in measureLabels" :key="`mt${i}`" :x="t.x" :y="t.y"
+              :transform="`rotate(${-rotation}, ${t.x}, ${t.y})`" class="lageplan__mass lageplan__mass--messen">
           {{ t.text }}
         </text>
       </g>
 
       <!-- Dimension chains -->
-      <g v-if="zeigeMasse">
-        <g v-for="(k, i) in ketten" :key="`k${i}`">
-          <line :x1="k.h1.x1" :y1="k.h1.y1" :x2="k.h1.x2" :y2="k.h1.y2"
+      <g v-if="dimensionsVisible">
+        <g v-for="(c, i) in dimensionChains" :key="`k${i}`">
+          <line :x1="c.h1.x1" :y1="c.h1.y1" :x2="c.h1.x2" :y2="c.h1.y2"
                 stroke="var(--w2b-karte-grenze)" stroke-width=".7" opacity=".45" />
-          <line :x1="k.h2.x1" :y1="k.h2.y1" :x2="k.h2.x2" :y2="k.h2.y2"
+          <line :x1="c.h2.x1" :y1="c.h2.y1" :x2="c.h2.x2" :y2="c.h2.y2"
                 stroke="var(--w2b-karte-grenze)" stroke-width=".7" opacity=".45" />
-          <line :x1="k.linie.x1" :y1="k.linie.y1" :x2="k.linie.x2" :y2="k.linie.y2"
+          <line :x1="c.line.x1" :y1="c.line.y1" :x2="c.line.x2" :y2="c.line.y2"
                 stroke="var(--w2b-karte-grenze)" stroke-width="1"
                 :marker-start="`url(#kote-${uid})`" :marker-end="`url(#kote-${uid})`" />
-          <text :x="k.text.x" :y="k.text.y" :transform="`rotate(${-drehung}, ${k.text.x}, ${k.text.y})`"
-                class="lageplan__mass">{{ k.label }}</text>
+          <text :x="c.text.x" :y="c.text.y" :transform="`rotate(${-rotation}, ${c.text.x}, ${c.text.y})`"
+                class="lageplan__mass">{{ c.label }}</text>
         </g>
-        <template v-if="engstelle">
-          <line :x1="engstelle.x1" :y1="engstelle.y1" :x2="engstelle.x2" :y2="engstelle.y2"
-                :stroke="engstelle.eng ? 'var(--w2b-karte-verstoss)' : 'var(--w2b-karte-fenster)'"
+        <template v-if="narrowest">
+          <line :x1="narrowest.x1" :y1="narrowest.y1" :x2="narrowest.x2" :y2="narrowest.y2"
+                :stroke="narrowest.tight ? 'var(--w2b-karte-verstoss)' : 'var(--w2b-karte-fenster)'"
                 stroke-width="1.4" stroke-dasharray="3 3" />
-          <text :x="engstelle.tx" :y="engstelle.ty"
-                :transform="`rotate(${-drehung}, ${engstelle.tx}, ${engstelle.ty})`"
+          <text :x="narrowest.tx" :y="narrowest.ty"
+                :transform="`rotate(${-rotation}, ${narrowest.tx}, ${narrowest.ty})`"
                 class="lageplan__mass"
-                :style="{ fill: engstelle.eng ? 'var(--w2b-karte-verstoss)' : 'var(--w2b-karte-fenster)' }">
-            {{ engstelle.label }}
+                :style="{ fill: narrowest.tight ? 'var(--w2b-karte-verstoss)' : 'var(--w2b-karte-fenster)' }">
+            {{ narrowest.label }}
           </text>
         </template>
       </g>
@@ -108,21 +108,21 @@
 
     <!-- North arrow and scale bar stay upright and stay in print: with the map
          turned to the street they are the only orientation left. -->
-    <g v-if="!kompakt">
-      <g :transform="`translate(${breite - 58}, 74) rotate(${nordWinkel})`">
+    <g v-if="!compact">
+      <g :transform="`translate(${width - 58}, 74) rotate(${northAngle})`">
         <circle cx="0" cy="0" r="26" fill="var(--w2b-karte-halo)" opacity=".65" />
         <path d="M0,-22 L7,12 L0,5 L-7,12 Z" fill="var(--w2b-karte-grenze)" />
       </g>
-      <text :x="breite - 58" y="112" text-anchor="middle" class="lageplan__nord">N</text>
+      <text :x="width - 58" y="112" text-anchor="middle" class="lageplan__nord">N</text>
 
-      <g :transform="`translate(38, ${hoehe - 44})`">
-        <rect x="0" y="-5" :width="zehnMeter" height="5" fill="var(--w2b-karte-grenze)" />
-        <rect :x="zehnMeter" y="-5" :width="zehnMeter" height="5" fill="none"
+      <g :transform="`translate(38, ${height - 44})`">
+        <rect x="0" y="-5" :width="tenMetres" height="5" fill="var(--w2b-karte-grenze)" />
+        <rect :x="tenMetres" y="-5" :width="tenMetres" height="5" fill="none"
               stroke="var(--w2b-karte-grenze)" stroke-width="1.2" />
-        <line x1="0" y1="0" :x2="zehnMeter * 2" y2="0" stroke="var(--w2b-karte-grenze)" stroke-width="1.2" />
+        <line x1="0" y1="0" :x2="tenMetres * 2" y2="0" stroke="var(--w2b-karte-grenze)" stroke-width="1.2" />
         <text x="0" y="15" class="lageplan__leiste" text-anchor="middle">0</text>
-        <text :x="zehnMeter" y="15" class="lageplan__leiste" text-anchor="middle">10</text>
-        <text :x="zehnMeter * 2" y="15" class="lageplan__leiste" text-anchor="end">20 m</text>
+        <text :x="tenMetres" y="15" class="lageplan__leiste" text-anchor="middle">10</text>
+        <text :x="tenMetres * 2" y="15" class="lageplan__leiste" text-anchor="end">20 m</text>
       </g>
     </g>
     </svg>
@@ -132,20 +132,20 @@
 <script>
 import {
   buildableArea, polygonEdges, rectangleCorners, pointInPolygon,
-  closestBoundaryPoint, boundingBox, fitScale, alignmentToEdge
+  closestBoundaryPoint, boundingBox, alignmentToEdge
 } from "../lib/geometry.js";
 import { cameraFor } from "../lib/projection.js";
 import { num } from "../lib/format.js";
 // MapLibre 6 ships named exports only — there is no default.
 // Its worker URL is set once in main.js; see the note there.
-import { Map as MapLibreKarte } from "maplibre-gl";
+import { Map as MapLibreMap } from "maplibre-gl";
 
 /* Every backdrop comes through our own backend. The vector style is rewritten
  * server-side so each URL inside it points back at /api/basemap/; the raster
  * layers are the authority's own WMS behind /api/tiles/. The browser therefore
  * needs no route to the internet, which is what makes this work behind a
  * firewall — and what stopped it working when the style was loaded directly. */
-const KARTENSTIL = "/api/basemap/style.json";
+const MAP_STYLE_URL = "/api/basemap/style.json";
 
 /**
  * The proxy answers with relative URLs, because only the browser knows which
@@ -156,334 +156,333 @@ const KARTENSTIL = "/api/basemap/style.json";
  * silent failure: the style never finishes loading and no tile is ever asked
  * for. So every URL is made absolute here, against this page.
  */
-async function vektorStil() {
+async function vectorStyle() {
   // A style that does not arrive means no backdrop, not a page that waits
   // forever: the drawing is what matters and it needs no network at all.
-  const abbruch = AbortSignal.timeout ? AbortSignal.timeout(15000) : undefined;
-  const antwort = await fetch(KARTENSTIL, { signal: abbruch });
-  if (!antwort.ok) throw new Error(`Kartenstil nicht ladbar (HTTP ${antwort.status})`);
-  const stil = await antwort.json();
-  const her = window.location.origin;
-  const absolut = wert => (typeof wert === "string" && wert.startsWith("/") ? `${her}${wert}` : wert);
+  const signal = AbortSignal.timeout ? AbortSignal.timeout(15000) : undefined;
+  const response = await fetch(MAP_STYLE_URL, { signal });
+  if (!response.ok) throw new Error(`Kartenstil nicht ladbar (HTTP ${response.status})`);
+  const style = await response.json();
+  const origin = window.location.origin;
+  const absolute = value => (typeof value === "string" && value.startsWith("/") ? `${origin}${value}` : value);
 
-  if (stil.glyphs) stil.glyphs = absolut(stil.glyphs);
-  if (stil.sprite) {
-    stil.sprite = Array.isArray(stil.sprite)
-      ? stil.sprite.map(e => ({ ...e, url: absolut(e.url) }))
-      : absolut(stil.sprite);
+  if (style.glyphs) style.glyphs = absolute(style.glyphs);
+  if (style.sprite) {
+    style.sprite = Array.isArray(style.sprite)
+      ? style.sprite.map(e => ({ ...e, url: absolute(e.url) }))
+      : absolute(style.sprite);
   }
   // A source that points at a TileJSON is resolved here instead of by MapLibre:
   // the tile URLs inside that document are relative too, and MapLibre does not
   // resolve those against the source URL. Inlining them ends the guesswork.
-  await Promise.all(Object.values(stil.sources || {}).map(async quelle => {
-    if (Array.isArray(quelle.tiles)) quelle.tiles = quelle.tiles.map(absolut);
-    if (!quelle.url) return;
-    const tilejson = await fetch(absolut(quelle.url), { signal: abbruch }).then(a => (a.ok ? a.json() : null));
+  await Promise.all(Object.values(style.sources || {}).map(async source => {
+    if (Array.isArray(source.tiles)) source.tiles = source.tiles.map(absolute);
+    if (!source.url) return;
+    const tilejson = await fetch(absolute(source.url), { signal }).then(r => (r.ok ? r.json() : null));
     if (!tilejson || !Array.isArray(tilejson.tiles)) return;
-    delete quelle.url;
-    Object.assign(quelle, tilejson, { type: quelle.type, tiles: tilejson.tiles.map(absolut) });
+    delete source.url;
+    Object.assign(source, tilejson, { type: source.type, tiles: tilejson.tiles.map(absolute) });
   }));
-  return stil;
+  return style;
 }
 
 /** A minimal raster style around one of the proxied WMS layers. */
-const rasterStil = (ebene, zuschreibung) => ({
+const rasterStyle = (layer, attribution) => ({
   version: 8,
   sources: {
-    [ebene]: {
+    [layer]: {
       type: "raster",
-      tiles: [`${window.location.origin}/api/tiles/${ebene}/{z}/{x}/{y}.png`],
+      tiles: [`${window.location.origin}/api/tiles/${layer}/{z}/{x}/{y}.png`],
       tileSize: 256,
       maxzoom: 20,
-      attribution: zuschreibung
+      attribution
     }
   },
-  layers: [{ id: ebene, type: "raster", source: ebene }]
+  layers: [{ id: layer, type: "raster", source: layer }]
 });
 
 const GEOSN = "© GeoSN, dl-de/by-2-0";
 
-/** What each ground offers. `ohne` keeps the drawing on plain paper. */
-const HINTERGRUENDE = {
-  karte: vektorStil,
-  luftbild: async () => rasterStil("dop", GEOSN),
-  kataster: async () => rasterStil("alkis", GEOSN)
+/** What each backdrop offers. `none` keeps the drawing on plain paper. */
+const BACKDROPS = {
+  map: vectorStyle,
+  aerial: async () => rasterStyle("dop", GEOSN),
+  cadastre: async () => rasterStyle("alkis", GEOSN)
 };
 
-let laufendeNummer = 0;
+let instanceCount = 0;
 
 export default {
   name: "SitePlan",
   props: {
     plot: { type: Object, required: true },
-    koerper: { type: Object, required: true },   // {width, depth, cx, cy, rotation}
-    breite: { type: Number, default: 820 },
-    hoehe: { type: Number, default: 620 },
-    interaktiv: { type: Boolean, default: false },
-    kompakt: { type: Boolean, default: false },
-    // "ohne" by default: a backdrop is a MapLibre instance, and the small
+    building: { type: Object, required: true },   // {width, depth, cx, cy, rotation}
+    width: { type: Number, default: 820 },
+    height: { type: Number, default: 620 },
+    interactive: { type: Boolean, default: false },
+    compact: { type: Boolean, default: false },
+    // "none" by default: a backdrop is a MapLibre instance, and the small
     // plans on cards and in the comparison must not each start one.
-    grund: { type: String, default: "ohne" },
-    genordet: { type: Boolean, default: false },
-    masse: { type: Boolean, default: true },
-    saum: { type: Boolean, default: true },
+    backdrop: { type: String, default: "none" },
+    northUp: { type: Boolean, default: false },
+    showDimensions: { type: Boolean, default: true },
+    showSetbacks: { type: Boolean, default: true },
     /** Fixed pixels per metre. Without it each plan fits its own frame. */
-    massstab: { type: Number, default: null },
-    /** Put a real basemap under the drawing. Needs `plot.anker`. */
+    scale: { type: Number, default: null },
     /** Measuring mode: clicks add points, the run is measured segment by segment. */
-    messen: { type: Boolean, default: false }
+    measuring: { type: Boolean, default: false }
   },
-  emits: ["verschieben", "gemessen"],
+  emits: ["move", "measured"],
   data() {
-    return { uid: ++laufendeNummer, ziehen: null, karteFehlt: false, messpunkte: [], messZeiger: null };
+    return { uid: ++instanceCount, dragging: null, mapUnavailable: false, measurePoints: [], measurePointer: null };
   },
   computed: {
-    beschriftung() {
+    ariaLabel() {
       return `Lageplan ${this.plot.name}: Flurstück, farbig markierte Abstandsfläche und Baukörper`;
     },
     /** Dimension chains are noise at thumbnail size. */
-    zeigeMasse() { return this.masse && !this.kompakt; },
+    dimensionsVisible() { return this.showDimensions && !this.compact; },
     /* Real outlines arrive already oriented: local +y is north. "Genordet"
        therefore means no rotation, and "straßenparallel" turns the drawing by
        the angle of the street front. */
-    drehung() {
-      if (this.genordet) return 0;
+    rotation() {
+      if (this.northUp) return 0;
       // Normalised to (-90°, 90°]: the raw edge angle would turn the plan upside
       // down whenever the ring happens to run the other way round the boundary.
-      return alignmentToEdge(this.plot.polygon, this.plot.strassenkante ?? 0);
+      return alignmentToEdge(this.plot.polygon, this.plot.streetEdge ?? 0);
     },
-    nordWinkel() { return this.drehung; },
-    /** A backdrop needs a ground that is not "ohne" and a georeference to put
-     *  it under. Without the anchor there is nothing to align a map to. */
-    hintergrund() { return this.grund !== "ohne" && Boolean(this.plot.anker) && !this.karteFehlt; },
-    grundfarbe() { return this.grund === "luftbild" ? "var(--w2b-karte-gruen)" : "var(--w2b-karte-grund)"; },
+    northAngle() { return this.rotation; },
+    /** A backdrop needs one that is not "none" and a georeference to put it
+     *  under. Without the anchor there is nothing to align a map to. */
+    hasBackdrop() { return this.backdrop !== "none" && Boolean(this.plot.anchor) && !this.mapUnavailable; },
+    backgroundFill() { return this.backdrop === "aerial" ? "var(--w2b-karte-gruen)" : "var(--w2b-karte-grund)"; },
 
     /* Frame the plot with a margin, then stretch the box to the frame's aspect
        so the drawing fills the panel instead of floating in it. */
-    sicht() {
+    view() {
       const box = boundingBox(this.plot.polygon);
-      const rand = this.kompakt ? 6 : 40;
-      const luft = 0.16;
-      let bw = box.width * (1 + luft * 2);
-      let bh = box.height * (1 + luft * 2);
-      const seiten = (this.breite - rand * 2) / (this.hoehe - rand * 2);
-      if (bw / bh < seiten) bw = bh * seiten; else bh = bw / seiten;
-      const scale = (this.breite - rand * 2) / bw;
+      const margin = this.compact ? 6 : 40;
+      const padding = 0.16;
+      let bw = box.width * (1 + padding * 2);
+      let bh = box.height * (1 + padding * 2);
+      const aspect = (this.width - margin * 2) / (this.height - margin * 2);
+      if (bw / bh < aspect) bw = bh * aspect; else bh = bw / aspect;
+      const scale = (this.width - margin * 2) / bw;
       return { scale, mx: (box.minX + box.maxX) / 2, my: (box.minY + box.maxY) / 2 };
     },
-    zehnMeter() { return 10 * this.sicht.scale; },
-    fenster() { return buildableArea(this.plot.polygon, this.plot.tiefen); },
-    saumRing() {
-      const aussen = this.plot.polygon.map(v => `${this.p(v).x},${this.p(v).y}`).join("L");
-      const innen = this.fenster.map(v => `${this.p(v).x},${this.p(v).y}`).join("L");
-      return `M${aussen}Z M${innen}Z`;
+    tenMetres() { return 10 * this.view.scale; },
+    envelope() { return buildableArea(this.plot.polygon, this.plot.setbacks); },
+    setbackRing() {
+      const outer = this.plot.polygon.map(v => `${this.p(v).x},${this.p(v).y}`).join("L");
+      const inner = this.envelope.map(v => `${this.p(v).x},${this.p(v).y}`).join("L");
+      return `M${outer}Z M${inner}Z`;
     },
-    hausEcken() { return rectangleCorners(this.koerper); },
-    ausreisser() {
-      if (!this.fenster.length) return this.hausEcken;
-      return this.hausEcken.filter(e => !pointInPolygon(e, this.fenster));
+    houseCorners() { return rectangleCorners(this.building); },
+    outliers() {
+      if (!this.envelope.length) return this.houseCorners;
+      return this.houseCorners.filter(e => !pointInPolygon(e, this.envelope));
     },
-    verstoss() { return this.ausreisser.length > 0; },
-    ketten() {
-      const kanten = polygonEdges(this.plot.polygon);
-      const h = this.hausEcken;
-      const liste = [
-        { a: this.plot.polygon[1], b: this.plot.polygon[0], off: 4.5, wert: kanten[0].length },
-        { a: this.plot.polygon[0], b: this.plot.polygon[this.plot.polygon.length - 1], off: 4.5,
-          wert: kanten[kanten.length - 1].length },
-        { a: h[0], b: h[1], off: -3.1, wert: this.koerper.width },
-        { a: h[1], b: h[2], off: -3.1, wert: this.koerper.depth }
+    violation() { return this.outliers.length > 0; },
+    dimensionChains() {
+      const edges = polygonEdges(this.plot.polygon);
+      const h = this.houseCorners;
+      const wanted = [
+        { a: this.plot.polygon[1], b: this.plot.polygon[0], offset: 4.5, value: edges[0].length },
+        { a: this.plot.polygon[0], b: this.plot.polygon[this.plot.polygon.length - 1], offset: 4.5,
+          value: edges[edges.length - 1].length },
+        { a: h[0], b: h[1], offset: -3.1, value: this.building.width },
+        { a: h[1], b: h[2], offset: -3.1, value: this.building.depth }
       ];
-      return liste.map(k => this.kette(k.a, k.b, k.off, `${num(k.wert)} m`));
+      return wanted.map(c => this.dimensionChain(c.a, c.b, c.offset, `${num(c.value)} m`));
     },
-    messLinie() {
-      return this.messpunkte.map(m => { const q = this.p(m); return `${q.x.toFixed(1)},${q.y.toFixed(1)}`; }).join(" ");
+    measureLine() {
+      return this.measurePoints.map(m => { const q = this.p(m); return `${q.x.toFixed(1)},${q.y.toFixed(1)}`; }).join(" ");
     },
     /** One label per segment, plus the running total once there are three points. */
-    messBeschriftung() {
-      const texte = [];
-      let summe = 0;
-      for (let i = 1; i < this.messpunkte.length; i++) {
-        const a = this.messpunkte[i - 1], b = this.messpunkte[i];
-        const laenge = Math.hypot(b.x - a.x, b.y - a.y);
-        summe += laenge;
+    measureLabels() {
+      const labels = [];
+      let total = 0;
+      for (let i = 1; i < this.measurePoints.length; i++) {
+        const a = this.measurePoints[i - 1], b = this.measurePoints[i];
+        const length = Math.hypot(b.x - a.x, b.y - a.y);
+        total += length;
         const A = this.p(a), B = this.p(b);
-        texte.push({ x: (A.x + B.x) / 2, y: (A.y + B.y) / 2 - 7, text: `${num(laenge)} m` });
+        labels.push({ x: (A.x + B.x) / 2, y: (A.y + B.y) / 2 - 7, text: `${num(length)} m` });
       }
-      if (this.messpunkte.length > 2) {
-        const letzter = this.p(this.messpunkte[this.messpunkte.length - 1]);
-        texte.push({ x: letzter.x, y: letzter.y + 18, text: `gesamt ${num(summe)} m` });
+      if (this.measurePoints.length > 2) {
+        const last = this.p(this.measurePoints[this.measurePoints.length - 1]);
+        labels.push({ x: last.x, y: last.y + 18, text: `gesamt ${num(total)} m` });
       }
-      return texte;
+      return labels;
     },
-    engstelle() {
+    narrowest() {
       if (!this.plot.polygon.length) return null;
       let best = { distance: Infinity };
-      for (const ecke of this.hausEcken) {
-        const nah = closestBoundaryPoint(ecke, this.plot.polygon);
-        if (nah.distance < best.distance) best = { ...nah, von: ecke };
+      for (const corner of this.houseCorners) {
+        const near = closestBoundaryPoint(corner, this.plot.polygon);
+        if (near.distance < best.distance) best = { ...near, from: corner };
       }
       if (!best.point) return null;
-      const a = this.p(best.von), b = this.p(best.point);
-      const mindest = Math.min(...this.plot.tiefen);
+      const a = this.p(best.from), b = this.p(best.point);
+      const required = Math.min(...this.plot.setbacks);
       return {
         x1: a.x, y1: a.y, x2: b.x, y2: b.y,
         tx: (a.x + b.x) / 2, ty: (a.y + b.y) / 2 - 7,
-        eng: best.distance < mindest - 0.01,
+        tight: best.distance < required - 0.01,
         label: `${num(best.distance)} m`
       };
     }
   },
-  created() { this._kartenLauf = 0; },
-  mounted() { this.karteAufbauen(); },
-  beforeUnmount() { this.karteAbbauen(); },
+  created() { this._mapRun = 0; },
+  mounted() { this.buildMap(); },
+  beforeUnmount() { this.destroyMap(); },
   watch: {
-    // A different ground means a different style; MapLibre cannot swap sources
+    // A different backdrop means a different style; MapLibre cannot swap sources
     // underneath itself, so the map is torn down and rebuilt.
-    hintergrund() { this.karteNeuAufbauen(); },
-    grund() { this.karteNeuAufbauen(); },
-    messen(an) { if (!an) this.messungLoeschen(); },
+    hasBackdrop() { this.rebuildMap(); },
+    backdrop() { this.rebuildMap(); },
+    measuring(on) { if (!on) this.clearMeasurement(); },
     "plot.id"() {
-      this.messungLoeschen();
-      this.karteNeuAufbauen();
+      this.clearMeasurement();
+      this.rebuildMap();
     },
-    drehung() { this.kameraSetzen(); },
-    sicht() { this.kameraSetzen(); }
+    rotation() { this.setCamera(); },
+    view() { this.setCamera(); }
   },
   methods: {
     /** MapLibre needs WebGL and a network; neither is guaranteed. Any failure
      *  leaves the drawing alone rather than taking the page down with it. */
-    karteNeuAufbauen() {
-      this.karteAbbauen();
-      this.karteFehlt = false;
-      // The container only exists once `hintergrund` has re-rendered it.
-      this.$nextTick(() => this.karteAufbauen());
+    rebuildMap() {
+      this.destroyMap();
+      this.mapUnavailable = false;
+      // The container only exists once `hasBackdrop` has re-rendered it.
+      this.$nextTick(() => this.buildMap());
     },
-    async karteAufbauen() {
-      if (!this.hintergrund || !this.plot.anker || this._karte) return;
-      const bau = ++this._kartenLauf;
+    async buildMap() {
+      if (!this.hasBackdrop || !this.plot.anchor || this._map) return;
+      const run = ++this._mapRun;
       try {
-        const stil = await HINTERGRUENDE[this.grund]();
-        // The ground may have changed again while the style was in flight.
-        if (bau !== this._kartenLauf || !this.$refs.karte || this._karte) return;
-        this._karte = new MapLibreKarte({
-          container: this.$refs.karte,
-          style: stil,
-          center: [this.plot.anker.lon, this.plot.anker.lat],
+        const style = await BACKDROPS[this.backdrop]();
+        // The backdrop may have changed again while the style was in flight.
+        if (run !== this._mapRun || !this.$refs.mapContainer || this._map) return;
+        this._map = new MapLibreMap({
+          container: this.$refs.mapContainer,
+          style,
+          center: [this.plot.anchor.lon, this.plot.anchor.lat],
           zoom: 17,
           interactive: false,
           attributionControl: false,
           // Set at construction or the map prints blank — it cannot be added later.
           preserveDrawingBuffer: true
         });
-        this._karte.on("load", () => this.kameraSetzen());
+        this._map.on("load", () => this.setCamera());
         // A single missing icon or tile is not a broken map. Tearing the
         // backdrop down for one of those is what made it look permanently
         // unavailable; only a style that never loads counts as a failure.
-        this._karte.on("error", e => console.warn("Karte:", e?.error?.message || e));
-        this.kameraSetzen();
-      } catch (fehler) {
+        this._map.on("error", e => console.warn("Karte:", e?.error?.message || e));
+        this.setCamera();
+      } catch (error) {
         // A missing basemap must not take the drawing down, but staying silent
         // about it would hide a broken build.
-        console.warn("Kartenhintergrund nicht verfügbar:", fehler);
-        if (bau === this._kartenLauf) this.karteFehlt = true;
+        console.warn("Kartenhintergrund nicht verfügbar:", error);
+        if (run === this._mapRun) this.mapUnavailable = true;
       }
     },
-    karteAbbauen() {
-      if (this._karte) { this._karte.remove(); this._karte = null; }
+    destroyMap() {
+      if (this._map) { this._map.remove(); this._map = null; }
     },
     /** Put the camera exactly where the drawing is, so overlay and ground agree. */
-    kameraSetzen() {
-      if (!this._karte || !this.plot.anker) return;
-      const breitePx = this.$refs.flaeche?.getBoundingClientRect().width || this.breite;
-      this._karte.jumpTo(cameraFor({
-        anchor: this.plot.anker,
-        centreMetres: { x: this.sicht.mx, y: this.sicht.my },
-        metresPerPixel: 1 / (this.sicht.scale * (breitePx / this.breite)),
-        rotation: this.drehung
+    setCamera() {
+      if (!this._map || !this.plot.anchor) return;
+      const renderedWidth = this.$refs.svg?.getBoundingClientRect().width || this.width;
+      this._map.jumpTo(cameraFor({
+        anchor: this.plot.anchor,
+        centreMetres: { x: this.view.mx, y: this.view.my },
+        metresPerPixel: 1 / (this.view.scale * (renderedWidth / this.width)),
+        rotation: this.rotation
       }));
-      this._karte.resize();
+      this._map.resize();
     },
-    px(x) { return this.breite / 2 + (x - this.sicht.mx) * this.sicht.scale; },
-    py(y) { return this.hoehe / 2 - (y - this.sicht.my) * this.sicht.scale; },
+    px(x) { return this.width / 2 + (x - this.view.mx) * this.view.scale; },
+    py(y) { return this.height / 2 - (y - this.view.my) * this.view.scale; },
     p(v) {
       const point = Array.isArray(v) ? { x: v[0], y: v[1] } : v;
       return { x: this.px(point.x), y: this.py(point.y) };
     },
-    pfad(ring) { return ring.map(v => { const q = this.p(v); return `${q.x.toFixed(1)},${q.y.toFixed(1)}`; }).join(" "); },
-    ecken(rect) { return rectangleCorners(rect); },
+    path(ring) { return ring.map(v => { const q = this.p(v); return `${q.x.toFixed(1)},${q.y.toFixed(1)}`; }).join(" "); },
+    corners(rect) { return rectangleCorners(rect); },
     /** One dimension chain: two witness lines, the measure line, and a label. */
-    kette(a, b, versatz, label) {
+    dimensionChain(a, b, offset, label) {
       const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
       const n = { x: -dy / len, y: dx / len };
-      const a2 = { x: a.x + n.x * versatz, y: a.y + n.y * versatz };
-      const b2 = { x: b.x + n.x * versatz, y: b.y + n.y * versatz };
-      const mitte = { x: (a2.x + b2.x) / 2 + n.x * 1.6, y: (a2.y + b2.y) / 2 + n.y * 1.6 };
-      const A = this.p(a), B = this.p(b), A2 = this.p(a2), B2 = this.p(b2), M = this.p(mitte);
+      const a2 = { x: a.x + n.x * offset, y: a.y + n.y * offset };
+      const b2 = { x: b.x + n.x * offset, y: b.y + n.y * offset };
+      const middle = { x: (a2.x + b2.x) / 2 + n.x * 1.6, y: (a2.y + b2.y) / 2 + n.y * 1.6 };
+      const A = this.p(a), B = this.p(b), A2 = this.p(a2), B2 = this.p(b2), M = this.p(middle);
       return {
         h1: { x1: A.x, y1: A.y, x2: A2.x, y2: A2.y },
         h2: { x1: B.x, y1: B.y, x2: B2.x, y2: B2.y },
-        linie: { x1: A2.x, y1: A2.y, x2: B2.x, y2: B2.y },
+        line: { x1: A2.x, y1: A2.y, x2: B2.x, y2: B2.y },
         text: { x: M.x, y: M.y + 3.5 },
         label
       };
     },
     /** Screen pixels back to metres, undoing the map rotation. */
-    inMeter(event) {
-      const rect = this.$refs.flaeche.getBoundingClientRect();
-      const k = this.breite / rect.width;
+    toMetres(event) {
+      const rect = this.$refs.svg.getBoundingClientRect();
+      const k = this.width / rect.width;
       const px = (event.clientX - rect.left) * k;
       const py = (event.clientY - rect.top) * k;
-      const r = (this.drehung * Math.PI) / 180;
-      const dx = px - this.breite / 2, dy = py - this.hoehe / 2;
+      const r = (this.rotation * Math.PI) / 180;
+      const dx = px - this.width / 2, dy = py - this.height / 2;
       const ux = dx * Math.cos(-r) - dy * Math.sin(-r);
       const uy = dx * Math.sin(-r) + dy * Math.cos(-r);
-      return { x: this.sicht.mx + ux / this.sicht.scale, y: this.sicht.my - uy / this.sicht.scale };
+      return { x: this.view.mx + ux / this.view.scale, y: this.view.my - uy / this.view.scale };
     },
     /** In measuring mode a click adds a point; a double click ends the run. */
-    messKlick(event) {
-      const punkt = this.inMeter(event);
-      this.messpunkte = [...this.messpunkte, punkt];
-      this.$emit("gemessen", { punkte: this.messpunkte, laenge: this.messLaenge() });
+    measureClick(event) {
+      const point = this.toMetres(event);
+      this.measurePoints = [...this.measurePoints, point];
+      this.$emit("measured", { points: this.measurePoints, length: this.measureLength() });
     },
-    messLaenge() {
-      let summe = 0;
-      for (let i = 1; i < this.messpunkte.length; i++) {
-        summe += Math.hypot(this.messpunkte[i].x - this.messpunkte[i - 1].x,
-                            this.messpunkte[i].y - this.messpunkte[i - 1].y);
+    measureLength() {
+      let total = 0;
+      for (let i = 1; i < this.measurePoints.length; i++) {
+        total += Math.hypot(this.measurePoints[i].x - this.measurePoints[i - 1].x,
+                            this.measurePoints[i].y - this.measurePoints[i - 1].y);
       }
-      return summe;
+      return total;
     },
-    messungLoeschen() {
-      this.messpunkte = [];
-      this.messZeiger = null;
-      this.$emit("gemessen", { punkte: [], laenge: 0 });
+    clearMeasurement() {
+      this.measurePoints = [];
+      this.measurePointer = null;
+      this.$emit("measured", { points: [], length: 0 });
     },
-    griffFassen(event) {
-      if (this.messen) { this.messKlick(event); return; }
-      if (!this.interaktiv || !event.target.closest("[data-haus]")) return;
-      const point = this.inMeter(event);
-      this.ziehen = { dx: this.koerper.cx - point.x, dy: this.koerper.cy - point.y };
-      this.$refs.flaeche.setPointerCapture(event.pointerId);
+    pointerDown(event) {
+      if (this.measuring) { this.measureClick(event); return; }
+      if (!this.interactive || !event.target.closest("[data-haus]")) return;
+      const point = this.toMetres(event);
+      this.dragging = { dx: this.building.cx - point.x, dy: this.building.cy - point.y };
+      this.$refs.svg.setPointerCapture(event.pointerId);
       event.preventDefault();
     },
-    griffZiehen(event) {
-      if (this.messen) { if (this.messpunkte.length) this.messZeiger = this.inMeter(event); return; }
-      if (!this.ziehen) return;
-      const point = this.inMeter(event);
-      this.$emit("verschieben", { cx: point.x + this.ziehen.dx, cy: point.y + this.ziehen.dy });
+    pointerMove(event) {
+      if (this.measuring) { if (this.measurePoints.length) this.measurePointer = this.toMetres(event); return; }
+      if (!this.dragging) return;
+      const point = this.toMetres(event);
+      this.$emit("move", { cx: point.x + this.dragging.dx, cy: point.y + this.dragging.dy });
     },
-    griffLoslassen() { this.ziehen = null; },
-    tastatur(event) {
-      if (!this.interaktiv || !event.target.closest("[data-haus]")) return;
-      const schritt = event.shiftKey ? 1 : 0.25;
-      const richtung = {
-        ArrowLeft: [-schritt, 0], ArrowRight: [schritt, 0],
-        ArrowUp: [0, schritt], ArrowDown: [0, -schritt]
+    pointerUp() { this.dragging = null; },
+    onKeydown(event) {
+      if (!this.interactive || !event.target.closest("[data-haus]")) return;
+      const step = event.shiftKey ? 1 : 0.25;
+      const direction = {
+        ArrowLeft: [-step, 0], ArrowRight: [step, 0],
+        ArrowUp: [0, step], ArrowDown: [0, -step]
       }[event.key];
-      if (!richtung) return;
+      if (!direction) return;
       event.preventDefault();
-      this.$emit("verschieben", { cx: this.koerper.cx + richtung[0], cy: this.koerper.cy + richtung[1] });
+      this.$emit("move", { cx: this.building.cx + direction[0], cy: this.building.cy + direction[1] });
     }
   }
 };

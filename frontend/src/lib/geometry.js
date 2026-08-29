@@ -70,23 +70,23 @@ export function clipToHalfPlane(ring, point, normal) {
  *  this brings it down to something a renderer and a person can handle. */
 export function simplify(ring, tolerance) {
   if (ring.length < 3) return ring;
-  const abstand = (p, a, b) => {
+  const offset = (p, a, b) => {
     const dx = b.x - a.x, dy = b.y - a.y;
     const len = Math.hypot(dx, dy);
     if (len < 1e-12) return Math.hypot(p.x - a.x, p.y - a.y);
     return Math.abs((p.x - a.x) * dy - (p.y - a.y) * dx) / len;
   };
-  const teile = (von, bis, behalten) => {
-    let schlimmster = 0, index = -1;
-    for (let i = von + 1; i < bis; i++) {
-      const d = abstand(ring[i], ring[von], ring[bis]);
-      if (d > schlimmster) { schlimmster = d; index = i; }
+  const split = (from, to, keep) => {
+    let worst = 0, index = -1;
+    for (let i = from + 1; i < to; i++) {
+      const d = offset(ring[i], ring[from], ring[to]);
+      if (d > worst) { worst = d; index = i; }
     }
-    if (schlimmster > tolerance) { teile(von, index, behalten); behalten.add(index); teile(index, bis, behalten); }
+    if (worst > tolerance) { split(from, index, keep); keep.add(index); split(index, to, keep); }
   };
-  const behalten = new Set([0, ring.length - 1]);
-  teile(0, ring.length - 1, behalten);
-  return [...behalten].sort((a, b) => a - b).map(i => ring[i]);
+  const keep = new Set([0, ring.length - 1]);
+  split(0, ring.length - 1, keep);
+  return [...keep].sort((a, b) => a - b).map(i => ring[i]);
 }
 
 /** True when every turn goes the same way. Half-plane clipping is only a
@@ -164,43 +164,43 @@ function insetByGrid(ring, depths, step, safety) {
       const v = [field[j * cols + i], field[j * cols + i + 1],
                  field[(j + 1) * cols + i + 1], field[(j + 1) * cols + i]];
       const p = [at(i, j), at(i + 1, j), at(i + 1, j + 1), at(i, j + 1)];
-      const kreuzungen = [];
+      const crossings = [];
       for (let k = 0; k < 4; k++) {
         const a = k, b = (k + 1) % 4;
-        if ((v[a] > 0) !== (v[b] > 0)) kreuzungen.push(between(p[a], p[b], v[a], v[b]));
+        if ((v[a] > 0) !== (v[b] > 0)) crossings.push(between(p[a], p[b], v[a], v[b]));
       }
-      if (kreuzungen.length === 2) segments.push(kreuzungen);
+      if (crossings.length === 2) segments.push(crossings);
     }
   }
   if (!segments.length) return [];
 
   // Chain segments end to end; keep the longest closed ring.
-  const schluessel = q => `${Math.round(q.x / (step / 8))},${Math.round(q.y / (step / 8))}`;
-  const offen = new Map();
-  segments.forEach((s, idx) => {
-    for (const ende of [0, 1]) {
-      const k = schluessel(s[ende]);
-      if (!offen.has(k)) offen.set(k, []);
-      offen.get(k).push({ idx, ende });
+  const key = q => `${Math.round(q.x / (step / 8))},${Math.round(q.y / (step / 8))}`;
+  const openEnds = new Map();
+  segments.forEach((segment, idx) => {
+    for (const end of [0, 1]) {
+      const k = key(segment[end]);
+      if (!openEnds.has(k)) openEnds.set(k, []);
+      openEnds.get(k).push({ idx, end });
     }
   });
-  const benutzt = new Set();
-  let beste = [];
+  const used = new Set();
+  let best = [];
   for (let start = 0; start < segments.length; start++) {
-    if (benutzt.has(start)) continue;
-    const kette = [segments[start][0], segments[start][1]];
-    benutzt.add(start);
-    for (let schritt = 0; schritt < segments.length; schritt++) {
-      const k = schluessel(kette[kette.length - 1]);
-      const weiter = (offen.get(k) || []).find(e => !benutzt.has(e.idx));
-      if (!weiter) break;
-      benutzt.add(weiter.idx);
-      kette.push(segments[weiter.idx][1 - weiter.ende]);
+    if (used.has(start)) continue;
+    const chain = [segments[start][0], segments[start][1]];
+    used.add(start);
+    for (let hop = 0; hop < segments.length; hop++) {
+      const k = key(chain[chain.length - 1]);
+      const next = (openEnds.get(k) || []).find(e => !used.has(e.idx));
+      if (!next) break;
+      used.add(next.idx);
+      chain.push(segments[next.idx][1 - next.end]);
     }
-    if (kette.length > beste.length) beste = kette;
+    if (chain.length > best.length) best = chain;
   }
-  const vereinfacht = simplify(beste, step * 0.6);
-  return vereinfacht.length >= 3 ? vereinfacht : [];
+  const simplified = simplify(best, step * 0.6);
+  return simplified.length >= 3 ? simplified : [];
 }
 
 /**
@@ -218,10 +218,10 @@ function insetByGrid(ring, depths, step, safety) {
 /* The envelope is asked for by the plan, the key figures, the comparison and the
  * house-type fit check, all for the same plot. On a concave parcel each answer
  * costs a grid sweep, so the last few are kept. */
-const fensterCache = new Map();
-const CACHE_GRENZE = 64;
+const envelopeCache = new Map();
+const CACHE_LIMIT = 64;
 
-function cacheSchluessel(ring, depths, options) {
+function cacheKey(ring, depths, options) {
   const p = ring.map(v => `${v.x.toFixed(2)},${v.y.toFixed(2)}`).join(";");
   const d = Array.isArray(depths) ? depths.join(",") : String(depths);
   return `${p}|${d}|${options.step ?? ""}|${options.safety ?? ""}`;
@@ -258,18 +258,18 @@ function plainDepths(depths, length) {
 }
 
 export function buildableArea(ring, depths, options = {}) {
-  const schluessel = cacheSchluessel(ring, depths, options);
-  const gemerkt = fensterCache.get(schluessel);
-  if (gemerkt) return gemerkt;
-  const ergebnis = berechneBuildableArea(
+  const key = cacheKey(ring, depths, options);
+  const cached = envelopeCache.get(key);
+  if (cached) return cached;
+  const envelope = computeBuildableArea(
     plainRing(ring), plainDepths(depths, ring.length), options
   );
-  if (fensterCache.size >= CACHE_GRENZE) fensterCache.delete(fensterCache.keys().next().value);
-  fensterCache.set(schluessel, ergebnis);
-  return ergebnis;
+  if (envelopeCache.size >= CACHE_LIMIT) envelopeCache.delete(envelopeCache.keys().next().value);
+  envelopeCache.set(key, envelope);
+  return envelope;
 }
 
-function berechneBuildableArea(ring, depths, options) {
+function computeBuildableArea(ring, depths, options) {
   const poly = asCounterClockwise(ring);
   const offsets = Array.isArray(depths) ? depths : poly.map(() => depths);
 
@@ -405,19 +405,19 @@ export function footprintFromArea(builtArea, ratio) {
  */
 /* Same reasoning as the envelope cache: the catalogue asks the same question
  * for every render of the same plot. */
-const lageCache = new Map();
+const placementCache = new Map();
 
 export function findPlacement(envelope, width, depth, options = {}) {
   if (!envelope.length) return null;
-  const schluessel = `${envelope.map(v => `${v.x.toFixed(1)},${v.y.toFixed(1)}`).join(";")}|${width.toFixed(2)}|${depth.toFixed(2)}|${options.rotation ?? ""}|${options.near ? `${options.near.x.toFixed(1)},${options.near.y.toFixed(1)}` : ""}|${options.step ?? ""}`;
-  if (lageCache.has(schluessel)) return lageCache.get(schluessel);
-  const ergebnis = sucheLage(plainRing(envelope), width, depth, options);
-  if (lageCache.size >= CACHE_GRENZE) lageCache.delete(lageCache.keys().next().value);
-  lageCache.set(schluessel, ergebnis);
-  return ergebnis;
+  const key = `${envelope.map(v => `${v.x.toFixed(1)},${v.y.toFixed(1)}`).join(";")}|${width.toFixed(2)}|${depth.toFixed(2)}|${options.rotation ?? ""}|${options.near ? `${options.near.x.toFixed(1)},${options.near.y.toFixed(1)}` : ""}|${options.step ?? ""}`;
+  if (placementCache.has(key)) return placementCache.get(key);
+  const placement = searchPlacement(plainRing(envelope), width, depth, options);
+  if (placementCache.size >= CACHE_LIMIT) placementCache.delete(placementCache.keys().next().value);
+  placementCache.set(key, placement);
+  return placement;
 }
 
-function sucheLage(envelope, width, depth, options) {
+function searchPlacement(envelope, width, depth, options) {
   const { rotation, near, step = 0.75, angleStep = 6 } = options;
   const box = boundingBox(envelope);
 

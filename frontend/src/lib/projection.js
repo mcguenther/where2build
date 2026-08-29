@@ -47,14 +47,14 @@ export function anchorOf(coordinates) {
  * tiles and puts the basemap at exactly twice the scale of the drawing — a
  * mismatch that looks plausible until you measure it.
  */
-const METER_JE_PIXEL_Z0 = 40075016.685578488 / 512;
+const METRES_PER_PIXEL_Z0 = 40075016.685578488 / 512;
 
 export const resolutionAt = (lat, zoom) =>
-  (METER_JE_PIXEL_Z0 * Math.cos((lat * Math.PI) / 180)) / 2 ** zoom;
+  (METRES_PER_PIXEL_Z0 * Math.cos((lat * Math.PI) / 180)) / 2 ** zoom;
 
 /** The inverse: which zoom shows `metresPerPixel` at this latitude. */
 export const zoomFor = (lat, metresPerPixel) =>
-  Math.log2((METER_JE_PIXEL_Z0 * Math.cos((lat * Math.PI) / 180)) / metresPerPixel);
+  Math.log2((METRES_PER_PIXEL_Z0 * Math.cos((lat * Math.PI) / 180)) / metresPerPixel);
 
 /**
  * Camera for a basemap sitting under the drawing.
