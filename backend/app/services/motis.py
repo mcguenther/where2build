@@ -22,6 +22,7 @@ from ..schemas import (
     ReachabilityResponse,
     RouteErgebnis,
     Teilstrecke,
+    Umgebungsmodus,
     Ziel,
 )
 from ..settings import AppSettings, MotisSettings
@@ -37,6 +38,11 @@ GEOCODE_ADVICE = (
     "Die Adresssuche steht damit nicht zur Verfügung — Koordinate oder "
     "Gemarkung mit Flurstücksnummer lassen sich direkt eintragen."
 )
+NEARBY_ADVICE = (
+    "Haltestellen und Gehzeiten lassen sich damit gerade nicht ermitteln; "
+    "Fläche, Bodenrichtwert und Bebauung des Grundstücks sind davon nicht "
+    "betroffen."
+)
 
 DEFAULT_PRECISION = 6
 
@@ -45,6 +51,16 @@ MAX_GEOCODE_RESULTS = 5
 
 # How each API mode maps onto MOTIS query parameters.
 _DIRECT_MODES: dict[str, str] = {"car": "CAR", "bike": "BIKE", "walk": "WALK"}
+
+# `one-to-many` routes on the street network. Its `many` list is capped at 128
+# by the server ("onetomany_max_many"), which is what the candidate budget in
+# services/nearby.py is sized against.
+ONE_TO_MANY_MAX = 128
+_STREET_MODES: dict[str, str] = {"walk": "WALK", "bike": "BIKE"}
+
+# Enough precision that two points on one parcel share a cache entry (4 decimal
+# places is about 11 m) without ever merging two different plots.
+_ORIGIN_PRECISION = 4
 
 
 def decode_polyline(encoded: str, precision: int = DEFAULT_PRECISION) -> list[tuple[float, float]]:
@@ -189,6 +205,14 @@ class MotisService:
         self.settings = settings
         self.app_settings = app_settings
         self.cache = DiskCache(app_settings.cache_dir / "motis", ttl_s=settings.cache_ttl_s)
+        # Separate directories, because these answers stay valid far longer
+        # than a routed itinerary does.
+        self.stops_cache = DiskCache(
+            app_settings.cache_dir / "motis-stops", ttl_s=settings.stops_cache_ttl_s
+        )
+        self.matrix_cache = DiskCache(
+            app_settings.cache_dir / "motis-matrix", ttl_s=settings.matrix_cache_ttl_s
+        )
         self._semaphore = asyncio.Semaphore(max(1, settings.max_concurrency))
 
     def _plan_params(
@@ -279,6 +303,156 @@ class MotisService:
             for mode in modes
         ]
         return ReachabilityResponse(ergebnisse=list(await asyncio.gather(*tasks)))
+
+    async def _get_json(
+        self, path: str, params: dict[str, Any], cache_key: str, cache: DiskCache
+    ) -> Any:
+        """One cached GET against MOTIS, returning parsed JSON."""
+
+        cached = cache.get_json(cache_key)
+        if cached is not None:
+            return cached
+        async with self._semaphore:
+            response = await request(
+                "GET",
+                f"{self.settings.base_url.rstrip('/')}{path}",
+                service=SERVICE_NAME,
+                advice=NEARBY_ADVICE,
+                timeout_s=self.settings.timeout_s,
+                user_agent=self.app_settings.user_agent,
+                params=params,
+            )
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            raise UpstreamError(
+                f"{SERVICE_NAME} hat kein gültiges JSON geliefert. {NEARBY_ADVICE}"
+            ) from exc
+        cache.set_json(cache_key, payload)
+        return payload
+
+    async def stops_in_box(
+        self, south: float, west: float, north: float, east: float
+    ) -> list[dict[str, Any]]:
+        """Every stop in a bounding box, one entry per physical stop.
+
+        Two things about this endpoint, both measured (docs/research/poi.md § 3.1):
+        ``min``/``max`` are **lat,lon** in that order, and ``grouped=true`` is
+        not optional -- without it the same stop comes back once per GTFS feed
+        (115 entries instead of 27 over Leipzig centre). The ``modes`` query
+        parameter validates its enum and is then ignored, so the filtering
+        happens here on each stop's own ``modes`` array.
+        """
+
+        params = {
+            "min": f"{south:.5f},{west:.5f}",
+            "max": f"{north:.5f},{east:.5f}",
+            "grouped": "true",
+        }
+        payload = await self._get_json(
+            "/api/v6/map/stops",
+            params,
+            f"stops:{repr(sorted(params.items()))}",
+            self.stops_cache,
+        )
+        if not isinstance(payload, list):
+            return []
+        return [entry for entry in payload if isinstance(entry, dict)]
+
+    async def stop_routes(self, stop_id: str) -> list[dict[str, Any]]:
+        """The lines calling at one stop, with mode, short name and operator."""
+
+        params = {"stopId": stop_id}
+        payload = await self._get_json(
+            "/api/v6/stop", params, f"stop:{stop_id}", self.stops_cache
+        )
+        routes = payload.get("routes") if isinstance(payload, dict) else None
+        if not isinstance(routes, list):
+            return []
+        return [entry for entry in routes if isinstance(entry, dict)]
+
+    async def travel_time_matrix(
+        self,
+        origin: Koordinate,
+        destinations: list[Koordinate],
+        mode: Umgebungsmodus = "walk",
+        max_time_s: int = 5400,
+        max_matching_distance_m: int = 250,
+    ) -> list[tuple[int, int] | None]:
+        """Street-network travel time from one origin to many destinations.
+
+        One request for the lot: 128 destinations cost the same 148 ms as one,
+        against eight separate ``/api/v6/plan`` calls at 1 523 ms. That factor
+        is why this is here rather than a loop over ``route()`` -- Transitous is
+        a volunteer service and asks to be treated as one.
+
+        Returns ``(duration_s, distance_m)`` per destination, positionally
+        aligned with ``destinations``; ``None`` where MOTIS answered ``{}``,
+        which is its way of saying "not reachable on this network at all".
+
+        Two traps: the coordinate separator is a **semicolon**, not a comma (a
+        comma is rejected as "not a valid geo coordinate"), and repeated
+        ``many`` parameters on a GET are silently collapsed to one -- verified
+        29.08.2026, three ``many`` values returned a single duration. The POST
+        form takes a JSON array and is the only one that answers all of them.
+        """
+
+        if not destinations:
+            return []
+        if len(destinations) > ONE_TO_MANY_MAX:
+            raise ValueError(f"one-to-many accepts at most {ONE_TO_MANY_MAX} destinations.")
+
+        body: dict[str, Any] = {
+            "one": f"{origin.lat};{origin.lon}",
+            "many": [f"{point.lat};{point.lon}" for point in destinations],
+            "mode": _STREET_MODES[mode],
+            "max": int(max_time_s),
+            # Required, not optional: leaving it out is answered with
+            # "key maxMatchingDistance not found".
+            "maxMatchingDistance": int(max_matching_distance_m),
+            "arriveBy": False,
+            "withDistance": True,
+        }
+        cache_key = "onetomany:" + repr(
+            (
+                round(origin.lat, _ORIGIN_PRECISION),
+                round(origin.lon, _ORIGIN_PRECISION),
+                body["many"],
+                body["mode"],
+                body["max"],
+                body["maxMatchingDistance"],
+            )
+        )
+        payload = self.matrix_cache.get_json(cache_key)
+        if payload is None:
+            async with self._semaphore:
+                response = await request(
+                    "POST",
+                    f"{self.settings.base_url.rstrip('/')}/api/v1/one-to-many",
+                    service=SERVICE_NAME,
+                    advice=NEARBY_ADVICE,
+                    timeout_s=self.settings.timeout_s,
+                    user_agent=self.app_settings.user_agent,
+                    json=body,
+                )
+            try:
+                payload = response.json()
+            except ValueError as exc:
+                raise UpstreamError(
+                    f"{SERVICE_NAME} hat kein gültiges JSON geliefert. {NEARBY_ADVICE}"
+                ) from exc
+            self.matrix_cache.set_json(cache_key, payload)
+
+        results: list[tuple[int, int] | None] = []
+        for index in range(len(destinations)):
+            entry = payload[index] if isinstance(payload, list) and index < len(payload) else None
+            duration = entry.get("duration") if isinstance(entry, dict) else None
+            if duration is None:
+                results.append(None)
+                continue
+            distance = entry.get("distance")
+            results.append((int(round(float(duration))), int(round(float(distance or 0)))))
+        return results
 
     async def geocode_candidates(
         self, text: str, bias: Koordinate | None = None, limit: int = MAX_GEOCODE_RESULTS

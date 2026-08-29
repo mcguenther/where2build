@@ -24,10 +24,12 @@ from .routers import (
     housetypes,
     landvalue,
     listings,
+    nearby,
     parcels,
     reachability,
     tiles,
 )
+from .deps import nearby_service
 from .schemas import DienstStatus, HealthResponse
 from .settings import get_settings
 from .validation import readable_validation_error
@@ -49,6 +51,35 @@ FRAMEWORK_MESSAGES = {
     413: "Die Anfrage ist zu groß.",
     422: "Die Anfrage ist unvollständig oder ungültig.",
 }
+
+
+def _poi_hinweis(status: dict[str, object]) -> str:
+    """What /api/health says about the local POI index.
+
+    The point of the sentence is the difference the frontend has to be able to
+    make: a missing index is "not set up here", never "nothing nearby". So the
+    message names the categories that go dark and the command that fills it.
+    """
+
+    kategorien = "Schule, Kindergarten, Park, Spielplatz, Supermarkt und Arztpraxis"
+    if not status["konfiguriert"]:
+        reason = (
+            f" Die vorhandene Datei ist unbrauchbar: {status['fehler']}."
+            if status.get("fehler")
+            else ""
+        )
+        return (
+            f"Kein Umgebungsverzeichnis vorhanden — {kategorien} können nicht "
+            "beantwortet werden; Haltestellen und Bahnhöfe kommen aus dem "
+            "Fahrplan und funktionieren weiterhin. Erzeugen mit: "
+            f"python scripts/build_poi_index.py --download.{reason}"
+        )
+    datenstand = status.get("datenstand")
+    stand = f", Stand {datenstand}" if datenstand else ""
+    return (
+        f"{status['anzahl']} Orte aus OpenStreetMap{stand} für {kategorien}. "
+        "Haltestellen und Bahnhöfe kommen aus dem Fahrplan (MOTIS)."
+    )
 
 
 def create_app() -> FastAPI:
@@ -100,6 +131,7 @@ def create_app() -> FastAPI:
     @app.get("/api/health", response_model=HealthResponse, tags=["Betrieb"], summary="Zustand")
     async def health() -> HealthResponse:
         current = get_settings()
+        poi = nearby_service().index_status()
         return HealthResponse(
             version=__version__,
             dienste=[
@@ -123,6 +155,12 @@ def create_app() -> FastAPI:
                         "Routing (/api/reachability) und Adresssuche (/api/geocode); "
                         "öffentliche Instanz nur für den Prototyp."
                     ),
+                ),
+                DienstStatus(
+                    name="poi",
+                    konfiguriert=poi["konfiguriert"],
+                    endpunkt=poi["pfad"],
+                    hinweis=_poi_hinweis(poi),
                 ),
                 DienstStatus(
                     name="tiles",
@@ -162,6 +200,7 @@ def create_app() -> FastAPI:
         landvalue,
         geocode,
         reachability,
+        nearby,
         tiles,
         basemap,
     ):

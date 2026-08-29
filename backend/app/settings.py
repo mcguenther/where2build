@@ -19,6 +19,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # would silently leave every key unset there.
 _ENV_FILE = (Path(__file__).resolve().parent.parent / ".env", ".env")
 
+# Same reasoning for the POI index: it is a build artefact next to the code,
+# not something to look for in whatever directory uvicorn happened to start in.
+_BACKEND_DIR = Path(__file__).resolve().parent.parent
+
 
 class AppSettings(BaseSettings):
     """Process-wide settings (env prefix ``APP_``)."""
@@ -88,6 +92,37 @@ class MotisSettings(BaseSettings):
     # Bike feeders need more than the MOTIS default of 900 s.
     max_pre_transit_time_s: int = 1800
     cache_ttl_s: int = 3600
+    # Stop positions and the modes serving them change on the order of days,
+    # so they get a far longer life than a routing answer.
+    stops_cache_ttl_s: int = 24 * 3600
+    # Walking times move with the street network, which moves slowly.
+    matrix_cache_ttl_s: int = 7 * 24 * 3600
+
+
+class NearbySettings(BaseSettings):
+    """"Was ist in der Nähe?" -- POI index and its search budget (env prefix ``NEARBY_``).
+
+    The transit half of this feature needs nothing here: it comes from the same
+    MOTIS instance the routing uses. What is configured here is the local
+    OpenStreetMap index for schools, parks and the rest, which is built by
+    ``scripts/build_poi_index.py`` and may legitimately be absent.
+    """
+
+    model_config = SettingsConfigDict(env_prefix="NEARBY_", env_file=_ENV_FILE, extra="ignore")
+
+    poi_index_path: Path = _BACKEND_DIR / "data" / "poi-sachsen.json"
+    # The server's own cap on `one-to-many`; asking for more is a 422 from MOTIS.
+    max_candidates: int = 128
+    # Ceiling for the routing search. 90 minutes on foot is far past the point
+    # where "the nearest one" still means anything.
+    max_time_s: int = 5400
+    # How far MOTIS may look for a street to attach a candidate point to.
+    max_matching_distance_m: int = 250
+    # Rounding of the stop bounding box, in degrees, so nearby plots share a
+    # cache entry instead of each cutting its own.
+    bbox_grid_deg: float = 0.02
+    # Lines per stop are an extra request each; cap what one answer can cost.
+    max_line_lookups: int = 6
 
 
 class TilesSettings(BaseSettings):
@@ -168,6 +203,7 @@ class Settings(BaseSettings):
     alkis: AlkisSettings = Field(default_factory=AlkisSettings)
     boris: BorisSettings = Field(default_factory=BorisSettings)
     motis: MotisSettings = Field(default_factory=MotisSettings)
+    nearby: NearbySettings = Field(default_factory=NearbySettings)
     tiles: TilesSettings = Field(default_factory=TilesSettings)
     basemap: BasemapSettings = Field(default_factory=BasemapSettings)
     llm: LLMSettings = Field(default_factory=LLMSettings)

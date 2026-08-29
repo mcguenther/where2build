@@ -52,6 +52,10 @@ def isolated_settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("LLM_BASE_URL", LLM_URL)
     monkeypatch.setenv("LLM_API_KEY", "test-key")
     monkeypatch.setenv("LLM_MODEL", "test/model")
+    # No POI index unless a test asks for one. Pointed at a path inside the
+    # test's own tmp_path rather than deleted, so a developer's own built index
+    # in backend/data cannot make the "index missing" tests pass by accident.
+    monkeypatch.setenv("NEARBY_POI_INDEX_PATH", str(tmp_path / "kein-poi-index.json"))
     reset_services()
     yield
     reset_services()
@@ -74,3 +78,17 @@ def without_llm(monkeypatch: pytest.MonkeyPatch):
 @pytest.fixture
 def client() -> TestClient:
     return TestClient(fastapi_app)
+
+
+@pytest.fixture
+def poi_index(monkeypatch: pytest.MonkeyPatch):
+    """A deployment where scripts/build_poi_index.py has been run.
+
+    The fixture file is the real output of that script, built from
+    ``fixtures/poi_extract.osm`` -- so the format the loader reads is the
+    format the builder writes, and a change to either breaks a test.
+    """
+
+    monkeypatch.setenv("NEARBY_POI_INDEX_PATH", str(FIXTURES / "poi_index.json"))
+    reset_services()
+    yield

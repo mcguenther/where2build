@@ -1,0 +1,51 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<osm version="0.6" generator="handmade">
+  <node id="1" lat="51.28300" lon="12.46360" version="1">
+    <tag k="amenity" v="school"/>
+    <tag k="name" v="Schule Liebertwolkwitz - Grundschule der Stadt Leipzig"/>
+  </node>
+  <node id="2" lat="51.28305" lon="12.46365" version="1">
+    <tag k="amenity" v="school"/>
+    <tag k="name" v="Geschwister Scholl Schule Liebertwolkwitz - Oberschule der Stadt Leipzig"/>
+  </node>
+  <node id="3" lat="51.28100" lon="12.46500" version="1">
+    <tag k="amenity" v="driving_school"/>
+    <tag k="name" v="Fahrschule Nein Danke"/>
+  </node>
+  <node id="4" lat="51.28400" lon="12.46000" version="1">
+    <tag k="shop" v="supermarket"/><tag k="name" v="Konsum"/>
+  </node>
+  <node id="5" lat="51.28450" lon="12.46100" version="1">
+    <tag k="leisure" v="playground"/><tag k="access" v="private"/>
+  </node>
+  <node id="6" lat="51.28460" lon="12.46110" version="1">
+    <tag k="leisure" v="playground"/>
+  </node>
+  <node id="7" lat="51.28470" lon="12.46120" version="1">
+    <tag k="amenity" v="doctors"/><tag k="healthcare" v="doctor"/><tag k="name" v="Praxis Dr. Meier"/>
+  </node>
+  <node id="10" lat="51.2860" lon="12.4600" version="1"/>
+  <node id="11" lat="51.2860" lon="12.4620" version="1"/>
+  <node id="12" lat="51.2870" lon="12.4620" version="1"/>
+  <node id="13" lat="51.2870" lon="12.4600" version="1"/>
+  <way id="100" version="1">
+    <nd ref="10"/><nd ref="11"/><nd ref="12"/><nd ref="13"/><nd ref="10"/>
+    <tag k="leisure" v="park"/><tag k="name" v="Volkspark"/>
+  </way>
+  <node id="20" lat="51.2880" lon="12.4600" version="1"/>
+  <node id="21" lat="51.2880" lon="12.4610" version="1"/>
+  <node id="22" lat="51.2890" lon="12.4610" version="1"/>
+  <node id="23" lat="51.2890" lon="12.4600" version="1"/>
+  <way id="101" version="1">
+    <nd ref="20"/><nd ref="21"/><nd ref="22"/><nd ref="23"/><nd ref="20"/>
+    <tag k="leisure" v="garden"/><tag k="garden:type" v="residential"/>
+  </way>
+  <node id="30" lat="51.2900" lon="12.4600" version="1"/>
+  <node id="31" lat="51.2900" lon="12.4610" version="1"/>
+  <node id="32" lat="51.2910" lon="12.4610" version="1"/>
+  <node id="33" lat="51.2910" lon="12.4600" version="1"/>
+  <way id="102" version="1">
+    <nd ref="30"/><nd ref="31"/><nd ref="32"/><nd ref="33"/><nd ref="30"/>
+    <tag k="amenity" v="school"/>
+  </way>
+</osm>

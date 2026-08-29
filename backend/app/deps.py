@@ -13,6 +13,7 @@ from .services.basemap import BasemapService
 from .services.boris import BorisService
 from .services.llm import LLMClient
 from .services.motis import MotisService
+from .services.nearby import NearbyService
 from .services.tiles import TileService
 from .settings import Settings, get_settings
 
@@ -33,6 +34,12 @@ def boris_service() -> BorisService:
 def motis_service() -> MotisService:
     settings = get_settings()
     return MotisService(settings.motis, settings.app)
+
+
+@lru_cache(maxsize=1)
+def nearby_service() -> NearbyService:
+    settings = get_settings()
+    return NearbyService(settings.nearby, motis_service())
 
 
 @lru_cache(maxsize=1)
@@ -65,6 +72,7 @@ def reset_services() -> None:
         alkis_service,
         boris_service,
         motis_service,
+        nearby_service,
         tile_service,
         basemap_service,
         llm_client,

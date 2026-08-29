@@ -1,0 +1,93 @@
+{
+ "place": {
+  "name": "Leipzig, Meusdorf",
+  "stopId": "de-DELFI_de:14713:11559::01",
+  "importance": 5.316481474437751e-05,
+  "lat": 51.29411000000001,
+  "lon": 12.440334,
+  "tz": "Europe/Berlin",
+  "vertexType": "TRANSIT",
+  "modes": [
+   "TRAM",
+   "BUS"
+  ]
+ },
+ "routes": [
+  {
+   "routeId": "de-DELFI_de:nasa:14713|Strab|15:LVB_0",
+   "routeShortName": "15",
+   "routeLongName": "",
+   "mode": "TRAM",
+   "agencyId": "8872",
+   "agencyName": "Leipziger Verkehrsbetriebe",
+   "agencyUrl": "",
+   "routeColor": "233b8d",
+   "routeTextColor": "ffffff",
+   "routeType": 0
+  },
+  {
+   "routeId": "de-DELFI_de:nasa:14713|Bus|172:LVB_3",
+   "routeShortName": "172",
+   "routeLongName": "",
+   "mode": "BUS",
+   "agencyId": "8872",
+   "agencyName": "Leipziger Verkehrsbetriebe",
+   "agencyUrl": "",
+   "routeType": 3
+  },
+  {
+   "routeId": "de-DELFI_de:nasa:14713|Strab|2:LVB_0",
+   "routeShortName": "2",
+   "routeLongName": "",
+   "mode": "TRAM",
+   "agencyId": "8872",
+   "agencyName": "Leipziger Verkehrsbetriebe",
+   "agencyUrl": "",
+   "routeColor": "fecb29",
+   "routeTextColor": "000000",
+   "routeType": 0
+  },
+  {
+   "routeId": "de-DELFI_de:nasa:14713|Strab|31:LVB_0",
+   "routeShortName": "31",
+   "routeLongName": "",
+   "mode": "TRAM",
+   "agencyId": "8872",
+   "agencyName": "Leipziger Verkehrsbetriebe",
+   "agencyUrl": "",
+   "routeType": 0
+  },
+  {
+   "routeId": "de-DELFI_de:nasa:14729|Bus|690:RL_3",
+   "routeShortName": "690",
+   "routeLongName": "",
+   "mode": "BUS",
+   "agencyId": "8889",
+   "agencyName": "Regionalbus Leipzig GmbH",
+   "agencyUrl": "",
+   "routeType": 3
+  },
+  {
+   "routeId": "de-DELFI_de:nasa:14713|Bus|75:LVB_3",
+   "routeShortName": "75",
+   "routeLongName": "",
+   "mode": "BUS",
+   "agencyId": "8872",
+   "agencyName": "Leipziger Verkehrsbetriebe",
+   "agencyUrl": "",
+   "routeType": 3
+  },
+  {
+   "routeId": "de-DELFI_de:nasa:14713|Bus|N8:LVB/408_3",
+   "routeShortName": "N8",
+   "routeLongName": "",
+   "mode": "BUS",
+   "agencyId": "8872",
+   "agencyName": "Leipziger Verkehrsbetriebe",
+   "agencyUrl": "",
+   "routeColor": "f5a522",
+   "routeTextColor": "000000",
+   "routeType": 3
+  }
+ ]
+}

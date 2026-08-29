@@ -1,0 +1,112 @@
+[
+ {
+  "name": "Leipzig, Liebertwolkwitzer Markt",
+  "stopId": "de-DELFI_de:14713:12409::01",
+  "importance": 2.047533371296595e-06,
+  "lat": 51.28277587890625,
+  "lon": 12.463879585266113,
+  "tz": "Europe/Berlin",
+  "vertexType": "TRANSIT",
+  "modes": [
+   "BUS"
+  ]
+ },
+ {
+  "name": "Leipzig, Schwarzes Ross",
+  "stopId": "de-DELFI_de:14713:12542::01",
+  "importance": 1.583938137628138e-05,
+  "lat": 51.28253173828125,
+  "lon": 12.460906982421875,
+  "tz": "Europe/Berlin",
+  "vertexType": "TRANSIT",
+  "modes": [
+   "BUS"
+  ]
+ },
+ {
+  "name": "Leipzig, Zur alten Sandgrube",
+  "stopId": "de-DELFI_de:14713:12547::01",
+  "importance": 7.627496870554751e-06,
+  "lat": 51.28062438964844,
+  "lon": 12.46352481842041,
+  "tz": "Europe/Berlin",
+  "vertexType": "TRANSIT",
+  "modes": [
+   "BUS"
+  ]
+ },
+ {
+  "name": "Leipzig, Roßstr.",
+  "stopId": "de-DELFI_de:14713:12645::01",
+  "importance": 1.9489268652250757e-06,
+  "lat": 51.28603744506836,
+  "lon": 12.465685844421387,
+  "tz": "Europe/Berlin",
+  "vertexType": "TRANSIT",
+  "modes": [
+   "BUS"
+  ]
+ },
+ {
+  "name": "Leipzig, An den Badeanlagen",
+  "stopId": "de-DELFI_de:14713:12407::01",
+  "importance": 7.530340553785209e-06,
+  "lat": 51.279205322265625,
+  "lon": 12.466147422790527,
+  "tz": "Europe/Berlin",
+  "vertexType": "TRANSIT",
+  "modes": [
+   "BUS"
+  ]
+ },
+ {
+  "name": "Leipzig-Liebertwolkwitz",
+  "stopId": "de-DELFI_de:14713:8012228",
+  "importance": 0.00034249635064043105,
+  "lat": 51.28396987915039,
+  "lon": 12.469247817993164,
+  "tz": "Europe/Berlin",
+  "vertexType": "TRANSIT",
+  "modes": [
+   "REGIONAL_RAIL",
+   "BUS"
+  ]
+ },
+ {
+  "name": "Leipzig, Liebertwolkwitz, Störmthaler Str.",
+  "stopId": "de-DELFI_de:14713:12543::01",
+  "importance": 1.7112564819399267e-05,
+  "lat": 51.277854919433594,
+  "lon": 12.469029426574707,
+  "tz": "Europe/Berlin",
+  "vertexType": "TRANSIT",
+  "modes": [
+   "BUS"
+  ]
+ },
+ {
+  "name": "Leipzig-Holzhausen",
+  "stopId": "de-DELFI_de:14713:8011913",
+  "importance": 0.0002701526100281626,
+  "lat": 51.3060417175293,
+  "lon": 12.461447715759277,
+  "tz": "Europe/Berlin",
+  "vertexType": "TRANSIT",
+  "modes": [
+   "REGIONAL_RAIL"
+  ]
+ },
+ {
+  "name": "Leipzig, Meusdorf",
+  "stopId": "de-DELFI_de:14713:11559::01",
+  "importance": 5.316481474437751e-05,
+  "lat": 51.29410934448242,
+  "lon": 12.44033432006836,
+  "tz": "Europe/Berlin",
+  "vertexType": "TRANSIT",
+  "modes": [
+   "TRAM",
+   "BUS"
+  ]
+ }
+]

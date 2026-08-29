@@ -1,0 +1,70 @@
+{
+ "erzeugt_am": "2026-08-29T00:00:00Z",
+ "quelle": "tests/fixtures/poi_extract.osm",
+ "datenstand": "2026-08-22T20:21:02Z",
+ "lizenz": "OpenStreetMap contributors, ODbL",
+ "anzahl": 7,
+ "anzahl_je_kategorie": {
+  "schule": 3,
+  "supermarkt": 1,
+  "spielplatz": 1,
+  "arzt": 1,
+  "park": 1
+ },
+ "eintraege": [
+  {
+   "kategorie": "schule",
+   "lat": 51.283,
+   "lon": 12.4636,
+   "name": "Schule Liebertwolkwitz - Grundschule der Stadt Leipzig",
+   "art": "Grundschule",
+   "osm_id": "N1"
+  },
+  {
+   "kategorie": "schule",
+   "lat": 51.28305,
+   "lon": 12.46365,
+   "name": "Geschwister Scholl Schule Liebertwolkwitz - Oberschule der Stadt Leipzig",
+   "art": "Oberschule",
+   "osm_id": "N2"
+  },
+  {
+   "kategorie": "supermarkt",
+   "lat": 51.284,
+   "lon": 12.46,
+   "name": "Konsum",
+   "art": "Supermarkt",
+   "osm_id": "N4"
+  },
+  {
+   "kategorie": "spielplatz",
+   "lat": 51.2846,
+   "lon": 12.4611,
+   "art": "Spielplatz",
+   "osm_id": "N6"
+  },
+  {
+   "kategorie": "arzt",
+   "lat": 51.2847,
+   "lon": 12.4612,
+   "name": "Praxis Dr. Meier",
+   "art": "Arztpraxis",
+   "osm_id": "N7"
+  },
+  {
+   "kategorie": "park",
+   "lat": 51.2865,
+   "lon": 12.461,
+   "name": "Volkspark",
+   "art": "Park",
+   "osm_id": "W100"
+  },
+  {
+   "kategorie": "schule",
+   "lat": 51.2905,
+   "lon": 12.4605,
+   "art": "Schule",
+   "osm_id": "W102"
+  }
+ ]
+}

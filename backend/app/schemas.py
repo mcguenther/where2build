@@ -528,6 +528,160 @@ class ReachabilityResponse(BaseModel):
 
 
 # --------------------------------------------------------------------------
+# Nearby -- "wie weit ist die nächste Schule"
+# --------------------------------------------------------------------------
+
+# Six categories come from the local OpenStreetMap index, four from the MOTIS
+# timetable. They are one enum because a caller asks one question of them.
+Kategorie = Literal[
+    "schule",
+    "kindergarten",
+    "park",
+    "spielplatz",
+    "supermarkt",
+    "arzt",
+    "tram",
+    "sbahn",
+    "bus",
+    "bahnhof",
+]
+
+ALLE_KATEGORIEN: tuple[Kategorie, ...] = (
+    "schule",
+    "kindergarten",
+    "park",
+    "spielplatz",
+    "supermarkt",
+    "arzt",
+    "tram",
+    "sbahn",
+    "bus",
+    "bahnhof",
+)
+
+# What a user reads for each. Kept here so the endpoint, the health report and
+# every message use the same word for the same thing.
+KATEGORIE_LABELS: dict[str, str] = {
+    "schule": "Schule",
+    "kindergarten": "Kindergarten",
+    "park": "Park",
+    "spielplatz": "Spielplatz",
+    "supermarkt": "Supermarkt",
+    "arzt": "Arztpraxis",
+    "tram": "Straßenbahnhaltestelle",
+    "sbahn": "S-Bahn-Haltestelle",
+    "bus": "Bushaltestelle",
+    "bahnhof": "Bahnhof",
+}
+
+# one-to-many routes on the street network only; public transport is not a way
+# of getting to the nearest playground.
+Umgebungsmodus = Literal["walk", "bike"]
+
+UMGEBUNG_HINWEIS = (
+    "Die Gehzeiten stammen aus dem Fußwegenetz von OpenStreetMap und sind "
+    "Schätzwerte, keine Messwerte — sortiert wird danach und nicht nach "
+    "Luftlinie, weil der nächstgelegene Ort oft der weitere Weg ist. "
+    "Schule, Kindergarten, Park, Spielplatz, Supermarkt und Arztpraxis stammen "
+    "aus OpenStreetMap und damit aus ehrenamtlicher Kartierung, nicht aus einem "
+    "amtlichen Verzeichnis; die Schulart wird aus dem Namen abgeleitet und ist "
+    "zu prüfen. Haltestellen und Bahnhöfe kommen aus dem Fahrplan und zeigen, "
+    "was dort tatsächlich hält."
+)
+
+
+class NearbyRequest(BaseModel):
+    """One coordinate, one question: was ist in der Nähe?"""
+
+    origin: Koordinate
+    kategorien: list[Kategorie] = Field(
+        default_factory=lambda: list(ALLE_KATEGORIEN),
+        min_length=1,
+        max_length=len(ALLE_KATEGORIEN),
+        description="Welche Kategorien gesucht werden; ohne Angabe alle.",
+    )
+    modus: Umgebungsmodus = "walk"
+    umkreis_m: int = Field(
+        default=3000,
+        ge=200,
+        le=15000,
+        description=(
+            "Luftlinien-Umkreis, in dem nach Kandidaten gesucht wird. Nur ein "
+            "Vorfilter — angezeigt wird die Gehzeit."
+        ),
+    )
+    treffer_je_kategorie: int = Field(
+        default=2, ge=1, le=10, description="Wie viele Treffer je Kategorie zurückkommen."
+    )
+    linien: bool = Field(
+        default=False,
+        description=(
+            "Zusätzlich die Linien abfragen, die an einer gefundenen Haltestelle "
+            "halten. Kostet je Haltestelle eine weitere Anfrage an den Fahrplandienst."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def _no_duplicate_categories(self) -> "NearbyRequest":
+        seen: list[Kategorie] = []
+        for kategorie in self.kategorien:
+            if kategorie not in seen:
+                seen.append(kategorie)
+        self.kategorien = seen
+        return self
+
+
+class UmgebungTreffer(BaseModel):
+    """One place found, with the walking time that put it in this position."""
+
+    kategorie: Kategorie
+    # Absent is normal, not an error: most Saxon playgrounds carry no name.
+    name: str | None = None
+    # "Grundschule", "Straßenbahn, Bus" -- what kind of thing this is.
+    art: str | None = None
+    lat: float
+    lon: float
+    erreichbar: bool
+    # MOTIS' pedestrian routing cost. It charges for crossings and turns, so it
+    # is NOT distance divided by a walking speed -- do not derive one.
+    duration_s: int | None = None
+    distance_m: int | None = None
+    # Kept so the "not reachable on foot" case still has a number to show.
+    luftlinie_m: int
+    # ``None`` means "not asked for", an empty list means "asked, and nothing
+    # calls here in this category". The same distinction the whole endpoint is
+    # built on, one level down.
+    linien: list[str] | None = None
+    quelle: Literal["osm", "motis"]
+    osm_id: str | None = None
+    stop_id: str | None = None
+    hinweis: str | None = None
+
+
+class KategorieStatus(BaseModel):
+    """Whether a category could be answered at all.
+
+    The distinction this exists for: "der Server hat dazu keine Daten" is not
+    the same statement as "in der Nähe gibt es nichts", and an empty list reads
+    as the second one.
+    """
+
+    kategorie: Kategorie
+    verfuegbar: bool
+    anzahl: int = 0
+    hinweis: str | None = None
+
+
+class NearbyResponse(BaseModel):
+    treffer: list[UmgebungTreffer] = Field(default_factory=list)
+    kategorien: list[KategorieStatus] = Field(default_factory=list)
+    # Timestamp of the OSM extract the index was built from, when there is one.
+    datenstand: str | None = None
+    quelle: str = "OpenStreetMap (ODbL) und MOTIS / Transitous (DELFI-GTFS)"
+    hinweis: str = UMGEBUNG_HINWEIS
+
+
+# --------------------------------------------------------------------------
 # Health
 # --------------------------------------------------------------------------
 

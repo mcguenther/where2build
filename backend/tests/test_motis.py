@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import httpx
 import pytest
 import respx
@@ -175,3 +177,65 @@ async def test_user_agent_is_sent_as_the_usage_policy_requires():
     await motis_service().route(ORIGIN, DESTINATION, "car")
 
     assert respx.calls[0].request.headers["user-agent"].startswith("GrundstuecksCheckSachsen")
+
+
+# --------------------------------------------------------------------------
+# one-to-many and map/stops -- what /api/nearby is built on
+# --------------------------------------------------------------------------
+
+
+async def test_the_matrix_refuses_more_than_the_server_would_accept():
+    """MOTIS answers 129 destinations with a 422 naming `onetomany_max_many`.
+
+    Better to notice that here than to spend a round trip finding out.
+    """
+
+    service = motis_service()
+    too_many = [Koordinate(lat=51.28 + index * 1e-4, lon=12.46) for index in range(129)]
+
+    with pytest.raises(ValueError, match="128"):
+        await service.travel_time_matrix(ORIGIN, too_many)
+
+
+async def test_an_empty_destination_list_needs_no_request():
+    assert await motis_service().travel_time_matrix(ORIGIN, []) == []
+
+
+@respx.mock
+async def test_the_matrix_answer_is_aligned_with_the_destinations_sent():
+    route = respx.post(f"{MOTIS_URL}/api/v1/one-to-many").mock(
+        return_value=httpx.Response(
+            200, json=[{"duration": 6.03e2, "distance": 4.78e2}, {}, {"duration": 1.2e2}]
+        )
+    )
+
+    result = await motis_service().travel_time_matrix(
+        ORIGIN,
+        [
+            Koordinate(lat=51.2830, lon=12.4640),
+            Koordinate(lat=51.0555, lon=13.7700),
+            Koordinate(lat=51.2820, lon=12.4620),
+        ],
+    )
+
+    # `{}` means "no route at all", not duration 0.
+    assert result == [(603, 478), None, (120, 0)]
+    body = json.loads(route.calls[0].request.read())
+    # Semicolon, not comma: a comma is "is not a valid geo coordinate".
+    assert body["one"] == "51.3397;12.3731"
+    assert body["many"][1] == "51.0555;13.77"
+
+
+@respx.mock
+async def test_stops_are_requested_grouped_and_cached_on_the_box():
+    route = respx.get(f"{MOTIS_URL}/api/v6/map/stops").mock(
+        return_value=httpx.Response(200, json=fixture_json("motis_stops.json"))
+    )
+    service = motis_service()
+
+    first = await service.stops_in_box(51.26, 12.44, 51.30, 12.49)
+    second = await service.stops_in_box(51.26, 12.44, 51.30, 12.49)
+
+    assert len(first) == len(second) == 9
+    assert route.call_count == 1
+    assert route.calls[0].request.url.params["grouped"] == "true"

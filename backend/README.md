@@ -8,8 +8,9 @@ manufacturer pages into structured, unconfirmed suggestions.
 
 Data sources: ALKIS (parcels), BORIS (land reference values), GeoSN WMS
 (orthophoto, topographic map, cadastral map), OpenFreeMap (vector basemap),
-MOTIS/Transitous (multimodal routing), and one OpenAI-compatible provider for
-page extraction.
+MOTIS/Transitous (multimodal routing and public-transport stops), a locally
+built OpenStreetMap index for everyday destinations, and one OpenAI-compatible
+provider for page extraction.
 
 The browser talks to this API and to nothing else. Every authority service,
 and the basemap along with them, is proxied here -- that is what makes the app
@@ -54,6 +55,7 @@ in `../docs/research/`.
 | GET | `/api/landvalue?lat=&lon=` | Land reference value, zone, reference date, source |
 | POST | `/api/geocode` | Free text → up to 5 coordinate candidates with the labels that were matched |
 | POST | `/api/reachability` | Origin + destinations + modes → duration and route geometry per pair |
+| POST | `/api/nearby` | Origin → nearest school, park, tram/S-Bahn/bus stop … per category, ranked by walking time |
 | GET | `/api/tiles/{layer}/{z}/{x}/{y}.png` | Cached proxy for the GeoSN WMS (`dop`, `webatlas`, `alkis`) |
 | GET | `/api/basemap/style.json` | MapLibre style, every URL in it rewritten onto this API |
 | GET | `/api/basemap/{path}` | Everything the style then asks for: TileJSON, vector tiles, glyphs, sprites |
@@ -417,6 +419,195 @@ geometry lands between 12.371–12.464 E and 51.282–51.340 N, i.e. on Leipzig 
 the check that `legGeometry` was read with precision 6.
 
 
+## "Wie weit ist die nächste Schule?" — `POST /api/nearby`
+
+One coordinate in, the nearest one or two of each category out, **ranked by
+walking time and never by air distance**. The two orders disagree from the
+first position: at the Liebertwolkwitz test plot the Oberschule is 254 m away
+as the crow flies and a 6-minute walk, while the Grundschule is 300 m away and
+an 11-minute walk — 843 m of footpath for 300 m of air. In
+Dresden-Johannstadt the nearest
+playground by air, 172 m off, cannot be walked to at all, because the Elbe is
+in between and the crossing there is a ferry.
+
+```jsonc
+// Request — every field but `origin` has a default
+{
+  "origin": { "lat": 51.2828, "lon": 12.4630 },
+  "kategorien": ["schule", "park", "tram", "sbahn", "bus", "bahnhof"],  // default: all ten
+  "modus": "walk",                 // walk | bike
+  "umkreis_m": 2000,               // air-distance pre-filter, 200…15000
+  "treffer_je_kategorie": 2,       // 1…10
+  "linien": false                  // also ask which lines call at each stop
+}
+```
+
+```jsonc
+// Answer (200)
+{
+  "treffer": [
+    { "kategorie": "schule", "name": "Geschwister Scholl Schule Liebertwolkwitz — Oberschule …",
+      "art": "Oberschule", "lat": 51.284419, "lon": 12.460414, "erreichbar": true,
+      "duration_s": 362, "distance_m": 393, "luftlinie_m": 254,
+      "quelle": "osm", "osm_id": "N10985287011", "stop_id": null, "linien": null },
+    { "kategorie": "bahnhof", "name": "Leipzig-Liebertwolkwitz", "art": "Regionalbahn, Bus",
+      "lat": 51.283970, "lon": 12.469248, "erreichbar": true,
+      "duration_s": 630, "distance_m": 742, "luftlinie_m": 454,
+      "quelle": "motis", "osm_id": null, "stop_id": "de-DELFI_de:14713:8012228", "linien": null }
+  ],
+  "kategorien": [
+    { "kategorie": "schule", "verfuegbar": true,  "anzahl": 2, "hinweis": null },
+    { "kategorie": "sbahn",  "verfuegbar": true,  "anzahl": 0,
+      "hinweis": "Im Umkreis von 2.000 m wurde nichts gefunden." },
+    { "kategorie": "park",   "verfuegbar": false, "anzahl": 0,
+      "hinweis": "Für diese Kategorie ist auf dem Server kein Datenbestand eingerichtet — …" }
+  ],
+  "datenstand": "2026-08-22T20:21:02Z",
+  "quelle": "OpenStreetMap (ODbL) und MOTIS / Transitous (DELFI-GTFS)",
+  "hinweis": "Die Gehzeiten stammen aus dem Fußwegenetz von OpenStreetMap …"
+}
+```
+
+### The ten categories, and where each one comes from
+
+| Kategorie | Source | Note |
+|---|---|---|
+| `tram`, `sbahn`, `bus`, `bahnhof` | **MOTIS timetable**, live | Works with no local data at all |
+| `schule`, `kindergarten`, `park`, `spielplatz`, `supermarkt`, `arzt` | **Local OSM index**, built offline | Answers "kein Datenbestand" until the index is built |
+
+The stop categories are split on each stop's own `modes` array, which MOTIS
+derives from the GTFS feeds. That is the whole reason the transit half does not
+use OpenStreetMap: **there is no S-Bahn tag in Saxony** — `service=suburban` has
+zero objects statewide, `station=light_rail` zero, and the S-Bahn platforms of
+the Leipzig City-Tunnel are indistinguishable from any other railway halt. MOTIS
+hands it over as `"modes": ["SUBURBAN"]` and separates `Leipzig Markt`
+(S-Bahn) from `Leipzig, Markt (Bus)` in one field.
+
+`bahnhof` is `REGIONAL_RAIL`, `REGIONAL_FAST_RAIL`, `LONG_DISTANCE`,
+`HIGHSPEED_RAIL` or `NIGHT_RAIL`. Ferries, funiculars and the aerial lifts are
+deliberately not their own category, although the data carries them.
+
+### `kategorien[]` is the point of the answer, not decoration
+
+`treffer` alone cannot say why a category is empty, and the two reasons are
+opposite statements:
+
+* `verfuegbar: false` — **this server holds no such data.** The index has not
+  been built here. Never render that as "es gibt hier keine Schule".
+* `verfuegbar: true, anzahl: 0` — the data was searched and the radius really
+  is empty.
+
+`/api/health` reports the same thing under the service name `poi`, so the
+frontend can tell the two apart before it asks anything.
+
+### Building the POI index
+
+```bash
+cd backend
+.venv/bin/pip install -e ".[poi]"                    # pyosmium, only for this step
+.venv/bin/python scripts/build_poi_index.py --download
+```
+
+That fetches `sachsen-latest.osm.pbf` from Geofabrik (~450 MB), verifies it
+against the published MD5, converts it and writes `data/poi-sachsen.json`
+(≈ 22 600 places, 2–3 MB; `.json.gz` also works). An extract already on disk is
+used directly:
+
+```bash
+.venv/bin/python scripts/build_poi_index.py sachsen-latest.osm.pbf
+```
+
+The output is a build artefact — `data/` is git-ignored — and wants refreshing
+on the order of once a quarter. `datenstand` in the answer is the extract's own
+replication timestamp, so the UI can say how old the data is.
+
+**Why offline and not a query per request.** The Overpass manual names "setting
+up an app for more than just OSM mappers and relying on the public instances as
+backend" as problematic behaviour in so many words, and rate-limits per IP —
+ours, shared by every user of the app. A build job that runs quarterly is inside
+that policy; a request-time dependency is not, and caching does not change the
+shape of the usage. The full argument, with the measurements, is in
+`../docs/research/poi.md` § 2.2.
+
+### The tag decisions, and why they are not obvious
+
+| Included | Left out on purpose |
+|---|---|
+| `amenity=school` | `driving_school`, `music_school`, `language_school`, `college`, `university` |
+| `leisure=park`, `nature_reserve`, `landuse=recreation_ground`, `village_green` | **`leisure=garden`** and `landuse=allotments` |
+| `leisure=playground` | playgrounds with `access` = `private`/`no`/`customers`/`permit` |
+| `shop=supermarket`, `shop=convenience` | `shop=bakery`, `shop=greengrocer` |
+| `amenity=doctors`, `amenity=clinic` | `healthcare=doctor`, `amenity=hospital` |
+| `amenity=kindergarten`, `amenity=childcare` | — |
+
+`leisure=garden` is Saxony's most common green tag — 12 583 objects, more than
+parks and recreation grounds together — and its `garden:type` values are
+`residential` 3 689, `private` 3 049 and `public` **26**. These are the front
+gardens of terraced houses. `healthcare=doctor` is a second tag on the same node
+as `amenity=doctors`, not a second surgery, so unioning the two double-counts
+every practice.
+
+**The school type is read off the name**, because nothing else carries it:
+`school:DE` has zero objects in Saxony and `isced:level` covers under a fifth of
+schools in two incompatible spellings (`2;3` and `2-3` both occur, and one
+object has value `9`). `art` is therefore a hint next to the name, not a fact,
+and the note in `hinweis` says so.
+
+**One school is often three objects** — the named Grundschule node, the named
+Oberschule node, and the unnamed way of the shared grounds. Entries of the same
+category within 60 m are collapsed, keeping the named one; two *differently*
+named schools at one address stay two schools.
+
+### What one answer costs
+
+Two upstream requests for all ten categories, whatever the number of hits:
+
+1. `GET /api/v6/map/stops?min=lat,lon&max=lat,lon&grouped=true` — one box.
+2. `POST /api/v1/one-to-many` — every candidate of every category in **one**
+   body, capped at the server's own limit of 128.
+
+`one-to-many` costs the same for 128 destinations as for one (~150 ms both,
+measured), while eight separate `/api/v6/plan` calls at `MOTIS_MAX_CONCURRENCY=2`
+take 1 523 ms and cost Transitous eight requests instead of one. The candidate
+budget is filled round-robin across the requested categories, so a category with
+two candidates hands its unused places back rather than starving one with
+twenty.
+
+Live against Transitous, 29.08.2026, plot 51.2828/12.4630, `umkreis_m: 2000`,
+two hits per category:
+
+| Request | Cold | Warm |
+|---|---|---|
+| all ten categories, index present | **1.70 s** | 0.005 s |
+| all ten categories, no index (four transit categories answer) | 3.35 s | 0.005 s |
+| four transit categories, `linien: true`, Leipzig centre | 5.89 s | — |
+
+`linien` is opt-in for that last row's reason: it is one extra request per stop,
+against a volunteer service that asks to be treated lightly. A hit whose lines
+were not asked for carries `linien: null`, never `[]` — an empty list would
+claim that nothing calls there.
+
+### Traps that are already handled here
+
+* **`one-to-many` needs a POST.** Repeated `many=` parameters on a GET are
+  silently collapsed: three of them come back as one duration, and reordering
+  them turns the same request into `{"error":"missing parameter"}`. The POST
+  body takes a JSON array and answers all of them, positionally aligned.
+* **The coordinate separator is a semicolon**, `lat;lon`. A comma is rejected
+  with "is not a valid geo coordinate".
+* **`maxMatchingDistance` is required** in that body — leaving it out is
+  answered with `key maxMatchingDistance not found`.
+* **An unreachable destination is `{}`**, not an error and not a null duration.
+  It comes back as `erreichbar: false` with its air distance and a German note,
+  because "die nächste Schule liegt jenseits des Flusses" is worth showing.
+* **`map/stops` takes lat,lon** in `min`/`max`, and `grouped=true` is not
+  optional: without it the same physical stop appears once per GTFS feed — 115
+  entries instead of 27 over Leipzig centre.
+* **The `modes` query parameter of `map/stops` is parsed and then ignored.**
+  It validates the enum (`modes=NONSENSE` is an error) and returns the same
+  stops either way, so the filtering happens on each stop's own `modes` array.
+
+
 ## Environment variables
 
 All settings have defaults; see `.env.example` for the full list with comments.
@@ -426,7 +617,8 @@ All settings have defaults; see `.env.example` for the full list with comments.
 | `APP_` | `CORS_ORIGINS`, `CACHE_DIR`, `USER_AGENT`, `PORTAL_USER_AGENT`, `HTTP_TIMEOUT_S` | Process-wide settings. `USER_AGENT` must carry a real contact address — the Transitous usage policy requires it. |
 | `ALKIS_` | `WFS_URL`, `VERSION`, `SRID`, `MAX_FEATURES`, `POINT_BUFFER_M`, `CACHE_TTL_S` | ALKIS WFS of the GeoSN |
 | `BORIS_` | `WMS_URL`, `LAYER`, `PORTAL_URL`, `CACHE_TTL_S` | BORIS WMS. The URL carries the reference year (`boris_2026`) — check it once a year. |
-| `MOTIS_` | `BASE_URL`, `TIMEOUT_S`, `MAX_CONCURRENCY`, `MAX_DIRECT_TIME_S`, `MAX_PRE_TRANSIT_TIME_S`, `CACHE_TTL_S` | Routing and geocoding |
+| `MOTIS_` | `BASE_URL`, `TIMEOUT_S`, `MAX_CONCURRENCY`, `MAX_DIRECT_TIME_S`, `MAX_PRE_TRANSIT_TIME_S`, `CACHE_TTL_S`, `STOPS_CACHE_TTL_S`, `MATRIX_CACHE_TTL_S` | Routing, geocoding, stops and walking-time matrices |
+| `NEARBY_` | `POI_INDEX_PATH`, `MAX_CANDIDATES`, `MAX_TIME_S`, `MAX_MATCHING_DISTANCE_M`, `BBOX_GRID_DEG`, `MAX_LINE_LOOKUPS` | `/api/nearby`. Only the POI index needs configuring; stops come from the MOTIS above. |
 | `TILES_` | `DOP_URL`, `DOP_LAYERS`, `WEBATLAS_URL`, `WEBATLAS_LAYERS`, `ALKIS_URL`, `ALKIS_LAYERS`, `CRS`, `IMAGE_FORMAT`, `TILE_SIZE`, `TRANSPARENT`, `CACHE_TTL_S`, `MAX_ZOOM` | WMS proxy |
 | `BASEMAP_` | `UPSTREAM_URL`, `STYLE_PATH`, `PUBLIC_PREFIX`, `REWRITE_HOSTS`, `CACHE_TTL_S`, `TIMEOUT_S` | Vector basemap proxy. Point `UPSTREAM_URL` at your own tile server to drop OpenFreeMap. |
 | `LLM_` | `BASE_URL`, `API_KEY`, `MODEL`, `FETCH_ENGINE`, `TIMEOUT_S`, `MAX_CONTENT_TOKENS` | Extraction provider. No provider is hard-wired; switching one is a line in `.env`. Without `API_KEY` the extraction endpoints answer 503 and the rest of the API keeps working. |
@@ -434,15 +626,20 @@ All settings have defaults; see `.env.example` for the full list with comments.
 ## Caches
 
 Everything lands under `APP_CACHE_DIR` (default `.cache/`), one subdirectory per
-service. Parcel, land-value, tile, basemap and routing entries expire after
-their `CACHE_TTL_S`; LLM extractions are keyed by normalised URL and kept
+service. The POI index is **not** among them: it is a build artefact under
+`data/`, read once at startup, and nothing about `/api/nearby` reaches
+OpenStreetMap at request time. Parcel, land-value, tile, basemap and routing
+entries expire after their `CACHE_TTL_S`; LLM extractions are keyed by normalised URL and kept
 indefinitely, because a house type does not change from one week to the next
 and every fetch costs money. Deleting the directory is safe.
 
 ## Licence and attribution
 
-Official data: © GeoSN, dl-de/by-2-0. Routing via Transitous/MOTIS
-(DELFI-GTFS, OpenStreetMap) — link to <https://transitous.org/sources/> in the
-UI. Basemap via OpenFreeMap and OpenMapTiles from OpenStreetMap data (ODbL);
-the attribution must stay visible on the map even though the tiles arrive
+Official data: © GeoSN, dl-de/by-2-0. Routing, stops and lines via
+Transitous/MOTIS (DELFI-GTFS, OpenStreetMap) — link to
+<https://transitous.org/sources/> in the UI. The POI index behind `/api/nearby`
+is derived from OpenStreetMap and carries the same ODbL as the basemap, so
+"© OpenStreetMap-Mitwirkende" belongs wherever those hits are shown, not only
+on the map. Basemap via OpenFreeMap and OpenMapTiles from OpenStreetMap data
+(ODbL); the attribution must stay visible on the map even though the tiles arrive
 through our own proxy. Nothing here is legal advice or a building-code assessment.
