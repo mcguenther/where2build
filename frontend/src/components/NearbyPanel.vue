@@ -25,11 +25,12 @@
             <td class="nearby__what">
               <b>{{ label(hit.kategorie) }}</b>
               <span v-if="hit.art && hit.art !== label(hit.kategorie)" class="nearby__kind">{{ hit.art }}</span>
-              <!-- A place you cannot look up is a name, not a finding. -->
-              <a v-if="Number.isFinite(hit.lat) && Number.isFinite(hit.lon)"
-                 class="nearby__name" :href="placeLink(hit)"
+              <!-- A place you cannot look up is a name, not a finding. The link
+                   is the way there, not a pin on it: the row states a walking
+                   distance, and a marker alone leaves that claim unchecked. -->
+              <a v-if="located(hit)" class="nearby__name" :href="link(hit)"
                  target="_blank" rel="noopener noreferrer"
-                 :title="`${hit.name} auf OpenStreetMap ansehen`">{{ hit.name }}</a>
+                 :title="`Fußweg vom Grundstück zu ${hit.name} auf OpenStreetMap`">{{ hit.name }}</a>
               <span v-else class="nearby__name">{{ hit.name }}</span>
             </td>
             <td class="num">{{ hit.erreichbar ? duration(hit.duration_s) : "—" }}</td>
@@ -62,7 +63,7 @@
 <script>
 import { nearby } from "../lib/api.js";
 import { duration, metres } from "../lib/format.js";
-import { openStreetMapPlace, openStreetMapRoute } from "../lib/mapLinks.js";
+import { openStreetMapRoute } from "../lib/mapLinks.js";
 
 /** German labels for the server's category keys. */
 const LABELS = {
@@ -98,9 +99,10 @@ export default {
   methods: {
     duration,
     metres,
-    placeLink(hit) { return openStreetMapPlace(hit); },
-    /** The walk itself, for anyone who wants to see the route rather than the point. */
-    walkLink(hit) { return openStreetMapRoute(this.plot.anchor, hit, "walk"); },
+    located(hit) { return Number.isFinite(hit.lat) && Number.isFinite(hit.lon); },
+    /** The walk the row measured, openable. No anchor, no rows: the panel
+     *  refuses to search at all without one, so there is no second case. */
+    link(hit) { return openStreetMapRoute(this.plot.anchor, hit, "walk"); },
     label(key) { return LABELS[key] ?? key; },
     async load() {
       this.busy = true;

@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
+import { nextTick } from "vue";
 import SitePlan from "../src/components/SitePlan.vue";
 import PlotCard from "../src/components/PlotCard.vue";
 import RouteCards from "../src/components/RouteCards.vue";
@@ -31,6 +32,35 @@ const plot = () => plotById("plot-concave");
 describe("Lageplan", () => {
   const build = (props = {}) =>
     mount(SitePlan, { props: { plot: plot(), building: placement(plot()), ...props } });
+
+  /* A backdrop that cannot be fetched used to restart itself: the failure flag
+     was part of `hasBackdrop`, whose watcher rebuilt the map, and the rebuild
+     cleared the flag again. Nothing on screen showed it — the drawing looked
+     fine while the tab burned a core and re-asked the backend for the style
+     forever. The count is the whole test: one attempt, then silence. */
+  it("versucht einen Kartenhintergrund, der nicht lädt, nicht endlos erneut", async () => {
+    const asked = [];
+    const original = globalThis.fetch;
+    // The loop this guards against starves the microtask queue, so no timeout
+    // can end it — not the browser's, not the runner's. The stub therefore has
+    // to be the brake: past the cap it hands back a promise that never settles,
+    // which parks the component and lets the assertion below actually run.
+    globalThis.fetch = url => {
+      asked.push(String(url));
+      return asked.length > 4 ? new Promise(() => {}) : Promise.reject(new Error("kein Netz"));
+    };
+    try {
+      const w = build({ backdrop: "map" });
+      for (let i = 0; i < 12; i++) await nextTick();
+
+      expect(asked.length).toBeLessThanOrEqual(1);
+      // And it gives up visibly rather than pretending: plain paper, no container.
+      expect(w.find(".site-plan__map").exists()).toBe(false);
+      expect(w.vm.mapUnavailable).toBe(true);
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
 
   it("zeichnet ohne NaN und ohne undefined", () => {
     const html = build().html();

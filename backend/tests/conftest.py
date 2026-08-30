@@ -45,6 +45,9 @@ def isolated_settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """Point every service at a test endpoint and give each test its own cache."""
 
     monkeypatch.setenv("APP_CACHE_DIR", str(tmp_path / "cache"))
+    # Whatever contact address the developer put in .env stays out of the suite:
+    # tests that assert who is told it must not depend on a local file.
+    monkeypatch.setenv("APP_CONTACT", "")
     monkeypatch.setenv("ALKIS_WFS_URL", ALKIS_URL)
     monkeypatch.setenv("BORIS_WMS_URL", BORIS_URL)
     monkeypatch.setenv("MOTIS_BASE_URL", MOTIS_URL)

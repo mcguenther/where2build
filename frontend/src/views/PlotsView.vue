@@ -47,7 +47,7 @@
 
 <script>
 import PlotCard from "../components/PlotCard.vue";
-import { state, toggleSelection, removePlot } from "../lib/store.js";
+import { state, toggleSelection, removePlot, save } from "../lib/store.js";
 import { backendHealth } from "../lib/api.js";
 import { wizardStage } from "../router/stages.js";
 
@@ -73,8 +73,17 @@ export default {
     open(id) { this.$router.push({ name: "plot", params: { id } }); },
     startWizard() { this.$router.push(wizardStage(0)); },
     compare() { this.$router.push({ name: "compare" }); },
-    selectAll() { state.data.selection = state.data.plots.map(p => p.id); },
-    selectNone() { state.data.selection = []; },
+    // Both must persist like the per-card checkbox does — /vergleich is a link
+    // someone can open cold, and a selection that vanishes on reload is worse
+    // than none, because the page then honestly reports "nothing selected".
+    selectAll() {
+      state.data.selection = state.data.plots.map(p => p.id);
+      save();
+    },
+    selectNone() {
+      state.data.selection = [];
+      save();
+    },
     remove(plot) {
       const confirmed = window.confirm(`„${plot.name}“ aus der Liste entfernen? Der Stand dieses Grundstücks geht verloren.`);
       if (confirmed) removePlot(plot.id);

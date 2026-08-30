@@ -11,6 +11,7 @@ import { createAppRouter } from "../src/router/index.js";
 import { WIZARD_STAGES } from "../src/router/stages.js";
 import { state } from "../src/lib/store.js";
 import { realState } from "./helpers.js";
+import PlotsView from "../src/views/PlotsView.vue";
 
 beforeEach(() => {
   localStorage.clear();
@@ -179,5 +180,40 @@ describe("Aufnahme", () => {
   it("kennt keinen erfundenen Schritt", async () => {
     const { app } = await openApp("/aufnahme/quatsch");
     expect(app.text()).toContain("Diese Seite gibt es nicht");
+  });
+});
+
+describe("Auswahl für den Vergleich", () => {
+  it("überlebt „Alle auswählen“ einen Neuladen", async () => {
+    // /vergleich is a link someone can open cold. A selection that is not
+    // written down is gone by then, and the page then honestly reports
+    // "nothing selected" — which hides the fact that the click did nothing.
+    const { router } = await openApp("/");
+    localStorage.clear();
+    state.data = realState();
+
+    const view = mount(PlotsView, { global: { plugins: [router] } });
+    await view.findAll("button").find(b => b.text() === "Alle auswählen").trigger("click");
+
+    expect(state.data.selection).toHaveLength(state.data.plots.length);
+    const stored = JSON.parse(localStorage.getItem(
+      Object.keys(localStorage).find(k => (localStorage.getItem(k) || "").startsWith("{"))
+    ));
+    expect(stored.selection).toHaveLength(state.data.plots.length);
+  });
+
+  it("schreibt auch das Aufheben der Auswahl weg", async () => {
+    const { router } = await openApp("/");
+    localStorage.clear();
+    state.data = realState();
+    state.data.selection = state.data.plots.map(p => p.id);
+
+    const view = mount(PlotsView, { global: { plugins: [router] } });
+    await view.findAll("button").find(b => b.text() === "Auswahl aufheben").trigger("click");
+
+    const stored = JSON.parse(localStorage.getItem(
+      Object.keys(localStorage).find(k => (localStorage.getItem(k) || "").startsWith("{"))
+    ));
+    expect(stored.selection).toEqual([]);
   });
 });

@@ -79,10 +79,10 @@ lives in `localStorage`; **Daten** exports and imports it as JSON.
 ## Tests
 
 ```bash
-backend/.venv/bin/python -m pytest backend/tests -q   # 278 tests
-cd frontend && npm run test                           # 179 tests
+backend/.venv/bin/python -m pytest backend/tests -q   # 315 tests
+cd frontend && npm run test                           # 214 tests
 cd frontend && npm run test:integration               # 10, against a running backend
-node scripts/screenshots.mjs                          # 35 images and a print PDF
+node scripts/screenshots.mjs                          # 34 images and a print PDF
 ```
 
 The backend suite touches no network: ALKIS, BORIS, MOTIS, OpenFreeMap and the

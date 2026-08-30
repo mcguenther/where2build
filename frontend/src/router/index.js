@@ -23,10 +23,7 @@ import { WIZARD_STAGES, wizardStage } from "./stages.js";
  * the comparison all belong under "Grundstücke". */
 export const routes = [
   { path: "/", name: "plots", component: PlotsView, meta: { section: "plots" } },
-  {
-    path: "/aufnahme",
-    redirect: () => wizardStage(0)
-  },
+  { path: "/aufnahme", redirect: () => wizardStage(0) },
   {
     // An unknown stage is a typo, not a stage: it falls through to the 404 route.
     path: `/aufnahme/:stage(${WIZARD_STAGES.join("|")})`,

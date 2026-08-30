@@ -39,9 +39,15 @@ class AppSettings(BaseSettings):
         description="Allowed browser origins; defaults cover the Vite dev and preview servers.",
     )
     cache_dir: Path = Path(".cache")
-    # Sent to every upstream service. Transitous requires a contact address in the
-    # User-Agent, so keep a real one here in deployments.
-    user_agent: str = "GrundstuecksCheckSachsen/0.1 (+https://github.com/; kontakt@example.org)"
+    # Sent to every upstream service. Deliberately carries no contact address:
+    # a mail address in here would travel to ALKIS, BORIS, the tile servers and
+    # the extraction provider alike, none of which asks for one.
+    user_agent: str = "GrundstuecksCheckSachsen/0.1 (+https://github.com/mcguenther/where2build)"
+    # Transitous is the one upstream whose usage policy demands a way of contact
+    # ("Name of the application / Version of the client / A way of contact"), so
+    # it is kept separate and appended for that service alone. Empty means the
+    # plain user agent goes out everywhere.
+    contact: str = ""
     # Listing portals answer a plain library user agent with a challenge page,
     # so requests to them identify as a browser instead.
     portal_user_agent: str = (
@@ -49,6 +55,11 @@ class AppSettings(BaseSettings):
         "(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
     )
     http_timeout_s: float = 30.0
+
+    @property
+    def contact_user_agent(self) -> str:
+        """The user agent for services that require a way of contact."""
+        return f"{self.user_agent} ({self.contact})" if self.contact else self.user_agent
 
 
 class AlkisSettings(BaseSettings):

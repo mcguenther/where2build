@@ -41,11 +41,5 @@ export function googleMapsRoute(from, to, mode = "car") {
   return `https://www.google.com/maps/dir/?${params}`;
 }
 
-/** A single place, not a route — used by the surroundings list. */
-export function openStreetMapPlace(point, zoom = 18) {
-  return `https://www.openstreetmap.org/?mlat=${point.lat.toFixed(6)}`
-    + `&mlon=${point.lon.toFixed(6)}#map=${zoom}/${point.lat.toFixed(5)}/${point.lon.toFixed(5)}`;
-}
-
 /** True when the service can actually answer for this mode. */
 export const routableOnOpenStreetMap = mode => mode !== "transit";

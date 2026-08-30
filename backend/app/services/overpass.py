@@ -218,9 +218,9 @@ class OverpassService:
                     status_hints=STATUS_HINTS,
                     timeout_s=self.settings.timeout_s,
                     # The manual asks for no particular User-Agent, unlike
-                    # Transitous and the OSM API. Send the app's own anyway --
-                    # it carries a contact address, which is what the policy is
-                    # ultimately after.
+                    # Transitous and the OSM API. Send the app's own anyway, so
+                    # the traffic is attributable -- but not the contact
+                    # address, which no policy here asks for.
                     user_agent=self.app_settings.user_agent,
                     data={"data": query},
                 )

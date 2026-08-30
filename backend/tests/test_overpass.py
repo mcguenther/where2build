@@ -200,8 +200,10 @@ def test_the_request_is_one_post_with_the_apps_user_agent(overpass, client: Test
     assert route.call_count == 1
     request = route.calls[0].request
     agent = request.headers["user-agent"]
-    # The policy is ultimately after a way to reach the operator.
-    assert "GrundstuecksCheckSachsen" in agent and "@" in agent
+    # Attributable, but no contact address: the Overpass manual asks for none,
+    # and handing one over anyway would spread it further than any policy wants.
+    assert "GrundstuecksCheckSachsen" in agent
+    assert "@" not in agent
     assert b"data=" in request.content
 
 

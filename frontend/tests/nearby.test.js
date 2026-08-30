@@ -133,8 +133,9 @@ describe("Umgebung", () => {
 });
 
 describe("Nachprüfbarkeit der Umgebung", () => {
-  it("verlinkt jeden gefundenen Ort auf OpenStreetMap", async () => {
-    const w = mount(NearbyPanel, { props: { plot: plot() } });
+  it("verlinkt jeden gefundenen Ort als Fußweg vom Grundstück aus", async () => {
+    const site = plot();
+    const w = mount(NearbyPanel, { props: { plot: site } });
     await w.find("button").trigger("click");
     await flushPromises();
 
@@ -142,10 +143,15 @@ describe("Nachprüfbarkeit der Umgebung", () => {
     expect(links.length).toBe(recorded.treffer.length);
     links.forEach((a, i) => {
       const href = a.attributes("href");
-      expect(href).toContain("openstreetmap.org");
-      // The coordinate in the link must be the one that was found, not a guess.
-      expect(href).toContain(recorded.treffer[i].lat.toFixed(6));
-      expect(href).toContain(recorded.treffer[i].lon.toFixed(6));
+      // A marker on the destination answers "where is it", but the row claims a
+      // walking distance -- and that claim is only checkable as a route.
+      expect(href).toContain("openstreetmap.org/directions");
+      expect(href).toContain("fossgis_osrm_foot");
+      // Both ends, in order: from this plot, to the place that was found.
+      expect(href).toContain(`route=${site.anchor.lat.toFixed(6)},${site.anchor.lon.toFixed(6)}`);
+      expect(href).toContain(`%3B${recorded.treffer[i].lat.toFixed(6)},${recorded.treffer[i].lon.toFixed(6)}`);
+      expect(href.indexOf(site.anchor.lat.toFixed(6)))
+        .toBeLessThan(href.indexOf(recorded.treffer[i].lat.toFixed(6)));
       expect(a.attributes("rel")).toContain("noopener");
     });
   });

@@ -251,7 +251,7 @@ class MotisService:
                 service=SERVICE_NAME,
                 advice=ADVICE,
                 timeout_s=self.settings.timeout_s,
-                user_agent=self.app_settings.user_agent,
+                user_agent=self.app_settings.contact_user_agent,
                 params=params,
             )
         try:
@@ -319,7 +319,7 @@ class MotisService:
                 service=SERVICE_NAME,
                 advice=NEARBY_ADVICE,
                 timeout_s=self.settings.timeout_s,
-                user_agent=self.app_settings.user_agent,
+                user_agent=self.app_settings.contact_user_agent,
                 params=params,
             )
         try:
@@ -432,7 +432,7 @@ class MotisService:
                     service=SERVICE_NAME,
                     advice=NEARBY_ADVICE,
                     timeout_s=self.settings.timeout_s,
-                    user_agent=self.app_settings.user_agent,
+                    user_agent=self.app_settings.contact_user_agent,
                     json=body,
                 )
             try:
@@ -483,7 +483,7 @@ class MotisService:
                     service=SERVICE_NAME,
                     advice=GEOCODE_ADVICE,
                     timeout_s=self.settings.timeout_s,
-                    user_agent=self.app_settings.user_agent,
+                    user_agent=self.app_settings.contact_user_agent,
                     params=params,
                 )
             try:

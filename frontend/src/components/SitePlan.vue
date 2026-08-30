@@ -249,9 +249,14 @@ export default {
       return alignmentToEdge(this.plot.polygon, this.plot.streetEdge ?? 0);
     },
     northAngle() { return this.rotation; },
-    /** A backdrop needs one that is not "none" and a georeference to put it
-     *  under. Without the anchor there is nothing to align a map to. */
-    hasBackdrop() { return this.backdrop !== "none" && Boolean(this.plot.anchor) && !this.mapUnavailable; },
+    /** Whether a backdrop is *wanted*: one that is not "none", and an anchor
+     *  to align it to. Kept apart from whether one is actually on screen: the
+     *  rebuild watcher hangs off this, and folding the failure flag in made the
+     *  component fight itself — a failed build set the flag, the flag changed
+     *  this, the watcher rebuilt, the rebuild cleared the flag, and the style
+     *  was fetched again, forever. */
+    wantsBackdrop() { return this.backdrop !== "none" && Boolean(this.plot.anchor); },
+    hasBackdrop() { return this.wantsBackdrop && !this.mapUnavailable; },
     backgroundFill() { return this.backdrop === "aerial" ? "var(--w2b-map-green)" : "var(--w2b-map-ground)"; },
 
     /* Frame the plot with a margin, then stretch the box to the frame's aspect
@@ -340,7 +345,7 @@ export default {
   watch: {
     // A different backdrop means a different style; MapLibre cannot swap sources
     // underneath itself, so the map is torn down and rebuilt.
-    hasBackdrop() { this.rebuildMap(); },
+    wantsBackdrop() { this.rebuildMap(); },
     backdrop() { this.rebuildMap(); },
     measuring(on) { if (!on) this.clearMeasurement(); },
     "plot.id"() {
