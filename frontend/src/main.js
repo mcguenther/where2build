@@ -23,8 +23,17 @@ import { setWorkerUrl } from "maplibre-gl";
 import mapWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 
 import { createApp } from "vue";
+import { createWebHistory } from "vue-router";
 import App from "./App.vue";
+import { createAppRouter } from "./router/index.js";
+import { load } from "./lib/store.js";
 
 setWorkerUrl(mapWorkerUrl);
 
-createApp(App).mount("#app");
+/* Before the first route is resolved: a link straight to a plot has to find
+ * that plot in the document, and the document lives in this browser. */
+load();
+
+createApp(App)
+  .use(createAppRouter(createWebHistory(import.meta.env.BASE_URL)))
+  .mount("#app");

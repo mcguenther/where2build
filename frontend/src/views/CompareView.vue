@@ -1,7 +1,7 @@
 <template>
   <div class="stack">
     <nav class="breadcrumb no-print" aria-label="Pfad">
-      <button type="button" @click="back">Grundstücke</button>
+      <RouterLink :to="{ name: 'plots' }">Grundstücke</RouterLink>
       <span aria-hidden="true">›</span><span>Vergleich</span>
     </nav>
 
@@ -12,7 +12,7 @@
         <p class="page-head__sub">{{ subtitle }}</p>
       </div>
       <div class="spacer"></div>
-      <button type="button" class="btn btn--quiet no-print" @click="back">Auswahl ändern</button>
+      <button type="button" class="btn btn--quiet no-print" @click="$router.push({ name: 'plots' })">Auswahl ändern</button>
       <button type="button" class="btn btn--secondary no-print" @click="print">Drucken</button>
     </div>
 
@@ -121,8 +121,7 @@ export default {
       const m = plot.routes[destinationId]?.modes?.[mode];
       return m && m.erreichbar ? duration(m.duration_s) : "—";
     },
-    back() { state.view = "plots"; window.scrollTo({ top: 0 }); },
-    open(id) { state.openPlotId = id; state.view = "plot"; window.scrollTo({ top: 0 }); },
+    open(id) { this.$router.push({ name: "plot", params: { id } }); },
     print() { window.print(); }
   }
 };
@@ -130,7 +129,8 @@ export default {
 
 <style scoped>
 .breadcrumb{ display: flex; align-items: center; gap: var(--w2b-space-2); font-size: var(--w2b-text-xs); color: var(--w2b-muted); }
-.breadcrumb button{ background: none; border: 0; padding: 0; cursor: pointer; color: var(--w2b-primary); font: inherit; }
+.breadcrumb a{ color: var(--w2b-primary); text-decoration: none; }
+.breadcrumb a:hover{ text-decoration: underline; }
 .page-head{ display: flex; align-items: flex-end; gap: var(--w2b-space-4); flex-wrap: wrap; }
 .page-head__sub{ margin-top: var(--w2b-space-2); color: var(--w2b-graphite); font-size: var(--w2b-text-s); max-width: 66ch; }
 .faint{ color: var(--w2b-muted); font-size: var(--w2b-text-xs); }

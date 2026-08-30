@@ -1,7 +1,7 @@
 <template>
   <div class="stack">
     <nav class="breadcrumb" aria-label="Pfad">
-      <button type="button" @click="cancel">Grundstücke</button>
+      <RouterLink :to="{ name: 'plots' }">Grundstücke</RouterLink>
       <span aria-hidden="true">›</span>
       <span>Grundstück hinzufügen</span>
     </nav>
@@ -12,22 +12,27 @@
         <h1>Grundstück hinzufügen</h1>
       </div>
       <div class="spacer"></div>
-      <button type="button" class="btn btn--quiet" @click="cancel">Abbrechen</button>
+      <button type="button" class="btn btn--quiet" @click="$router.push({ name: 'plots' })">Abbrechen</button>
     </div>
 
     <ol class="steps" aria-label="Schritte">
       <li v-for="(s, i) in steps" :key="s.id"
-          :class="{ 'is-current': i === step, 'is-done': i < step }"
-          :aria-current="i === step ? 'step' : null">
-        <span class="steps__number">{{ i < step ? "✓" : i + 1 }}</span>
+          :class="{ 'is-current': i === stageIndex, 'is-done': i < stageIndex }"
+          :aria-current="i === stageIndex ? 'step' : null">
+        <span class="steps__number">{{ i < stageIndex ? "✓" : i + 1 }}</span>
         <span class="steps__name">{{ s.name }}</span>
       </li>
     </ol>
 
+    <p v-if="lost" class="notice notice--error" role="alert">
+      Der begonnene Entwurf ist nicht mehr vorhanden — beim Neuladen der Seite bleibt er
+      nicht erhalten. Bitte noch einmal mit der Quelle beginnen.
+    </p>
     <p v-if="error" class="notice notice--error" role="alert">{{ error }}</p>
 
-    <!-- 1 · Quelle -->
-    <section v-if="step === 0" class="stack">
+    <!-- 1 · Quelle. Also what a stage without its data falls back to, so the
+         redirect in `checkStage` never renders a step that has nothing. -->
+    <section v-if="stageIndex === 0 || !reachable" class="stack">
       <p class="subtitle">Drei Wege hinein. Welcher passt zu dem, was vorliegt?</p>
       <div class="sources">
         <label v-for="s in sources" :key="s.id" class="source" :class="{ 'source--selected': source === s.id }">
@@ -92,7 +97,7 @@
     </section>
 
     <!-- 2 · Gelesene Werte -->
-    <section v-else-if="step === 1" class="stack">
+    <section v-else-if="stageIndex === 1" class="stack">
       <p class="subtitle">
         Jedes Feld führt die Quelle mit, aus der es stammt. Erst nach Bestätigung wandern die
         Werte in die Planung — das Modell antwortet auch dann, wenn die Seite die Zahl gar nicht hergibt.
@@ -114,12 +119,12 @@
         <button type="button" class="btn" :disabled="busy" @click="lookUpParcel">
           {{ busy ? "Kataster wird abgefragt …" : "Flurstück nachschlagen" }}
         </button>
-        <button type="button" class="btn btn--quiet" @click="step = 0">Zurück</button>
+        <button type="button" class="btn btn--quiet" @click="stepBack(0)">Zurück</button>
       </div>
     </section>
 
     <!-- 3 · Flurstück -->
-    <section v-else-if="step === 2" class="stack">
+    <section v-else-if="stageIndex === 2" class="stack">
       <p class="subtitle">
         So liegt das Flurstück im Kataster. Stimmt der Zuschnitt, geht es weiter;
         sonst zurück und die Angaben korrigieren.
@@ -152,10 +157,10 @@
         </div>
       </div>
       <div class="row">
-        <button type="button" :class="doubt ? 'btn btn--secondary' : 'btn'" @click="step = 3">
+        <button type="button" :class="doubt ? 'btn btn--secondary' : 'btn'" @click="goToStage(3)">
           {{ doubt ? "Trotzdem übernehmen" : "Passt" }}
         </button>
-        <button type="button" class="btn btn--quiet" @click="step = returnStep">Zurück</button>
+        <button type="button" class="btn btn--quiet" @click="stepBack(returnStage)">Zurück</button>
       </div>
     </section>
 
@@ -184,7 +189,7 @@
           </p>
           <div class="row">
             <button type="button" class="btn" @click="create">Anlegen und öffnen</button>
-            <button type="button" class="btn btn--quiet" @click="step = 2">Zurück</button>
+            <button type="button" class="btn btn--quiet" @click="stepBack(2)">Zurück</button>
           </div>
         </div>
       </div>
@@ -195,6 +200,7 @@
 <script>
 import SitePlan from "../components/SitePlan.vue";
 import { state, addPlot, placement } from "../lib/store.js";
+import { WIZARD_STAGES, wizardStage } from "../router/stages.js";
 import { readListing, readPage, resolveParcel, landValue } from "../lib/api.js";
 import { plotFromCadastre } from "../lib/plots.js";
 import { polygonArea } from "../lib/geometry.js";
@@ -228,10 +234,16 @@ function fieldsFromResponse(response) {
 export default {
   name: "WizardView",
   components: { SitePlan },
+  props: {
+    /** The stage's URL segment; the route only matches the four known ones. */
+    stage: { type: String, required: true }
+  },
   data() {
     return {
-      step: 0,
-      returnStep: 0,
+      returnStage: 0,
+      lost: false,
+      // How many history entries this wizard pushed; see `stepBack`.
+      ownEntries: 0,
       source: "url",
       url: "",
       gemarkung: "",
@@ -242,6 +254,7 @@ export default {
       readFields: [],
       draft: null,
       doubt: null,
+      // The labels for the stages in `WIZARD_STAGES`, in that order.
       steps: [
         { id: "source", name: "Quelle" },
         { id: "fields", name: "Gelesene Werte" },
@@ -259,6 +272,14 @@ export default {
     };
   },
   computed: {
+    stageIndex() { return WIZARD_STAGES.indexOf(this.stage); },
+    /* What each stage needs in order to have anything to show. Only the first
+     * one stands on its own: the read fields and the draft live in this
+     * component and are gone after a reload. */
+    reachable() {
+      if (this.stageIndex <= 0) return true;
+      return this.stageIndex === 1 ? this.readFields.length > 0 : Boolean(this.draft);
+    },
     ready() {
       if (this.source === "url") return /^https?:\/\/\S{6,}/.test(this.url.trim());
       if (this.source === "parcel") return this.gemarkung.trim() && this.flurstuecksnummer.trim();
@@ -267,16 +288,43 @@ export default {
     draftBuilding() { return this.draft ? placement(this.draft) : null; },
     computedArea() { return this.draft ? polygonArea(this.draft.polygon) : 0; }
   },
+  created() { this.checkStage(); },
+  watch: { stage() { this.checkStage(); } },
   methods: {
     area, euroPerSqm,
-    cancel() { state.view = "plots"; window.scrollTo({ top: 0 }); },
+
+    /** A stage reached without the data behind it — a reload, or the back
+     *  button after the plot was created — sends the user back to the start
+     *  with a reason rather than showing an empty step. */
+    checkStage() {
+      if (this.reachable) return;
+      this.lost = true;
+      this.$router.replace(wizardStage(0));
+    },
+
+    goToStage(stage) {
+      this.lost = false;
+      this.ownEntries++;
+      this.$router.push(wizardStage(stage));
+    },
+
+    /** The "Zurück" buttons leave the entry this wizard pushed instead of
+     *  adding another one, so they and the browser's own back button do the
+     *  same thing. The entry behind is always the stage that was left — the
+     *  wizard pushed it — so it is the one `stage` names. A stage opened
+     *  directly has nothing to step out of and gets a plain push. */
+    stepBack(stage) {
+      if (!this.ownEntries) return this.goToStage(stage);
+      this.ownEntries--;
+      this.$router.back();
+    },
 
     async read() {
       this.busy = true;
       this.error = "";
       try {
         if (this.source === "parcel") {
-          this.returnStep = 0;
+          this.returnStage = 0;
           await this.queryCadastre({
             gemarkung: this.gemarkung.trim(),
             flurstuecksnummer: this.flurstuecksnummer.trim()
@@ -287,8 +335,8 @@ export default {
           ? await readListing(this.url.trim())
           : await readPage(this.pastedText);
         this.readFields = fieldsFromResponse(response);
-        this.returnStep = 1;
-        this.step = 1;
+        this.returnStage = 1;
+        this.goToStage(1);
       } catch (error) {
         this.error = error.message;
       } finally {
@@ -349,14 +397,13 @@ export default {
       } catch { /* leave it empty and say so on the next step */ }
       plot.houseTypeId = state.data.houseTypes[0]?.id ?? null;
       this.draft = plot;
-      this.step = 2;
+      this.goToStage(2);
     },
 
     create() {
       const plot = addPlot(this.draft);
-      state.openPlotId = plot.id;
-      state.view = "plot";
-      window.scrollTo({ top: 0 });
+      // Replace: the last stage of a finished wizard is not a place to return to.
+      this.$router.replace({ name: "plot", params: { id: plot.id } });
     }
   }
 };
@@ -366,7 +413,8 @@ export default {
 .doubt-note{ display: block; line-height: 1.5; }
 .doubt-note b{ display: block; margin-bottom: 2px; }
 .breadcrumb{ display: flex; align-items: center; gap: var(--w2b-space-2); font-size: var(--w2b-text-xs); color: var(--w2b-muted); }
-.breadcrumb button{ background: none; border: 0; padding: 0; cursor: pointer; color: var(--w2b-primary); font: inherit; }
+.breadcrumb a{ color: var(--w2b-primary); text-decoration: none; }
+.breadcrumb a:hover{ text-decoration: underline; }
 .page-head{ display: flex; align-items: flex-end; gap: var(--w2b-space-4); flex-wrap: wrap; }
 .subtitle{ color: var(--w2b-graphite); font-size: var(--w2b-text-s); max-width: 70ch; }
 .hint{ color: var(--w2b-muted); font-size: var(--w2b-text-s); }

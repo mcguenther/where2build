@@ -1,7 +1,7 @@
 <template>
   <div v-if="plot" class="stack plot-page">
     <nav class="breadcrumb no-print" aria-label="Pfad">
-      <button type="button" @click="back">Grundstücke</button>
+      <RouterLink :to="{ name: 'plots' }">Grundstücke</RouterLink>
       <span aria-hidden="true">›</span>
       <span>{{ plot.name }}</span>
     </nav>
@@ -273,7 +273,7 @@
                 :disabled="!routesPossible || routesBusy" @click="computeRoutes">
           {{ routesBusy ? "Rechnet…" : "Wege berechnen" }}
         </button>
-        <button type="button" class="btn btn--quiet no-print" @click="state.view = 'destinations'">
+        <button type="button" class="btn btn--quiet no-print" @click="$router.push({ name: 'destinations' })">
           Ziele bearbeiten
         </button>
       </div>
@@ -290,6 +290,27 @@
 
       <NearbyPanel :plot="plot" />
     </section>
+  </div>
+
+  <div v-else class="stack">
+    <div class="page-head">
+      <div>
+        <p class="eyebrow">Grundstück</p>
+        <h1>Dieses Grundstück liegt nicht in diesem Browser</h1>
+        <p class="page-head__sub">
+          Grundstücke werden nur hier gespeichert, nicht auf einem Server: ein weitergegebener
+          Link öffnet sie deshalb bei niemandem sonst, und nach „Alles löschen“ sind sie fort.
+          Unter <span class="mono">{{ id }}</span> ist hier keines hinterlegt.
+        </p>
+      </div>
+    </div>
+    <div class="missing">
+      <p>Ein gesicherter Stand lässt sich unter „Daten“ wieder einlesen.</p>
+      <div class="row">
+        <RouterLink class="btn" :to="{ name: 'plots' }">Zur Übersicht</RouterLink>
+        <RouterLink class="btn btn--quiet" :to="{ name: 'data' }">Zu den Daten</RouterLink>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -310,6 +331,10 @@ import { area, euro, euroPerSqm, metres, num, percent, degrees, date } from "../
 export default {
   name: "PlotView",
   components: { SitePlan, RouteCards, NearbyPanel },
+  props: {
+    /** The plot's id, straight out of the URL. */
+    id: { type: String, required: true }
+  },
   data() {
     return {
       state, CUSTOM_SIZE,
@@ -330,7 +355,7 @@ export default {
       return state.data.destinations.filter(d => Number.isFinite(d.lat) && Number.isFinite(d.lon));
     },
     routesPossible() { return Boolean(this.plot.anchor) && this.locatedDestinations.length > 0; },
-    plot() { return plotById(state.openPlotId) || state.data.plots[0] || null; },
+    plot() { return plotById(this.id); },
     hasAnchor() { return Boolean(this.plot?.anchor); },
     building() { return placement(this.plot); },
     houseType() { return houseTypeById(this.plot.houseTypeId); },
@@ -396,10 +421,9 @@ export default {
       }
     },
     area, euro, euroPerSqm, metres, num, percent, degrees, date,
-    back() { state.view = "plots"; window.scrollTo({ top: 0 }); },
     step(by) {
       const target = state.data.plots[this.index + by];
-      if (target) { state.openPlotId = target.id; window.scrollTo({ top: 0 }); }
+      if (target) this.$router.push({ name: "plot", params: { id: target.id } });
     },
     print() { window.print(); },
     toggleMeasuring() {
@@ -471,8 +495,15 @@ export default {
 
 <style scoped>
 .breadcrumb{ display: flex; align-items: center; gap: var(--w2b-space-2); font-size: var(--w2b-text-xs); color: var(--w2b-muted); }
-.breadcrumb button{ background: none; border: 0; padding: 0; cursor: pointer; color: var(--w2b-primary); font: inherit; }
-.breadcrumb button:hover{ text-decoration: underline; }
+.breadcrumb a{ color: var(--w2b-primary); text-decoration: none; }
+.breadcrumb a:hover{ text-decoration: underline; }
+.missing{
+  border: 1px dashed var(--w2b-line); border-radius: var(--w2b-radius-m);
+  display: flex; flex-direction: column; align-items: center; gap: var(--w2b-space-3);
+  padding: var(--w2b-space-6) var(--w2b-space-5); text-align: center;
+}
+.missing p{ color: var(--w2b-muted); font-size: var(--w2b-text-s); }
+.missing .btn{ text-decoration: none; }
 
 .page-head{ display: flex; align-items: flex-end; gap: var(--w2b-space-4); flex-wrap: wrap; }
 .page-head__sub{ margin-top: var(--w2b-space-2); color: var(--w2b-graphite); font-size: var(--w2b-text-s); max-width: 64ch; }

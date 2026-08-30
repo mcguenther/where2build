@@ -24,6 +24,7 @@
           <tr v-for="(hit, i) in found" :key="i">
             <td class="nearby__what">
               <b>{{ label(hit.kategorie) }}</b>
+              <span v-if="hit.art && hit.art !== label(hit.kategorie)" class="nearby__kind">{{ hit.art }}</span>
               <!-- A place you cannot look up is a name, not a finding. -->
               <a v-if="Number.isFinite(hit.lat) && Number.isFinite(hit.lon)"
                  class="nearby__name" :href="placeLink(hit)"
@@ -43,10 +44,12 @@
       </table>
 
       <!-- Two different silences, and confusing them would be a lie: a
-           category this server has no data for, and one that was searched. -->
-      <p v-if="missing.length" class="nearby__hint">
-        Kein Datenbestand für {{ missing.map(c => label(c.kategorie)).join(", ") }}.
-        Das heißt nicht, dass es dort nichts gibt.
+           category this server has no data for, and one that was searched.
+           The reason comes from the service, never from here — it knows
+           whether the index is missing or the source refused the request, and
+           a fixed sentence would state the wrong one. -->
+      <p v-for="group in unavailable" :key="group.hinweis" class="nearby__hint">
+        <b>{{ group.categories.map(label).join(", ") }}:</b> {{ group.hinweis }}
       </p>
       <p v-if="empty.length" class="nearby__hint">
         Nichts gefunden für {{ empty.map(c => label(c.kategorie)).join(", ") }}.
@@ -74,7 +77,19 @@ export default {
   data() { return { result: null, busy: false, error: null }; },
   computed: {
     found() { return this.result?.treffer ?? []; },
-    missing() { return (this.result?.kategorien ?? []).filter(c => c.verfuegbar === false); },
+    /** Unavailable categories, grouped by the reason the service gave, so six
+     *  categories failing the same way read as one line rather than six. */
+    unavailable() {
+      const byReason = new Map();
+      (this.result?.kategorien ?? [])
+        .filter(c => c.verfuegbar === false)
+        .forEach(c => {
+          const reason = c.hinweis || "Für diese Kategorie liegen hier keine Daten vor.";
+          if (!byReason.has(reason)) byReason.set(reason, []);
+          byReason.get(reason).push(c.kategorie);
+        });
+      return [...byReason].map(([hinweis, categories]) => ({ hinweis, categories }));
+    },
     empty() {
       return (this.result?.kategorien ?? []).filter(c => c.verfuegbar === true && c.anzahl === 0);
     }
@@ -107,6 +122,7 @@ export default {
 .nearby__list td{ padding: 7px var(--w2b-space-4); vertical-align: baseline; }
 .nearby__what{ display: flex; flex-direction: column; gap: 1px; }
 .nearby__name{ color: var(--w2b-muted); font-size: var(--w2b-text-xs); }
+.nearby__kind{ color: var(--w2b-muted); font-size: var(--w2b-text-xs); }
 a.nearby__name{ text-decoration: underline; text-underline-offset: 2px; }
 a.nearby__name:hover{ color: var(--w2b-primary); }
 .nearby__walk{ color: var(--w2b-muted); font-size: var(--w2b-text-xs); white-space: nowrap; }

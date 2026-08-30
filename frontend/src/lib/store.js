@@ -24,10 +24,10 @@ export const centreOf = ring => {
 const STORAGE_KEY = "where2build.v1";
 const THEME_KEY = "where2build.theme";
 
+/* Navigation is not in here: which view is open, and which plot, is what the
+ * URL says. See `src/router/`. */
 export const state = reactive({
   data: emptyState(),
-  view: "plots",   // plots | plot | wizard | compare | houseTypes | destinations | data
-  openPlotId: null,
   theme: "system",
   plan: { backdrop: "map", northUp: true, showDimensions: true, showSetbacks: true, measuring: false }
 });
@@ -347,7 +347,6 @@ export function addPlot(plot) {
 export function removePlot(id) {
   state.data.plots = state.data.plots.filter(p => p.id !== id);
   state.data.selection = state.data.selection.filter(s => s !== id);
-  if (state.openPlotId === id) state.openPlotId = null;
   save();
 }
 

@@ -12,7 +12,7 @@ import PlotView from "../src/views/PlotView.vue";
 import HouseTypesView from "../src/views/HouseTypesView.vue";
 import CompareView from "../src/views/CompareView.vue";
 import { state, placement, plotById } from "../src/lib/store.js";
-import { realState } from "./helpers.js";
+import { realState, mountWithRouter, testRouter } from "./helpers.js";
 import { buildableArea, cornersOutside, alignmentToEdge, polygonArea, findPlacement } from "../src/lib/geometry.js";
 import { area } from "../src/lib/format.js";
 import { plotMetrics } from "../src/lib/metrics.js";
@@ -21,7 +21,6 @@ import { boundingBox } from "../src/lib/geometry.js";
 beforeEach(() => {
   localStorage.clear();
   state.data = realState();
-  state.openPlotId = "plot-concave";
   // "none": mounting must not reach for a basemap. The backdrop is verified in
   // the browser by scripts/screenshots.mjs, which fails if no tile arrives.
   state.plan = { backdrop: "none", northUp: true, showDimensions: true, showSetbacks: true, measuring: false };
@@ -166,14 +165,14 @@ describe("Grundstückskarte", () => {
 describe("Leere Zustände", () => {
   it("bietet die Aufnahme an, wenn noch nichts da ist", () => {
     state.data = { version: 2, plots: [], houseTypes: [], destinations: [], selection: [] };
-    const t = mount(PlotsView).text();
+    const t = mountWithRouter(PlotsView).text();
     expect(t).toContain("Noch nichts in der Prüfung");
     expect(t).toContain("Grundstück hinzufügen");
   });
 
   it("sagt beim Haustyp-Katalog, dass er leer ist", () => {
     state.data.houseTypes = [];
-    const t = mount(HouseTypesView).text();
+    const t = mountWithRouter(HouseTypesView).text();
     expect(t).toContain("Noch kein Haustyp im Katalog");
   });
 
@@ -213,15 +212,15 @@ describe("Kartenhintergrund", () => {
     const withoutAnchor = { ...plot() };
     delete withoutAnchor.anchor;
     state.data.plots = [withoutAnchor];
-    state.openPlotId = withoutAnchor.id;
-    const buttons = mount(PlotView).findAll('[aria-label="Kartenhintergrund"] button');
+    const buttons = mountWithRouter(PlotView, { props: { id: withoutAnchor.id } })
+      .findAll('[aria-label="Kartenhintergrund"] button');
     expect(buttons.map(b => b.text())).toEqual(["Ohne", "Karte", "Luftbild", "Kataster"]);
     expect(buttons[0].attributes("disabled")).toBeUndefined();
     buttons.slice(1).forEach(b => expect(b.attributes("disabled")).toBeDefined());
   });
 
   it("gibt die Gründe frei, sobald eine Koordinate da ist", () => {
-    const buttons = mount(PlotView).findAll('[aria-label="Kartenhintergrund"] button');
+    const buttons = mountWithRouter(PlotView, { props: { id: "plot-concave" } }).findAll('[aria-label="Kartenhintergrund"] button');
     buttons.forEach(b => expect(b.attributes("disabled")).toBeUndefined());
   });
 });
@@ -239,7 +238,7 @@ describe("Preis ohne Kaufpreis", () => {
 
   it("sagt auf der Seite, dass der Vergleich fehlt, statt −100 % zu zeigen", () => {
     plot().askingPrice = null;
-    const t = mount(PlotView).text();
+    const t = mountWithRouter(PlotView, { props: { id: "plot-concave" } }).text();
     expect(t).toContain("Ohne Kaufpreis lässt sich das Angebot nicht");
     expect(t).toContain("Kaufpreis—");        // an em dash, not a number
     expect(t).toContain("Angebot je m²—");
@@ -255,24 +254,24 @@ describe("Preis ohne Kaufpreis", () => {
 
 describe("Grundstücksseite", () => {
   it("stellt amtliche und gerechnete Fläche nebeneinander", () => {
-    const t = mount(PlotView).text();
+    const t = mountWithRouter(PlotView, { props: { id: "plot-concave" } }).text();
     expect(t).toContain("1.685 m²");
     expect(t).toContain(area(polygonArea(plot().polygon), 1));
   });
 
   it("benennt die Grenzen nach der Himmelsrichtung", () => {
-    const t = mount(PlotView).text();
+    const t = mountWithRouter(PlotView, { props: { id: "plot-concave" } }).text();
     expect(t).toMatch(/(Nord|Ost|Süd|West|Nordost|Nordwest|Südost|Südwest) — zur Straße/);
     expect(t).not.toMatch(/Grenze \d/);
   });
 
   it("nennt keine Anforderungsnummern", () => {
-    const t = mount(PlotView).text();
+    const t = mountWithRouter(PlotView, { props: { id: "plot-concave" } }).text();
     expect(t).not.toMatch(/\bF-\d\d\b/);
   });
 
   it("richtet den Baukörper an der Straße aus und lässt ihn im Fenster", async () => {
-    const w = mount(PlotView);
+    const w = mountWithRouter(PlotView, { props: { id: "plot-concave" } });
     const p = plot();
     p.house.rotation = 40;
     await w.findAll("button").find(b => b.text().includes("An der Straße ausrichten")).trigger("click");
@@ -281,7 +280,7 @@ describe("Grundstücksseite", () => {
   });
 
   it("koppelt die Abstandstiefe an die Wandhöhe, mit 3 m als Mindestmaß", async () => {
-    const w = mount(PlotView);
+    const w = mountWithRouter(PlotView, { props: { id: "plot-concave" } });
     const p = plot();
     await w.find("#wall-height").setValue("10");
     expect(p.setbacks.every(d => Math.abs(d - 4) < 0.05)).toBe(true);
@@ -290,7 +289,7 @@ describe("Grundstücksseite", () => {
   });
 
   it("erlaubt eigene Maße und hält sie in den Grenzen", async () => {
-    const w = mount(PlotView);
+    const w = mountWithRouter(PlotView, { props: { id: "plot-concave" } });
     await w.find("#house-type").setValue("custom");
     expect(plot().houseTypeId).toBe("custom");
     await w.find("#custom-length").setValue("13");
@@ -302,7 +301,7 @@ describe("Grundstücksseite", () => {
   });
 
   it("schaltet das Messen ein und wieder aus", async () => {
-    const w = mount(PlotView);
+    const w = mountWithRouter(PlotView, { props: { id: "plot-concave" } });
     const button = w.findAll("button").find(b => b.text().trim() === "Messen");
     await button.trigger("click");
     expect(state.plan.measuring).toBe(true);
@@ -314,24 +313,26 @@ describe("Grundstücksseite", () => {
 
 describe("Haustypen", () => {
   it("prüft je Grundstück, ob der Baukörper passt", () => {
-    const w = mount(HouseTypesView);
+    const w = mountWithRouter(HouseTypesView);
     const headings = w.findAll(".fits__head").map(n => n.text());
     expect(headings).toHaveLength(state.data.houseTypes.length);
     headings.forEach(h => expect(h).toMatch(/^Passt auf \d von 2 Grundstücken$/));
   });
 
   it("setzt einen Typ auf ein Grundstück und öffnet es zulässig", async () => {
-    const w = mount(HouseTypesView);
+    const router = testRouter();
+    const w = mountWithRouter(HouseTypesView, { router });
     const button = w.findAll(".fits__button")[0];
     if (!button) return;                      // kein Typ passt auf ein Grundstück
     await button.trigger("click");
-    expect(state.view).toBe("plot");
-    const p = plotById(state.openPlotId);
+    await router.isReady();
+    expect(router.currentRoute.value.name).toBe("plot");
+    const p = plotById(router.currentRoute.value.params.id);
     expect(cornersOutside(placement(p), buildableArea(p.polygon, p.setbacks))).toBe(0);
   });
 
   it("nimmt von Hand eingetragene Maße auf", async () => {
-    const w = mount(HouseTypesView);
+    const w = mountWithRouter(HouseTypesView);
     const before = state.data.houseTypes.length;
     await w.findAll(".page-head .btn")[0].trigger("click");
     await w.find("#manual-length").setValue(12);
@@ -347,7 +348,7 @@ describe("Vergleich", () => {
     // Passing the same prop is not the same as using it: SitePlan used to
     // compute its own fit per plot and ignore the value, so the panel claimed
     // a shared scale it did not have and the "rund 1 : N" chip was wrong.
-    const w = mount(CompareView);
+    const w = mountWithRouter(CompareView);
     const plans = w.findAllComponents({ name: "SitePlan" });
     expect(plans.length).toBeGreaterThan(1);
 
@@ -361,7 +362,7 @@ describe("Vergleich", () => {
   });
 
   it("wählt den Maßstab so, dass auch das größte Grundstück hineinpasst", () => {
-    const w = mount(CompareView);
+    const w = mountWithRouter(CompareView);
     w.findAllComponents({ name: "SitePlan" }).forEach(plan => {
       const box = boundingBox(plan.props("plot").polygon);
       const scale = plan.vm.view.scale;
@@ -372,6 +373,6 @@ describe("Vergleich", () => {
 
   it("listet nur die ausgewählten Kandidaten", () => {
     state.data.selection = ["plot-concave"];
-    expect(mount(CompareView).findAll("tbody tr")).toHaveLength(1);
+    expect(mountWithRouter(CompareView).findAll("tbody tr")).toHaveLength(1);
   });
 });

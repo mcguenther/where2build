@@ -36,13 +36,25 @@ const server = createServer(async (req, res) => {
     }
     return;
   }
-  let file = join(dist, path_ === "/" ? "index.html" : path_);
-  try {
+  const send = async file => {
     const content = await readFile(file);
     res.writeHead(200, { "Content-Type": MIME[extname(file)] || "application/octet-stream" });
     res.end(content);
+  };
+  const file = join(dist, path_ === "/" ? "index.html" : path_);
+  try {
+    await send(file);
   } catch {
-    res.writeHead(404).end("not found");
+    /* The app routes in history mode, so `/grundstueck/…` is a page, not a
+     * file: every static host has to answer an unknown path with index.html or
+     * a deep link 404s. A path that names a file extension stays a 404, so a
+     * missing asset still shows up as one. */
+    if (extname(file)) return void res.writeHead(404).end("not found");
+    try {
+      await send(join(dist, "index.html"));
+    } catch {
+      res.writeHead(404).end("not found");
+    }
   }
 });
 await new Promise(r => server.listen(4173, r));
@@ -123,6 +135,7 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
 
   await page.waitForTimeout(6000);                             // Kacheln laden lassen
   await shot(page, "grundstueck", mode, narrow ? "-schmal" : "");
+
   if (!narrow) {
     await page.getByRole("button", { name: "Luftbild" }).click();
     await page.waitForTimeout(4000);
@@ -130,14 +143,28 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
     await page.getByRole("button", { name: "Karte" }).click();
     await page.waitForTimeout(2000);
   }
-  await page.click(".breadcrumb button");
 
-  await page.click('.main-nav button:nth-child(2)');               // Haustypen
+  /* The point of the addresses: the plot has one of its own, and reloading it
+   * comes back to the same page instead of the overview. This is also what
+   * exercises the server's history-mode fallback above. */
+  const plotAddress = page.url();
+  if (!/\/grundstueck\/[^/]+$/.test(plotAddress)) {
+    problems.push(`${mode}/${width}: das Grundstück hat keine eigene Adresse (${plotAddress})`);
+  }
+  await page.reload({ waitUntil: "load" });
+  await page.waitForSelector(".plot-page", { timeout: 20000 });
+  if (page.url() !== plotAddress) {
+    problems.push(`${mode}/${width}: nach dem Neuladen auf ${page.url()} statt ${plotAddress}`);
+  }
+
+  await page.click(".breadcrumb a");
+
+  await page.click('.main-nav a:nth-child(2)');               // Haustypen
   await shot(page, "haustypen", mode, narrow ? "-schmal" : "");
   if (!narrow) {
     // A destination, looked up for real: the picker is the point here, because
     // this geocoder answers "Am Kirschberg" with Bavaria as readily as Saxony.
-    await page.click('.main-nav button:nth-child(3)');             // Ziele
+    await page.click('.main-nav a:nth-child(3)');             // Ziele
     await page.getByRole("button", { name: /Ziel hinzufügen|Erstes Ziel anlegen/ }).first().click();
     const fields = await page.locator("input[type=text]").all();
     await fields[0].fill("Bahnhof");
@@ -149,7 +176,7 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
     await shot(page, "ziele", mode);
 
     // And the routes that follow from it, drawn from the geometry MOTIS sends.
-    await page.click('.main-nav button:nth-child(1)');
+    await page.click('.main-nav a:nth-child(1)');
     await page.click(".plot-card .btn");
     await page.getByRole("button", { name: "Wege berechnen" }).click();
     await page.waitForSelector(".route-card polyline", { timeout: 60000 });
@@ -159,9 +186,9 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
     await page.getByRole("button", { name: "Nachsehen" }).click();
     await page.waitForSelector(".nearby__list tbody tr", { timeout: 60000 });
     await shot(page, "grundstueck-umgebung", mode);
-    await page.click(".breadcrumb button");
+    await page.click(".breadcrumb a");
 
-    await page.click('.main-nav button:nth-child(4)');             // Daten
+    await page.click('.main-nav a:nth-child(4)');             // Daten
     await shot(page, "daten", mode);
   }
   await ctx.close();

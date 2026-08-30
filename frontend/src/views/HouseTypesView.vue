@@ -197,9 +197,7 @@ export default {
         rotation: placement.rotation > 90 ? placement.rotation - 180 : placement.rotation
       };
       save();
-      state.openPlotId = plot.id;
-      state.view = "plot";
-      window.scrollTo({ top: 0 });
+      this.$router.push({ name: "plot", params: { id: plot.id } });
     },
     async read() {
       this.busy = true;

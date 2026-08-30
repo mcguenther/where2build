@@ -48,6 +48,47 @@ describe("Umgebung", () => {
     expect(w.findAll("tbody tr")).toHaveLength(recorded.treffer.length);
   });
 
+  it("übernimmt die Begründung des Dienstes, statt eine eigene zu behaupten", async () => {
+    // The panel used to print a fixed "kein Datenbestand" sentence for every
+    // unavailable category. With a rate limit or a runtime error that sentence
+    // is simply false — the service knows which of the two happened.
+    const refused = structuredClone(recorded);
+    refused.kategorien = refused.kategorien.map(c => c.kategorie === "schule"
+      ? { ...c, verfuegbar: false, anzahl: 0,
+          hinweis: "Die Umgebungssuche wurde wegen zu vieler Zugriffe abgewiesen (HTTP 429)." }
+      : c);
+    nearby.mockResolvedValueOnce(refused);
+
+    const w = mount(NearbyPanel, { props: { plot: plot() } });
+    await w.find("button").trigger("click");
+    await flushPromises();
+
+    expect(w.text()).toContain("wegen zu vieler Zugriffe abgewiesen");
+    expect(w.text()).toContain("Schule");
+  });
+
+  it("fasst Kategorien mit derselben Begründung zu einer Zeile zusammen", async () => {
+    const w = mount(NearbyPanel, { props: { plot: plot() } });
+    await w.find("button").trigger("click");
+    await flushPromises();
+
+    // Six categories share one reason in the recording; one line, not six.
+    const lines = w.findAll(".nearby__hint").map(p => p.text());
+    const noData = lines.filter(t => t.includes("kein Datenbestand"));
+    expect(noData).toHaveLength(1);
+    ["Schule", "Kita", "Park", "Spielplatz", "Supermarkt", "Arzt"]
+      .forEach(name => expect(noData[0]).toContain(name));
+  });
+
+  it("zeigt bei einem Halt, welche Verkehrsmittel dort fahren", async () => {
+    const w = mount(NearbyPanel, { props: { plot: plot() } });
+    await w.find("button").trigger("click");
+    await flushPromises();
+    // A stop merged across categories would otherwise lose its "also S-Bahn".
+    const withKind = recorded.treffer.filter(t => t.art && t.art !== "Bus");
+    if (withKind.length) expect(w.text()).toContain(withKind[0].art);
+  });
+
   it("trennt „kein Datenbestand“ von „nichts gefunden“", async () => {
     const w = mount(NearbyPanel, { props: { plot: plot() } });
     await w.find("button").trigger("click");
@@ -55,9 +96,10 @@ describe("Umgebung", () => {
     const text = w.text();
 
     // Six categories have no index on this server; one was searched and empty.
-    expect(text).toContain("Kein Datenbestand für");
+    // The wording is the service's own, so assert on what it actually said.
+    const noData = recorded.kategorien.find(c => c.verfuegbar === false).hinweis;
+    expect(text).toContain(noData);
     expect(text).toContain("Schule");
-    expect(text).toContain("Das heißt nicht, dass es dort nichts gibt");
     expect(text).toContain("Nichts gefunden für");
     expect(text).toContain("S-Bahn");
   });

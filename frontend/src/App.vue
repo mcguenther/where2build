@@ -2,7 +2,7 @@
   <div class="shell">
     <header class="site-header no-print">
       <div class="container site-header__inner">
-        <button type="button" class="brand" @click="goTo('plots')" aria-label="Zur Übersicht">
+        <RouterLink class="brand" :to="{ name: 'plots' }" aria-label="Zur Übersicht">
           <svg viewBox="0 0 48 48" width="30" height="30" aria-hidden="true">
             <rect x="5.5" y="5.5" width="37" height="37" rx="3.5" fill="none"
                   stroke="var(--w2b-primary)" stroke-width="3" />
@@ -10,14 +10,13 @@
                   fill="var(--w2b-secondary)" transform="rotate(15 24 24)" />
           </svg>
           <span class="brand__word">where<b>2</b>build</span>
-        </button>
+        </RouterLink>
 
         <nav class="main-nav" aria-label="Bereiche">
-          <button v-for="s in sections" :key="s.id" type="button"
-                  :aria-current="isCurrent(s.id) ? 'page' : null"
-                  @click="goTo(s.id)">
+          <RouterLink v-for="s in sections" :key="s.section" :to="s.to"
+                      :aria-current="isCurrent(s.section) ? 'page' : null">
             {{ s.name }}<span v-if="s.count !== null" class="main-nav__count">{{ s.count }}</span>
-          </button>
+          </RouterLink>
         </nav>
 
         <div class="spacer"></div>
@@ -31,13 +30,7 @@
     </header>
 
     <main class="container">
-      <PlotsView        v-if="state.view === 'plots'" />
-      <WizardView       v-else-if="state.view === 'wizard'" />
-      <PlotView         v-else-if="state.view === 'plot'" />
-      <CompareView      v-else-if="state.view === 'compare'" />
-      <HouseTypesView   v-else-if="state.view === 'houseTypes'" />
-      <DestinationsView v-else-if="state.view === 'destinations'" />
-      <DataView         v-else-if="state.view === 'data'" />
+      <RouterView />
     </main>
 
     <footer class="site-footer no-print">
@@ -55,18 +48,10 @@
 </template>
 
 <script>
-import { state, load, applyTheme } from "./lib/store.js";
-import PlotsView from "./views/PlotsView.vue";
-import PlotView from "./views/PlotView.vue";
-import WizardView from "./views/WizardView.vue";
-import CompareView from "./views/CompareView.vue";
-import HouseTypesView from "./views/HouseTypesView.vue";
-import DestinationsView from "./views/DestinationsView.vue";
-import DataView from "./views/DataView.vue";
+import { state, applyTheme } from "./lib/store.js";
 
 export default {
   name: "App",
-  components: { PlotsView, PlotView, WizardView, CompareView, HouseTypesView, DestinationsView, DataView },
   data() {
     return {
       state,
@@ -80,25 +65,19 @@ export default {
   computed: {
     sections() {
       return [
-        { id: "plots", name: "Grundstücke", count: state.data.plots.length },
-        { id: "houseTypes", name: "Haustypen", count: state.data.houseTypes.length },
-        { id: "destinations", name: "Ziele", count: state.data.destinations.length },
-        { id: "data", name: "Daten", count: null }
+        { section: "plots", to: { name: "plots" }, name: "Grundstücke", count: state.data.plots.length },
+        { section: "houseTypes", to: { name: "houseTypes" }, name: "Haustypen", count: state.data.houseTypes.length },
+        { section: "destinations", to: { name: "destinations" }, name: "Ziele", count: state.data.destinations.length },
+        { section: "data", to: { name: "data" }, name: "Daten", count: null }
       ];
     }
   },
-  created() { load(); },
   methods: {
     applyTheme,
-    goTo(id) {
-      state.view = id;
-      window.scrollTo({ top: 0, behavior: "instant" });
-    },
-    /** Detail, wizard and compare all live under "Grundstücke" in the navigation. */
-    isCurrent(id) {
-      const home = ["plot", "compare", "wizard"].includes(state.view) ? "plots" : state.view;
-      return home === id;
-    }
+    /** Detail, wizard and comparison all live under "Grundstücke" in the
+     *  navigation, so the current section comes from the route, not from the
+     *  link being the exact one that was followed. */
+    isCurrent(section) { return this.$route.meta.section === section; }
   }
 };
 </script>
@@ -115,7 +94,7 @@ main{ flex: 1; padding-top: var(--w2b-space-5); }
 
 .brand{
   display: flex; align-items: center; gap: 10px;
-  background: none; border: 0; padding: 0; cursor: pointer;
+  background: none; border: 0; padding: 0; cursor: pointer; text-decoration: none;
 }
 .brand__word{
   font-family: var(--w2b-font-display); font-weight: 700; font-size: 21px;
@@ -124,21 +103,21 @@ main{ flex: 1; padding-top: var(--w2b-space-5); }
 .brand__word b{ color: var(--w2b-secondary-text); }
 
 .main-nav{ display: flex; gap: var(--w2b-space-1); flex-wrap: wrap; min-width: 0; }
-.main-nav button{
+.main-nav a{
   display: flex; align-items: center; gap: 7px;
-  background: none; border: 0; cursor: pointer;
+  background: none; border: 0; cursor: pointer; text-decoration: none;
   padding: 7px 13px; border-radius: var(--w2b-radius-s);
   font-family: var(--w2b-font-display); font-weight: 600; font-size: 14.5px;
   color: var(--w2b-graphite);
 }
-.main-nav button:hover{ background: var(--w2b-primary-veil); color: var(--w2b-ink); }
-.main-nav button[aria-current="page"]{ background: var(--w2b-primary); color: var(--w2b-primary-on); }
+.main-nav a:hover{ background: var(--w2b-primary-veil); color: var(--w2b-ink); }
+.main-nav a[aria-current="page"]{ background: var(--w2b-primary); color: var(--w2b-primary-on); }
 .main-nav__count{
   font-family: var(--w2b-font-mono); font-size: 10.5px; font-variant-numeric: tabular-nums;
   padding: 0 5px; border-radius: var(--w2b-radius-full);
   background: var(--w2b-line-faint); color: var(--w2b-muted);
 }
-.main-nav button[aria-current="page"] .main-nav__count{
+.main-nav a[aria-current="page"] .main-nav__count{
   background: rgba(255,255,255,.18); color: var(--w2b-primary-on);
 }
 
@@ -160,6 +139,6 @@ main{ flex: 1; padding-top: var(--w2b-space-5); }
 
 @media (max-width: 560px){
   .brand__word{ font-size: 18px; }
-  .main-nav button{ padding: 6px 10px; font-size: 13.5px; }
+  .main-nav a{ padding: 6px 10px; font-size: 13.5px; }
 }
 </style>

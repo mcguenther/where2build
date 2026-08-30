@@ -5,6 +5,9 @@ import large from "./fixtures/parcel-large.json";
 import manyCorners from "./fixtures/parcel-many-corners.json";
 import elk from "./fixtures/housetype-elk.json";
 import reachability from "./fixtures/reachability-liebertwolkwitz.json";
+import { mount } from "@vue/test-utils";
+import { createMemoryHistory } from "vue-router";
+import { createAppRouter } from "../src/router/index.js";
 import { plotFromCadastre } from "../src/lib/plots.js";
 import { houseTypeFromResponse } from "../src/lib/houseTypes.js";
 import { SCHEMA_VERSION } from "../src/lib/sample.js";
@@ -96,3 +99,16 @@ export const realStateV1 = () => {
     auswahl: current.selection
   };
 };
+
+/* ---------- Mounting a view ----------
+ * Views navigate and draw links, so they need a router. A memory history keeps
+ * it out of jsdom's one shared address bar, so every test gets its own. */
+export function testRouter(path = "/") {
+  const router = createAppRouter(createMemoryHistory());
+  router.push(path);
+  return router;
+}
+
+/** Mount one view with a live router. `props` are what the route would pass. */
+export const mountWithRouter = (component, { path = "/", props, router = testRouter(path) } = {}) =>
+  mount(component, { props, global: { plugins: [router] } });

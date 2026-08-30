@@ -49,6 +49,7 @@
 import PlotCard from "../components/PlotCard.vue";
 import { state, toggleSelection, removePlot } from "../lib/store.js";
 import { backendHealth } from "../lib/api.js";
+import { wizardStage } from "../router/stages.js";
 
 export default {
   name: "PlotsView",
@@ -69,9 +70,9 @@ export default {
   methods: {
     toggleSelection,
     isSelected(id) { return state.data.selection.includes(id); },
-    open(id) { state.openPlotId = id; state.view = "plot"; window.scrollTo({ top: 0 }); },
-    startWizard() { state.view = "wizard"; window.scrollTo({ top: 0 }); },
-    compare() { state.view = "compare"; window.scrollTo({ top: 0 }); },
+    open(id) { this.$router.push({ name: "plot", params: { id } }); },
+    startWizard() { this.$router.push(wizardStage(0)); },
+    compare() { this.$router.push({ name: "compare" }); },
     selectAll() { state.data.selection = state.data.plots.map(p => p.id); },
     selectNone() { state.data.selection = []; },
     remove(plot) {
