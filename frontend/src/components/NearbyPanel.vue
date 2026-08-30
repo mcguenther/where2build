@@ -74,7 +74,14 @@ const LABELS = {
 
 export default {
   name: "NearbyPanel",
-  props: { plot: { type: Object, required: true } },
+  props: {
+    plot: { type: Object, required: true },
+    /** Look straight away instead of waiting for the button. The surroundings
+     *  view exists to show this; making it ask first would be a click for
+     *  nothing. The plot page keeps the button. */
+    auto: { type: Boolean, default: false }
+  },
+  emits: ["loaded"],
   data() { return { result: null, busy: false, error: null }; },
   computed: {
     found() { return this.result?.treffer ?? []; },
@@ -95,7 +102,15 @@ export default {
       return (this.result?.kategorien ?? []).filter(c => c.verfuegbar === true && c.anzahl === 0);
     }
   },
-  watch: { "plot.id"() { this.result = null; this.error = null; } },
+  mounted() { if (this.auto && this.plot.anchor) this.load(); },
+  watch: {
+    "plot.id"() {
+      this.result = null;
+      this.error = null;
+      this.$emit("loaded", null);
+      if (this.auto && this.plot.anchor) this.load();
+    }
+  },
   methods: {
     duration,
     metres,
@@ -109,6 +124,7 @@ export default {
       this.error = null;
       try {
         this.result = await nearby({ lat: this.plot.anchor.lat, lon: this.plot.anchor.lon });
+        this.$emit("loaded", this.result);
       } catch (error) {
         this.error = error.message;
       } finally {

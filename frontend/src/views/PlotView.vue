@@ -289,6 +289,12 @@
       <RouteCards :plot="plot" />
 
       <NearbyPanel :plot="plot" />
+
+      <p v-if="hasAnchor" class="row no-print">
+        <RouterLink class="btn btn--quiet" :to="{ name: 'surroundings', params: { id: plot.id } }">
+          Auf der Umgebungskarte ansehen
+        </RouterLink>
+      </p>
     </section>
   </div>
 

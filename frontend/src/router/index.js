@@ -15,6 +15,7 @@ import WizardView from "../views/WizardView.vue";
 import CompareView from "../views/CompareView.vue";
 import HouseTypesView from "../views/HouseTypesView.vue";
 import DestinationsView from "../views/DestinationsView.vue";
+import SurroundingsView from "../views/SurroundingsView.vue";
 import DataView from "../views/DataView.vue";
 import NotFoundView from "../views/NotFoundView.vue";
 import { WIZARD_STAGES, wizardStage } from "./stages.js";
@@ -33,6 +34,13 @@ export const routes = [
     meta: { section: "plots" }
   },
   { path: "/grundstueck/:id", name: "plot", component: PlotView, props: true, meta: { section: "plots" } },
+  {
+    path: "/grundstueck/:id/umgebung",
+    name: "surroundings",
+    component: SurroundingsView,
+    props: true,
+    meta: { section: "plots" }
+  },
   { path: "/vergleich", name: "compare", component: CompareView, meta: { section: "plots" } },
   { path: "/haustypen", name: "houseTypes", component: HouseTypesView, meta: { section: "houseTypes" } },
   { path: "/ziele", name: "destinations", component: DestinationsView, meta: { section: "destinations" } },

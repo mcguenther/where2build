@@ -93,6 +93,18 @@ async function addPlot(page) {
 const taken = [];
 const problems = [];
 
+/* The map reports when every tile for the current view has arrived. A tile
+ * that 502s never lets it, and a whole screenshot run must not hang on one --
+ * so the wait is bounded and says what it settled for. */
+async function mapSettled(page, what) {
+  try {
+    await page.waitForSelector('[data-map-ready="true"]', { timeout: 45000 });
+  } catch {
+    problems.push(`${what}: Kartenkacheln kamen nicht vollständig an`);
+    await page.waitForTimeout(2000);
+  }
+}
+
 async function shot(page, name, mode, zusatz = "") {
   await page.waitForTimeout(340);
   // A layout that pushes the page sideways is a defect, and no screenshot shows it.
@@ -198,6 +210,21 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
     await page.getByRole("button", { name: "Nachsehen" }).click();
     await page.waitForSelector(".nearby__list tbody tr", { timeout: 60000 });
     await shot(page, "grundstueck-umgebung", mode);
+
+    // The map of the same thing: house, ground around it, and every place that
+    // was found. The wait is on a marker, not on the canvas -- an empty map
+    // would otherwise pass as a picture.
+    await page.getByRole("link", { name: "Auf der Umgebungskarte ansehen" }).click();
+    await page.waitForSelector(".surroundings__poi", { timeout: 60000 });
+    // Not a timeout: the map says when every tile for this view has arrived.
+    // Waiting on a clock photographed a quarter-drawn basemap.
+    await mapSettled(page, `${mode}/${width} Umgebungskarte`);
+    await shot(page, "umgebungskarte", mode);
+    if (!narrow && mode === "hell") {
+      await page.getByRole("button", { name: "Mit Zielen" }).click();
+      await mapSettled(page, `${mode}/${width} Umgebungskarte mit Zielen`);
+      await shot(page, "umgebungskarte-ziele", mode);
+    }
     await page.click(".breadcrumb a");
 
     await page.click('.main-nav a:nth-child(4)');             // Daten

@@ -186,6 +186,25 @@ from the user directly. Reopen only if the user asks.
   inward offset for convex rings; on an L-shaped plot it returns an empty
   envelope. `buildableArea` falls back to a grid contour, biased inward so an
   approximation is never more permissive than the law.
+- **A failure flag must never be an input to the watcher that retries.**
+  `SitePlan.hasBackdrop` contained `!mapUnavailable`, and its watcher rebuilt
+  the map; the rebuild cleared the flag, which changed `hasBackdrop`, which
+  fired the watcher. A basemap that would not load therefore re-fetched the
+  style forever. Nothing was visible — the drawing looked right. And the loop
+  is pure microtasks, so it starves every timer: no browser watchdog and no
+  test timeout can end it, which is why the frontend suite took twenty minutes
+  and reported a killed worker rather than a failure. What a thing *should be*
+  is now separate from whether it *is*, and only the former drives a rebuild.
+- **MapLibre never fires `idle` while a tile is still failing.** A 502 on one
+  vector tile keeps `areTilesLoaded()` false indefinitely, so anything that
+  waits for `idle` before photographing a map needs a bounded fallback that
+  reports the incomplete render instead of hanging the whole run.
+- **`node scripts/screenshots.mjs` serves `frontend/dist`, not the dev server.**
+  Run `npm run build` first or the pictures show the previous code.
+- **A dead upstream connection pool survives a container restart.** After the
+  sandbox restarted, the running backend answered 502 for every Transitous call
+  while the same request from `curl` returned 200. Restarting uvicorn fixed it;
+  do not go looking for the bug in the code first.
 - **The sandbox browser has no route to the internet**, only the shell has.
   Basemap tiles therefore cannot be verified by screenshot here; the camera
   maths is covered by `tests/projection.test.js` instead.
@@ -222,6 +241,6 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 ## Test and screenshot counts at last check
 
 - `pytest`: 319
-- `vitest`: 205 (plus `npm run test:integration`, 10 against a running backend)
-- `scripts/screenshots.mjs`: 34 images plus a print PDF. It fails on console errors, on
+- `vitest`: 213 (plus `npm run test:integration`, 10 against a running backend)
+- `scripts/screenshots.mjs`: 37 images plus a print PDF. It fails on console errors, on
   horizontal overflow, and if not a single vector tile arrived.
