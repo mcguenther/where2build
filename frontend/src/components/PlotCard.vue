@@ -12,7 +12,11 @@
 
     <div class="plot-card__body">
       <h3><button type="button" class="plot-card__title" @click="$emit('open')">{{ plot.name }}</button></h3>
-      <p class="plot-card__place">{{ plot.ort }} · Flst. {{ plot.flurstuecke.join(" · ") }}</p>
+      <!-- `ort` never existed; plotFromCadastre sets `municipality`. Reading the
+           missing field left every card starting with a stray separator. -->
+      <p class="plot-card__place">
+        <template v-if="plot.municipality">{{ plot.municipality }} · </template>Flst. {{ plot.flurstuecke.join(" · ") }}
+      </p>
 
       <dl class="plot-card__values">
         <dt>Fläche</dt><dd>{{ area(plot.officialArea) }}</dd>

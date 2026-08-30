@@ -24,7 +24,12 @@
           <tr v-for="(hit, i) in found" :key="i">
             <td class="nearby__what">
               <b>{{ label(hit.kategorie) }}</b>
-              <span class="nearby__name">{{ hit.name }}</span>
+              <!-- A place you cannot look up is a name, not a finding. -->
+              <a v-if="Number.isFinite(hit.lat) && Number.isFinite(hit.lon)"
+                 class="nearby__name" :href="placeLink(hit)"
+                 target="_blank" rel="noopener noreferrer"
+                 :title="`${hit.name} auf OpenStreetMap ansehen`">{{ hit.name }}</a>
+              <span v-else class="nearby__name">{{ hit.name }}</span>
             </td>
             <td class="num">{{ hit.erreichbar ? duration(hit.duration_s) : "—" }}</td>
             <td class="num nearby__walk">
@@ -54,6 +59,7 @@
 <script>
 import { nearby } from "../lib/api.js";
 import { duration, metres } from "../lib/format.js";
+import { openStreetMapPlace, openStreetMapRoute } from "../lib/mapLinks.js";
 
 /** German labels for the server's category keys. */
 const LABELS = {
@@ -77,6 +83,9 @@ export default {
   methods: {
     duration,
     metres,
+    placeLink(hit) { return openStreetMapPlace(hit); },
+    /** The walk itself, for anyone who wants to see the route rather than the point. */
+    walkLink(hit) { return openStreetMapRoute(this.plot.anchor, hit, "walk"); },
     label(key) { return LABELS[key] ?? key; },
     async load() {
       this.busy = true;
@@ -98,6 +107,8 @@ export default {
 .nearby__list td{ padding: 7px var(--w2b-space-4); vertical-align: baseline; }
 .nearby__what{ display: flex; flex-direction: column; gap: 1px; }
 .nearby__name{ color: var(--w2b-muted); font-size: var(--w2b-text-xs); }
+a.nearby__name{ text-decoration: underline; text-underline-offset: 2px; }
+a.nearby__name:hover{ color: var(--w2b-primary); }
 .nearby__walk{ color: var(--w2b-muted); font-size: var(--w2b-text-xs); white-space: nowrap; }
 .nearby__hint{ padding: 0 var(--w2b-space-4) var(--w2b-space-2); color: var(--w2b-muted); font-size: var(--w2b-text-xs); }
 </style>

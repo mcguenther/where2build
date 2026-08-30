@@ -174,3 +174,68 @@ describe("Wegekarten mit echten Daten", () => {
     expect(Object.keys(restored.plots[0].routes)).toEqual([HBF]);
   });
 });
+
+describe("Nachprüfbarkeit und Begründung", () => {
+  it("nennt bei jedem nicht erreichbaren Verkehrsmittel den Grund im Klartext", () => {
+    // The reason used to live in a title attribute — invisible on a touch
+    // screen, in print, and to anyone who does not hover.
+    const w = mount(RouteCards, { props: { plot: plot() } });
+    const reasons = w.findAll(".route-card__why").map(p => p.text());
+    expect(reasons.length).toBeGreaterThan(0);
+    expect(reasons.some(t => t.includes("ÖPNV"))).toBe(true);
+    expect(reasons.some(t => /keine Verbindung/i.test(t))).toBe(true);
+  });
+
+  it("schreibt keinen Grund hin, wo alles erreichbar war", () => {
+    const w = mount(RouteCards, { props: { plot: plot() } });
+    const cards = w.findAll("article");
+    // Hbf: every mode routed. School: no transit.
+    expect(cards[0].findAll(".route-card__why")).toHaveLength(0);
+    expect(cards[1].findAll(".route-card__why").length).toBeGreaterThan(0);
+  });
+
+  it("verlinkt jede Route nach OpenStreetMap und Google Maps", () => {
+    const w = mount(RouteCards, { props: { plot: plot() } });
+    const links = w.findAll(".route-card__links a").map(a => a.attributes("href"));
+    expect(links.some(h => h.startsWith("https://www.openstreetmap.org/directions"))).toBe(true);
+    expect(links.some(h => h.startsWith("https://www.google.com/maps/dir/"))).toBe(true);
+    // Both ends of the route must be in the URL, or the link is decoration.
+    // Both ends, taken from the data rather than hard-coded, so the assertion
+    // cannot drift away from the fixture.
+    const osm = links.find(h => h.includes("openstreetmap"));
+    expect(osm).toContain(plot().anchor.lat.toFixed(6));
+    expect(osm).toContain(realDestinations()[0].lat.toFixed(6));
+    w.findAll(".route-card__links a").forEach(a => {
+      expect(a.attributes("rel")).toContain("noopener");
+      expect(a.attributes("target")).toBe("_blank");
+    });
+  });
+
+  it("sagt dazu, wenn OpenStreetMap den schnellsten Modus nicht kann", () => {
+    // In the recorded data the car is fastest everywhere, so the note stays
+    // away. Make transit the fastest and it has to appear — OSM has no public
+    // transport engine and would silently route by car instead.
+    const p = plot();
+    const hbf = p.routes[HBF].modes;
+    hbf.transit.duration_s = 60;
+    expect(mount(RouteCards, { props: { plot: p } }).text()).toContain("kennt keinen ÖPNV");
+
+    hbf.transit.duration_s = 1920;
+    expect(mount(RouteCards, { props: { plot: p } }).text()).not.toContain("kennt keinen ÖPNV");
+  });
+
+  it("verlinkt nichts ohne Koordinaten", () => {
+    const withoutAnchor = { ...plot() };
+    delete withoutAnchor.anchor;
+    const w = mount(RouteCards, { props: { plot: withoutAnchor } });
+    expect(w.findAll(".route-card__links")).toHaveLength(0);
+  });
+
+  it("die Links verschwinden im Druck", () => {
+    const w = mount(RouteCards, { props: { plot: plot() } });
+    // Paper cannot be clicked; the class print.css hides must be on them.
+    w.findAll(".route-card__links").forEach(p => {
+      expect(p.classes()).toContain("no-print");
+    });
+  });
+});

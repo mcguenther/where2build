@@ -18,8 +18,11 @@
               fill="var(--w2b-map-halo)" stroke="var(--w2b-map-violation)" stroke-width="2.2" />
         <circle :cx="sketch(destination).end.x" :cy="sketch(destination).end.y" r="5.5"
                 :fill="MODE_COLOURS[sketch(destination).fastest]" stroke="var(--w2b-map-halo)" stroke-width="1.6" />
-        <text x="293" y="143" text-anchor="end" class="route-card__scale">{{ sketch(destination).scaleLabel }}</text>
       </svg>
+      <!-- Below the drawing, not on it. Laid over the sketch — even on a
+           semi-transparent strip — the caption ran through the start marker
+           whenever the frame was wide. Nothing overlaps if nothing overlaps. -->
+      <p v-if="sketch(destination)" class="route-card__scale">{{ sketch(destination).scaleLabel }}</p>
 
       <table v-if="modes(destination).length" class="data-table route-card__modes">
         <tbody>
@@ -31,6 +34,13 @@
         </tbody>
       </table>
 
+      <!-- A tooltip is not a display: invisible on a touch screen, in print, and
+           to anyone who does not hover. The reason gets its own line, below the
+           table where there is room for a sentence. -->
+      <p v-for="m in unreachable(destination)" :key="`why-${m.mode}`" class="route-card__why">
+        <b>{{ m.name }}:</b> {{ m.hinweis || "Der Routendienst hat keine Verbindung gefunden." }}
+      </p>
+
       <p v-if="!destination.lat" class="route-card__empty">
         Adresse noch nicht verortet — unter „Ziele“ nachschlagen lassen.
       </p>
@@ -38,6 +48,17 @@
       <p v-else-if="!modes(destination).some(m => m.erreichbar)" class="route-card__empty">
         Keine Verbindung gefunden — mit keinem Verkehrsmittel.
       </p>
+      <!-- A drawn route is a claim until someone can open it elsewhere. -->
+      <p v-if="canLinkOut(destination)" class="route-card__links nicht-drucken no-print">
+        Nachprüfen:
+        <a :href="osmLink(destination)" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>
+        ·
+        <a :href="googleLink(destination)" target="_blank" rel="noopener noreferrer">Google Maps</a>
+        <span v-if="fastestMode(plot.routes[destination.id]) === 'transit'" class="route-card__links-note">
+          — OpenStreetMap kennt keinen ÖPNV, dort als Autoroute.
+        </span>
+      </p>
+
       <p v-if="plot.routes[destination.id] && plot.routes[destination.id].calculatedAt" class="route-card__computed">
         Berechnet {{ formatDate(plot.routes[destination.id].calculatedAt) }}<span v-if="plot.routes[destination.id].source"> · {{ plot.routes[destination.id].source }}</span>
       </p>
@@ -49,6 +70,7 @@
 <script>
 import { state } from "../lib/store.js";
 import { duration } from "../lib/format.js";
+import { openStreetMapRoute, googleMapsRoute } from "../lib/mapLinks.js";
 import { MODES, routeBounds, fitBounds, toPolyline, toScreen, coordinatesOf, fastestMode, groundWidth } from "../lib/routes.js";
 
 /** One colour per mode, shared by the dots in the table and the drawn line,
@@ -73,6 +95,25 @@ export default {
       return Number.isNaN(d.getTime())
         ? "unbekannt"
         : d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+    },
+    fastestMode,
+    canLinkOut(destination) {
+      return Boolean(this.plot.anchor) && Number.isFinite(destination.lat) && Number.isFinite(destination.lon);
+    },
+    /** Link out in whichever mode came out fastest — that is the one shown. */
+    linkMode(destination) {
+      return fastestMode(this.plot.routes[destination.id]) || "car";
+    },
+    osmLink(destination) {
+      return openStreetMapRoute(this.plot.anchor, destination, this.linkMode(destination));
+    },
+    googleLink(destination) {
+      return googleMapsRoute(this.plot.anchor, destination, this.linkMode(destination));
+    },
+
+    /** Modes the service could not route — each gets a readable reason. */
+    unreachable(destination) {
+      return this.modes(destination).filter(m => !m.erreichbar);
     },
     modes(destination) {
       const route = this.plot.routes[destination.id];
@@ -138,14 +179,33 @@ export default {
 <style scoped>
 .route-grid{ display: grid; grid-template-columns: repeat(auto-fill, minmax(292px, 1fr)); gap: var(--w2b-space-4); }
 .route-card{ display: flex; flex-direction: column; }
-.route-card__head{ display: flex; align-items: baseline; gap: var(--w2b-space-2); padding: var(--w2b-space-3) var(--w2b-space-4); border-bottom: 1px solid var(--w2b-line); }
+/* Two lines high whatever the name does. A destination whose name wraps used
+   to make its card taller than its neighbours, so the rows across the grid
+   stopped lining up — which is the whole point of a comparison. */
+.route-card__head{
+  display: flex; align-items: baseline; gap: var(--w2b-space-2);
+  padding: var(--w2b-space-3) var(--w2b-space-4); border-bottom: 1px solid var(--w2b-line);
+  min-height: 3.4rem;
+}
+.route-card__head h3{ overflow-wrap: anywhere; }
 .route-card__head h3{ font-size: var(--w2b-text-l); }
 .route-card__address{ font-family: var(--w2b-font-mono); font-size: 10px; color: var(--w2b-muted); margin-left: auto; text-align: right; }
 .route-card__sketch{ display: block; width: 100%; height: auto; border-bottom: 1px solid var(--w2b-line); }
-.route-card__scale{ font-family: var(--w2b-font-mono); font-size: 8.5px; fill: var(--w2b-muted); }
+.route-card__scale{
+  margin: 0; padding: 3px var(--w2b-space-4) 0; text-align: right;
+  font-family: var(--w2b-font-mono); font-size: 9.5px; color: var(--w2b-muted);
+}
 .route-card__modes td{ padding: 7px var(--w2b-space-4); white-space: nowrap; }
 .route-card__note{ color: var(--w2b-muted); font-size: var(--w2b-text-xs); text-align: right; white-space: normal; }
+.route-card__why{
+  padding: var(--w2b-space-2) var(--w2b-space-4) 0; margin: 0;
+  color: var(--w2b-muted); font-size: var(--w2b-text-xs); line-height: 1.45;
+}
+.route-card__why b{ color: var(--w2b-ink); font-weight: 600; }
 .route-card__empty{ padding: var(--w2b-space-4); color: var(--w2b-muted); font-size: var(--w2b-text-s); }
+.route-card__links{ padding: var(--w2b-space-2) var(--w2b-space-4) 0; margin: 0; font-size: var(--w2b-text-xs); color: var(--w2b-muted); }
+.route-card__links a{ color: var(--w2b-primary); }
+.route-card__links-note{ display: block; }
 .route-card__computed{ padding: 0 var(--w2b-space-4) var(--w2b-space-3); color: var(--w2b-muted); font-size: var(--w2b-text-xs); font-family: var(--w2b-font-mono); }
 .mode{ display: inline-flex; align-items: center; gap: var(--w2b-space-2); font-size: var(--w2b-text-s); }
 .mode__dot{ width: 11px; height: 11px; border-radius: 3px; flex: none; }

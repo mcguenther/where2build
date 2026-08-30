@@ -89,3 +89,22 @@ describe("Umgebung", () => {
     expect(w.findAll("tbody tr")).toHaveLength(0);
   });
 });
+
+describe("Nachprüfbarkeit der Umgebung", () => {
+  it("verlinkt jeden gefundenen Ort auf OpenStreetMap", async () => {
+    const w = mount(NearbyPanel, { props: { plot: plot() } });
+    await w.find("button").trigger("click");
+    await flushPromises();
+
+    const links = w.findAll("a.nearby__name");
+    expect(links.length).toBe(recorded.treffer.length);
+    links.forEach((a, i) => {
+      const href = a.attributes("href");
+      expect(href).toContain("openstreetmap.org");
+      // The coordinate in the link must be the one that was found, not a guess.
+      expect(href).toContain(recorded.treffer[i].lat.toFixed(6));
+      expect(href).toContain(recorded.treffer[i].lon.toFixed(6));
+      expect(a.attributes("rel")).toContain("noopener");
+    });
+  });
+});
