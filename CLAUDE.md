@@ -158,12 +158,23 @@ from the user directly. Reopen only if the user asks.
   objects), and `school:DE` does not exist there either. So transit stops come
   from MOTIS, whose modes are derived from the actual timetable, and the school
   type is only derivable from the name string.
-- **The public Overpass instances forbid this use case** in their own manual,
-  which lists "setting up an app … and relying on the public instances as
-  backend" under problematic behaviour. Caching does not fix it; the rate limit
-  is per-IP, the worst case for a shared proxy. Schools, parks and the rest
-  therefore need a local Saxony extract, built by
-  `backend/scripts/build_poi_index.py`.
+- **`REGIONAL_RAIL` is not a synonym for S-Bahn, and MOTIS does emit
+  `SUBURBAN`.** Checked against the Leipzig city tunnel: Leipzig Markt,
+  Wilhelm-Leuschner-Platz and Bayerischer Bahnhof all come back as
+  `["REGIONAL_RAIL", "SUBURBAN"]` — a real S-Bahn stop carries *both*. And
+  Leipzig-Liebertwolkwitz is `["REGIONAL_RAIL", "BUS"]` because the line that
+  stops there is RB113 to Geithain, a Regionalbahn. Do not map REGIONAL_RAIL to
+  S-Bahn; check the timetable at `/api/v6/stoptimes?stopId=…` when in doubt.
+- **Overpass: read the policy for what it says, not for a verdict.** The manual
+  lists "setting up an app for more than just OSM mappers and **relying on the
+  public instances as backend**" under problematic behaviour, and puts the
+  guideline at ~10 000 requests and 1 GB per day. The same page says occasional
+  manual requests are fine. So a single-user prototype querying it now and then
+  is within the guideline; *a deployed product* on a shared server IP is what
+  the policy objects to. The endpoint therefore takes Overpass as a configurable
+  source, and a self-hosted instance or the local extract
+  (`backend/scripts/build_poi_index.py`) is the production answer — not because
+  Overpass is forbidden, but because it does not carry someone else's product.
 - **Rank by walking time, never air distance.** Detour ratios reach 2.88x, and
   the nearest thing by air can be unwalkable altogether.
 - **An address is not a plot.** A district address ("Plaußig-Portitz, 04349

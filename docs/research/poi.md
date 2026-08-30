@@ -144,7 +144,17 @@ On rate limiting:
 > time." — "Requests stay enqueued up to 15 seconds on the server if not yet a
 > slot is available to them."
 
-**What that means for us.** Our tool is precisely "an app for more than just OSM
+**What that means for us — revised 2026-08-30.** The paragraph below read this
+policy as a prohibition and concluded Overpass was out. That was too broad, and
+the project owner said so: this is a prototype with a single user, and the same
+policy page is explicit that occasional manual requests are fine. The line the
+manual draws is around *relying on the public instances as the backend of a
+deployed app* — which a one-user prototype is not. Overpass is therefore
+available as a configurable source, with a self-hosted instance or the local
+extract as the production answer. What follows is the original reasoning, kept
+because the load argument is still the reason not to ship it that way.
+
+Our tool would, once deployed, be "an app for more than just OSM
 mappers relying on the public instances as backend". The manual names it as
 problematic in so many words. A caching proxy does not fix this: it reduces the
 count, but the shape of the usage is the thing the policy objects to, and the
