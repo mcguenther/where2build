@@ -9,6 +9,7 @@ their answers in a cache, and turning pages into structured suggestions.
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -53,15 +54,17 @@ FRAMEWORK_MESSAGES = {
 }
 
 
-def _poi_hinweis(status: dict[str, object]) -> str:
-    """What /api/health says about the local POI index.
+def _poi_hinweis(status: dict[str, Any]) -> str:
+    """What /api/health says about the six OpenStreetMap categories.
 
     The point of the sentence is the difference the frontend has to be able to
-    make: a missing index is "not set up here", never "nothing nearby". So the
-    message names the categories that go dark and the command that fills it.
+    make: no source is "not set up here", never "nothing nearby". So the message
+    names the categories that go dark and the command that fills it.
     """
 
     kategorien = "Schule, Kindergarten, Park, Spielplatz, Supermarkt und Arztpraxis"
+    fahrplan = "Haltestellen und Bahnhöfe kommen aus dem Fahrplan (MOTIS)."
+    overpass = status.get("overpass") or {}
     if not status["konfiguriert"]:
         reason = (
             f" Die vorhandene Datei ist unbrauchbar: {status['fehler']}."
@@ -72,14 +75,21 @@ def _poi_hinweis(status: dict[str, object]) -> str:
             f"Kein Umgebungsverzeichnis vorhanden — {kategorien} können nicht "
             "beantwortet werden; Haltestellen und Bahnhöfe kommen aus dem "
             "Fahrplan und funktionieren weiterhin. Erzeugen mit: "
-            f"python scripts/build_poi_index.py --download.{reason}"
+            "python scripts/build_poi_index.py --download — oder für den "
+            f"Prototyp OVERPASS_ENABLED=true setzen.{reason}"
+        )
+    if status.get("quelle") == "overpass":
+        return (
+            f"Kein lokales Verzeichnis — {kategorien} werden bei jeder Anfrage "
+            f"live über Overpass ({overpass.get('endpunkt')}) geholt und "
+            "zwischengespeichert. Das ist eine Prototyp-Abkürzung: für den "
+            "Dauerbetrieb ein eigenes Verzeichnis erzeugen "
+            f"(python scripts/build_poi_index.py --download) oder eine eigene "
+            f"Overpass-Instanz eintragen. {fahrplan}"
         )
     datenstand = status.get("datenstand")
     stand = f", Stand {datenstand}" if datenstand else ""
-    return (
-        f"{status['anzahl']} Orte aus OpenStreetMap{stand} für {kategorien}. "
-        "Haltestellen und Bahnhöfe kommen aus dem Fahrplan (MOTIS)."
-    )
+    return f"{status['anzahl']} Orte aus OpenStreetMap{stand} für {kategorien}. {fahrplan}"
 
 
 def create_app() -> FastAPI:
@@ -159,7 +169,11 @@ def create_app() -> FastAPI:
                 DienstStatus(
                     name="poi",
                     konfiguriert=poi["konfiguriert"],
-                    endpunkt=poi["pfad"],
+                    endpunkt=(
+                        poi["overpass"]["endpunkt"]
+                        if poi.get("quelle") == "overpass"
+                        else poi["pfad"]
+                    ),
                     hinweis=_poi_hinweis(poi),
                 ),
                 DienstStatus(

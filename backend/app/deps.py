@@ -14,6 +14,7 @@ from .services.boris import BorisService
 from .services.llm import LLMClient
 from .services.motis import MotisService
 from .services.nearby import NearbyService
+from .services.overpass import OverpassService
 from .services.tiles import TileService
 from .settings import Settings, get_settings
 
@@ -37,9 +38,15 @@ def motis_service() -> MotisService:
 
 
 @lru_cache(maxsize=1)
+def overpass_service() -> OverpassService:
+    settings = get_settings()
+    return OverpassService(settings.overpass, settings.app)
+
+
+@lru_cache(maxsize=1)
 def nearby_service() -> NearbyService:
     settings = get_settings()
-    return NearbyService(settings.nearby, motis_service())
+    return NearbyService(settings.nearby, motis_service(), overpass_service())
 
 
 @lru_cache(maxsize=1)
@@ -72,6 +79,7 @@ def reset_services() -> None:
         alkis_service,
         boris_service,
         motis_service,
+        overpass_service,
         nearby_service,
         tile_service,
         basemap_service,

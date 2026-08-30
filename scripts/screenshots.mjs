@@ -70,12 +70,12 @@ const countTiles = page =>
 /* There is no example data any more: every screenshot needs a plot that was
  * really resolved through ALKIS first. This is the app's own add flow. */
 async function addPlot(page) {
-  await page.click(".seitenkopf .knopf");
+  await page.click(".page-head .btn");
   await page.getByText("Flurstück direkt").click();
-  await page.fill("#q-gemarkung", "Liebertwolkwitz");
-  await page.fill("#q-nummer", "85/1");
+  await page.fill("#q-cadastral-district", "Liebertwolkwitz");
+  await page.fill("#q-parcel-number", "85/1");
   await page.getByRole("button", { name: "Nachschlagen" }).click();
-  await page.waitForSelector(".assistent__vorschau, .lageplan", { timeout: 60000 });
+  await page.waitForSelector(".wizard__preview, .site-plan", { timeout: 60000 });
 }
 
 const taken = [];
@@ -101,21 +101,21 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
   page.on("console", m => { if (m.type() === "error" && !expected(m.text())) problems.push(`${mode}/${width}: ${m.text()}`); });
   await page.goto(address, { waitUntil: "load" });
   await page.evaluate(() => document.fonts.ready);
-  await page.click(`.darstellung button:nth-child(${mode === "hell" ? 1 : 2})`);
+  await page.click(`.theme-switch button:nth-child(${mode === "hell" ? 1 : 2})`);
   await page.waitForTimeout(200);
 
   // The empty state is a real state and worth a picture: this is what the app
   // looks like before anything has been resolved.
   await shot(page, "uebersicht-leer", mode, narrow ? "-schmal" : "");
 
-  await page.click(".seitenkopf .knopf");                      // Grundstück hinzufügen
+  await page.click(".page-head .btn");                      // Grundstück hinzufügen
   await shot(page, "assistent-1", mode, narrow ? "-schmal" : "");
   await page.getByText("Flurstück direkt").click();
-  await page.fill("#q-gemarkung", "Liebertwolkwitz");
-  await page.fill("#q-nummer", "85/1");
+  await page.fill("#q-cadastral-district", "Liebertwolkwitz");
+  await page.fill("#q-parcel-number", "85/1");
   await shot(page, "assistent-2", mode, narrow ? "-schmal" : "");
   await page.getByRole("button", { name: "Nachschlagen" }).click();
-  await page.waitForSelector(".lageplan", { timeout: 60000 });
+  await page.waitForSelector(".site-plan", { timeout: 60000 });
   await shot(page, "assistent-3", mode, narrow ? "-schmal" : "");
   await page.getByRole("button", { name: "Passt" }).click();
   await shot(page, "assistent-4", mode, narrow ? "-schmal" : "");
@@ -130,38 +130,38 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
     await page.getByRole("button", { name: "Karte" }).click();
     await page.waitForTimeout(2000);
   }
-  await page.click(".krume button");
+  await page.click(".breadcrumb button");
 
-  await page.click('.orte button:nth-child(2)');               // Haustypen
+  await page.click('.main-nav button:nth-child(2)');               // Haustypen
   await shot(page, "haustypen", mode, narrow ? "-schmal" : "");
   if (!narrow) {
     // A destination, looked up for real: the picker is the point here, because
     // this geocoder answers "Am Kirschberg" with Bavaria as readily as Saxony.
-    await page.click('.orte button:nth-child(3)');             // Ziele
+    await page.click('.main-nav button:nth-child(3)');             // Ziele
     await page.getByRole("button", { name: /Ziel hinzufügen|Erstes Ziel anlegen/ }).first().click();
     const fields = await page.locator("input[type=text]").all();
     await fields[0].fill("Bahnhof");
     await fields[1].fill("Bahnhof Wurzen");
     await page.getByRole("button", { name: "Nachschlagen" }).click();
-    await page.waitForSelector(".trefferliste__wahl", { timeout: 60000 });
+    await page.waitForSelector(".match-list__option", { timeout: 60000 });
     await shot(page, "ziele-treffer", mode);
-    await page.locator(".trefferliste__wahl").first().click();
+    await page.locator(".match-list__option").first().click();
     await shot(page, "ziele", mode);
 
     // And the routes that follow from it, drawn from the geometry MOTIS sends.
-    await page.click('.orte button:nth-child(1)');
-    await page.click(".karte .knopf");
+    await page.click('.main-nav button:nth-child(1)');
+    await page.click(".plot-card .btn");
     await page.getByRole("button", { name: "Wege berechnen" }).click();
-    await page.waitForSelector(".weg-karte polyline", { timeout: 60000 });
+    await page.waitForSelector(".route-card polyline", { timeout: 60000 });
     await page.waitForTimeout(600);
     // And the surroundings: transit stops are live, the OSM categories say
     // plainly that this server has no index for them.
     await page.getByRole("button", { name: "Nachsehen" }).click();
-    await page.waitForSelector(".umgebung__liste tbody tr", { timeout: 60000 });
+    await page.waitForSelector(".nearby__list tbody tr", { timeout: 60000 });
     await shot(page, "grundstueck-umgebung", mode);
-    await page.click(".krume button");
+    await page.click(".breadcrumb button");
 
-    await page.click('.orte button:nth-child(4)');             // Daten
+    await page.click('.main-nav button:nth-child(4)');             // Daten
     await shot(page, "daten", mode);
   }
   await ctx.close();

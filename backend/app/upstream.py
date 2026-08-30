@@ -25,6 +25,7 @@ async def request(
     user_agent: str,
     expect: str | None = None,
     advice: str | None = None,
+    status_hints: dict[int, str] | None = None,
     **kwargs: Any,
 ) -> httpx.Response:
     """Perform one upstream request.
@@ -36,6 +37,10 @@ async def request(
     ``advice`` is the sentence appended to every failure: what the user can do
     now that this service is unavailable. Every caller passes one -- an error
     that only states the fault leaves the user stuck.
+
+    ``status_hints`` replaces the generic "Status N abgelehnt" for the codes a
+    service uses to mean something specific -- Overpass' 429 is "you are over
+    your slot quota", which is a different piece of advice from a 500.
     """
 
     headers = {"User-Agent": user_agent, **(kwargs.pop("headers", None) or {})}
@@ -52,7 +57,8 @@ async def request(
     if response.status_code >= 400:
         raise UpstreamError(
             _sentence(
-                f"{service} hat die Anfrage mit Status {response.status_code} abgelehnt.",
+                (status_hints or {}).get(response.status_code)
+                or f"{service} hat die Anfrage mit Status {response.status_code} abgelehnt.",
                 advice,
             )
         )

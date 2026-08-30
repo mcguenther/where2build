@@ -1,10 +1,10 @@
 <template>
-  <div class="lageplan-huelle">
-    <div v-if="hasBackdrop" ref="mapContainer" class="lageplan__karte" aria-hidden="true"></div>
+  <div class="site-plan-shell">
+    <div v-if="hasBackdrop" ref="mapContainer" class="site-plan__map" aria-hidden="true"></div>
     <svg
     ref="svg"
-    class="lageplan"
-    :class="{ 'lageplan--zieht': dragging, 'lageplan--messen': measuring }"
+    class="site-plan"
+    :class="{ 'site-plan--dragging': dragging, 'site-plan--measuring': measuring }"
     :viewBox="`0 0 ${width} ${height}`"
     role="img"
     :aria-label="ariaLabel"
@@ -15,63 +15,63 @@
     @keydown="onKeydown"
   >
     <defs>
-      <marker :id="`kote-${uid}`" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto">
-        <line x1="5" y1="1.5" x2="5" y2="8.5" stroke="var(--w2b-karte-grenze)" stroke-width="1.2" />
+      <marker :id="`dim-${uid}`" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto">
+        <line x1="5" y1="1.5" x2="5" y2="8.5" stroke="var(--w2b-map-boundary)" stroke-width="1.2" />
       </marker>
     </defs>
 
     <rect v-if="!hasBackdrop" x="0" y="0" :width="width" :height="height" :fill="backgroundFill" />
 
     <g :transform="`rotate(${rotation}, ${width / 2}, ${height / 2})`">
-      <polygon :points="path(plot.polygon)" fill="var(--w2b-karte-flaeche)"
+      <polygon :points="path(plot.polygon)" fill="var(--w2b-map-surface)"
                :fill-opacity="hasBackdrop ? 0.42 : 1" />
 
       <!-- The setback strip is what gets colour: marked is what may NOT be built on. -->
       <template v-if="showSetbacks && envelope.length">
-        <path :d="setbackRing" fill-rule="evenodd" fill="var(--w2b-karte-saum)" />
-        <polygon :points="path(envelope)" fill="none" stroke="var(--w2b-karte-fenster)"
+        <path :d="setbackRing" fill-rule="evenodd" fill="var(--w2b-map-setback)" />
+        <polygon :points="path(envelope)" fill="none" stroke="var(--w2b-map-envelope)"
                  stroke-width="1.5" stroke-dasharray="6 4" />
       </template>
 
       <line v-if="plot.divisionLine" :x1="p(plot.divisionLine[0]).x" :y1="p(plot.divisionLine[0]).y"
             :x2="p(plot.divisionLine[1]).x" :y2="p(plot.divisionLine[1]).y"
-            stroke="var(--w2b-karte-grenze)" stroke-width="1" stroke-dasharray="6 4" opacity=".4" />
+            stroke="var(--w2b-map-boundary)" stroke-width="1" stroke-dasharray="6 4" opacity=".4" />
 
       <!-- Halo first, then the line: without it boundaries vanish in an orthophoto. -->
-      <polygon :points="path(plot.polygon)" fill="none" stroke="var(--w2b-karte-halo)"
+      <polygon :points="path(plot.polygon)" fill="none" stroke="var(--w2b-map-halo)"
                :stroke-width="compact ? 3.5 : 6" stroke-linejoin="round" />
-      <polygon :points="path(plot.polygon)" fill="none" stroke="var(--w2b-karte-grenze)"
+      <polygon :points="path(plot.polygon)" fill="none" stroke="var(--w2b-map-boundary)"
                :stroke-width="compact ? 1.5 : 2.2" stroke-linejoin="round" />
       <template v-if="!compact">
         <rect v-for="(v, i) in plot.polygon" :key="`v${i}`"
               :x="p(v).x - 2.5" :y="p(v).y - 2.5" width="5" height="5"
-              fill="var(--w2b-karte-halo)" stroke="var(--w2b-karte-grenze)" stroke-width="1.4" />
+              fill="var(--w2b-map-halo)" stroke="var(--w2b-map-boundary)" stroke-width="1.4" />
       </template>
 
       <!-- The house: brass, because the user designed it -->
-      <g :class="{ 'plan-griff': interactive }" :tabindex="interactive ? 0 : null"
+      <g :class="{ 'plan-handle': interactive }" :tabindex="interactive ? 0 : null"
          :role="interactive ? 'button' : null"
          :aria-label="interactive ? 'Baukörper — ziehen oder mit den Pfeiltasten verschieben' : null"
-         data-haus>
-        <polygon :points="path(houseCorners)" fill="var(--w2b-karte-entwurf)" fill-opacity=".85"
-                 :stroke="violation ? 'var(--w2b-karte-verstoss)' : 'var(--w2b-karte-entwurf-rand)'"
+         data-house>
+        <polygon :points="path(houseCorners)" fill="var(--w2b-map-design)" fill-opacity=".85"
+                 :stroke="violation ? 'var(--w2b-map-violation)' : 'var(--w2b-map-design-edge)'"
                  :stroke-width="violation ? 2.4 : (compact ? 1.2 : 1.7)" />
         <circle v-for="(e, i) in outliers" :key="`a${i}`" :cx="p(e).x" :cy="p(e).y" r="4.5"
-                fill="none" stroke="var(--w2b-karte-verstoss)" stroke-width="1.7" />
+                fill="none" stroke="var(--w2b-map-violation)" stroke-width="1.7" />
       </g>
 
       <!-- Measuring tape: click sets a point, a second click closes the run. -->
-      <g v-if="measuring && measurePoints.length" class="lageplan__messen">
+      <g v-if="measuring && measurePoints.length" class="site-plan__measure">
         <polyline v-if="measurePoints.length > 1" :points="measureLine" fill="none"
-                  stroke="var(--w2b-karte-verstoss)" stroke-width="1.8" stroke-dasharray="6 4" />
+                  stroke="var(--w2b-map-violation)" stroke-width="1.8" stroke-dasharray="6 4" />
         <line v-if="measurePoints.length === 1 && measurePointer"
               :x1="p(measurePoints[0]).x" :y1="p(measurePoints[0]).y"
               :x2="p(measurePointer).x" :y2="p(measurePointer).y"
-              stroke="var(--w2b-karte-verstoss)" stroke-width="1.4" stroke-dasharray="4 4" opacity=".7" />
+              stroke="var(--w2b-map-violation)" stroke-width="1.4" stroke-dasharray="4 4" opacity=".7" />
         <circle v-for="(m, i) in measurePoints" :key="`m${i}`" :cx="p(m).x" :cy="p(m).y" r="4"
-                fill="var(--w2b-karte-halo)" stroke="var(--w2b-karte-verstoss)" stroke-width="2" />
+                fill="var(--w2b-map-halo)" stroke="var(--w2b-map-violation)" stroke-width="2" />
         <text v-for="(t, i) in measureLabels" :key="`mt${i}`" :x="t.x" :y="t.y"
-              :transform="`rotate(${-rotation}, ${t.x}, ${t.y})`" class="lageplan__mass lageplan__mass--messen">
+              :transform="`rotate(${-rotation}, ${t.x}, ${t.y})`" class="site-plan__dimension site-plan__dimension--measuring">
           {{ t.text }}
         </text>
       </g>
@@ -80,23 +80,23 @@
       <g v-if="dimensionsVisible">
         <g v-for="(c, i) in dimensionChains" :key="`k${i}`">
           <line :x1="c.h1.x1" :y1="c.h1.y1" :x2="c.h1.x2" :y2="c.h1.y2"
-                stroke="var(--w2b-karte-grenze)" stroke-width=".7" opacity=".45" />
+                stroke="var(--w2b-map-boundary)" stroke-width=".7" opacity=".45" />
           <line :x1="c.h2.x1" :y1="c.h2.y1" :x2="c.h2.x2" :y2="c.h2.y2"
-                stroke="var(--w2b-karte-grenze)" stroke-width=".7" opacity=".45" />
+                stroke="var(--w2b-map-boundary)" stroke-width=".7" opacity=".45" />
           <line :x1="c.line.x1" :y1="c.line.y1" :x2="c.line.x2" :y2="c.line.y2"
-                stroke="var(--w2b-karte-grenze)" stroke-width="1"
-                :marker-start="`url(#kote-${uid})`" :marker-end="`url(#kote-${uid})`" />
+                stroke="var(--w2b-map-boundary)" stroke-width="1"
+                :marker-start="`url(#dim-${uid})`" :marker-end="`url(#dim-${uid})`" />
           <text :x="c.text.x" :y="c.text.y" :transform="`rotate(${-rotation}, ${c.text.x}, ${c.text.y})`"
-                class="lageplan__mass">{{ c.label }}</text>
+                class="site-plan__dimension">{{ c.label }}</text>
         </g>
         <template v-if="narrowest">
           <line :x1="narrowest.x1" :y1="narrowest.y1" :x2="narrowest.x2" :y2="narrowest.y2"
-                :stroke="narrowest.tight ? 'var(--w2b-karte-verstoss)' : 'var(--w2b-karte-fenster)'"
+                :stroke="narrowest.tight ? 'var(--w2b-map-violation)' : 'var(--w2b-map-envelope)'"
                 stroke-width="1.4" stroke-dasharray="3 3" />
           <text :x="narrowest.tx" :y="narrowest.ty"
                 :transform="`rotate(${-rotation}, ${narrowest.tx}, ${narrowest.ty})`"
-                class="lageplan__mass"
-                :style="{ fill: narrowest.tight ? 'var(--w2b-karte-verstoss)' : 'var(--w2b-karte-fenster)' }">
+                class="site-plan__dimension"
+                :style="{ fill: narrowest.tight ? 'var(--w2b-map-violation)' : 'var(--w2b-map-envelope)' }">
             {{ narrowest.label }}
           </text>
         </template>
@@ -107,19 +107,19 @@
          turned to the street they are the only orientation left. -->
     <g v-if="!compact">
       <g :transform="`translate(${width - 58}, 74) rotate(${northAngle})`">
-        <circle cx="0" cy="0" r="26" fill="var(--w2b-karte-halo)" opacity=".65" />
-        <path d="M0,-22 L7,12 L0,5 L-7,12 Z" fill="var(--w2b-karte-grenze)" />
+        <circle cx="0" cy="0" r="26" fill="var(--w2b-map-halo)" opacity=".65" />
+        <path d="M0,-22 L7,12 L0,5 L-7,12 Z" fill="var(--w2b-map-boundary)" />
       </g>
-      <text :x="width - 58" y="112" text-anchor="middle" class="lageplan__nord">N</text>
+      <text :x="width - 58" y="112" text-anchor="middle" class="site-plan__north">N</text>
 
       <g :transform="`translate(38, ${height - 44})`">
-        <rect x="0" y="-5" :width="tenMetres" height="5" fill="var(--w2b-karte-grenze)" />
+        <rect x="0" y="-5" :width="tenMetres" height="5" fill="var(--w2b-map-boundary)" />
         <rect :x="tenMetres" y="-5" :width="tenMetres" height="5" fill="none"
-              stroke="var(--w2b-karte-grenze)" stroke-width="1.2" />
-        <line x1="0" y1="0" :x2="tenMetres * 2" y2="0" stroke="var(--w2b-karte-grenze)" stroke-width="1.2" />
-        <text x="0" y="15" class="lageplan__leiste" text-anchor="middle">0</text>
-        <text :x="tenMetres" y="15" class="lageplan__leiste" text-anchor="middle">10</text>
-        <text :x="tenMetres * 2" y="15" class="lageplan__leiste" text-anchor="end">20 m</text>
+              stroke="var(--w2b-map-boundary)" stroke-width="1.2" />
+        <line x1="0" y1="0" :x2="tenMetres * 2" y2="0" stroke="var(--w2b-map-boundary)" stroke-width="1.2" />
+        <text x="0" y="15" class="site-plan__scale-bar" text-anchor="middle">0</text>
+        <text :x="tenMetres" y="15" class="site-plan__scale-bar" text-anchor="middle">10</text>
+        <text :x="tenMetres * 2" y="15" class="site-plan__scale-bar" text-anchor="end">20 m</text>
       </g>
     </g>
     </svg>
@@ -252,7 +252,7 @@ export default {
     /** A backdrop needs one that is not "none" and a georeference to put it
      *  under. Without the anchor there is nothing to align a map to. */
     hasBackdrop() { return this.backdrop !== "none" && Boolean(this.plot.anchor) && !this.mapUnavailable; },
-    backgroundFill() { return this.backdrop === "aerial" ? "var(--w2b-karte-gruen)" : "var(--w2b-karte-grund)"; },
+    backgroundFill() { return this.backdrop === "aerial" ? "var(--w2b-map-green)" : "var(--w2b-map-ground)"; },
 
     /* Frame the plot with a margin, then stretch the box to the frame's aspect
        so the drawing fills the panel instead of floating in it. */
@@ -460,7 +460,7 @@ export default {
     },
     pointerDown(event) {
       if (this.measuring) { this.measureClick(event); return; }
-      if (!this.interactive || !event.target.closest("[data-haus]")) return;
+      if (!this.interactive || !event.target.closest("[data-house]")) return;
       const point = this.toMetres(event);
       this.dragging = { dx: this.building.cx - point.x, dy: this.building.cy - point.y };
       this.$refs.svg.setPointerCapture(event.pointerId);
@@ -474,7 +474,7 @@ export default {
     },
     pointerUp() { this.dragging = null; },
     onKeydown(event) {
-      if (!this.interactive || !event.target.closest("[data-haus]")) return;
+      if (!this.interactive || !event.target.closest("[data-house]")) return;
       const step = event.shiftKey ? 1 : 0.25;
       const direction = {
         ArrowLeft: [-step, 0], ArrowRight: [step, 0],
@@ -489,25 +489,25 @@ export default {
 </script>
 
 <style scoped>
-.lageplan-huelle{ position: relative; }
-.lageplan__karte{ position: absolute; inset: 0; }
-.lageplan{ display: block; width: 100%; height: auto; touch-action: none; position: relative; }
-.lageplan--zieht{ cursor: grabbing; }
-.lageplan--messen{ cursor: crosshair; }
-.lageplan__mass--messen{ fill: var(--w2b-karte-verstoss); }
-.plan-griff{ cursor: grab; }
-.lageplan__mass{
-  font-family: var(--w2b-daten); font-size: 10.5px; font-weight: 500;
-  fill: var(--w2b-karte-grenze); text-anchor: middle;
-  paint-order: stroke fill; stroke: var(--w2b-karte-halo); stroke-width: 3.4px; stroke-linejoin: round;
+.site-plan-shell{ position: relative; }
+.site-plan__map{ position: absolute; inset: 0; }
+.site-plan{ display: block; width: 100%; height: auto; touch-action: none; position: relative; }
+.site-plan--dragging{ cursor: grabbing; }
+.site-plan--measuring{ cursor: crosshair; }
+.site-plan__dimension--measuring{ fill: var(--w2b-map-violation); }
+.plan-handle{ cursor: grab; }
+.site-plan__dimension{
+  font-family: var(--w2b-font-mono); font-size: 10.5px; font-weight: 500;
+  fill: var(--w2b-map-boundary); text-anchor: middle;
+  paint-order: stroke fill; stroke: var(--w2b-map-halo); stroke-width: 3.4px; stroke-linejoin: round;
 }
-.lageplan__nord{
-  font-family: var(--w2b-anzeige); font-size: 14px; font-weight: 600;
-  fill: var(--w2b-karte-grenze); text-anchor: middle;
-  paint-order: stroke fill; stroke: var(--w2b-karte-halo); stroke-width: 3px;
+.site-plan__north{
+  font-family: var(--w2b-font-display); font-size: 14px; font-weight: 600;
+  fill: var(--w2b-map-boundary); text-anchor: middle;
+  paint-order: stroke fill; stroke: var(--w2b-map-halo); stroke-width: 3px;
 }
-.lageplan__leiste{
-  font-family: var(--w2b-daten); font-size: 9.5px; fill: var(--w2b-karte-grenze);
-  paint-order: stroke fill; stroke: var(--w2b-karte-halo); stroke-width: 3px;
+.site-plan__scale-bar{
+  font-family: var(--w2b-font-mono); font-size: 9.5px; fill: var(--w2b-map-boundary);
+  paint-order: stroke fill; stroke: var(--w2b-map-halo); stroke-width: 3px;
 }
 </style>

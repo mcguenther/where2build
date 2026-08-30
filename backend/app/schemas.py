@@ -634,7 +634,13 @@ class NearbyRequest(BaseModel):
 class UmgebungTreffer(BaseModel):
     """One place found, with the walking time that put it in this position."""
 
+    # The category this row is labelled with. One stop can serve several, and
+    # then this is the longest-range one among those that were asked for.
     kategorie: Kategorie
+    # Every requested category this place satisfies, `kategorie` included. A
+    # stop where the S-Bahn and regional trains both call is listed once, with
+    # ["sbahn", "bahnhof"] here, instead of once per category.
+    kategorien: list[Kategorie] = Field(default_factory=list)
     # Absent is normal, not an error: most Saxon playgrounds carry no name.
     name: str | None = None
     # "Grundschule", "Straßenbahn, Bus" -- what kind of thing this is.
@@ -652,7 +658,9 @@ class UmgebungTreffer(BaseModel):
     # calls here in this category". The same distinction the whole endpoint is
     # built on, one level down.
     linien: list[str] | None = None
-    quelle: Literal["osm", "motis"]
+    # Which source answered: the locally built index, a live Overpass query, or
+    # the timetable. All three are shown to the user differently.
+    quelle: Literal["osm", "overpass", "motis"]
     osm_id: str | None = None
     stop_id: str | None = None
     hinweis: str | None = None
@@ -663,11 +671,16 @@ class KategorieStatus(BaseModel):
 
     The distinction this exists for: "der Server hat dazu keine Daten" is not
     the same statement as "in der Nähe gibt es nichts", and an empty list reads
-    as the second one.
+    as the second one. ``verfuegbar: false`` covers both ways the first can
+    happen -- no index built here, and no source that answered right now.
     """
 
     kategorie: Kategorie
     verfuegbar: bool
+    # How many hits satisfy this category -- which is not the number of rows
+    # carrying it in `kategorie`. A stop listed once under `bahnhof` still
+    # counts for `sbahn` when the S-Bahn calls there, so this never says
+    # "nichts gefunden" about something that was in fact found.
     anzahl: int = 0
     hinweis: str | None = None
 

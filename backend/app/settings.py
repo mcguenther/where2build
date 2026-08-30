@@ -125,6 +125,47 @@ class NearbySettings(BaseSettings):
     max_line_lookups: int = 6
 
 
+class OverpassSettings(BaseSettings):
+    """Live OpenStreetMap queries through an Overpass instance (env prefix ``OVERPASS_``).
+
+    Off by default and deliberately so. This is the prototype convenience that
+    makes ``/api/nearby`` answer schools, parks and the rest on a machine where
+    ``scripts/build_poi_index.py`` has never run. The Overpass manual names
+    "setting up an app for more than just OSM mappers and relying on the public
+    instances as backend" as problematic behaviour and asks for at most ~10 000
+    requests and 1 GB a day; a single-user prototype behind a 30-day cache is
+    far inside that, an app with users is not. Point ``url`` at your own
+    instance and the question does not arise.
+    """
+
+    model_config = SettingsConfigDict(env_prefix="OVERPASS_", env_file=_ENV_FILE, extra="ignore")
+
+    enabled: bool = False
+    url: str = "https://overpass-api.de/api/interpreter"
+    # Goes into the query itself as `[timeout:N]`, which is what the server
+    # enforces. It answers with a "runtime error" remark when it runs out.
+    query_timeout_s: int = 25
+    # Longer than the query timeout on purpose: the manual says a request stays
+    # enqueued for up to 15 s before a slot frees, and that wait comes on top.
+    timeout_s: float = 60.0
+    # A plot does not move and its surroundings change on the order of months --
+    # the offline index the README recommends is refreshed quarterly. 30 days
+    # keeps the live source no staler than that while making repeat views of the
+    # same plot free.
+    cache_ttl_s: int = 30 * 24 * 3600
+    # One query in flight at a time. The public instances hand out execution
+    # slots per IP address, and ours is one address for the whole deployment.
+    max_concurrency: int = 1
+    # The radius is rounded up to a multiple of this before it goes out, so
+    # 2 000 m and 2 500 m share one cached answer.
+    radius_step_m: int = 1000
+    # Decimal places the query centre is rounded to for the same reason. Three
+    # is about 110 m north-south, so every point on one plot shares an entry.
+    origin_precision: int = 3
+    # Safety margin added to the queried radius to cover that rounding.
+    origin_margin_m: int = 200
+
+
 class TilesSettings(BaseSettings):
     """WMS raster proxy (env prefix ``TILES_``).
 
@@ -204,6 +245,7 @@ class Settings(BaseSettings):
     boris: BorisSettings = Field(default_factory=BorisSettings)
     motis: MotisSettings = Field(default_factory=MotisSettings)
     nearby: NearbySettings = Field(default_factory=NearbySettings)
+    overpass: OverpassSettings = Field(default_factory=OverpassSettings)
     tiles: TilesSettings = Field(default_factory=TilesSettings)
     basemap: BasemapSettings = Field(default_factory=BasemapSettings)
     llm: LLMSettings = Field(default_factory=LLMSettings)

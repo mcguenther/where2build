@@ -1,10 +1,10 @@
 <template>
-  <div class="stapel">
-    <div class="seitenkopf">
+  <div class="stack">
+    <div class="page-head">
       <div>
-        <p class="marke-klein">Sicherung und Umzug</p>
+        <p class="eyebrow">Sicherung und Umzug</p>
         <h1>Daten</h1>
-        <p class="seitenkopf__unter">
+        <p class="page-head__sub">
           Alles, was ihr hier eingebt, liegt im Speicher dieses Browsers — kein Konto, kein
           Server. Zum Mitnehmen auf einen anderen Rechner oder als Sicherung gibt es den
           Austausch als JSON.
@@ -12,53 +12,53 @@
       </div>
     </div>
 
-    <div class="zweispalt">
-      <section class="tafel">
-        <div class="tafel__kopf"><h3>Ausgeben</h3><div class="dehnen"></div><span class="chip">{{ size }}</span></div>
-        <div class="tafel__leib stapel">
-          <p class="hinweis">
+    <div class="two-columns">
+      <section class="panel">
+        <div class="panel__head"><h3>Ausgeben</h3><div class="spacer"></div><span class="chip">{{ size }}</span></div>
+        <div class="panel__body stack">
+          <p class="hint">
             Der vollständige Stand: Grundstücke samt Geometrie und Baukörperlage, Haustypen,
             Ziele und Wegezeiten.
           </p>
-          <textarea class="datenfeld" readonly :value="output" aria-label="Ausgegebene Daten als JSON"></textarea>
-          <div class="reihe">
-            <button type="button" class="knopf" @click="copyToClipboard">In die Zwischenablage</button>
-            <button type="button" class="knopf knopf--zweit" @click="downloadFile">Als Datei sichern</button>
+          <textarea class="data-field" readonly :value="output" aria-label="Ausgegebene Daten als JSON"></textarea>
+          <div class="row">
+            <button type="button" class="btn" @click="copyToClipboard">In die Zwischenablage</button>
+            <button type="button" class="btn btn--secondary" @click="downloadFile">Als Datei sichern</button>
           </div>
-          <p v-if="exportMessage" class="band" :class="{ 'band--fehler': exportFailed, 'band--gut': !exportFailed }">{{ exportMessage }}</p>
+          <p v-if="exportMessage" class="notice" :class="{ 'notice--error': exportFailed, 'notice--good': !exportFailed }">{{ exportMessage }}</p>
         </div>
       </section>
 
-      <section class="tafel">
-        <div class="tafel__kopf"><h3>Einlesen</h3></div>
-        <div class="tafel__leib stapel">
-          <p class="hinweis">
+      <section class="panel">
+        <div class="panel__head"><h3>Einlesen</h3></div>
+        <div class="panel__body stack">
+          <p class="hint">
             JSON einfügen oder eine gesicherte Datei wählen. Der bisherige Stand wird ersetzt —
             vorher ausgeben, wenn er noch gebraucht wird.
           </p>
-          <textarea class="datenfeld" v-model="input"
+          <textarea class="data-field" v-model="input"
                     placeholder="Hier den gesicherten JSON-Stand einfügen"
                     aria-label="Einzulesende Daten als JSON"></textarea>
-          <div class="reihe">
-            <button type="button" class="knopf" @click="runImport">Einlesen</button>
-            <label class="knopf knopf--zweit dateiwahl">
+          <div class="row">
+            <button type="button" class="btn" @click="runImport">Einlesen</button>
+            <label class="btn btn--secondary file-picker">
               Datei wählen
               <input type="file" accept="application/json,.json" @change="pickFile">
             </label>
           </div>
-          <p v-if="importMessage" class="band" :class="{ 'band--fehler': importFailed, 'band--gut': !importFailed }">{{ importMessage }}</p>
+          <p v-if="importMessage" class="notice" :class="{ 'notice--error': importFailed, 'notice--good': !importFailed }">{{ importMessage }}</p>
         </div>
       </section>
     </div>
 
-    <section class="tafel">
-      <div class="tafel__kopf"><h3>Alles löschen</h3></div>
-      <div class="tafel__leib reihe">
-        <p class="hinweis" style="flex:1; min-width: 260px">
+    <section class="panel">
+      <div class="panel__head"><h3>Alles löschen</h3></div>
+      <div class="panel__body row">
+        <p class="hint" style="flex:1; min-width: 260px">
           Leert den Browser-Speicher: alle Grundstücke, Haustypen und Ziele. Vorher
           ausgeben, wenn der Stand noch gebraucht wird.
         </p>
-        <button type="button" class="knopf knopf--still" @click="clearAll">
+        <button type="button" class="btn btn--quiet" @click="clearAll">
           Alles löschen
         </button>
       </div>
@@ -141,10 +141,10 @@ export default {
 </script>
 
 <style scoped>
-.seitenkopf__unter{ margin-top: var(--w2b-raum-2); color: var(--w2b-graphit); font-size: var(--w2b-schrift-s); max-width: 68ch; }
-.hinweis{ font-size: var(--w2b-schrift-s); color: var(--w2b-graphit); }
-.zweispalt{ display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--w2b-raum-4); align-items: start; }
-.datenfeld{ min-height: 210px; font-size: 11.5px; line-height: 1.5; }
-.dateiwahl{ cursor: pointer; display: inline-flex; align-items: center; }
-.dateiwahl input{ display: none; }
+.page-head__sub{ margin-top: var(--w2b-space-2); color: var(--w2b-graphite); font-size: var(--w2b-text-s); max-width: 68ch; }
+.hint{ font-size: var(--w2b-text-s); color: var(--w2b-graphite); }
+.two-columns{ display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--w2b-space-4); align-items: start; }
+.data-field{ min-height: 210px; font-size: 11.5px; line-height: 1.5; }
+.file-picker{ cursor: pointer; display: inline-flex; align-items: center; }
+.file-picker input{ display: none; }
 </style>

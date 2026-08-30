@@ -1,38 +1,38 @@
 <template>
-  <div class="stapel">
-    <div class="seitenkopf">
+  <div class="stack">
+    <div class="page-head">
       <div>
-        <p class="marke-klein">Für alle Grundstücke</p>
+        <p class="eyebrow">Für alle Grundstücke</p>
         <h1>Haustypen</h1>
-        <p class="seitenkopf__unter">
+        <p class="page-head__sub">
           Der Katalog gilt für alle Grundstücke. Jede Karte prüft selbst, auf welche Kandidaten
           der Baukörper überhaupt passt — geprüft wird, ob sich das Rechteck in irgendeiner
           Drehung vollständig in das Bebauungsfenster legen lässt.
         </p>
       </div>
-      <div class="dehnen"></div>
-      <button type="button" class="knopf" @click="adding = !adding">
+      <div class="spacer"></div>
+      <button type="button" class="btn" @click="adding = !adding">
         {{ adding ? "Aufnahme schließen" : "Haustyp hinzufügen" }}
       </button>
     </div>
 
-    <p v-if="error" class="band band--fehler" role="alert">{{ error }}</p>
+    <p v-if="error" class="notice notice--error" role="alert">{{ error }}</p>
 
-    <section v-if="adding" class="aufnahme">
-      <div class="tafel">
-        <div class="tafel__kopf"><h3>Vom Hersteller lesen</h3></div>
-        <div class="tafel__leib stapel">
-          <p class="hinweis">
+    <section v-if="adding" class="intake">
+      <div class="panel">
+        <div class="panel__head"><h3>Vom Hersteller lesen</h3></div>
+        <div class="panel__body stack">
+          <p class="hint">
             Link zu einem Haustyp — von jedem Hersteller, es gibt keine Liste
             erlaubter Anbieter. Gelesen wird nur die Seite, die hier steht; das
             Ergebnis je Adresse dauerhaft zwischengespeichert.
           </p>
-          <div class="feld">
+          <div class="field">
             <label for="ht-url">Adresse der Haustyp-Seite</label>
             <input id="ht-url" type="text" v-model="url">
           </div>
-          <div class="reihe">
-            <button type="button" class="knopf" :disabled="busy" @click="read">
+          <div class="row">
+            <button type="button" class="btn" :disabled="busy" @click="read">
               {{ busy ? "Wird gelesen …" : "Haustyp lesen" }}
             </button>
             <span class="chip">allowed_domains: {{ domain }}</span>
@@ -40,26 +40,26 @@
         </div>
       </div>
 
-      <div class="tafel">
-        <div class="tafel__kopf"><h3>Von Hand eintragen</h3></div>
-        <div class="tafel__leib stapel">
-          <p class="hinweis">Wenn kein Datenblatt vorliegt oder ihr einfach Maße durchprobieren wollt.</p>
-          <div class="drei">
-            <div class="feld"><label for="e-name">Bezeichnung</label><input id="e-name" type="text" v-model="custom.name"></div>
-            <div class="feld"><label for="e-laenge">Länge</label><input id="e-laenge" type="number" min="4" max="30" step="0.1" v-model.number="custom.length"></div>
-            <div class="feld"><label for="e-breite">Breite</label><input id="e-breite" type="number" min="4" max="30" step="0.1" v-model.number="custom.width"></div>
+      <div class="panel">
+        <div class="panel__head"><h3>Von Hand eintragen</h3></div>
+        <div class="panel__body stack">
+          <p class="hint">Wenn kein Datenblatt vorliegt oder ihr einfach Maße durchprobieren wollt.</p>
+          <div class="field-trio">
+            <div class="field"><label for="manual-name">Bezeichnung</label><input id="manual-name" type="text" v-model="custom.name"></div>
+            <div class="field"><label for="manual-length">Länge</label><input id="manual-length" type="number" min="4" max="30" step="0.1" v-model.number="custom.length"></div>
+            <div class="field"><label for="manual-width">Breite</label><input id="manual-width" type="number" min="4" max="30" step="0.1" v-model.number="custom.width"></div>
           </div>
-          <p class="hinweis">
+          <p class="hint">
             Ergibt {{ area(custom.length * custom.width, 1) }} bebaute Fläche.
             Kantenlängen unter 4 m oder über 30 m sind kein Haus, sondern ein Tippfehler.
           </p>
-          <button type="button" class="knopf knopf--zweit" :disabled="!customValid" @click="addCustom">
+          <button type="button" class="btn btn--secondary" :disabled="!customValid" @click="addCustom">
             In den Katalog
           </button>
         </div>
       </div>
 
-      <div class="notiz notiz--mahnung">
+      <div class="callout callout--caution">
         <h4>Wohnfläche ist nicht Grundfläche</h4>
         <p>Der häufigste Fehler beim Fertighaus. Beim ELK All in One 159 sind 159,21 m² die
           Netto-Raumfläche über alle Geschosse — die <em>bebaute</em> Fläche beträgt 96,88 m².
@@ -69,61 +69,61 @@
       </div>
     </section>
 
-    <p v-if="types.length" class="massstab-hinweis">Alle Grundrisse im gleichen Maßstab gezeichnet.</p>
+    <p v-if="types.length" class="scale-hint">Alle Grundrisse im gleichen Maßstab gezeichnet.</p>
 
-    <div v-if="!types.length" class="leerstelle">
+    <div v-if="!types.length" class="empty-state">
       <h3>Noch kein Haustyp im Katalog</h3>
       <p>Einen Link zu einer Haustyp-Seite einlesen lassen oder die Maße von Hand eintragen.
         Erst dann lässt sich ein Baukörper auf ein Grundstück legen.</p>
-      <button type="button" class="knopf knopf--zweit" @click="adding = true">Haustyp hinzufügen</button>
+      <button type="button" class="btn btn--secondary" @click="adding = true">Haustyp hinzufügen</button>
     </div>
 
-    <div v-else class="katalog">
-      <article v-for="type in types" :key="type.id" class="typkarte tafel">
-        <svg viewBox="0 0 300 130" class="typkarte__riss" role="img" :aria-label="`Grundriss ${type.name}`">
-          <rect x="0" y="0" width="300" height="130" fill="var(--w2b-karte-grund)" />
+    <div v-else class="catalogue">
+      <article v-for="type in types" :key="type.id" class="type-card panel">
+        <svg viewBox="0 0 300 130" class="type-card__plan" role="img" :aria-label="`Grundriss ${type.name}`">
+          <rect x="0" y="0" width="300" height="130" fill="var(--w2b-map-ground)" />
           <rect :x="outline(type).x" :y="outline(type).y" :width="outline(type).w" :height="outline(type).h" rx="2"
-                fill="var(--w2b-karte-entwurf)" fill-opacity=".8"
-                stroke="var(--w2b-karte-entwurf-rand)" stroke-width="1.6" />
+                fill="var(--w2b-map-design)" fill-opacity=".8"
+                stroke="var(--w2b-map-design-edge)" stroke-width="1.6" />
           <line :x1="outline(type).x" :y1="outline(type).y + outline(type).h + 13"
                 :x2="outline(type).x + outline(type).w" :y2="outline(type).y + outline(type).h + 13"
-                stroke="var(--w2b-karte-grenze)" stroke-width="1" />
-          <text x="150" :y="outline(type).y + outline(type).h + 26" class="typkarte__mass">{{ num(dimensions(type).length, 1) }} m</text>
-          <text :x="outline(type).x - 11" y="62" class="typkarte__mass"
+                stroke="var(--w2b-map-boundary)" stroke-width="1" />
+          <text x="150" :y="outline(type).y + outline(type).h + 26" class="type-card__dimension">{{ num(dimensions(type).length, 1) }} m</text>
+          <text :x="outline(type).x - 11" y="62" class="type-card__dimension"
                 :transform="`rotate(-90, ${outline(type).x - 11}, 62)`">{{ num(dimensions(type).width, 1) }} m</text>
         </svg>
 
-        <div class="typkarte__rumpf">
+        <div class="type-card__body">
           <h3>{{ type.name }}</h3>
-          <p class="typkarte__hersteller">{{ type.manufacturer }}</p>
+          <p class="type-card__manufacturer">{{ type.manufacturer }}</p>
           <dl>
             <dt>Bebaute Fläche</dt><dd>{{ area(type.builtArea, 2) }}</dd>
             <dt>Wohnfläche</dt><dd>{{ type.livingArea ? area(type.livingArea, 2) : "—" }}</dd>
             <dt>Außenmaß</dt>
             <dd>{{ num(dimensions(type).length, 1) }} × {{ num(dimensions(type).width, 1) }} m
-              <span v-if="!type.length" class="zart" title="aus der bebauten Fläche geschätzt">≈</span></dd>
+              <span v-if="!type.length" class="faint" title="aus der bebauten Fläche geschätzt">≈</span></dd>
             <dt>Dach</dt><dd>{{ type.roofShape }}</dd>
             <dt>Preis ab</dt><dd>{{ type.priceFrom ? euro(type.priceFrom) : "—" }}</dd>
           </dl>
-          <div class="typkarte__marken">
+          <div class="type-card__chips">
             <span class="chip">gelesen {{ date(type.readAt) }}</span>
             <span v-if="!type.length" class="chip chip--warn">Maße geschätzt</span>
-            <span v-if="type.custom" class="chip chip--messing">eigene Maße</span>
+            <span v-if="type.custom" class="chip chip--brass">eigene Maße</span>
           </div>
         </div>
 
-        <div class="passt">
-          <p class="passt__kopf">Passt auf {{ fit(type).count }} von {{ plots.length }} Grundstücken</p>
-          <div v-for="row in fit(type).rows" :key="row.plot.id" class="passt__zeile">
-            <span class="chip" :class="row.placement ? 'chip--gut' : 'chip--fehler'">{{ row.placement ? "passt" : "zu groß" }}</span>
-            <span class="passt__name">{{ row.plot.name }}</span>
-            <button v-if="row.placement" type="button" class="passt__knopf" @click="tryOn(type, row)">Ausprobieren</button>
+        <div class="fits">
+          <p class="fits__head">Passt auf {{ fit(type).count }} von {{ plots.length }} Grundstücken</p>
+          <div v-for="row in fit(type).rows" :key="row.plot.id" class="fits__row">
+            <span class="chip" :class="row.placement ? 'chip--good' : 'chip--error'">{{ row.placement ? "passt" : "zu groß" }}</span>
+            <span class="fits__name">{{ row.plot.name }}</span>
+            <button v-if="row.placement" type="button" class="fits__button" @click="tryOn(type, row)">Ausprobieren</button>
           </div>
         </div>
 
-        <div class="typkarte__fuss">
-          <div class="dehnen"></div>
-          <button type="button" class="knopf knopf--still knopf--klein" @click="remove(type)">Entfernen</button>
+        <div class="type-card__foot">
+          <div class="spacer"></div>
+          <button type="button" class="btn btn--quiet btn--small" @click="remove(type)">Entfernen</button>
         </div>
       </article>
     </div>
@@ -233,37 +233,37 @@ export default {
 </script>
 
 <style scoped>
-.seitenkopf{ display: flex; align-items: flex-end; gap: var(--w2b-raum-4); flex-wrap: wrap; }
-.seitenkopf__unter{ margin-top: var(--w2b-raum-2); color: var(--w2b-graphit); font-size: var(--w2b-schrift-s); max-width: 70ch; }
-.hinweis{ font-size: var(--w2b-schrift-s); color: var(--w2b-graphit); }
-.zart{ color: var(--w2b-gedaempft); }
-.aufnahme{ display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--w2b-raum-4); align-items: start; }
-.drei{ display: grid; grid-template-columns: 1fr 90px 90px; gap: var(--w2b-raum-3); }
-@media (max-width: 560px){ .drei{ grid-template-columns: 1fr; } }
+.page-head{ display: flex; align-items: flex-end; gap: var(--w2b-space-4); flex-wrap: wrap; }
+.page-head__sub{ margin-top: var(--w2b-space-2); color: var(--w2b-graphite); font-size: var(--w2b-text-s); max-width: 70ch; }
+.hint{ font-size: var(--w2b-text-s); color: var(--w2b-graphite); }
+.faint{ color: var(--w2b-muted); }
+.intake{ display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--w2b-space-4); align-items: start; }
+.field-trio{ display: grid; grid-template-columns: 1fr 90px 90px; gap: var(--w2b-space-3); }
+@media (max-width: 560px){ .field-trio{ grid-template-columns: 1fr; } }
 
-.massstab-hinweis{ font-size: var(--w2b-schrift-xs); color: var(--w2b-gedaempft); }
-.leerstelle{
-  border: 1px dashed var(--w2b-linie); border-radius: var(--w2b-radius-m);
+.scale-hint{ font-size: var(--w2b-text-xs); color: var(--w2b-muted); }
+.empty-state{
+  border: 1px dashed var(--w2b-line); border-radius: var(--w2b-radius-m);
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: var(--w2b-raum-3); padding: var(--w2b-raum-7) var(--w2b-raum-5); text-align: center;
+  gap: var(--w2b-space-3); padding: var(--w2b-space-7) var(--w2b-space-5); text-align: center;
 }
-.leerstelle h3{ color: var(--w2b-graphit); font-size: var(--w2b-schrift-l); }
-.leerstelle p{ color: var(--w2b-gedaempft); font-size: var(--w2b-schrift-s); max-width: 46ch; }
-.katalog{ display: grid; grid-template-columns: repeat(auto-fill, minmax(304px, 1fr)); gap: var(--w2b-raum-4); }
-.typkarte{ display: flex; flex-direction: column; }
-.typkarte__riss{ display: block; width: 100%; height: auto; border-bottom: 1px solid var(--w2b-linie); }
-.typkarte__mass{ font-family: var(--w2b-daten); font-size: 10px; fill: var(--w2b-karte-grenze); text-anchor: middle; }
-.typkarte__rumpf{ padding: var(--w2b-raum-3) var(--w2b-raum-4); display: flex; flex-direction: column; gap: var(--w2b-raum-2); flex: 1; }
-.typkarte__hersteller{ font-family: var(--w2b-daten); font-size: 10.5px; color: var(--w2b-gedaempft); margin-top: -4px; }
-.typkarte__rumpf dl{ margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 3px var(--w2b-raum-3); font-size: var(--w2b-schrift-s); }
-.typkarte__rumpf dt{ color: var(--w2b-graphit); }
-.typkarte__rumpf dd{ margin: 0; text-align: right; font-family: var(--w2b-daten); font-variant-numeric: tabular-nums; }
-.typkarte__marken{ display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto; padding-top: var(--w2b-raum-1); }
-.passt{ border-top: 1px solid var(--w2b-linie-zart); padding: var(--w2b-raum-3) var(--w2b-raum-4); display: flex; flex-direction: column; gap: 7px; }
-.passt__kopf{ font-family: var(--w2b-anzeige); font-weight: 600; font-size: var(--w2b-schrift-xs); letter-spacing: .06em; color: var(--w2b-gedaempft); }
-.passt__zeile{ display: flex; align-items: center; gap: var(--w2b-raum-2); font-size: var(--w2b-schrift-s); }
-.passt__name{ flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--w2b-graphit); }
-.passt__knopf{ background: none; border: 0; padding: 0; cursor: pointer; color: var(--w2b-primaer); font-family: var(--w2b-anzeige); font-weight: 600; font-size: var(--w2b-schrift-xs); }
-.passt__knopf:hover{ text-decoration: underline; }
-.typkarte__fuss{ display: flex; padding: var(--w2b-raum-3) var(--w2b-raum-4); border-top: 1px solid var(--w2b-linie-zart); }
+.empty-state h3{ color: var(--w2b-graphite); font-size: var(--w2b-text-l); }
+.empty-state p{ color: var(--w2b-muted); font-size: var(--w2b-text-s); max-width: 46ch; }
+.catalogue{ display: grid; grid-template-columns: repeat(auto-fill, minmax(304px, 1fr)); gap: var(--w2b-space-4); }
+.type-card{ display: flex; flex-direction: column; }
+.type-card__plan{ display: block; width: 100%; height: auto; border-bottom: 1px solid var(--w2b-line); }
+.type-card__dimension{ font-family: var(--w2b-font-mono); font-size: 10px; fill: var(--w2b-map-boundary); text-anchor: middle; }
+.type-card__body{ padding: var(--w2b-space-3) var(--w2b-space-4); display: flex; flex-direction: column; gap: var(--w2b-space-2); flex: 1; }
+.type-card__manufacturer{ font-family: var(--w2b-font-mono); font-size: 10.5px; color: var(--w2b-muted); margin-top: -4px; }
+.type-card__body dl{ margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 3px var(--w2b-space-3); font-size: var(--w2b-text-s); }
+.type-card__body dt{ color: var(--w2b-graphite); }
+.type-card__body dd{ margin: 0; text-align: right; font-family: var(--w2b-font-mono); font-variant-numeric: tabular-nums; }
+.type-card__chips{ display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto; padding-top: var(--w2b-space-1); }
+.fits{ border-top: 1px solid var(--w2b-line-faint); padding: var(--w2b-space-3) var(--w2b-space-4); display: flex; flex-direction: column; gap: 7px; }
+.fits__head{ font-family: var(--w2b-font-display); font-weight: 600; font-size: var(--w2b-text-xs); letter-spacing: .06em; color: var(--w2b-muted); }
+.fits__row{ display: flex; align-items: center; gap: var(--w2b-space-2); font-size: var(--w2b-text-s); }
+.fits__name{ flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--w2b-graphite); }
+.fits__button{ background: none; border: 0; padding: 0; cursor: pointer; color: var(--w2b-primary); font-family: var(--w2b-font-display); font-weight: 600; font-size: var(--w2b-text-xs); }
+.fits__button:hover{ text-decoration: underline; }
+.type-card__foot{ display: flex; padding: var(--w2b-space-3) var(--w2b-space-4); border-top: 1px solid var(--w2b-line-faint); }
 </style>

@@ -8,9 +8,10 @@ Two sources, because no single one answers the question well
   separate cleanly. OpenStreetMap cannot do this in Saxony at all -- there is
   no S-Bahn tag in the whole state, `service=suburban` has zero objects.
 * **Everything else comes from a local OSM index** (``app/poi_index.py``),
-  built offline. The public Overpass instances forbid exactly our kind of use,
-  and the name-indexed geocoders miss most of the objects: 88 % of Saxon
-  playgrounds have no name to be indexed under.
+  built offline -- or, on a server that has never built one, from a live
+  Overpass query (``services/overpass.py``, opt-in). The name-indexed geocoders
+  are no alternative to either: 88 % of Saxon playgrounds have no name to be
+  indexed under.
 
 Both halves are ranked by **walking time, never by air distance**. That is not
 pedantry: measured in Dresden-Johannstadt, the nearest playground by air, 172 m
@@ -23,8 +24,9 @@ from __future__ import annotations
 
 import logging
 import math
-from typing import Any, Iterable
+from typing import Any, Iterable, Sequence
 
+from ..errors import AppError
 from ..poi_index import POI_CATEGORIES, PoiEntry, PoiIndex, haversine_m, load_index
 from ..schemas import (
     KATEGORIE_LABELS,
@@ -37,6 +39,7 @@ from ..schemas import (
 )
 from ..settings import NearbySettings
 from .motis import ONE_TO_MANY_MAX, MotisService
+from .overpass import OverpassService
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +59,15 @@ TRANSIT_MODES: dict[str, tuple[str, ...]] = {
 }
 
 TRANSIT_CATEGORIES = tuple(TRANSIT_MODES)
+
+# One physical stop serves several of these -- the City-Tunnel halts in Leipzig
+# carry REGIONAL_RAIL and SUBURBAN, so they are a Bahnhof *and* an S-Bahn-Halt.
+# They are listed once and labelled with the first of these the caller asked
+# for: longest range first, the same order `_stop_kind` lists the modes in.
+# Note what this is NOT: REGIONAL_RAIL alone is a Bahnhof and nothing else.
+# Leipzig-Liebertwolkwitz is served by RB113 to Geithain, which is a regional
+# train, not an S-Bahn -- real S-Bahn stops carry SUBURBAN in addition.
+KATEGORIE_RANG: tuple[str, ...] = ("bahnhof", "sbahn", "tram", "bus")
 
 # MOTIS' mode vocabulary in the words a user reads.
 MODE_LABELS: dict[str, str] = {
@@ -85,6 +97,10 @@ KEIN_INDEX_HINWEIS = (
 )
 
 NICHTS_GEFUNDEN = "Im Umkreis von {umkreis} m wurde nichts gefunden."
+
+# When the live source was asked and did not answer, the category is unavailable
+# for a third reason -- neither "kein Datenbestand" nor "nichts gefunden". The
+# sentence comes from the service that failed and already says what to do.
 
 
 def _thousands(value: int) -> str:
@@ -200,9 +216,15 @@ class _Candidate:
 class NearbyService:
     """The endpoint's whole flow: candidates, one routing call, ranking."""
 
-    def __init__(self, settings: NearbySettings, motis: MotisService) -> None:
+    def __init__(
+        self,
+        settings: NearbySettings,
+        motis: MotisService,
+        overpass: OverpassService | None = None,
+    ) -> None:
         self.settings = settings
         self.motis = motis
+        self.overpass = overpass
         self._index: PoiIndex | None = None
         self._index_error: str | None = None
         self._loaded = False
@@ -225,30 +247,44 @@ class NearbyService:
         return self._index
 
     def index_status(self) -> dict[str, Any]:
-        """What ``/api/health`` reports about the index."""
+        """What ``/api/health`` reports about the six OpenStreetMap categories.
 
+        ``konfiguriert`` answers one question: can this server say anything at
+        all about schools, parks and the rest? A live Overpass source answers it
+        as well as a built index does, so it counts -- and ``quelle`` says which
+        of the two the frontend is going to get.
+        """
+
+        overpass = self.overpass.status() if self.overpass is not None else {"aktiv": False}
         index = self.index
         if index is None:
             return {
-                "konfiguriert": False,
+                "konfiguriert": bool(overpass["aktiv"]),
+                "quelle": "overpass" if overpass["aktiv"] else None,
                 "pfad": str(self.settings.poi_index_path),
                 "fehler": self._index_error,
+                "overpass": overpass,
             }
         return {
             "konfiguriert": True,
+            "quelle": "index",
             "pfad": str(index.path or self.settings.poi_index_path),
             "anzahl": index.count,
             "datenstand": index.datenstand,
+            "overpass": overpass,
         }
 
     # -- candidates --------------------------------------------------------
 
     def _poi_candidates(
-        self, kategorie: str, origin: Koordinate, radius_m: int, limit: int
+        self,
+        index: PoiIndex,
+        kategorie: str,
+        origin: Koordinate,
+        radius_m: int,
+        limit: int,
+        quelle: str,
     ) -> list[_Candidate]:
-        index = self.index
-        if index is None:
-            return []
         candidates: list[_Candidate] = []
         for entry, distance in index.nearest(kategorie, origin.lat, origin.lon, radius_m, limit):
             candidates.append(
@@ -259,11 +295,39 @@ class NearbyService:
                     name=entry.name,
                     art=self._poi_kind(entry),
                     luftlinie_m=distance,
-                    quelle="osm",
+                    quelle=quelle,
                     osm_id=entry.osm_id,
                 )
             )
         return candidates
+
+    async def _poi_source(
+        self, kategorien: list[str], origin: Koordinate, radius_m: int
+    ) -> tuple[PoiIndex | None, str, str | None]:
+        """Which source answers the OSM categories, and what to say if none can.
+
+        Index first, live Overpass second, nothing third -- in that order and
+        never both. The built index is the production answer; the live query is
+        the stand-in for a server that has none, and is off unless someone set
+        ``OVERPASS_ENABLED``.
+
+        Returns ``(index, quelle, fehler)``. ``fehler`` is a German sentence and
+        is set only when a source was asked and did not answer -- which is a
+        third statement, neither "kein Datenbestand" nor "nichts gefunden".
+        """
+
+        index = self.index
+        if index is not None or not kategorien:
+            return index, "osm", None
+        if self.overpass is None or not self.overpass.enabled:
+            return None, "osm", None
+        try:
+            return await self.overpass.places(origin, radius_m, kategorien), "overpass", None
+        except AppError as exc:
+            # An overloaded or rate-limited Overpass must not take the stops
+            # down with it: they come from the timetable and are unaffected.
+            logger.warning("Overpass did not answer: %s", exc.message)
+            return None, "overpass", exc.message
 
     @staticmethod
     def _poi_kind(entry: PoiEntry) -> str | None:
@@ -323,15 +387,19 @@ class NearbyService:
         pools: dict[str, list[_Candidate]] = {}
         status: dict[str, KategorieStatus] = {}
 
-        index = self.index
+        index, poi_quelle, poi_fehler = await self._poi_source(
+            poi_kategorien, payload.origin, payload.umkreis_m
+        )
         for kategorie in poi_kategorien:
             if index is None:
                 status[kategorie] = KategorieStatus(
-                    kategorie=kategorie, verfuegbar=False, hinweis=KEIN_INDEX_HINWEIS
+                    kategorie=kategorie,
+                    verfuegbar=False,
+                    hinweis=poi_fehler or KEIN_INDEX_HINWEIS,
                 )
                 continue
             pools[kategorie] = self._poi_candidates(
-                kategorie, payload.origin, payload.umkreis_m, per_category
+                index, kategorie, payload.origin, payload.umkreis_m, per_category, poi_quelle
             )
 
         if transit_kategorien:
@@ -362,7 +430,7 @@ class NearbyService:
         for candidate, result in zip(selected, durations):
             hits[candidate.kategorie].append(_as_treffer(candidate, result, payload.modus))
 
-        treffer: list[UmgebungTreffer] = []
+        shortlist: dict[str, list[UmgebungTreffer]] = {}
         for kategorie in requested:
             if kategorie in status:
                 continue
@@ -370,16 +438,24 @@ class NearbyService:
             # Reachable first, then by walking time; an unreachable hit still
             # travels, ordered by air distance, because "die nächste Schule
             # liegt jenseits des Flusses" is an answer worth showing.
-            found.sort(key=lambda hit: (not hit.erreichbar, hit.duration_s or 0, hit.luftlinie_m))
-            found = found[: payload.treffer_je_kategorie]
-            treffer.extend(found)
+            found.sort(key=_rank)
+            shortlist[kategorie] = found[: payload.treffer_je_kategorie]
+
+        treffer = _merge_duplicate_stops(shortlist, requested)
+
+        for kategorie in requested:
+            if kategorie in status:
+                continue
+            # Counted over `kategorien`, not over the label: a stop listed once
+            # as `bahnhof` still counts for `sbahn` when the S-Bahn calls there.
+            anzahl = sum(1 for hit in treffer if kategorie in hit.kategorien)
             status[kategorie] = KategorieStatus(
                 kategorie=kategorie,
                 verfuegbar=True,
-                anzahl=len(found),
+                anzahl=anzahl,
                 hinweis=(
                     None
-                    if found
+                    if anzahl
                     else NICHTS_GEFUNDEN.format(umkreis=_thousands(payload.umkreis_m))
                 ),
             )
@@ -410,13 +486,78 @@ class NearbyService:
                 # rather than showing an empty list that reads as "keine Linie".
                 break
             budget -= 1
-            wanted = set(TRANSIT_MODES.get(hit.kategorie, ()))
+            # Every category this stop was listed for, not just its label: the
+            # S-Bahn lines of a merged Bahnhof/S-Bahn stop belong on it too.
+            wanted = {
+                mode
+                for kategorie in (hit.kategorien or [hit.kategorie])
+                for mode in TRANSIT_MODES.get(kategorie, ())
+            }
             names = {
                 str(route.get("routeShortName") or "").strip()
                 for route in await self.motis.stop_routes(hit.stop_id)
                 if str(route.get("mode") or "") in wanted
             }
             hit.linien = sorted((name for name in names if name), key=_line_sort_key)
+
+
+def _rank(hit: UmgebungTreffer) -> tuple[bool, int, int]:
+    """Reachable first, then by walking time, then by air distance."""
+
+    return (not hit.erreichbar, hit.duration_s or 0, hit.luftlinie_m)
+
+
+def _primary_category(kategorien: list[str]) -> str:
+    """The one category a row is labelled with when it satisfies several."""
+
+    for kategorie in KATEGORIE_RANG:
+        if kategorie in kategorien:
+            return kategorie
+    return kategorien[0]
+
+
+def _merge_duplicate_stops(
+    shortlist: dict[str, list[UmgebungTreffer]], requested: Sequence[str]
+) -> list[UmgebungTreffer]:
+    """One row per physical place, carrying every category it satisfies.
+
+    Verified around Wilhelm-Leuschner-Platz: Leipzig Markt and Leipzig
+    Bayerischer Bahnhof each carry REGIONAL_RAIL *and* SUBURBAN, so both were
+    listed twice -- four rows for two stations. The categorisation was right and
+    the list was still noise. Merging happens after the per-category ranking, so
+    asking only for `sbahn` gives exactly the same S-Bahn stops as before; what
+    changes is only that asking for both no longer repeats them.
+
+    Stops are the same place when they share a ``stop_id`` -- MOTIS' ``grouped``
+    id, one per physical stop across all feeds. Places from OpenStreetMap belong
+    to exactly one category and are never merged.
+    """
+
+    merged: dict[tuple[str, Any], UmgebungTreffer] = {}
+    order: list[tuple[str, Any]] = []
+    for kategorie in requested:
+        for position, hit in enumerate(shortlist.get(kategorie, [])):
+            key = ("stop", hit.stop_id) if hit.stop_id else ("einzeln", (kategorie, position))
+            first = merged.get(key)
+            if first is None:
+                hit.kategorien = [hit.kategorie]
+                merged[key] = hit
+                order.append(key)
+            elif kategorie not in first.kategorien:
+                first.kategorien.append(kategorie)  # type: ignore[arg-type]
+
+    for key in order:
+        hit = merged[key]
+        hit.kategorie = _primary_category(list(hit.kategorien))  # type: ignore[assignment]
+
+    # Grouped by the label each row ended up with, in the order the categories
+    # were asked for -- the frontend renders `treffer` as one flat list.
+    treffer: list[UmgebungTreffer] = []
+    for kategorie in requested:
+        block = [merged[key] for key in order if merged[key].kategorie == kategorie]
+        block.sort(key=_rank)
+        treffer.extend(block)
+    return treffer
 
 
 def _round_robin(pools: dict[str, list[_Candidate]], budget: int) -> list[_Candidate]:
@@ -453,6 +594,7 @@ def _as_treffer(
     reachable = result is not None
     return UmgebungTreffer(
         kategorie=candidate.kategorie,  # type: ignore[arg-type]
+        kategorien=[candidate.kategorie],  # type: ignore[list-item]
         name=candidate.name,
         art=candidate.art,
         lat=candidate.lat,
@@ -473,6 +615,7 @@ def _as_treffer(
 # Categories this module can answer without the local index, kept next to the
 # ones that need it so a reader sees the split in one place.
 __all__ = [
+    "KATEGORIE_RANG",
     "MODE_LABELS",
     "NearbyService",
     "TRANSIT_CATEGORIES",

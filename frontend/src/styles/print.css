@@ -4,17 +4,17 @@
  * this file hides what does not belong on paper and re-flows the rest. That
  * keeps a single render path, so nothing recomputes the same dimensions twice.
  *
- * Mark anything that should vanish with `.nicht-drucken`, anything that only
- * exists on paper with `.nur-drucken`.
+ * Mark anything that should vanish with `.no-print`, anything that only
+ * exists on paper with `.print-only`.
  *
  * Why so many `!important`: component styles are scoped, so every one of their
  * selectors carries a `[data-v-…]` attribute and outweighs a bare class here.
  * Without it a print rule silently loses — that is how the plan came to fill a
- * whole sheet: `.druckblatt` set two columns and the scoped `.plangitter` kept
+ * whole sheet: `.print-sheet` set two columns and the scoped `.plan-grid` kept
  * its 336 px sidebar, leaving the drawing the rest of the page.
  */
 
-.nur-drucken{ display: none; }
+.print-only{ display: none; }
 
 @media print{
   /* Portrait. The sheet gets filed with the rest of the purchase papers, and
@@ -36,85 +36,85 @@
   :root, :root:not([data-theme="light"]){
     color-scheme: light;
 
-    --w2b-papier: #FFFFFF;
-    --w2b-flaeche: #FFFFFF;
-    --w2b-flaeche-tief: #FFFFFF;
-    --w2b-karte-grund: #FFFFFF;
-    --w2b-karte-flaeche: #FFFFFF;
-    --w2b-schatten: none;
-    --w2b-schatten-hoch: none;
+    --w2b-paper: #FFFFFF;
+    --w2b-surface: #FFFFFF;
+    --w2b-surface-sunken: #FFFFFF;
+    --w2b-map-ground: #FFFFFF;
+    --w2b-map-surface: #FFFFFF;
+    --w2b-shadow: none;
+    --w2b-shadow-high: none;
 
     /* Warm hairlines survive a screen but not a laser printer's dither, and
        the row rules are what makes a printed list readable as a table. */
-    --w2b-linie:      #8E877D;
-    --w2b-linie-zart: #BDB6AB;
+    --w2b-line:      #8E877D;
+    --w2b-line-faint: #BDB6AB;
 
-    --w2b-tinte:      #1E1A16;
-    --w2b-graphit:    #4A443C;
-    --w2b-gedaempft:  #6F675C;
+    --w2b-ink:      #1E1A16;
+    --w2b-graphite:    #4A443C;
+    --w2b-muted:  #6F675C;
 
-    --w2b-primaer:          #2F4A3A;
-    --w2b-primaer-hell:     #456B52;
-    --w2b-primaer-schleier: rgba(47,74,58,.10);
-    --w2b-sekundaer:        #B5813C;
-    --w2b-sekundaer-text:   #7C5620;
-    --w2b-salbei:           #9DB39A;
+    --w2b-primary:          #2F4A3A;
+    --w2b-primary-light:     #456B52;
+    --w2b-primary-veil: rgba(47,74,58,.10);
+    --w2b-secondary:        #B5813C;
+    --w2b-secondary-text:   #7C5620;
+    --w2b-sage:           #9DB39A;
 
-    --w2b-warnung:      #BE8524;
-    --w2b-warnung-text: #7C5620;
-    --w2b-fehler:       #A8402C;
-    --w2b-gut:          #2F4A3A;
+    --w2b-warning:      #BE8524;
+    --w2b-warning-text: #7C5620;
+    --w2b-error:       #A8402C;
+    --w2b-good:          #2F4A3A;
 
-    --w2b-karte-grenze:          #1E1A16;
-    --w2b-karte-halo:            #FFFFFF;
-    --w2b-karte-fenster:         #2F4A3A;
-    --w2b-karte-saum:            rgba(47,74,58,.17);
-    --w2b-karte-entwurf:         #B5813C;
-    --w2b-karte-entwurf-rand:    #7C5620;
-    --w2b-karte-bestand:         #4A443C;
-    --w2b-karte-nachbar:         #9A9184;
-    --w2b-karte-strasse:         #B5813C;
-    --w2b-karte-strasse-flaeche: #D6D2CA;
-    --w2b-karte-verstoss:        #A8402C;
-    --w2b-karte-auswahl:         #456B52;
-    --w2b-karte-gruen:           #DCE4DA;
+    --w2b-map-boundary:          #1E1A16;
+    --w2b-map-halo:            #FFFFFF;
+    --w2b-map-envelope:         #2F4A3A;
+    --w2b-map-setback:            rgba(47,74,58,.17);
+    --w2b-map-design:         #B5813C;
+    --w2b-map-design-edge:    #7C5620;
+    --w2b-map-existing:         #4A443C;
+    --w2b-map-neighbour:         #9A9184;
+    --w2b-map-street:         #B5813C;
+    --w2b-map-street-surface: #D6D2CA;
+    --w2b-map-violation:        #A8402C;
+    --w2b-map-selection:         #456B52;
+    --w2b-map-green:           #DCE4DA;
 
     /* Paper is not a screen: both scales come down a step. This is what turns
        seven loose sheets into one, and it costs nothing — every component
        already measures its padding and type against these. */
-    --w2b-raum-1:  1pt;  --w2b-raum-2:  2.5pt; --w2b-raum-3:  4pt;
-    --w2b-raum-4:  6pt;  --w2b-raum-5:  8pt;   --w2b-raum-6: 10pt;
-    --w2b-raum-7: 12pt;  --w2b-raum-8: 12pt;
+    --w2b-space-1:  1pt;  --w2b-space-2:  2.5pt; --w2b-space-3:  4pt;
+    --w2b-space-4:  6pt;  --w2b-space-5:  8pt;   --w2b-space-6: 10pt;
+    --w2b-space-7: 12pt;  --w2b-space-8: 12pt;
 
-    --w2b-schrift-xs: 7pt;   --w2b-schrift-s:  8pt;  --w2b-schrift-m: 8.5pt;
-    --w2b-schrift-l:  9.5pt; --w2b-schrift-xl: 11pt;
+    --w2b-text-xs: 7pt;   --w2b-text-s:  8pt;  --w2b-text-m: 8.5pt;
+    --w2b-text-l:  9.5pt; --w2b-text-xl: 11pt;
   }
 
   body{ background: #fff; color: #000; font-size: 8.5pt; line-height: 1.34; }
-  .bahn{ max-width: none; padding: 0; }
+  .container{ max-width: none; padding: 0; }
   main{ padding-top: 0 !important; }
 
   /* The shell is a full-height flex column so the footer sits at the bottom of
      a short screen. On paper `100vh` is one sheet, `main` stretches to fill it,
      and the closing note is pushed onto a second page that holds nothing else.
      Flat block flow instead — pagination decides where the page ends here. */
-  .huelle{ display: block !important; min-height: 0 !important; }
+  .shell{ display: block !important; min-height: 0 !important; }
 
   /* Controls, navigation and anything that only makes sense with a pointer. */
-  .nicht-drucken,
-  .kopfleiste, .fussleiste, .krume,
-  .knopf, button, input[type="range"], select,
-  .planleiste, .auswahlleiste, .schrittleiste, .messband{ display: none !important; }
+  .no-print,
+  .site-header, .site-footer, .breadcrumb,
+  .btn, button, input[type="range"], select,
+  .plan-bar, .selection-bar, .steps, .measure-bar{ display: none !important; }
 
-  .nur-drucken{ display: block; }
+  .print-only{ display: block; }
 
   /* Two of these are not controls but content that happens to be clickable, and
      the blanket `button` rule above swallows them: a printed list of plots
      without names or outlines is not a list of plots. The compare checkbox
      beside them really is a control and stays gone. */
-  .karte__titel{ display: inline !important; }
-  .karte__riss{ display: block !important; }
-  .karte__wahl{ display: none !important; }
+  .plot-card__title{ display: inline !important; }
+  .plot-card__plan{ display: block !important; }
+  .plot-card__select{ display: none !important; }
 
   /* ---------- Fields are values on paper, not controls ----------
      The reason this file exists in its current form: Firefox draws the stepper
@@ -148,94 +148,94 @@
   /* ---------- Panels ----------
      Plain blocks: the border, the rounding and the fill are screen furniture.
      The rule under the panel title is what keeps the grouping legible. */
-  .tafel{ border: 0; border-radius: 0; background: none; overflow: visible; break-inside: avoid; }
-  .tafel__kopf{ border-bottom: .8pt solid #000; padding: 0 0 2pt; margin-bottom: 3pt; background: none; }
-  .tafel__leib{ padding: 0; }
-  .tafel__fussnote{ padding: 3pt 0 0 !important; }
+  .panel{ border: 0; border-radius: 0; background: none; overflow: visible; break-inside: avoid; }
+  .panel__head{ border-bottom: .8pt solid #000; padding: 0 0 2pt; margin-bottom: 3pt; background: none; }
+  .panel__body{ padding: 0; }
+  .panel__footnote{ padding: 3pt 0 0 !important; }
 
-  .werteliste dt, .werteliste dd{ padding: 1pt 0 !important; }
+  .value-list dt, .value-list dd{ padding: 1pt 0 !important; }
 
   h1{ font-size: 16pt; }
   h2{ font-size: 12pt; }
   h3{ font-size: 9.5pt; }
-  h1, h2, h3, h4, .marke-klein, .seitenkopf{ break-after: avoid; }
-  .seitenkopf__unter{ font-size: 8.5pt; }
+  h1, h2, h3, h4, .eyebrow, .page-head{ break-after: avoid; }
+  .page-head__sub{ font-size: 8.5pt; }
 
   /* ---------- The plot sheet ----------
      Plan left, figures right. The drawing keeps the larger share because a
      boundary dimension has to be readable off it; the three figure panels need
      about a third of the width and no more. */
-  .druckblatt{
+  .print-sheet{
     display: grid !important;
     grid-template-columns: 1.7fr 1fr !important;
     gap: 6mm !important;
     align-items: start;
     break-inside: avoid;
   }
-  .druckblatt__plan, .planrahmen{
+  .print-sheet__plan, .plan-frame{
     position: static !important;
     border: .6pt solid #000 !important;
     border-radius: 0;
     break-inside: avoid;
   }
-  .planrahmen svg{ width: 100%; height: auto; }
-  .planfuss{ padding: 2pt 4pt !important; font-size: 6.5pt !important; }
-  .grundstueck-seite + .grundstueck-seite{ break-before: page; }
+  .plan-frame svg{ width: 100%; height: auto; }
+  .plan-foot{ padding: 2pt 4pt !important; font-size: 6.5pt !important; }
+  .plot-page + .plot-page{ break-before: page; }
 
   /* The plan is half a sheet wide, so its labels come down with it — at the
      drawn 10.5 units a dimension prints at 1.4 mm, below anything a surveyor
      would accept. Raised here to roughly 2.2 mm, the usual floor for lettering
      on a technical drawing. The halo behind the text grows with it. */
-  .lageplan__mass{ font-size: 16px !important; stroke-width: 5px !important; }
-  .lageplan__nord{ font-size: 19px !important; }
-  .lageplan__leiste{ font-size: 13px !important; }
+  .site-plan__dimension{ font-size: 16px !important; stroke-width: 5px !important; }
+  .site-plan__north{ font-size: 19px !important; }
+  .site-plan__scale-bar{ font-size: 13px !important; }
 
   /* The north arrow and the scale bar stay: with the map rotated to the street
      they are the only orientation left on paper.
-     Do NOT hide `.plan-griff` here — that class sits on the building footprint
+     Do NOT hide `.plan-handle` here — that class sits on the building footprint
      itself and only carries a cursor; hiding it prints an empty envelope. */
-  .plan-hinweis{ display: none !important; }
+  .plan-hint{ display: none !important; }
 
   /* ---------- Setbacks, building body, disclaimer ----------
      The setback table runs to one row per boundary and is by far the tallest
      of the three, so it takes the left column on its own and the other two
      stack beside it. */
-  .werkzeuge{
+  .tools{
     display: grid !important;
     grid-template-columns: 1.2fr 1fr !important;
     gap: 6mm !important;
     align-items: start;
   }
-  .werkzeuge > :first-child{ grid-row: span 2; }
+  .tools > :first-child{ grid-row: span 2; }
 
   /* A depth reads as a measurement, like the length beside it — the input is
      only how it gets edited on screen. */
-  .abstands-tabelle input{ width: 4.5ch !important; text-align: right !important; }
-  .abstands-tabelle tbody td:last-child::after{ content: "\00a0m"; }
+  .setback-table input{ width: 4.5ch !important; text-align: right !important; }
+  .setback-table tbody td:last-child::after{ content: "\00a0m"; }
 
   /* ---------- No filled surfaces ----------
      The verdict on the last printout was that losing the background colours
      was the one good thing about it. Colour stays where it carries meaning:
      inside the drawing, and in the text of a violation. */
-  .band{ background: none !important; padding: 2pt 4pt !important; border-radius: 0; }
-  .chip{ background: none !important; padding: 0 3pt !important; border: .5pt solid var(--w2b-linie); }
-  .notiz{
+  .notice{ background: none !important; padding: 2pt 4pt !important; border-radius: 0; }
+  .chip{ background: none !important; padding: 0 3pt !important; border: .5pt solid var(--w2b-line); }
+  .callout{
     background: none;
     border: 0; border-left: 1.5pt solid #000; border-radius: 0;
     padding: 0 0 0 5pt;
     break-inside: avoid;
   }
 
-  table.liste{ font-size: 8pt; }
-  table.liste th, table.liste td{ padding: 1.3pt 4pt; }
-  table.liste thead{ display: table-header-group; }
-  table.liste tr{ break-inside: avoid; }
+  table.data-table{ font-size: 8pt; }
+  table.data-table th, table.data-table td{ padding: 1.3pt 4pt; }
+  table.data-table thead{ display: table-header-group; }
+  table.data-table tr{ break-inside: avoid; }
 
-  .wege-kartei{ grid-template-columns: repeat(2, 1fr) !important; gap: 4mm !important; }
-  .weg-karte{ break-inside: avoid; }
-  .weg-karte__skizze{ display: none !important; }   /* route sketches cost ink and say little on paper */
+  .route-grid{ grid-template-columns: repeat(2, 1fr) !important; gap: 4mm !important; }
+  .route-card{ break-inside: avoid; }
+  .route-card__sketch{ display: none !important; }   /* route sketches cost ink and say little on paper */
 
-  .kennwerte{ grid-template-columns: repeat(2, 1fr) !important; }
+  .key-figures{ grid-template-columns: repeat(2, 1fr) !important; }
 
   a{ color: inherit; text-decoration: none; }
   a[href^="http"]::after{ content: " (" attr(href) ")"; font-size: 7pt; color: #444; }
@@ -245,7 +245,7 @@
      margin boxes, which no browser implements, and `position: fixed` is not a
      substitute — Chromium places it once, on a page of its own choosing, which
      costs a sheet. A plot fits on one sheet, so once at the end is on every page. */
-  .druckfuss{
+  .print-footer{
     display: block;
     margin-top: 3mm;
     padding-top: 1.5mm;

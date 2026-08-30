@@ -15,12 +15,14 @@ Why an offline build rather than a query at request time: the public Overpass
 instances name "an app for more than just OSM mappers relying on the public
 instances as backend" as problematic behaviour in their own manual, and their
 rate limit is per IP -- ours, shared by every user of the app. A build job that
-runs on the order of once a quarter is squarely inside that policy. See
-``docs/research/poi.md`` § 2.2.
+runs on the order of once a quarter is squarely inside that policy, and so is a
+self-hosted instance. See ``docs/research/poi.md`` § 2.2.
 
 The output is a build artefact and is not committed. Without it the API answers
-the six OSM categories with "kein Datenbestand eingerichtet" and keeps serving
-stops and stations, which come from the timetable and need no extract.
+the six OSM categories with "kein Datenbestand eingerichtet", or -- when
+``OVERPASS_ENABLED`` is set, which is a single-user prototype convenience and
+not a deployment -- from a live Overpass query. Stops and stations come from the
+timetable either way and need no extract.
 """
 
 from __future__ import annotations
@@ -37,86 +39,13 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-from app.poi_index import PoiEntry, classify_school  # noqa: E402
+# The tag mapping lives in the app package, not here: the live Overpass
+# source (app/services/overpass.py) answers the same categories and must
+# read the same tags. See docs/research/poi.md § 4 for every exclusion.
+from app.poi_index import PoiEntry, categorise  # noqa: E402
 
 DEFAULT_EXTRACT_URL = "https://download.geofabrik.de/europe/germany/sachsen-latest.osm.pbf"
 DEFAULT_OUTPUT = BACKEND_DIR / "data" / "poi-sachsen.json"
-
-# The tag mapping, with the exclusions that matter. Every one of them is a
-# measured decision from docs/research/poi.md § 4, not a guess:
-#
-# * `leisure=garden` is left out although it is Saxony's most common green tag
-#   (12 583 objects): `garden:type` says `residential` 3 689, `private` 3 049
-#   and `public` 26. These are front gardens. `landuse=allotments` (7 912) is
-#   the same trap -- this is Leipzig, where the Schrebergarten was invented.
-# * `amenity=school` excludes driving, music and language schools, colleges and
-#   universities; all four are tagged `amenity=*_school` or their own value.
-# * `healthcare=doctor` is a second tag on the same node as `amenity=doctors`,
-#   not a second surgery, so only `amenity` is matched.
-# * `shop=bakery` is not a food shop for this purpose.
-INCLUDE: dict[str, tuple[tuple[str, str], ...]] = {
-    "schule": (("amenity", "school"),),
-    "kindergarten": (("amenity", "kindergarten"), ("amenity", "childcare")),
-    "park": (
-        ("leisure", "park"),
-        ("leisure", "nature_reserve"),
-        ("landuse", "recreation_ground"),
-        ("landuse", "village_green"),
-    ),
-    "spielplatz": (("leisure", "playground"),),
-    "supermarkt": (("shop", "supermarket"), ("shop", "convenience")),
-    "arzt": (("amenity", "doctors"), ("amenity", "clinic")),
-}
-
-# A playground behind a fence is not a playground the buyer's children can use.
-# `access` is the most common companion tag on Saxon playgrounds (58.7 %).
-CLOSED_ACCESS = {"private", "no", "customers", "permit"}
-
-# What `art` says for a category when the object carries nothing better.
-DEFAULT_KIND: dict[str, str] = {
-    "kindergarten": "Kindergarten",
-    "park": "Park",
-    "spielplatz": "Spielplatz",
-    "supermarkt": "Supermarkt",
-    "arzt": "Arztpraxis",
-}
-PARK_KINDS: dict[tuple[str, str], str] = {
-    ("leisure", "park"): "Park",
-    ("leisure", "nature_reserve"): "Naturschutzgebiet",
-    ("landuse", "recreation_ground"): "Grünanlage",
-    ("landuse", "village_green"): "Dorfanger",
-}
-SHOP_KINDS: dict[tuple[str, str], str] = {
-    ("shop", "supermarket"): "Supermarkt",
-    ("shop", "convenience"): "Nachbarschaftsladen",
-}
-CARE_KINDS: dict[tuple[str, str], str] = {
-    ("amenity", "doctors"): "Arztpraxis",
-    ("amenity", "clinic"): "Ambulanz",
-    ("amenity", "kindergarten"): "Kindergarten",
-    ("amenity", "childcare"): "Kindertagespflege",
-}
-
-
-def categorise(tags: dict[str, str]) -> tuple[str, str | None] | None:
-    """(category, art) for an OSM object, or ``None`` when it is not wanted."""
-
-    for kategorie, wanted in INCLUDE.items():
-        for key, value in wanted:
-            if tags.get(key) != value:
-                continue
-            if kategorie == "spielplatz" and tags.get("access") in CLOSED_ACCESS:
-                return None
-            if kategorie == "schule":
-                return kategorie, classify_school(tags.get("name")) or "Schule"
-            art = (
-                PARK_KINDS.get((key, value))
-                or SHOP_KINDS.get((key, value))
-                or CARE_KINDS.get((key, value))
-                or DEFAULT_KIND.get(kategorie)
-            )
-            return kategorie, art
-    return None
 
 
 def _entry(

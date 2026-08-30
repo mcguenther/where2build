@@ -12,92 +12,92 @@
 
 :root{
   /* ---------- Primary: Loden ---------- */
-  --w2b-primaer:            #2F4A3A;
-  --w2b-primaer-hell:       #456B52;
-  --w2b-primaer-dunkel:     #1C2E23;
-  --w2b-primaer-schleier:   rgba(47,74,58,.10);
-  --w2b-primaer-auf:        #F7F4EE;   /* text on a Loden surface */
+  --w2b-primary:            #2F4A3A;
+  --w2b-primary-light:       #456B52;
+  --w2b-primary-dark:     #1C2E23;
+  --w2b-primary-veil:   rgba(47,74,58,.10);
+  --w2b-primary-on:        #F7F4EE;   /* text on a Loden surface */
 
   /* ---------- Secondary: brass ---------- */
-  --w2b-sekundaer:          #B5813C;   /* areas and graphics only — 2.9 on paper */
-  --w2b-sekundaer-text:     #7C5620;   /* same hue, safe for text */
-  --w2b-sekundaer-hell:     #E8D4B0;
-  --w2b-sekundaer-schleier: rgba(181,129,60,.16);
+  --w2b-secondary:          #B5813C;   /* areas and graphics only — 2.9 on paper */
+  --w2b-secondary-text:     #7C5620;   /* same hue, safe for text */
+  --w2b-secondary-light:     #E8D4B0;
+  --w2b-secondary-veil: rgba(181,129,60,.16);
 
   /* ---------- Support: sage ---------- */
-  --w2b-salbei:             #9DB39A;
-  --w2b-salbei-hell:        #DCE4DA;
+  --w2b-sage:             #9DB39A;
+  --w2b-sage-light:        #DCE4DA;
 
   /* ---------- Neutrals, all warm ---------- */
-  --w2b-tinte:              #1E1A16;
-  --w2b-graphit:            #4A443C;
-  --w2b-gedaempft:          #6F675C;
-  --w2b-linie:              #DCD3C6;
-  --w2b-linie-zart:         #EBE4D9;
-  --w2b-flaeche:            #FAF7F1;
-  --w2b-flaeche-tief:       #F3EFE6;   /* inputs, sunken rows */
-  --w2b-papier:             #F1EBE1;
-  --w2b-weiss:              #FFFFFF;
+  --w2b-ink:              #1E1A16;
+  --w2b-graphite:            #4A443C;
+  --w2b-muted:          #6F675C;
+  --w2b-line:              #DCD3C6;
+  --w2b-line-faint:         #EBE4D9;
+  --w2b-surface:            #FAF7F1;
+  --w2b-surface-sunken:       #F3EFE6;   /* inputs, sunken rows */
+  --w2b-paper:             #F1EBE1;
+  --w2b-white:              #FFFFFF;
 
   /* ---------- Signals ---------- */
-  --w2b-warnung:            #BE8524;
-  --w2b-warnung-text:       #7C5620;
-  --w2b-warnung-flaeche:    #F6E9CE;
-  --w2b-fehler:             #A8402C;
-  --w2b-fehler-flaeche:     #F2DED8;
-  --w2b-gut:                #2F4A3A;
-  --w2b-gut-flaeche:        #DEE7DF;
+  --w2b-warning:            #BE8524;
+  --w2b-warning-text:       #7C5620;
+  --w2b-warning-surface:    #F6E9CE;
+  --w2b-error:             #A8402C;
+  --w2b-error-surface:     #F2DED8;
+  --w2b-good:                #2F4A3A;
+  --w2b-good-surface:        #DEE7DF;
 
   /* ---------- Map layers ----------
      The map stays neutral, not cream: warm ground competes with orthophotos
      and cadastral rendering. Warm belongs to the interface around it. */
-  --w2b-karte-grund:         #E6E3DC;
-  --w2b-karte-flaeche:       #EFEDE7;   /* the parcel itself */
-  --w2b-karte-grenze:        #1E1A16;
-  --w2b-karte-halo:          #FFFFFF;
-  --w2b-karte-fenster:       #2F4A3A;
-  --w2b-karte-saum:          rgba(47,74,58,.17);  /* the strip that may NOT be built on */
-  --w2b-karte-entwurf:       #B5813C;
-  --w2b-karte-entwurf-rand:  #7C5620;
-  --w2b-karte-bestand:       #4A443C;
-  --w2b-karte-nachbar:       #9A9184;
-  --w2b-karte-strasse:       #B5813C;
-  --w2b-karte-strasse-flaeche:#D6D2CA;
-  --w2b-karte-verstoss:      #A8402C;
-  --w2b-karte-auswahl:       #456B52;
-  --w2b-karte-gruen:         #DCE4DA;
+  --w2b-map-ground:         #E6E3DC;
+  --w2b-map-surface:       #EFEDE7;   /* the parcel itself */
+  --w2b-map-boundary:        #1E1A16;
+  --w2b-map-halo:          #FFFFFF;
+  --w2b-map-envelope:       #2F4A3A;
+  --w2b-map-setback:          rgba(47,74,58,.17);  /* the strip that may NOT be built on */
+  --w2b-map-design:       #B5813C;
+  --w2b-map-design-edge:  #7C5620;
+  --w2b-map-existing:       #4A443C;
+  --w2b-map-neighbour:       #9A9184;
+  --w2b-map-street:       #B5813C;
+  --w2b-map-street-surface:#D6D2CA;
+  --w2b-map-violation:      #A8402C;
+  --w2b-map-selection:       #456B52;
+  --w2b-map-green:         #DCE4DA;
 
   /* ---------- Corner radii: one per order of magnitude ---------- */
   --w2b-radius-xs:   5px;
   --w2b-radius-s:    8px;
   --w2b-radius-m:   12px;
   --w2b-radius-l:   18px;
-  --w2b-radius-voll: 999px;
+  --w2b-radius-full: 999px;
 
   /* ---------- Spacing ---------- */
-  --w2b-raum-1:  4px;
-  --w2b-raum-2:  8px;
-  --w2b-raum-3: 12px;
-  --w2b-raum-4: 16px;
-  --w2b-raum-5: 24px;
-  --w2b-raum-6: 32px;
-  --w2b-raum-7: 48px;
-  --w2b-raum-8: 72px;
+  --w2b-space-1:  4px;
+  --w2b-space-2:  8px;
+  --w2b-space-3: 12px;
+  --w2b-space-4: 16px;
+  --w2b-space-5: 24px;
+  --w2b-space-6: 32px;
+  --w2b-space-7: 48px;
+  --w2b-space-8: 72px;
 
   /* ---------- Type ---------- */
-  --w2b-anzeige: "Archivo", system-ui, -apple-system, sans-serif;
-  --w2b-text:    "Public Sans", system-ui, -apple-system, sans-serif;
-  --w2b-daten:   "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --w2b-font-display: "Archivo", system-ui, -apple-system, sans-serif;
+  --w2b-font-body:    "Public Sans", system-ui, -apple-system, sans-serif;
+  --w2b-font-mono:   "IBM Plex Mono", ui-monospace, Menlo, monospace;
 
-  --w2b-schrift-xs:  11.5px;
-  --w2b-schrift-s:   13px;
-  --w2b-schrift-m:   15px;
-  --w2b-schrift-l:   17px;
-  --w2b-schrift-xl:  21px;
+  --w2b-text-xs:  11.5px;
+  --w2b-text-s:   13px;
+  --w2b-text-m:   15px;
+  --w2b-text-l:   17px;
+  --w2b-text-xl:  21px;
 
   /* ---------- Elevation: only for things that really float ---------- */
-  --w2b-schatten:      0 1px 2px rgba(30,26,22,.05), 0 10px 24px -18px rgba(30,26,22,.45);
-  --w2b-schatten-hoch: 0 2px 6px rgba(30,26,22,.10), 0 24px 48px -24px rgba(30,26,22,.55);
+  --w2b-shadow:      0 1px 2px rgba(30,26,22,.05), 0 10px 24px -18px rgba(30,26,22,.45);
+  --w2b-shadow-high: 0 2px 6px rgba(30,26,22,.10), 0 24px 48px -24px rgba(30,26,22,.55);
 
   color-scheme: light;
 }
@@ -108,112 +108,112 @@
  * `[data-theme="dark"]` so the toggle wins in both directions. */
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --w2b-primaer:            #7FA98A;
-    --w2b-primaer-hell:       #9BC0A4;
-    --w2b-primaer-dunkel:     #24382C;
-    --w2b-primaer-schleier:   rgba(127,169,138,.14);
-    --w2b-primaer-auf:        #12211A;
+    --w2b-primary:            #7FA98A;
+    --w2b-primary-light:       #9BC0A4;
+    --w2b-primary-dark:     #24382C;
+    --w2b-primary-veil:   rgba(127,169,138,.14);
+    --w2b-primary-on:        #12211A;
 
-    --w2b-sekundaer:          #D9A55E;
-    --w2b-sekundaer-text:     #DBB273;
-    --w2b-sekundaer-hell:     #3E3021;
-    --w2b-sekundaer-schleier: rgba(217,165,94,.18);
+    --w2b-secondary:          #D9A55E;
+    --w2b-secondary-text:     #DBB273;
+    --w2b-secondary-light:     #3E3021;
+    --w2b-secondary-veil: rgba(217,165,94,.18);
 
-    --w2b-salbei:             #6E8470;
-    --w2b-salbei-hell:        #26302A;
+    --w2b-sage:             #6E8470;
+    --w2b-sage-light:        #26302A;
 
-    --w2b-tinte:              #F1EBE1;
-    --w2b-graphit:            #C4BCB0;
-    --w2b-gedaempft:          #948B7E;
-    --w2b-linie:              #3A342C;
-    --w2b-linie-zart:         #2A2620;
-    --w2b-flaeche:            #201C17;
-    --w2b-flaeche-tief:       #191510;
-    --w2b-papier:             #16130F;
-    --w2b-weiss:              #FFFFFF;
+    --w2b-ink:              #F1EBE1;
+    --w2b-graphite:            #C4BCB0;
+    --w2b-muted:          #948B7E;
+    --w2b-line:              #3A342C;
+    --w2b-line-faint:         #2A2620;
+    --w2b-surface:            #201C17;
+    --w2b-surface-sunken:       #191510;
+    --w2b-paper:             #16130F;
+    --w2b-white:              #FFFFFF;
 
-    --w2b-warnung:            #D8A340;
-    --w2b-warnung-text:       #E3BC72;
-    --w2b-warnung-flaeche:    #3A2E19;
-    --w2b-fehler:             #E0705A;
-    --w2b-fehler-flaeche:     #3B211B;
-    --w2b-gut:                #7FA98A;
-    --w2b-gut-flaeche:        #1F2C24;
+    --w2b-warning:            #D8A340;
+    --w2b-warning-text:       #E3BC72;
+    --w2b-warning-surface:    #3A2E19;
+    --w2b-error:             #E0705A;
+    --w2b-error-surface:     #3B211B;
+    --w2b-good:                #7FA98A;
+    --w2b-good-surface:        #1F2C24;
 
-    --w2b-karte-grund:         #1A1917;
-    --w2b-karte-flaeche:       #23211D;
-    --w2b-karte-grenze:        #F1EBE1;
-    --w2b-karte-halo:          #16130F;
-    --w2b-karte-fenster:       #7FA98A;
-    --w2b-karte-saum:          rgba(127,169,138,.34);
-    --w2b-karte-entwurf:       #D9A55E;
-    --w2b-karte-entwurf-rand:  #F0C688;
-    --w2b-karte-bestand:       #6B6459;
-    --w2b-karte-nachbar:       #5A544B;
-    --w2b-karte-strasse:       #8A6A3A;
-    --w2b-karte-strasse-flaeche:#242220;
-    --w2b-karte-verstoss:      #E0705A;
-    --w2b-karte-auswahl:       #9BC0A4;
-    --w2b-karte-gruen:         #26302A;
+    --w2b-map-ground:         #1A1917;
+    --w2b-map-surface:       #23211D;
+    --w2b-map-boundary:        #F1EBE1;
+    --w2b-map-halo:          #16130F;
+    --w2b-map-envelope:       #7FA98A;
+    --w2b-map-setback:          rgba(127,169,138,.34);
+    --w2b-map-design:       #D9A55E;
+    --w2b-map-design-edge:  #F0C688;
+    --w2b-map-existing:       #6B6459;
+    --w2b-map-neighbour:       #5A544B;
+    --w2b-map-street:       #8A6A3A;
+    --w2b-map-street-surface:#242220;
+    --w2b-map-violation:      #E0705A;
+    --w2b-map-selection:       #9BC0A4;
+    --w2b-map-green:         #26302A;
 
-    --w2b-schatten:      0 1px 2px rgba(0,0,0,.5), 0 12px 28px -20px rgba(0,0,0,.85);
-    --w2b-schatten-hoch: 0 2px 8px rgba(0,0,0,.6), 0 28px 56px -26px rgba(0,0,0,.95);
+    --w2b-shadow:      0 1px 2px rgba(0,0,0,.5), 0 12px 28px -20px rgba(0,0,0,.85);
+    --w2b-shadow-high: 0 2px 8px rgba(0,0,0,.6), 0 28px 56px -26px rgba(0,0,0,.95);
 
     color-scheme: dark;
   }
 }
 
 :root[data-theme="dark"]{
-  --w2b-primaer:            #7FA98A;
-  --w2b-primaer-hell:       #9BC0A4;
-  --w2b-primaer-dunkel:     #24382C;
-  --w2b-primaer-schleier:   rgba(127,169,138,.14);
-  --w2b-primaer-auf:        #12211A;
+  --w2b-primary:            #7FA98A;
+  --w2b-primary-light:       #9BC0A4;
+  --w2b-primary-dark:     #24382C;
+  --w2b-primary-veil:   rgba(127,169,138,.14);
+  --w2b-primary-on:        #12211A;
 
-  --w2b-sekundaer:          #D9A55E;
-  --w2b-sekundaer-text:     #DBB273;
-  --w2b-sekundaer-hell:     #3E3021;
-  --w2b-sekundaer-schleier: rgba(217,165,94,.18);
+  --w2b-secondary:          #D9A55E;
+  --w2b-secondary-text:     #DBB273;
+  --w2b-secondary-light:     #3E3021;
+  --w2b-secondary-veil: rgba(217,165,94,.18);
 
-  --w2b-salbei:             #6E8470;
-  --w2b-salbei-hell:        #26302A;
+  --w2b-sage:             #6E8470;
+  --w2b-sage-light:        #26302A;
 
-  --w2b-tinte:              #F1EBE1;
-  --w2b-graphit:            #C4BCB0;
-  --w2b-gedaempft:          #948B7E;
-  --w2b-linie:              #3A342C;
-  --w2b-linie-zart:         #2A2620;
-  --w2b-flaeche:            #201C17;
-  --w2b-flaeche-tief:       #191510;
-  --w2b-papier:             #16130F;
-  --w2b-weiss:              #FFFFFF;
+  --w2b-ink:              #F1EBE1;
+  --w2b-graphite:            #C4BCB0;
+  --w2b-muted:          #948B7E;
+  --w2b-line:              #3A342C;
+  --w2b-line-faint:         #2A2620;
+  --w2b-surface:            #201C17;
+  --w2b-surface-sunken:       #191510;
+  --w2b-paper:             #16130F;
+  --w2b-white:              #FFFFFF;
 
-  --w2b-warnung:            #D8A340;
-  --w2b-warnung-text:       #E3BC72;
-  --w2b-warnung-flaeche:    #3A2E19;
-  --w2b-fehler:             #E0705A;
-  --w2b-fehler-flaeche:     #3B211B;
-  --w2b-gut:                #7FA98A;
-  --w2b-gut-flaeche:        #1F2C24;
+  --w2b-warning:            #D8A340;
+  --w2b-warning-text:       #E3BC72;
+  --w2b-warning-surface:    #3A2E19;
+  --w2b-error:             #E0705A;
+  --w2b-error-surface:     #3B211B;
+  --w2b-good:                #7FA98A;
+  --w2b-good-surface:        #1F2C24;
 
-  --w2b-karte-grund:         #1A1917;
-  --w2b-karte-flaeche:       #23211D;
-  --w2b-karte-grenze:        #F1EBE1;
-  --w2b-karte-halo:          #16130F;
-  --w2b-karte-fenster:       #7FA98A;
-  --w2b-karte-saum:          rgba(127,169,138,.34);
-  --w2b-karte-entwurf:       #D9A55E;
-  --w2b-karte-entwurf-rand:  #F0C688;
-  --w2b-karte-bestand:       #6B6459;
-  --w2b-karte-nachbar:       #5A544B;
-  --w2b-karte-strasse:       #8A6A3A;
-  --w2b-karte-strasse-flaeche:#242220;
-  --w2b-karte-verstoss:      #E0705A;
-  --w2b-karte-auswahl:       #9BC0A4;
-  --w2b-karte-gruen:         #26302A;
+  --w2b-map-ground:         #1A1917;
+  --w2b-map-surface:       #23211D;
+  --w2b-map-boundary:        #F1EBE1;
+  --w2b-map-halo:          #16130F;
+  --w2b-map-envelope:       #7FA98A;
+  --w2b-map-setback:          rgba(127,169,138,.34);
+  --w2b-map-design:       #D9A55E;
+  --w2b-map-design-edge:  #F0C688;
+  --w2b-map-existing:       #6B6459;
+  --w2b-map-neighbour:       #5A544B;
+  --w2b-map-street:       #8A6A3A;
+  --w2b-map-street-surface:#242220;
+  --w2b-map-violation:      #E0705A;
+  --w2b-map-selection:       #9BC0A4;
+  --w2b-map-green:         #26302A;
 
-  --w2b-schatten:      0 1px 2px rgba(0,0,0,.5), 0 12px 28px -20px rgba(0,0,0,.85);
-  --w2b-schatten-hoch: 0 2px 8px rgba(0,0,0,.6), 0 28px 56px -26px rgba(0,0,0,.95);
+  --w2b-shadow:      0 1px 2px rgba(0,0,0,.5), 0 12px 28px -20px rgba(0,0,0,.85);
+  --w2b-shadow-high: 0 2px 8px rgba(0,0,0,.6), 0 28px 56px -26px rgba(0,0,0,.95);
 
   color-scheme: dark;
 }

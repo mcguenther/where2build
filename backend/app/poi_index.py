@@ -11,10 +11,12 @@ Two decisions are worth stating, both from ``docs/research/poi.md``:
   answer, not an error -- a caller has to be able to tell "this server holds no
   such data" from "nothing within the search radius". An empty list would read
   as the second when it is the first.
-* The public Overpass instances are **not** an alternative at request time.
-  Their manual names "an app for more than just OSM mappers relying on the
-  public instances as backend" as problematic behaviour, and the rate limit is
-  per IP -- ours, shared by every user.
+* A live Overpass query is the **prototype** alternative when the extract is
+  absent (``services/overpass.py``, off unless ``OVERPASS_ENABLED``). It is not
+  the production answer: the Overpass manual names "an app for more than just
+  OSM mappers relying on the public instances as backend" as problematic and
+  asks for a self-hosted instance. Both sources share the tag mapping below, so
+  the two cannot drift apart.
 """
 
 from __future__ import annotations
@@ -41,10 +43,12 @@ _EARTH_RADIUS_M = 6_371_008.8
 # twice: OSM maps a school as the named node *and* as the way of its grounds.
 DEDUPE_RADIUS_M = 60.0
 
-# No OSM tag tells a Grundschule from a Gymnasium in Saxony -- `school:DE` does
-# not exist here at all and `isced:level` covers under a fifth of the objects,
-# in two incompatible spellings. The type is in the name, every time, so that is
-# what is read. The result is a hint shown next to the name, never a fact.
+# Almost no OSM tag tells a Grundschule from a Gymnasium in Saxony --
+# `school:DE` does not exist here at all and `isced:level` covers under a fifth
+# of the objects, in two incompatible spellings. `grades` is read first where it
+# is present (see `classify_school_grades`); otherwise the type is in the name,
+# and that is what is matched here. Either way the result is a hint shown next
+# to the name, never a fact.
 _SCHOOL_KINDS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"grundschule", re.I), "Grundschule"),
     (re.compile(r"oberschule|mittelschule", re.I), "Oberschule"),
@@ -65,6 +69,118 @@ def classify_school(name: str | None) -> str | None:
     for pattern, label in _SCHOOL_KINDS:
         if pattern.search(name):
             return label
+    return None
+
+
+def classify_school_grades(grades: str | None) -> str | None:
+    """The school type from an OSM ``grades`` range, or ``None``.
+
+    Saxony: Grundschule 1-4, Oberschule 5-10, Gymnasium 5-12. The tag is on only
+    370 objects statewide, but where it is it beats the name -- "Umweltschule
+    der Stadt Leipzig" carries ``grades=1-4`` and a name that says nothing.
+
+    Deliberately narrow. A single number ("9" occurs) is not a range and is not
+    classified; neither is a span that starts in primary and runs past it, which
+    is a campus or a Gemeinschaftsschule rather than one of the three types.
+    """
+
+    numbers = {int(part) for part in re.findall(r"\d+", grades or "") if 1 <= int(part) <= 13}
+    if len(numbers) < 2:
+        return None
+    first, last = min(numbers), max(numbers)
+    if last <= 4:
+        return "Grundschule"
+    if first >= 5 and last <= 10:
+        return "Oberschule"
+    if first >= 5 and last >= 11:
+        return "Gymnasium"
+    return None
+
+
+# --------------------------------------------------------------------------
+# The OSM tag mapping
+# --------------------------------------------------------------------------
+# Shared by the offline build (``scripts/build_poi_index.py``) and the live
+# Overpass query (``app/services/overpass.py``): two sources answering the same
+# categories from different tags would be a bug waiting to happen.
+#
+# Every exclusion is a measured decision from docs/research/poi.md § 4:
+#
+# * `leisure=garden` is left out although it is Saxony's most common green tag
+#   (12 583 objects): `garden:type` says `residential` 3 689, `private` 3 049
+#   and `public` 26. These are front gardens. `landuse=allotments` (7 912) is
+#   the same trap -- this is Leipzig, where the Schrebergarten was invented.
+# * `amenity=school` excludes driving, music and language schools, colleges and
+#   universities; all four are tagged `amenity=*_school` or their own value.
+# * `healthcare=doctor` is a second tag on the same node as `amenity=doctors`,
+#   not a second surgery, so only `amenity` is matched.
+# * `shop=bakery` is not a food shop for this purpose.
+INCLUDE: dict[str, tuple[tuple[str, str], ...]] = {
+    "schule": (("amenity", "school"),),
+    "kindergarten": (("amenity", "kindergarten"), ("amenity", "childcare")),
+    "park": (
+        ("leisure", "park"),
+        ("leisure", "nature_reserve"),
+        ("landuse", "recreation_ground"),
+        ("landuse", "village_green"),
+    ),
+    "spielplatz": (("leisure", "playground"),),
+    "supermarkt": (("shop", "supermarket"), ("shop", "convenience")),
+    "arzt": (("amenity", "doctors"), ("amenity", "clinic")),
+}
+
+# A playground behind a fence is not a playground the buyer's children can use.
+# `access` is the most common companion tag on Saxon playgrounds (58.7 %).
+CLOSED_ACCESS = {"private", "no", "customers", "permit"}
+
+# What `art` says for a category when the object carries nothing better.
+DEFAULT_KIND: dict[str, str] = {
+    "kindergarten": "Kindergarten",
+    "park": "Park",
+    "spielplatz": "Spielplatz",
+    "supermarkt": "Supermarkt",
+    "arzt": "Arztpraxis",
+}
+PARK_KINDS: dict[tuple[str, str], str] = {
+    ("leisure", "park"): "Park",
+    ("leisure", "nature_reserve"): "Naturschutzgebiet",
+    ("landuse", "recreation_ground"): "Grünanlage",
+    ("landuse", "village_green"): "Dorfanger",
+}
+SHOP_KINDS: dict[tuple[str, str], str] = {
+    ("shop", "supermarket"): "Supermarkt",
+    ("shop", "convenience"): "Nachbarschaftsladen",
+}
+CARE_KINDS: dict[tuple[str, str], str] = {
+    ("amenity", "doctors"): "Arztpraxis",
+    ("amenity", "clinic"): "Ambulanz",
+    ("amenity", "kindergarten"): "Kindergarten",
+    ("amenity", "childcare"): "Kindertagespflege",
+}
+
+
+def categorise(tags: dict[str, str]) -> tuple[str, str | None] | None:
+    """(category, art) for an OSM object, or ``None`` when it is not wanted."""
+
+    for kategorie, wanted in INCLUDE.items():
+        for key, value in wanted:
+            if tags.get(key) != value:
+                continue
+            if kategorie == "spielplatz" and tags.get("access") in CLOSED_ACCESS:
+                return None
+            if kategorie == "schule":
+                return kategorie, (
+                    classify_school_grades(tags.get("grades"))
+                    or classify_school(tags.get("name"))
+                    or "Schule"
+                )
+            art = (
+                PARK_KINDS.get((key, value))
+                or SHOP_KINDS.get((key, value))
+                or CARE_KINDS.get((key, value))
+                or DEFAULT_KIND.get(kategorie)
+            )
+            return kategorie, art
     return None
 
 

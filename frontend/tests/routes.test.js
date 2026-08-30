@@ -132,9 +132,9 @@ describe("Wegekarten mit echten Daten", () => {
     // A 292 px card has no room for the service's full sentence; it wrapped to
     // four lines and pushed the times out of view. The long form lives in the
     // title attribute instead, so nothing is lost.
-    const notes = w.findAll(".weg-karte__notiz").map(n => n.text());
+    const notes = w.findAll(".route-card__note").map(n => n.text());
     notes.forEach(n => expect(n.length).toBeLessThan(28));
-    const long = w.findAll(".weg-karte__notiz").map(n => n.attributes("title")).filter(Boolean);
+    const long = w.findAll(".route-card__note").map(n => n.attributes("title")).filter(Boolean);
     expect(long.some(t => t.includes("keine Verbindung gefunden"))).toBe(true);
   });
 

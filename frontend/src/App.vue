@@ -1,28 +1,28 @@
 <template>
-  <div class="huelle">
-    <header class="kopfleiste nicht-drucken">
-      <div class="bahn kopfleiste__inhalt">
-        <button type="button" class="marke" @click="goTo('plots')" aria-label="Zur Übersicht">
+  <div class="shell">
+    <header class="site-header no-print">
+      <div class="container site-header__inner">
+        <button type="button" class="brand" @click="goTo('plots')" aria-label="Zur Übersicht">
           <svg viewBox="0 0 48 48" width="30" height="30" aria-hidden="true">
             <rect x="5.5" y="5.5" width="37" height="37" rx="3.5" fill="none"
-                  stroke="var(--w2b-primaer)" stroke-width="3" />
+                  stroke="var(--w2b-primary)" stroke-width="3" />
             <rect x="14.5" y="14.5" width="19" height="19" rx="2"
-                  fill="var(--w2b-sekundaer)" transform="rotate(15 24 24)" />
+                  fill="var(--w2b-secondary)" transform="rotate(15 24 24)" />
           </svg>
-          <span class="marke__wort">where<b>2</b>build</span>
+          <span class="brand__word">where<b>2</b>build</span>
         </button>
 
-        <nav class="orte" aria-label="Bereiche">
+        <nav class="main-nav" aria-label="Bereiche">
           <button v-for="s in sections" :key="s.id" type="button"
                   :aria-current="isCurrent(s.id) ? 'page' : null"
                   @click="goTo(s.id)">
-            {{ s.name }}<span v-if="s.count !== null" class="orte__zahl">{{ s.count }}</span>
+            {{ s.name }}<span v-if="s.count !== null" class="main-nav__count">{{ s.count }}</span>
           </button>
         </nav>
 
-        <div class="dehnen"></div>
+        <div class="spacer"></div>
 
-        <div class="darstellung" role="group" aria-label="Darstellung">
+        <div class="theme-switch" role="group" aria-label="Darstellung">
           <button v-for="t in themes" :key="t.id" type="button"
                   :aria-pressed="String(state.theme === t.id)"
                   @click="applyTheme(t.id)">{{ t.name }}</button>
@@ -30,7 +30,7 @@
       </div>
     </header>
 
-    <main class="bahn">
+    <main class="container">
       <PlotsView        v-if="state.view === 'plots'" />
       <WizardView       v-else-if="state.view === 'wizard'" />
       <PlotView         v-else-if="state.view === 'plot'" />
@@ -40,14 +40,14 @@
       <DataView         v-else-if="state.view === 'data'" />
     </main>
 
-    <footer class="fussleiste nicht-drucken">
-      <div class="bahn fussleiste__inhalt">
+    <footer class="site-footer no-print">
+      <div class="container site-footer__inner">
         <span>Amtliche Daten: © GeoSN, dl-de/by-2-0 · Bodenrichtwerte vom Gutachterausschuss</span>
         <span>Keine bauordnungsrechtliche Prüfung · keine Rechtsberatung</span>
       </div>
     </footer>
 
-    <p class="druckfuss nur-drucken">
+    <p class="print-footer print-only">
       where2build · Amtliche Daten © GeoSN, dl-de/by-2-0 ·
       Keine bauordnungsrechtliche Prüfung, keine Rechtsberatung.
     </p>
@@ -104,62 +104,62 @@ export default {
 </script>
 
 <style scoped>
-.huelle{ min-height: 100vh; display: flex; flex-direction: column; }
-main{ flex: 1; padding-top: var(--w2b-raum-5); }
+.shell{ min-height: 100vh; display: flex; flex-direction: column; }
+main{ flex: 1; padding-top: var(--w2b-space-5); }
 
-.kopfleiste{ background: var(--w2b-flaeche); border-bottom: 1px solid var(--w2b-linie); }
-.kopfleiste__inhalt{
-  display: flex; align-items: center; gap: var(--w2b-raum-4) var(--w2b-raum-5);
-  flex-wrap: wrap; padding-top: var(--w2b-raum-3); padding-bottom: var(--w2b-raum-3);
+.site-header{ background: var(--w2b-surface); border-bottom: 1px solid var(--w2b-line); }
+.site-header__inner{
+  display: flex; align-items: center; gap: var(--w2b-space-4) var(--w2b-space-5);
+  flex-wrap: wrap; padding-top: var(--w2b-space-3); padding-bottom: var(--w2b-space-3);
 }
 
-.marke{
+.brand{
   display: flex; align-items: center; gap: 10px;
   background: none; border: 0; padding: 0; cursor: pointer;
 }
-.marke__wort{
-  font-family: var(--w2b-anzeige); font-weight: 700; font-size: 21px;
-  letter-spacing: -.035em; color: var(--w2b-tinte);
+.brand__word{
+  font-family: var(--w2b-font-display); font-weight: 700; font-size: 21px;
+  letter-spacing: -.035em; color: var(--w2b-ink);
 }
-.marke__wort b{ color: var(--w2b-sekundaer-text); }
+.brand__word b{ color: var(--w2b-secondary-text); }
 
-.orte{ display: flex; gap: var(--w2b-raum-1); flex-wrap: wrap; min-width: 0; }
-.orte button{
+.main-nav{ display: flex; gap: var(--w2b-space-1); flex-wrap: wrap; min-width: 0; }
+.main-nav button{
   display: flex; align-items: center; gap: 7px;
   background: none; border: 0; cursor: pointer;
   padding: 7px 13px; border-radius: var(--w2b-radius-s);
-  font-family: var(--w2b-anzeige); font-weight: 600; font-size: 14.5px;
-  color: var(--w2b-graphit);
+  font-family: var(--w2b-font-display); font-weight: 600; font-size: 14.5px;
+  color: var(--w2b-graphite);
 }
-.orte button:hover{ background: var(--w2b-primaer-schleier); color: var(--w2b-tinte); }
-.orte button[aria-current="page"]{ background: var(--w2b-primaer); color: var(--w2b-primaer-auf); }
-.orte__zahl{
-  font-family: var(--w2b-daten); font-size: 10.5px; font-variant-numeric: tabular-nums;
-  padding: 0 5px; border-radius: var(--w2b-radius-voll);
-  background: var(--w2b-linie-zart); color: var(--w2b-gedaempft);
+.main-nav button:hover{ background: var(--w2b-primary-veil); color: var(--w2b-ink); }
+.main-nav button[aria-current="page"]{ background: var(--w2b-primary); color: var(--w2b-primary-on); }
+.main-nav__count{
+  font-family: var(--w2b-font-mono); font-size: 10.5px; font-variant-numeric: tabular-nums;
+  padding: 0 5px; border-radius: var(--w2b-radius-full);
+  background: var(--w2b-line-faint); color: var(--w2b-muted);
 }
-.orte button[aria-current="page"] .orte__zahl{
-  background: rgba(255,255,255,.18); color: var(--w2b-primaer-auf);
+.main-nav button[aria-current="page"] .main-nav__count{
+  background: rgba(255,255,255,.18); color: var(--w2b-primary-on);
 }
 
-.darstellung{ display: flex; border: 1px solid var(--w2b-linie); border-radius: var(--w2b-radius-s); overflow: hidden; }
-.darstellung button{
-  background: var(--w2b-flaeche); border: 0; cursor: pointer; padding: 6px 11px;
-  font-family: var(--w2b-anzeige); font-weight: 600; font-size: var(--w2b-schrift-xs);
-  color: var(--w2b-gedaempft);
+.theme-switch{ display: flex; border: 1px solid var(--w2b-line); border-radius: var(--w2b-radius-s); overflow: hidden; }
+.theme-switch button{
+  background: var(--w2b-surface); border: 0; cursor: pointer; padding: 6px 11px;
+  font-family: var(--w2b-font-display); font-weight: 600; font-size: var(--w2b-text-xs);
+  color: var(--w2b-muted);
 }
-.darstellung button + button{ border-left: 1px solid var(--w2b-linie); }
-.darstellung button[aria-pressed="true"]{ background: var(--w2b-primaer); color: var(--w2b-primaer-auf); }
+.theme-switch button + button{ border-left: 1px solid var(--w2b-line); }
+.theme-switch button[aria-pressed="true"]{ background: var(--w2b-primary); color: var(--w2b-primary-on); }
 
-.fussleiste{ border-top: 1px solid var(--w2b-linie); margin-top: var(--w2b-raum-8); }
-.fussleiste__inhalt{
-  display: flex; justify-content: space-between; gap: var(--w2b-raum-4); flex-wrap: wrap;
-  padding-top: var(--w2b-raum-4); padding-bottom: var(--w2b-raum-4);
-  font-size: var(--w2b-schrift-xs); color: var(--w2b-gedaempft);
+.site-footer{ border-top: 1px solid var(--w2b-line); margin-top: var(--w2b-space-8); }
+.site-footer__inner{
+  display: flex; justify-content: space-between; gap: var(--w2b-space-4); flex-wrap: wrap;
+  padding-top: var(--w2b-space-4); padding-bottom: var(--w2b-space-4);
+  font-size: var(--w2b-text-xs); color: var(--w2b-muted);
 }
 
 @media (max-width: 560px){
-  .marke__wort{ font-size: 18px; }
-  .orte button{ padding: 6px 10px; font-size: 13.5px; }
+  .brand__word{ font-size: 18px; }
+  .main-nav button{ padding: 6px 10px; font-size: 13.5px; }
 }
 </style>

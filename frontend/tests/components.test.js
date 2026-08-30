@@ -43,7 +43,7 @@ describe("Lageplan", () => {
     const w = build();
     const ring = w.find("path[fill-rule='evenodd']");
     expect(ring.exists()).toBe(true);
-    expect(ring.attributes("fill")).toBe("var(--w2b-karte-saum)");
+    expect(ring.attributes("fill")).toBe("var(--w2b-map-setback)");
     expect(ring.attributes("d").match(/M/g)).toHaveLength(2);
     expect(w.find("polygon[stroke-dasharray='6 4']").attributes("fill")).toBe("none");
   });
@@ -72,24 +72,24 @@ describe("Lageplan", () => {
     const fitting = findPlacement(envelope, 11.44, 8.47);
     expect(fitting).not.toBeNull();
     const inside = build({ building: { ...fitting, width: 11.44, depth: 8.47 } });
-    expect(inside.find("[data-haus] polygon").attributes("stroke")).toBe("var(--w2b-karte-entwurf-rand)");
+    expect(inside.find("[data-house] polygon").attributes("stroke")).toBe("var(--w2b-map-design-edge)");
     const huge = { ...placement(plot()), width: 200, depth: 200 };
     const outside = build({ building: huge });
-    expect(outside.find("[data-haus] polygon").attributes("stroke")).toBe("var(--w2b-karte-verstoss)");
-    expect(outside.findAll("[data-haus] circle").length).toBeGreaterThan(0);
+    expect(outside.find("[data-house] polygon").attributes("stroke")).toBe("var(--w2b-map-violation)");
+    expect(outside.findAll("[data-house] circle").length).toBeGreaterThan(0);
   });
 
   it("meldet Verschiebungen per Pfeiltaste, grob und fein", async () => {
     const w = build({ interactive: true });
-    await w.find("[data-haus]").trigger("keydown", { key: "ArrowUp" });
+    await w.find("[data-house]").trigger("keydown", { key: "ArrowUp" });
     expect(w.emitted("move")[0][0].cy).toBeCloseTo(placement(plot()).cy + 0.25, 6);
-    await w.find("[data-haus]").trigger("keydown", { key: "ArrowRight", shiftKey: true });
+    await w.find("[data-house]").trigger("keydown", { key: "ArrowRight", shiftKey: true });
     expect(w.emitted("move")[1][0].cx).toBeCloseTo(placement(plot()).cx + 1, 6);
   });
 
   it("ist ohne interaktiv nicht bedienbar", async () => {
     const w = build();
-    await w.find("[data-haus]").trigger("keydown", { key: "ArrowUp" });
+    await w.find("[data-house]").trigger("keydown", { key: "ArrowUp" });
     expect(w.emitted("move")).toBeUndefined();
   });
 });
@@ -154,11 +154,11 @@ describe("Grundstückskarte", () => {
 
   it("meldet Öffnen, Entfernen und Auswahl", async () => {
     const w = mount(PlotCard, { props: { plot: plot(), selected: false } });
-    await w.find(".karte__riss").trigger("click");
+    await w.find(".plot-card__plan").trigger("click");
     expect(w.emitted("open")).toBeTruthy();
-    await w.findAll(".karte__fuss button")[1].trigger("click");
+    await w.findAll(".plot-card__foot button")[1].trigger("click");
     expect(w.emitted("remove")).toBeTruthy();
-    await w.find(".karte__wahl input").setValue(true);
+    await w.find(".plot-card__select input").setValue(true);
     expect(w.emitted("select")[0]).toEqual([true]);
   });
 });
@@ -206,7 +206,7 @@ describe("Kartenhintergrund", () => {
     // the comparison must not each start one.
     const w = mount(SitePlan, { props: { plot: plot(), building: placement(plot()) } });
     expect(w.props("backdrop")).toBe("none");
-    expect(w.find(".lageplan__karte").exists()).toBe(false);
+    expect(w.find(".site-plan__map").exists()).toBe(false);
   });
 
   it("bietet alle Gründe an, sperrt sie aber ohne Koordinate", async () => {
@@ -234,7 +234,7 @@ describe("Preis ohne Kaufpreis", () => {
     const metrics = plotMetrics(withoutPrice);
     expect(metrics.pricePerSqm).toBeNull();
     expect(metrics.deviation).toBeNull();
-    expect(metrics.deviationClass).toBe("unbekannt");
+    expect(metrics.deviationClass).toBe("unknown");
   });
 
   it("sagt auf der Seite, dass der Vergleich fehlt, statt −100 % zu zeigen", () => {
@@ -283,21 +283,21 @@ describe("Grundstücksseite", () => {
   it("koppelt die Abstandstiefe an die Wandhöhe, mit 3 m als Mindestmaß", async () => {
     const w = mount(PlotView);
     const p = plot();
-    await w.find("#wandhoehe").setValue("10");
+    await w.find("#wall-height").setValue("10");
     expect(p.setbacks.every(d => Math.abs(d - 4) < 0.05)).toBe(true);
-    await w.find("#wandhoehe").setValue("4");
+    await w.find("#wall-height").setValue("4");
     expect(p.setbacks.every(d => d === 3)).toBe(true);
   });
 
   it("erlaubt eigene Maße und hält sie in den Grenzen", async () => {
     const w = mount(PlotView);
-    await w.find("#haustyp").setValue("custom");
+    await w.find("#house-type").setValue("custom");
     expect(plot().houseTypeId).toBe("custom");
-    await w.find("#em-laenge").setValue("13");
+    await w.find("#custom-length").setValue("13");
     expect(placement(plot()).width).toBe(13);
-    await w.find("#em-laenge").setValue("99");
+    await w.find("#custom-length").setValue("99");
     expect(plot().customSize.length).toBe(30);
-    await w.find("#em-breite").setValue("1");
+    await w.find("#custom-width").setValue("1");
     expect(plot().customSize.width).toBe(4);
   });
 
@@ -315,14 +315,14 @@ describe("Grundstücksseite", () => {
 describe("Haustypen", () => {
   it("prüft je Grundstück, ob der Baukörper passt", () => {
     const w = mount(HouseTypesView);
-    const headings = w.findAll(".passt__kopf").map(n => n.text());
+    const headings = w.findAll(".fits__head").map(n => n.text());
     expect(headings).toHaveLength(state.data.houseTypes.length);
     headings.forEach(h => expect(h).toMatch(/^Passt auf \d von 2 Grundstücken$/));
   });
 
   it("setzt einen Typ auf ein Grundstück und öffnet es zulässig", async () => {
     const w = mount(HouseTypesView);
-    const button = w.findAll(".passt__knopf")[0];
+    const button = w.findAll(".fits__button")[0];
     if (!button) return;                      // kein Typ passt auf ein Grundstück
     await button.trigger("click");
     expect(state.view).toBe("plot");
@@ -333,9 +333,9 @@ describe("Haustypen", () => {
   it("nimmt von Hand eingetragene Maße auf", async () => {
     const w = mount(HouseTypesView);
     const before = state.data.houseTypes.length;
-    await w.findAll(".seitenkopf .knopf")[0].trigger("click");
-    await w.find("#e-laenge").setValue(12);
-    await w.find("#e-breite").setValue(9);
+    await w.findAll(".page-head .btn")[0].trigger("click");
+    await w.find("#manual-length").setValue(12);
+    await w.find("#manual-width").setValue(9);
     await w.findAll("button").find(b => b.text().trim() === "In den Katalog").trigger("click");
     expect(state.data.houseTypes).toHaveLength(before + 1);
     expect(state.data.houseTypes.at(-1).builtArea).toBe(108);

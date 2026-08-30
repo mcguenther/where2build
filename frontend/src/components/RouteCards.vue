@@ -1,49 +1,49 @@
 <template>
-  <div v-if="destinations.length" class="wege-kartei">
-    <article v-for="destination in destinations" :key="destination.id" class="weg-karte tafel">
-      <div class="weg-karte__kopf">
+  <div v-if="destinations.length" class="route-grid">
+    <article v-for="destination in destinations" :key="destination.id" class="route-card panel">
+      <div class="route-card__head">
         <h3>{{ destination.name }}</h3>
-        <span class="weg-karte__adresse">{{ destination.match || destination.address || "ohne Adresse" }}</span>
+        <span class="route-card__address">{{ destination.match || destination.address || "ohne Adresse" }}</span>
       </div>
 
-      <svg v-if="sketch(destination)" viewBox="0 0 300 150" class="weg-karte__skizze"
+      <svg v-if="sketch(destination)" viewBox="0 0 300 150" class="route-card__sketch"
            role="img" :aria-label="`Gefahrener Weg nach ${destination.name}`">
-        <rect x="0" y="0" width="300" height="150" fill="var(--w2b-karte-grund)" />
+        <rect x="0" y="0" width="300" height="150" fill="var(--w2b-map-ground)" />
         <polyline v-for="line in sketch(destination).lines" :key="line.mode" :points="line.points"
                   fill="none" :stroke="MODE_COLOURS[line.mode]"
                   :stroke-width="line.mode === sketch(destination).fastest ? 3.4 : 2"
                   :opacity="line.mode === sketch(destination).fastest ? 1 : 0.45"
                   stroke-linejoin="round" stroke-linecap="round" />
         <rect :x="sketch(destination).start.x - 4.5" :y="sketch(destination).start.y - 4.5" width="9" height="9" rx="2"
-              fill="var(--w2b-karte-halo)" stroke="var(--w2b-karte-verstoss)" stroke-width="2.2" />
+              fill="var(--w2b-map-halo)" stroke="var(--w2b-map-violation)" stroke-width="2.2" />
         <circle :cx="sketch(destination).end.x" :cy="sketch(destination).end.y" r="5.5"
-                :fill="MODE_COLOURS[sketch(destination).fastest]" stroke="var(--w2b-karte-halo)" stroke-width="1.6" />
-        <text x="293" y="143" text-anchor="end" class="weg-karte__quelle">{{ sketch(destination).scaleLabel }}</text>
+                :fill="MODE_COLOURS[sketch(destination).fastest]" stroke="var(--w2b-map-halo)" stroke-width="1.6" />
+        <text x="293" y="143" text-anchor="end" class="route-card__scale">{{ sketch(destination).scaleLabel }}</text>
       </svg>
 
-      <table v-if="modes(destination).length" class="liste weg-karte__modi">
+      <table v-if="modes(destination).length" class="data-table route-card__modes">
         <tbody>
           <tr v-for="m in modes(destination)" :key="m.mode">
-            <td><span class="modus"><i :class="`modus__punkt modus__punkt--${m.mode}`"></i>{{ m.name }}</span></td>
-            <td class="zahl">{{ m.erreichbar ? duration(m.duration_s) : "—" }}</td>
-            <td class="zahl weg-karte__notiz" :title="m.title">{{ m.note }}</td>
+            <td><span class="mode"><i :class="`mode__dot mode__dot--${m.mode}`"></i>{{ m.name }}</span></td>
+            <td class="num">{{ m.erreichbar ? duration(m.duration_s) : "—" }}</td>
+            <td class="num route-card__note" :title="m.title">{{ m.note }}</td>
           </tr>
         </tbody>
       </table>
 
-      <p v-if="!destination.lat" class="weg-karte__leer">
+      <p v-if="!destination.lat" class="route-card__empty">
         Adresse noch nicht verortet — unter „Ziele“ nachschlagen lassen.
       </p>
-      <p v-else-if="!plot.routes[destination.id]" class="weg-karte__leer">Noch nicht berechnet.</p>
-      <p v-else-if="!modes(destination).some(m => m.erreichbar)" class="weg-karte__leer">
+      <p v-else-if="!plot.routes[destination.id]" class="route-card__empty">Noch nicht berechnet.</p>
+      <p v-else-if="!modes(destination).some(m => m.erreichbar)" class="route-card__empty">
         Keine Verbindung gefunden — mit keinem Verkehrsmittel.
       </p>
-      <p v-if="plot.routes[destination.id] && plot.routes[destination.id].calculatedAt" class="weg-karte__stand">
+      <p v-if="plot.routes[destination.id] && plot.routes[destination.id].calculatedAt" class="route-card__computed">
         Berechnet {{ formatDate(plot.routes[destination.id].calculatedAt) }}<span v-if="plot.routes[destination.id].source"> · {{ plot.routes[destination.id].source }}</span>
       </p>
     </article>
   </div>
-  <p v-else class="weg-karte__leer">Noch keine Ziele hinterlegt.</p>
+  <p v-else class="route-card__empty">Noch keine Ziele hinterlegt.</p>
 </template>
 
 <script>
@@ -54,9 +54,9 @@ import { MODES, routeBounds, fitBounds, toPolyline, toScreen, coordinatesOf, fas
 /** One colour per mode, shared by the dots in the table and the drawn line,
  *  so the sketch says which mode actually wins for that destination. */
 const MODE_COLOURS = {
-  car: "var(--w2b-graphit)",
-  bike: "var(--w2b-sekundaer)",
-  transit: "var(--w2b-primaer)"
+  car: "var(--w2b-graphite)",
+  bike: "var(--w2b-secondary)",
+  transit: "var(--w2b-primary)"
 };
 
 export default {
@@ -136,20 +136,20 @@ export default {
 </script>
 
 <style scoped>
-.wege-kartei{ display: grid; grid-template-columns: repeat(auto-fill, minmax(292px, 1fr)); gap: var(--w2b-raum-4); }
-.weg-karte{ display: flex; flex-direction: column; }
-.weg-karte__kopf{ display: flex; align-items: baseline; gap: var(--w2b-raum-2); padding: var(--w2b-raum-3) var(--w2b-raum-4); border-bottom: 1px solid var(--w2b-linie); }
-.weg-karte__kopf h3{ font-size: var(--w2b-schrift-l); }
-.weg-karte__adresse{ font-family: var(--w2b-daten); font-size: 10px; color: var(--w2b-gedaempft); margin-left: auto; text-align: right; }
-.weg-karte__skizze{ display: block; width: 100%; height: auto; border-bottom: 1px solid var(--w2b-linie); }
-.weg-karte__quelle{ font-family: var(--w2b-daten); font-size: 8.5px; fill: var(--w2b-gedaempft); }
-.weg-karte__modi td{ padding: 7px var(--w2b-raum-4); white-space: nowrap; }
-.weg-karte__notiz{ color: var(--w2b-gedaempft); font-size: var(--w2b-schrift-xs); text-align: right; white-space: normal; }
-.weg-karte__leer{ padding: var(--w2b-raum-4); color: var(--w2b-gedaempft); font-size: var(--w2b-schrift-s); }
-.weg-karte__stand{ padding: 0 var(--w2b-raum-4) var(--w2b-raum-3); color: var(--w2b-gedaempft); font-size: var(--w2b-schrift-xs); font-family: var(--w2b-daten); }
-.modus{ display: inline-flex; align-items: center; gap: var(--w2b-raum-2); font-size: var(--w2b-schrift-s); }
-.modus__punkt{ width: 11px; height: 11px; border-radius: 3px; flex: none; }
-.modus__punkt--car{ background: var(--w2b-graphit); }
-.modus__punkt--bike{ background: var(--w2b-sekundaer); }
-.modus__punkt--transit{ background: var(--w2b-primaer); }
+.route-grid{ display: grid; grid-template-columns: repeat(auto-fill, minmax(292px, 1fr)); gap: var(--w2b-space-4); }
+.route-card{ display: flex; flex-direction: column; }
+.route-card__head{ display: flex; align-items: baseline; gap: var(--w2b-space-2); padding: var(--w2b-space-3) var(--w2b-space-4); border-bottom: 1px solid var(--w2b-line); }
+.route-card__head h3{ font-size: var(--w2b-text-l); }
+.route-card__address{ font-family: var(--w2b-font-mono); font-size: 10px; color: var(--w2b-muted); margin-left: auto; text-align: right; }
+.route-card__sketch{ display: block; width: 100%; height: auto; border-bottom: 1px solid var(--w2b-line); }
+.route-card__scale{ font-family: var(--w2b-font-mono); font-size: 8.5px; fill: var(--w2b-muted); }
+.route-card__modes td{ padding: 7px var(--w2b-space-4); white-space: nowrap; }
+.route-card__note{ color: var(--w2b-muted); font-size: var(--w2b-text-xs); text-align: right; white-space: normal; }
+.route-card__empty{ padding: var(--w2b-space-4); color: var(--w2b-muted); font-size: var(--w2b-text-s); }
+.route-card__computed{ padding: 0 var(--w2b-space-4) var(--w2b-space-3); color: var(--w2b-muted); font-size: var(--w2b-text-xs); font-family: var(--w2b-font-mono); }
+.mode{ display: inline-flex; align-items: center; gap: var(--w2b-space-2); font-size: var(--w2b-text-s); }
+.mode__dot{ width: 11px; height: 11px; border-radius: 3px; flex: none; }
+.mode__dot--car{ background: var(--w2b-graphite); }
+.mode__dot--bike{ background: var(--w2b-secondary); }
+.mode__dot--transit{ background: var(--w2b-primary); }
 </style>

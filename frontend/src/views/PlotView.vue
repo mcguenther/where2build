@@ -1,57 +1,57 @@
 <template>
-  <div v-if="plot" class="stapel grundstueck-seite">
-    <nav class="krume nicht-drucken" aria-label="Pfad">
+  <div v-if="plot" class="stack plot-page">
+    <nav class="breadcrumb no-print" aria-label="Pfad">
       <button type="button" @click="back">Grundstücke</button>
       <span aria-hidden="true">›</span>
       <span>{{ plot.name }}</span>
     </nav>
 
-    <div class="seitenkopf">
+    <div class="page-head">
       <div>
-        <p class="marke-klein">Gemarkung {{ plot.gemarkung }} · {{ plot.flurstuecke.length }} Flurstück{{ plot.flurstuecke.length > 1 ? 'e' : '' }}</p>
+        <p class="eyebrow">Gemarkung {{ plot.gemarkung }} · {{ plot.flurstuecke.length }} Flurstück{{ plot.flurstuecke.length > 1 ? 'e' : '' }}</p>
         <h1>{{ plot.name }}</h1>
-        <p class="seitenkopf__unter">
+        <p class="page-head__sub">
           {{ plot.municipality }} · Flurstück {{ plot.flurstuecke.join(" und ") }} ·
           {{ area(plot.officialArea) }} · {{ euro(plot.askingPrice) }}
         </p>
-        <p v-if="plot.note" class="seitenkopf__notiz">{{ plot.note }}</p>
+        <p v-if="plot.note" class="page-head__note">{{ plot.note }}</p>
       </div>
-      <div class="dehnen"></div>
-      <div class="reihe nicht-drucken">
-        <button type="button" class="knopf knopf--still" :disabled="!hasPrevious" @click="step(-1)">‹ Voriges</button>
-        <button type="button" class="knopf knopf--still" :disabled="!hasNext" @click="step(1)">Nächstes ›</button>
-        <button type="button" class="knopf knopf--zweit" @click="print">Drucken</button>
+      <div class="spacer"></div>
+      <div class="row no-print">
+        <button type="button" class="btn btn--quiet" :disabled="!hasPrevious" @click="step(-1)">‹ Voriges</button>
+        <button type="button" class="btn btn--quiet" :disabled="!hasNext" @click="step(1)">Nächstes ›</button>
+        <button type="button" class="btn btn--secondary" @click="print">Drucken</button>
       </div>
     </div>
 
-    <div class="plangitter druckblatt">
-      <div class="planrahmen tafel druckblatt__plan">
-        <div class="planleiste nicht-drucken">
-          <span class="planleiste__schild">Grund</span>
-          <div class="schaltgruppe" role="group" aria-label="Kartenhintergrund">
+    <div class="plan-grid print-sheet">
+      <div class="plan-frame panel print-sheet__plan">
+        <div class="plan-bar no-print">
+          <span class="plan-bar__label">Grund</span>
+          <div class="button-group" role="group" aria-label="Kartenhintergrund">
             <button v-for="b in backdrops" :key="b.id" type="button"
                     :disabled="b.id !== 'none' && !hasAnchor"
                     :title="b.id !== 'none' && !hasAnchor ? 'Ohne Koordinate lässt sich keine Karte darunterlegen.' : null"
                     :aria-pressed="String(state.plan.backdrop === b.id)"
                     @click="state.plan.backdrop = b.id">{{ b.name }}</button>
           </div>
-          <span class="planleiste__schild">Ausrichtung</span>
-          <div class="schaltgruppe" role="group" aria-label="Kartenausrichtung">
+          <span class="plan-bar__label">Ausrichtung</span>
+          <div class="button-group" role="group" aria-label="Kartenausrichtung">
             <button type="button" :aria-pressed="String(state.plan.northUp)"
                     @click="state.plan.northUp = true">Genordet</button>
             <button type="button" :aria-pressed="String(!state.plan.northUp)"
                     @click="state.plan.northUp = false">Straßenparallel</button>
           </div>
-          <div class="dehnen"></div>
-          <button type="button" class="schalter" :aria-pressed="String(state.plan.showDimensions)"
+          <div class="spacer"></div>
+          <button type="button" class="toggle" :aria-pressed="String(state.plan.showDimensions)"
                   @click="state.plan.showDimensions = !state.plan.showDimensions">Maße</button>
-          <button type="button" class="schalter" :aria-pressed="String(state.plan.showSetbacks)"
+          <button type="button" class="toggle" :aria-pressed="String(state.plan.showSetbacks)"
                   @click="state.plan.showSetbacks = !state.plan.showSetbacks">Abstandsflächen</button>
-          <button type="button" class="schalter" :aria-pressed="String(state.plan.measuring)"
+          <button type="button" class="toggle" :aria-pressed="String(state.plan.measuring)"
                   @click="toggleMeasuring">Messen</button>
         </div>
 
-        <p class="band" :class="violation ? 'band--fehler' : 'band--gut'" role="status">
+        <p class="notice" :class="violation ? 'notice--error' : 'notice--good'" role="status">
           <span v-if="violation">
             <b>{{ outliers }} Gebäudeecke{{ outliers > 1 ? 'n liegen' : ' liegt' }} außerhalb des Bebauungsfensters.</b>
             Geringster Grenzabstand {{ metres(narrowestSetback) }}.
@@ -62,11 +62,11 @@
           </span>
         </p>
 
-        <p v-if="state.plan.measuring" class="band messband">
+        <p v-if="state.plan.measuring" class="notice measure-bar">
           <span v-if="!measurement.points.length">Auf den Plan klicken, um zu messen. Jeder weitere Klick verlängert den Streckenzug.</span>
           <span v-else><b>{{ metres(measurement.length) }}</b> über {{ measurement.points.length - 1 }}
             {{ measurement.points.length === 2 ? "Abschnitt" : "Abschnitte" }}.</span>
-          <button v-if="measurement.points.length" type="button" class="knopf knopf--still knopf--klein"
+          <button v-if="measurement.points.length" type="button" class="btn btn--quiet btn--small"
                   style="margin-left:auto" @click="clearMeasurement">Zurücksetzen</button>
         </p>
 
@@ -76,16 +76,16 @@
                   :show-dimensions="state.plan.showDimensions" :show-setbacks="state.plan.showSetbacks"
                   @move="moveHouse" />
 
-        <div class="planfuss">
+        <div class="plan-foot">
           <span>ETRS89 / UTM33N — EPSG:25833</span>
           <span>© GeoSN, dl-de/by-2-0</span>
         </div>
       </div>
 
-      <aside class="protokoll">
-        <section class="tafel">
-          <div class="tafel__kopf"><h3>Grundstück</h3><div class="dehnen"></div><span class="chip">ALKIS</span></div>
-          <dl class="werteliste">
+      <aside class="facts">
+        <section class="panel">
+          <div class="panel__head"><h3>Grundstück</h3><div class="spacer"></div><span class="chip">ALKIS</span></div>
+          <dl class="value-list">
             <dt>Gemarkung</dt><dd>{{ plot.gemarkung }}</dd>
             <dt>Flurstücke</dt><dd>{{ plot.flurstuecke.join(" · ") }}</dd>
             <dt>Fläche amtlich</dt><dd>{{ area(plot.officialArea) }}</dd>
@@ -93,49 +93,49 @@
             <dt>Grenzpunkte</dt><dd>{{ plot.polygon.length }}</dd>
             <dt>Straßenfront</dt><dd>{{ metres(metrics.streetFrontage) }}</dd>
           </dl>
-          <p class="tafel__fussnote">
+          <p class="panel__footnote">
             Für den Preisvergleich zählt die amtliche Fläche. Die aus dem Polygon
             gerechnete weicht regelmäßig um ein paar Quadratmeter ab.
           </p>
         </section>
 
-        <section class="tafel">
-          <div class="tafel__kopf"><h3>Form</h3></div>
-          <dl class="werteliste">
+        <section class="panel">
+          <div class="panel__head"><h3>Form</h3></div>
+          <dl class="value-list">
             <dt>Rechteckigkeit</dt><dd>{{ num(metrics.rectangularity, 3) }}</dd>
-            <dt>Einstufung</dt><dd><span class="chip chip--gut">{{ metrics.shapeClass }}</span></dd>
+            <dt>Einstufung</dt><dd><span class="chip chip--good">{{ metrics.shapeClass }}</span></dd>
             <dt>Seitenverhältnis</dt><dd>1 : {{ num(aspectRatio) }}</dd>
             <dt>Umschl. Rechteck</dt><dd>{{ num(metrics.mrr.width, 1) }} × {{ num(metrics.mrr.height, 1) }} m</dd>
           </dl>
         </section>
 
-        <section class="tafel">
-          <div class="tafel__kopf"><h3>Preis</h3><div class="dehnen"></div><span class="chip">BORIS</span></div>
-          <dl class="werteliste">
+        <section class="panel">
+          <div class="panel__head"><h3>Preis</h3><div class="spacer"></div><span class="chip">BORIS</span></div>
+          <dl class="value-list">
             <dt>Kaufpreis</dt><dd>{{ euro(plot.askingPrice) }}</dd>
             <dt>Angebot je m²</dt><dd>{{ euroPerSqm(metrics.pricePerSqm) }}</dd>
-            <dt>Bodenrichtwert</dt><dd>{{ euroPerSqm(plot.bodenrichtwert) }} <span class="zart">Zone {{ plot.brwZone }}</span></dd>
+            <dt>Bodenrichtwert</dt><dd>{{ euroPerSqm(plot.bodenrichtwert) }} <span class="faint">Zone {{ plot.brwZone }}</span></dd>
             <dt>Stichtag</dt><dd>{{ date(plot.brwReferenceDate) }}</dd>
           </dl>
-          <div v-if="Number.isFinite(plot.bodenrichtwert)" class="preisband">
-            <div class="preisband__skala">
-              <div class="preisband__achse"></div>
-              <div class="preisband__spanne" :style="{ left: pricePosition(plot.bodenrichtwert * .85) + '%', width: (pricePosition(plot.bodenrichtwert * 1.15) - pricePosition(plot.bodenrichtwert * .85)) + '%' }"></div>
-              <div class="preisband__brw" :style="{ left: pricePosition(plot.bodenrichtwert) + '%' }"></div>
-              <div v-if="metrics.pricePerSqm !== null" class="preisband__marke"
+          <div v-if="Number.isFinite(plot.bodenrichtwert)" class="price-band">
+            <div class="price-band__scale">
+              <div class="price-band__axis"></div>
+              <div class="price-band__range" :style="{ left: pricePosition(plot.bodenrichtwert * .85) + '%', width: (pricePosition(plot.bodenrichtwert * 1.15) - pricePosition(plot.bodenrichtwert * .85)) + '%' }"></div>
+              <div class="price-band__brw" :style="{ left: pricePosition(plot.bodenrichtwert) + '%' }"></div>
+              <div v-if="metrics.pricePerSqm !== null" class="price-band__marker"
                    :style="{ left: pricePosition(metrics.pricePerSqm) + '%' }"
                    :title="`Angebot ${euroPerSqm(metrics.pricePerSqm)}/m²`"></div>
             </div>
-            <div class="preisband__achsentext">
+            <div class="price-band__axis-labels">
               <span>{{ Math.round(priceRange.lo) }} €</span>
               <span>{{ Math.round(plot.bodenrichtwert) }} €</span>
               <span>{{ Math.round(priceRange.hi) }} €</span>
             </div>
-            <p v-if="metrics.deviation !== null" class="preisband__aussage">
+            <p v-if="metrics.deviation !== null" class="price-band__statement">
               Das Angebot liegt <b>{{ percent(metrics.deviation) }}
               {{ metrics.deviation > 0 ? "über" : "unter" }} dem Bodenrichtwert</b> der Zone.
             </p>
-            <p v-else class="preisband__aussage">
+            <p v-else class="price-band__statement">
               Ohne Kaufpreis lässt sich das Angebot nicht mit dem Bodenrichtwert vergleichen.
               Der Preis steht im Inserat und kann oben eingetragen werden.
             </p>
@@ -144,29 +144,29 @@
       </aside>
     </div>
 
-    <div class="werkzeuge">
-      <section class="tafel">
-        <div class="tafel__kopf"><h3>Abstandsflächen</h3><div class="dehnen"></div><span class="chip chip--warn">§ 6 SächsBO</span></div>
-        <table class="liste abstands-tabelle">
-          <thead><tr><th>Grenze</th><th class="zahl">Länge</th><th class="zahl">Tiefe</th></tr></thead>
+    <div class="tools">
+      <section class="panel">
+        <div class="panel__head"><h3>Abstandsflächen</h3><div class="spacer"></div><span class="chip chip--warn">§ 6 SächsBO</span></div>
+        <table class="data-table setback-table">
+          <thead><tr><th>Grenze</th><th class="num">Länge</th><th class="num">Tiefe</th></tr></thead>
           <tbody>
             <tr v-for="(boundary, i) in boundaries" :key="i">
               <td>{{ boundary.name }}</td>
-              <td class="zahl">{{ metres(boundary.length) }}</td>
-              <td class="zahl">
-                <input type="number" min="0" max="20" step="0.1" class="tiefe"
+              <td class="num">{{ metres(boundary.length) }}</td>
+              <td class="num">
+                <input type="number" min="0" max="20" step="0.1" class="depth"
                        :value="plot.setbacks[i]" :aria-label="`Abstandstiefe ${boundary.name}`"
                        @input="setSetback(i, $event.target.value)">
               </td>
             </tr>
           </tbody>
         </table>
-        <div class="regler nicht-drucken">
-          <label for="wandhoehe">Wandhöhe</label>
-          <output class="daten">{{ metres(plot.wallHeight) }}</output>
-          <input id="wandhoehe" type="range" min="2.5" max="12" step="0.1"
+        <div class="slider no-print">
+          <label for="wall-height">Wandhöhe</label>
+          <output class="mono">{{ metres(plot.wallHeight) }}</output>
+          <input id="wall-height" type="range" min="2.5" max="12" step="0.1"
                  :value="plot.wallHeight" @input="setWallHeight($event.target.value)">
-          <p class="regler__hinweis">
+          <p class="slider__hint">
             0,4 · H = <b>{{ metres(plot.wallHeight * 0.4) }}</b>
             <template v-if="plot.wallHeight * 0.4 < 3"> — unter dem Mindestmaß von 3 m, deshalb greift der Mindestwert.</template>
             <template v-else> — maßgeblich, weil größer als das Mindestmaß von 3 m.</template>
@@ -174,11 +174,11 @@
         </div>
       </section>
 
-      <section class="tafel">
-        <div class="tafel__kopf"><h3>Baukörper</h3></div>
-        <div class="feld feld--gerahmt nicht-drucken">
-          <label for="haustyp">Haustyp</label>
-          <select id="haustyp" :value="plot.houseTypeId" @change="setHouseType($event.target.value)">
+      <section class="panel">
+        <div class="panel__head"><h3>Baukörper</h3></div>
+        <div class="field field--framed no-print">
+          <label for="house-type">Haustyp</label>
+          <select id="house-type" :value="plot.houseTypeId" @change="setHouseType($event.target.value)">
             <option v-for="h in state.data.houseTypes" :key="h.id" :value="h.id">
               {{ h.manufacturer }} {{ h.name }} — {{ num(h.builtArea) }} m² bebaut
             </option>
@@ -186,27 +186,27 @@
           </select>
         </div>
 
-        <div v-if="isCustomSize" class="eigenmass nicht-drucken">
-          <div class="feld">
-            <label for="em-laenge">Länge</label>
-            <input id="em-laenge" type="number" min="4" max="30" step="0.1"
+        <div v-if="isCustomSize" class="custom-size no-print">
+          <div class="field">
+            <label for="custom-length">Länge</label>
+            <input id="custom-length" type="number" min="4" max="30" step="0.1"
                    :value="customSize.length" @input="setCustomSize('length', $event.target.value)">
           </div>
-          <div class="feld">
-            <label for="em-breite">Breite</label>
-            <input id="em-breite" type="number" min="4" max="30" step="0.1"
+          <div class="field">
+            <label for="custom-width">Breite</label>
+            <input id="custom-width" type="number" min="4" max="30" step="0.1"
                    :value="customSize.width" @input="setCustomSize('width', $event.target.value)">
           </div>
-          <p class="eigenmass__hinweis">
+          <p class="custom-size__hint">
             Ergibt {{ area(customSize.length * customSize.width, 1) }} bebaute Fläche.
             Kantenlängen unter 4 m oder über 30 m sind kein Haus, sondern ein Tippfehler.
           </p>
-          <button type="button" class="knopf knopf--zweit knopf--klein" @click="saveAsHouseType">
+          <button type="button" class="btn btn--secondary btn--small" @click="saveAsHouseType">
             Als Haustyp in den Katalog
           </button>
         </div>
 
-        <dl class="werteliste">
+        <dl class="value-list">
           <!-- On paper the <select> is hidden, so without this the printed
                sheet never says which house type it is about. -->
           <template v-if="houseType">
@@ -216,39 +216,39 @@
           <dt v-if="houseType">Wohnfläche ges.</dt><dd v-if="houseType">{{ area(houseType.livingArea, 2) }}</dd>
           <dt>Außenmaß</dt>
           <dd>{{ num(building.width, 1) }} × {{ num(building.depth, 1) }} m
-            <span v-if="building.estimated" class="zart" title="aus der bebauten Fläche geschätzt">≈</span></dd>
+            <span v-if="building.estimated" class="faint" title="aus der bebauten Fläche geschätzt">≈</span></dd>
           <dt>Drehung</dt><dd>{{ degrees(plot.house.rotation) }}</dd>
           <dt>GRZ</dt><dd>{{ num(builtArea / plot.officialArea, 2) }}</dd>
         </dl>
 
-        <div class="ausrichten nicht-drucken">
-          <button type="button" class="knopf knopf--zweit" @click="alignToStreet">
+        <div class="align no-print">
+          <button type="button" class="btn btn--secondary" @click="alignToStreet">
             An der Straße ausrichten
           </button>
-          <p class="regler__hinweis">
+          <p class="slider__hint">
             Dreht den Baukörper parallel zur Straßenfront ({{ degrees(streetAngle) }})
             und schiebt ihn zurück ins Fenster, falls er dabei herausrutscht.
           </p>
         </div>
 
-        <div v-if="building.estimated" class="regler nicht-drucken">
-          <label for="verhaeltnis">Seitenverhältnis</label>
-          <output class="daten">{{ num(plot.ratio) }}</output>
-          <input id="verhaeltnis" type="range" min="1" max="2.2" step="0.01"
+        <div v-if="building.estimated" class="slider no-print">
+          <label for="ratio">Seitenverhältnis</label>
+          <output class="mono">{{ num(plot.ratio) }}</output>
+          <input id="ratio" type="range" min="1" max="2.2" step="0.01"
                  :value="plot.ratio" @input="setRatio($event.target.value)">
-          <p class="regler__hinweis">Aus der bebauten Fläche geschätzt — das Datenblatt liefert keine Außenmaße.</p>
+          <p class="slider__hint">Aus der bebauten Fläche geschätzt — das Datenblatt liefert keine Außenmaße.</p>
         </div>
 
-        <div class="regler nicht-drucken">
-          <label for="drehung">Drehung</label>
-          <output class="daten">{{ degrees(plot.house.rotation) }}</output>
-          <input id="drehung" type="range" min="-90" max="90" step="1"
+        <div class="slider no-print">
+          <label for="rotation">Drehung</label>
+          <output class="mono">{{ degrees(plot.house.rotation) }}</output>
+          <input id="rotation" type="range" min="-90" max="90" step="1"
                  :value="plot.house.rotation" @input="setRotation($event.target.value)">
-          <p class="regler__hinweis">Haus mit der Maus ziehen, mit den Pfeiltasten fein verschieben.</p>
+          <p class="slider__hint">Haus mit der Maus ziehen, mit den Pfeiltasten fein verschieben.</p>
         </div>
       </section>
 
-      <div class="notiz notiz--mahnung">
+      <div class="callout callout--caution">
         <h4>Keine bauordnungsrechtliche Prüfung</h4>
         <p>Die Abstandstiefe bemisst sich nach § 6 SächsBO grundsätzlich nach der Wandhöhe;
           3 m sind der Mindestwert, nicht die Regel. Grenzgaragen sind privilegiert, ein
@@ -258,31 +258,31 @@
       </div>
     </div>
 
-    <section class="stapel">
-      <div class="seitenkopf">
+    <section class="stack">
+      <div class="page-head">
         <div>
-          <p class="marke-klein">Erreichbarkeiten</p>
+          <p class="eyebrow">Erreichbarkeiten</p>
           <h2>Wege von hier</h2>
-          <p class="seitenkopf__unter">
+          <p class="page-head__sub">
             Für jedes hinterlegte Ziel Auto, Rad und ÖPNV, gerechnet vom Grundstück aus.
             Ziele gelten für alle Grundstücke.
           </p>
         </div>
-        <div class="dehnen"></div>
-        <button type="button" class="knopf nicht-drucken"
+        <div class="spacer"></div>
+        <button type="button" class="btn no-print"
                 :disabled="!routesPossible || routesBusy" @click="computeRoutes">
           {{ routesBusy ? "Rechnet…" : "Wege berechnen" }}
         </button>
-        <button type="button" class="knopf knopf--still nicht-drucken" @click="state.view = 'destinations'">
+        <button type="button" class="btn btn--quiet no-print" @click="state.view = 'destinations'">
           Ziele bearbeiten
         </button>
       </div>
 
-      <p v-if="routesError" class="band band--fehler">{{ routesError }}</p>
-      <p v-else-if="!plot.anchor" class="band">
+      <p v-if="routesError" class="notice notice--error">{{ routesError }}</p>
+      <p v-else-if="!plot.anchor" class="notice">
         Dieses Grundstück hat keine Koordinate — ohne sie gibt es keinen Startpunkt für eine Route.
       </p>
-      <p v-else-if="!locatedDestinations.length && state.data.destinations.length" class="band">
+      <p v-else-if="!locatedDestinations.length && state.data.destinations.length" class="notice">
         Keines der Ziele ist verortet. Unter „Ziele bearbeiten“ die Adressen nachschlagen lassen.
       </p>
 
@@ -470,76 +470,76 @@ export default {
 </script>
 
 <style scoped>
-.krume{ display: flex; align-items: center; gap: var(--w2b-raum-2); font-size: var(--w2b-schrift-xs); color: var(--w2b-gedaempft); }
-.krume button{ background: none; border: 0; padding: 0; cursor: pointer; color: var(--w2b-primaer); font: inherit; }
-.krume button:hover{ text-decoration: underline; }
+.breadcrumb{ display: flex; align-items: center; gap: var(--w2b-space-2); font-size: var(--w2b-text-xs); color: var(--w2b-muted); }
+.breadcrumb button{ background: none; border: 0; padding: 0; cursor: pointer; color: var(--w2b-primary); font: inherit; }
+.breadcrumb button:hover{ text-decoration: underline; }
 
-.seitenkopf{ display: flex; align-items: flex-end; gap: var(--w2b-raum-4); flex-wrap: wrap; }
-.seitenkopf__unter{ margin-top: var(--w2b-raum-2); color: var(--w2b-graphit); font-size: var(--w2b-schrift-s); max-width: 64ch; }
-.seitenkopf__notiz{ margin-top: var(--w2b-raum-1); color: var(--w2b-gedaempft); font-size: var(--w2b-schrift-s); font-style: italic; }
+.page-head{ display: flex; align-items: flex-end; gap: var(--w2b-space-4); flex-wrap: wrap; }
+.page-head__sub{ margin-top: var(--w2b-space-2); color: var(--w2b-graphite); font-size: var(--w2b-text-s); max-width: 64ch; }
+.page-head__note{ margin-top: var(--w2b-space-1); color: var(--w2b-muted); font-size: var(--w2b-text-s); font-style: italic; }
 
-.plangitter{ display: grid; grid-template-columns: minmax(0, 1fr) 336px; gap: var(--w2b-raum-4); align-items: start; }
-@media (max-width: 1140px){ .plangitter{ grid-template-columns: 1fr; } }
-.planrahmen{ position: sticky; top: var(--w2b-raum-3); }
-@media (max-width: 1140px){ .planrahmen{ position: static; } }
+.plan-grid{ display: grid; grid-template-columns: minmax(0, 1fr) 336px; gap: var(--w2b-space-4); align-items: start; }
+@media (max-width: 1140px){ .plan-grid{ grid-template-columns: 1fr; } }
+.plan-frame{ position: sticky; top: var(--w2b-space-3); }
+@media (max-width: 1140px){ .plan-frame{ position: static; } }
 
-.planleiste{
+.plan-bar{
   display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-  padding: var(--w2b-raum-2) var(--w2b-raum-3); border-bottom: 1px solid var(--w2b-linie);
+  padding: var(--w2b-space-2) var(--w2b-space-3); border-bottom: 1px solid var(--w2b-line);
 }
-.planleiste__schild{
-  font-family: var(--w2b-anzeige); font-weight: 600; font-size: 10.5px;
-  letter-spacing: .1em; text-transform: uppercase; color: var(--w2b-gedaempft); margin-left: 4px;
+.plan-bar__label{
+  font-family: var(--w2b-font-display); font-weight: 600; font-size: 10.5px;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--w2b-muted); margin-left: 4px;
 }
-.schaltgruppe{ display: flex; border: 1px solid var(--w2b-linie); border-radius: var(--w2b-radius-s); overflow: hidden; }
-.schaltgruppe button, .schalter{
-  background: var(--w2b-flaeche); border: 0; cursor: pointer; padding: 5px 11px;
-  font-family: var(--w2b-anzeige); font-weight: 600; font-size: var(--w2b-schrift-xs);
-  color: var(--w2b-gedaempft);
+.button-group{ display: flex; border: 1px solid var(--w2b-line); border-radius: var(--w2b-radius-s); overflow: hidden; }
+.button-group button, .toggle{
+  background: var(--w2b-surface); border: 0; cursor: pointer; padding: 5px 11px;
+  font-family: var(--w2b-font-display); font-weight: 600; font-size: var(--w2b-text-xs);
+  color: var(--w2b-muted);
 }
-.schaltgruppe button + button{ border-left: 1px solid var(--w2b-linie); }
-.schalter{ border: 1px solid var(--w2b-linie); border-radius: var(--w2b-radius-s); }
-.schaltgruppe button[aria-pressed="true"], .schalter[aria-pressed="true"]{
-  background: var(--w2b-primaer); color: var(--w2b-primaer-auf);
+.button-group button + button{ border-left: 1px solid var(--w2b-line); }
+.toggle{ border: 1px solid var(--w2b-line); border-radius: var(--w2b-radius-s); }
+.button-group button[aria-pressed="true"], .toggle[aria-pressed="true"]{
+  background: var(--w2b-primary); color: var(--w2b-primary-on);
 }
-.band{ border-radius: 0; }
-.messband{ display: flex; align-items: center; gap: var(--w2b-raum-3); border-bottom: 1px solid var(--w2b-linie); }
-.planfuss{
-  display: flex; justify-content: space-between; gap: var(--w2b-raum-3); flex-wrap: wrap;
-  padding: var(--w2b-raum-2) var(--w2b-raum-3); border-top: 1px solid var(--w2b-linie);
-  font-family: var(--w2b-daten); font-size: 10.5px; color: var(--w2b-gedaempft);
+.notice{ border-radius: 0; }
+.measure-bar{ display: flex; align-items: center; gap: var(--w2b-space-3); border-bottom: 1px solid var(--w2b-line); }
+.plan-foot{
+  display: flex; justify-content: space-between; gap: var(--w2b-space-3); flex-wrap: wrap;
+  padding: var(--w2b-space-2) var(--w2b-space-3); border-top: 1px solid var(--w2b-line);
+  font-family: var(--w2b-font-mono); font-size: 10.5px; color: var(--w2b-muted);
 }
 
-.protokoll{ display: flex; flex-direction: column; gap: var(--w2b-raum-4); }
-.werteliste{ margin: 0; display: grid; grid-template-columns: auto 1fr; }
-.werteliste dt, .werteliste dd{
-  padding: 8px var(--w2b-raum-4); border-bottom: 1px solid var(--w2b-linie-zart); margin: 0;
+.facts{ display: flex; flex-direction: column; gap: var(--w2b-space-4); }
+.value-list{ margin: 0; display: grid; grid-template-columns: auto 1fr; }
+.value-list dt, .value-list dd{
+  padding: 8px var(--w2b-space-4); border-bottom: 1px solid var(--w2b-line-faint); margin: 0;
   display: flex; align-items: center;
 }
-.werteliste dt{ font-size: var(--w2b-schrift-s); color: var(--w2b-graphit); }
-.werteliste dd{ justify-content: flex-end; gap: 6px; font-family: var(--w2b-daten); font-size: var(--w2b-schrift-s); font-variant-numeric: tabular-nums; }
-.werteliste dt:last-of-type, .werteliste dd:last-of-type{ border-bottom: 0; }
-.zart{ color: var(--w2b-gedaempft); font-size: var(--w2b-schrift-xs); }
-.tafel__fussnote{ padding: var(--w2b-raum-3) var(--w2b-raum-4); border-top: 1px solid var(--w2b-linie-zart); font-size: var(--w2b-schrift-xs); color: var(--w2b-gedaempft); }
+.value-list dt{ font-size: var(--w2b-text-s); color: var(--w2b-graphite); }
+.value-list dd{ justify-content: flex-end; gap: 6px; font-family: var(--w2b-font-mono); font-size: var(--w2b-text-s); font-variant-numeric: tabular-nums; }
+.value-list dt:last-of-type, .value-list dd:last-of-type{ border-bottom: 0; }
+.faint{ color: var(--w2b-muted); font-size: var(--w2b-text-xs); }
+.panel__footnote{ padding: var(--w2b-space-3) var(--w2b-space-4); border-top: 1px solid var(--w2b-line-faint); font-size: var(--w2b-text-xs); color: var(--w2b-muted); }
 
-.preisband{ padding: var(--w2b-raum-4); }
-.preisband__skala{ position: relative; height: 34px; margin-bottom: var(--w2b-raum-2); }
-.preisband__achse{ position: absolute; left: 0; right: 0; top: 17px; height: 1px; background: var(--w2b-linie); }
-.preisband__spanne{ position: absolute; top: 15px; height: 5px; border-radius: var(--w2b-radius-voll); background: var(--w2b-primaer-schleier); }
-.preisband__brw{ position: absolute; top: 7px; width: 2px; height: 21px; background: var(--w2b-primaer); border-radius: 1px; }
-.preisband__marke{ position: absolute; top: 11px; width: 12px; height: 12px; margin-left: -6px; border-radius: 3px; background: var(--w2b-sekundaer); border: 1.5px solid var(--w2b-sekundaer-text); transform: rotate(45deg); }
-.preisband__achsentext{ display: flex; justify-content: space-between; font-family: var(--w2b-daten); font-size: 10.5px; color: var(--w2b-gedaempft); }
-.preisband__aussage{ margin-top: var(--w2b-raum-3); font-size: var(--w2b-schrift-s); color: var(--w2b-graphit); }
-.preisband__aussage b{ color: var(--w2b-tinte); }
+.price-band{ padding: var(--w2b-space-4); }
+.price-band__scale{ position: relative; height: 34px; margin-bottom: var(--w2b-space-2); }
+.price-band__axis{ position: absolute; left: 0; right: 0; top: 17px; height: 1px; background: var(--w2b-line); }
+.price-band__range{ position: absolute; top: 15px; height: 5px; border-radius: var(--w2b-radius-full); background: var(--w2b-primary-veil); }
+.price-band__brw{ position: absolute; top: 7px; width: 2px; height: 21px; background: var(--w2b-primary); border-radius: 1px; }
+.price-band__marker{ position: absolute; top: 11px; width: 12px; height: 12px; margin-left: -6px; border-radius: 3px; background: var(--w2b-secondary); border: 1.5px solid var(--w2b-secondary-text); transform: rotate(45deg); }
+.price-band__axis-labels{ display: flex; justify-content: space-between; font-family: var(--w2b-font-mono); font-size: 10.5px; color: var(--w2b-muted); }
+.price-band__statement{ margin-top: var(--w2b-space-3); font-size: var(--w2b-text-s); color: var(--w2b-graphite); }
+.price-band__statement b{ color: var(--w2b-ink); }
 
-.werkzeuge{ display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--w2b-raum-4); align-items: start; }
-.tiefe{ width: 72px; padding: 4px 7px; text-align: right; }
-.regler{ display: grid; grid-template-columns: 1fr auto; gap: 5px var(--w2b-raum-3); align-items: center; padding: var(--w2b-raum-3) var(--w2b-raum-4); border-top: 1px solid var(--w2b-linie-zart); }
-.regler label{ font-family: var(--w2b-anzeige); font-weight: 600; font-size: var(--w2b-schrift-xs); letter-spacing: .09em; text-transform: uppercase; color: var(--w2b-gedaempft); }
-.regler input[type="range"]{ grid-column: 1 / -1; }
-.regler__hinweis{ grid-column: 1 / -1; font-size: var(--w2b-schrift-xs); color: var(--w2b-gedaempft); }
-.feld--gerahmt{ padding: var(--w2b-raum-3) var(--w2b-raum-4); border-bottom: 1px solid var(--w2b-linie); }
-.eigenmass{ display: grid; grid-template-columns: 1fr 1fr; gap: var(--w2b-raum-3); padding: var(--w2b-raum-3) var(--w2b-raum-4); border-bottom: 1px solid var(--w2b-linie); background: var(--w2b-sekundaer-schleier); }
-.eigenmass__hinweis{ grid-column: 1 / -1; font-size: var(--w2b-schrift-xs); color: var(--w2b-sekundaer-text); }
-.ausrichten{ display: flex; flex-direction: column; gap: var(--w2b-raum-2); padding: var(--w2b-raum-3) var(--w2b-raum-4); border-top: 1px solid var(--w2b-linie-zart); }
+.tools{ display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--w2b-space-4); align-items: start; }
+.depth{ width: 72px; padding: 4px 7px; text-align: right; }
+.slider{ display: grid; grid-template-columns: 1fr auto; gap: 5px var(--w2b-space-3); align-items: center; padding: var(--w2b-space-3) var(--w2b-space-4); border-top: 1px solid var(--w2b-line-faint); }
+.slider label{ font-family: var(--w2b-font-display); font-weight: 600; font-size: var(--w2b-text-xs); letter-spacing: .09em; text-transform: uppercase; color: var(--w2b-muted); }
+.slider input[type="range"]{ grid-column: 1 / -1; }
+.slider__hint{ grid-column: 1 / -1; font-size: var(--w2b-text-xs); color: var(--w2b-muted); }
+.field--framed{ padding: var(--w2b-space-3) var(--w2b-space-4); border-bottom: 1px solid var(--w2b-line); }
+.custom-size{ display: grid; grid-template-columns: 1fr 1fr; gap: var(--w2b-space-3); padding: var(--w2b-space-3) var(--w2b-space-4); border-bottom: 1px solid var(--w2b-line); background: var(--w2b-secondary-veil); }
+.custom-size__hint{ grid-column: 1 / -1; font-size: var(--w2b-text-xs); color: var(--w2b-secondary-text); }
+.align{ display: flex; flex-direction: column; gap: var(--w2b-space-2); padding: var(--w2b-space-3) var(--w2b-space-4); border-top: 1px solid var(--w2b-line-faint); }
 </style>

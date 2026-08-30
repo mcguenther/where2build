@@ -1,52 +1,52 @@
 <template>
-  <div class="stapel">
-    <nav class="krume nicht-drucken" aria-label="Pfad">
+  <div class="stack">
+    <nav class="breadcrumb no-print" aria-label="Pfad">
       <button type="button" @click="back">Grundstücke</button>
       <span aria-hidden="true">›</span><span>Vergleich</span>
     </nav>
 
-    <div class="seitenkopf">
+    <div class="page-head">
       <div>
-        <p class="marke-klein">Nebeneinander</p>
+        <p class="eyebrow">Nebeneinander</p>
         <h1>Vergleich</h1>
-        <p class="seitenkopf__unter">{{ subtitle }}</p>
+        <p class="page-head__sub">{{ subtitle }}</p>
       </div>
-      <div class="dehnen"></div>
-      <button type="button" class="knopf knopf--still nicht-drucken" @click="back">Auswahl ändern</button>
-      <button type="button" class="knopf knopf--zweit nicht-drucken" @click="print">Drucken</button>
+      <div class="spacer"></div>
+      <button type="button" class="btn btn--quiet no-print" @click="back">Auswahl ändern</button>
+      <button type="button" class="btn btn--secondary no-print" @click="print">Drucken</button>
     </div>
 
-    <section class="tafel">
-      <div class="tafel__kopf"><h3>Kennzahlen</h3></div>
-      <div class="tabelle-rollt">
-        <table class="liste">
+    <section class="panel">
+      <div class="panel__head"><h3>Kennzahlen</h3></div>
+      <div class="table-scroll">
+        <table class="data-table">
           <thead>
             <tr>
-              <th>Grundstück</th><th class="zahl">Fläche</th><th class="zahl">Preis</th>
-              <th class="zahl">Je m²</th><th class="zahl">Δ Bodenrichtwert</th><th>Form</th>
-              <th v-if="firstDestination" class="zahl">{{ firstDestination.name }} ÖPNV</th>
-              <th v-if="secondDestination" class="zahl">{{ secondDestination.name }} Rad</th>
-              <th class="nicht-drucken"></th>
+              <th>Grundstück</th><th class="num">Fläche</th><th class="num">Preis</th>
+              <th class="num">Je m²</th><th class="num">Δ Bodenrichtwert</th><th>Form</th>
+              <th v-if="firstDestination" class="num">{{ firstDestination.name }} ÖPNV</th>
+              <th v-if="secondDestination" class="num">{{ secondDestination.name }} Rad</th>
+              <th class="no-print"></th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="p in selectedPlots" :key="p.id">
               <td>
                 <b>{{ p.name }}</b><br>
-                <span class="zart daten">{{ p.gemarkung }} · Flst. {{ p.flurstuecke.join(" · ") }}</span>
+                <span class="faint mono">{{ p.gemarkung }} · Flst. {{ p.flurstuecke.join(" · ") }}</span>
               </td>
-              <td class="zahl">{{ area(p.officialArea) }}</td>
-              <td class="zahl">{{ euro(p.askingPrice) }}</td>
-              <td class="zahl">{{ euroPerSqm(metrics(p).pricePerSqm) }}</td>
-              <td class="zahl"><span class="chip" :class="`chip--${metrics(p).deviationClass}`">{{ percent(metrics(p).deviation) }}</span></td>
+              <td class="num">{{ area(p.officialArea) }}</td>
+              <td class="num">{{ euro(p.askingPrice) }}</td>
+              <td class="num">{{ euroPerSqm(metrics(p).pricePerSqm) }}</td>
+              <td class="num"><span class="chip" :class="`chip--${metrics(p).deviationClass}`">{{ percent(metrics(p).deviation) }}</span></td>
               <td>
-                <span class="chip chip--gut">{{ metrics(p).shapeClass }}</span>
-                <span class="zart daten"> {{ num(metrics(p).rectangularity, 2) }}</span>
+                <span class="chip chip--good">{{ metrics(p).shapeClass }}</span>
+                <span class="faint mono"> {{ num(metrics(p).rectangularity, 2) }}</span>
               </td>
-              <td v-if="firstDestination" class="zahl">{{ travelTime(p, firstDestination.id, "transit") }}</td>
-              <td v-if="secondDestination" class="zahl">{{ travelTime(p, secondDestination.id, "bike") }}</td>
-              <td class="nicht-drucken">
-                <button type="button" class="knopf knopf--still knopf--klein" @click="open(p.id)">Öffnen</button>
+              <td v-if="firstDestination" class="num">{{ travelTime(p, firstDestination.id, "transit") }}</td>
+              <td v-if="secondDestination" class="num">{{ travelTime(p, secondDestination.id, "bike") }}</td>
+              <td class="no-print">
+                <button type="button" class="btn btn--quiet btn--small" @click="open(p.id)">Öffnen</button>
               </td>
             </tr>
           </tbody>
@@ -54,24 +54,24 @@
       </div>
     </section>
 
-    <section class="tafel">
-      <div class="tafel__kopf">
+    <section class="panel">
+      <div class="panel__head">
         <h3>Gleicher Maßstab, gleiche Ausrichtung</h3>
-        <div class="dehnen"></div><span v-if="scaleDenominator" class="chip">rund 1 : {{ scaleDenominator }}</span>
+        <div class="spacer"></div><span v-if="scaleDenominator" class="chip">rund 1 : {{ scaleDenominator }}</span>
       </div>
-      <div class="tafel__leib">
-        <div class="risse">
-          <figure v-for="p in selectedPlots" :key="p.id" class="riss">
-            <button type="button" class="riss__knopf" :aria-label="`${p.name} öffnen`" @click="open(p.id)">
+      <div class="panel__body">
+        <div class="plan-figures">
+          <figure v-for="p in selectedPlots" :key="p.id" class="plan-figure">
+            <button type="button" class="plan-figure__button" :aria-label="`${p.name} öffnen`" @click="open(p.id)">
               <SitePlan :plot="p" :building="building(p)" :width="220" :height="280" :scale="sharedScale" compact />
             </button>
             <figcaption>
               <span>{{ p.gemarkung }}</span>
-              <span class="daten">R {{ num(metrics(p).rectangularity, 2) }}</span>
+              <span class="mono">R {{ num(metrics(p).rectangularity, 2) }}</span>
             </figcaption>
           </figure>
         </div>
-        <p class="fussnote">
+        <p class="footnote">
           R = Rechteckigkeit: Polygonfläche geteilt durch die Fläche des kleinsten gedrehten
           Umschließungsrechtecks. Über 0,95 rechteckig, 0,85–0,95 fast, darunter komplex.
         </p>
@@ -129,14 +129,14 @@ export default {
 </script>
 
 <style scoped>
-.krume{ display: flex; align-items: center; gap: var(--w2b-raum-2); font-size: var(--w2b-schrift-xs); color: var(--w2b-gedaempft); }
-.krume button{ background: none; border: 0; padding: 0; cursor: pointer; color: var(--w2b-primaer); font: inherit; }
-.seitenkopf{ display: flex; align-items: flex-end; gap: var(--w2b-raum-4); flex-wrap: wrap; }
-.seitenkopf__unter{ margin-top: var(--w2b-raum-2); color: var(--w2b-graphit); font-size: var(--w2b-schrift-s); max-width: 66ch; }
-.zart{ color: var(--w2b-gedaempft); font-size: var(--w2b-schrift-xs); }
-.risse{ display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: var(--w2b-raum-4); }
-.riss{ margin: 0; display: flex; flex-direction: column; gap: var(--w2b-raum-2); }
-.riss__knopf{ padding: 0; border: 1px solid var(--w2b-linie); border-radius: var(--w2b-radius-s); overflow: hidden; background: none; cursor: pointer; }
-.riss figcaption{ display: flex; justify-content: space-between; gap: var(--w2b-raum-2); font-size: var(--w2b-schrift-xs); color: var(--w2b-graphit); }
-.fussnote{ margin-top: var(--w2b-raum-4); font-size: var(--w2b-schrift-xs); color: var(--w2b-gedaempft); }
+.breadcrumb{ display: flex; align-items: center; gap: var(--w2b-space-2); font-size: var(--w2b-text-xs); color: var(--w2b-muted); }
+.breadcrumb button{ background: none; border: 0; padding: 0; cursor: pointer; color: var(--w2b-primary); font: inherit; }
+.page-head{ display: flex; align-items: flex-end; gap: var(--w2b-space-4); flex-wrap: wrap; }
+.page-head__sub{ margin-top: var(--w2b-space-2); color: var(--w2b-graphite); font-size: var(--w2b-text-s); max-width: 66ch; }
+.faint{ color: var(--w2b-muted); font-size: var(--w2b-text-xs); }
+.plan-figures{ display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: var(--w2b-space-4); }
+.plan-figure{ margin: 0; display: flex; flex-direction: column; gap: var(--w2b-space-2); }
+.plan-figure__button{ padding: 0; border: 1px solid var(--w2b-line); border-radius: var(--w2b-radius-s); overflow: hidden; background: none; cursor: pointer; }
+.plan-figure figcaption{ display: flex; justify-content: space-between; gap: var(--w2b-space-2); font-size: var(--w2b-text-xs); color: var(--w2b-graphite); }
+.footnote{ margin-top: var(--w2b-space-4); font-size: var(--w2b-text-xs); color: var(--w2b-muted); }
 </style>

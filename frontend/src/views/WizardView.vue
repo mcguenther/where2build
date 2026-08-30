@@ -1,126 +1,126 @@
 <template>
-  <div class="stapel">
-    <nav class="krume" aria-label="Pfad">
+  <div class="stack">
+    <nav class="breadcrumb" aria-label="Pfad">
       <button type="button" @click="cancel">Grundstücke</button>
       <span aria-hidden="true">›</span>
       <span>Grundstück hinzufügen</span>
     </nav>
 
-    <div class="seitenkopf">
+    <div class="page-head">
       <div>
-        <p class="marke-klein">Aufnahme</p>
+        <p class="eyebrow">Aufnahme</p>
         <h1>Grundstück hinzufügen</h1>
       </div>
-      <div class="dehnen"></div>
-      <button type="button" class="knopf knopf--still" @click="cancel">Abbrechen</button>
+      <div class="spacer"></div>
+      <button type="button" class="btn btn--quiet" @click="cancel">Abbrechen</button>
     </div>
 
-    <ol class="schrittleiste" aria-label="Schritte">
+    <ol class="steps" aria-label="Schritte">
       <li v-for="(s, i) in steps" :key="s.id"
-          :class="{ 'ist-hier': i === step, 'ist-fertig': i < step }"
+          :class="{ 'is-current': i === step, 'is-done': i < step }"
           :aria-current="i === step ? 'step' : null">
-        <span class="schrittleiste__zahl">{{ i < step ? "✓" : i + 1 }}</span>
-        <span class="schrittleiste__name">{{ s.name }}</span>
+        <span class="steps__number">{{ i < step ? "✓" : i + 1 }}</span>
+        <span class="steps__name">{{ s.name }}</span>
       </li>
     </ol>
 
-    <p v-if="error" class="band band--fehler" role="alert">{{ error }}</p>
+    <p v-if="error" class="notice notice--error" role="alert">{{ error }}</p>
 
     <!-- 1 · Quelle -->
-    <section v-if="step === 0" class="stapel">
-      <p class="unterzeile">Drei Wege hinein. Welcher passt zu dem, was vorliegt?</p>
-      <div class="quellen">
-        <label v-for="s in sources" :key="s.id" class="quelle" :class="{ 'quelle--gewaehlt': source === s.id }">
-          <input type="radio" name="quelle" :value="s.id" v-model="source">
-          <span class="quelle__name">{{ s.name }}</span>
-          <span class="quelle__text">{{ s.text }}</span>
+    <section v-if="step === 0" class="stack">
+      <p class="subtitle">Drei Wege hinein. Welcher passt zu dem, was vorliegt?</p>
+      <div class="sources">
+        <label v-for="s in sources" :key="s.id" class="source" :class="{ 'source--selected': source === s.id }">
+          <input type="radio" name="source" :value="s.id" v-model="source">
+          <span class="source__name">{{ s.name }}</span>
+          <span class="source__text">{{ s.text }}</span>
         </label>
       </div>
 
-      <div class="tafel">
-        <div class="tafel__leib stapel">
+      <div class="panel">
+        <div class="panel__body stack">
           <template v-if="source === 'url'">
-            <div class="feld">
+            <div class="field">
               <label for="q-url">Adresse der Anzeige</label>
               <input id="q-url" type="text" v-model="url" placeholder="https://…">
             </div>
-            <p class="hinweis">
+            <p class="hint">
               Die Seite wird auf dem Server geholt und ausgelesen. ImmoScout24 lässt das
               nicht zu — dort den Weg über „Seite einfügen“ nehmen.
             </p>
           </template>
 
           <template v-else-if="source === 'parcel'">
-            <div class="zwei">
-              <div class="feld">
-                <label for="q-gemarkung">Gemarkung</label>
-                <input id="q-gemarkung" type="text" v-model="gemarkung" placeholder="Moritzburg oder 3044">
+            <div class="field-pair">
+              <div class="field">
+                <label for="q-cadastral-district">Gemarkung</label>
+                <input id="q-cadastral-district" type="text" v-model="gemarkung" placeholder="Moritzburg oder 3044">
               </div>
-              <div class="feld">
-                <label for="q-nummer">Flurstücksnummer</label>
-                <input id="q-nummer" type="text" v-model="flurstuecksnummer" placeholder="85/1">
+              <div class="field">
+                <label for="q-parcel-number">Flurstücksnummer</label>
+                <input id="q-parcel-number" type="text" v-model="flurstuecksnummer" placeholder="85/1">
               </div>
             </div>
-            <p class="hinweis">
-              <b>Gemarkung:</b> der Name (<span class="daten">Moritzburg</span>) oder der
+            <p class="hint">
+              <b>Gemarkung:</b> der Name (<span class="mono">Moritzburg</span>) oder der
               Gemarkungsschlüssel — die Sachdatenabfrage zeigt ihn je nach Kartenebene
-              vierstellig (<span class="daten">3044</span>) oder sechsstellig
-              (<span class="daten">143044</span>); beides wird angenommen.
+              vierstellig (<span class="mono">3044</span>) oder sechsstellig
+              (<span class="mono">143044</span>); beides wird angenommen.
               <br>
               <b>Flurstücksnummer:</b> so, wie sie im Geoportal steht —
-              <span class="daten">85/1</span>, <span class="daten">476</span> oder
-              <span class="daten">41/e</span>. Der Nenner darf ein Buchstabe sein.
+              <span class="mono">85/1</span>, <span class="mono">476</span> oder
+              <span class="mono">41/e</span>. Der Nenner darf ein Buchstabe sein.
             </p>
           </template>
 
           <template v-else>
-            <div class="feld">
+            <div class="field">
               <label for="q-paste">Anzeige hier einfügen</label>
               <textarea id="q-paste" v-model="pastedText"
                         placeholder="Strg+V — die kopierte Anzeigenseite"></textarea>
             </div>
           </template>
 
-          <div class="reihe">
-            <button type="button" class="knopf" :disabled="busy || !ready" @click="read">
+          <div class="row">
+            <button type="button" class="btn" :disabled="busy || !ready" @click="read">
               {{ busy ? "Wird gelesen …" : source === "parcel" ? "Nachschlagen" : "Lesen" }}
             </button>
-            <span v-if="busy" class="hinweis">Der Abruf kann eine Minute dauern.</span>
+            <span v-if="busy" class="hint">Der Abruf kann eine Minute dauern.</span>
           </div>
         </div>
       </div>
     </section>
 
     <!-- 2 · Gelesene Werte -->
-    <section v-else-if="step === 1" class="stapel">
-      <p class="unterzeile">
+    <section v-else-if="step === 1" class="stack">
+      <p class="subtitle">
         Jedes Feld führt die Quelle mit, aus der es stammt. Erst nach Bestätigung wandern die
         Werte in die Planung — das Modell antwortet auch dann, wenn die Seite die Zahl gar nicht hergibt.
       </p>
 
-      <div class="vorschlaege">
-        <div v-for="f in readFields" :key="f.key" class="vorschlag" :class="{ 'vorschlag--leer': !f.value }">
-          <span class="vorschlag__kopf">
-            <span class="feldname">{{ f.label }}</span>
-            <span class="vorschlag__marke">{{ f.value ? "automatisch gelesen" : "nicht belegt" }}</span>
+      <div class="suggestions">
+        <div v-for="f in readFields" :key="f.key" class="suggestion" :class="{ 'suggestion--empty': !f.value }">
+          <span class="suggestion__head">
+            <span class="field-label">{{ f.label }}</span>
+            <span class="suggestion__tag">{{ f.value ? "automatisch gelesen" : "nicht belegt" }}</span>
           </span>
           <input type="text" v-model="f.value" :aria-label="f.label"
                  :placeholder="f.value ? '' : 'steht nicht auf der Seite'">
-          <span class="vorschlag__quelle">{{ f.source }}</span>
+          <span class="suggestion__source">{{ f.source }}</span>
         </div>
       </div>
 
-      <div class="reihe">
-        <button type="button" class="knopf" :disabled="busy" @click="lookUpParcel">
+      <div class="row">
+        <button type="button" class="btn" :disabled="busy" @click="lookUpParcel">
           {{ busy ? "Kataster wird abgefragt …" : "Flurstück nachschlagen" }}
         </button>
-        <button type="button" class="knopf knopf--still" @click="step = 0">Zurück</button>
+        <button type="button" class="btn btn--quiet" @click="step = 0">Zurück</button>
       </div>
     </section>
 
     <!-- 3 · Flurstück -->
-    <section v-else-if="step === 2" class="stapel">
-      <p class="unterzeile">
+    <section v-else-if="step === 2" class="stack">
+      <p class="subtitle">
         So liegt das Flurstück im Kataster. Stimmt der Zuschnitt, geht es weiter;
         sonst zurück und die Angaben korrigieren.
       </p>
@@ -128,18 +128,18 @@
       <!-- The service found something implausible for this listing. Not an
            error — the parcel is real — but the user has to see it before the
            next click turns it into a plot they plan a house on. -->
-      <div v-if="doubt" class="band band--fehler zweifel">
+      <div v-if="doubt" class="notice notice--error doubt-note">
         <b>Das ist vermutlich nicht das richtige Flurstück.</b>
         {{ doubt }}
       </div>
 
-      <div class="pruefgitter">
-        <div class="tafel">
+      <div class="check-grid">
+        <div class="panel">
           <SitePlan :plot="draft" :building="draftBuilding" :width="640" :height="440" backdrop="map" north-up />
         </div>
-        <div class="tafel">
-          <div class="tafel__kopf"><h3>Was übernommen wird</h3><div class="dehnen"></div><span class="chip">ALKIS</span></div>
-          <dl class="werteliste">
+        <div class="panel">
+          <div class="panel__head"><h3>Was übernommen wird</h3><div class="spacer"></div><span class="chip">ALKIS</span></div>
+          <dl class="value-list">
             <dt>Gemarkung</dt><dd>{{ draft.gemarkung || "—" }}</dd>
             <dt>Flurstücke</dt><dd>{{ draft.flurstuecke.join(" · ") || "—" }}</dd>
             <dt>Lage</dt><dd>{{ draft.lagebezeichnung || "—" }}</dd>
@@ -148,43 +148,43 @@
             <dt>Grenzpunkte</dt><dd>{{ draft.polygon.length }}</dd>
             <dt>Bodenrichtwert</dt><dd>{{ draft.bodenrichtwert ? euroPerSqm(draft.bodenrichtwert) : "—" }}</dd>
           </dl>
-          <p class="tafel__fussnote">{{ draft.source }}</p>
+          <p class="panel__footnote">{{ draft.source }}</p>
         </div>
       </div>
-      <div class="reihe">
-        <button type="button" :class="doubt ? 'knopf knopf--zweit' : 'knopf'" @click="step = 3">
+      <div class="row">
+        <button type="button" :class="doubt ? 'btn btn--secondary' : 'btn'" @click="step = 3">
           {{ doubt ? "Trotzdem übernehmen" : "Passt" }}
         </button>
-        <button type="button" class="knopf knopf--still" @click="step = returnStep">Zurück</button>
+        <button type="button" class="btn btn--quiet" @click="step = returnStep">Zurück</button>
       </div>
     </section>
 
     <!-- 4 · Angaben -->
-    <section v-else class="stapel">
-      <div class="tafel">
-        <div class="tafel__leib stapel">
-          <div class="zwei">
-            <div class="feld">
+    <section v-else class="stack">
+      <div class="panel">
+        <div class="panel__body stack">
+          <div class="field-pair">
+            <div class="field">
               <label for="q-name">Name in der Übersicht</label>
               <input id="q-name" type="text" v-model="draft.name">
             </div>
-            <div class="feld">
-              <label for="q-preis">Kaufpreis in Euro</label>
-              <input id="q-preis" type="number" min="0" step="1000" v-model.number="draft.askingPrice"
+            <div class="field">
+              <label for="q-price">Kaufpreis in Euro</label>
+              <input id="q-price" type="number" min="0" step="1000" v-model.number="draft.askingPrice"
                      placeholder="ohne Angabe kein €/m²-Vergleich">
             </div>
           </div>
-          <div class="feld">
-            <label for="q-notiz">Notiz</label>
-            <input id="q-notiz" type="text" v-model="draft.note" placeholder="Optional — was auffiel">
+          <div class="field">
+            <label for="q-note">Notiz</label>
+            <input id="q-note" type="text" v-model="draft.note" placeholder="Optional — was auffiel">
           </div>
-          <p v-if="!draft.bodenrichtwert" class="band">
+          <p v-if="!draft.bodenrichtwert" class="notice">
             Für dieses Grundstück ließ sich kein Bodenrichtwert abrufen. Die Preiseinordnung
             bleibt dann leer; nachtragen lässt sie sich später.
           </p>
-          <div class="reihe">
-            <button type="button" class="knopf" @click="create">Anlegen und öffnen</button>
-            <button type="button" class="knopf knopf--still" @click="step = 2">Zurück</button>
+          <div class="row">
+            <button type="button" class="btn" @click="create">Anlegen und öffnen</button>
+            <button type="button" class="btn btn--quiet" @click="step = 2">Zurück</button>
           </div>
         </div>
       </div>
@@ -363,67 +363,67 @@ export default {
 </script>
 
 <style scoped>
-.zweifel{ display: block; line-height: 1.5; }
-.zweifel b{ display: block; margin-bottom: 2px; }
-.krume{ display: flex; align-items: center; gap: var(--w2b-raum-2); font-size: var(--w2b-schrift-xs); color: var(--w2b-gedaempft); }
-.krume button{ background: none; border: 0; padding: 0; cursor: pointer; color: var(--w2b-primaer); font: inherit; }
-.seitenkopf{ display: flex; align-items: flex-end; gap: var(--w2b-raum-4); flex-wrap: wrap; }
-.unterzeile{ color: var(--w2b-graphit); font-size: var(--w2b-schrift-s); max-width: 70ch; }
-.hinweis{ color: var(--w2b-gedaempft); font-size: var(--w2b-schrift-s); }
+.doubt-note{ display: block; line-height: 1.5; }
+.doubt-note b{ display: block; margin-bottom: 2px; }
+.breadcrumb{ display: flex; align-items: center; gap: var(--w2b-space-2); font-size: var(--w2b-text-xs); color: var(--w2b-muted); }
+.breadcrumb button{ background: none; border: 0; padding: 0; cursor: pointer; color: var(--w2b-primary); font: inherit; }
+.page-head{ display: flex; align-items: flex-end; gap: var(--w2b-space-4); flex-wrap: wrap; }
+.subtitle{ color: var(--w2b-graphite); font-size: var(--w2b-text-s); max-width: 70ch; }
+.hint{ color: var(--w2b-muted); font-size: var(--w2b-text-s); }
 
-.schrittleiste{ display: flex; gap: var(--w2b-raum-2); flex-wrap: wrap; list-style: none; margin: 0; padding: 0; }
-.schrittleiste li{
-  display: flex; align-items: center; gap: var(--w2b-raum-2);
-  padding: 9px var(--w2b-raum-4) 9px 10px; border-radius: var(--w2b-radius-voll);
-  border: 1px solid var(--w2b-linie); background: var(--w2b-flaeche);
-  font-family: var(--w2b-anzeige); font-weight: 600; font-size: var(--w2b-schrift-s); color: var(--w2b-gedaempft);
+.steps{ display: flex; gap: var(--w2b-space-2); flex-wrap: wrap; list-style: none; margin: 0; padding: 0; }
+.steps li{
+  display: flex; align-items: center; gap: var(--w2b-space-2);
+  padding: 9px var(--w2b-space-4) 9px 10px; border-radius: var(--w2b-radius-full);
+  border: 1px solid var(--w2b-line); background: var(--w2b-surface);
+  font-family: var(--w2b-font-display); font-weight: 600; font-size: var(--w2b-text-s); color: var(--w2b-muted);
 }
-.schrittleiste__zahl{
+.steps__number{
   display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
-  background: var(--w2b-linie-zart); color: var(--w2b-graphit);
-  font-family: var(--w2b-daten); font-size: var(--w2b-schrift-xs);
+  background: var(--w2b-line-faint); color: var(--w2b-graphite);
+  font-family: var(--w2b-font-mono); font-size: var(--w2b-text-xs);
 }
-.schrittleiste .ist-hier{ border-color: var(--w2b-primaer); color: var(--w2b-tinte); }
-.schrittleiste .ist-hier .schrittleiste__zahl{ background: var(--w2b-primaer); color: var(--w2b-primaer-auf); }
-.schrittleiste .ist-fertig{ color: var(--w2b-primaer); border-color: var(--w2b-primaer-schleier); }
-.schrittleiste .ist-fertig .schrittleiste__zahl{ background: var(--w2b-primaer-schleier); color: var(--w2b-primaer); }
+.steps .is-current{ border-color: var(--w2b-primary); color: var(--w2b-ink); }
+.steps .is-current .steps__number{ background: var(--w2b-primary); color: var(--w2b-primary-on); }
+.steps .is-done{ color: var(--w2b-primary); border-color: var(--w2b-primary-veil); }
+.steps .is-done .steps__number{ background: var(--w2b-primary-veil); color: var(--w2b-primary); }
 
-.quellen{ display: grid; grid-template-columns: repeat(auto-fit, minmax(272px, 1fr)); gap: var(--w2b-raum-3); }
-.quelle{
-  display: flex; flex-direction: column; gap: var(--w2b-raum-2); cursor: pointer;
-  padding: var(--w2b-raum-4); border: 1.5px solid var(--w2b-linie); border-radius: var(--w2b-radius-m);
-  background: var(--w2b-flaeche);
+.sources{ display: grid; grid-template-columns: repeat(auto-fit, minmax(272px, 1fr)); gap: var(--w2b-space-3); }
+.source{
+  display: flex; flex-direction: column; gap: var(--w2b-space-2); cursor: pointer;
+  padding: var(--w2b-space-4); border: 1.5px solid var(--w2b-line); border-radius: var(--w2b-radius-m);
+  background: var(--w2b-surface);
 }
-.quelle input{ position: absolute; opacity: 0; pointer-events: none; }
-.quelle--gewaehlt{ border-color: var(--w2b-primaer); background: var(--w2b-primaer-schleier); }
-.quelle__name{ font-family: var(--w2b-anzeige); font-weight: 600; font-size: var(--w2b-schrift-l); }
-.quelle__text{ font-size: var(--w2b-schrift-s); color: var(--w2b-graphit); }
+.source input{ position: absolute; opacity: 0; pointer-events: none; }
+.source--selected{ border-color: var(--w2b-primary); background: var(--w2b-primary-veil); }
+.source__name{ font-family: var(--w2b-font-display); font-weight: 600; font-size: var(--w2b-text-l); }
+.source__text{ font-size: var(--w2b-text-s); color: var(--w2b-graphite); }
 
-.zwei{ display: grid; grid-template-columns: 1fr 1fr; gap: var(--w2b-raum-3); }
-@media (max-width: 560px){ .zwei{ grid-template-columns: 1fr; } }
+.field-pair{ display: grid; grid-template-columns: 1fr 1fr; gap: var(--w2b-space-3); }
+@media (max-width: 560px){ .field-pair{ grid-template-columns: 1fr; } }
 
-.vorschlaege{ display: grid; grid-template-columns: repeat(auto-fill, minmax(244px, 1fr)); gap: var(--w2b-raum-3); }
-.vorschlag{
-  display: flex; flex-direction: column; gap: var(--w2b-raum-2);
-  padding: var(--w2b-raum-3) var(--w2b-raum-4);
-  border: 1.5px dashed var(--w2b-sekundaer); border-radius: var(--w2b-radius-m);
-  background: var(--w2b-sekundaer-schleier);
+.suggestions{ display: grid; grid-template-columns: repeat(auto-fill, minmax(244px, 1fr)); gap: var(--w2b-space-3); }
+.suggestion{
+  display: flex; flex-direction: column; gap: var(--w2b-space-2);
+  padding: var(--w2b-space-3) var(--w2b-space-4);
+  border: 1.5px dashed var(--w2b-secondary); border-radius: var(--w2b-radius-m);
+  background: var(--w2b-secondary-veil);
 }
-.vorschlag--leer{ border-color: var(--w2b-fehler); background: var(--w2b-fehler-flaeche); }
-.vorschlag__kopf{ display: flex; align-items: center; gap: var(--w2b-raum-2); flex-wrap: wrap; }
-.vorschlag__marke{
-  font-family: var(--w2b-daten); font-size: 9.5px; letter-spacing: .06em; text-transform: uppercase;
-  padding: 1px 7px; border-radius: var(--w2b-radius-voll);
-  border: 1px solid var(--w2b-sekundaer-text); color: var(--w2b-sekundaer-text);
+.suggestion--empty{ border-color: var(--w2b-error); background: var(--w2b-error-surface); }
+.suggestion__head{ display: flex; align-items: center; gap: var(--w2b-space-2); flex-wrap: wrap; }
+.suggestion__tag{
+  font-family: var(--w2b-font-mono); font-size: 9.5px; letter-spacing: .06em; text-transform: uppercase;
+  padding: 1px 7px; border-radius: var(--w2b-radius-full);
+  border: 1px solid var(--w2b-secondary-text); color: var(--w2b-secondary-text);
 }
-.vorschlag--leer .vorschlag__marke{ border-color: var(--w2b-fehler); color: var(--w2b-fehler); }
-.vorschlag__quelle{ font-family: var(--w2b-daten); font-size: 10px; color: var(--w2b-gedaempft); overflow-wrap: anywhere; line-height: 1.45; }
+.suggestion--empty .suggestion__tag{ border-color: var(--w2b-error); color: var(--w2b-error); }
+.suggestion__source{ font-family: var(--w2b-font-mono); font-size: 10px; color: var(--w2b-muted); overflow-wrap: anywhere; line-height: 1.45; }
 
-.pruefgitter{ display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: var(--w2b-raum-4); align-items: start; }
-@media (max-width: 900px){ .pruefgitter{ grid-template-columns: 1fr; } }
-.werteliste{ margin: 0; display: grid; grid-template-columns: auto 1fr; }
-.werteliste dt, .werteliste dd{ padding: 8px var(--w2b-raum-4); border-bottom: 1px solid var(--w2b-linie-zart); margin: 0; display: flex; align-items: center; }
-.werteliste dt{ font-size: var(--w2b-schrift-s); color: var(--w2b-graphit); }
-.werteliste dd{ justify-content: flex-end; font-family: var(--w2b-daten); font-size: var(--w2b-schrift-s); font-variant-numeric: tabular-nums; text-align: right; }
-.tafel__fussnote{ padding: var(--w2b-raum-3) var(--w2b-raum-4); font-size: var(--w2b-schrift-xs); color: var(--w2b-gedaempft); }
+.check-grid{ display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: var(--w2b-space-4); align-items: start; }
+@media (max-width: 900px){ .check-grid{ grid-template-columns: 1fr; } }
+.value-list{ margin: 0; display: grid; grid-template-columns: auto 1fr; }
+.value-list dt, .value-list dd{ padding: 8px var(--w2b-space-4); border-bottom: 1px solid var(--w2b-line-faint); margin: 0; display: flex; align-items: center; }
+.value-list dt{ font-size: var(--w2b-text-s); color: var(--w2b-graphite); }
+.value-list dd{ justify-content: flex-end; font-family: var(--w2b-font-mono); font-size: var(--w2b-text-s); font-variant-numeric: tabular-nums; text-align: right; }
+.panel__footnote{ padding: var(--w2b-space-3) var(--w2b-space-4); font-size: var(--w2b-text-xs); color: var(--w2b-muted); }
 </style>

@@ -24,10 +24,10 @@ export function plotMetrics(plot) {
        the two differ by a few square metres and only the official figure counts. */
     pricePerSqm: perSqm,
     deviation,
-    // The value goes straight into a `chip--…` CSS class, which stays German.
+    // The value is the modifier of a `chip--…` CSS class.
     deviationClass: deviation === null
-      ? "unbekannt"
-      : Math.abs(deviation) <= 5 ? "gut" : deviation > 15 ? "fehler" : "warn",
+      ? "unknown"
+      : Math.abs(deviation) <= 5 ? "good" : deviation > 15 ? "error" : "warn",
     streetFrontage: polygonEdges(plot.polygon)[0].length
   };
 }
