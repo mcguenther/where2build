@@ -447,7 +447,8 @@ class NearbyService:
             if kategorie in status:
                 continue
             # Counted over `kategorien`, not over the label: a stop listed once
-            # as `bahnhof` still counts for `sbahn` when the S-Bahn calls there.
+            # as `bahnhof` still counts for `sbahn` when it is among the nearest
+            # S-Bahn stops. Bounded by `treffer_je_kategorie` either way.
             anzahl = sum(1 for hit in treffer if kategorie in hit.kategorien)
             status[kategorie] = KategorieStatus(
                 kategorie=kategorie,
@@ -519,7 +520,7 @@ def _primary_category(kategorien: list[str]) -> str:
 def _merge_duplicate_stops(
     shortlist: dict[str, list[UmgebungTreffer]], requested: Sequence[str]
 ) -> list[UmgebungTreffer]:
-    """One row per physical place, carrying every category it satisfies.
+    """One row per physical place, carrying every category it was found for.
 
     Verified around Wilhelm-Leuschner-Platz: Leipzig Markt and Leipzig
     Bayerischer Bahnhof each carry REGIONAL_RAIL *and* SUBURBAN, so both were

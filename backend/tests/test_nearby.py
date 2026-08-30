@@ -485,3 +485,225 @@ def test_the_answer_carries_its_sources_and_a_note_on_what_the_numbers_are(clien
     assert "OpenStreetMap" in body["quelle"] and "Transitous" in body["quelle"]
     assert "Gehzeiten" in body["hinweis"]
     assert "Luftlinie" in body["hinweis"]
+
+
+# --------------------------------------------------------------------------
+# One physical stop, one row
+# --------------------------------------------------------------------------
+
+# Wilhelm-Leuschner-Platz, over the Leipzig City-Tunnel. `motis_stops_citytunnel`
+# and `motis_stop_citytunnel` are real `map/stops` and `stop` answers from
+# api.transitous.org, recorded 30.08.2026 -- the stops around this coordinate are
+# the case that made this necessary: `Leipzig Markt`, `Leipzig Bayerischer
+# Bahnhof` and `Leipzig Wilhelm-Leuschner-Platz` each carry REGIONAL_RAIL *and*
+# SUBURBAN, so each was listed once as `sbahn` and again as `bahnhof`.
+CITYTUNNEL = {"lat": 51.3350, "lon": 12.3770}
+
+
+def _mock_citytunnel():
+    respx.get(STOPS_URL).mock(
+        return_value=httpx.Response(200, json=fixture_json("motis_stops_citytunnel.json"))
+    )
+
+
+@respx.mock
+def test_a_stop_serving_two_categories_is_listed_once(client: TestClient):
+    """The observed bug, and the shape of the fix.
+
+    Six rows for three stations become three. Both categories still count all
+    three -- `anzahl` is over `kategorien`, not over the label -- so nothing
+    claims "nichts gefunden" about something that was found.
+    """
+
+    _mock_citytunnel()
+    respx.post(MATRIX_URL).mock(side_effect=_by_air)
+
+    body = client.post(
+        "/api/nearby",
+        json={
+            "origin": CITYTUNNEL,
+            "kategorien": ["sbahn", "bahnhof"],
+            "treffer_je_kategorie": 3,
+        },
+    ).json()
+
+    assert [hit["name"] for hit in body["treffer"]] == [
+        "Leipzig Wilhelm-Leuschner-Platz",
+        "Leipzig Markt",
+        "Leipzig Bayerischer Bahnhof",
+    ]
+    # Labelled with the longest-range category it serves, and carrying the rest.
+    assert [hit["kategorie"] for hit in body["treffer"]] == ["bahnhof"] * 3
+    assert all(hit["kategorien"] == ["sbahn", "bahnhof"] for hit in body["treffer"])
+    # `art` already said what calls there; that is unchanged.
+    assert body["treffer"][0]["art"] == "Regionalbahn, S-Bahn"
+    assert body["treffer"][2]["art"] == "Regionalbahn, S-Bahn, Bus"
+
+    status = {entry["kategorie"]: entry for entry in body["kategorien"]}
+    assert status["sbahn"]["anzahl"] == 3
+    assert status["bahnhof"]["anzahl"] == 3
+    assert status["sbahn"]["hinweis"] is None
+
+
+@respx.mock
+def test_asking_only_for_sbahn_still_returns_the_sbahn_stops(client: TestClient):
+    """The dedupe happens after the per-category ranking, so a caller that asks
+    one question gets exactly what it asked for."""
+
+    _mock_citytunnel()
+    respx.post(MATRIX_URL).mock(side_effect=_by_air)
+
+    body = client.post(
+        "/api/nearby",
+        json={"origin": CITYTUNNEL, "kategorien": ["sbahn"], "treffer_je_kategorie": 3},
+    ).json()
+
+    assert [hit["name"] for hit in body["treffer"]] == [
+        "Leipzig Wilhelm-Leuschner-Platz",
+        "Leipzig Markt",
+        "Leipzig Bayerischer Bahnhof",
+    ]
+    assert all(hit["kategorie"] == "sbahn" for hit in body["treffer"])
+    assert all(hit["kategorien"] == ["sbahn"] for hit in body["treffer"])
+
+
+@respx.mock
+def test_every_stop_appears_exactly_once_across_all_categories(client: TestClient):
+    """Seven physical stops, four categories, seven rows -- not twelve."""
+
+    _mock_citytunnel()
+    respx.post(MATRIX_URL).mock(side_effect=_by_air)
+
+    body = client.post(
+        "/api/nearby",
+        json={
+            "origin": CITYTUNNEL,
+            "kategorien": ["tram", "sbahn", "bus", "bahnhof"],
+            "treffer_je_kategorie": 3,
+        },
+    ).json()
+
+    stop_ids = [hit["stop_id"] for hit in body["treffer"]]
+    assert len(stop_ids) == len(set(stop_ids)) == 7
+    by_name = {hit["name"]: hit for hit in body["treffer"]}
+    assert by_name["Leipzig, Wilhelm-Leuschner-Platz (Tram/Bus)"]["kategorien"] == ["tram", "bus"]
+    assert by_name["Leipzig Markt"]["kategorien"] == ["sbahn", "bahnhof"]
+    assert by_name["Leipzig Markt"]["kategorie"] == "bahnhof"
+    # Two names, two ids, two physical stops: the S-Bahn station under the
+    # market square and the bus stop on it are not the same place.
+    assert by_name["Leipzig, Markt (Bus)"]["kategorien"] == ["bus"]
+    assert by_name["Leipzig, Markt (Bus)"]["stop_id"] != by_name["Leipzig Markt"]["stop_id"]
+    # Leipzig Hbf is here as one of the three nearest tram stops -- the three
+    # nearer stations beat it in `bahnhof`. The label says why the row is in the
+    # list; `art` still says everything that calls there.
+    assert by_name["Leipzig Hbf"]["kategorie"] == "tram"
+    assert (
+        by_name["Leipzig Hbf"]["art"]
+        == "Fernverkehr, Regionalbahn, S-Bahn, Straßenbahn, Fernbus, Bus"
+    )
+
+    status = {entry["kategorie"]: entry for entry in body["kategorien"]}
+    assert [status[k]["anzahl"] for k in ("tram", "sbahn", "bus", "bahnhof")] == [3, 3, 3, 3]
+
+
+@respx.mock
+def test_a_regional_stop_is_a_bahnhof_and_never_an_sbahn(client: TestClient):
+    """Leipzig-Liebertwolkwitz carries REGIONAL_RAIL and is served by RB113 to
+    Geithain. That is a regional train, not an S-Bahn -- the real S-Bahn stops
+    carry SUBURBAN as well, and neither of these does."""
+
+    _mock_stops()
+    respx.post(MATRIX_URL).mock(side_effect=_by_air)
+
+    body = client.post(
+        "/api/nearby",
+        json={"origin": ORIGIN, "kategorien": ["sbahn", "bahnhof"], "umkreis_m": 5000},
+    ).json()
+
+    bahnhoefe = [hit for hit in body["treffer"] if hit["kategorie"] == "bahnhof"]
+    assert {hit["name"] for hit in bahnhoefe} == {
+        "Leipzig-Liebertwolkwitz",
+        "Leipzig-Holzhausen",
+    }
+    assert all(hit["kategorien"] == ["bahnhof"] for hit in bahnhoefe)
+    status = {entry["kategorie"]: entry for entry in body["kategorien"]}
+    assert status["sbahn"]["verfuegbar"] is True
+    assert status["sbahn"]["anzahl"] == 0
+    assert "Umkreis" in status["sbahn"]["hinweis"]
+
+
+@respx.mock
+def test_a_merged_stop_shows_the_lines_of_every_mode_it_serves(client: TestClient):
+    """Otherwise merging would lose exactly the lines it merged the row for.
+
+    The row is labelled `bahnhof`; filtering on that category alone would drop
+    every S-Bahn line at the stop and leave an empty list, which reads as "hier
+    faehrt nichts".
+    """
+
+    _mock_citytunnel()
+    respx.post(MATRIX_URL).mock(side_effect=_by_air)
+    stop = respx.get(STOP_URL).mock(
+        return_value=httpx.Response(200, json=fixture_json("motis_stop_citytunnel.json"))
+    )
+
+    body = client.post(
+        "/api/nearby",
+        json={
+            "origin": CITYTUNNEL,
+            "kategorien": ["sbahn", "bahnhof"],
+            "treffer_je_kategorie": 1,
+            "linien": True,
+        },
+    ).json()
+
+    assert stop.call_count == 1
+    assert body["treffer"][0]["name"] == "Leipzig Wilhelm-Leuschner-Platz"
+    assert body["treffer"][0]["kategorie"] == "bahnhof"
+    assert body["treffer"][0]["linien"] == ["S1", "S2", "S3", "S4", "S5", "S5X"]
+
+
+@respx.mock
+def test_an_osm_place_carries_exactly_its_own_category(poi_index, client: TestClient):
+    """A school is a school. Only stops can be several things at once."""
+
+    respx.post(MATRIX_URL).mock(side_effect=_by_air)
+
+    treffer = client.post(
+        "/api/nearby", json={"origin": ORIGIN, "kategorien": ["schule", "supermarkt"]}
+    ).json()["treffer"]
+
+    assert treffer
+    assert all(hit["kategorien"] == [hit["kategorie"]] for hit in treffer)
+    assert all(hit["stop_id"] is None for hit in treffer)
+
+
+@respx.mock
+def test_a_category_a_stop_was_not_found_for_is_not_claimed(client: TestClient):
+    """`kategorien` lists what the hit was found for, not every mode it serves.
+
+    Leipzig-Liebertwolkwitz carries REGIONAL_RAIL *and* BUS, but two bus stops
+    in the village are nearer, so it is not one of the two nearest bus stops and
+    does not claim to be. `art` still says "Regionalbahn, Bus".
+    """
+
+    _mock_stops()
+    respx.post(MATRIX_URL).mock(side_effect=_by_air)
+
+    body = client.post(
+        "/api/nearby",
+        json={
+            "origin": ORIGIN,
+            "kategorien": ["bus", "bahnhof"],
+            "umkreis_m": 5000,
+            "treffer_je_kategorie": 2,
+        },
+    ).json()
+
+    station = next(hit for hit in body["treffer"] if hit["name"] == "Leipzig-Liebertwolkwitz")
+    assert station["kategorien"] == ["bahnhof"]
+    assert station["art"] == "Regionalbahn, Bus"
+    status = {entry["kategorie"]: entry for entry in body["kategorien"]}
+    # Never more than treffer_je_kategorie, whatever the merging did.
+    assert status["bus"]["anzahl"] == 2
+    assert status["bahnhof"]["anzahl"] == 2

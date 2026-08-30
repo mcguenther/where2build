@@ -637,9 +637,11 @@ class UmgebungTreffer(BaseModel):
     # The category this row is labelled with. One stop can serve several, and
     # then this is the longest-range one among those that were asked for.
     kategorie: Kategorie
-    # Every requested category this place satisfies, `kategorie` included. A
-    # stop where the S-Bahn and regional trains both call is listed once, with
-    # ["sbahn", "bahnhof"] here, instead of once per category.
+    # The requested categories this hit was found for, `kategorie` included --
+    # a stop among the nearest for both `sbahn` and `bahnhof` is listed once and
+    # carries both, instead of appearing twice. Not every mode that calls here:
+    # a stop can serve buses and still be too far to be one of the nearest bus
+    # stops. `art` is what lists the modes.
     kategorien: list[Kategorie] = Field(default_factory=list)
     # Absent is normal, not an error: most Saxon playgrounds carry no name.
     name: str | None = None
@@ -677,10 +679,11 @@ class KategorieStatus(BaseModel):
 
     kategorie: Kategorie
     verfuegbar: bool
-    # How many hits satisfy this category -- which is not the number of rows
-    # carrying it in `kategorie`. A stop listed once under `bahnhof` still
-    # counts for `sbahn` when the S-Bahn calls there, so this never says
-    # "nichts gefunden" about something that was in fact found.
+    # How many returned hits carry this category in `kategorien` -- which is not
+    # the number of rows labelled with it in `kategorie`. A stop listed once
+    # under `bahnhof` still counts for `sbahn` when it is among the nearest
+    # S-Bahn stops, so this never says "nichts gefunden" about something that
+    # was in fact found. Never more than `treffer_je_kategorie`.
     anzahl: int = 0
     hinweis: str | None = None
 

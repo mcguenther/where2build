@@ -22,6 +22,7 @@ FIXTURES = Path(__file__).parent / "fixtures"
 ALKIS_URL = "https://alkis.example.org/wfs"
 BORIS_URL = "https://boris.example.org/wms"
 MOTIS_URL = "https://motis.example.org"
+OVERPASS_URL = "https://overpass.example.org/api/interpreter"
 LLM_URL = "https://llm.example.org/v1"
 DOP_URL = "https://wms.example.org/dop"
 BASEMAP_URL = "https://tiles.openfreemap.org"
@@ -56,6 +57,11 @@ def isolated_settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     # test's own tmp_path rather than deleted, so a developer's own built index
     # in backend/data cannot make the "index missing" tests pass by accident.
     monkeypatch.setenv("NEARBY_POI_INDEX_PATH", str(tmp_path / "kein-poi-index.json"))
+    # Off, like a fresh deployment, and pointed somewhere harmless either way:
+    # a developer's own .env must not be able to send a test to a public
+    # Overpass instance.
+    monkeypatch.setenv("OVERPASS_ENABLED", "false")
+    monkeypatch.setenv("OVERPASS_URL", OVERPASS_URL)
     reset_services()
     yield
     reset_services()
@@ -90,5 +96,18 @@ def poi_index(monkeypatch: pytest.MonkeyPatch):
     """
 
     monkeypatch.setenv("NEARBY_POI_INDEX_PATH", str(FIXTURES / "poi_index.json"))
+    reset_services()
+    yield
+
+
+@pytest.fixture
+def overpass(monkeypatch: pytest.MonkeyPatch):
+    """A deployment that switched the live OpenStreetMap source on.
+
+    The prototype setting: no index built, ``OVERPASS_ENABLED=true``, and every
+    request for a school or a park turns into one Overpass query.
+    """
+
+    monkeypatch.setenv("OVERPASS_ENABLED", "true")
     reset_services()
     yield

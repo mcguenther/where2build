@@ -9,8 +9,8 @@ manufacturer pages into structured, unconfirmed suggestions.
 Data sources: ALKIS (parcels), BORIS (land reference values), GeoSN WMS
 (orthophoto, topographic map, cadastral map), OpenFreeMap (vector basemap),
 MOTIS/Transitous (multimodal routing and public-transport stops), a locally
-built OpenStreetMap index for everyday destinations, and one OpenAI-compatible
-provider for page extraction.
+built OpenStreetMap index for everyday destinations (or, for a prototype, a live
+Overpass query), and one OpenAI-compatible provider for page extraction.
 
 The browser talks to this API and to nothing else. Every authority service,
 and the basemap along with them, is proxied here -- that is what makes the app
@@ -446,14 +446,16 @@ in between and the crossing there is a ferry.
 // Answer (200)
 {
   "treffer": [
-    { "kategorie": "schule", "name": "Geschwister Scholl Schule Liebertwolkwitz — Oberschule …",
+    { "kategorie": "schule", "kategorien": ["schule"],
+      "name": "Geschwister Scholl Schule Liebertwolkwitz — Oberschule …",
       "art": "Oberschule", "lat": 51.284419, "lon": 12.460414, "erreichbar": true,
       "duration_s": 362, "distance_m": 393, "luftlinie_m": 254,
       "quelle": "osm", "osm_id": "N10985287011", "stop_id": null, "linien": null },
-    { "kategorie": "bahnhof", "name": "Leipzig-Liebertwolkwitz", "art": "Regionalbahn, Bus",
-      "lat": 51.283970, "lon": 12.469248, "erreichbar": true,
+    { "kategorie": "bahnhof", "kategorien": ["sbahn", "bahnhof"],
+      "name": "Leipzig Markt", "art": "Regionalbahn, S-Bahn",
+      "lat": 51.340431, "lon": 12.374781, "erreichbar": true,
       "duration_s": 630, "distance_m": 742, "luftlinie_m": 454,
-      "quelle": "motis", "osm_id": null, "stop_id": "de-DELFI_de:14713:8012228", "linien": null }
+      "quelle": "motis", "osm_id": null, "stop_id": "de-DELFI_de:14713:15477", "linien": null }
   ],
   "kategorien": [
     { "kategorie": "schule", "verfuegbar": true,  "anzahl": 2, "hinweis": null },
@@ -473,7 +475,7 @@ in between and the crossing there is a ferry.
 | Kategorie | Source | Note |
 |---|---|---|
 | `tram`, `sbahn`, `bus`, `bahnhof` | **MOTIS timetable**, live | Works with no local data at all |
-| `schule`, `kindergarten`, `park`, `spielplatz`, `supermarkt`, `arzt` | **Local OSM index**, built offline | Answers "kein Datenbestand" until the index is built |
+| `schule`, `kindergarten`, `park`, `spielplatz`, `supermarkt`, `arzt` | **Local OSM index**, built offline — else a **live Overpass query** if `OVERPASS_ENABLED` — else "kein Datenbestand" | The source that answered is in each hit's `quelle`: `osm` or `overpass` |
 
 The stop categories are split on each stop's own `modes` array, which MOTIS
 derives from the GTFS feeds. That is the whole reason the transit half does not
@@ -486,6 +488,50 @@ hands it over as `"modes": ["SUBURBAN"]` and separates `Leipzig Markt`
 `bahnhof` is `REGIONAL_RAIL`, `REGIONAL_FAST_RAIL`, `LONG_DISTANCE`,
 `HIGHSPEED_RAIL` or `NIGHT_RAIL`. Ferries, funiculars and the aerial lifts are
 deliberately not their own category, although the data carries them.
+
+### One physical stop, one row
+
+A stop that carries several modes used to be listed once per category. Around
+Wilhelm-Leuschner-Platz that is four rows for two stations:
+
+```
+sbahn      Leipzig Markt                  Regionalbahn, S-Bahn
+sbahn      Leipzig Bayerischer Bahnhof    Regionalbahn, S-Bahn, Bus
+bahnhof    Leipzig Markt                  Regionalbahn, S-Bahn
+bahnhof    Leipzig Bayerischer Bahnhof    Regionalbahn, S-Bahn, Bus
+```
+
+The categorisation was right — those stops really do carry `REGIONAL_RAIL` *and*
+`SUBURBAN` — so the fix is not in the categorisation. Hits are now **merged by
+`stop_id` after the per-category ranking**, and each one carries:
+
+* `kategorie` — the single category the row is labelled with. When a stop serves
+  several of the categories that were *asked for*, this is the longest-range one:
+  `bahnhof` > `sbahn` > `tram` > `bus`, the same order `art` lists the modes in.
+* `kategorien[]` — the requested categories the hit was *found for*, `kategorie`
+  included. Not every mode that calls there: a station can serve buses and still
+  be too far to be one of the nearest bus stops. `art` is what lists the modes.
+  For a place from OpenStreetMap this is always a single entry.
+
+So the four rows above become two, both labelled `bahnhof`, both carrying
+`"kategorien": ["sbahn", "bahnhof"]`. Asking for `sbahn` alone is unchanged:
+the merge happens after ranking, so the same stops come back, labelled `sbahn`.
+
+**`anzahl` counts over `kategorien`, not over the label.** `sbahn` reports 2 for
+the answer above even though no row is labelled `sbahn` — otherwise the status
+would say "im Umkreis wurde nichts gefunden" about a stop that was found. It is
+still never more than `treffer_je_kategorie`. A
+frontend that groups by `kategorie` renders one row per stop; one that groups by
+`kategorien[]` can show the stop under both headings. Either way `art`
+("Regionalbahn, S-Bahn, Bus") already says what calls there.
+
+`linien` follows `kategorien[]` too: a merged Bahnhof/S-Bahn stop lists both its
+regional and its S-Bahn lines.
+
+**Not a bug to "fix": `REGIONAL_RAIL` alone is not an S-Bahn.**
+Leipzig-Liebertwolkwitz is served by RB113 to Geithain — a regional train. Real
+S-Bahn stops carry `SUBURBAN` in addition, which is exactly why the split is on
+the timetable's modes and not on a name.
 
 ### `kategorien[]` is the point of the answer, not decoration
 
@@ -521,13 +567,86 @@ The output is a build artefact — `data/` is git-ignored — and wants refreshi
 on the order of once a quarter. `datenstand` in the answer is the extract's own
 replication timestamp, so the UI can say how old the data is.
 
-**Why offline and not a query per request.** The Overpass manual names "setting
-up an app for more than just OSM mappers and relying on the public instances as
-backend" as problematic behaviour in so many words, and rate-limits per IP —
-ours, shared by every user of the app. A build job that runs quarterly is inside
-that policy; a request-time dependency is not, and caching does not change the
-shape of the usage. The full argument, with the measurements, is in
-`../docs/research/poi.md` § 2.2.
+### The live Overpass source — a prototype convenience, not the deployment
+
+Without the index the six OpenStreetMap categories answer "kein Datenbestand".
+For a prototype on one developer's machine that is a needless gap, so there is a
+second source: **one live Overpass query per request**, off unless switched on.
+
+```bash
+OVERPASS_ENABLED=true          # off by default
+OVERPASS_URL=https://overpass-api.de/api/interpreter
+```
+
+The source that answered is named per hit in `quelle`: `osm` for the built
+index, `overpass` for the live query, `motis` for a stop. `/api/health` reports
+the same under `poi`, including which of the two would answer. The order is
+**index if present, else Overpass if enabled, else "kein Datenbestand"** — never
+both, never a mix.
+
+**What the policy actually says.** From the Overpass manual's *Commons* page
+(`dev.overpass-api.de/overpass-doc/en/preface/commons.html`), verbatim:
+
+> "Examples of problematic behaviour: […] **Setting up an app for more than just
+> OSM mappers and relying on the public instances as backend.**"
+> "In the last cast [*sic*], **only running your own instance sustainably serves
+> your mission.**"
+> "As a broad guideline to stay within safety margins, users are expected to send
+> a maximum of about **10000 requests per day** and keep their download volume
+> below about **1 GB per day**."
+> "It is extremely unlikely that you will ever cause problems with **manually put
+> requests**."
+
+Rate limiting is by execution slots **per IP address**, with a cool-down that
+grows under load, and a request "stays enqueued up to 15 seconds" waiting for a
+slot.
+
+So the policy is not a prohibition on querying; it is a prohibition on *being an
+app's backend*. A single-user prototype that issues at most one query per view
+of a plot, behind a 30-day cache, is three orders of magnitude inside the stated
+numbers. An app with users is not — and no amount of caching changes that,
+because the shape of the usage is what the manual objects to, and one server IP
+shared by every user is the worst case under a per-IP slot scheme.
+
+**The production answer is your own instance**, which is why the endpoint is a
+setting: point `OVERPASS_URL` at it and nothing else changes. The offline index
+remains the answer that needs no instance at all.
+
+**What this costs the service, by design:**
+
+| | |
+|---|---|
+| Requests | **One per `/api/nearby` call at most.** Every requested category goes into one union block, so ten categories are one execution slot, not ten. Asking only for stops asks Overpass nothing. |
+| Cache | 30 days on disk, under `.cache/overpass/`. That is the same freshness the quarterly index build would give, and a plot does not move. |
+| Cache key | The query centre rounded to three decimals (~110 m) and the radius rounded up to the next kilometre, so every plot in a street and every radius between 2 001 m and 3 000 m share one answer. A margin covers the rounding; the true air distance is measured against the real coordinate afterwards. |
+| Concurrency | One query in flight (`OVERPASS_MAX_CONCURRENCY`). |
+| Volume | `out tags center` — the areas come back as one coordinate and their tags, without the node id lists `out body` would send. |
+| `User-Agent` | `APP_USER_AGENT`, which carries the app name and a contact address. The Overpass manual asks for no particular agent, unlike Transitous and the OSM API; sending a real one is the point of the policy anyway. |
+| Timeout | `[timeout:25]` in the query, 60 s on the socket — longer on purpose, because the wait for a slot comes on top of the execution. |
+
+**When it fails, the six categories fail and nothing else.** Stops, stations and
+all the walking times come from the timetable and are untouched. The category
+comes back `verfuegbar: false` with the German sentence from the failure — never
+"im Umkreis wurde nichts gefunden", which would be a different and false claim:
+
+* **HTTP 429** — "Der Overpass-Dienst hat die Anfrage wegen zu vieler Zugriffe
+  abgewiesen (HTTP 429). Die öffentlichen Instanzen begrenzen je IP-Adresse …"
+* **`"remark": "runtime error: Query timed out …"`** — Overpass answers **HTTP
+  200 with an empty `elements` array** and puts the failure in `remark`. Reading
+  that as an empty neighbourhood is the one answer this endpoint exists to
+  avoid, so a remark containing "error" is an error. Such an answer is not
+  cached; one busy minute must not blank a category for a month.
+* A timeout, a 504 or a non-JSON body land the same way.
+
+**Both sources read the same tags.** `app/poi_index.py` holds the mapping and
+`categorise()`; the build script and the Overpass service both import them, so
+`leisure=garden`, driving schools, and playgrounds on `access=private`/`permit`
+are excluded from the live query exactly as they are from the extract.
+
+**Why offline is still the default.** A build job that runs quarterly is inside
+the policy for any number of users; a request-time dependency on a public
+instance is only inside it while there is one user. The full argument, with the
+measurements, is in `../docs/research/poi.md` § 2.2.
 
 ### The tag decisions, and why they are not obvious
 
@@ -547,11 +666,16 @@ gardens of terraced houses. `healthcare=doctor` is a second tag on the same node
 as `amenity=doctors`, not a second surgery, so unioning the two double-counts
 every practice.
 
-**The school type is read off the name**, because nothing else carries it:
-`school:DE` has zero objects in Saxony and `isced:level` covers under a fifth of
-schools in two incompatible spellings (`2;3` and `2-3` both occur, and one
-object has value `9`). `art` is therefore a hint next to the name, not a fact,
-and the note in `hinweis` says so.
+**The school type comes from `grades`, then from the name.** `school:DE` has
+zero objects in Saxony and `isced:level` covers under a fifth of schools in two
+incompatible spellings (`2;3` and `2-3` both occur, and one object has value
+`9`). `grades` is present on only 370 objects statewide, but where it is it is
+the harder signal: in the recorded Liebertwolkwitz answer the *Umweltschule der
+Stadt Leipzig* carries `grades=1-4` and a name that gives the type away nowhere.
+Ranges are read narrowly — `1-4` Grundschule, `5-10` Oberschule, `5-12`
+Gymnasium; a single number (`9` occurs) or a span that runs from primary past it
+is not classified and falls through to the name. `art` remains a hint next to
+the name, not a fact, and the note in `hinweis` says so.
 
 **One school is often three objects** — the named Grundschule node, the named
 Oberschule node, and the unnamed way of the shared grounds. Entries of the same
@@ -619,6 +743,7 @@ All settings have defaults; see `.env.example` for the full list with comments.
 | `BORIS_` | `WMS_URL`, `LAYER`, `PORTAL_URL`, `CACHE_TTL_S` | BORIS WMS. The URL carries the reference year (`boris_2026`) — check it once a year. |
 | `MOTIS_` | `BASE_URL`, `TIMEOUT_S`, `MAX_CONCURRENCY`, `MAX_DIRECT_TIME_S`, `MAX_PRE_TRANSIT_TIME_S`, `CACHE_TTL_S`, `STOPS_CACHE_TTL_S`, `MATRIX_CACHE_TTL_S` | Routing, geocoding, stops and walking-time matrices |
 | `NEARBY_` | `POI_INDEX_PATH`, `MAX_CANDIDATES`, `MAX_TIME_S`, `MAX_MATCHING_DISTANCE_M`, `BBOX_GRID_DEG`, `MAX_LINE_LOOKUPS` | `/api/nearby`. Only the POI index needs configuring; stops come from the MOTIS above. |
+| `OVERPASS_` | `ENABLED`, `URL`, `QUERY_TIMEOUT_S`, `TIMEOUT_S`, `CACHE_TTL_S`, `MAX_CONCURRENCY`, `RADIUS_STEP_M`, `ORIGIN_PRECISION`, `ORIGIN_MARGIN_M` | Live OpenStreetMap source for `/api/nearby`, **off by default**. `ENABLED=true` fills in for a missing POI index; `URL` points at a self-hosted instance. |
 | `TILES_` | `DOP_URL`, `DOP_LAYERS`, `WEBATLAS_URL`, `WEBATLAS_LAYERS`, `ALKIS_URL`, `ALKIS_LAYERS`, `CRS`, `IMAGE_FORMAT`, `TILE_SIZE`, `TRANSPARENT`, `CACHE_TTL_S`, `MAX_ZOOM` | WMS proxy |
 | `BASEMAP_` | `UPSTREAM_URL`, `STYLE_PATH`, `PUBLIC_PREFIX`, `REWRITE_HOSTS`, `CACHE_TTL_S`, `TIMEOUT_S` | Vector basemap proxy. Point `UPSTREAM_URL` at your own tile server to drop OpenFreeMap. |
 | `LLM_` | `BASE_URL`, `API_KEY`, `MODEL`, `FETCH_ENGINE`, `TIMEOUT_S`, `MAX_CONTENT_TOKENS` | Extraction provider. No provider is hard-wired; switching one is a line in `.env`. Without `API_KEY` the extraction endpoints answer 503 and the rest of the API keeps working. |
@@ -627,9 +752,11 @@ All settings have defaults; see `.env.example` for the full list with comments.
 
 Everything lands under `APP_CACHE_DIR` (default `.cache/`), one subdirectory per
 service. The POI index is **not** among them: it is a build artefact under
-`data/`, read once at startup, and nothing about `/api/nearby` reaches
-OpenStreetMap at request time. Parcel, land-value, tile, basemap and routing
-entries expire after their `CACHE_TTL_S`; LLM extractions are keyed by normalised URL and kept
+`data/`, read once at startup, and with it in place nothing about `/api/nearby`
+reaches OpenStreetMap at request time. Without it and with `OVERPASS_ENABLED`,
+`.cache/overpass/` holds the live answers for 30 days — a plot does not move.
+Parcel, land-value, tile, basemap and routing entries expire after their
+`CACHE_TTL_S`; LLM extractions are keyed by normalised URL and kept
 indefinitely, because a house type does not change from one week to the next
 and every fetch costs money. Deleting the directory is safe.
 
@@ -638,7 +765,8 @@ and every fetch costs money. Deleting the directory is safe.
 Official data: © GeoSN, dl-de/by-2-0. Routing, stops and lines via
 Transitous/MOTIS (DELFI-GTFS, OpenStreetMap) — link to
 <https://transitous.org/sources/> in the UI. The POI index behind `/api/nearby`
-is derived from OpenStreetMap and carries the same ODbL as the basemap, so
+-- and the live Overpass answers, when that source is switched on -- is derived
+from OpenStreetMap and carries the same ODbL as the basemap, so
 "© OpenStreetMap-Mitwirkende" belongs wherever those hits are shown, not only
 on the map. Basemap via OpenFreeMap and OpenMapTiles from OpenStreetMap data
 (ODbL); the attribution must stay visible on the map even though the tiles arrive

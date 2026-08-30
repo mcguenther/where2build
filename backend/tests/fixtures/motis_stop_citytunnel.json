@@ -1,0 +1,180 @@
+{
+ "place": {
+  "name": "Leipzig Wilhelm-Leuschner-Platz",
+  "stopId": "de-DELFI_de:14713:8012202",
+  "importance": 0.003033742541447282,
+  "lat": 51.335396,
+  "lon": 12.375394000000002,
+  "level": -2.0,
+  "tz": "Europe/Berlin",
+  "vertexType": "TRANSIT",
+  "modes": [
+   "REGIONAL_RAIL",
+   "SUBURBAN"
+  ]
+ },
+ "routes": [
+  {
+   "routeId": "de-DELFI_de:nasa:14|S|MDSB_S1:DBRegio_109",
+   "routeShortName": "S1",
+   "routeLongName": "",
+   "mode": "SUBURBAN",
+   "agencyId": "10437",
+   "agencyName": "DB Regio AG Südost",
+   "agencyUrl": "",
+   "routeColor": "4f9551",
+   "routeTextColor": "ffffff",
+   "routeType": 109
+  },
+  {
+   "routeId": "de-DELFI_162601_109",
+   "routeShortName": "S2",
+   "routeLongName": "",
+   "mode": "SUBURBAN",
+   "agencyId": "10437",
+   "agencyName": "DB Regio AG Südost",
+   "agencyUrl": "",
+   "routeColor": "f58220",
+   "routeTextColor": "ffffff",
+   "routeType": 109
+  },
+  {
+   "routeId": "de-DELFI_de:nasa:15|S|MDSB_S2:DBRegio_109",
+   "routeShortName": "S2",
+   "routeLongName": "",
+   "mode": "SUBURBAN",
+   "agencyId": "10437",
+   "agencyName": "DB Regio AG Südost",
+   "agencyUrl": "",
+   "routeColor": "f58220",
+   "routeTextColor": "ffffff",
+   "routeType": 109
+  },
+  {
+   "routeId": "de-DELFI_de:nasa:14|S|MDSB_S3:DBRegio_109",
+   "routeShortName": "S3",
+   "routeLongName": "",
+   "mode": "SUBURBAN",
+   "agencyId": "10437",
+   "agencyName": "DB Regio AG Südost",
+   "agencyUrl": "",
+   "routeColor": "00b3ef",
+   "routeTextColor": "ffffff",
+   "routeType": 109
+  },
+  {
+   "routeId": "de-DELFI_de:nasa:14|S|MDSB_S3:DBRegio_D_109",
+   "routeShortName": "S3",
+   "routeLongName": "",
+   "mode": "SUBURBAN",
+   "agencyId": "10437",
+   "agencyName": "DB Regio AG Südost",
+   "agencyUrl": "",
+   "routeColor": "00b3ef",
+   "routeTextColor": "ffffff",
+   "routeType": 109
+  },
+  {
+   "routeId": "de-DELFI_162620_109",
+   "routeShortName": "S4",
+   "routeLongName": "",
+   "mode": "SUBURBAN",
+   "agencyId": "10437",
+   "agencyName": "DB Regio AG Südost",
+   "agencyUrl": "",
+   "routeColor": "109644",
+   "routeTextColor": "ffffff",
+   "routeType": 109
+  },
+  {
+   "routeId": "de-DELFI_de:nasa:14|S|MDSB_S4:DBRegio_109",
+   "routeShortName": "S4",
+   "routeLongName": "",
+   "mode": "SUBURBAN",
+   "agencyId": "10437",
+   "agencyName": "DB Regio AG Südost",
+   "agencyUrl": "",
+   "routeColor": "109644",
+   "routeTextColor": "ffffff",
+   "routeType": 109
+  },
+  {
+   "routeId": "de-VBB_19155_109",
+   "routeShortName": "S4",
+   "routeLongName": "",
+   "mode": "SUBURBAN",
+   "agencyId": "108",
+   "agencyName": "DB Regio AG",
+   "agencyUrl": "https://www.bahn.de/brandenburg",
+   "routeType": 109
+  },
+  {
+   "routeId": "de-DELFI_7138257_109",
+   "routeShortName": "S5",
+   "routeLongName": "",
+   "mode": "SUBURBAN",
+   "agencyId": "14437",
+   "agencyName": "Die Länderbahn GmbH",
+   "agencyUrl": "",
+   "routeType": 109
+  },
+  {
+   "routeId": "de-DELFI_de:nasa:14|S|MDSB_S5:DBRegio_109",
+   "routeShortName": "S5",
+   "routeLongName": "",
+   "mode": "SUBURBAN",
+   "agencyId": "10437",
+   "agencyName": "DB Regio AG Südost",
+   "agencyUrl": "",
+   "routeColor": "ed7c1c",
+   "routeTextColor": "ffffff",
+   "routeType": 109
+  },
+  {
+   "routeId": "de-DELFI_de:nasa:14|S|MDSB_S5:DBRegio_D_109",
+   "routeShortName": "S5",
+   "routeLongName": "",
+   "mode": "SUBURBAN",
+   "agencyId": "10437",
+   "agencyName": "DB Regio AG Südost",
+   "agencyUrl": "",
+   "routeColor": "ed7c1c",
+   "routeTextColor": "ffffff",
+   "routeType": 109
+  },
+  {
+   "routeId": "de-DELFI_7137834_109",
+   "routeShortName": "S5X",
+   "routeLongName": "",
+   "mode": "SUBURBAN",
+   "agencyId": "10437",
+   "agencyName": "DB Regio AG Südost",
+   "agencyUrl": "",
+   "routeColor": "fdce5c",
+   "routeTextColor": "000000",
+   "routeType": 109
+  },
+  {
+   "routeId": "de-DELFI_7138258_109",
+   "routeShortName": "S5X",
+   "routeLongName": "",
+   "mode": "SUBURBAN",
+   "agencyId": "14437",
+   "agencyName": "Die Länderbahn GmbH",
+   "agencyUrl": "",
+   "routeType": 109
+  },
+  {
+   "routeId": "de-DELFI_de:nasa:14|S|MDSB_S5X:DBRegio_109",
+   "routeShortName": "S5X",
+   "routeLongName": "",
+   "mode": "SUBURBAN",
+   "agencyId": "10437",
+   "agencyName": "DB Regio AG Südost",
+   "agencyUrl": "",
+   "routeColor": "fdce5c",
+   "routeTextColor": "000000",
+   "routeType": 109
+  }
+ ]
+}

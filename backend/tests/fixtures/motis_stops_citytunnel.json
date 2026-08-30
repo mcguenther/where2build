@@ -1,0 +1,103 @@
+[
+ {
+  "name": "Leipzig, Wilhelm-Leuschner-Platz (Tram/Bus)",
+  "stopId": "de-DELFI_de:14713:12992::01",
+  "importance": 0.00015503611939493567,
+  "lat": 51.33590316772461,
+  "lon": 12.3766508102417,
+  "level": -2.0,
+  "tz": "Europe/Berlin",
+  "vertexType": "TRANSIT",
+  "modes": [
+   "TRAM",
+   "BUS"
+  ]
+ },
+ {
+  "name": "Leipzig, Roßplatz",
+  "stopId": "de-DELFI_de:14713:13001::01",
+  "importance": 7.616404036525637e-05,
+  "lat": 51.33561325073242,
+  "lon": 12.37868595123291,
+  "tz": "Europe/Berlin",
+  "vertexType": "TRANSIT",
+  "modes": [
+   "TRAM",
+   "BUS"
+  ]
+ },
+ {
+  "name": "Leipzig Wilhelm-Leuschner-Platz",
+  "stopId": "de-DELFI_de:14713:8012202",
+  "importance": 0.003033742541447282,
+  "lat": 51.33539581298828,
+  "lon": 12.375393867492676,
+  "level": -2.0,
+  "tz": "Europe/Berlin",
+  "vertexType": "TRANSIT",
+  "modes": [
+   "REGIONAL_RAIL",
+   "SUBURBAN"
+  ]
+ },
+ {
+  "name": "Leipzig Markt",
+  "stopId": "de-DELFI_de:14713:8012186",
+  "importance": 0.003033742541447282,
+  "lat": 51.340641021728516,
+  "lon": 12.374611854553223,
+  "level": -2.0,
+  "tz": "Europe/Berlin",
+  "vertexType": "TRANSIT",
+  "modes": [
+   "REGIONAL_RAIL",
+   "SUBURBAN"
+  ]
+ },
+ {
+  "name": "Leipzig, Markt (Bus)",
+  "stopId": "de-DELFI_de:14713:12145::01",
+  "importance": 1.310595416725846e-05,
+  "lat": 51.33986282348633,
+  "lon": 12.374154090881348,
+  "tz": "Europe/Berlin",
+  "vertexType": "TRANSIT",
+  "modes": [
+   "BUS"
+  ]
+ },
+ {
+  "name": "Leipzig Bayerischer Bahnhof",
+  "stopId": "de-DELFI_de:14713:8012184",
+  "importance": 0.0030338834039866924,
+  "lat": 51.32926559448242,
+  "lon": 12.381657600402832,
+  "level": -1.0,
+  "tz": "Europe/Berlin",
+  "vertexType": "TRANSIT",
+  "modes": [
+   "REGIONAL_RAIL",
+   "SUBURBAN",
+   "BUS"
+  ]
+ },
+ {
+  "name": "Leipzig Hbf",
+  "stopId": "de-DELFI_de:14713:8010205",
+  "importance": 0.010030676610767841,
+  "lat": 51.3454704284668,
+  "lon": 12.382063865661621,
+  "level": 1.0,
+  "tz": "Europe/Berlin",
+  "vertexType": "TRANSIT",
+  "modes": [
+   "HIGHSPEED_RAIL",
+   "LONG_DISTANCE",
+   "COACH",
+   "REGIONAL_RAIL",
+   "SUBURBAN",
+   "TRAM",
+   "BUS"
+  ]
+ }
+]
