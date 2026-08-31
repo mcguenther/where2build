@@ -5,7 +5,7 @@
       <div class="spacer"></div>
       <button type="button" class="btn btn--secondary btn--small no-print"
               :disabled="!plot.anchor || busy" @click="load">
-        {{ busy ? "Sucht…" : result ? "Neu suchen" : "Nachsehen" }}
+        {{ busy ? "Sucht…" : result || error ? "Neu suchen" : "Nachsehen" }}
       </button>
     </div>
 
@@ -81,13 +81,22 @@ const LABELS = {
   bus: "Bus", bahnhof: "Bahnhof"
 };
 
+/** What this browser session has already asked for, per plot and coordinate.
+ *  An unasked-for search may happen once: opening the same plot again, or
+ *  seeing it on both pages, must not put the timetable service through the
+ *  whole round again. A failure is remembered as well — a search that failed
+ *  by itself has to stay failed until somebody presses the button. */
+const answered = new Map();
+
+const sessionKey = plot => `${plot.id}:${plot.anchor?.lat ?? ""},${plot.anchor?.lon ?? ""}`;
+
 export default {
   name: "NearbyPanel",
   props: {
     plot: { type: Object, required: true },
-    /** Look straight away instead of waiting for the button. The surroundings
-     *  view exists to show this; making it ask first would be a click for
-     *  nothing. The plot page keeps the button. */
+    /** Look straight away instead of waiting for the button — once per plot
+     *  and session, see `answered`. The button stays either way, as the way to
+     *  search again. */
     auto: { type: Boolean, default: false }
   },
   emits: ["loaded"],
@@ -111,13 +120,13 @@ export default {
       return (this.result?.kategorien ?? []).filter(c => c.verfuegbar === true && c.anzahl === 0);
     }
   },
-  mounted() { if (this.auto && this.plot.anchor) this.load(); },
+  mounted() { if (this.auto && this.plot.anchor) this.autoLoad(); },
   watch: {
     "plot.id"() {
       this.result = null;
       this.error = null;
       this.$emit("loaded", null);
-      if (this.auto && this.plot.anchor) this.load();
+      if (this.auto && this.plot.anchor) this.autoLoad();
     }
   },
   methods: {
@@ -137,9 +146,21 @@ export default {
       if (hit.quelle !== "motis") return null;
       return hit.linien == null ? "Linien nicht abgefragt" : "keine Linie im Fahrplan";
     },
+    /** The search nobody asked for: skipped once this session has an answer
+     *  for this plot, so a re-render, a return visit or the second page
+     *  showing the same plot costs no request at all. */
+    autoLoad() {
+      const seen = answered.get(sessionKey(this.plot));
+      if (!seen) return this.load();
+      this.result = seen.result;
+      this.error = seen.error;
+      this.$emit("loaded", this.result);
+      return Promise.resolve();
+    },
     async load() {
       this.busy = true;
       this.error = null;
+      const key = sessionKey(this.plot);
       try {
         // `linien` costs the timetable service one request per stop, and is the
         // difference between "hier hält ein Bus" and "hier hält die 141".
@@ -147,9 +168,11 @@ export default {
           { lat: this.plot.anchor.lat, lon: this.plot.anchor.lon },
           { linien: true }
         );
+        answered.set(key, { result: this.result, error: null });
         this.$emit("loaded", this.result);
       } catch (error) {
         this.error = error.message;
+        answered.set(key, { result: null, error: this.error });
       } finally {
         this.busy = false;
       }

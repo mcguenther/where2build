@@ -201,9 +201,25 @@
             Ergibt {{ area(customSize.length * customSize.width, 1) }} bebaute Fläche.
             Kantenlängen unter 4 m oder über 30 m sind kein Haus, sondern ein Tippfehler.
           </p>
-          <button type="button" class="btn btn--secondary btn--small" @click="saveAsHouseType">
+          <button v-if="!naming" type="button" class="btn btn--secondary btn--small" @click="startNaming">
             Als Haustyp in den Katalog
           </button>
+
+          <div v-else class="naming no-print">
+            <div class="field">
+              <label for="house-type-name">Name</label>
+              <input id="house-type-name" ref="nameField" type="text" maxlength="60"
+                     v-model="typeName" @keyup.enter="confirmHouseType" @keyup.esc="cancelNaming">
+            </div>
+            <div class="naming__buttons">
+              <button type="button" class="btn btn--small" @click="confirmHouseType">Speichern</button>
+              <button type="button" class="btn btn--quiet btn--small" @click="cancelNaming">Abbrechen</button>
+            </div>
+            <p class="naming__hint">
+              Kommt unter „Eigene Maße“ in den Katalog und ist danach für dieses Grundstück
+              ausgewählt. Ohne Namen steht dort das Maß.
+            </p>
+          </div>
         </div>
 
         <dl class="value-list">
@@ -288,7 +304,7 @@
 
       <RouteCards :plot="plot" />
 
-      <NearbyPanel :plot="plot" />
+      <NearbyPanel :plot="plot" auto />
 
       <p v-if="hasAnchor" class="row no-print">
         <RouterLink class="btn btn--quiet" :to="{ name: 'surroundings', params: { id: plot.id } }">
@@ -324,8 +340,10 @@
 import SitePlan from "../components/SitePlan.vue";
 import RouteCards from "../components/RouteCards.vue";
 import NearbyPanel from "../components/NearbyPanel.vue";
-import { state, plotById, placement, houseTypeById, houseFootprint, save, addHouseType, newId, setRoutes, CUSTOM_SIZE }
-  from "../lib/store.js";
+import {
+  state, plotById, placement, houseTypeById, houseFootprint, save, addHouseType,
+  newId, setRoutes, CUSTOM_SIZE, DEFAULT_FOOTPRINT
+} from "../lib/store.js";
 import { reachability } from "../lib/api.js";
 import { plotMetrics } from "../lib/metrics.js";
 import {
@@ -345,6 +363,8 @@ export default {
     return {
       state, CUSTOM_SIZE,
       measurement: { points: [], length: 0 },
+      naming: false,
+      typeName: "",
       routesBusy: false,
       routesError: null,
       backdrops: [
@@ -366,11 +386,16 @@ export default {
     building() { return placement(this.plot); },
     houseType() { return houseTypeById(this.plot.houseTypeId); },
     isCustomSize() { return this.plot.houseTypeId === CUSTOM_SIZE; },
-    customSize() { return this.plot.customSize || { length: 11.4, width: 8.5 }; },
+    /* Optional chaining, because a watcher now hangs off `dimensionLabel`: a
+     * watched computed is evaluated whether or not the template reached it, and
+     * the id in the URL may name no plot in this browser at all. */
+    customSize() { return this.plot?.customSize || DEFAULT_FOOTPRINT; },
     builtArea() {
       const f = houseFootprint(this.plot);
       return f.width * f.depth;
     },
+    /** What a self-measured type is called when nobody names it. */
+    dimensionLabel() { return `${num(this.customSize.length, 1)} × ${num(this.customSize.width, 1)} m`; },
     metrics() { return plotMetrics(this.plot); },
     envelope() { return buildableArea(this.plot.polygon, this.plot.setbacks); },
     outliers() { return cornersOutside(this.building, this.envelope); },
@@ -391,6 +416,12 @@ export default {
     index() { return state.data.plots.findIndex(p => p.id === this.plot.id); },
     hasPrevious() { return this.index > 0; },
     hasNext() { return this.index < state.data.plots.length - 1; }
+  },
+  watch: {
+    /** A default nobody has touched follows the fields above it. */
+    dimensionLabel(next, previous) {
+      if (this.naming && this.typeName === previous) this.typeName = next;
+    }
   },
   methods: {
     /** Ask the routing service for every located destination at once and keep
@@ -460,12 +491,13 @@ export default {
     setRatio(value) { this.plot.ratio = parseFloat(value); save(); },
     setRotation(value) { this.plot.house.rotation = parseFloat(value); save(); },
     setHouseType(id) {
+      this.naming = false;
       this.plot.houseTypeId = id;
       if (id === CUSTOM_SIZE) {
-        if (!this.plot.customSize) {
-          const f = this.building;
-          this.plot.customSize = { length: Math.round(f.width * 10) / 10, width: Math.round(f.depth * 10) / 10 };
-        }
+        this.plot.customSize ||= {
+          length: Math.round(this.building.width * 10) / 10,
+          width: Math.round(this.building.depth * 10) / 10
+        };
       } else {
         const type = houseTypeById(id);
         if (type?.ratio) this.plot.ratio = type.ratio;
@@ -478,15 +510,28 @@ export default {
       this.plot.customSize = { ...this.customSize, [field]: Math.min(30, Math.max(4, v)) };
       save();
     },
-    saveAsHouseType() {
+    /** Step one of saving: the catalogue is a list people read later, so a
+     *  type goes into it under a name, not under its own dimensions. */
+    startNaming() {
+      this.typeName = this.dimensionLabel;
+      this.naming = true;
+      // Selected, not just focused: typing replaces the default, Enter keeps it.
+      this.$nextTick(() => {
+        this.$refs.nameField?.focus();
+        this.$refs.nameField?.select();
+      });
+    },
+    cancelNaming() { this.naming = false; },
+    confirmHouseType() {
       const { length, width } = this.customSize;
       const type = addHouseType({
-        id: newId("house"), manufacturer: "Eigene Maße", name: `${num(length, 1)} × ${num(width, 1)} m`,
+        id: newId("house"), manufacturer: "Eigene Maße", name: this.typeName.trim() || this.dimensionLabel,
         builtArea: Math.round(length * width * 100) / 100, livingArea: null,
         livingAreaGround: null, livingAreaUpper: null, length, width,
         roofShape: "offen", priceFrom: null, ratio: length / width,
         source: null, readAt: new Date().toISOString().slice(0, 10), custom: true
       });
+      this.naming = false;
       this.plot.houseTypeId = type.id;
       save();
     },
@@ -578,5 +623,9 @@ export default {
 .field--framed{ padding: var(--w2b-space-3) var(--w2b-space-4); border-bottom: 1px solid var(--w2b-line); }
 .custom-size{ display: grid; grid-template-columns: 1fr 1fr; gap: var(--w2b-space-3); padding: var(--w2b-space-3) var(--w2b-space-4); border-bottom: 1px solid var(--w2b-line); background: var(--w2b-secondary-veil); }
 .custom-size__hint{ grid-column: 1 / -1; font-size: var(--w2b-text-xs); color: var(--w2b-secondary-text); }
+.naming{ grid-column: 1 / -1; display: grid; gap: var(--w2b-space-2); min-width: 0; }
+.naming input{ font-family: var(--w2b-font-body); }
+.naming__buttons{ display: flex; flex-wrap: wrap; gap: var(--w2b-space-2); }
+.naming__hint{ font-size: var(--w2b-text-xs); color: var(--w2b-secondary-text); }
 .align{ display: flex; flex-direction: column; gap: var(--w2b-space-2); padding: var(--w2b-space-3) var(--w2b-space-4); border-top: 1px solid var(--w2b-line-faint); }
 </style>

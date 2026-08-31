@@ -109,6 +109,12 @@ export function testRouter(path = "/") {
   return router;
 }
 
-/** Mount one view with a live router. `props` are what the route would pass. */
-export const mountWithRouter = (component, { path = "/", props, router = testRouter(path) } = {}) =>
-  mount(component, { props, global: { plugins: [router] } });
+/** Mount one view with a live router. `props` are what the route would pass.
+ *  `attach` puts the component in the document, which jsdom needs before
+ *  `document.activeElement` can say anything about focus. */
+export const mountWithRouter = (component, { path = "/", props, router = testRouter(path), attach = false } = {}) =>
+  mount(component, {
+    props,
+    global: { plugins: [router] },
+    ...(attach ? { attachTo: document.body } : {})
+  });
