@@ -76,6 +76,13 @@ class AlkisSettings(BaseSettings):
     # Half-edge of the bounding box (metres) used when resolving a coordinate.
     point_buffer_m: float = 1.0
     cache_ttl_s: int = 7 * 24 * 3600
+    # The cadastral district directory served by GET /api/gemarkungen. Built
+    # from this same WFS by scripts/build_gemarkung_index.py and committed --
+    # see app/gemarkung_index.py for why it is not queried per request.
+    gemarkung_index_path: Path = _BACKEND_DIR / "data" / "gemarkungen-sachsen.json"
+    # Browser cache for that answer. Districts change on the order of a
+    # municipal reform, and a redeploy ships a new file anyway.
+    gemarkung_cache_ttl_s: int = 24 * 3600
 
 
 class BorisSettings(BaseSettings):

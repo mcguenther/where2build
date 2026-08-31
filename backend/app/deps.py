@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from .gemarkung_index import GemarkungDirectory, load_directory
 from .services.alkis import AlkisService
 from .services.basemap import BasemapService
 from .services.boris import BorisService
@@ -23,6 +24,18 @@ from .settings import Settings, get_settings
 def alkis_service() -> AlkisService:
     settings = get_settings()
     return AlkisService(settings.alkis, settings.app)
+
+
+@lru_cache(maxsize=1)
+def gemarkung_directory() -> GemarkungDirectory | None:
+    """The cadastral district list, read from disk once per process.
+
+    Half a megabyte of JSON parsed and folded on every request would be the
+    single most expensive thing this backend does; the file only changes when
+    ``scripts/build_gemarkung_index.py`` runs again.
+    """
+
+    return load_directory(get_settings().alkis.gemarkung_index_path)
 
 
 @lru_cache(maxsize=1)
@@ -77,6 +90,7 @@ def reset_services() -> None:
     get_settings.cache_clear()
     for factory in (
         alkis_service,
+        gemarkung_directory,
         boris_service,
         motis_service,
         overpass_service,

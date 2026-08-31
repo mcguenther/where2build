@@ -698,6 +698,30 @@ class NearbyResponse(BaseModel):
 
 
 # --------------------------------------------------------------------------
+# Cadastral districts
+# --------------------------------------------------------------------------
+
+
+class Gemarkung(BaseModel):
+    """One cadastral district, as ALKIS spells it.
+
+    ``name`` is not unique -- 5 339 districts share 4 880 names -- so a picklist
+    has to show the key and the municipality alongside it.
+    """
+
+    name: str
+    schluessel: str
+    gemeinde: str | None = None
+
+
+class GemarkungenResponse(BaseModel):
+    stand: str | None = Field(
+        default=None, description="Tag, an dem das Verzeichnis vom Katasterdienst geholt wurde."
+    )
+    gemarkungen: list[Gemarkung]
+
+
+# --------------------------------------------------------------------------
 # Health
 # --------------------------------------------------------------------------
 
