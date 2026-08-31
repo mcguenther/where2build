@@ -193,6 +193,9 @@ describe("Auswahl für den Vergleich", () => {
     state.data = realState();
 
     const view = mount(PlotsView, { global: { plugins: [router] } });
+    // The selection buttons live in the comparison mode now; opening a plot is
+    // what the overview offers first.
+    await view.find(".compare-toggle").trigger("click");
     await view.findAll("button").find(b => b.text() === "Alle auswählen").trigger("click");
 
     expect(state.data.selection).toHaveLength(state.data.plots.length);
@@ -209,6 +212,7 @@ describe("Auswahl für den Vergleich", () => {
     state.data.selection = state.data.plots.map(p => p.id);
 
     const view = mount(PlotsView, { global: { plugins: [router] } });
+    await view.find(".compare-toggle").trigger("click");
     await view.findAll("button").find(b => b.text() === "Auswahl aufheben").trigger("click");
 
     const stored = JSON.parse(localStorage.getItem(

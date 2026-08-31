@@ -95,21 +95,36 @@ describe("Vergleichsmodus", () => {
     expect(checkboxes(w).every(box => box.element.checked)).toBe(true);
   });
 
-  it("startet im Vergleichsmodus, wenn eine Auswahl gespeichert ist", () => {
-    // The way back from /vergleich: hiding the ticks here would leave the
-    // comparison holding plots the overview shows as unchosen.
+  it("zeigt eine gespeicherte Auswahl, sobald der Modus angeschaltet ist", () => {
+    // The way back from /vergleich: the ticks are still there, they are just
+    // not shown until asked for.
     state.data.selection = ["plot-convex", "plot-concave"];
     const w = mountWithRouter(PlotsView);
 
-    expect(w.find(".selection-bar").exists()).toBe(true);
-    expect(w.find(".selection-bar").text()).toContain("2 Grundstücke ausgewählt");
-    expect(checkboxes(w)).toHaveLength(2);
+    return compareToggle(w).trigger("click").then(() => {
+      expect(w.find(".selection-bar").text()).toContain("2 Grundstücke ausgewählt");
+      expect(checkboxes(w)).toHaveLength(2);
+      expect(checkboxes(w).every(c => c.element.checked)).toBe(true);
+    });
   });
 
   it("bietet den Vergleich gar nicht an, solange die Liste leer ist", () => {
     state.data.plots = [];
     const w = mountWithRouter(PlotsView);
     expect(compareToggle(w).exists()).toBe(false);
+    expect(w.find(".selection-bar").exists()).toBe(false);
+  });
+});
+
+describe("Was den Modus nicht anschaltet", () => {
+  /* `addPlot` adds every new plot to the selection, so "es ist etwas
+     ausgewählt" is true for anyone who has ever added one — starting the mode
+     on that would mean it never appears to be off. */
+  it("bleibt aus, obwohl die Auswahl des Dokuments gefüllt ist", () => {
+    // What `addPlot` leaves behind after two plots have been added.
+    state.data.selection = ["plot-convex", "plot-concave"];
+    const w = mountWithRouter(PlotsView);
+    expect(w.findAll("input[type=checkbox]")).toHaveLength(0);
     expect(w.find(".selection-bar").exists()).toBe(false);
   });
 });

@@ -61,12 +61,12 @@ export default {
     return {
       state,
       backendUp: true,
-      // View state, not part of the document: opening a plot is the common
-      // errand, so the checkboxes stay away until asked for. A selection that
-      // is already written down is the one exception — it comes from
-      // /vergleich or from an earlier visit, and hiding it would leave the
-      // comparison holding plots nobody can see are chosen.
-      comparing: state.data.selection.length > 0
+      /* View state, not part of the document: opening a plot is the common
+       * errand, so the checkboxes stay away until asked for. Not conditional on
+       * there being a selection either — `addPlot` puts every new plot into it,
+       * so anyone who has ever added one would land in comparison mode, which
+       * is the state this button exists to get out of. */
+      comparing: false
     };
   },
   computed: {
