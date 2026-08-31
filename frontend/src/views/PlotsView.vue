@@ -5,11 +5,13 @@
         <p class="eyebrow">Übersicht</p>
         <h1>Meine Grundstücke</h1>
         <p class="page-head__sub">
-          Kandidaten in der Prüfung. Ein Klick auf die Karte öffnet den Lageplan; über die
-          Auswahl links oben kommen mehrere nebeneinander in den Vergleich.
+          Kandidaten in der Prüfung. Ein Klick auf die Karte öffnet den Lageplan; „Vergleichen“
+          schaltet die Auswahl frei, um mehrere nebeneinander zu legen.
         </p>
       </div>
       <div class="spacer"></div>
+      <button v-if="hasPlots" type="button" class="btn btn--secondary compare-toggle no-print"
+              :aria-pressed="String(comparing)" @click="toggleComparing">Vergleichen</button>
       <button type="button" class="btn" @click="startWizard">Grundstück hinzufügen</button>
     </div>
 
@@ -18,19 +20,20 @@
       Seiten auslesen — gespeicherte Grundstücke bleiben aber sichtbar.
     </p>
 
-    <div v-if="hasPlots" class="selection-bar panel no-print">
-      <span class="selection-bar__count mono">{{ selectionLabel }}</span>
+    <div v-if="comparing && hasPlots" class="selection-bar panel no-print">
+      <span class="selection-bar__count mono" role="status" aria-live="polite">{{ selectionLabel }}</span>
       <button type="button" class="btn btn--quiet btn--small" @click="selectAll">Alle auswählen</button>
       <button type="button" class="btn btn--quiet btn--small" @click="selectNone">Auswahl aufheben</button>
       <div class="spacer"></div>
+      <button type="button" class="btn btn--quiet btn--small" @click="toggleComparing">Fertig</button>
       <button type="button" class="btn" :disabled="selected.length < 2" @click="compare">
-        {{ selected.length < 2 ? "Vergleichen" : `${selected.length} vergleichen` }}
+        {{ selected.length < 2 ? "Vergleich öffnen" : `${selected.length} vergleichen` }}
       </button>
     </div>
 
     <div class="card-grid">
       <PlotCard v-for="plot in state.data.plots" :key="plot.id"
-                :plot="plot" :selected="isSelected(plot.id)"
+                :plot="plot" :selected="isSelected(plot.id)" :selectable="comparing"
                 @open="open(plot.id)"
                 @remove="remove(plot)"
                 @select="on => toggleSelection(plot.id, on)" />
@@ -54,14 +57,26 @@ import { wizardStage } from "../router/stages.js";
 export default {
   name: "PlotsView",
   components: { PlotCard },
-  data() { return { state, backendUp: true }; },
+  data() {
+    return {
+      state,
+      backendUp: true,
+      // View state, not part of the document: opening a plot is the common
+      // errand, so the checkboxes stay away until asked for. A selection that
+      // is already written down is the one exception — it comes from
+      // /vergleich or from an earlier visit, and hiding it would leave the
+      // comparison holding plots nobody can see are chosen.
+      comparing: state.data.selection.length > 0
+    };
+  },
   computed: {
     selected() { return state.data.selection; },
     hasPlots() { return state.data.plots.length > 0; },
     selectionLabel() {
       const n = this.selected.length;
-      if (n === 0) return "Nichts ausgewählt";
-      return n === 1 ? "1 Grundstück ausgewählt" : `${n} Grundstücke ausgewählt`;
+      if (n === 0) return "Nichts ausgewählt — mindestens zwei Grundstücke anhaken";
+      if (n === 1) return "1 Grundstück ausgewählt — noch mindestens eines";
+      return `${n} Grundstücke ausgewählt`;
     }
   },
   async created() {
@@ -73,6 +88,10 @@ export default {
     open(id) { this.$router.push({ name: "plot", params: { id } }); },
     startWizard() { this.$router.push(wizardStage(0)); },
     compare() { this.$router.push({ name: "compare" }); },
+    // Leaving the mode hides the checkboxes and nothing else. The selection is
+    // stored data that /vergleich reads cold; discarding it here would throw
+    // away work the user did not ask to undo — "Auswahl aufheben" is that ask.
+    toggleComparing() { this.comparing = !this.comparing; },
     // Both must persist like the per-card checkbox does — /vergleich is a link
     // someone can open cold, and a selection that vanishes on reload is worse
     // than none, because the page then honestly reports "nothing selected".
@@ -95,6 +114,8 @@ export default {
 <style scoped>
 .page-head{ display: flex; align-items: flex-end; gap: var(--w2b-space-4); flex-wrap: wrap; }
 .page-head__sub{ margin-top: var(--w2b-space-2); color: var(--w2b-graphite); max-width: 62ch; font-size: var(--w2b-text-s); }
+.compare-toggle[aria-pressed="true"]{ background: var(--w2b-primary); color: var(--w2b-primary-on); }
+.compare-toggle[aria-pressed="true"]:hover:not(:disabled){ background: var(--w2b-primary-light); }
 .selection-bar{ display: flex; align-items: center; gap: var(--w2b-space-3); flex-wrap: wrap; padding: var(--w2b-space-3) var(--w2b-space-4); }
 .selection-bar__count{ font-size: var(--w2b-text-s); color: var(--w2b-graphite); }
 .card-grid{ display: grid; grid-template-columns: repeat(auto-fill, minmax(292px, 1fr)); gap: var(--w2b-space-4); }

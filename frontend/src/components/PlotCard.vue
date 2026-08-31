@@ -1,6 +1,6 @@
 <template>
   <article class="plot-card panel" :class="{ 'plot-card--selected': selected }">
-    <label class="plot-card__select no-print">
+    <label v-if="selectable" class="plot-card__select no-print">
       <input type="checkbox" :checked="selected" :aria-label="`${plot.name} für den Vergleich auswählen`"
              @change="$emit('select', $event.target.checked)">
       Vergleich
@@ -52,7 +52,13 @@ import { area, euro, euroPerSqm, percent, duration } from "../lib/format.js";
 export default {
   name: "PlotCard",
   components: { SitePlan },
-  props: { plot: { type: Object, required: true }, selected: { type: Boolean, default: false } },
+  // `selectable` defaults to true so the card on its own is complete; the list
+  // switches it off outside comparison mode, where a plot is opened, not ticked.
+  props: {
+    plot: { type: Object, required: true },
+    selected: { type: Boolean, default: false },
+    selectable: { type: Boolean, default: true }
+  },
   emits: ["open", "remove", "select"],
   computed: {
     building() { return placement(this.plot); },
