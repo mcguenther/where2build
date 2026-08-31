@@ -139,6 +139,12 @@ from the user directly. Reopen only if the user asks.
   Use the **minimum rotated rectangle**, not the bounding box, to describe a
   shape: that same parcel is a 1594 x 30 m ribbon running diagonally, and the
   axis-aligned box hides exactly the elongation you are looking for.
+- **`ave:KatasterBezirk` will not drop its geometry.** `PROPERTYNAME` without the
+  `ave:` prefix is rejected outright (`ErrorInPropertyName`); with the prefix the
+  request is accepted and the outline comes back anyway — about 5 kB per
+  district, 28 MB for all 5 339. So the district list is *built once* by
+  `backend/scripts/build_gemarkung_index.py` into a committed 490 kB file and
+  served from there; `GET /api/gemarkungen` never touches the WFS.
 - **The Geoportal shows the Gemarkungsschlüssel two ways.** The 'Flurstueck'
   layer prints the four-digit form (`3044`), the 'Gemarkung' layer the
   six-digit one (`143044`). Both resolve, and the name (`Moritzburg`) as well.
@@ -201,6 +207,9 @@ from the user directly. Reopen only if the user asks.
   reports the incomplete render instead of hanging the whole run.
 - **`node scripts/screenshots.mjs` serves `frontend/dist`, not the dev server.**
   Run `npm run build` first or the pictures show the previous code.
+  Its Playwright import is an absolute sandbox path (`/opt/node22/...`), so the
+  script only runs where that path exists — on a plain machine it fails before
+  the first picture.
 - **A dead upstream connection pool survives a container restart.** After the
   sandbox restarted, the running backend answered 502 for every Transitous call
   while the same request from `curl` returned 200. Restarting uvicorn fixed it;
@@ -218,7 +227,8 @@ backend/.venv/bin/pip install -e "backend[dev]"
 backend/.venv/bin/python -m pytest backend/tests -q
 backend/.venv/bin/python -m uvicorn app.main:app --reload --app-dir backend
 
-# frontend
+# frontend — needs Node >= 22.19: jsdom 30 pulls in undici 8, and on Node 20
+# vitest dies before loading a test with `markAsUncloneable is not a function`.
 cd frontend && npm install
 npm run dev            # proxies /api to 127.0.0.1:8000
 npm run test           # vitest
@@ -240,7 +250,7 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 319
-- `vitest`: 213 (plus `npm run test:integration`, 10 against a running backend)
+- `pytest`: 348 (one skipped)
+- `vitest`: 251 (plus `npm run test:integration`, 10 against a running backend)
 - `scripts/screenshots.mjs`: 37 images plus a print PDF. It fails on console errors, on
   horizontal overflow, and if not a single vector tile arrived.
