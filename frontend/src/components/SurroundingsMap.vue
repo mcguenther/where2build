@@ -54,6 +54,12 @@ const CATEGORY_LABELS = {
 
 /* Read off the stylesheet rather than hard-coded, so the drawing keeps using
  * the same palette as the site plan and follows the theme with it. */
+/** "Linie 141" / "Linien 141, 172", and nothing at all when the answer carries
+ *  no lines -- `null` is "nicht abgefragt", and a hover label is no place to
+ *  explain that. The panel below the map says it in words. */
+const lineLabel = (lines) =>
+  lines && lines.length ? `${lines.length === 1 ? "Linie" : "Linien"} ${lines.join(", ")}` : "";
+
 const token = (element, name) =>
   getComputedStyle(element).getPropertyValue(name).trim() || "#000";
 
@@ -226,7 +232,7 @@ export default {
       // couple of pixels wide, and a place you cannot find is not located.
       const home = [{
         lon: this.plot.anchor.lon, lat: this.plot.anchor.lat, kind: "home",
-        title: "Hier", name: this.plot.name, note: "",
+        title: "Hier", name: this.plot.name, lines: "", note: "",
         href: openStreetMapPlace(this.plot.anchor),
         hover: `${this.plot.name} auf OpenStreetMap`
       }];
@@ -234,6 +240,10 @@ export default {
         lon: hit.lon, lat: hit.lat, kind: "poi",
         title: this.label(hit.kategorie),
         name: hit.name,
+        // The lines belong on hover, not on the always-visible label: six
+        // stops in one village already fight for the same few pixels, and
+        // the category is what has to stay readable there.
+        lines: lineLabel(hit.linien),
         note: hit.erreichbar
           ? `${duration(hit.duration_s)} · ${metres(hit.distance_m, 0)}`
           : "kein Fußweg gefunden",
@@ -244,6 +254,7 @@ export default {
         lon: goal.lon, lat: goal.lat, kind: "goal",
         title: "Ziel",
         name: goal.name,
+        lines: "",
         note: goal.note || "",
         href: openStreetMapRoute(this.plot.anchor, goal, "car"),
         hover: `Weg vom Grundstück zu ${goal.name} auf OpenStreetMap`
@@ -265,7 +276,7 @@ export default {
         const strong = document.createElement("b");
         strong.textContent = place.title;
         text.append(strong);
-        [place.name, place.note].filter(Boolean).forEach(line => {
+        [place.name, place.lines, place.note].filter(Boolean).forEach(line => {
           const span = document.createElement("span");
           span.textContent = line;
           text.append(span);

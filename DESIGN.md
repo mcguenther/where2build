@@ -236,6 +236,22 @@ Bahnlinie, ist ein Kilometer Weg — und an einem Ufergrundstück ist das nach
 Luftlinie Nächstgelegene mitunter überhaupt nicht zu Fuß erreichbar. Sortiert
 wird deshalb nach dem, was man geht, nicht nach dem, was man misst.
 
+## Eine Haltestelle ist ihre Linie
+
+„Bus" ist eine Kategorie, „143" ist das, womit jemand tatsächlich fährt. Unter
+jedem Halt stehen deshalb die Liniennummern aus dem Fahrplan als kleine Marken
+in der Schreibmaschinenschrift der Tafel — und zwar nur die der Verkehrsmittel,
+für die der Halt überhaupt in der Liste steht: Die Buslinien an einer
+Straßenbahnhaltestelle machen sie nicht zur Bushaltestelle.
+
+Auf der Umgebungskarte erscheinen die Linien erst beim Überfahren, neben Namen
+und Gehzeit. Immer sichtbar bleibt allein die Kategorie — sechs Halte in einem
+Dorf würden mit ihren Nummern genau das zudecken, wofür die Karte da ist.
+
+Wurden die Linien nicht abgefragt — der Server hört nach einer festen Zahl von
+Halten damit auf —, steht das an der Zeile. Eine leere Zeile sähe aus wie „hier
+fährt nichts", und das ist die eine Aussage, die niemand treffen darf.
+
 ## Was extrahiert wurde, ist ein Vorschlag
 
 Werte, die ein Modell aus einer Seite gelesen hat, erscheinen sichtbar anders
