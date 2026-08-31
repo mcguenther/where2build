@@ -1,0 +1,310 @@
+{
+  "gemarkungen": [
+    {
+      "name": "Lauer",
+      "schluessel": "140419",
+      "gemeinde": "Stadt Leipzig"
+    },
+    {
+      "name": "Pfaffenhaus",
+      "schluessel": "140505",
+      "gemeinde": "Stadt Plauen"
+    },
+    {
+      "name": "Siehdichfür",
+      "schluessel": "141316",
+      "gemeinde": "Grünbach"
+    },
+    {
+      "name": "Rabitz",
+      "schluessel": "141487",
+      "gemeinde": "Kubschütz"
+    },
+    {
+      "name": "Kronförstchen",
+      "schluessel": "141600",
+      "gemeinde": "Großdubrau"
+    },
+    {
+      "name": "Pautzsch",
+      "schluessel": "141813",
+      "gemeinde": "Stadt Groitzsch"
+    },
+    {
+      "name": "Saasdorf",
+      "schluessel": "141814",
+      "gemeinde": "Stadt Groitzsch"
+    },
+    {
+      "name": "Zschagast",
+      "schluessel": "141815",
+      "gemeinde": "Stadt Groitzsch"
+    },
+    {
+      "name": "Schleenhain",
+      "schluessel": "141823",
+      "gemeinde": "Stadt Groitzsch"
+    },
+    {
+      "name": "Treppendorf",
+      "schluessel": "141831",
+      "gemeinde": "Stadt Böhlen"
+    },
+    {
+      "name": "Zeschwitz",
+      "schluessel": "141832",
+      "gemeinde": "Stadt Böhlen"
+    },
+    {
+      "name": "Droßdorf",
+      "schluessel": "141847",
+      "gemeinde": "Stadt Groitzsch"
+    },
+    {
+      "name": "Kleinzössen",
+      "schluessel": "141872",
+      "gemeinde": "Neukieritzsch"
+    },
+    {
+      "name": "Apelt",
+      "schluessel": "141873",
+      "gemeinde": "Stadt Kitzscher"
+    },
+    {
+      "name": "Heuersdorf",
+      "schluessel": "141877",
+      "gemeinde": "Stadt Regis-Breitingen"
+    },
+    {
+      "name": "Mark Zöllsdorf",
+      "schluessel": "141888",
+      "gemeinde": "Neukieritzsch"
+    },
+    {
+      "name": "Peres",
+      "schluessel": "141890",
+      "gemeinde": "Neukieritzsch"
+    },
+    {
+      "name": "Piegel",
+      "schluessel": "141891",
+      "gemeinde": "Neukieritzsch"
+    },
+    {
+      "name": "Stöntzsch",
+      "schluessel": "141903",
+      "gemeinde": "Stadt Pegau"
+    },
+    {
+      "name": "Wildenhain",
+      "schluessel": "141909",
+      "gemeinde": "Stadt Regis-Breitingen"
+    },
+    {
+      "name": "Geschwitz",
+      "schluessel": "141913",
+      "gemeinde": "Stadt Rötha"
+    },
+    {
+      "name": "Rüben",
+      "schluessel": "141916",
+      "gemeinde": "Stadt Rötha"
+    },
+    {
+      "name": "Rüssener Großaue",
+      "schluessel": "141920",
+      "gemeinde": "Stadt Zwenkau"
+    },
+    {
+      "name": "Brinnis Flur 2",
+      "schluessel": "142223",
+      "gemeinde": "Schönwölkau"
+    },
+    {
+      "name": "Glesien Flur 8",
+      "schluessel": "142269",
+      "gemeinde": "Stadt Schkeuditz"
+    },
+    {
+      "name": "Mocherwitz Flur 2",
+      "schluessel": "142275",
+      "gemeinde": "Schönwölkau"
+    },
+    {
+      "name": "Klitschmar Flur 3",
+      "schluessel": "142284",
+      "gemeinde": "Wiedemar"
+    },
+    {
+      "name": "Kölsa Flur 3",
+      "schluessel": "142288",
+      "gemeinde": "Wiedemar"
+    },
+    {
+      "name": "Löbnitz Flur 11",
+      "schluessel": "142332",
+      "gemeinde": "Löbnitz"
+    },
+    {
+      "name": "Roitzschjora Flur 5",
+      "schluessel": "142338",
+      "gemeinde": "Löbnitz"
+    },
+    {
+      "name": "Mutschlena Flur 1",
+      "schluessel": "142339",
+      "gemeinde": "Krostitz"
+    },
+    {
+      "name": "Priester Flur 3",
+      "schluessel": "142348",
+      "gemeinde": "Krostitz"
+    },
+    {
+      "name": "Radefeld Flur 3",
+      "schluessel": "142363",
+      "gemeinde": "Stadt Schkeuditz"
+    },
+    {
+      "name": "Sausedlitz Flur 1",
+      "schluessel": "142370",
+      "gemeinde": "Löbnitz"
+    },
+    {
+      "name": "Schenkenberg Flur 6",
+      "schluessel": "142382",
+      "gemeinde": "Stadt Delitzsch"
+    },
+    {
+      "name": "Selben Flur 6",
+      "schluessel": "142389",
+      "gemeinde": "Stadt Delitzsch"
+    },
+    {
+      "name": "Wiesenena Flur 9",
+      "schluessel": "142407",
+      "gemeinde": "Wiedemar"
+    },
+    {
+      "name": "Wölkau Flur 7",
+      "schluessel": "142417",
+      "gemeinde": "Schönwölkau"
+    },
+    {
+      "name": "Wolteritz Flur 4",
+      "schluessel": "142421",
+      "gemeinde": "Stadt Schkeuditz"
+    },
+    {
+      "name": "Zaasch Flur 6",
+      "schluessel": "142427",
+      "gemeinde": "Wiedemar"
+    },
+    {
+      "name": "Zschernitz Flur 5",
+      "schluessel": "142432",
+      "gemeinde": "Wiedemar"
+    },
+    {
+      "name": "Zschortau Flur 1",
+      "schluessel": "142439",
+      "gemeinde": "Rackwitz"
+    },
+    {
+      "name": "Kreuma Flur 3",
+      "schluessel": "142448",
+      "gemeinde": "Rackwitz"
+    },
+    {
+      "name": "Kattersnaundorf Flur 4",
+      "schluessel": "142452",
+      "gemeinde": "Rackwitz"
+    },
+    {
+      "name": "Gaschütz",
+      "schluessel": "142803",
+      "gemeinde": "Jahnatal"
+    },
+    {
+      "name": "Oberlützschera",
+      "schluessel": "142805",
+      "gemeinde": "Jahnatal"
+    },
+    {
+      "name": "Gödelitz",
+      "schluessel": "142807",
+      "gemeinde": "Stadt Döbeln"
+    },
+    {
+      "name": "Dobernitz",
+      "schluessel": "142813",
+      "gemeinde": "Stadt Leisnig"
+    },
+    {
+      "name": "Höckendorf",
+      "schluessel": "142868",
+      "gemeinde": "Großweitzschen"
+    },
+    {
+      "name": "Kobelsdorf",
+      "schluessel": "142876",
+      "gemeinde": "Stadt Roßwein"
+    },
+    {
+      "name": "Hasenberg",
+      "schluessel": "142892",
+      "gemeinde": "Stadt Leisnig"
+    },
+    {
+      "name": "Parzelle Grunau",
+      "schluessel": "142901",
+      "gemeinde": "Stadt Roßwein"
+    },
+    {
+      "name": "Dreißig",
+      "schluessel": "142902",
+      "gemeinde": "Stadt Döbeln"
+    },
+    {
+      "name": "Obergoseln",
+      "schluessel": "142922",
+      "gemeinde": "Großweitzschen"
+    },
+    {
+      "name": "Kalthausen",
+      "schluessel": "142953",
+      "gemeinde": "Stadt Leisnig"
+    },
+    {
+      "name": "Troischau",
+      "schluessel": "142963",
+      "gemeinde": "Stadt Roßwein"
+    },
+    {
+      "name": "Miera",
+      "schluessel": "142973",
+      "gemeinde": "Stadt Döbeln"
+    },
+    {
+      "name": "Pischwitz",
+      "schluessel": "142977",
+      "gemeinde": "Stadt Döbeln"
+    },
+    {
+      "name": "Lauschka",
+      "schluessel": "142984",
+      "gemeinde": "Stadt Hartha"
+    },
+    {
+      "name": "Mischütz",
+      "schluessel": "142997",
+      "gemeinde": "Jahnatal"
+    },
+    {
+      "name": "Mölkau",
+      "schluessel": "145592",
+      "gemeinde": "Stadt Leipzig"
+    }
+  ],
+  "stand": "2026-08-30"
+}

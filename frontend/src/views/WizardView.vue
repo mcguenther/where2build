@@ -57,20 +57,18 @@
 
           <template v-else-if="source === 'parcel'">
             <div class="field-pair">
-              <div class="field">
-                <label for="q-cadastral-district">Gemarkung</label>
-                <input id="q-cadastral-district" type="text" v-model="gemarkung" placeholder="Moritzburg oder 3044">
-              </div>
+              <CadastralDistrictPicker v-model="gemarkung" @select="gemarkungEntry = $event" />
               <div class="field">
                 <label for="q-parcel-number">Flurstücksnummer</label>
                 <input id="q-parcel-number" type="text" v-model="flurstuecksnummer" placeholder="85/1">
               </div>
             </div>
             <p class="hint">
-              <b>Gemarkung:</b> der Name (<span class="mono">Moritzburg</span>) oder der
-              Gemarkungsschlüssel — die Sachdatenabfrage zeigt ihn je nach Kartenebene
-              vierstellig (<span class="mono">3044</span>) oder sechsstellig
-              (<span class="mono">143044</span>); beides wird angenommen.
+              <b>Gemarkung:</b> tippen und aus dem Verzeichnis wählen — der Name
+              (<span class="mono">Moritzburg</span>) oder der Gemarkungsschlüssel, den die
+              Sachdatenabfrage je nach Kartenebene vierstellig (<span class="mono">3044</span>)
+              oder sechsstellig (<span class="mono">143044</span>) zeigt. Beides wird angenommen,
+              auch ohne Eintrag im Verzeichnis.
               <br>
               <b>Flurstücksnummer:</b> so, wie sie im Geoportal steht —
               <span class="mono">85/1</span>, <span class="mono">476</span> oder
@@ -127,7 +125,8 @@
     <section v-else-if="stageIndex === 2" class="stack">
       <p class="subtitle">
         So liegt das Flurstück im Kataster. Stimmt der Zuschnitt, geht es weiter;
-        sonst zurück und die Angaben korrigieren.
+        sonst zurück und die Angaben korrigieren. Den Ausschnitt bewegt die
+        gedrückte Maustaste, das Mausrad zoomt, ein Doppelklick setzt ihn zurück.
       </p>
 
       <!-- The service found something implausible for this listing. Not an
@@ -140,7 +139,10 @@
 
       <div class="check-grid">
         <div class="panel">
-          <SitePlan :plot="draft" :building="draftBuilding" :width="640" :height="440" backdrop="map" north-up />
+          <!-- No house here: this step is about the parcel's outline, and a
+               body nobody has planned yet only distracts from it. -->
+          <SitePlan :plot="draft" :width="640" :height="440" backdrop="map" north-up
+                    :show-building="false" navigable />
         </div>
         <div class="panel">
           <div class="panel__head"><h3>Was übernommen wird</h3><div class="spacer"></div><span class="chip">ALKIS</span></div>
@@ -199,7 +201,8 @@
 
 <script>
 import SitePlan from "../components/SitePlan.vue";
-import { state, addPlot, placement } from "../lib/store.js";
+import CadastralDistrictPicker from "../components/CadastralDistrictPicker.vue";
+import { state, addPlot } from "../lib/store.js";
 import { WIZARD_STAGES, wizardStage } from "../router/stages.js";
 import { readListing, readPage, resolveParcel, landValue } from "../lib/api.js";
 import { plotFromCadastre } from "../lib/plots.js";
@@ -233,7 +236,7 @@ function fieldsFromResponse(response) {
 
 export default {
   name: "WizardView",
-  components: { SitePlan },
+  components: { SitePlan, CadastralDistrictPicker },
   props: {
     /** The stage's URL segment; the route only matches the four known ones. */
     stage: { type: String, required: true }
@@ -247,6 +250,9 @@ export default {
       source: "url",
       url: "",
       gemarkung: "",
+      // The directory entry the text stands for, once one does. Null while
+      // the text is free-hand — which stays a valid way to look one up.
+      gemarkungEntry: null,
       flurstuecksnummer: "",
       pastedText: "",
       busy: false,
@@ -285,8 +291,10 @@ export default {
       if (this.source === "parcel") return this.gemarkung.trim() && this.flurstuecksnummer.trim();
       return this.pastedText.trim().length > 20;
     },
-    draftBuilding() { return this.draft ? placement(this.draft) : null; },
-    computedArea() { return this.draft ? polygonArea(this.draft.polygon) : 0; }
+    computedArea() { return this.draft ? polygonArea(this.draft.polygon) : 0; },
+    /** What the cadastre is asked for: the key of the chosen entry, which is
+     *  unambiguous where two districts share a name, else the plain text. */
+    gemarkungQuery() { return this.gemarkungEntry?.schluessel || this.gemarkung.trim(); }
   },
   created() { this.checkStage(); },
   watch: { stage() { this.checkStage(); } },
@@ -326,7 +334,7 @@ export default {
         if (this.source === "parcel") {
           this.returnStage = 0;
           await this.queryCadastre({
-            gemarkung: this.gemarkung.trim(),
+            gemarkung: this.gemarkungQuery,
             flurstuecksnummer: this.flurstuecksnummer.trim()
           });
           return;
@@ -352,7 +360,7 @@ export default {
 
       let query = null;
       if (Number.isFinite(lat) && Number.isFinite(lon)) query = { lat, lon };
-      else if (numbers.length) query = { gemarkung: this.gemarkung.trim() || undefined, flurstuecksnummer: numbers[0] };
+      else if (numbers.length) query = { gemarkung: this.gemarkungQuery || undefined, flurstuecksnummer: numbers[0] };
       else if (read("adresse")) query = { address: read("adresse") };
 
       // The listing's own plot area lets the service judge whether the parcel
