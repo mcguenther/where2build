@@ -162,9 +162,16 @@ export function validate(raw) {
   const houseTypes = Array.isArray(input.houseTypes)
     ? input.houseTypes.filter(h => h && h.id && h.builtArea >= 30 && h.builtArea <= 400)
     : [];
-  const destinations = (Array.isArray(input.destinations) ? input.destinations.filter(d => d && d.id && d.name) : [])
+  /* A name is not what makes a destination real — its identity and its
+   * coordinate are. The name field starts empty on purpose, so filtering on it
+   * would throw away exactly the destination the user just created. */
+  const destinations = (Array.isArray(input.destinations) ? input.destinations.filter(d => d && d.id) : [])
     .map(d => {
-      const destination = { id: d.id, name: d.name, address: typeof d.address === "string" ? d.address : "" };
+      const destination = {
+        id: d.id,
+        name: typeof d.name === "string" ? d.name : "",
+        address: typeof d.address === "string" ? d.address : ""
+      };
       // A destination only counts as located once both coordinates survived.
       if (Number.isFinite(d.lat) && Number.isFinite(d.lon)) {
         destination.lat = d.lat;
@@ -452,6 +459,10 @@ export function locateDestination(id, { lat, lon, match }) {
   destination.lat = lat;
   destination.lon = lon;
   destination.match = match || null;
+  // Nobody has to name a destination to use it. Once it is located it appears
+  // on route cards, in the comparison and on the map, and what the geocoder
+  // matched is a real name for it — better than a placeholder everywhere.
+  if (!(destination.name || "").trim() && destination.match) destination.name = destination.match;
   // The old routes started somewhere else; they are no longer this route.
   state.data.plots.forEach(p => { delete p.routes[id]; });
   save();
@@ -480,12 +491,22 @@ export function setRoutes(plotId, routes, source) {
   save();
 }
 
+/** A new destination arrives nameless: "Neues Ziel" is the suggestion in the
+ *  empty field, not a value the user has to select and delete first. */
 export function addDestination() {
-  const destination = { id: newId("dest"), name: "Neues Ziel", address: "" };
+  const destination = { id: newId("dest"), name: "", address: "" };
   state.data.destinations.push(destination);
   save();
   return destination;
 }
+
+/** What a destination without a name is called wherever it is shown. One
+ *  decision in one place: an empty heading names nothing, and the field is
+ *  allowed to be empty. */
+export const UNNAMED_DESTINATION = "Ziel ohne Namen";
+
+export const destinationName = destination =>
+  (destination?.name || "").trim() || UNNAMED_DESTINATION;
 
 export function removeDestination(id) {
   state.data.destinations = state.data.destinations.filter(d => d.id !== id);

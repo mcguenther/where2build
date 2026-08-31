@@ -24,8 +24,8 @@
             <tr>
               <th>Grundstück</th><th class="num">Fläche</th><th class="num">Preis</th>
               <th class="num">Je m²</th><th class="num">Δ Bodenrichtwert</th><th>Form</th>
-              <th v-if="firstDestination" class="num">{{ firstDestination.name }} ÖPNV</th>
-              <th v-if="secondDestination" class="num">{{ secondDestination.name }} Rad</th>
+              <th v-if="firstDestination" class="num">{{ destinationName(firstDestination) }} ÖPNV</th>
+              <th v-if="secondDestination" class="num">{{ destinationName(secondDestination) }} Rad</th>
               <th class="no-print"></th>
             </tr>
           </thead>
@@ -82,7 +82,7 @@
 
 <script>
 import SitePlan from "../components/SitePlan.vue";
-import { state, placement } from "../lib/store.js";
+import { state, placement, destinationName } from "../lib/store.js";
 import { plotMetrics } from "../lib/metrics.js";
 import { fitScale } from "../lib/geometry.js";
 import { area, euro, euroPerSqm, percent, num, duration } from "../lib/format.js";
@@ -111,6 +111,7 @@ export default {
     }
   },
   methods: {
+    destinationName,
     area, euro, euroPerSqm, percent, num,
     metrics(plot) { return plotMetrics(plot); },
     building(plot) { return placement(plot); },

@@ -22,7 +22,7 @@
         <dt>Fläche</dt><dd>{{ area(plot.officialArea) }}</dd>
         <dt>Kaufpreis</dt><dd>{{ euro(plot.askingPrice) }}</dd>
         <dt>Je m²</dt><dd>{{ euroPerSqm(metrics.pricePerSqm) }}</dd>
-        <dt v-if="firstDestination">{{ firstDestination.name }} · ÖPNV</dt>
+        <dt v-if="firstDestination">{{ destinationName(firstDestination) }} · ÖPNV</dt>
         <dd v-if="firstDestination">{{ duration(firstDestinationTime) }}</dd>
       </dl>
 
@@ -46,7 +46,7 @@
 <script>
 import SitePlan from "./SitePlan.vue";
 import { plotMetrics } from "../lib/metrics.js";
-import { placement, state } from "../lib/store.js";
+import { placement, state, destinationName } from "../lib/store.js";
 import { area, euro, euroPerSqm, percent, duration } from "../lib/format.js";
 
 export default {
@@ -69,7 +69,7 @@ export default {
       return m && m.erreichbar ? m.duration_s : null;
     }
   },
-  methods: { area, euro, euroPerSqm, percent, duration }
+  methods: { destinationName, area, euro, euroPerSqm, percent, duration }
 };
 </script>
 

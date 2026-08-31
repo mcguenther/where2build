@@ -20,43 +20,89 @@
       </div>
       <div v-if="destinations.length" class="destination-list">
         <div v-for="destination in destinations" :key="destination.id" class="destination-row">
-          <div class="destination-row__fields">
-            <div class="field">
-              <label :for="`n-${destination.id}`">Name</label>
-              <input :id="`n-${destination.id}`" type="text" v-model="destination.name" @input="save">
+
+          <!-- Located and not open for editing: a filed record, not a form. -->
+          <div v-if="isSaved(destination)" class="destination-record">
+            <div class="destination-record__head">
+              <h4 class="destination-record__name">{{ displayName(destination) }}</h4>
+              <span class="chip chip--good">Gespeichert</span>
+              <div class="spacer"></div>
+              <button type="button" class="btn btn--secondary btn--small no-print"
+                      :aria-label="`„${displayName(destination)}“ bearbeiten`"
+                      @click="beginEdit(destination)">
+                <span aria-hidden="true">✎</span> Bearbeiten
+              </button>
+              <button type="button" class="btn btn--quiet btn--small no-print"
+                      @click="remove(destination)">Entfernen</button>
             </div>
-            <div class="field">
-              <label :for="`a-${destination.id}`">Adresse</label>
-              <input :id="`a-${destination.id}`" type="text" v-model="destination.address"
-                     @input="addressChanged(destination)" placeholder="Straße Hausnummer, Ort">
-            </div>
-            <button type="button" class="btn btn--secondary btn--small"
-                    :disabled="!destination.address || busy === destination.id" @click="lookUp(destination)">
-              {{ busy === destination.id ? "Sucht…" : "Nachschlagen" }}
-            </button>
-            <button type="button" class="btn btn--quiet btn--small" @click="remove(destination)">Entfernen</button>
+            <dl class="value-list">
+              <dt>Adresse</dt><dd>{{ destination.address || "—" }}</dd>
+              <dt>Verortet auf</dt>
+              <dd>
+                {{ destination.match || "gewählte Koordinate" }}
+                <span class="faint">{{ destination.lat.toFixed(5) }}, {{ destination.lon.toFixed(5) }}</span>
+              </dd>
+            </dl>
           </div>
 
-          <p v-if="errors[destination.id]" class="notice notice--error">{{ errors[destination.id] }}</p>
+          <template v-else>
+            <div class="destination-row__fields">
+              <div class="field">
+                <label :for="`n-${destination.id}`">Name</label>
+                <input :id="`n-${destination.id}`" type="text" placeholder="Neues Ziel"
+                       :value="draft(destination).name"
+                       @input="setName(destination, $event.target.value)">
+              </div>
+              <div class="field">
+                <label :for="`a-${destination.id}`">Adresse</label>
+                <input :id="`a-${destination.id}`" type="text" placeholder="Straße Hausnummer, Ort"
+                       :value="draft(destination).address"
+                       @input="setAddress(destination, $event.target.value)">
+              </div>
+              <button type="button" class="btn btn--secondary btn--small"
+                      :disabled="!draft(destination).address || busy === destination.id"
+                      @click="lookUp(destination)">
+                {{ busy === destination.id ? "Sucht…" : "Nachschlagen" }}
+              </button>
+              <button type="button" class="btn btn--quiet btn--small"
+                      @click="remove(destination)">Entfernen</button>
+            </div>
 
-          <div v-else-if="matches[destination.id]" class="match-list">
-            <p class="match-list__question">Welcher Ort ist gemeint?</p>
-            <button v-for="(m, i) in matches[destination.id]" :key="i" type="button"
-                    class="match-list__option" @click="accept(destination, m)">
-              <span class="match-list__name">{{ m.name }}</span>
-              <span class="match-list__where">{{ m.beschreibung }}</span>
-              <span class="match-list__coords">{{ m.lat.toFixed(5) }}, {{ m.lon.toFixed(5) }}</span>
-            </button>
-            <button type="button" class="btn btn--quiet btn--small" @click="discard(destination)">Abbrechen</button>
-          </div>
+            <!-- What the change costs, before it takes effect rather than after. -->
+            <p v-if="addressEdited(destination)" class="notice notice--warn" role="status">
+              <!-- One span: `.notice` is a flex row, and a bare <strong> beside
+                   the text becomes a column of its own on a narrow screen. -->
+              <span>
+                Mit „Fertig“ wird die Verortung auf
+                <strong>{{ destination.match || "die gewählte Koordinate" }}</strong>
+                verworfen, und mit ihr alle bereits berechneten Wege zu diesem Ziel bei allen
+                Grundstücken. „Abbrechen“ lässt beides stehen.
+              </span>
+            </p>
 
-          <p v-else-if="destination.lat" class="destination-row__status">
-            Verortet auf <strong>{{ destination.match || "gewählte Koordinate" }}</strong>
-            <span class="faint">{{ destination.lat.toFixed(5) }}, {{ destination.lon.toFixed(5) }}</span>
-          </p>
-          <p v-else class="destination-row__status destination-row__status--open">
-            Noch nicht verortet — ohne Koordinate lässt sich kein Weg berechnen.
-          </p>
+            <div v-if="edits[destination.id]" class="destination-row__actions no-print">
+              <button type="button" class="btn btn--small" @click="commit(destination)">Fertig</button>
+              <button type="button" class="btn btn--quiet btn--small"
+                      @click="cancel(destination)">Abbrechen</button>
+            </div>
+
+            <p v-if="errors[destination.id]" class="notice notice--error">{{ errors[destination.id] }}</p>
+
+            <div v-else-if="matches[destination.id]" class="match-list">
+              <p class="match-list__question">Welcher Ort ist gemeint?</p>
+              <button v-for="(m, i) in matches[destination.id]" :key="i" type="button"
+                      class="match-list__option" @click="accept(destination, m)">
+                <span class="match-list__name">{{ m.name }}</span>
+                <span class="match-list__where">{{ m.beschreibung }}</span>
+                <span class="match-list__coords">{{ m.lat.toFixed(5) }}, {{ m.lon.toFixed(5) }}</span>
+              </button>
+              <button type="button" class="btn btn--quiet btn--small" @click="discard(destination)">Abbrechen</button>
+            </div>
+
+            <p v-else-if="!isLocated(destination)" class="destination-row__status destination-row__status--open">
+              Noch nicht verortet — ohne Koordinate lässt sich kein Weg berechnen.
+            </p>
+          </template>
         </div>
       </div>
       <div v-else class="empty">
@@ -77,7 +123,8 @@
 
 <script>
 import {
-  state, addDestination, removeDestination, save, locateDestination, unlocateDestination
+  state, addDestination, removeDestination, save, locateDestination, unlocateDestination,
+  destinationName
 } from "../lib/store.js";
 import { geocode } from "../lib/api.js";
 
@@ -87,7 +134,11 @@ export default {
     return {
       busy: null,       // id of the destination currently being looked up
       matches: {},      // id -> candidates awaiting a decision
-      errors: {}
+      errors: {},
+      /* id -> the fields as they are being typed. A located destination is a
+       * stored record: its name and address are only written back when the
+       * user says so, which is what makes leaving the editor free of cost. */
+      edits: {}
     };
   },
   computed: {
@@ -95,16 +146,69 @@ export default {
     referencePoint() { return state.data.plots.find(p => p.anchor)?.anchor || null; }
   },
   methods: {
-    save,
+    displayName: destinationName,
     add() { addDestination(); },
 
-    /** Editing the address invalidates the coordinate that was found for the
-     *  old one — keeping it would route to the previous place in silence. */
-    addressChanged(destination) {
+    isLocated(destination) {
+      return Number.isFinite(destination.lat) && Number.isFinite(destination.lon);
+    },
+
+    /** A record to read rather than a form to fill: located, and not open for editing. */
+    isSaved(destination) {
+      return this.isLocated(destination) && !this.edits[destination.id];
+    },
+
+    /** The fields under the cursor: the edit buffer where there is one, the
+     *  destination itself while it is still a draft nothing depends on. */
+    draft(destination) { return this.edits[destination.id] || destination; },
+
+    addressEdited(destination) {
+      const edit = this.edits[destination.id];
+      return Boolean(edit) && edit.address.trim() !== (destination.address || "").trim();
+    },
+
+    setName(destination, value) {
+      const edit = this.edits[destination.id];
+      if (edit) { edit.name = value; return; }
+      destination.name = value;
+      save();
+    },
+
+    setAddress(destination, value) {
       delete this.errors[destination.id];
       delete this.matches[destination.id];
-      if (destination.lat !== undefined) unlocateDestination(destination.id);
+      const edit = this.edits[destination.id];
+      if (edit) { edit.address = value; return; }
+      destination.address = value;
+      save();
+    },
+
+    beginEdit(destination) {
+      this.edits[destination.id] = { name: destination.name, address: destination.address };
+      // The cursor belongs where the editing starts, not at the top of the page.
+      this.$nextTick(() => this.$el.querySelector(`#n-${destination.id}`)?.focus());
+    },
+
+    /** Write the buffer back. A changed address invalidates the coordinate that
+     *  was found for the old one — keeping it would route to the previous place
+     *  in silence — so it goes, together with every route computed to it. */
+    commit(destination) {
+      const edit = this.edits[destination.id];
+      if (!edit) return;
+      const addressChanged = this.addressEdited(destination);
+      destination.name = edit.name.trim();
+      destination.address = edit.address;
+      delete this.edits[destination.id];
+      delete this.errors[destination.id];
+      delete this.matches[destination.id];
+      if (addressChanged) unlocateDestination(destination.id);
       else save();
+    },
+
+    cancel(destination) {
+      delete this.edits[destination.id];
+      delete this.errors[destination.id];
+      delete this.matches[destination.id];
     },
 
     async lookUp(destination) {
@@ -115,7 +219,7 @@ export default {
         // The first plot's coordinate is the reference: destinations are
         // everyday places near the plots, and the geocoder is far more likely
         // to pick the right "Am Kirschberg" when it knows the region.
-        const response = await geocode(destination.address, this.referencePoint);
+        const response = await geocode(this.draft(destination).address, this.referencePoint);
         const candidates = (response.treffer || []).filter(t => Number.isFinite(t.lat) && Number.isFinite(t.lon));
         if (!candidates.length) {
           this.errors[destination.id] = "Zu dieser Adresse wurde nichts gefunden. Bitte genauer schreiben, etwa mit Ort.";
@@ -133,7 +237,15 @@ export default {
       }
     },
 
+    /** Accepting a candidate is the moment the destination is stored: the typed
+     *  fields go in with it, and the editor closes on the finished record. */
     accept(destination, choice) {
+      const edit = this.edits[destination.id];
+      if (edit) {
+        destination.name = edit.name.trim();
+        destination.address = edit.address;
+        delete this.edits[destination.id];
+      }
       locateDestination(destination.id, { lat: choice.lat, lon: choice.lon, match: choice.name });
       delete this.matches[destination.id];
     },
@@ -141,7 +253,7 @@ export default {
     discard(destination) { delete this.matches[destination.id]; },
 
     remove(destination) {
-      const confirmed = window.confirm(`„${destination.name}“ entfernen? Die berechneten Wege dorthin gehen bei allen Grundstücken verloren.`);
+      const confirmed = window.confirm(`„${destinationName(destination)}“ entfernen? Die berechneten Wege dorthin gehen bei allen Grundstücken verloren.`);
       if (confirmed) removeDestination(destination.id);
     }
   }
@@ -156,9 +268,31 @@ export default {
 .destination-row:last-child{ border-bottom: 0; }
 .destination-row__fields{ display: grid; grid-template-columns: 1fr 1.6fr auto auto; gap: var(--w2b-space-3); align-items: end; }
 @media (max-width: 680px){ .destination-row__fields{ grid-template-columns: 1fr; } }
+.destination-row__actions{ display: flex; gap: var(--w2b-space-2); margin-top: var(--w2b-space-3); flex-wrap: wrap; }
 .destination-row__status{ margin-top: var(--w2b-space-2); font-size: var(--w2b-text-xs); color: var(--w2b-muted); }
 .destination-row__status--open{ color: var(--w2b-secondary-deep, var(--w2b-muted)); }
 .destination-row__status .faint{ font-family: var(--w2b-font-mono); margin-left: var(--w2b-space-2); }
+.notice{ margin-top: var(--w2b-space-3); }
+/* Not an error: the coordinate is still there, and the user can still step back. */
+.notice--warn{ background: var(--w2b-warning-surface); color: var(--w2b-warning-text); }
+
+/* A stored destination reads as a record — a heading, a state, three values. */
+.destination-record{ border: 1px solid var(--w2b-line); border-radius: var(--w2b-radius-s); background: var(--w2b-surface-sunken); }
+.destination-record__head{
+  display: flex; align-items: center; gap: var(--w2b-space-2); flex-wrap: wrap;
+  padding: var(--w2b-space-2) var(--w2b-space-3); border-bottom: 1px solid var(--w2b-line-faint);
+}
+.destination-record__name{ margin: 0; font-size: var(--w2b-text-m); }
+.value-list{ margin: 0; display: grid; grid-template-columns: auto 1fr; }
+.value-list dt, .value-list dd{
+  padding: 6px var(--w2b-space-3); border-bottom: 1px solid var(--w2b-line-faint); margin: 0;
+  display: flex; align-items: center;
+}
+.value-list dt{ font-size: var(--w2b-text-s); color: var(--w2b-graphite); }
+.value-list dd{ justify-content: flex-end; gap: 6px; font-size: var(--w2b-text-s); text-align: right; }
+.value-list dt:last-of-type, .value-list dd:last-of-type{ border-bottom: 0; }
+.faint{ font-family: var(--w2b-font-mono); font-size: var(--w2b-text-xs); color: var(--w2b-muted); }
+
 .match-list{ margin-top: var(--w2b-space-3); display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
 .match-list__question{ font-size: var(--w2b-text-xs); color: var(--w2b-muted); margin-bottom: 2px; }
 .match-list__option{
