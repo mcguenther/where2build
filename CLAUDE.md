@@ -175,6 +175,14 @@ from the user directly. Reopen only if the user asks.
   source, and a self-hosted instance or the local extract
   (`backend/scripts/build_poi_index.py`) is the production answer — not because
   Overpass is forbidden, but because it does not carry someone else's product.
+- **The feeder to the first stop is chosen, not assumed.** Foot and bike are
+  both asked for; the bike wins if it is faster *and* either the walk to the
+  first stop is ≥ 10 min or the whole journey gets ≥ 10 min shorter. The car is
+  only asked once the bike feeder itself is ≥ 10 min, and never taken when it is
+  slower — driving to a station and parking all day is not worth three minutes.
+  A destination can pin the choice (`zubringer`); absent means automatic. The
+  chosen variant is the mode the card names, and `hinweis` carries the numbers,
+  so a substituted mode is never silent.
 - **Rank by walking time, never air distance.** Detour ratios reach 2.88x, and
   the nearest thing by air can be unwalkable altogether.
 - **An address is not a plot.** A district address ("Plaußig-Portitz, 04349
@@ -207,7 +215,33 @@ from the user directly. Reopen only if the user asks.
   do not go looking for the bug in the code first.
 - **The sandbox browser has no route to the internet**, only the shell has.
   Basemap tiles therefore cannot be verified by screenshot here; the camera
-  maths is covered by `tests/projection.test.js` instead.
+  maths is covered by `tests/projection.test.js` instead. Tiles that come
+  through *our own* backend are a different matter — the browser reaches those,
+  so the route cards' raster ground can be photographed here.
+- **`postTransitModes=BIKE` fabricates a bike at the far end.** MOTIS answers
+  with a `BIKE` egress leg while every transit leg says `bikesAllowed: false` —
+  a bike no train carried. Egress is therefore always `WALK`. And
+  **`preTransitModes=CAR` drives onto the platform** and abandons the car;
+  park-and-ride is `CAR_PARKING`, which also returns bare-car itineraries, so
+  the answer has to be checked for CAR-then-WALK. Both verified against
+  Transitous; see § 9 of `docs/research/routing-motis.md`.
+- **A dimension chain hangs a fixed number of *pixels* outside the outline, so
+  the frame it needs is a pixel margin.** Reserving it in metres needs a scale,
+  which the reservation then changes, and the two chase each other — a 35 m plot
+  ended up at a third of its frame. `SitePlan.margin` is a pixel constant and
+  the fit runs once against it.
+- **Above ~16 boundary segments, a label per edge is not information.** The
+  field a district address resolves to has 159 and every chain drawn turned the
+  plan into a black band. The overall size (minimum rotated rectangle) is what
+  survives; the setback table lists the individual lengths anyway.
+- **A watched computed is evaluated whether or not the template reached it.**
+  `PlotView`'s computeds all read `this.plot`, and a `v-if="plot"` had kept them
+  from ever seeing `null`. Adding one watcher was enough to crash the page whose
+  whole job is to explain that the id in the URL names no plot here.
+- **"Something is selected" is not a signal that anybody selected anything.**
+  `addPlot` puts every new plot into `state.data.selection`, so opening the
+  overview's comparison mode when the selection is non-empty means opening it
+  always — the state that button exists to get out of.
 
 ## Commands
 
@@ -240,7 +274,8 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 320
-- `vitest`: 216 (plus `npm run test:integration`, 10 against a running backend)
+- `pytest`: 345 passed, 1 skipped
+- `vitest`: 300 passed, 10 skipped — the 10 are the integration tests, which run
+  and pass (308/2) when a backend is up on :8000
 - `scripts/screenshots.mjs`: 37 images plus a print PDF. It fails on console errors, on
   horizontal overflow, and if not a single vector tile arrived.
