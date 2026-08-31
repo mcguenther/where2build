@@ -456,6 +456,80 @@ function searchPlacement(envelope, width, depth, options) {
 /** Does this footprint fit anywhere at all? Cheaper to read than findPlacement. */
 export const fitsAnywhere = (envelope, width, depth) => findPlacement(envelope, width, depth) !== null;
 
+/** All four corners inside: the whole validity test for a placed footprint. */
+function insideEnvelope(placement, envelope) {
+  const corners = rectangleCorners(placement);
+  for (let i = 0; i < 4; i++) if (!pointInPolygon(corners[i], envelope)) return false;
+  return true;
+}
+
+/* Sixteen halvings leave the stop within a ten-thousandth of the requested
+ * move — far below a pixel at any scale this plan is drawn at, and a fixed
+ * cost so a pointer move never gets slower the further it travels. */
+const SLIDE_STEPS = 16;
+
+/**
+ * The far end of the longest part of `dx, dy` that keeps the footprint inside.
+ * The whole move first, then bisection between the last position known to be
+ * legal and the requested one.
+ */
+function reachAlong(envelope, shape, from, dx, dy) {
+  const at = t => ({ ...shape, cx: from.cx + dx * t, cy: from.cy + dy * t });
+  if (insideEnvelope(at(1), envelope)) return { cx: from.cx + dx, cy: from.cy + dy };
+  let legal = 0, blocked = 1;
+  for (let i = 0; i < SLIDE_STEPS; i++) {
+    const middle = (legal + blocked) / 2;
+    if (insideEnvelope(at(middle), envelope)) legal = middle; else blocked = middle;
+  }
+  return { cx: from.cx + dx * legal, cy: from.cy + dy * legal };
+}
+
+/**
+ * Where a footprint dragged from `placement` towards `wanted` is allowed to end
+ * up: the position closest to `wanted` that still has all four corners in the
+ * envelope. Returns `{cx, cy}`.
+ *
+ * Three candidates are tried — the whole move, the move in x alone, the move in
+ * y alone — each cut back to the part of it that stays legal, and the one that
+ * comes nearest to `wanted` wins. That is what makes the footprint slide along
+ * a boundary it is pushed into instead of stopping dead against it, and it
+ * leaves a drag far past the boundary standing at the boundary rather than
+ * snapping back to where it started.
+ *
+ * The constraint gives itself up wherever there is nothing to enforce: an
+ * envelope of fewer than three points, a footprint that fits nowhere at this
+ * angle, or one that is already outside. Holding a drag inside a window that
+ * does not exist would only mean the house could not be moved at all; the
+ * violation markers say what is wrong instead.
+ */
+export function constrainToEnvelope(envelope, placement, wanted) {
+  const target = { cx: wanted.cx, cy: wanted.cy };
+  if (!envelope || envelope.length < 3) return target;
+
+  /* Both of these are read a few thousand times below, and a Vue prop charges
+     a proxy trap per property read. Copy once at the door — see plainRing. */
+  const ring = plainRing(envelope);
+  const shape = { width: placement.width, depth: placement.depth, rotation: placement.rotation };
+  if (insideEnvelope({ ...shape, ...target }, ring)) return target;
+
+  if (!findPlacement(ring, shape.width, shape.depth, { rotation: shape.rotation })) return target;
+
+  const from = { cx: placement.cx, cy: placement.cy };
+  // A slide needs somewhere legal to slide from.
+  if (!insideEnvelope({ ...shape, ...from }, ring)) return target;
+
+  const dx = target.cx - from.cx, dy = target.cy - from.cy;
+  let best = from;
+  let shortest = Math.hypot(dx, dy);
+  for (const [mx, my] of [[dx, dy], [dx, 0], [0, dy]]) {
+    if (!mx && !my) continue;
+    const candidate = reachAlong(ring, shape, from, mx, my);
+    const distance = Math.hypot(target.cx - candidate.cx, target.cy - candidate.cy);
+    if (distance < shortest) { shortest = distance; best = candidate; }
+  }
+  return best;
+}
+
 /**
  * Rotation in degrees that lays the footprint's long side parallel to a parcel
  * edge — normally the street front, which is what people actually build to.

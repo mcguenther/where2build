@@ -1,0 +1,111 @@
+{
+  "type": "FeatureCollection",
+  "crs_hinweis": "EPSG:4326 (WGS84); Längen und Flächen wurden in EPSG:25833 gerechnet.",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "DESNALK0v90009BRFL",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              12.44208139204319,
+              51.336394069671584
+            ],
+            [
+              12.442093879016328,
+              51.33641065752354
+            ],
+            [
+              12.442161513146377,
+              51.33650414333532
+            ],
+            [
+              12.441529940640779,
+              51.33667614800693
+            ],
+            [
+              12.441452528570872,
+              51.336564891946715
+            ],
+            [
+              12.44208139204319,
+              51.336394069671584
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kennzeichen": "145592___00204____02",
+        "gemarkung": "Mölkau",
+        "gemarkungsnummer": "145592",
+        "flur": null,
+        "zaehler": "204",
+        "nenner": null,
+        "flaeche_amtlich_m2": 650.0,
+        "flaeche_berechnet_m2": 645.57,
+        "lagebezeichnung": "Lessingweg 44",
+        "gemeinde": "Stadt Leipzig",
+        "aktualitaet": "2019-07-09"
+      }
+    }
+  ],
+  "grundstueck": {
+    "type": "Feature",
+    "geometry": {
+      "type": "Polygon",
+      "coordinates": [
+        [
+          [
+            12.44208139204319,
+            51.336394069671584
+          ],
+          [
+            12.442093879016328,
+            51.33641065752354
+          ],
+          [
+            12.442161513146377,
+            51.33650414333532
+          ],
+          [
+            12.441529940640779,
+            51.33667614800693
+          ],
+          [
+            12.441452528570872,
+            51.336564891946715
+          ],
+          [
+            12.44208139204319,
+            51.336394069671584
+          ]
+        ]
+      ]
+    },
+    "properties": {
+      "anzahl_flurstuecke": 1,
+      "kennzeichen": [
+        "145592___00204____02"
+      ],
+      "flaeche_amtlich_m2": 650.0,
+      "flaeche_berechnet_m2": 645.57,
+      "gemarkung": "Mölkau",
+      "gemeinde": "Stadt Leipzig"
+    }
+  },
+  "quelle": "Landesamt für Geobasisinformation Sachsen (GeoSN), dl-de/by-2-0",
+  "hinweis": null,
+  "plausibility": {
+    "plausible": true,
+    "issues": [],
+    "expected_area_m2": null,
+    "flaeche_amtlich_m2": 650.0,
+    "area_factor": null,
+    "longest_extent_m": 48.0,
+    "shortest_extent_m": 13.5,
+    "elongation": 3.56,
+    "warning": null
+  }
+}
