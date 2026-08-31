@@ -25,6 +25,12 @@
       <marker :id="`dim-${uid}`" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto">
         <line x1="5" y1="1.5" x2="5" y2="8.5" stroke="var(--w2b-map-boundary)" stroke-width="1.2" />
       </marker>
+      <!-- A hatch, not a fill: the statutory setback strip is the only thing on
+           this drawing that gets a solid colour, and this is a hint. -->
+      <pattern :id="`hint-${uid}`" width="7" height="7" patternUnits="userSpaceOnUse"
+               patternTransform="rotate(45)">
+        <line x1="0" y1="0" x2="0" y2="7" stroke="var(--w2b-map-neighbour)" stroke-width="1.1" />
+      </pattern>
     </defs>
 
     <rect v-if="!hasBackdrop" x="0" y="0" :width="width" :height="height" :fill="backgroundFill" />
@@ -36,6 +42,13 @@
       <!-- The setback strip is what gets colour: marked is what may NOT be built on. -->
       <template v-if="showSetbacks && envelope.length">
         <path :d="setbackRing" fill-rule="evenodd" fill="var(--w2b-map-setback)" />
+        <!-- Where the neighbouring building's own minimum setback would reach
+             onto this plot. A hint, never a finding — see
+             docs/research/abstandsflaechen-nachbargebaeude.md. -->
+        <path v-if="neighbourRing" :d="neighbourRing" fill-rule="evenodd"
+              :fill="`url(#hint-${uid})`" opacity=".75" />
+        <polygon v-if="neighbourEnvelope.length" :points="path(neighbourEnvelope)" fill="none"
+                 stroke="var(--w2b-map-neighbour)" stroke-width="1.1" stroke-dasharray="2 3" />
         <polygon :points="path(envelope)" fill="none" stroke="var(--w2b-map-envelope)"
                  stroke-width="1.5" stroke-dasharray="6 4" />
       </template>
@@ -136,7 +149,8 @@
 <script>
 import {
   buildableArea, polygonEdges, rectangleCorners, pointInPolygon,
-  closestBoundaryPoint, boundingBox, alignmentToEdge, constrainToEnvelope
+  closestBoundaryPoint, boundingBox, alignmentToEdge, constrainToEnvelope,
+  hasNeighbourHint
 } from "../lib/geometry.js";
 import { cameraFor } from "../lib/projection.js";
 import { num } from "../lib/format.js";
@@ -176,6 +190,9 @@ export default {
     showBuilding: { type: Boolean, default: true },
     /** Let the pointer pan and the wheel zoom the framing, backdrop included. */
     navigable: { type: Boolean, default: false },
+    /** Per-segment depths a neighbouring building's own minimum would ask for.
+     *  Absent, or equal to the statutory ones, and nothing extra is drawn. */
+    neighbourDepths: { type: Array, default: null },
     /** Fixed pixels per metre. Without it each plan fits its own frame. */
     scale: { type: Number, default: null },
     /** Measuring mode: clicks add points, the run is measured segment by segment. */
@@ -256,6 +273,19 @@ export default {
     },
     tenMetres() { return 10 * this.view.scale; },
     envelope() { return buildableArea(this.plot.polygon, this.plot.setbacks); },
+    /** The envelope as it would be if the neighbours' minimum setbacks counted
+     *  against this plot. Empty unless it is actually deeper than our own. */
+    neighbourEnvelope() {
+      if (!this.neighbourDepths || !this.envelope.length) return [];
+      if (!hasNeighbourHint(this.plot.setbacks, this.neighbourDepths)) return [];
+      return buildableArea(this.plot.polygon, this.neighbourDepths);
+    },
+    neighbourRing() {
+      if (!this.neighbourEnvelope.length) return null;
+      const outer = this.envelope.map(v => `${this.p(v).x},${this.p(v).y}`).join("L");
+      const inner = this.neighbourEnvelope.map(v => `${this.p(v).x},${this.p(v).y}`).join("L");
+      return `M${outer}Z M${inner}Z`;
+    },
     setbackRing() {
       const outer = this.plot.polygon.map(v => `${this.p(v).x},${this.p(v).y}`).join("L");
       const inner = this.envelope.map(v => `${this.p(v).x},${this.p(v).y}`).join("L");

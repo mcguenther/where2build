@@ -698,6 +698,49 @@ class NearbyResponse(BaseModel):
 
 
 # --------------------------------------------------------------------------
+# Neighbouring buildings
+# --------------------------------------------------------------------------
+
+
+NACHBARN_HINWEIS = (
+    "Umrisse aus OpenStreetMap, ohne Wandhöhen — daraus lässt sich nur das "
+    "Mindestmaß von 3 m nach § 6 Abs. 5 SächsBO rechnen, nie 0,4 H. Ein "
+    "Hinweis, keine bauordnungsrechtliche Prüfung."
+)
+
+
+class Nachbargebaeude(BaseModel):
+    """One mapped building outline, as OpenStreetMap has it."""
+
+    osm_id: str
+    umriss: list[list[float]] = Field(
+        description="Geschlossener Ring in [lon, lat], WGS84.", min_length=4
+    )
+    adresse: str | None = None
+    geschosse: int | None = Field(
+        default=None,
+        description="Nur wenn OSM es führt; in sächsischen Wohnlagen fast nie.",
+    )
+
+
+class NachbarnRequest(BaseModel):
+    origin: Koordinate
+    umkreis_m: int = Field(
+        default=80,
+        ge=20,
+        le=300,
+        description="Luftlinien-Umkreis um den Ankerpunkt des Grundstücks.",
+    )
+
+
+class NachbarnResponse(BaseModel):
+    gebaeude: list[Nachbargebaeude]
+    quelle: str | None = None
+    datenstand: str | None = None
+    hinweis: str = NACHBARN_HINWEIS
+
+
+# --------------------------------------------------------------------------
 # Cadastral districts
 # --------------------------------------------------------------------------
 

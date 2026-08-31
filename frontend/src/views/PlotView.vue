@@ -49,6 +49,10 @@
                   @click="state.plan.showSetbacks = !state.plan.showSetbacks">Abstandsflächen</button>
           <button type="button" class="toggle" :aria-pressed="String(state.plan.measuring)"
                   @click="toggleMeasuring">Messen</button>
+          <button type="button" class="toggle" :disabled="!hasAnchor"
+                  :title="hasAnchor ? null : 'Ohne Koordinate lassen sich keine Nachbargebäude finden.'"
+                  :aria-pressed="String(showNeighbours)"
+                  @click="toggleNeighbours">Nachbarn</button>
         </div>
 
         <p class="notice" :class="violation ? 'notice--error' : 'notice--good'" role="status">
@@ -60,6 +64,23 @@
             <b>Baukörper liegt im Bebauungsfenster.</b>
             Geringster Grenzabstand {{ metres(narrowestSetback) }}.
           </span>
+        </p>
+
+        <p v-if="showNeighbours" class="notice neighbour-note" role="status">
+          <span v-if="neighboursBusy">Nachbargebäude werden geholt …</span>
+          <span v-else-if="neighboursError">{{ neighboursError }}</span>
+          <span v-else-if="neighbourHint">
+            <b>Schraffiert: hier reicht die Abstandsfläche des Nachbargebäudes herüber.</b>
+            § 6 SächsBO verlangt das nicht von uns — jedes Gebäude hält seine Abstandsfläche
+            auf dem eigenen Grundstück. Wo beide sich überdecken würden, ist das eine Frage
+            an die Bauaufsicht, keine Prüfung. Umrisse aus OpenStreetMap, ohne Wandhöhen,
+            gerechnet mit dem Mindestmaß von 3 m.
+          </span>
+          <span v-else-if="neighbourBuildings.length">
+            <b>Kein Nachbargebäude steht näher als 3 m an der Grenze.</b>
+            {{ neighbourBuildings.length }} Umrisse aus OpenStreetMap geprüft.
+          </span>
+          <span v-else>In der Umgebung ist in OpenStreetMap kein Gebäude erfasst.</span>
         </p>
 
         <p v-if="state.plan.measuring" class="notice measure-bar">
@@ -74,7 +95,8 @@
                   :measuring="state.plan.measuring" @measured="m => (measurement = m)"
                   :backdrop="state.plan.backdrop" :north-up="state.plan.northUp"
                   :show-dimensions="state.plan.showDimensions" :show-setbacks="state.plan.showSetbacks"
-                  :confine-to-envelope="confineHouse" @move="moveHouse" />
+                  :confine-to-envelope="confineHouse" :neighbour-depths="neighbourDepths"
+                  @move="moveHouse" />
 
         <div class="plan-foot">
           <span>ETRS89 / UTM33N — EPSG:25833</span>
@@ -345,11 +367,12 @@ import RouteCards from "../components/RouteCards.vue";
 import NearbyPanel from "../components/NearbyPanel.vue";
 import { state, plotById, placement, houseTypeById, houseFootprint, save, addHouseType, newId, setRoutes, CUSTOM_SIZE }
   from "../lib/store.js";
-import { reachability } from "../lib/api.js";
+import { reachability, neighbourBuildings as fetchNeighbourBuildings } from "../lib/api.js";
+import { toLocal } from "../lib/projection.js";
 import { plotMetrics } from "../lib/metrics.js";
 import {
   polygonEdges, edgeCompass, buildableArea, cornersOutside, smallestSetback,
-  alignToEdge, alignmentToEdge, findPlacement
+  alignToEdge, alignmentToEdge, findPlacement, neighbourSetbackDepths, hasNeighbourHint
 } from "../lib/geometry.js";
 import { area, euro, euroPerSqm, metres, num, percent, degrees, date } from "../lib/format.js";
 
@@ -371,6 +394,12 @@ export default {
        *  in. `null` means nobody is editing, so the stored size is shown. */
       sizeDraft: { length: null, width: null },
       measurement: { points: [], length: 0 },
+      /** Outlines are not stored with the plot: they are somebody else's data,
+       *  they are large, and the backend keeps them for a month anyway. Only
+       *  the preference lives in the document. */
+      neighbourBuildings: [],
+      neighboursBusy: false,
+      neighboursError: null,
       routesBusy: false,
       routesError: null,
       backdrops: [
@@ -413,6 +442,20 @@ export default {
        written before the setting existed carry no field, and those plots have
        always been dragged with the house kept inside as of this version. */
     confineHouse() { return this.plot?.confineHouse !== false; },
+    showNeighbours() { return Boolean(this.plot?.showNeighbours) && this.hasAnchor; },
+    /** The outlines in this plot's own metre frame. */
+    neighbourOutlines() {
+      if (!this.showNeighbours || !this.plot.anchor) return [];
+      return this.neighbourBuildings.map(b => toLocal(b.umriss, this.plot.anchor));
+    },
+    neighbourDepths() {
+      if (!this.neighbourOutlines.length) return null;
+      return neighbourSetbackDepths(this.plot.polygon, this.plot.setbacks, this.neighbourOutlines);
+    },
+    neighbourHint() {
+      return Boolean(this.neighbourDepths)
+        && hasNeighbourHint(this.plot.setbacks, this.neighbourDepths);
+    },
     /** What the house *is*, apart from where it stands. A change to any of it
      *  can leave the house outside a window it was inside a moment ago. */
     houseShape() {
@@ -441,7 +484,16 @@ export default {
     hasPrevious() { return this.index > 0; },
     hasNext() { return this.index < state.data.plots.length - 1; }
   },
+  /* A plot that was left with the neighbour hint on comes back with it on, so
+     the outlines have to be fetched again — they are not in the document. */
+  created() { if (this.showNeighbours) this.loadNeighbours(); },
   watch: {
+    /* Another plot in the same view: its outlines are somewhere else. */
+    "plot.id"() {
+      this.neighbourBuildings = [];
+      this.neighboursError = null;
+      if (this.showNeighbours) this.loadNeighbours();
+    },
     /* Another house type, other dimensions, another angle, deeper setbacks: any
        of them can push a house that was inside out of the window, and with the
        constraint on, dragging can no longer be what puts it back. So it is put
@@ -576,6 +628,25 @@ export default {
       this.plot.house = { cx: next.cx, cy: next.cy, rotation: Math.round(next.rotation * 10) / 10 };
       save();
     },
+    toggleNeighbours() {
+      this.plot.showNeighbours = !this.plot.showNeighbours;
+      save();
+      if (this.plot.showNeighbours) this.loadNeighbours();
+    },
+    /** One question per plot; the backend answers repeats from disk. */
+    async loadNeighbours() {
+      if (!this.plot?.anchor || this.neighbourBuildings.length || this.neighboursBusy) return;
+      this.neighboursBusy = true;
+      this.neighboursError = null;
+      try {
+        const answer = await fetchNeighbourBuildings(this.plot.anchor.lat, this.plot.anchor.lon);
+        this.neighbourBuildings = answer?.gebaeude ?? [];
+      } catch (error) {
+        this.neighboursError = error.message;
+      } finally {
+        this.neighboursBusy = false;
+      }
+    },
     toggleConfine() {
       this.plot.confineHouse = !this.confineHouse;
       save();
@@ -682,5 +753,6 @@ export default {
 .custom-size{ display: grid; grid-template-columns: 1fr 1fr; gap: var(--w2b-space-3); padding: var(--w2b-space-3) var(--w2b-space-4); border-bottom: 1px solid var(--w2b-line); background: var(--w2b-secondary-veil); }
 .custom-size__hint{ grid-column: 1 / -1; font-size: var(--w2b-text-xs); color: var(--w2b-secondary-text); }
 .custom-size__hint--warn{ color: var(--w2b-warning-text); }
+.neighbour-note{ font-size: var(--w2b-text-xs); }
 .align, .confine{ display: flex; flex-direction: column; align-items: flex-start; gap: var(--w2b-space-2); padding: var(--w2b-space-3) var(--w2b-space-4); border-top: 1px solid var(--w2b-line-faint); }
 </style>

@@ -57,6 +57,16 @@ from the user directly. Reopen only if the user asks.
   agent names or phone numbers, so no personal data reaches the database.
 - **Fonts come from npm (Fontsource)**, never from a CDN.
 - **No separate print view.** `print.css` restyles the live page.
+- **There is no "6 m between buildings" rule in Saxony.** § 6 Abs. 5 SächsBO
+  gives 0,4 H with a 3 m floor, Abs. 2 puts that area on one's own plot, Abs. 3
+  forbids setback areas overlapping — so 6 m is the arithmetic of two minimal
+  cases, not a norm, and a neighbour standing too close does **not** enlarge our
+  setback. The hatched strip in the plan therefore says where the two areas
+  would overlap and that this is a question for the Bauaufsicht; it must never
+  be worded as an obligation. OSM has the outlines but almost no wall heights
+  (11 of 59 around Mölkau 204 carry `building:levels`, none carries `height`),
+  so only the 3 m floor is computable.
+  See `docs/research/abstandsflaechen-nachbargebaeude.md`.
 - Region is Saxony only; ALKIS and BORIS are state-specific.
 - **Never show example data.** There is no sample state and no fallback: when a
   service fails, the German `detail` from the backend is shown instead. Tests
@@ -250,7 +260,7 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 348 (one skipped)
-- `vitest`: 251 (plus `npm run test:integration`, 10 against a running backend)
+- `pytest`: 359 (one skipped)
+- `vitest`: 263 (plus `npm run test:integration`, 10 against a running backend)
 - `scripts/screenshots.mjs`: 37 images plus a print PDF. It fails on console errors, on
   horizontal overflow, and if not a single vector tile arrived.

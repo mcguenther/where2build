@@ -27,6 +27,7 @@ from .routers import (
     landvalue,
     listings,
     nearby,
+    neighbours,
     parcels,
     reachability,
     tiles,
@@ -230,6 +231,7 @@ def create_app() -> FastAPI:
         geocode,
         reachability,
         nearby,
+        neighbours,
         tiles,
         basemap,
     ):

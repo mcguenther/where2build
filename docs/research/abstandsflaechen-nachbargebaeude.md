@@ -83,11 +83,13 @@ on most of them (`Lessingweg 48`, `Lessingweg 50`, `Paunsdorfer Straße 55`, …
 Coverage in this ordinary Leipzig residential street is complete enough to work
 with.
 
-**But: not one of the 21 carried `building:levels` or `height`.** So wall
-heights are not available, and 0.4 H cannot be computed for a neighbour. Only
-the 3 m floor is. Every number derived from this is therefore the *most
-permissive* reading — the real setback of a taller neighbouring house is
-larger, never smaller.
+**Wall heights are the gap.** Widening the same query to 125 m returns 59
+buildings, of which **11 carry `building:levels`** and none carries `height`.
+A storey count is not a wall height either — § 6 Abs. 5 measures H from the
+ground to where the wall meets the roof skin, which no OSM tag gives. So 0.4 H
+cannot be computed for a neighbour and only the 3 m floor is available. Every
+number derived from this is therefore the *most permissive* reading: the real
+setback of a taller neighbouring house is larger, never smaller.
 
 The Overpass policy question is already settled in CLAUDE.md: the endpoint is a
 configurable source, and a self-hosted instance or a local extract is the

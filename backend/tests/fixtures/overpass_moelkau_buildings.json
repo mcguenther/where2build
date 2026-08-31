@@ -1,0 +1,2347 @@
+{
+ "version": 0.6,
+ "generator": "Overpass API 0.7.62.11 87bfad18",
+ "osm3s": {
+  "timestamp_osm_base": "2026-08-31T15:31:03Z",
+  "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."
+ },
+ "elements": [
+  {
+   "type": "way",
+   "id": 153387640,
+   "bounds": {
+    "minlat": 51.3353284,
+    "minlon": 12.4419664,
+    "maxlat": 51.3356148,
+    "maxlon": 12.4422498
+   },
+   "geometry": [
+    {
+     "lat": 51.3356148,
+     "lon": 12.4421249
+    },
+    {
+     "lat": 51.3355846,
+     "lon": 12.4422498
+    },
+    {
+     "lat": 51.3355285,
+     "lon": 12.4422151
+    },
+    {
+     "lat": 51.3354028,
+     "lon": 12.4421373
+    },
+    {
+     "lat": 51.3353284,
+     "lon": 12.4420913
+    },
+    {
+     "lat": 51.3353586,
+     "lon": 12.4419664
+    },
+    {
+     "lat": 51.3356148,
+     "lon": 12.4421249
+    }
+   ],
+   "tags": {
+    "building": "apartments",
+    "building:levels": "3",
+    "roof:levels": "1"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387645,
+   "bounds": {
+    "minlat": 51.3363544,
+    "minlon": 12.440347,
+    "maxlat": 51.3364768,
+    "maxlon": 12.440499
+   },
+   "geometry": [
+    {
+     "lat": 51.3364768,
+     "lon": 12.4404136
+    },
+    {
+     "lat": 51.3364547,
+     "lon": 12.440499
+    },
+    {
+     "lat": 51.3363544,
+     "lon": 12.4404324
+    },
+    {
+     "lat": 51.3363765,
+     "lon": 12.440347
+    },
+    {
+     "lat": 51.3364768,
+     "lon": 12.4404136
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "15",
+    "addr:postcode": "04316",
+    "addr:street": "Goetheweg",
+    "building": "residential"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387646,
+   "bounds": {
+    "minlat": 51.3357086,
+    "minlon": 12.4410819,
+    "maxlat": 51.3358294,
+    "maxlon": 12.4412944
+   },
+   "geometry": [
+    {
+     "lat": 51.3357527,
+     "lon": 12.4410819
+    },
+    {
+     "lat": 51.3358294,
+     "lon": 12.441137
+    },
+    {
+     "lat": 51.3357853,
+     "lon": 12.4412944
+    },
+    {
+     "lat": 51.3357086,
+     "lon": 12.4412393
+    },
+    {
+     "lat": 51.3357527,
+     "lon": 12.4410819
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "30",
+    "addr:postcode": "04316",
+    "addr:street": "Lessingweg",
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387648,
+   "bounds": {
+    "minlat": 51.3371806,
+    "minlon": 12.4409795,
+    "maxlat": 51.3373178,
+    "maxlon": 12.4412208
+   },
+   "geometry": [
+    {
+     "lat": 51.3373178,
+     "lon": 12.4410421
+    },
+    {
+     "lat": 51.3372676,
+     "lon": 12.4412208
+    },
+    {
+     "lat": 51.3371806,
+     "lon": 12.4411582
+    },
+    {
+     "lat": 51.3372307,
+     "lon": 12.4409795
+    },
+    {
+     "lat": 51.3373178,
+     "lon": 12.4410421
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "37",
+    "addr:postcode": "04316",
+    "addr:street": "Lessingweg",
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387652,
+   "bounds": {
+    "minlat": 51.3360497,
+    "minlon": 12.4406776,
+    "maxlat": 51.3361592,
+    "maxlon": 12.4408685
+   },
+   "geometry": [
+    {
+     "lat": 51.3361592,
+     "lon": 12.440728
+    },
+    {
+     "lat": 51.3361198,
+     "lon": 12.4408685
+    },
+    {
+     "lat": 51.3360497,
+     "lon": 12.4408182
+    },
+    {
+     "lat": 51.336089,
+     "lon": 12.4406776
+    },
+    {
+     "lat": 51.3361592,
+     "lon": 12.440728
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "23",
+    "addr:postcode": "04316",
+    "addr:street": "Lessingweg",
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387658,
+   "bounds": {
+    "minlat": 51.3358388,
+    "minlon": 12.442136,
+    "maxlat": 51.3359686,
+    "maxlon": 12.4423978
+   },
+   "geometry": [
+    {
+     "lat": 51.3359686,
+     "lon": 12.4421859
+    },
+    {
+     "lat": 51.3359131,
+     "lon": 12.4423978
+    },
+    {
+     "lat": 51.3358388,
+     "lon": 12.442348
+    },
+    {
+     "lat": 51.3358943,
+     "lon": 12.442136
+    },
+    {
+     "lat": 51.3359686,
+     "lon": 12.4421859
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "55",
+    "addr:postcode": "04316",
+    "addr:street": "Paunsdorfer Straße",
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387664,
+   "bounds": {
+    "minlat": 51.3370373,
+    "minlon": 12.4408966,
+    "maxlat": 51.3371711,
+    "maxlon": 12.4410804
+   },
+   "geometry": [
+    {
+     "lat": 51.3370689,
+     "lon": 12.4408966
+    },
+    {
+     "lat": 51.3371711,
+     "lon": 12.4409753
+    },
+    {
+     "lat": 51.3371395,
+     "lon": 12.4410804
+    },
+    {
+     "lat": 51.3370373,
+     "lon": 12.4410016
+    },
+    {
+     "lat": 51.3370689,
+     "lon": 12.4408966
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "35",
+    "addr:postcode": "04316",
+    "addr:street": "Lessingweg",
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387665,
+   "bounds": {
+    "minlat": 51.3368053,
+    "minlon": 12.4419107,
+    "maxlat": 51.3369287,
+    "maxlon": 12.4421392
+   },
+   "geometry": [
+    {
+     "lat": 51.3368535,
+     "lon": 12.4419107
+    },
+    {
+     "lat": 51.3369287,
+     "lon": 12.4419636
+    },
+    {
+     "lat": 51.3368806,
+     "lon": 12.4421392
+    },
+    {
+     "lat": 51.3368053,
+     "lon": 12.4420863
+    },
+    {
+     "lat": 51.3368535,
+     "lon": 12.4419107
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "50",
+    "addr:postcode": "04316",
+    "addr:street": "Lessingweg",
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387670,
+   "bounds": {
+    "minlat": 51.3357097,
+    "minlon": 12.440495,
+    "maxlat": 51.3358486,
+    "maxlon": 12.4407028
+   },
+   "geometry": [
+    {
+     "lat": 51.3357097,
+     "lon": 12.4406331
+    },
+    {
+     "lat": 51.3357465,
+     "lon": 12.440495
+    },
+    {
+     "lat": 51.3358486,
+     "lon": 12.4405646
+    },
+    {
+     "lat": 51.3358118,
+     "lon": 12.4407028
+    },
+    {
+     "lat": 51.3357097,
+     "lon": 12.4406331
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "10",
+    "addr:postcode": "04316",
+    "addr:street": "Körnerweg",
+    "building": "house",
+    "building:levels": "1",
+    "building:material": "plaster",
+    "roof:levels": "1",
+    "roof:material": "roof_tiles",
+    "roof:shape": "gabled"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387680,
+   "bounds": {
+    "minlat": 51.3366722,
+    "minlon": 12.4418765,
+    "maxlat": 51.3368043,
+    "maxlon": 12.4421591
+   },
+   "geometry": [
+    {
+     "lat": 51.3367324,
+     "lon": 12.4418765
+    },
+    {
+     "lat": 51.3368043,
+     "lon": 12.4419236
+    },
+    {
+     "lat": 51.3367441,
+     "lon": 12.4421591
+    },
+    {
+     "lat": 51.3366722,
+     "lon": 12.442112
+    },
+    {
+     "lat": 51.3367324,
+     "lon": 12.4418765
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "48",
+    "addr:postcode": "04316",
+    "addr:street": "Lessingweg",
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387690,
+   "bounds": {
+    "minlat": 51.3359055,
+    "minlon": 12.4402561,
+    "maxlat": 51.3360306,
+    "maxlon": 12.4404589
+   },
+   "geometry": [
+    {
+     "lat": 51.3359414,
+     "lon": 12.4402561
+    },
+    {
+     "lat": 51.3360306,
+     "lon": 12.4403121
+    },
+    {
+     "lat": 51.3359947,
+     "lon": 12.4404589
+    },
+    {
+     "lat": 51.3359055,
+     "lon": 12.440403
+    },
+    {
+     "lat": 51.3359414,
+     "lon": 12.4402561
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "12",
+    "addr:postcode": "04316",
+    "addr:street": "Körnerweg",
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387692,
+   "bounds": {
+    "minlat": 51.3372762,
+    "minlon": 12.4410445,
+    "maxlat": 51.3373966,
+    "maxlon": 12.4412574
+   },
+   "geometry": [
+    {
+     "lat": 51.3373966,
+     "lon": 12.4410985
+    },
+    {
+     "lat": 51.3373531,
+     "lon": 12.4412574
+    },
+    {
+     "lat": 51.3372762,
+     "lon": 12.4412035
+    },
+    {
+     "lat": 51.3373197,
+     "lon": 12.4410445
+    },
+    {
+     "lat": 51.3373966,
+     "lon": 12.4410985
+    }
+   ],
+   "tags": {
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387702,
+   "bounds": {
+    "minlat": 51.3367615,
+    "minlon": 12.4411434,
+    "maxlat": 51.3368924,
+    "maxlon": 12.4413839
+   },
+   "geometry": [
+    {
+     "lat": 51.3368135,
+     "lon": 12.4411434
+    },
+    {
+     "lat": 51.3368924,
+     "lon": 12.4412007
+    },
+    {
+     "lat": 51.3368403,
+     "lon": 12.4413839
+    },
+    {
+     "lat": 51.3367615,
+     "lon": 12.4413266
+    },
+    {
+     "lat": 51.3368135,
+     "lon": 12.4411434
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "33",
+    "addr:postcode": "04316",
+    "addr:street": "Lessingweg",
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387708,
+   "bounds": {
+    "minlat": 51.3375078,
+    "minlon": 12.440961,
+    "maxlat": 51.3376124,
+    "maxlon": 12.4411483
+   },
+   "geometry": [
+    {
+     "lat": 51.3375434,
+     "lon": 12.4411483
+    },
+    {
+     "lat": 51.3375078,
+     "lon": 12.4411195
+    },
+    {
+     "lat": 51.337558,
+     "lon": 12.440961
+    },
+    {
+     "lat": 51.3376124,
+     "lon": 12.4410051
+    },
+    {
+     "lat": 51.3375962,
+     "lon": 12.4410565
+    },
+    {
+     "lat": 51.3375772,
+     "lon": 12.4410412
+    },
+    {
+     "lat": 51.3375434,
+     "lon": 12.4411483
+    }
+   ],
+   "tags": {
+    "addr:housenumber": "11",
+    "addr:street": "Uhlandweg",
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387713,
+   "bounds": {
+    "minlat": 51.3371749,
+    "minlon": 12.4421214,
+    "maxlat": 51.3373082,
+    "maxlon": 12.4423386
+   },
+   "geometry": [
+    {
+     "lat": 51.3373082,
+     "lon": 12.4421865
+    },
+    {
+     "lat": 51.3372657,
+     "lon": 12.4423386
+    },
+    {
+     "lat": 51.3371749,
+     "lon": 12.4422735
+    },
+    {
+     "lat": 51.3372174,
+     "lon": 12.4421214
+    },
+    {
+     "lat": 51.3373082,
+     "lon": 12.4421865
+    }
+   ],
+   "tags": {
+    "addr:housenumber": "7",
+    "addr:street": "Uhlandweg",
+    "building": "yes",
+    "building:levels": "1",
+    "roof:levels": "1"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387714,
+   "bounds": {
+    "minlat": 51.3364329,
+    "minlon": 12.4424347,
+    "maxlat": 51.3365465,
+    "maxlon": 12.4426623
+   },
+   "geometry": [
+    {
+     "lat": 51.3365465,
+     "lon": 12.4424771
+    },
+    {
+     "lat": 51.3365023,
+     "lon": 12.4426623
+    },
+    {
+     "lat": 51.3364329,
+     "lon": 12.4426199
+    },
+    {
+     "lat": 51.3364771,
+     "lon": 12.4424347
+    },
+    {
+     "lat": 51.3365465,
+     "lon": 12.4424771
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "65",
+    "addr:postcode": "04316",
+    "addr:street": "Paunsdorfer Straße",
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387719,
+   "bounds": {
+    "minlat": 51.3366347,
+    "minlon": 12.4411494,
+    "maxlat": 51.3367123,
+    "maxlon": 12.4412789
+   },
+   "geometry": [
+    {
+     "lat": 51.3366613,
+     "lon": 12.4411494
+    },
+    {
+     "lat": 51.3367123,
+     "lon": 12.4411873
+    },
+    {
+     "lat": 51.3366858,
+     "lon": 12.4412789
+    },
+    {
+     "lat": 51.3366347,
+     "lon": 12.4412411
+    },
+    {
+     "lat": 51.3366613,
+     "lon": 12.4411494
+    }
+   ],
+   "tags": {
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387720,
+   "bounds": {
+    "minlat": 51.3363014,
+    "minlon": 12.4413828,
+    "maxlat": 51.3364167,
+    "maxlon": 12.4415596
+   },
+   "geometry": [
+    {
+     "lat": 51.3364167,
+     "lon": 12.4414386
+    },
+    {
+     "lat": 51.3363853,
+     "lon": 12.4415596
+    },
+    {
+     "lat": 51.3363014,
+     "lon": 12.4415038
+    },
+    {
+     "lat": 51.3363329,
+     "lon": 12.4413828
+    },
+    {
+     "lat": 51.3364167,
+     "lon": 12.4414386
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "40",
+    "addr:postcode": "04316",
+    "addr:street": "Lessingweg",
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387726,
+   "bounds": {
+    "minlat": 51.3359473,
+    "minlon": 12.443165,
+    "maxlat": 51.3360795,
+    "maxlon": 12.4434048
+   },
+   "geometry": [
+    {
+     "lat": 51.3359941,
+     "lon": 12.443165
+    },
+    {
+     "lat": 51.3360795,
+     "lon": 12.4432206
+    },
+    {
+     "lat": 51.3360327,
+     "lon": 12.4434048
+    },
+    {
+     "lat": 51.3359473,
+     "lon": 12.4433492
+    },
+    {
+     "lat": 51.3359941,
+     "lon": 12.443165
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "50",
+    "addr:postcode": "04316",
+    "addr:street": "Paunsdorfer Straße",
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387730,
+   "bounds": {
+    "minlat": 51.3373205,
+    "minlon": 12.441378,
+    "maxlat": 51.3374254,
+    "maxlon": 12.441522
+   },
+   "geometry": [
+    {
+     "lat": 51.3373451,
+     "lon": 12.441378
+    },
+    {
+     "lat": 51.3374254,
+     "lon": 12.4414387
+    },
+    {
+     "lat": 51.3374008,
+     "lon": 12.441522
+    },
+    {
+     "lat": 51.3373205,
+     "lon": 12.4414613
+    },
+    {
+     "lat": 51.3373451,
+     "lon": 12.441378
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "41",
+    "addr:postcode": "04316",
+    "addr:street": "Lessingweg",
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387734,
+   "bounds": {
+    "minlat": 51.335822,
+    "minlon": 12.4411275,
+    "maxlat": 51.3359431,
+    "maxlon": 12.4413658
+   },
+   "geometry": [
+    {
+     "lat": 51.3359431,
+     "lon": 12.4411763
+    },
+    {
+     "lat": 51.3358903,
+     "lon": 12.4413658
+    },
+    {
+     "lat": 51.335822,
+     "lon": 12.441317
+    },
+    {
+     "lat": 51.3358748,
+     "lon": 12.4411275
+    },
+    {
+     "lat": 51.3359431,
+     "lon": 12.4411763
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "32",
+    "addr:postcode": "04316",
+    "addr:street": "Lessingweg",
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387739,
+   "bounds": {
+    "minlat": 51.337243,
+    "minlon": 12.4405771,
+    "maxlat": 51.3373555,
+    "maxlon": 12.440762
+   },
+   "geometry": [
+    {
+     "lat": 51.3372808,
+     "lon": 12.4405771
+    },
+    {
+     "lat": 51.3373555,
+     "lon": 12.4406333
+    },
+    {
+     "lat": 51.3373176,
+     "lon": 12.440762
+    },
+    {
+     "lat": 51.337243,
+     "lon": 12.4407058
+    },
+    {
+     "lat": 51.3372808,
+     "lon": 12.4405771
+    }
+   ],
+   "tags": {
+    "addr:housenumber": "22",
+    "addr:street": "Goetheweg",
+    "building": "yes",
+    "building:levels": "1",
+    "building:material": "wood",
+    "roof:levels": "1"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387748,
+   "bounds": {
+    "minlat": 51.3370995,
+    "minlon": 12.4411594,
+    "maxlat": 51.3372222,
+    "maxlon": 12.4413901
+   },
+   "geometry": [
+    {
+     "lat": 51.3372222,
+     "lon": 12.4412085
+    },
+    {
+     "lat": 51.3371777,
+     "lon": 12.4413901
+    },
+    {
+     "lat": 51.3370995,
+     "lon": 12.4413411
+    },
+    {
+     "lat": 51.337144,
+     "lon": 12.4411594
+    },
+    {
+     "lat": 51.3372222,
+     "lon": 12.4412085
+    }
+   ],
+   "tags": {
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387754,
+   "bounds": {
+    "minlat": 51.33626,
+    "minlon": 12.4408587,
+    "maxlat": 51.3364238,
+    "maxlon": 12.4410845
+   },
+   "geometry": [
+    {
+     "lat": 51.3362971,
+     "lon": 12.4408587
+    },
+    {
+     "lat": 51.3364238,
+     "lon": 12.440945
+    },
+    {
+     "lat": 51.3363868,
+     "lon": 12.4410845
+    },
+    {
+     "lat": 51.33626,
+     "lon": 12.4409982
+    },
+    {
+     "lat": 51.3362971,
+     "lon": 12.4408587
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "27",
+    "addr:postcode": "04316",
+    "addr:street": "Lessingweg",
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387763,
+   "bounds": {
+    "minlat": 51.3373325,
+    "minlon": 12.4427539,
+    "maxlat": 51.3374501,
+    "maxlon": 12.4429602
+   },
+   "geometry": [
+    {
+     "lat": 51.3374501,
+     "lon": 12.4428012
+    },
+    {
+     "lat": 51.3374142,
+     "lon": 12.4429602
+    },
+    {
+     "lat": 51.3373325,
+     "lon": 12.4429129
+    },
+    {
+     "lat": 51.3373684,
+     "lon": 12.4427539
+    },
+    {
+     "lat": 51.3374501,
+     "lon": 12.4428012
+    }
+   ],
+   "tags": {
+    "addr:housenumber": "2",
+    "addr:street": "Uhlandweg",
+    "building": "yes",
+    "building:levels": "2"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387764,
+   "bounds": {
+    "minlat": 51.3353586,
+    "minlon": 12.4418015,
+    "maxlat": 51.3354799,
+    "maxlon": 12.4420166
+   },
+   "geometry": [
+    {
+     "lat": 51.3353586,
+     "lon": 12.4419664
+    },
+    {
+     "lat": 51.3353981,
+     "lon": 12.4418015
+    },
+    {
+     "lat": 51.3354799,
+     "lon": 12.4418517
+    },
+    {
+     "lat": 51.3354405,
+     "lon": 12.4420166
+    },
+    {
+     "lat": 51.3353586,
+     "lon": 12.4419664
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "2",
+    "addr:postcode": "04316",
+    "addr:street": "Körnerweg",
+    "building": "apartments",
+    "building:levels": "3",
+    "roof:levels": "1"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387766,
+   "bounds": {
+    "minlat": 51.3367078,
+    "minlon": 12.4405472,
+    "maxlat": 51.3367818,
+    "maxlon": 12.4406447
+   },
+   "geometry": [
+    {
+     "lat": 51.3367818,
+     "lon": 12.440588
+    },
+    {
+     "lat": 51.3367664,
+     "lon": 12.4406447
+    },
+    {
+     "lat": 51.3367078,
+     "lon": 12.4406038
+    },
+    {
+     "lat": 51.3367232,
+     "lon": 12.4405472
+    },
+    {
+     "lat": 51.3367818,
+     "lon": 12.440588
+    }
+   ],
+   "tags": {
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387771,
+   "bounds": {
+    "minlat": 51.3369364,
+    "minlon": 12.4420039,
+    "maxlat": 51.337059,
+    "maxlon": 12.4421849
+   },
+   "geometry": [
+    {
+     "lat": 51.3369652,
+     "lon": 12.4420039
+    },
+    {
+     "lat": 51.337059,
+     "lon": 12.4420586
+    },
+    {
+     "lat": 51.3370302,
+     "lon": 12.4421849
+    },
+    {
+     "lat": 51.3369364,
+     "lon": 12.4421302
+    },
+    {
+     "lat": 51.3369652,
+     "lon": 12.4420039
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "50a",
+    "addr:postcode": "04316",
+    "addr:street": "Lessingweg",
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387775,
+   "bounds": {
+    "minlat": 51.3360645,
+    "minlon": 12.442309,
+    "maxlat": 51.3361873,
+    "maxlon": 12.4425199
+   },
+   "geometry": [
+    {
+     "lat": 51.3361873,
+     "lon": 12.4423604
+    },
+    {
+     "lat": 51.3361498,
+     "lon": 12.4425199
+    },
+    {
+     "lat": 51.3360645,
+     "lon": 12.4424685
+    },
+    {
+     "lat": 51.3361019,
+     "lon": 12.442309
+    },
+    {
+     "lat": 51.3361873,
+     "lon": 12.4423604
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "61",
+    "addr:postcode": "04316",
+    "addr:street": "Paunsdorfer Straße",
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387778,
+   "bounds": {
+    "minlat": 51.3362296,
+    "minlon": 12.4403649,
+    "maxlat": 51.3363383,
+    "maxlon": 12.4405136
+   },
+   "geometry": [
+    {
+     "lat": 51.3363383,
+     "lon": 12.4404253
+    },
+    {
+     "lat": 51.3363133,
+     "lon": 12.4405136
+    },
+    {
+     "lat": 51.3362296,
+     "lon": 12.4404543
+    },
+    {
+     "lat": 51.3362543,
+     "lon": 12.4403649
+    },
+    {
+     "lat": 51.3363383,
+     "lon": 12.4404253
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "25",
+    "addr:postcode": "04316",
+    "addr:street": "Lessingweg",
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387785,
+   "bounds": {
+    "minlat": 51.3370404,
+    "minlon": 12.4406301,
+    "maxlat": 51.3371323,
+    "maxlon": 12.4407555
+   },
+   "geometry": [
+    {
+     "lat": 51.3370623,
+     "lon": 12.4406301
+    },
+    {
+     "lat": 51.3371323,
+     "lon": 12.4406922
+    },
+    {
+     "lat": 51.3371104,
+     "lon": 12.4407555
+    },
+    {
+     "lat": 51.3370404,
+     "lon": 12.4406934
+    },
+    {
+     "lat": 51.3370623,
+     "lon": 12.4406301
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "21",
+    "addr:street": "Goetheweg",
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387789,
+   "bounds": {
+    "minlat": 51.3361851,
+    "minlon": 12.442383,
+    "maxlat": 51.336299,
+    "maxlon": 12.4425916
+   },
+   "geometry": [
+    {
+     "lat": 51.3362589,
+     "lon": 12.4425916
+    },
+    {
+     "lat": 51.3361851,
+     "lon": 12.4425447
+    },
+    {
+     "lat": 51.3362252,
+     "lon": 12.442383
+    },
+    {
+     "lat": 51.336299,
+     "lon": 12.44243
+    },
+    {
+     "lat": 51.3362589,
+     "lon": 12.4425916
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "63",
+    "addr:postcode": "04316",
+    "addr:street": "Paunsdorfer Straße",
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387799,
+   "bounds": {
+    "minlat": 51.3373907,
+    "minlon": 12.4426059,
+    "maxlat": 51.3374823,
+    "maxlon": 12.4427365
+   },
+   "geometry": [
+    {
+     "lat": 51.3374823,
+     "lon": 12.4426544
+    },
+    {
+     "lat": 51.3374598,
+     "lon": 12.4427365
+    },
+    {
+     "lat": 51.3373907,
+     "lon": 12.442688
+    },
+    {
+     "lat": 51.3374132,
+     "lon": 12.4426059
+    },
+    {
+     "lat": 51.3374823,
+     "lon": 12.4426544
+    }
+   ],
+   "tags": {
+    "building": "garage"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387803,
+   "bounds": {
+    "minlat": 51.3367596,
+    "minlon": 12.4408405,
+    "maxlat": 51.3368554,
+    "maxlon": 12.4410141
+   },
+   "geometry": [
+    {
+     "lat": 51.3367956,
+     "lon": 12.4408405
+    },
+    {
+     "lat": 51.3368554,
+     "lon": 12.4408824
+    },
+    {
+     "lat": 51.3368195,
+     "lon": 12.4410141
+    },
+    {
+     "lat": 51.3367596,
+     "lon": 12.4409723
+    },
+    {
+     "lat": 51.3367956,
+     "lon": 12.4408405
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "31",
+    "addr:postcode": "04316",
+    "addr:street": "Lessingweg",
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387804,
+   "bounds": {
+    "minlat": 51.3365361,
+    "minlon": 12.4420381,
+    "maxlat": 51.3366307,
+    "maxlon": 12.4421821
+   },
+   "geometry": [
+    {
+     "lat": 51.3365605,
+     "lon": 12.4420381
+    },
+    {
+     "lat": 51.3366307,
+     "lon": 12.442082
+    },
+    {
+     "lat": 51.3366063,
+     "lon": 12.4421821
+    },
+    {
+     "lat": 51.3365361,
+     "lon": 12.4421382
+    },
+    {
+     "lat": 51.3365605,
+     "lon": 12.4420381
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "46",
+    "addr:postcode": "04316",
+    "addr:street": "Lessingweg",
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387812,
+   "bounds": {
+    "minlat": 51.3376093,
+    "minlon": 12.4418193,
+    "maxlat": 51.3377509,
+    "maxlon": 12.4420381
+   },
+   "geometry": [
+    {
+     "lat": 51.3377509,
+     "lon": 12.4418867
+    },
+    {
+     "lat": 51.3377121,
+     "lon": 12.4420381
+    },
+    {
+     "lat": 51.3376093,
+     "lon": 12.4419707
+    },
+    {
+     "lat": 51.3376481,
+     "lon": 12.4418193
+    },
+    {
+     "lat": 51.3377509,
+     "lon": 12.4418867
+    }
+   ],
+   "tags": {
+    "addr:housenumber": "10",
+    "addr:street": "Uhlandweg",
+    "building": "yes",
+    "building:levels": "2",
+    "roof:levels": "1"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387816,
+   "bounds": {
+    "minlat": 51.336361,
+    "minlon": 12.4415536,
+    "maxlat": 51.3365144,
+    "maxlon": 12.4418272
+   },
+   "geometry": [
+    {
+     "lat": 51.3365144,
+     "lon": 12.4416217
+    },
+    {
+     "lat": 51.3364582,
+     "lon": 12.4418272
+    },
+    {
+     "lat": 51.336361,
+     "lon": 12.4417592
+    },
+    {
+     "lat": 51.3364172,
+     "lon": 12.4415536
+    },
+    {
+     "lat": 51.3365144,
+     "lon": 12.4416217
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "42",
+    "addr:postcode": "04316",
+    "addr:street": "Lessingweg",
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387818,
+   "bounds": {
+    "minlat": 51.3373451,
+    "minlon": 12.4412448,
+    "maxlat": 51.3374627,
+    "maxlon": 12.441436
+   },
+   "geometry": [
+    {
+     "lat": 51.337383,
+     "lon": 12.4412448
+    },
+    {
+     "lat": 51.3374627,
+     "lon": 12.4413028
+    },
+    {
+     "lat": 51.3374249,
+     "lon": 12.441436
+    },
+    {
+     "lat": 51.3373451,
+     "lon": 12.441378
+    },
+    {
+     "lat": 51.337383,
+     "lon": 12.4412448
+    }
+   ],
+   "tags": {
+    "addr:housenumber": "9",
+    "addr:street": "Uhlandweg",
+    "building": "yes",
+    "building:levels": "1",
+    "roof:levels": "1"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387831,
+   "bounds": {
+    "minlat": 51.3364865,
+    "minlon": 12.4434637,
+    "maxlat": 51.3365573,
+    "maxlon": 12.4436029
+   },
+   "geometry": [
+    {
+     "lat": 51.3365573,
+     "lon": 12.4434916
+    },
+    {
+     "lat": 51.3365285,
+     "lon": 12.4436029
+    },
+    {
+     "lat": 51.3364865,
+     "lon": 12.443575
+    },
+    {
+     "lat": 51.3365152,
+     "lon": 12.4434637
+    },
+    {
+     "lat": 51.3365573,
+     "lon": 12.4434916
+    }
+   ],
+   "tags": {
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387838,
+   "bounds": {
+    "minlat": 51.3365892,
+    "minlon": 12.4423035,
+    "maxlat": 51.3367297,
+    "maxlon": 12.4425852
+   },
+   "geometry": [
+    {
+     "lat": 51.3367297,
+     "lon": 12.4423561
+    },
+    {
+     "lat": 51.3366749,
+     "lon": 12.4425852
+    },
+    {
+     "lat": 51.3365892,
+     "lon": 12.4425327
+    },
+    {
+     "lat": 51.3366441,
+     "lon": 12.4423035
+    },
+    {
+     "lat": 51.3367297,
+     "lon": 12.4423561
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "67",
+    "addr:postcode": "04316",
+    "addr:street": "Paunsdorfer Straße",
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387847,
+   "bounds": {
+    "minlat": 51.3365737,
+    "minlon": 12.4432877,
+    "maxlat": 51.3367205,
+    "maxlon": 12.4435151
+   },
+   "geometry": [
+    {
+     "lat": 51.3367205,
+     "lon": 12.4433545
+    },
+    {
+     "lat": 51.3366817,
+     "lon": 12.4435151
+    },
+    {
+     "lat": 51.3365737,
+     "lon": 12.4434483
+    },
+    {
+     "lat": 51.3366125,
+     "lon": 12.4432877
+    },
+    {
+     "lat": 51.3367205,
+     "lon": 12.4433545
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "52",
+    "addr:postcode": "04316",
+    "addr:street": "Paunsdorfer Straße",
+    "building": "apartments",
+    "building:levels": "2",
+    "roof:levels": "1",
+    "roof:shape": "gabled"
+   }
+  },
+  {
+   "type": "way",
+   "id": 153387855,
+   "bounds": {
+    "minlat": 51.3365148,
+    "minlon": 12.4407616,
+    "maxlat": 51.3366113,
+    "maxlon": 12.4410481
+   },
+   "geometry": [
+    {
+     "lat": 51.3365517,
+     "lon": 12.4407616
+    },
+    {
+     "lat": 51.3366113,
+     "lon": 12.4408021
+    },
+    {
+     "lat": 51.3365461,
+     "lon": 12.4410481
+    },
+    {
+     "lat": 51.3365148,
+     "lon": 12.4410268
+    },
+    {
+     "lat": 51.3365438,
+     "lon": 12.4409173
+    },
+    {
+     "lat": 51.3365155,
+     "lon": 12.4408981
+    },
+    {
+     "lat": 51.3365517,
+     "lon": 12.4407616
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "27a",
+    "addr:postcode": "04316",
+    "addr:street": "Lessingweg",
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 399107796,
+   "bounds": {
+    "minlat": 51.3357627,
+    "minlon": 12.4420228,
+    "maxlat": 51.3358755,
+    "maxlon": 12.4422284
+   },
+   "geometry": [
+    {
+     "lat": 51.3358755,
+     "lon": 12.4420691
+    },
+    {
+     "lat": 51.3358016,
+     "lon": 12.4420228
+    },
+    {
+     "lat": 51.3357627,
+     "lon": 12.4421821
+    },
+    {
+     "lat": 51.3358366,
+     "lon": 12.4422284
+    },
+    {
+     "lat": 51.3358755,
+     "lon": 12.4420691
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "53",
+    "addr:postcode": "04316",
+    "addr:street": "Paunsdorfer Straße",
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 399107797,
+   "bounds": {
+    "minlat": 51.3356472,
+    "minlon": 12.4419452,
+    "maxlat": 51.3357627,
+    "maxlon": 12.4421438
+   },
+   "geometry": [
+    {
+     "lat": 51.3357627,
+     "lon": 12.4419929
+    },
+    {
+     "lat": 51.3356819,
+     "lon": 12.4419452
+    },
+    {
+     "lat": 51.3356472,
+     "lon": 12.4420962
+    },
+    {
+     "lat": 51.335728,
+     "lon": 12.4421438
+    },
+    {
+     "lat": 51.3357627,
+     "lon": 12.4419929
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "51",
+    "addr:postcode": "04316",
+    "addr:street": "Paunsdorfer Straße",
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 399108869,
+   "bounds": {
+    "minlat": 51.3369124,
+    "minlon": 12.4427404,
+    "maxlat": 51.3370173,
+    "maxlon": 12.4429078
+   },
+   "geometry": [
+    {
+     "lat": 51.3370173,
+     "lon": 12.4427847
+    },
+    {
+     "lat": 51.33694,
+     "lon": 12.4427404
+    },
+    {
+     "lat": 51.3369124,
+     "lon": 12.4428634
+    },
+    {
+     "lat": 51.3369897,
+     "lon": 12.4429078
+    },
+    {
+     "lat": 51.3370173,
+     "lon": 12.4427847
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "73",
+    "addr:postcode": "04316",
+    "addr:street": "Paunsdorfer Straße",
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 399115719,
+   "bounds": {
+    "minlat": 51.3361689,
+    "minlon": 12.4408148,
+    "maxlat": 51.3362586,
+    "maxlon": 12.4409409
+   },
+   "geometry": [
+    {
+     "lat": 51.3362586,
+     "lon": 12.4408591
+    },
+    {
+     "lat": 51.336189,
+     "lon": 12.4408148
+    },
+    {
+     "lat": 51.3361689,
+     "lon": 12.4408966
+    },
+    {
+     "lat": 51.3362385,
+     "lon": 12.4409409
+    },
+    {
+     "lat": 51.3362586,
+     "lon": 12.4408591
+    }
+   ],
+   "tags": {
+    "building": "garage"
+   }
+  },
+  {
+   "type": "way",
+   "id": 399115720,
+   "bounds": {
+    "minlat": 51.3365232,
+    "minlon": 12.4417577,
+    "maxlat": 51.3366122,
+    "maxlon": 12.4418955
+   },
+   "geometry": [
+    {
+     "lat": 51.3366122,
+     "lon": 12.4417756
+    },
+    {
+     "lat": 51.3365853,
+     "lon": 12.4417577
+    },
+    {
+     "lat": 51.3365722,
+     "lon": 12.4418083
+    },
+    {
+     "lat": 51.3365412,
+     "lon": 12.4417877
+    },
+    {
+     "lat": 51.3365232,
+     "lon": 12.441857
+    },
+    {
+     "lat": 51.3365811,
+     "lon": 12.4418955
+    },
+    {
+     "lat": 51.3366122,
+     "lon": 12.4417756
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "44",
+    "addr:postcode": "04316",
+    "addr:street": "Lessingweg",
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 399115721,
+   "bounds": {
+    "minlat": 51.3359746,
+    "minlon": 12.4411915,
+    "maxlat": 51.3360674,
+    "maxlon": 12.4413446
+   },
+   "geometry": [
+    {
+     "lat": 51.3360674,
+     "lon": 12.4412326
+    },
+    {
+     "lat": 51.3360021,
+     "lon": 12.4411915
+    },
+    {
+     "lat": 51.3359746,
+     "lon": 12.4413035
+    },
+    {
+     "lat": 51.3360399,
+     "lon": 12.4413446
+    },
+    {
+     "lat": 51.3360674,
+     "lon": 12.4412326
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "34",
+    "addr:postcode": "04316",
+    "addr:street": "Lessingweg",
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 399115722,
+   "bounds": {
+    "minlat": 51.3365482,
+    "minlon": 12.4409728,
+    "maxlat": 51.3366697,
+    "maxlon": 12.4412288
+   },
+   "geometry": [
+    {
+     "lat": 51.3366697,
+     "lon": 12.4410173
+    },
+    {
+     "lat": 51.3366042,
+     "lon": 12.4409728
+    },
+    {
+     "lat": 51.3365482,
+     "lon": 12.4411844
+    },
+    {
+     "lat": 51.3366137,
+     "lon": 12.4412288
+    },
+    {
+     "lat": 51.3366697,
+     "lon": 12.4410173
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "29",
+    "addr:postcode": "04316",
+    "addr:street": "Lessingweg",
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 399115993,
+   "bounds": {
+    "minlat": 51.335989,
+    "minlon": 12.440635,
+    "maxlat": 51.336089,
+    "maxlon": 12.4408182
+   },
+   "geometry": [
+    {
+     "lat": 51.3360497,
+     "lon": 12.4408182
+    },
+    {
+     "lat": 51.335989,
+     "lon": 12.4407732
+    },
+    {
+     "lat": 51.3360281,
+     "lon": 12.440635
+    },
+    {
+     "lat": 51.336089,
+     "lon": 12.4406776
+    },
+    {
+     "lat": 51.3360497,
+     "lon": 12.4408182
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "21",
+    "addr:postcode": "04316",
+    "addr:street": "Lessingweg",
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 399119751,
+   "bounds": {
+    "minlat": 51.3362262,
+    "minlon": 12.4401579,
+    "maxlat": 51.3363666,
+    "maxlon": 12.4404253
+   },
+   "geometry": [
+    {
+     "lat": 51.3363383,
+     "lon": 12.4404253
+    },
+    {
+     "lat": 51.3363666,
+     "lon": 12.4403242
+    },
+    {
+     "lat": 51.3363286,
+     "lon": 12.4402969
+    },
+    {
+     "lat": 51.3363196,
+     "lon": 12.4403287
+    },
+    {
+     "lat": 51.3362826,
+     "lon": 12.4403021
+    },
+    {
+     "lat": 51.3363156,
+     "lon": 12.4401846
+    },
+    {
+     "lat": 51.3362786,
+     "lon": 12.4401579
+    },
+    {
+     "lat": 51.3362262,
+     "lon": 12.4403447
+    },
+    {
+     "lat": 51.3362543,
+     "lon": 12.4403649
+    },
+    {
+     "lat": 51.3363383,
+     "lon": 12.4404253
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "14",
+    "addr:postcode": "04316",
+    "addr:street": "Goetheweg",
+    "building": "residential"
+   }
+  },
+  {
+   "type": "way",
+   "id": 399120296,
+   "bounds": {
+    "minlat": 51.3364823,
+    "minlon": 12.4403752,
+    "maxlat": 51.3367071,
+    "maxlon": 12.4406228
+   },
+   "geometry": [
+    {
+     "lat": 51.3367071,
+     "lon": 12.4405064
+    },
+    {
+     "lat": 51.336513,
+     "lon": 12.4403752
+    },
+    {
+     "lat": 51.3364823,
+     "lon": 12.4404916
+    },
+    {
+     "lat": 51.3366764,
+     "lon": 12.4406228
+    },
+    {
+     "lat": 51.3367071,
+     "lon": 12.4405064
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "17",
+    "addr:postcode": "04316",
+    "addr:street": "Goetheweg",
+    "building": "residential"
+   }
+  },
+  {
+   "type": "way",
+   "id": 503073487,
+   "bounds": {
+    "minlat": 51.3371308,
+    "minlon": 12.4423755,
+    "maxlat": 51.3372485,
+    "maxlon": 12.4425817
+   },
+   "geometry": [
+    {
+     "lat": 51.3372485,
+     "lon": 12.4424227
+    },
+    {
+     "lat": 51.3372125,
+     "lon": 12.4425817
+    },
+    {
+     "lat": 51.3371308,
+     "lon": 12.4425345
+    },
+    {
+     "lat": 51.3371668,
+     "lon": 12.4423755
+    },
+    {
+     "lat": 51.3372485,
+     "lon": 12.4424227
+    }
+   ],
+   "tags": {
+    "addr:housenumber": "5",
+    "addr:street": "Uhlandweg",
+    "building": "yes",
+    "building:levels": "1",
+    "roof:levels": "1"
+   }
+  },
+  {
+   "type": "way",
+   "id": 503073490,
+   "bounds": {
+    "minlat": 51.3370609,
+    "minlon": 12.4426509,
+    "maxlat": 51.3371786,
+    "maxlon": 12.4428571
+   },
+   "geometry": [
+    {
+     "lat": 51.3371786,
+     "lon": 12.4426981
+    },
+    {
+     "lat": 51.3371426,
+     "lon": 12.4428571
+    },
+    {
+     "lat": 51.3370609,
+     "lon": 12.4428099
+    },
+    {
+     "lat": 51.3370969,
+     "lon": 12.4426509
+    },
+    {
+     "lat": 51.3371786,
+     "lon": 12.4426981
+    }
+   ],
+   "tags": {
+    "addr:housenumber": "3",
+    "addr:street": "Uhlandweg",
+    "building": "yes",
+    "building:levels": "1",
+    "roof:levels": "1"
+   }
+  },
+  {
+   "type": "way",
+   "id": 551156767,
+   "bounds": {
+    "minlat": 51.3366412,
+    "minlon": 12.4416256,
+    "maxlat": 51.3366976,
+    "maxlon": 12.4417477
+   },
+   "geometry": [
+    {
+     "lat": 51.3366412,
+     "lon": 12.4417279
+    },
+    {
+     "lat": 51.3366718,
+     "lon": 12.4417477
+    },
+    {
+     "lat": 51.3366976,
+     "lon": 12.4416454
+    },
+    {
+     "lat": 51.3366671,
+     "lon": 12.4416256
+    },
+    {
+     "lat": 51.3366412,
+     "lon": 12.4417279
+    }
+   ],
+   "tags": {
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 820228757,
+   "bounds": {
+    "minlat": 51.3374357,
+    "minlon": 12.4408838,
+    "maxlat": 51.3375537,
+    "maxlon": 12.4411088
+   },
+   "geometry": [
+    {
+     "lat": 51.3374357,
+     "lon": 12.4409887
+    },
+    {
+     "lat": 51.3374705,
+     "lon": 12.4408838
+    },
+    {
+     "lat": 51.3375537,
+     "lon": 12.4409545
+    },
+    {
+     "lat": 51.3375025,
+     "lon": 12.4411088
+    },
+    {
+     "lat": 51.3374702,
+     "lon": 12.4410813
+    },
+    {
+     "lat": 51.3374866,
+     "lon": 12.441032
+    },
+    {
+     "lat": 51.3374357,
+     "lon": 12.4409887
+    }
+   ],
+   "tags": {
+    "addr:housenumber": "24",
+    "addr:street": "Goetheweg",
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 820228758,
+   "bounds": {
+    "minlat": 51.3372841,
+    "minlon": 12.4408473,
+    "maxlat": 51.3374076,
+    "maxlon": 12.4410824
+   },
+   "geometry": [
+    {
+     "lat": 51.3373334,
+     "lon": 12.4408473
+    },
+    {
+     "lat": 51.3374023,
+     "lon": 12.4409
+    },
+    {
+     "lat": 51.3373851,
+     "lon": 12.4409577
+    },
+    {
+     "lat": 51.3374076,
+     "lon": 12.4409749
+    },
+    {
+     "lat": 51.3373755,
+     "lon": 12.4410824
+    },
+    {
+     "lat": 51.3372841,
+     "lon": 12.4410125
+    },
+    {
+     "lat": 51.3373334,
+     "lon": 12.4408473
+    }
+   ],
+   "tags": {
+    "addr:housenumber": "23",
+    "addr:street": "Goetheweg",
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 980980905,
+   "bounds": {
+    "minlat": 51.3367219,
+    "minlon": 12.4427461,
+    "maxlat": 51.3368251,
+    "maxlon": 12.4429486
+   },
+   "geometry": [
+    {
+     "lat": 51.3368251,
+     "lon": 12.442784
+    },
+    {
+     "lat": 51.3367879,
+     "lon": 12.4429486
+    },
+    {
+     "lat": 51.3367219,
+     "lon": 12.4429113
+    },
+    {
+     "lat": 51.3367602,
+     "lon": 12.4427461
+    },
+    {
+     "lat": 51.3368251,
+     "lon": 12.442784
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "69",
+    "addr:street": "Paunsdorfer Straße",
+    "building": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1550895871,
+   "bounds": {
+    "minlat": 51.335528,
+    "minlon": 12.441329,
+    "maxlat": 51.335649,
+    "maxlon": 12.441519
+   },
+   "geometry": [
+    {
+     "lat": 51.335649,
+     "lon": 12.441386
+    },
+    {
+     "lat": 51.335561,
+     "lon": 12.441329
+    },
+    {
+     "lat": 51.335528,
+     "lon": 12.441462
+    },
+    {
+     "lat": 51.335616,
+     "lon": 12.441519
+    },
+    {
+     "lat": 51.335649,
+     "lon": 12.441386
+    }
+   ],
+   "tags": {
+    "addr:city": "Leipzig",
+    "addr:housenumber": "6",
+    "addr:postcode": "04316",
+    "addr:street": "Körnerweg",
+    "building": "yes"
+   }
+  }
+ ]
+}

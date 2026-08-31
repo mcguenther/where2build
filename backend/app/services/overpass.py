@@ -88,6 +88,14 @@ RUNTIME_ERROR = (
 # geometry.
 _QUERY = "[out:json][timeout:{timeout}];({body});out tags center;"
 
+# Outlines, not centres: `out geom` inlines every node, which is the only way to
+# get a polygon out of Overpass in one request. Ways only -- a building mapped as
+# a multipolygon relation would come back as unassembled members, and those are
+# rare enough among houses that assembling them here would be dead weight.
+_BUILDING_QUERY = (
+    '[out:json][timeout:{timeout}];way["building"](around:{radius},{lat},{lon});out tags geom;'
+)
+
 # How an element's type maps onto the id prefix the index and the UI use.
 _OSM_PREFIX = {"node": "N", "way": "W", "relation": "R"}
 
@@ -106,6 +114,64 @@ def build_query(
         for key, value in INCLUDE.get(kategorie, ()):
             filters.append(f'nwr["{key}"="{value}"](around:{radius_m},{lat},{lon});')
     return _QUERY.format(timeout=int(timeout_s), body="".join(filters))
+
+
+def build_building_query(lat: float, lon: float, radius_m: int, timeout_s: int) -> str:
+    """Every mapped building outline around a point."""
+
+    return _BUILDING_QUERY.format(
+        timeout=int(timeout_s), radius=int(radius_m), lat=lat, lon=lon
+    )
+
+
+def rings_from_elements(elements: Iterable[Any]) -> list[dict[str, Any]]:
+    """Overpass ways with `geometry` -> closed rings in [lon, lat] order.
+
+    Anything with fewer than three distinct points is not an outline. The ring is
+    closed here so the caller never has to wonder whether it is.
+    """
+
+    buildings: list[dict[str, Any]] = []
+    for element in elements:
+        if not isinstance(element, dict):
+            continue
+        geometry = element.get("geometry")
+        if not isinstance(geometry, list) or len(geometry) < 4:
+            continue
+        ring = [
+            [round(float(point["lon"]), 7), round(float(point["lat"]), 7)]
+            for point in geometry
+            if isinstance(point, dict)
+            and isinstance(point.get("lat"), (int, float))
+            and isinstance(point.get("lon"), (int, float))
+        ]
+        if len(ring) < 4:
+            continue
+        if ring[0] != ring[-1]:
+            ring.append(ring[0])
+        tags = element.get("tags") if isinstance(element.get("tags"), dict) else {}
+        street = str(tags.get("addr:street") or "").strip()
+        number = str(tags.get("addr:housenumber") or "").strip()
+        buildings.append(
+            {
+                "osm_id": f"W{element.get('id')}",
+                "umriss": ring,
+                "adresse": " ".join(part for part in (street, number) if part) or None,
+                # Almost never tagged in Saxon residential areas -- see
+                # docs/research/abstandsflaechen-nachbargebaeude.md. Passed on
+                # when it is there, never guessed when it is not.
+                "geschosse": _levels(tags.get("building:levels")),
+            }
+        )
+    return buildings
+
+
+def _levels(value: Any) -> int | None:
+    try:
+        levels = int(float(str(value)))
+    except (TypeError, ValueError):
+        return None
+    return levels if 1 <= levels <= 60 else None
 
 
 def _coordinate(element: dict[str, Any]) -> tuple[float, float] | None:
@@ -205,36 +271,7 @@ class OverpassService:
 
         lat, lon, radius = self._query_area(origin, radius_m)
         query = build_query(wanted, lat, lon, radius, self.settings.query_timeout_s)
-        cache_key = f"overpass:{self.settings.url}:{query}"
-
-        payload = self.cache.get_json(cache_key)
-        if payload is None:
-            async with self._semaphore:
-                response = await request(
-                    "POST",
-                    self.settings.url,
-                    service=SERVICE_NAME,
-                    advice=ADVICE,
-                    status_hints=STATUS_HINTS,
-                    timeout_s=self.settings.timeout_s,
-                    # The manual asks for no particular User-Agent, unlike
-                    # Transitous and the OSM API. Send the app's own anyway, so
-                    # the traffic is attributable -- but not the contact
-                    # address, which no policy here asks for.
-                    user_agent=self.app_settings.user_agent,
-                    data={"data": query},
-                )
-            try:
-                payload = response.json()
-            except ValueError as exc:
-                raise UpstreamError(
-                    f"{SERVICE_NAME} hat kein gültiges JSON geliefert. {ADVICE}"
-                ) from exc
-            self._raise_on_remark(payload)
-            # Only a complete answer is worth keeping for 30 days.
-            self.cache.set_json(cache_key, payload)
-        else:
-            self._raise_on_remark(payload)
+        payload = await self._fetch(query)
 
         elements = payload.get("elements") if isinstance(payload, dict) else None
         entries = entries_from_elements(elements or [])
@@ -243,6 +280,72 @@ class OverpassService:
             datenstand=self._datenstand(payload),
             quelle=self.settings.url,
         )
+
+    def _building_query_area(self, origin: Koordinate, radius_m: int) -> tuple[float, float, int]:
+        """The same idea as ``_query_area``, at the scale a plot is asked about."""
+
+        precision = max(0, self.settings.building_origin_precision)
+        step = max(1, self.settings.building_radius_step_m)
+        rounded_radius = -(-max(1, radius_m) // step) * step
+        return (
+            round(origin.lat, precision),
+            round(origin.lon, precision),
+            rounded_radius + max(0, self.settings.building_origin_margin_m),
+        )
+
+    async def buildings(self, origin: Koordinate, radius_m: int) -> dict[str, Any]:
+        """Mapped building outlines around a point, for the neighbour hint.
+
+        The same cached, rounded query area as ``places``: two plots in one
+        street share the answer, and the radius is a pre-filter -- which outline
+        is close enough to matter is decided against the parcel boundary in the
+        browser, where the geometry lives.
+        """
+
+        lat, lon, radius = self._building_query_area(origin, radius_m)
+        query = build_building_query(lat, lon, radius, self.settings.query_timeout_s)
+        payload = await self._fetch(query)
+        elements = payload.get("elements") if isinstance(payload, dict) else None
+        return {
+            "gebaeude": rings_from_elements(elements or []),
+            "datenstand": self._datenstand(payload),
+            "quelle": self.settings.url,
+        }
+
+    async def _fetch(self, query: str) -> Any:
+        """One Overpass query, answered from disk when it has been asked before."""
+
+        cache_key = f"overpass:{self.settings.url}:{query}"
+        payload = self.cache.get_json(cache_key)
+        if payload is not None:
+            self._raise_on_remark(payload)
+            return payload
+
+        async with self._semaphore:
+            response = await request(
+                "POST",
+                self.settings.url,
+                service=SERVICE_NAME,
+                advice=ADVICE,
+                status_hints=STATUS_HINTS,
+                timeout_s=self.settings.timeout_s,
+                # The manual asks for no particular User-Agent, unlike
+                # Transitous and the OSM API. Send the app's own anyway, so
+                # the traffic is attributable -- but not the contact
+                # address, which no policy here asks for.
+                user_agent=self.app_settings.user_agent,
+                data={"data": query},
+            )
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            raise UpstreamError(
+                f"{SERVICE_NAME} hat kein gültiges JSON geliefert. {ADVICE}"
+            ) from exc
+        self._raise_on_remark(payload)
+        # Only a complete answer is worth keeping for 30 days.
+        self.cache.set_json(cache_key, payload)
+        return payload
 
     @staticmethod
     def _raise_on_remark(payload: Any) -> None:
@@ -270,4 +373,10 @@ class OverpassService:
         return {"aktiv": self.enabled, "endpunkt": self.settings.url}
 
 
-__all__ = ["OverpassService", "build_query", "entries_from_elements"]
+__all__ = [
+    "OverpassService",
+    "build_query",
+    "build_building_query",
+    "entries_from_elements",
+    "rings_from_elements",
+]

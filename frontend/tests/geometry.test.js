@@ -6,8 +6,10 @@ import {
   pointInPolygon, distanceToBoundary, closestBoundaryPoint,
   rectangleCorners, cornersOutside, smallestSetback, footprintFromArea,
   findPlacement, fitsAnywhere, alignmentToEdge, alignToEdge, edgeCompass,
-  constrainToEnvelope
+  constrainToEnvelope, neighbourDistances, neighbourSetbackDepths, hasNeighbourHint
 } from "../src/lib/geometry.js";
+import { toLocal } from "../src/lib/projection.js";
+import neighbourAnswer from "./fixtures/neighbours-moelkau.json";
 
 import { realPlot } from "./helpers.js";
 
@@ -324,5 +326,62 @@ describe("Den Baukörper im Bebauungsfenster halten", () => {
       const stop = constrainToEnvelope(window_, start, { cx: start.cx + dx, cy: start.cy + dy });
       expect(cornersOutside({ ...start, ...stop }, window_)).toBe(0);
     }
+  });
+});
+
+
+/* The neighbour hint. Not a legal requirement -- § 6 Abs. 2 SächsBO puts each
+   building's setback area on its own plot -- but the strip where the two would
+   overlap is worth showing. See
+   docs/research/abstandsflaechen-nachbargebaeude.md.
+
+   The outlines are the 59 buildings Overpass really returned within 125 m of
+   Mölkau, Flurstück 204. */
+describe("Wo die Abstandsfläche des Nachbarn herüberreicht", () => {
+  const plot = realPlot("moelkau");
+  const outlines = neighbourAnswer.gebaeude.map(b => toLocal(b.umriss, plot.anchor));
+
+  it("misst je Grenzabschnitt, wie nah das nächste Gebäude steht", () => {
+    const distances = neighbourDistances(plot.polygon, outlines);
+
+    expect(distances).toHaveLength(plot.polygon.length);
+    expect(distances.every(d => d >= 0)).toBe(true);
+    // Two of the five boundaries have a neighbour inside the 3 m minimum:
+    // 1,74 m and 0,46 m on the recorded data.
+    expect(distances.filter(d => d < 3)).toHaveLength(2);
+  });
+
+  it("vertieft genau die Abschnitte, an denen ein Nachbar zu nah steht", () => {
+    const depths = neighbourSetbackDepths(plot.polygon, plot.setbacks, outlines);
+
+    expect(hasNeighbourHint(plot.setbacks, depths)).toBe(true);
+    const deepened = depths.filter((d, i) => d > plot.setbacks[i] + 1e-9);
+    expect(deepened).toHaveLength(2);
+    // depth + (3 - distance): the neighbour's own minimum, as far as it reaches.
+    depths.forEach(d => expect(d).toBeLessThanOrEqual(3 + 3));
+    expect(polygonArea(buildableArea(plot.polygon, depths)))
+      .toBeLessThan(polygonArea(buildableArea(plot.polygon, plot.setbacks)));
+  });
+
+  it("lässt ohne Nachbarn alles, wie es ist", () => {
+    const depths = neighbourSetbackDepths(plot.polygon, plot.setbacks, []);
+
+    expect(depths).toEqual(plot.setbacks);
+    expect(hasNeighbourHint(plot.setbacks, depths)).toBe(false);
+  });
+
+  it("zählt ein Gebäude auf dem eigenen Flurstück nicht als Nachbarn", () => {
+    const box = boundingBox(plot.polygon);
+    const cx = (box.minX + box.maxX) / 2, cy = (box.minY + box.maxY) / 2;
+    const own = [{ x: cx - 1, y: cy - 1 }, { x: cx + 1, y: cy - 1 },
+                 { x: cx + 1, y: cy + 1 }, { x: cx - 1, y: cy + 1 }];
+
+    expect(neighbourDistances(plot.polygon, [own]).every(d => d === Infinity)).toBe(true);
+  });
+
+  it("sieht weit entfernte Gebäude gar nicht erst an", () => {
+    const far = [[{ x: 900, y: 900 }, { x: 910, y: 900 }, { x: 910, y: 910 }, { x: 900, y: 910 }]];
+
+    expect(neighbourDistances(plot.polygon, far).every(d => d === Infinity)).toBe(true);
   });
 });

@@ -530,6 +530,89 @@ export function constrainToEnvelope(envelope, placement, wanted) {
   return best;
 }
 
+/* § 6 Abs. 5 SächsBO: 0,4 H, at least 3 m. The floor is all that can be used
+   for a neighbour, because no OSM tag gives a wall height — see
+   docs/research/abstandsflaechen-nachbargebaeude.md. */
+const NEIGHBOUR_MINIMUM_M = 3;
+
+/** Beyond this from the boundary a neighbouring wall cannot reach onto us. */
+const NEIGHBOUR_REACH_M = 25;
+
+/** Shortest distance between two segments, or 0 where they cross. */
+function segmentDistance(a1, a2, b1, b2) {
+  return Math.min(
+    distanceToSegment(a1, b1, b2), distanceToSegment(a2, b1, b2),
+    distanceToSegment(b1, a1, a2), distanceToSegment(b2, a1, a2)
+  );
+}
+
+/**
+ * Per boundary segment, how close the nearest neighbouring building comes to
+ * it. `Infinity` where nothing is near enough to matter.
+ *
+ * Indexed like everything `buildableArea` consumes: by the edges of the ring
+ * turned counter-clockwise, not of the ring as it came in.
+ */
+export function neighbourDistances(ring, buildings, options = {}) {
+  const reach = options.reach ?? NEIGHBOUR_REACH_M;
+  const poly = asCounterClockwise(plainRing(ring));
+  const edges = polygonEdges(poly);
+  const distances = edges.map(() => Infinity);
+  if (!Array.isArray(buildings) || !buildings.length) return distances;
+
+  const outlines = [];
+  for (const building of buildings) {
+    const outline = plainRing(Array.isArray(building) ? building : building.ring ?? []);
+    if (outline.length < 3) continue;
+    /* Our own house, if OSM has it, is not a neighbour. A footprint whose
+       centre lies inside the parcel is on this plot, not next to it. */
+    if (pointInPolygon(polygonCentroid(outline), poly)) continue;
+    outlines.push(outline);
+  }
+
+  for (let i = 0; i < edges.length; i++) {
+    const { a, b } = edges[i];
+    for (const outline of outlines) {
+      for (let j = 0; j < outline.length; j++) {
+        const c = outline[j], d = outline[(j + 1) % outline.length];
+        const gap = segmentDistance(a, b, c, d);
+        if (gap < distances[i]) distances[i] = gap;
+      }
+    }
+    if (distances[i] > reach) distances[i] = Infinity;
+  }
+  return distances;
+}
+
+/**
+ * The setback depths as they would have to be for the neighbouring building's
+ * own minimum setback to clear ours.
+ *
+ * Not a legal requirement, and the interface must not present it as one:
+ * § 6 Abs. 2 SächsBO puts each building's setback area on its own plot, so a
+ * neighbour standing too close is their problem, not a deeper obligation for
+ * us. What this marks is the strip where the two areas would overlap — where
+ * the pair of buildings ends up closer than the 3 + 3 m the statute produces
+ * in its minimal case, which is a question for the building authority.
+ *
+ * `depth[i] + max(0, 3 − d[i])`: exactly how far the neighbour's own minimum
+ * reaches across the boundary onto us. Where the neighbour is 3 m clear or
+ * nothing is near, this is the ordinary setback and nothing extra is drawn.
+ */
+export function neighbourSetbackDepths(ring, depths, buildings, options = {}) {
+  const minimum = options.minimum ?? NEIGHBOUR_MINIMUM_M;
+  const own = plainDepths(depths, ring.length);
+  const distances = neighbourDistances(ring, buildings, options);
+  return distances.map((distance, i) => {
+    const base = Array.isArray(own) ? own[i] : own;
+    return Number.isFinite(distance) ? base + Math.max(0, minimum - distance) : base;
+  });
+}
+
+/** Does any segment ask for more than the statutory setback? */
+export const hasNeighbourHint = (own, hint) =>
+  Array.isArray(hint) && hint.some((depth, i) => depth > (Array.isArray(own) ? own[i] : own) + 1e-9);
+
 /**
  * Rotation in degrees that lays the footprint's long side parallel to a parcel
  * edge — normally the street front, which is what people actually build to.

@@ -86,6 +86,15 @@ export function cadastralDistricts() {
   return directoryRequest;
 }
 
+/* Mapped building outlines around a plot, for the neighbour hint. One question
+ * per plot, and the backend caches the answer for a month — an outline moves
+ * about as often as the house it belongs to. */
+export const neighbourBuildings = (lat, lon, umkreis_m = 80) =>
+  request("/neighbours", {
+    method: "POST",
+    body: JSON.stringify({ origin: { lat, lon }, umkreis_m })
+  });
+
 export const landValue = (lat, lon) =>
   request(`/landvalue?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`);
 

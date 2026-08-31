@@ -182,6 +182,13 @@ class OverpassSettings(BaseSettings):
     origin_precision: int = 3
     # Safety margin added to the queried radius to cover that rounding.
     origin_margin_m: int = 200
+    # Building outlines are asked for in tens of metres, not kilometres, so the
+    # rounding above would turn an 80 m question into a 1 200 m answer -- 1 670
+    # buildings for one plot, measured against Mölkau. Four decimal places is
+    # about 11 m, and the margin covers that.
+    building_origin_precision: int = 4
+    building_radius_step_m: int = 50
+    building_origin_margin_m: int = 25
 
 
 class TilesSettings(BaseSettings):
