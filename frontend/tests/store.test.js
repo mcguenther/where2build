@@ -4,10 +4,13 @@ import {
   state, validate, load, save, clear, exportJson, importJson,
   plotById, houseTypeById, houseFootprint, placement, centreOf,
   addPlot, removePlot, toggleSelection, addHouseType, removeHouseType,
-  addDestination, removeDestination, applyTheme, CUSTOM_SIZE
+  addDestination, removeDestination, applyTheme, CUSTOM_SIZE,
+  DEFAULT_FOOTPRINT, seatHouse, autoSeatHouse
 } from "../src/lib/store.js";
 import { SCHEMA_VERSION } from "../src/lib/sample.js";
 import { realState, realStateV1, realPlot, realHouseType, realRoutes } from "./helpers.js";
+import { buildableArea, cornersOutside, alignmentToEdge, rectangleCorners, pointInPolygon }
+  from "../src/lib/geometry.js";
 
 const square = [{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 30 }, { x: 0, y: 30 }];
 
@@ -360,5 +363,94 @@ describe("Darstellung", () => {
     applyTheme("system");
     expect(document.documentElement.hasAttribute("data-theme")).toBe(false);
     expect(localStorage.getItem("where2build.theme")).toBe("system");
+  });
+});
+
+/* The two parcels are the two answers. "concave" is 1685 m² and holds the ELK
+ * house easily; "convex" is a 34,9 x 12,0 m strip whose envelope is 6 m deep
+ * after the setbacks, so a house 8,47 m wide fits nowhere on it at any angle.
+ * Both are recorded parcels, which is why the impossible case needs no invented
+ * one. */
+describe("Baukörper setzen", () => {
+  it("setzt den Baukörper vollständig in das Bebauungsfenster", () => {
+    const plot = realPlot("concave");
+    const seat = seatHouse(plot);
+    expect(seat).not.toBeNull();
+    const { width, depth } = houseFootprint(plot);
+    expect(cornersOutside({ ...seat, width, depth }, buildableArea(plot.polygon, plot.setbacks))).toBe(0);
+  });
+
+  it("richtet ihn an der Straßenfront aus", () => {
+    const plot = realPlot("concave");
+    expect(seatHouse(plot).rotation).toBeCloseTo(alignmentToEdge(plot.polygon, plot.streetEdge), 1);
+  });
+
+  it("setzt ihn auch auf dem großen Flurstück ins Fenster", () => {
+    const plot = realPlot("large");
+    const seat = seatHouse(plot);
+    const { width, depth } = houseFootprint(plot);
+    expect(cornersOutside({ ...seat, width, depth }, buildableArea(plot.polygon, plot.setbacks))).toBe(0);
+  });
+
+  it("antwortet mit null, wenn der Umriss auf den Streifen nirgends passt", () => {
+    // 8,47 m Haustiefe in einem 6 m tiefen Fenster.
+    expect(seatHouse(realPlot("convex"))).toBeNull();
+  });
+
+  it("lässt bei einem Flurstück ohne Bebauungsfenster die Lage unverändert", () => {
+    const plot = realPlot("concave");
+    plot.setbacks = plot.polygon.map(() => 20);
+    const before = { ...plot.house };
+    expect(autoSeatHouse(plot)).toBe(false);
+    expect(plot.house).toEqual(before);
+  });
+
+  it("verschiebt den Baukörper und meldet den Erfolg", () => {
+    const plot = realPlot("concave");
+    plot.house = { cx: 0, cy: 0, rotation: 0 };
+    expect(autoSeatHouse(plot)).toBe(true);
+    expect(plot.house).not.toEqual({ cx: 0, cy: 0, rotation: 0 });
+    expect(rectangleCorners({ ...plot.house, ...footprintOf(plot) })
+      .every(c => pointInPolygon(c, buildableArea(plot.polygon, plot.setbacks)))).toBe(true);
+  });
+
+  /* The 1583 x 198 m strip a district address resolves to: millions of grid
+     cells at a fixed step, and the answer still has to arrive. */
+  it("bleibt auf dem 1583-Meter-Streifen in erträglicher Zeit", () => {
+    const started = Date.now();
+    expect(seatHouse(realPlot("many-corners"))).not.toBeNull();
+    expect(Date.now() - started).toBeLessThan(4000);
+  });
+
+  const footprintOf = plot => {
+    const f = houseFootprint(plot);
+    return { width: f.width, depth: f.depth };
+  };
+});
+
+describe("Haustyp eines Grundstücks", () => {
+  it("nimmt für ein Grundstück ohne bekannten Haustyp dessen eigene Maße", () => {
+    const raw = realState();
+    raw.plots[0].houseTypeId = null;
+    delete raw.plots[0].customSize;
+    const plot = validate(raw).plots[0];
+    expect(plot.houseTypeId).toBe(CUSTOM_SIZE);
+    expect(plot.customSize).toEqual(DEFAULT_FOOTPRINT);
+  });
+
+  it("fängt auch einen Verweis auf einen gelöschten Haustyp auf", () => {
+    const raw = realState();
+    raw.plots[0].houseTypeId = "ht-gibt-es-nicht";
+    expect(validate(raw).plots[0].houseTypeId).toBe(CUSTOM_SIZE);
+  });
+
+  it("lässt einen vorhandenen Haustyp in Ruhe", () => {
+    expect(validate(realState()).plots[0].houseTypeId).toBe("ht-elk");
+  });
+
+  it("zeichnet ohne Haustyp denselben Umriss, den die Felder anbieten", () => {
+    const plot = { ...realPlot("convex"), houseTypeId: CUSTOM_SIZE, customSize: undefined };
+    const f = houseFootprint(plot);
+    expect([f.width, f.depth]).toEqual([DEFAULT_FOOTPRINT.length, DEFAULT_FOOTPRINT.width]);
   });
 });

@@ -6,7 +6,7 @@
  */
 import { toLocal, anchorOf } from "./projection.js";
 import { polygonArea, polygonEdges } from "./geometry.js";
-import { newId } from "./store.js";
+import { newId, CUSTOM_SIZE, DEFAULT_FOOTPRINT } from "./store.js";
 
 /** Outer ring of a GeoJSON Polygon or the first ring of a MultiPolygon. */
 export function outerRing(geometry) {
@@ -82,7 +82,13 @@ export function plotFromCadastre(response, extra = {}) {
     polygon,
     divisionLine: null,
     streetEdge: guessStreetEdge(polygon),
-    houseTypeId: extra.houseTypeId ?? null,
+    /* A plot arrives with its own dimensions rather than with no house type at
+     * all: the plan draws a footprint either way, and "nothing selected" in the
+     * form beside it is not a state the user asked for. The caller replaces
+     * this with a catalogue entry when there is one. `house` is centred here
+     * and seated properly once the footprint is settled — see `seatHouse`. */
+    houseTypeId: extra.houseTypeId ?? CUSTOM_SIZE,
+    customSize: { ...DEFAULT_FOOTPRINT },
     house: centrePlacement(polygon),
     ratio: 1.35,
     wallHeight: 6.4,

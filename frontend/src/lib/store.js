@@ -8,7 +8,10 @@
  */
 import { reactive } from "vue";
 import { emptyState, SCHEMA_VERSION } from "./sample.js";
-import { polygonCentroid, footprintFromArea } from "./geometry.js";
+import {
+  polygonCentroid, footprintFromArea, buildableArea, findPlacement,
+  alignmentToEdge, boundingBox
+} from "./geometry.js";
 import { coordinatesOf } from "./routes.js";
 
 /** Centre of a ring in the shape a placement expects. The centroid returns
@@ -180,11 +183,21 @@ export function validate(raw) {
       ? { cx: p.house.cx, cy: p.house.cy, rotation: Number(p.house.rotation) || 0 }
       : centreOf(p.polygon);
     p.ratio = Math.min(2.2, Math.max(1, Number(p.ratio) || 1.35));
+    /* A house type the catalogue does not hold — never chosen, deleted since,
+     * or dropped by the filter above — used to leave `houseTypeId` pointing at
+     * nothing. The plan still drew a footprint, but the "Baukörper" box showed
+     * no selection, so the drawing and the form disagreed about what was on the
+     * plot. Such a plot falls back to its own dimensions, which is what the
+     * footprint was all along. */
+    if (p.houseTypeId !== CUSTOM_SIZE && !houseTypes.some(h => h.id === p.houseTypeId)) {
+      p.houseTypeId = CUSTOM_SIZE;
+      p.customSize ||= { ...DEFAULT_FOOTPRINT };
+    }
     if (p.customSize) {
       // Same plausibility limits the extraction schema uses: outside 4-30 m it is a typo, not a house.
       p.customSize = {
-        length: Math.min(30, Math.max(4, Number(p.customSize.length) || 11.4)),
-        width: Math.min(30, Math.max(4, Number(p.customSize.width) || 8.5))
+        length: Math.min(30, Math.max(4, Number(p.customSize.length) || DEFAULT_FOOTPRINT.length)),
+        width: Math.min(30, Math.max(4, Number(p.customSize.width) || DEFAULT_FOOTPRINT.width))
       };
     }
     p.wallHeight = Math.min(12, Math.max(2.5, Number(p.wallHeight) || 6.4));
@@ -316,15 +329,23 @@ export const houseTypeById = id => state.data.houseTypes.find(h => h.id === id) 
 /** Sentinel house type: dimensions typed straight into the plot. */
 export const CUSTOM_SIZE = "custom";
 
+/* The footprint a plot starts with while the catalogue is still empty. It is a
+ * placeholder to drag and retype, not a figure read from anywhere — which is
+ * why it arrives as "Eigene Maße" with the numbers in editable fields, and not
+ * as a house type with a manufacturer's name on it. Two defaults used to
+ * disagree here (10 x 8 in the footprint fallback, 11,4 x 8,5 in the custom
+ * one), so the drawing changed size the moment the user opened the fields. */
+export const DEFAULT_FOOTPRINT = { length: 11.4, width: 8.5 };
+
 export function houseFootprint(plot) {
   // A house type is measured length × width; on the plan that is the footprint's
   // width along its own axis and its depth across it.
   if (plot.houseTypeId === CUSTOM_SIZE) {
-    const size = plot.customSize || { length: 11.4, width: 8.5 };
+    const size = plot.customSize || DEFAULT_FOOTPRINT;
     return { width: size.length, depth: size.width, estimated: false, custom: true };
   }
   const type = houseTypeById(plot.houseTypeId);
-  if (!type) return { width: 10, depth: 8, estimated: true };
+  if (!type) return { width: DEFAULT_FOOTPRINT.length, depth: DEFAULT_FOOTPRINT.width, estimated: true };
   if (type.length && type.width) return { width: type.length, depth: type.width, estimated: false };
   return { ...footprintFromArea(type.builtArea, plot.ratio), estimated: true };
 }
@@ -336,6 +357,58 @@ export const placement = plot => ({
   cy: plot.house.cy,
   rotation: plot.house.rotation
 });
+
+/* A placement search sweeps a grid at up to thirty angles, and a district
+ * address really does resolve to a 1583 x 198 m field — a fixed 0,25 m step
+ * would be five million cells per angle there. Same answer as the envelope
+ * grid: cap the cell count and let the step grow. A seat is a starting point
+ * the user drags, so a coarse one on a field is no loss; an ordinary parcel
+ * stays at the fine step. */
+const MAX_SEAT_CELLS = 20_000;
+
+function seatStep(envelope) {
+  const box = boundingBox(envelope);
+  return Math.max(0.25, Math.sqrt((box.width * box.height) / MAX_SEAT_CELLS));
+}
+
+/**
+ * Where this plot's footprint actually fits: parallel to the street front, and
+ * as near the middle of the buildable envelope as that angle allows.
+ *
+ * Returns `null` when the footprint fits nowhere. That is a real answer on a
+ * narrow plot and the interface has to say it, because the alternative — a
+ * house drawn across the setback strip with nothing pointing it out — reads as
+ * a plan rather than as the conflict it is.
+ */
+export function seatHouse(plot) {
+  const envelope = buildableArea(plot.polygon, plot.setbacks);
+  if (!envelope.length) return null;
+  const { width, depth } = houseFootprint(plot);
+  const step = seatStep(envelope);
+  const near = polygonCentroid(envelope);
+  const rotation = alignmentToEdge(plot.polygon, plot.streetEdge ?? 0);
+
+  /* Street-parallel first: it is how the neighbours stand and what the user
+   * would turn it to anyway. A plot too tight for that angle may still hold the
+   * house at another one, and a seat askew beats no house at all — that search
+   * takes the first fit rather than the most central, because without a
+   * preferred centre it stops at the first hit instead of sweeping every angle
+   * across the whole envelope. */
+  const seat = findPlacement(envelope, width, depth, { rotation, near, step })
+    ?? findPlacement(envelope, width, depth, { step });
+  return seat
+    ? { cx: seat.cx, cy: seat.cy, rotation: Math.round(seat.rotation * 10) / 10 }
+    : null;
+}
+
+/** Seat the house, and say whether it worked. A footprint that fits nowhere
+ *  leaves the placement alone: the drawing then shows the conflict instead of
+ *  hiding it. */
+export function autoSeatHouse(plot) {
+  const seat = seatHouse(plot);
+  if (seat) plot.house = seat;
+  return Boolean(seat);
+}
 
 export function addPlot(plot) {
   state.data.plots.push(plot);

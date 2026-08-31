@@ -138,9 +138,28 @@
         {{ doubt }}
       </div>
 
+      <!-- The house is placed before the plot exists, so this is the first and
+           only moment the user can be told it did not fit. -->
+      <p v-if="!houseSeated" class="notice notice--error" role="status">
+        <b>Für den Baukörper ist zwischen den Abstandsflächen kein Platz.</b>
+        {{ num(draftBuilding.width, 1) }} × {{ num(draftBuilding.depth, 1) }} m finden auf diesem
+        Zuschnitt in keiner Lage und in keinem Winkel Platz. Der Umriss liegt deshalb mittig auf
+        dem Flurstück und ragt über das Bebauungsfenster hinaus. Auf der Grundstücksseite lassen
+        sich Maße, Wandhöhe und Abstandstiefen ändern.
+      </p>
+
       <div class="check-grid">
         <div class="panel">
           <SitePlan :plot="draft" :building="draftBuilding" :width="640" :height="440" backdrop="map" north-up />
+          <p class="panel__footnote">
+            <template v-if="houseSeated">
+              Der Baukörper ist probeweise gesetzt — parallel zur Straßenfront und innerhalb der
+              Abstandsflächen. Verschieben und drehen lässt er sich, sobald das Grundstück angelegt ist.
+            </template>
+            <template v-else>
+              Umriss, Abstandsflächen und Baukörper wie sie das Kataster und § 6 SächsBO ergeben.
+            </template>
+          </p>
         </div>
         <div class="panel">
           <div class="panel__head"><h3>Was übernommen wird</h3><div class="spacer"></div><span class="chip">ALKIS</span></div>
@@ -199,12 +218,12 @@
 
 <script>
 import SitePlan from "../components/SitePlan.vue";
-import { state, addPlot, placement } from "../lib/store.js";
+import { state, addPlot, placement, autoSeatHouse } from "../lib/store.js";
 import { WIZARD_STAGES, wizardStage } from "../router/stages.js";
 import { readListing, readPage, resolveParcel, landValue } from "../lib/api.js";
 import { plotFromCadastre } from "../lib/plots.js";
 import { polygonArea } from "../lib/geometry.js";
-import { area, euroPerSqm } from "../lib/format.js";
+import { area, euroPerSqm, num } from "../lib/format.js";
 
 /** "212.000 €" and "1.104 m²" as a German listing writes them. */
 function numberFrom(text) {
@@ -254,6 +273,8 @@ export default {
       readFields: [],
       draft: null,
       doubt: null,
+      // Whether the footprint found room inside the setbacks; see `seatHouse`.
+      houseSeated: true,
       // The labels for the stages in `WIZARD_STAGES`, in that order.
       steps: [
         { id: "source", name: "Quelle" },
@@ -291,7 +312,7 @@ export default {
   created() { this.checkStage(); },
   watch: { stage() { this.checkStage(); } },
   methods: {
-    area, euroPerSqm,
+    area, euroPerSqm, num,
 
     /** A stage reached without the data behind it — a reload, or the back
      *  button after the plot was created — sends the user back to the start
@@ -395,7 +416,15 @@ export default {
         plot.brwZone = value?.zone ?? null;
         plot.brwReferenceDate = value?.reference_date ?? null;
       } catch { /* leave it empty and say so on the next step */ }
-      plot.houseTypeId = state.data.houseTypes[0]?.id ?? null;
+      /* A catalogue entry when the user has one, and otherwise the plot's own
+       * dimensions — anything rather than a "Baukörper" box with nothing chosen
+       * in it while the plan already draws a house. */
+      const first = state.data.houseTypes[0];
+      if (first) {
+        plot.houseTypeId = first.id;
+        if (first.ratio) plot.ratio = first.ratio;
+      }
+      this.houseSeated = autoSeatHouse(plot);
       this.draft = plot;
       this.goToStage(2);
     },
