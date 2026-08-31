@@ -1,7 +1,7 @@
 /**
  * The "In der Umgebung" panel, against a recorded real answer.
  *
- * Liebertwolkwitz, fetched live on 2026-08-29 with the OSM index absent — which
+ * Liebertwolkwitz, fetched live on 2026-08-31 with the OSM index absent — which
  * is the state a fresh checkout is in, and the one that most easily produces a
  * lie: six categories the server has no data for must never read as "there is
  * no school near this plot".
@@ -78,6 +78,47 @@ describe("Umgebung", () => {
     expect(noData).toHaveLength(1);
     ["Schule", "Kita", "Park", "Spielplatz", "Supermarkt", "Arzt"]
       .forEach(name => expect(noData[0]).toContain(name));
+  });
+
+  it("fragt die Linien mit ab", async () => {
+    // Ohne dieses Flag antwortet der Dienst mit `linien: null` — und die Tafel
+    // wüsste dann nur, dass hier „ein Bus“ hält, nicht welcher.
+    const w = mount(NearbyPanel, { props: { plot: plot() } });
+    await w.find("button").trigger("click");
+    await flushPromises();
+    expect(nearby).toHaveBeenCalledWith(expect.anything(), { linien: true });
+  });
+
+  it("nennt die Linien, die an einer Haltestelle halten", async () => {
+    const w = mount(NearbyPanel, { props: { plot: plot() } });
+    await w.find("button").trigger("click");
+    await flushPromises();
+
+    // Aufgezeichnete Werte: am Liebertwolkwitzer Markt hält die 143, am
+    // Bahnhof der RB113 nach Geithain.
+    const chips = w.findAll(".nearby__line").map(el => el.text());
+    recorded.treffer
+      .flatMap(hit => hit.linien ?? [])
+      .forEach(line => expect(chips).toContain(line));
+    expect(chips).toContain("143");
+    expect(chips).toContain("RB113");
+  });
+
+  it("sagt „nicht abgefragt“, statt eine Haltestelle ohne Linie dastehen zu lassen", async () => {
+    // Der Dienst hört nach einer festen Zahl von Haltestellen auf, Linien
+    // nachzuschlagen. Das ist nicht dasselbe wie „hier hält keine Linie“.
+    const capped = structuredClone(recorded);
+    capped.treffer = capped.treffer.map((hit, i) => (i ? { ...hit, linien: null } : hit));
+    nearby.mockResolvedValueOnce(capped);
+
+    const w = mount(NearbyPanel, { props: { plot: plot() } });
+    await w.find("button").trigger("click");
+    await flushPromises();
+
+    const rows = w.findAll("tbody tr");
+    expect(rows[0].findAll(".nearby__line").length).toBeGreaterThan(0);
+    expect(rows[1].text()).toContain("Linien nicht abgefragt");
+    expect(rows[1].findAll(".nearby__line")).toHaveLength(0);
   });
 
   it("zeigt bei einem Halt, welche Verkehrsmittel dort fahren", async () => {

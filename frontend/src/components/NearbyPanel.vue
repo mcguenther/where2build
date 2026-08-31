@@ -32,6 +32,15 @@
                  target="_blank" rel="noopener noreferrer"
                  :title="`Fußweg vom Grundstück zu ${hit.name} auf OpenStreetMap`">{{ hit.name }}</a>
               <span v-else class="nearby__name">{{ hit.name }}</span>
+              <!-- Which lines call here, not only which kind of vehicle: "Bus"
+                   is a category, "141, 172" is what somebody actually rides.
+                   Only the lines of the modes this row was found for -- the bus
+                   lines at a tram stop are not what makes it a tram stop. -->
+              <span v-if="hit.linien && hit.linien.length" class="nearby__lines"
+                    :title="`Linien laut Fahrplan: ${hit.linien.join(', ')}`">
+                <span v-for="line in hit.linien" :key="line" class="nearby__line">{{ line }}</span>
+              </span>
+              <span v-else-if="lineNote(hit)" class="nearby__kind">{{ lineNote(hit) }}</span>
             </td>
             <td class="num">{{ hit.erreichbar ? duration(hit.duration_s) : "—" }}</td>
             <td class="num nearby__walk">
@@ -119,11 +128,25 @@ export default {
      *  refuses to search at all without one, so there is no second case. */
     link(hit) { return openStreetMapRoute(this.plot.anchor, hit, "walk"); },
     label(key) { return LABELS[key] ?? key; },
+    /** Why a stop shows no line -- and it is never "es fährt keine". Two
+     *  silences again: the server stops looking lines up after a fixed number
+     *  of stops, which is not the same statement as "an dieser Haltestelle
+     *  hält keine Linie". A place from OpenStreetMap has no lines to have and
+     *  says nothing at all. */
+    lineNote(hit) {
+      if (hit.quelle !== "motis") return null;
+      return hit.linien == null ? "Linien nicht abgefragt" : "keine Linie im Fahrplan";
+    },
     async load() {
       this.busy = true;
       this.error = null;
       try {
-        this.result = await nearby({ lat: this.plot.anchor.lat, lon: this.plot.anchor.lon });
+        // `linien` costs the timetable service one request per stop, and is the
+        // difference between "hier hält ein Bus" and "hier hält die 141".
+        this.result = await nearby(
+          { lat: this.plot.anchor.lat, lon: this.plot.anchor.lon },
+          { linien: true }
+        );
         this.$emit("loaded", this.result);
       } catch (error) {
         this.error = error.message;
@@ -141,6 +164,13 @@ export default {
 .nearby__what{ display: flex; flex-direction: column; gap: 1px; }
 .nearby__name{ color: var(--w2b-muted); font-size: var(--w2b-text-xs); }
 .nearby__kind{ color: var(--w2b-muted); font-size: var(--w2b-text-xs); }
+.nearby__lines{ display: flex; flex-wrap: wrap; gap: 3px; margin-top: 2px; }
+.nearby__line{
+  padding: 0 5px; border-radius: var(--w2b-radius-xs);
+  background: var(--w2b-surface-sunken); border: 1px solid var(--w2b-line);
+  color: var(--w2b-graphite); font-family: var(--w2b-font-mono);
+  font-size: var(--w2b-text-xs); line-height: 1.55;
+}
 a.nearby__name{ text-decoration: underline; text-underline-offset: 2px; }
 a.nearby__name:hover{ color: var(--w2b-primary); }
 .nearby__walk{ color: var(--w2b-muted); font-size: var(--w2b-text-xs); white-space: nowrap; }

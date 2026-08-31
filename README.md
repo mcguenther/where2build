@@ -131,7 +131,7 @@ nothing else.
 | `GET` | `/api/landvalue` | `?lat=&lon=` → €/m², zone, reference date |
 | `POST` | `/api/reachability` | origin + destinations + modes → durations and route geometry |
 | `GET` | `/api/tiles/{layer}/{z}/{x}/{y}.png` | cached proxy for the GeoSN WMS layers |
-| `POST` | `/api/nearby` | one coordinate → the nearest school, park, tram stop and so on, ranked by walking time |
+| `POST` | `/api/nearby` | one coordinate → the nearest school, park, tram stop and so on, ranked by walking time; `linien: true` also names the lines calling at each stop |
 | `GET` | `/api/health` | which services are configured |
 
 ## Configuration

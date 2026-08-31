@@ -140,7 +140,10 @@ class NearbySettings(BaseSettings):
     # cache entry instead of each cutting its own.
     bbox_grid_deg: float = 0.02
     # Lines per stop are an extra request each; cap what one answer can cost.
-    max_line_lookups: int = 6
+    # Eight, because that is what a default request can produce: two hits for
+    # each of the four transit categories. A lower cap would leave the last
+    # stops of an ordinary answer without their lines.
+    max_line_lookups: int = 8
 
 
 class OverpassSettings(BaseSettings):

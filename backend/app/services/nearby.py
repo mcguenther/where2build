@@ -22,6 +22,7 @@ simply correct instead of plausibly wrong.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import math
 from typing import Any, Iterable, Sequence
@@ -475,18 +476,30 @@ class NearbyService:
 
         Bounded on purpose: this is the only part of the answer whose cost grows
         with the number of hits, against a volunteer service that asks callers
-        to be light on it.
+        to be light on it. Which stops fall inside the budget is decided before
+        anything is fetched, so the answer does not depend on which request came
+        back first; the requests themselves then run together, throttled by the
+        routing client's own concurrency limit.
         """
 
         budget = self.settings.max_line_lookups
+        chosen: list[UmgebungTreffer] = []
         for hit in treffer:
             if hit.quelle != "motis" or not hit.stop_id:
                 continue
-            if budget <= 0:
+            if len(chosen) >= budget:
                 # `linien` stays None, so the answer says "nicht abgefragt"
                 # rather than showing an empty list that reads as "keine Linie".
                 break
-            budget -= 1
+            chosen.append(hit)
+
+        if not chosen:
+            return
+
+        answers = await asyncio.gather(
+            *(self.motis.stop_routes(hit.stop_id or "") for hit in chosen)
+        )
+        for hit, routes in zip(chosen, answers):
             # Every category this stop was listed for, not just its label: the
             # S-Bahn lines of a merged Bahnhof/S-Bahn stop belong on it too.
             wanted = {
@@ -496,7 +509,7 @@ class NearbyService:
             }
             names = {
                 str(route.get("routeShortName") or "").strip()
-                for route in await self.motis.stop_routes(hit.stop_id)
+                for route in routes
                 if str(route.get("mode") or "") in wanted
             }
             hit.linien = sorted((name for name in names if name), key=_line_sort_key)

@@ -396,6 +396,22 @@ def test_lines_are_only_fetched_when_asked_for(client: TestClient):
     assert loud["treffer"][0]["linien"] == ["2", "15", "31"]
 
 
+def test_the_line_budget_covers_an_ordinary_request():
+    """A default request must not run out of budget half way down its own list.
+
+    Two hits for each of the four transit categories is what the endpoint's own
+    defaults produce; a cap below that would leave the last stops of a perfectly
+    ordinary answer with "nicht abgefragt" against them.
+    """
+
+    from app.schemas import NearbyRequest
+    from app.services.nearby import TRANSIT_CATEGORIES
+    from app.settings import NearbySettings
+
+    default_hits = NearbyRequest.model_fields["treffer_je_kategorie"].default
+    assert NearbySettings().max_line_lookups >= default_hits * len(TRANSIT_CATEGORIES)
+
+
 @respx.mock
 def test_beyond_the_line_budget_nothing_is_claimed(monkeypatch, client: TestClient):
     """Running out of budget must not look like "an dieser Haltestelle fährt nichts"."""
