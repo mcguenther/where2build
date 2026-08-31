@@ -86,8 +86,24 @@
           <line :x1="c.line.x1" :y1="c.line.y1" :x2="c.line.x2" :y2="c.line.y2"
                 stroke="var(--w2b-map-boundary)" stroke-width="1"
                 :marker-start="`url(#dim-${uid})`" :marker-end="`url(#dim-${uid})`" />
+          <!-- A segment too short to carry its own text keeps its label on a leader. -->
+          <line v-if="c.leader" :x1="c.leader.x1" :y1="c.leader.y1" :x2="c.leader.x2" :y2="c.leader.y2"
+                stroke="var(--w2b-map-boundary)" stroke-width=".7" opacity=".5" />
           <text :x="c.text.x" :y="c.text.y" :transform="`rotate(${-rotation}, ${c.text.x}, ${c.text.y})`"
                 class="site-plan__dimension">{{ c.label }}</text>
+        </g>
+
+        <!-- Overall size on a ring of its own, outside every per-edge chain. -->
+        <g v-for="(c, i) in overallChains" :key="`o${i}`" class="site-plan__overall">
+          <line :x1="c.h1.x1" :y1="c.h1.y1" :x2="c.h1.x2" :y2="c.h1.y2"
+                stroke="var(--w2b-map-boundary)" stroke-width=".7" opacity=".3" stroke-dasharray="3 4" />
+          <line :x1="c.h2.x1" :y1="c.h2.y1" :x2="c.h2.x2" :y2="c.h2.y2"
+                stroke="var(--w2b-map-boundary)" stroke-width=".7" opacity=".3" stroke-dasharray="3 4" />
+          <line :x1="c.line.x1" :y1="c.line.y1" :x2="c.line.x2" :y2="c.line.y2"
+                stroke="var(--w2b-map-boundary)" stroke-width=".9" opacity=".55" stroke-dasharray="7 4"
+                :marker-start="`url(#dim-${uid})`" :marker-end="`url(#dim-${uid})`" />
+          <text :x="c.text.x" :y="c.text.y" :transform="`rotate(${-rotation}, ${c.text.x}, ${c.text.y})`"
+                class="site-plan__dimension site-plan__dimension--overall">{{ c.label }}</text>
         </g>
         <template v-if="narrowest">
           <line :x1="narrowest.x1" :y1="narrowest.y1" :x2="narrowest.x2" :y2="narrowest.y2"
@@ -113,13 +129,13 @@
       <text :x="width - 58" y="112" text-anchor="middle" class="site-plan__north">N</text>
 
       <g :transform="`translate(38, ${height - 44})`">
-        <rect x="0" y="-5" :width="tenMetres" height="5" fill="var(--w2b-map-boundary)" />
-        <rect :x="tenMetres" y="-5" :width="tenMetres" height="5" fill="none"
+        <rect x="0" y="-5" :width="scaleBar.width" height="5" fill="var(--w2b-map-boundary)" />
+        <rect :x="scaleBar.width" y="-5" :width="scaleBar.width" height="5" fill="none"
               stroke="var(--w2b-map-boundary)" stroke-width="1.2" />
-        <line x1="0" y1="0" :x2="tenMetres * 2" y2="0" stroke="var(--w2b-map-boundary)" stroke-width="1.2" />
+        <line x1="0" y1="0" :x2="scaleBar.width * 2" y2="0" stroke="var(--w2b-map-boundary)" stroke-width="1.2" />
         <text x="0" y="15" class="site-plan__scale-bar" text-anchor="middle">0</text>
-        <text :x="tenMetres" y="15" class="site-plan__scale-bar" text-anchor="middle">10</text>
-        <text :x="tenMetres * 2" y="15" class="site-plan__scale-bar" text-anchor="end">20 m</text>
+        <text :x="scaleBar.width" y="15" class="site-plan__scale-bar" text-anchor="middle">{{ scaleBar.label }}</text>
+        <text :x="scaleBar.width * 2" y="15" class="site-plan__scale-bar" text-anchor="end">{{ scaleBar.endLabel }}</text>
       </g>
     </g>
     </svg>
@@ -129,7 +145,8 @@
 <script>
 import {
   buildableArea, polygonEdges, rectangleCorners, pointInPolygon,
-  closestBoundaryPoint, boundingBox, alignmentToEdge
+  closestBoundaryPoint, boundingBox, alignmentToEdge, asCounterClockwise,
+  minimumRotatedRectangleCorners
 } from "../lib/geometry.js";
 import { cameraFor } from "../lib/projection.js";
 import { num } from "../lib/format.js";
@@ -139,6 +156,31 @@ import { BACKDROPS } from "../lib/basemap.js";
 import { Map as MapLibreMap } from "maplibre-gl";
 
 let instanceCount = 0;
+
+/* How far outside the outline each ring of dimensions sits, in pixels of the
+ * drawing rather than in metres: 4,5 m is a hair's breadth on a 1583 m field
+ * and half the picture on a 12 m plot, so a fixed metre offset can only look
+ * right at one size. Metres come from dividing by the scale. */
+const EDGE_CHAIN_PX = 18;
+const HOUSE_CHAIN_PX = 15;
+/* Two rings for the labels of segments too short to carry their own, so that
+ * neighbouring slivers do not write over each other. */
+const SHORT_LABEL_PX = [36, 54];
+/* How far the overall chain clears whatever ring ended up outermost. */
+const OVERALL_CLEARANCE_PX = 22;
+/* What the outermost text still needs beyond its chain. */
+const CHAIN_TEXT_PX = 14;
+/* Roughly the width of one character at the 10,5 px label size. */
+const LABEL_CHARACTER_PX = 6.2;
+/* Above this many segments a chain per boundary stops being information: the
+ * field a district address resolves to has 159 of them, and one label each
+ * turns the plan into a black band with nothing legible in it. The overall
+ * size still stands — that is the number being asked for — and every segment
+ * length is listed in the setback table on the plot page. */
+const MAX_LABELLED_EDGES = 16;
+/* Round distances a scale bar may step in, and the width one half aims for. */
+const SCALE_BAR_STEPS = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000];
+const SCALE_BAR_SEGMENT_PX = 56;
 
 export default {
   name: "SitePlan",
@@ -190,24 +232,70 @@ export default {
     hasBackdrop() { return this.wantsBackdrop && !this.mapUnavailable; },
     backgroundFill() { return this.backdrop === "aerial" ? "var(--w2b-map-green)" : "var(--w2b-map-ground)"; },
 
+    /** The outline in counter-clockwise order, so "outward" is one fixed sign.
+     *  A cadastral ring arrives either way round, and the old chains offset by
+     *  a normal whose direction depended on that — which is why one of them
+     *  sat inside the parcel. */
+    ccwPolygon() { return asCounterClockwise(this.plot.polygon); },
+
+    baseMargin() { return this.compact ? 6 : 40; },
+
+    /* Trial fit, read only to decide which segments have room for their own
+       label — and therefore how much frame the outer rings need. It never reads
+       that reserve back, so the two do not chase each other: reserving in
+       metres did, and shrank a 35 m plot to a third of its frame. */
+    trialScale() { return this.fitBox(boundingBox(this.plot.polygon), this.baseMargin); },
+
+    /** Whether a chain per boundary segment can still be read on this outline. */
+    edgesLabelled() { return this.ccwPolygon.length <= MAX_LABELLED_EDGES; },
+
+    /** Indices of the segments with no room to carry their own text. */
+    crowdedEdges() {
+      const found = [];
+      if (!this.edgesLabelled) return found;
+      polygonEdges(this.ccwPolygon).forEach((edge, i) => {
+        const label = `${num(edge.length)} m`;
+        if (edge.length * this.trialScale < label.length * LABEL_CHARACTER_PX) found.push(i);
+      });
+      return found;
+    },
+
+    /* The outermost ring in play. A parcel whose sides all carry their own
+       labels pays nothing for the leader rings it does not use. */
+    overallOffsetPx() {
+      const rings = Math.min(this.crowdedEdges.length, SHORT_LABEL_PX.length);
+      return (rings ? SHORT_LABEL_PX[rings - 1] : EDGE_CHAIN_PX) + OVERALL_CLEARANCE_PX;
+    },
+
+    /* The chains hang a fixed number of *pixels* outside the outline, so the
+       room they need is a pixel margin — not metres. */
+    margin() {
+      return this.dimensionsVisible
+        ? this.baseMargin + this.overallOffsetPx + CHAIN_TEXT_PX
+        : this.baseMargin;
+    },
+
+    /** Metres per pixel of the drawing — the chain offsets' unit of exchange. */
+    metresPerPixel() { return 1 / this.view.scale; },
+
     /* Frame the plot with a margin, then stretch the box to the frame's aspect
        so the drawing fills the panel instead of floating in it. */
     view() {
       const box = boundingBox(this.plot.polygon);
-      const margin = this.compact ? 6 : 40;
-      const padding = 0.16;
-      let bw = box.width * (1 + padding * 2);
-      let bh = box.height * (1 + padding * 2);
-      const aspect = (this.width - margin * 2) / (this.height - margin * 2);
-      if (bw / bh < aspect) bw = bh * aspect; else bh = bw / aspect;
-      const fitted = (this.width - margin * 2) / bw;
       /* A caller that hands us a scale is drawing several plots side by side
          and needs them comparable, so its value wins over our own fit. It is
          the smallest of the individual fits, so nothing overflows its frame. */
-      const scale = Number.isFinite(this.scale) && this.scale > 0 ? this.scale : fitted;
+      const scale = Number.isFinite(this.scale) && this.scale > 0 ? this.scale : this.fitBox(box, this.margin);
       return { scale, mx: (box.minX + box.maxX) / 2, my: (box.minY + box.maxY) / 2 };
     },
-    tenMetres() { return 10 * this.view.scale; },
+    /* A bar of a fixed ten metres writes its three labels on top of each other
+       the moment the drawing covers a kilometre: the step follows the scale, so
+       each half stays about as wide on screen whatever the plot measures. */
+    scaleBar() {
+      const step = SCALE_BAR_STEPS.find(m => m * this.view.scale >= SCALE_BAR_SEGMENT_PX)
+        ?? SCALE_BAR_STEPS[SCALE_BAR_STEPS.length - 1];
+      return { width: step * this.view.scale, label: num(step, 0), endLabel: `${num(step * 2, 0)} m` };
+    },
     envelope() { return buildableArea(this.plot.polygon, this.plot.setbacks); },
     setbackRing() {
       const outer = this.plot.polygon.map(v => `${this.p(v).x},${this.p(v).y}`).join("L");
@@ -220,17 +308,52 @@ export default {
       return this.houseCorners.filter(e => !pointInPolygon(e, this.envelope));
     },
     violation() { return this.outliers.length > 0; },
+    /* One chain per boundary segment, not the two the old list picked out: on
+       a five-point parcel that left three sides unlabelled and the two it did
+       show — a 47,69 m front and a 2,04 m sliver — read as the whole story. */
     dimensionChains() {
-      const edges = polygonEdges(this.plot.polygon);
+      const ring = this.ccwPolygon;
+      const perPixel = this.metresPerPixel;
+      const chains = [];
+      let crowded = 0;
+
+      if (this.edgesLabelled) polygonEdges(ring).forEach((edge, i) => {
+        const a = ring[i], b = ring[(i + 1) % ring.length];
+        const label = `${num(edge.length)} m`;
+        const chain = this.dimensionChain(a, b, -EDGE_CHAIN_PX * perPixel, label);
+        // A segment with no room for its own text keeps the label, on a leader
+        // further out. Dropping it is what hid the short sides in the first place.
+        if (this.crowdedEdges.includes(i)) {
+          const ring2 = SHORT_LABEL_PX[crowded++ % SHORT_LABEL_PX.length];
+          const far = this.dimensionChain(a, b, -ring2 * perPixel, label);
+          chain.text = far.text;
+          chain.leader = {
+            x1: (chain.line.x1 + chain.line.x2) / 2, y1: (chain.line.y1 + chain.line.y2) / 2,
+            x2: far.text.x, y2: far.text.y - 3.5
+          };
+        }
+        chains.push(chain);
+      });
+
       const h = this.houseCorners;
-      const wanted = [
-        { a: this.plot.polygon[1], b: this.plot.polygon[0], offset: 4.5, value: edges[0].length },
-        { a: this.plot.polygon[0], b: this.plot.polygon[this.plot.polygon.length - 1], offset: 4.5,
-          value: edges[edges.length - 1].length },
-        { a: h[0], b: h[1], offset: -3.1, value: this.building.width },
-        { a: h[1], b: h[2], offset: -3.1, value: this.building.depth }
-      ];
-      return wanted.map(c => this.dimensionChain(c.a, c.b, c.offset, `${num(c.value)} m`));
+      const houseOffset = -HOUSE_CHAIN_PX * perPixel;
+      chains.push(this.dimensionChain(h[0], h[1], houseOffset, `${num(this.building.width)} m`));
+      chains.push(this.dimensionChain(h[1], h[2], houseOffset, `${num(this.building.depth)} m`));
+      return chains;
+    },
+
+    /* The overall size, on a ring outside all of those. Measured on the minimum
+       rotated rectangle rather than the axis-aligned box: the same parcel that
+       the box calls 1583 x 198 m is a 1594 x 30 m ribbon, and the elongation is
+       exactly what somebody reading a plot wants to see. */
+    overallChains() {
+      const mrr = minimumRotatedRectangleCorners(this.plot.polygon);
+      if (!mrr) return [];
+      const c = asCounterClockwise(mrr.corners);
+      const offset = -this.overallOffsetPx * this.metresPerPixel;
+      const side = (p, q) => Math.hypot(q.x - p.x, q.y - p.y);
+      return [[c[0], c[1]], [c[1], c[2]]].map(([p, q]) =>
+        this.dimensionChain(p, q, offset, `gesamt ${num(side(p, q), 1)} m`));
     },
     measureLine() {
       return this.measurePoints.map(m => { const q = this.p(m); return `${q.x.toFixed(1)},${q.y.toFixed(1)}`; }).join(" ");
@@ -340,6 +463,19 @@ export default {
       }));
       this._map.resize();
     },
+    /** Pixels per metre that fit a box into this frame, given the margin the
+     *  chains outside the outline need. */
+    fitBox(box, margin) {
+      /* The relative padding is breathing room around the outline. Once a ring
+         of chains is reserved in the margin, that ring *is* the breathing room,
+         and keeping both spends the frame twice. */
+      const padding = this.dimensionsVisible ? 0.02 : 0.16;
+      let bw = box.width * (1 + padding * 2);
+      let bh = box.height * (1 + padding * 2);
+      const aspect = (this.width - margin * 2) / (this.height - margin * 2);
+      if (bw / bh < aspect) bw = bh * aspect; else bh = bw / aspect;
+      return (this.width - margin * 2) / bw;
+    },
     px(x) { return this.width / 2 + (x - this.view.mx) * this.view.scale; },
     py(y) { return this.height / 2 - (y - this.view.my) * this.view.scale; },
     p(v) {
@@ -431,6 +567,7 @@ export default {
 .site-plan--dragging{ cursor: grabbing; }
 .site-plan--measuring{ cursor: crosshair; }
 .site-plan__dimension--measuring{ fill: var(--w2b-map-violation); }
+.site-plan__dimension--overall{ font-size: 9.5px; opacity: .8; }
 .plan-handle{ cursor: grab; }
 .site-plan__dimension{
   font-family: var(--w2b-font-mono); font-size: 10.5px; font-weight: 500;

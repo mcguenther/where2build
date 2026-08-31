@@ -511,3 +511,31 @@ export function fitScale(ring, frameWidth, frameHeight, margin = 40, padding = 0
   const height = box.height * (1 + padding * 2);
   return Math.min((frameWidth - margin * 2) / width, (frameHeight - margin * 2) / height);
 }
+
+/**
+ * The minimum rotated rectangle as four corners, counter-clockwise, starting at
+ * the corner that is lowest in its own frame.
+ *
+ * `minimumRotatedRectangle` answers with the measurements only, and a dimension
+ * chain has to be drawn on the actual sides. Side `0→1` is `width` long, side
+ * `1→2` is `height`. Returns `null` for a degenerate ring.
+ */
+export function minimumRotatedRectangleCorners(ring) {
+  if (!ring || ring.length < 3) return null;
+  const best = minimumRotatedRectangle(ring);
+  if (!best) return null;
+  const c = Math.cos(-best.angle), s = Math.sin(-best.angle);
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const p of ring) {
+    const x = p.x * c - p.y * s, y = p.x * s + p.y * c;
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  }
+  const back = (x, y) => ({ x: x * c + y * s, y: -x * s + y * c });
+  return {
+    ...best,
+    corners: [back(minX, minY), back(maxX, minY), back(maxX, maxY), back(minX, maxY)]
+  };
+}
