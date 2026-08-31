@@ -103,6 +103,28 @@
               Noch nicht verortet — ohne Koordinate lässt sich kein Weg berechnen.
             </p>
           </template>
+
+          <!-- How to reach the first stop. A preference about the next
+               calculation, not a record of what this place is, so it stays
+               adjustable without opening the record for editing — and changing
+               it destroys nothing that was already computed. -->
+          <div class="feeder no-print">
+            <label :for="`z-${destination.id}`">Zubringer zum ÖPNV</label>
+            <select :id="`z-${destination.id}`" :value="zubringerOf(destination)"
+                    @change="setZubringer(destination, $event.target.value)">
+              <option v-for="z in ZUBRINGER" :key="z.wert" :value="z.wert">{{ z.name }}</option>
+            </select>
+            <p class="feeder__hint">
+              <template v-if="zubringerOf(destination) === 'automatic'">
+                Rad und Fußweg werden beide gerechnet; das Rad gewinnt ab zehn Minuten Fußweg
+                zur ersten Haltestelle oder wenn es die Reise deutlich verkürzt. Das Auto
+                kommt erst ab zehn Minuten Radweg dazu — und nur, wenn es schneller ist.
+              </template>
+              <template v-else>
+                Fest eingestellt. „Wege berechnen“ auf der Grundstücksseite übernimmt es.
+              </template>
+            </p>
+          </div>
         </div>
       </div>
       <div v-else class="empty">
@@ -127,11 +149,13 @@ import {
   destinationName
 } from "../lib/store.js";
 import { geocode } from "../lib/api.js";
+import { ZUBRINGER, zubringerOf } from "../lib/routes.js";
 
 export default {
   name: "DestinationsView",
   data() {
     return {
+      ZUBRINGER,
       busy: null,       // id of the destination currently being looked up
       matches: {},      // id -> candidates awaiting a decision
       errors: {},
@@ -146,6 +170,16 @@ export default {
     referencePoint() { return state.data.plots.find(p => p.anchor)?.anchor || null; }
   },
   methods: {
+    zubringerOf,
+
+    /** Absent means "automatisch", so a return to the default clears the field
+     *  rather than writing the default into every destination. */
+    setZubringer(destination, value) {
+      if (value === "automatic") delete destination.zubringer;
+      else destination.zubringer = value;
+      save();
+    },
+
     displayName: destinationName,
     add() { addDestination(); },
 
@@ -266,6 +300,21 @@ export default {
 .destination-list{ display: flex; flex-direction: column; }
 .destination-row{ padding: var(--w2b-space-3) var(--w2b-space-4); border-bottom: 1px solid var(--w2b-line-faint); }
 .destination-row:last-child{ border-bottom: 0; }
+.feeder{
+  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px var(--w2b-space-3);
+  align-items: center; padding: var(--w2b-space-3) var(--w2b-space-4);
+  border-top: 1px solid var(--w2b-line-faint);
+}
+.feeder label{
+  font-family: var(--w2b-font-display); font-weight: 600; font-size: var(--w2b-text-xs);
+  letter-spacing: .09em; text-transform: uppercase; color: var(--w2b-muted);
+}
+.feeder select{ max-width: 26ch; }
+.feeder__hint{ grid-column: 1 / -1; font-size: var(--w2b-text-xs); color: var(--w2b-muted); }
+@media (max-width: 560px){
+  .feeder{ grid-template-columns: 1fr; }
+  .feeder select{ max-width: none; }
+}
 .destination-row__fields{ display: grid; grid-template-columns: 1fr 1.6fr auto auto; gap: var(--w2b-space-3); align-items: end; }
 @media (max-width: 680px){ .destination-row__fields{ grid-template-columns: 1fr; } }
 .destination-row__actions{ display: flex; gap: var(--w2b-space-2); margin-top: var(--w2b-space-3); flex-wrap: wrap; }

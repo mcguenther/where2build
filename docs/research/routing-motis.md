@@ -552,3 +552,119 @@ Quelle: `https://transitous.org/api/` (🟢 am 29.08.2026 abgerufen, Text unten 
 - Transitous API/Policy-Seite: `https://transitous.org/api/` (🟢 live abgerufen 29.08.2026, Text direkt aus HTML extrahiert)
 - Transitous/MOTIS-Notes-Wiki (⚠️ ältere Architektur-Generation, mit Vorsicht zu lesen): `https://github.com/public-transport/transitous/wiki/MOTIS-Notes`
 - Alle Live-Requests aus Abschnitt 3: direkt gegen `https://api.transitous.org` am 29.08.2026, Rohantworten lokal im Scratchpad gespeichert und mit Python nachgeprüft (u. a. Polyline-Dekodierung).
+
+---
+
+## 9. Zubringer und Abholer — Nachtrag vom 31.08.2026 🟢
+
+Nachgetragen, weil die Anwendung ab jetzt nicht mehr nur `preTransitModes=BIKE`
+kennt, sondern die Wahl des Zubringers pro Ziel trifft. **Alles hier ist live
+gegen `https://api.transitous.org` geprüft** (Server-Header weiterhin
+`MOTIS v2.11.1`), 14 Requests, User-Agent
+`GrundstuecksCheckSachsen/0.1 (+https://github.com/mcguenther/where2build)`,
+mindestens 4 s Pause dazwischen. Die Rohantworten liegen — auf die vom Code
+gelesenen Felder gekürzt, Polylinien auf je fünf ihrer eigenen echten Punkte
+ausgedünnt — als Fixtures unter `backend/tests/fixtures/motis_plan_*.json`.
+
+### 9.1 Die Anfrage
+
+```
+GET /api/v6/plan
+  ?fromPlace=<lat,lon>&toPlace=<lat,lon>
+  &transitModes=TRANSIT
+  &preTransitModes=WALK|BIKE|CAR_PARKING
+  &postTransitModes=WALK
+  &maxPreTransitTime=1800
+  &numItineraries=2
+  &time=2026-09-01T06:00:00Z
+```
+
+### 9.2 Was die drei Zubringer-Modi wirklich tun
+
+| `preTransitModes` | Was in der Antwort steht |
+|---|---|
+| `WALK` | Fuß-Leg bis zur ersten Haltestelle. Der Standard. |
+| `BIKE` | Rad-Leg bis zur Haltestelle. Das Rad bleibt dort: die Transit-Legs derselben Verbindung tragen `bikesAllowed: false`, es wird also nichts mitgenommen — Bike-and-Ride, nicht Radmitnahme. |
+| `CAR_PARKING` | `CAR`-Leg auf einen Punkt ohne Namen, dann `WALK` zur Haltestelle. Das ist Park-and-Ride. In der Spec als *experimentell* geführt, antwortet aber zuverlässig. |
+| `CAR` (verworfen) | Fährt **auf den Bahnsteig** und lässt das Auto dort stehen. Leipzig → Dresden: `CAR:240 → Leipzig Hbf`, kein Parkplatz, kein Fußweg. Gegenprobe mit `CAR_PARKING` an derselben Stelle: `CAR:120 + WALK:540`. `CAR` ist damit für „Auto zum ÖPNV“ die falsche Angabe. |
+
+**`CAR_PARKING` liefert beide Formen.** In der Leipziger Antwort war die zweite
+Verbindung ein blankes `CAR`-Leg bis zur Haltestelle — also eine Fahrt ohne
+Abstellmöglichkeit. Der Code erkennt das an der Folge „CAR-Leg, dann WALK-Leg“
+(`parks_the_car()` in `services/motis.py`) und schreibt es auf die Karte, statt
+einen Parkplatz zu behaupten, den MOTIS nicht gefunden hat.
+
+### 9.3 Warum der Abholer immer `WALK` bleibt
+
+`postTransitModes=BIKE` **antwortet** — und erfindet dabei ein Rad am Zielbahnhof:
+
+```
+BIKE:240 + REGIONAL_RAIL:1020 + WALK:300 + HIGHSPEED_RAIL:3960 + BIKE:120
+```
+
+Beide Transit-Legs dieser Verbindung tragen `bikesAllowed: false`. Das Rad, mit
+dem die letzten zwei Minuten gefahren werden, kann also gar nicht dort sein.
+Aufgezeichnet als `motis_plan_rad_am_zielende.json`. Eine Reise, die niemand
+antreten kann, ist schlechter als gar keine — deshalb ist der Abholer in allen
+drei Spielarten `WALK`.
+
+### 9.4 Die gemessenen Fälle (Grundlage der Automatik)
+
+Alle nach Dresden Hbf (51.040684, 13.731863), Abfahrt 01.09.2026 06:00 UTC:
+
+| Start | zu Fuß zum ÖPNV | mit dem Rad | mit dem Auto (P+R) |
+|---|---|---|---|
+| **Moritzburg** (51.16758, 13.67797 — das Flurstück aus `alkis_flurstueck_moritzburg.gml`) | Zubringer **660 s**, gesamt 2 940 s | Zubringer **420 s**, gesamt **2 700 s** | Zubringer 1 200 + 480 s, gesamt 2 040 s |
+| **Hinterhermsdorf** (50.9539, 14.3676) | Zubringer **1 740 s**, gesamt 11 760 s | Zubringer **900 s**, gesamt **6 240 s** | Zubringer 1 200 + 360 s, gesamt 7 200 s |
+| **Liebertwolkwitz** (51.282637, 12.463172) | Zubringer 300 s, gesamt 7 320 s | Zubringer 240 s, gesamt 6 240 s | Zubringer 840 + 480 s, gesamt 5 460 s |
+
+Zum Vergleich durchgehend ab Moritzburg: Auto 1 320 s, Rad 4 524 s.
+
+Zwei Beobachtungen, die die Regel geformt haben:
+
+1. **Moritzburg ist der Lehrbuchfall der Nutzerregel.** 11 Minuten zu Fuß zur
+   Haltestelle, 7 mit dem Rad: die Regel schaltet auf Rad, und weil der Radweg
+   unter 10 Minuten bleibt, wird das Auto gar nicht erst geprüft — obwohl es
+   mit 2 040 s schneller wäre. Genau das ist gewollt: 7 Minuten Radweg sind
+   niemandes Grund, das Auto zu nehmen.
+2. **Liebertwolkwitz zeigt, dass die Schwelle allein nicht reicht.** Der Fußweg
+   zur ersten Haltestelle ist nur 5 Minuten — die Regel würde also beim Fuß
+   bleiben und 7 320 s anzeigen, obwohl Rad + Bahn 6 240 s brauchen. Der kurze
+   Weg führt hier zu einer Bushaltestelle, nicht zum Bahnhof. Deshalb hat die
+   Automatik neben der Schwelle einen zweiten Auslöser: eine Ersparnis von
+   mindestens 10 Minuten auf der **Gesamtreise**.
+3. **Hinterhermsdorf zeigt, wo die Uhr die Regel überstimmt.** 15 Minuten
+   Radzeit schalten das Auto frei — und Park-and-Ride kommt mit 7 200 s
+   langsamer heraus als das Rad mit 6 240 s. Die Sprosse wird geprüft und
+   verworfen, und die Karte sagt warum.
+
+### 9.5 Die Regel, wie sie implementiert ist
+
+`MotisService.transit_auto()` in `backend/app/services/motis.py`:
+
+- **Ist am Ziel ein Zubringer festgelegt** (`zubringer` = `walk`/`bike`/`car`),
+  wird genau der gefahren — ein Request, keine Automatik.
+- **Sonst** werden Fuß und Rad gemeinsam angefragt (zwei Requests). Das Rad
+  gewinnt, wenn es überhaupt schneller ist **und** entweder der Fußweg zur
+  ersten Haltestelle ≥ 10 Minuten dauert **oder** die Gesamtreise um ≥ 10
+  Minuten kürzer wird.
+- **Das Auto wird nur angefragt**, wenn der Radzubringer ≥ 10 Minuten dauert
+  (die Regel des Nutzers) oder weder zu Fuß noch mit dem Rad eine Haltestelle
+  erreichbar war. Eine reine Zeitersparnis schaltet es nicht frei: hinfahren
+  und den Tag über parken ist eine Festlegung, die Minuten allein nicht
+  rechtfertigen.
+- **Gewählt wird nie eine langsamere Sprosse.** Ist die höhere nicht schneller,
+  bleibt die niedrigere stehen, und der Hinweistext nennt beide Zeiten.
+- Der `hinweis` der Antwort trägt die Zahlen, auf denen entschieden wurde. Ein
+  stillschweigend ersetztes Verkehrsmittel ist eine Zahl, die niemand prüfen
+  kann.
+
+Die Schwelle (`ACCESS_THRESHOLD_S`) und die Mindestersparnis (`MIN_SAVING_S`)
+stehen beide auf 600 s — die zehn Minuten, die der Nutzer genannt hat.
+
+### 9.6 Kosten gegenüber Transitous
+
+Vorher ein Request je Ziel und Verkehrsmittel (3). Jetzt: Auto, Rad und für die
+ÖPNV-Zeile zwei — also 4 statt 3, in seltenen Fällen 5. Ein Ziel mit
+festgelegtem Zubringer kostet wieder 3. `max_concurrency` bleibt bei 2, der
+Plattencache bleibt bei einer Stunde.

@@ -1,0 +1,39 @@
+{
+  "requestParameters": {},
+  "from": {
+    "name": "",
+    "lat": 51.16758,
+    "lon": 13.67797
+  },
+  "to": {
+    "name": "",
+    "lat": 51.040684,
+    "lon": 13.731863
+  },
+  "direct": [
+    {
+      "duration": 4524,
+      "transfers": 0,
+      "startTime": "2026-08-31T21:08:00Z",
+      "endTime": "2026-08-31T22:23:00Z",
+      "legs": [
+        {
+          "mode": "BIKE",
+          "duration": 4524,
+          "from": {
+            "name": "START"
+          },
+          "to": {
+            "name": "END"
+          },
+          "legGeometry": {
+            "points": "icbr`B{_waYfs|@slLny}Aq{e@tql@qgx@|zn@~f@",
+            "precision": 6,
+            "length": 5
+          }
+        }
+      ]
+    }
+  ],
+  "itineraries": []
+}

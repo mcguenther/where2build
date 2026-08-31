@@ -12,7 +12,7 @@ import {
   polygonCentroid, footprintFromArea, buildableArea, findPlacement,
   alignmentToEdge, boundingBox
 } from "./geometry.js";
-import { coordinatesOf } from "./routes.js";
+import { coordinatesOf, zubringerOf } from "./routes.js";
 
 /** Centre of a ring in the shape a placement expects. The centroid returns
  *  {x, y}; spreading that into a placement silently yields cx/cy of undefined. */
@@ -172,6 +172,12 @@ export function validate(raw) {
         name: typeof d.name === "string" ? d.name : "",
         address: typeof d.address === "string" ? d.address : ""
       };
+      /* The feeder to the first stop, when one was pinned. Absent is the
+       * default and means "automatisch", so only a real choice is written down
+       * — but it has to be written down: rebuilding the destination without it
+       * is how a picker comes to work and then forget. */
+      const zubringer = zubringerOf(d);
+      if (zubringer !== "automatic") destination.zubringer = zubringer;
       // A destination only counts as located once both coordinates survived.
       if (Number.isFinite(d.lat) && Number.isFinite(d.lon)) {
         destination.lat = d.lat;

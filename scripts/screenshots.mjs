@@ -205,6 +205,10 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
     await page.getByRole("button", { name: "Wege berechnen" }).click();
     await page.waitForSelector(".route-card polyline", { timeout: 60000 });
     await page.waitForTimeout(600);
+    // The cards themselves: this is the only picture that carries them, and
+    // since they gained a raster ground the flat sketch is no longer what
+    // they look like.
+    await shot(page, "grundstueck-wege", mode);
     // And the surroundings: transit stops are live, the OSM categories say
     // plainly that this server has no index for them. The panel starts its own
     // search on this page now, so there is nothing to click -- and the button

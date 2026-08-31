@@ -189,6 +189,7 @@ async def test_the_car_carries_the_journey_when_nothing_else_reaches_a_stop():
     assert result.mode == "car_transit"
     assert result.duration_s == 2040
     assert result.erreichbar is True
+    assert "34 Min." in result.hinweis
 
 
 @respx.mock
@@ -327,5 +328,55 @@ def test_an_unknown_zubringer_is_a_422(client):
     assert answer.status_code == 422
 
 
+@respx.mock
+async def test_the_combination_can_be_slower_than_driving_the_whole_way():
+    # Moritzburg is 22 minutes from Dresden Hbf by car and 75 by bike, against
+    # 45 for the bike-and-ride the ladder picks. Nothing here hides that: the
+    # three rows stand side by side and the card names the faster one. The
+    # ladder's job is to pick the best *ÖPNV* variant, not to talk anybody out
+    # of the car.
+    _moritzburg_ladder()
+    respx.get(PLAN_URL, params__contains={"directModes": "CAR"}).mock(
+        return_value=httpx.Response(200, json=fixture_json("motis_plan_car_moritzburg.json"))
+    )
+    respx.get(PLAN_URL, params__contains={"directModes": "BIKE"}).mock(
+        return_value=httpx.Response(200, json=fixture_json("motis_plan_bike_moritzburg.json"))
+    )
+
+    answer = await motis_service().reachability(
+        MORITZBURG, [DRESDEN_HBF], ["car", "bike", "transit_auto"]
+    )
+
+    by_mode = {result.mode: result.duration_s for result in answer.ergebnisse}
+    assert by_mode == {"car": 1320, "bike": 4524, "bike_transit": 2700}
+
+
 def test_the_threshold_is_the_ten_minutes_the_user_asked_for():
     assert ACCESS_THRESHOLD_S == 600
+
+
+@respx.mock
+@pytest.mark.parametrize(
+    "walk, bike, car",
+    [
+        ("motis_plan_transit_fussweg_lang.json", "motis_plan_bike_transit.json",
+         "motis_plan_car_transit.json"),
+        ("motis_plan_transit_hinterhermsdorf.json",
+         "motis_plan_bike_transit_langer_zubringer.json",
+         "motis_plan_car_transit_langsamer.json"),
+        ("motis_plan_leer.json", "motis_plan_leer.json", "motis_plan_car_transit.json"),
+        ("motis_plan_leer.json", "motis_plan_leer.json", "motis_plan_leer.json"),
+        ("motis_plan_transit_fussweg_lang.json", "motis_plan_leer.json",
+         "motis_plan_leer.json"),
+    ],
+)
+async def test_no_reason_ever_ends_in_two_full_stops(walk: str, bike: str, car: str):
+    # "Min." is an abbreviation whose own full stop ends the sentence. Adding
+    # another produced "11 Min.." on the card, which is what this guards.
+    _plan("WALK", walk)
+    _plan("BIKE", bike)
+    _plan("CAR_PARKING", car)
+
+    result = await motis_service().transit_auto(MORITZBURG, DRESDEN_HBF)
+
+    assert ".." not in (result.hinweis or "")

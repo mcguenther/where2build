@@ -281,7 +281,8 @@
           <h2>Wege von hier</h2>
           <p class="page-head__sub">
             Für jedes hinterlegte Ziel Auto, Rad und ÖPNV, gerechnet vom Grundstück aus.
-            Ziele gelten für alle Grundstücke.
+            Beim ÖPNV wird der Weg zur ersten Haltestelle mitgewählt — zu Fuß, mit dem
+            Rad oder mit dem Auto bis Park-and-Ride. Ziele gelten für alle Grundstücke.
           </p>
         </div>
         <div class="spacer"></div>
@@ -345,6 +346,7 @@ import {
   newId, setRoutes, CUSTOM_SIZE, DEFAULT_FOOTPRINT
 } from "../lib/store.js";
 import { reachability } from "../lib/api.js";
+import { zubringerOf } from "../lib/routes.js";
 import { plotMetrics } from "../lib/metrics.js";
 import {
   polygonEdges, edgeCompass, buildableArea, cornersOutside, smallestSetback,
@@ -433,10 +435,18 @@ export default {
       try {
         const response = await reachability(
           { lat: this.plot.anchor.lat, lon: this.plot.anchor.lon },
-          this.locatedDestinations.map(d => ({ id: d.id, name: d.name, lat: d.lat, lon: d.lon })),
-          ["car", "bike", "transit"]
+          // `zubringer` travels with the destination: the way to the first stop
+          // is decided per destination, and the backend needs several answers
+          // to decide it when nothing is pinned.
+          this.locatedDestinations.map(d => ({
+            id: d.id, name: d.name, lat: d.lat, lon: d.lon, zubringer: zubringerOf(d)
+          })),
+          ["car", "bike", "transit_auto"]
         );
         const routes = {};
+        // Keyed by the mode that was actually routed, not by the one asked for:
+        // "transit_auto" answers with the variant it chose, and that key is
+        // what makes the card able to label the row "Rad + ÖPNV".
         (response.ergebnisse || []).forEach(e => {
           (routes[e.destination_id] ||= {})[e.mode] = {
             erreichbar: e.erreichbar,

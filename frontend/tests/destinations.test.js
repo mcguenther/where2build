@@ -14,6 +14,7 @@ import {
 } from "../src/lib/store.js";
 import { SCHEMA_VERSION } from "../src/lib/sample.js";
 import { realState, realPlot, realRoutes, realDestinations, mountWithRouter } from "./helpers.js";
+import { zubringerOf } from "../src/lib/routes.js";
 
 vi.mock("../src/lib/api.js", () => ({
   geocode: vi.fn(),
@@ -246,5 +247,54 @@ describe("Ein Ziel ohne Namen", () => {
     expect(checked.destinations).toHaveLength(2);
     expect(checked.destinations[0].name).toBe("");
     expect(checked.plots[0].routes[HBF]).toBeTruthy();
+  });
+});
+
+describe("Zubringer zum ÖPNV", () => {
+  it("steht auf Automatisch, solange nichts festgelegt wurde", () => {
+    const w = mountWithRouter(DestinationsView);
+    const picker = w.find("select");
+    expect(picker.exists()).toBe(true);
+    expect(picker.element.value).toBe("automatic");
+    expect(w.text()).toContain("zehn Minuten");
+  });
+
+  it("lässt sich am fertigen Datensatz ändern, ohne ihn zu öffnen", async () => {
+    // The two destinations the recorded routes actually lead to; both located.
+    state.data.destinations = realDestinations();
+    const w = mountWithRouter(DestinationsView);
+    expect(w.findAll(".destination-record").length).toBe(2);
+
+    await w.findAll("select")[0].setValue("bike");
+    expect(state.data.destinations[0].zubringer).toBe("bike");
+    // Still a filed record: nothing about the place itself was touched.
+    expect(state.data.destinations[0].lat).toEqual(expect.any(Number));
+    expect(w.findAll(".destination-record").length).toBe(2);
+  });
+
+  it("löscht das Feld wieder, wenn auf Automatisch zurückgestellt wird", async () => {
+    const w = mountWithRouter(DestinationsView);
+    await w.findAll("select")[0].setValue("car");
+    expect(state.data.destinations[0].zubringer).toBe("car");
+
+    await w.findAll("select")[0].setValue("automatic");
+    expect("zubringer" in state.data.destinations[0]).toBe(false);
+  });
+
+  /* The failure this pins down is silent: the picker works, and the choice is
+     gone after a reload because `validate` rebuilt the destination without it. */
+  it("überlebt Speichern und Einlesen", () => {
+    const raw = realState();
+    raw.destinations[0].zubringer = "bike";
+    const read = validate(JSON.parse(JSON.stringify(raw)));
+    expect(read.destinations[0].zubringer).toBe("bike");
+  });
+
+  it("wirft einen unbekannten Wert weg, statt ihn weiterzureichen", () => {
+    const raw = realState();
+    raw.destinations[0].zubringer = "helikopter";
+    const read = validate(JSON.parse(JSON.stringify(raw)));
+    expect("zubringer" in read.destinations[0]).toBe(false);
+    expect(zubringerOf(read.destinations[0])).toBe("automatic");
   });
 });

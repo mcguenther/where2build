@@ -471,10 +471,11 @@ class MotisService:
             return by_bike, [
                 trigger,
                 f"Mit dem Rad {_minutes(bike_access)} zur Haltestelle, "
-                f"Gesamtreise {_minutes(bike_total)} statt {_minutes(walk_total)}.",
+                f"Gesamtreise {_minutes(bike_total)} statt {_minutes(walk_total)}",
             ]
         return on_foot, [
-            f"Fußweg zur ersten Haltestelle {_minutes(walk_access)}.",
+            # No full stop: "Min." already ends the sentence.
+            f"Fußweg zur ersten Haltestelle {_minutes(walk_access)}",
             (
                 f"Mit dem Rad wäre die Reise {_minutes(bike_total)} statt "
                 f"{_minutes(walk_total)} — das lohnt den Umstieg nicht."
@@ -505,11 +506,8 @@ class MotisService:
             f"{_minutes(ACCESS_THRESHOLD_S)} wird auf das Auto umgestellt.",
             f"Mit dem Auto {_minutes(access_seconds(by_car.teilstrecken))} bis zur "
             f"Haltestelle, Gesamtreise {_minutes(by_car.duration_s)}"
-            + (
-                f" statt {_minutes(chosen.duration_s)}."
-                if chosen.erreichbar
-                else "."
-            ),
+            # "Min." already carries the full stop either way.
+            + (f" statt {_minutes(chosen.duration_s)}" if chosen.erreichbar else ""),
         ]
         if not parks_the_car(by_car.teilstrecken):
             note.append(

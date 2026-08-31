@@ -6,12 +6,45 @@
  * invents a course: a card without geometry stays empty and says so.
  */
 
-/** Modes in the order the cards list them, with their German labels. */
+/**
+ * Modes in the order the cards list them, with their German labels.
+ *
+ * The last three are one row, not three: a destination is routed with exactly
+ * one of them, and which one is either pinned on the destination or chosen by
+ * the backend. They are listed separately because the label has to say which
+ * feeder the number belongs to — "32 min ÖPNV" reads differently once it turns
+ * out to start with a 15-minute bike ride.
+ */
 export const MODES = [
   { mode: "car", name: "Auto" },
   { mode: "bike", name: "Rad" },
-  { mode: "transit", name: "ÖPNV" }
+  { mode: "transit", name: "ÖPNV" },
+  { mode: "bike_transit", name: "Rad + ÖPNV" },
+  { mode: "car_transit", name: "Auto + ÖPNV" }
 ];
+
+/**
+ * How the first stop is reached, as it is stored on a destination.
+ *
+ * `wert` is the value of the destination's `zubringer` field — the wire format,
+ * shared with the backend's `Zubringer` enum. `name` is what a picker shows.
+ * "automatic" is the default and what every destination stored before the field
+ * existed falls back to.
+ */
+export const ZUBRINGER = [
+  { wert: "automatic", name: "Automatisch" },
+  { wert: "walk", name: "Zu Fuß zum ÖPNV" },
+  { wert: "bike", name: "Rad zum ÖPNV" },
+  { wert: "car", name: "Auto zum ÖPNV" }
+];
+
+const ZUBRINGER_VALUES = ZUBRINGER.map(z => z.wert);
+
+/** A destination's stored feeder choice, or the default when it has none. */
+export function zubringerOf(destination) {
+  const stored = destination && destination.zubringer;
+  return ZUBRINGER_VALUES.includes(stored) ? stored : "automatic";
+}
 
 const RADIANS_PER_DEGREE = Math.PI / 180;
 
@@ -107,3 +140,75 @@ export function fastestMode(route) {
   if (!reached.length) return null;
   return reached.reduce((a, b) => (b.duration_s < a.duration_s ? b : a)).mode;
 }
+
+/* ---------------------------------------------------------------------------
+ * The ground under the sketch
+ *
+ * A route card is not a site plan. A plot page carries one card per destination
+ * — up to twenty — and a MapLibre instance each would exhaust the browser's
+ * WebGL contexts long before that, silently: contexts past the limit are
+ * evicted and those maps go blank with nothing in the console. So the backdrop
+ * here is not MapLibre. It is the same raster tiles the WMS proxy already
+ * serves, placed as <image> elements inside the SVG that is drawn anyway.
+ *
+ * That buys three things beyond the context limit: it prints (a WebGL canvas
+ * needs `preserveDrawingBuffer` and often still prints blank, which is why
+ * SitePlan sets it at construction), a tile that never arrives is one empty
+ * <image> rather than a torn-down map, and the placement is arithmetic that can
+ * be tested without a browser.
+ * ------------------------------------------------------------------------- */
+
+/** Web Mercator raster tiles are 256 pixels; MapLibre's vector zoom is not. */
+const TILE_PIXELS = 256;
+
+/** Deepest zoom the WMS proxy is configured for. */
+const MAX_ZOOM = 19;
+
+/** Above this the card is asking for traffic, not for detail. */
+const MAX_TILES = 24;
+
+/**
+ * Which raster tiles cover the drawn frame, and where each one belongs.
+ *
+ * `fit` maps unscaled Mercator onto SVG user units, so one whole world is 2π of
+ * those times `fit.scale` — and that is what fixes both the zoom and the size a
+ * tile has to be drawn at. Returns `null` when there is no sensible cover,
+ * which leaves the flat ground the card already had.
+ */
+export function tileCover(fit, width, height, maxTiles = MAX_TILES) {
+  if (!fit || !(fit.scale > 0)) return null;
+  const world = 2 * Math.PI * fit.scale;              // SVG units for the whole world
+  const zoom = Math.max(0, Math.min(MAX_ZOOM, Math.round(Math.log2(world / TILE_PIXELS))));
+  const columns = 2 ** zoom;
+  const size = world / columns;
+
+  // Screen back to tile index: x grows east with the drawing, y grows south.
+  const clamp = value => Math.max(0, Math.min(columns - 1, Math.floor(value)));
+  const columnAt = x => (((x - fit.dx) / fit.scale / Math.PI + 1) / 2) * columns;
+  const rowAt = y => (0.5 - (fit.dy - y) / fit.scale / (2 * Math.PI)) * columns;
+
+  const west = clamp(columnAt(0));
+  const east = clamp(columnAt(width));
+  const north = clamp(rowAt(0));
+  const south = clamp(rowAt(height));
+  if ((east - west + 1) * (south - north + 1) > maxTiles) return null;
+
+  const tiles = [];
+  for (let x = west; x <= east; x += 1) {
+    for (let y = north; y <= south; y += 1) {
+      tiles.push({
+        key: `${zoom}/${x}/${y}`,
+        z: zoom, x, y,
+        // North-west corner of the tile, in the frame the routes are drawn in.
+        left: ((2 * x) / columns - 1) * Math.PI * fit.scale + fit.dx,
+        top: fit.dy - Math.PI * (1 - (2 * y) / columns) * fit.scale,
+        size
+      });
+    }
+  }
+  return { zoom, size, tiles };
+}
+
+/** Where one tile is fetched from. Our own proxy, so no key and no CORS. */
+export const tileUrl = (tile, layer = "webatlas") =>
+  `/api/tiles/${layer}/${tile.z}/${tile.x}/${tile.y}.png`;
