@@ -1,0 +1,257 @@
+{
+  "requestParameters": {},
+  "from": {
+    "name": "START",
+    "lat": 50.9539,
+    "lon": 14.3676
+  },
+  "to": {
+    "name": "END",
+    "lat": 51.040684,
+    "lon": 13.731863
+  },
+  "direct": [],
+  "itineraries": [
+    {
+      "duration": 7200,
+      "transfers": 1,
+      "startTime": "2026-09-01T06:01:00Z",
+      "endTime": "2026-09-01T08:01:00Z",
+      "legs": [
+        {
+          "mode": "CAR",
+          "duration": 1200,
+          "from": {
+            "name": "START"
+          },
+          "to": {
+            "name": ""
+          },
+          "legGeometry": {
+            "points": "_d|d`BmlykZ_io@vca@aqWrdt@xiXjsmAj{Npdo@",
+            "precision": 6,
+            "length": 5
+          }
+        },
+        {
+          "mode": "WALK",
+          "duration": 360,
+          "from": {
+            "name": ""
+          },
+          "to": {
+            "name": "Sebnitz Brückenschänke"
+          },
+          "legGeometry": {
+            "points": "{x{e`BchceZxAwIHsJtCqSnHcX",
+            "precision": 6,
+            "length": 5
+          }
+        },
+        {
+          "mode": "BUS",
+          "duration": 2040,
+          "from": {
+            "name": "Sebnitz Brückenschänke"
+          },
+          "to": {
+            "name": "Bad Schandau Nationalparkbahnhof"
+          },
+          "legGeometry": {
+            "points": "qg{e`BeleeZz~k@buh@nsW|l}CtnMl~@~gKhy\\",
+            "precision": 6,
+            "length": 5
+          },
+          "routeShortName": "260",
+          "bikesAllowed": false,
+          "tripId": "20260901_08:25_de-DELFI_3222495856"
+        },
+        {
+          "mode": "WALK",
+          "duration": 180,
+          "from": {
+            "name": "Bad Schandau Nationalparkbahnhof"
+          },
+          "to": {
+            "name": "Bad Schandau Nationalparkbahnhof"
+          },
+          "legGeometry": {
+            "points": "ozzb`Bkn}}YqAxHW|KpAlSeGzY",
+            "precision": 6,
+            "length": 5
+          }
+        },
+        {
+          "mode": "SUBURBAN",
+          "duration": 2640,
+          "from": {
+            "name": "Bad Schandau Nationalparkbahnhof"
+          },
+          "to": {
+            "name": "Dresden Hauptbahnhof"
+          },
+          "legGeometry": {
+            "points": "_d{b`Buh{}YsaZ|zyCu{^n{iAg~VpsyFccyCryvH",
+            "precision": 6,
+            "length": 5
+          },
+          "routeShortName": "S1",
+          "bikesAllowed": false,
+          "tripId": "20260901_09:14_de-DELFI_3369374174"
+        },
+        {
+          "mode": "WALK",
+          "duration": 180,
+          "from": {
+            "name": "Dresden Hauptbahnhof"
+          },
+          "to": {
+            "name": "END"
+          },
+          "legGeometry": {
+            "points": "efhj`Bs`ceYnIcXvEuApJ{IiNvf@",
+            "precision": 6,
+            "length": 5
+          }
+        }
+      ]
+    },
+    {
+      "duration": 7500,
+      "transfers": 2,
+      "startTime": "2026-09-01T06:14:00Z",
+      "endTime": "2026-09-01T08:19:00Z",
+      "legs": [
+        {
+          "mode": "CAR",
+          "duration": 1020,
+          "from": {
+            "name": "START"
+          },
+          "to": {
+            "name": ""
+          },
+          "legGeometry": {
+            "points": "_d|d`BmlykZ}nd@psc@efd@vbYzhS~lmAbtH`fb@",
+            "precision": 6,
+            "length": 5
+          }
+        },
+        {
+          "mode": "WALK",
+          "duration": 660,
+          "from": {
+            "name": ""
+          },
+          "to": {
+            "name": "Sebnitz Bahnhof"
+          },
+          "legGeometry": {
+            "points": "c|hf`Ba_ifZm^fgBmDtpA~OjeB~Lr@",
+            "precision": 6,
+            "length": 5
+          }
+        },
+        {
+          "mode": "BUS",
+          "duration": 960,
+          "from": {
+            "name": "Sebnitz Bahnhof"
+          },
+          "to": {
+            "name": "Neustadt Bahnhof"
+          },
+          "legGeometry": {
+            "points": "eaif`Bq|_fZ}iG`|k@mhFn{y@yka@ndX}zf@sbO",
+            "precision": 6,
+            "length": 5
+          },
+          "routeShortName": "U28",
+          "bikesAllowed": false,
+          "tripId": "20260901_08:42_de-DELFI_3369512386"
+        },
+        {
+          "mode": "WALK",
+          "duration": 300,
+          "from": {
+            "name": "Neustadt Bahnhof"
+          },
+          "to": {
+            "name": "Neustadt Bahnhof"
+          },
+          "legGeometry": {
+            "points": "i~bi`BcaobZYeIdSVlAuBbCiL",
+            "precision": 6,
+            "length": 5
+          }
+        },
+        {
+          "mode": "REGIONAL_RAIL",
+          "duration": 2340,
+          "from": {
+            "name": "Neustadt Bahnhof"
+          },
+          "to": {
+            "name": "Pirna Bahnhof"
+          },
+          "legGeometry": {
+            "points": "icbi`B_{obZs`^jcuEbfUly_Edg}@f{xAnm}@zb{@",
+            "precision": 6,
+            "length": 5
+          },
+          "routeShortName": "RB71",
+          "bikesAllowed": false,
+          "tripId": "20260901_09:08_de-DELFI_3369391587"
+        },
+        {
+          "mode": "WALK",
+          "duration": 120,
+          "from": {
+            "name": "Pirna Bahnhof"
+          },
+          "to": {
+            "name": "Pirna Bahnhof"
+          },
+          "legGeometry": {
+            "points": "mhne`Bm{bqY{E{HwMvEsJ~BqFsv@",
+            "precision": 6,
+            "length": 5
+          }
+        },
+        {
+          "mode": "SUBURBAN",
+          "duration": 1380,
+          "from": {
+            "name": "Pirna Bahnhof"
+          },
+          "to": {
+            "name": "Dresden Hauptbahnhof"
+          },
+          "legGeometry": {
+            "points": "mpoe`BsrdqY_aMprcBwbaAtplBwoj@bcxAw~[dguA",
+            "precision": 6,
+            "length": 5
+          },
+          "routeShortName": "S2",
+          "bikesAllowed": false,
+          "tripId": "20260901_09:53_de-DELFI_3369374824"
+        },
+        {
+          "mode": "WALK",
+          "duration": 180,
+          "from": {
+            "name": "Dresden Hauptbahnhof"
+          },
+          "to": {
+            "name": "END"
+          },
+          "legGeometry": {
+            "points": "efhj`Bs`ceYnIcXvEuApJ{IiNvf@",
+            "precision": 6,
+            "length": 5
+          }
+        }
+      ]
+    }
+  ]
+}

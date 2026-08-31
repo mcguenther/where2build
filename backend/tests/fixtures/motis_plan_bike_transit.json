@@ -1,0 +1,194 @@
+{
+  "requestParameters": {},
+  "from": {
+    "name": "START",
+    "lat": 51.16758,
+    "lon": 13.67797
+  },
+  "to": {
+    "name": "END",
+    "lat": 51.040684,
+    "lon": 13.731863
+  },
+  "direct": [],
+  "itineraries": [
+    {
+      "duration": 2880,
+      "transfers": 1,
+      "startTime": "2026-09-01T06:22:00Z",
+      "endTime": "2026-09-01T07:10:00Z",
+      "legs": [
+        {
+          "mode": "BIKE",
+          "duration": 420,
+          "from": {
+            "name": "START"
+          },
+          "to": {
+            "name": "Moritzburg Markt"
+          },
+          "legGeometry": {
+            "points": "icbr`B{_waY_b@z{ExdEk~@`XivBd_Bm~A",
+            "precision": 6,
+            "length": 5
+          }
+        },
+        {
+          "mode": "BUS",
+          "duration": 1560,
+          "from": {
+            "name": "Moritzburg Markt"
+          },
+          "to": {
+            "name": "Dresden Bahnhof Neustadt"
+          },
+          "legGeometry": {
+            "points": "ggyq`BcyxaYx}oAewZp`JuyiAvpaAkhHxga@ujL",
+            "precision": 6,
+            "length": 5
+          },
+          "routeShortName": "477",
+          "bikesAllowed": false,
+          "tripId": "20260901_07:31_de-DELFI_3231173851"
+        },
+        {
+          "mode": "WALK",
+          "duration": 120,
+          "from": {
+            "name": "Dresden Bahnhof Neustadt"
+          },
+          "to": {
+            "name": "Dresden Bahnhof Neustadt"
+          },
+          "legGeometry": {
+            "points": "olxk`BsfteY|DjMcKbBqG~]iMc[",
+            "precision": 6,
+            "length": 5
+          }
+        },
+        {
+          "mode": "HIGHSPEED_RAIL",
+          "duration": 300,
+          "from": {
+            "name": "Dresden Bahnhof Neustadt"
+          },
+          "to": {
+            "name": "Dresden Hauptbahnhof"
+          },
+          "legGeometry": {
+            "points": "yhyk`BksseYzgI|iSvkMtkPtcMtj@hfKerT",
+            "precision": 6,
+            "length": 5
+          },
+          "routeShortName": "27",
+          "bikesAllowed": false,
+          "tripId": "20260901_05:17_de-DELFI_3369185882"
+        },
+        {
+          "mode": "WALK",
+          "duration": 180,
+          "from": {
+            "name": "Dresden Hauptbahnhof"
+          },
+          "to": {
+            "name": "END"
+          },
+          "legGeometry": {
+            "points": "chfj`B_dbeYxAgPkX{S}NaLaIrV",
+            "precision": 6,
+            "length": 5
+          }
+        }
+      ]
+    },
+    {
+      "duration": 2700,
+      "transfers": 1,
+      "startTime": "2026-09-01T06:52:00Z",
+      "endTime": "2026-09-01T07:37:00Z",
+      "legs": [
+        {
+          "mode": "BIKE",
+          "duration": 420,
+          "from": {
+            "name": "START"
+          },
+          "to": {
+            "name": "Moritzburg Markt"
+          },
+          "legGeometry": {
+            "points": "icbr`B{_waY_b@z{ExdEk~@`XivBd_Bm~A",
+            "precision": 6,
+            "length": 5
+          }
+        },
+        {
+          "mode": "BUS",
+          "duration": 1560,
+          "from": {
+            "name": "Moritzburg Markt"
+          },
+          "to": {
+            "name": "Dresden Bahnhof Neustadt"
+          },
+          "legGeometry": {
+            "points": "ggyq`BcyxaYx}oAewZp`JuyiAvpaAkhHxga@ujL",
+            "precision": 6,
+            "length": 5
+          },
+          "routeShortName": "477",
+          "bikesAllowed": false,
+          "tripId": "20260901_08:59_de-DELFI_3231173799"
+        },
+        {
+          "mode": "WALK",
+          "duration": 120,
+          "from": {
+            "name": "Dresden Bahnhof Neustadt"
+          },
+          "to": {
+            "name": "Dresden Bahnhof Neustadt"
+          },
+          "legGeometry": {
+            "points": "olxk`BsfteY|DjMcKbBqG~]iMc[",
+            "precision": 6,
+            "length": 5
+          }
+        },
+        {
+          "mode": "REGIONAL_RAIL",
+          "duration": 360,
+          "from": {
+            "name": "Dresden Bahnhof Neustadt"
+          },
+          "to": {
+            "name": "Dresden Hauptbahnhof"
+          },
+          "legGeometry": {
+            "points": "wfyk`BwvseY`nJndUvsN~dPt`Lon@`yIogS",
+            "precision": 6,
+            "length": 5
+          },
+          "routeShortName": "RE50",
+          "bikesAllowed": false,
+          "tripId": "20260901_08:00_de-DELFI_3369389377"
+        },
+        {
+          "mode": "WALK",
+          "duration": 180,
+          "from": {
+            "name": "Dresden Hauptbahnhof"
+          },
+          "to": {
+            "name": "END"
+          },
+          "legGeometry": {
+            "points": "chfj`B_dbeYxAgPkX{S}NaLaIrV",
+            "precision": 6,
+            "length": 5
+          }
+        }
+      ]
+    }
+  ]
+}

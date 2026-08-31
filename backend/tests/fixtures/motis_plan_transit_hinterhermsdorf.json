@@ -1,0 +1,359 @@
+{
+  "requestParameters": {},
+  "from": {
+    "name": "START",
+    "lat": 50.9539,
+    "lon": 14.3676
+  },
+  "to": {
+    "name": "END",
+    "lat": 51.040684,
+    "lon": 13.731863
+  },
+  "direct": [],
+  "itineraries": [
+    {
+      "duration": 12480,
+      "transfers": 3,
+      "startTime": "2026-09-01T06:03:00Z",
+      "endTime": "2026-09-01T09:31:00Z",
+      "legs": [
+        {
+          "mode": "WALK",
+          "duration": 1740,
+          "from": {
+            "name": "START"
+          },
+          "to": {
+            "name": "Mikulášovice,střední-škola"
+          },
+          "legGeometry": {
+            "points": "_d|d`BmlykZmaHdzBwmCpgAabHqiBmp@`_@",
+            "precision": 6,
+            "length": 5
+          }
+        },
+        {
+          "mode": "BUS",
+          "duration": 960,
+          "from": {
+            "name": "Mikulášovice,střední-škola"
+          },
+          "to": {
+            "name": "Dolní Poustevna,střed"
+          },
+          "legGeometry": {
+            "points": "uite`BesukZaaOha_@al]jmPgyL`ol@z~Yf`t@",
+            "precision": 6,
+            "length": 5
+          },
+          "routeShortName": "512409",
+          "bikesAllowed": false,
+          "tripId": "20260901_08:01_cz-JDF-merged_CIST-512409-1-115"
+        },
+        {
+          "mode": "WALK",
+          "duration": 120,
+          "from": {
+            "name": "Dolní Poustevna,střed"
+          },
+          "to": {
+            "name": "Dolní Poustevna stred"
+          },
+          "legGeometry": {
+            "points": "csuf`BwragZgAtA",
+            "precision": 6,
+            "length": 2
+          }
+        },
+        {
+          "mode": "BUS",
+          "duration": 1440,
+          "from": {
+            "name": "Dolní Poustevna stred"
+          },
+          "to": {
+            "name": "Sebnitz Busbahnhof"
+          },
+          "legGeometry": {
+            "points": "iuuf`BmqagZbdKrp`@}}Bt}Mt~Bw_XliP~|I",
+            "precision": 6,
+            "length": 5
+          },
+          "routeShortName": "T (Sebnitz)",
+          "bikesAllowed": false,
+          "tripId": "20260901_09:03_de-DELFI_3222494902"
+        },
+        {
+          "mode": "WALK",
+          "duration": 180,
+          "from": {
+            "name": "Sebnitz Busbahnhof"
+          },
+          "to": {
+            "name": "Sebnitz Busbahnhof"
+          },
+          "legGeometry": {
+            "points": "oexe`Bya_fZiIuER_AfE`CrIzE",
+            "precision": 6,
+            "length": 5
+          }
+        },
+        {
+          "mode": "BUS",
+          "duration": 1380,
+          "from": {
+            "name": "Sebnitz Busbahnhof"
+          },
+          "to": {
+            "name": "Bad Schandau Elbbrücke"
+          },
+          "legGeometry": {
+            "points": "i~we`Bq__fZdkCtcr@zwo@bsv@rcVdrnB|sJ`wb@",
+            "precision": 6,
+            "length": 5
+          },
+          "routeShortName": "260",
+          "bikesAllowed": false,
+          "tripId": "20260901_10:05_de-DELFI_3222495887"
+        },
+        {
+          "mode": "WALK",
+          "duration": 300,
+          "from": {
+            "name": "Bad Schandau Elbbrücke"
+          },
+          "to": {
+            "name": "Bad Schandau Nationalparkbahnhof"
+          },
+          "legGeometry": {
+            "points": "",
+            "precision": 6,
+            "length": 0
+          }
+        },
+        {
+          "mode": "SUBURBAN",
+          "duration": 2640,
+          "from": {
+            "name": "Bad Schandau Nationalparkbahnhof"
+          },
+          "to": {
+            "name": "Dresden Hauptbahnhof"
+          },
+          "legGeometry": {
+            "points": "ktzb`Biw{}Y}n]x|uCoeTl}xAqw_@nmqFibxCnjtH",
+            "precision": 6,
+            "length": 5
+          },
+          "routeShortName": "S1",
+          "bikesAllowed": false,
+          "tripId": "20260901_10:32_de-DELFI_3369374113"
+        },
+        {
+          "mode": "WALK",
+          "duration": 180,
+          "from": {
+            "name": "Dresden Hauptbahnhof"
+          },
+          "to": {
+            "name": "END"
+          },
+          "legGeometry": {
+            "points": "efhj`Bs`ceYnIcXvEuApJ{IiNvf@",
+            "precision": 6,
+            "length": 5
+          }
+        }
+      ]
+    },
+    {
+      "duration": 11760,
+      "transfers": 4,
+      "startTime": "2026-09-01T06:03:00Z",
+      "endTime": "2026-09-01T09:19:00Z",
+      "legs": [
+        {
+          "mode": "WALK",
+          "duration": 1740,
+          "from": {
+            "name": "START"
+          },
+          "to": {
+            "name": "Mikulášovice,střední-škola"
+          },
+          "legGeometry": {
+            "points": "_d|d`BmlykZmaHdzBwmCpgAabHqiBmp@`_@",
+            "precision": 6,
+            "length": 5
+          }
+        },
+        {
+          "mode": "BUS",
+          "duration": 960,
+          "from": {
+            "name": "Mikulášovice,střední-škola"
+          },
+          "to": {
+            "name": "Dolní Poustevna,střed"
+          },
+          "legGeometry": {
+            "points": "uite`BesukZaaOha_@al]jmPgyL`ol@z~Yf`t@",
+            "precision": 6,
+            "length": 5
+          },
+          "routeShortName": "512409",
+          "bikesAllowed": false,
+          "tripId": "20260901_08:01_cz-JDF-merged_CIST-512409-1-115"
+        },
+        {
+          "mode": "WALK",
+          "duration": 120,
+          "from": {
+            "name": "Dolní Poustevna,střed"
+          },
+          "to": {
+            "name": "Dolní Poustevna stred"
+          },
+          "legGeometry": {
+            "points": "csuf`BwragZgAtA",
+            "precision": 6,
+            "length": 2
+          }
+        },
+        {
+          "mode": "BUS",
+          "duration": 240,
+          "from": {
+            "name": "Dolní Poustevna stred"
+          },
+          "to": {
+            "name": "Sebnitz Bahnhof"
+          },
+          "legGeometry": {
+            "points": "iuuf`BmqagZtjBoExfHdgHmQljLdNvnI",
+            "precision": 6,
+            "length": 5
+          },
+          "routeShortName": "T (Sebnitz)",
+          "bikesAllowed": false,
+          "tripId": "20260901_09:03_de-DELFI_3222494902"
+        },
+        {
+          "mode": "WALK",
+          "duration": 300,
+          "from": {
+            "name": "Sebnitz Bahnhof"
+          },
+          "to": {
+            "name": "Sebnitz Bahnhof"
+          },
+          "legGeometry": {
+            "points": "aeif`Bqt`fZXzC??|AfQUH",
+            "precision": 6,
+            "length": 5
+          }
+        },
+        {
+          "mode": "BUS",
+          "duration": 960,
+          "from": {
+            "name": "Sebnitz Bahnhof"
+          },
+          "to": {
+            "name": "Neustadt Bahnhof"
+          },
+          "legGeometry": {
+            "points": "eaif`Bq|_fZwcFn|h@wgFhdx@uy^`k[}sj@mrM",
+            "precision": 6,
+            "length": 5
+          },
+          "routeShortName": "U28",
+          "bikesAllowed": false,
+          "tripId": "20260901_09:04_de-DELFI_3369512372"
+        },
+        {
+          "mode": "WALK",
+          "duration": 300,
+          "from": {
+            "name": "Neustadt Bahnhof"
+          },
+          "to": {
+            "name": "Neustadt Bahnhof"
+          },
+          "legGeometry": {
+            "points": "i~bi`BcaobZYeIdSVlAuBbCiL",
+            "precision": 6,
+            "length": 5
+          }
+        },
+        {
+          "mode": "REGIONAL_RAIL",
+          "duration": 2340,
+          "from": {
+            "name": "Neustadt Bahnhof"
+          },
+          "to": {
+            "name": "Pirna Bahnhof"
+          },
+          "legGeometry": {
+            "points": "icbi`B_{obZs`^jcuEbfUly_Edg}@f{xAnm}@zb{@",
+            "precision": 6,
+            "length": 5
+          },
+          "routeShortName": "RB71",
+          "bikesAllowed": false,
+          "tripId": "20260901_10:08_de-DELFI_3369391586"
+        },
+        {
+          "mode": "WALK",
+          "duration": 120,
+          "from": {
+            "name": "Pirna Bahnhof"
+          },
+          "to": {
+            "name": "Pirna Bahnhof"
+          },
+          "legGeometry": {
+            "points": "mhne`Bm{bqY{E{HwMvEsJ~BqFsv@",
+            "precision": 6,
+            "length": 5
+          }
+        },
+        {
+          "mode": "SUBURBAN",
+          "duration": 1380,
+          "from": {
+            "name": "Pirna Bahnhof"
+          },
+          "to": {
+            "name": "Dresden Hauptbahnhof"
+          },
+          "legGeometry": {
+            "points": "mpoe`BsrdqY_aMprcBwbaAtplBwoj@bcxAw~[dguA",
+            "precision": 6,
+            "length": 5
+          },
+          "routeShortName": "S2",
+          "bikesAllowed": false,
+          "tripId": "20260901_10:53_de-DELFI_3369374818"
+        },
+        {
+          "mode": "WALK",
+          "duration": 180,
+          "from": {
+            "name": "Dresden Hauptbahnhof"
+          },
+          "to": {
+            "name": "END"
+          },
+          "legGeometry": {
+            "points": "efhj`Bs`ceYnIcXvEuApJ{IiNvf@",
+            "precision": 6,
+            "length": 5
+          }
+        }
+      ]
+    }
+  ]
+}

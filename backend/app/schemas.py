@@ -428,9 +428,33 @@ class LandValue(BaseModel):
 # Reachability
 # --------------------------------------------------------------------------
 
-# Mode names follow MOTIS semantics; "bike_transit" means bike to the first
-# stop and public transport from there.
-Modus = Literal["car", "bike", "walk", "transit", "bike_transit"]
+# Mode names follow MOTIS semantics. The three intermodal ones differ only in
+# how the first stop is reached -- the far end is always on foot, see
+# ``Zubringer`` below. "transit_auto" is not a mode the router knows: it asks
+# this service to pick one of the three, per destination.
+Modus = Literal[
+    "car",
+    "bike",
+    "walk",
+    "transit",        # on foot to the first stop
+    "bike_transit",   # by bike to the first stop, bike parked there
+    "car_transit",    # by car to a park-and-ride, on foot to the platform
+    "transit_auto",
+]
+
+# How the traveller reaches the first stop, fixed per destination. "automatic"
+# hands the decision to the ladder in services/motis.py; the other three pin it,
+# which is what "cycling to the office from the station is not worth it" means
+# in data. Absent on destinations stored before this field existed, and the
+# default is what those get.
+Zubringer = Literal["automatic", "walk", "bike", "car"]
+
+# What each pinned value routes as. The far end stays WALK in all three.
+ZUBRINGER_MODI: dict[str, Modus] = {
+    "walk": "transit",
+    "bike": "bike_transit",
+    "car": "car_transit",
+}
 
 
 class Koordinate(BaseModel):
@@ -441,6 +465,8 @@ class Koordinate(BaseModel):
 class Ziel(Koordinate):
     id: str = Field(min_length=1, max_length=120)
     name: str | None = Field(default=None, max_length=200)
+    # Only read when "transit_auto" is among the requested modes.
+    zubringer: Zubringer = "automatic"
 
 
 Geocodeart = Literal["adresse", "haltestelle", "ort", "sonstiges"]
@@ -497,7 +523,9 @@ class GeocodeResponse(BaseModel):
 class ReachabilityRequest(BaseModel):
     origin: Koordinate
     destinations: list[Ziel] = Field(min_length=1, max_length=20)
-    modes: list[Modus] = Field(default_factory=lambda: ["car", "bike", "transit"], min_length=1)
+    modes: list[Modus] = Field(
+        default_factory=lambda: ["car", "bike", "transit_auto"], min_length=1
+    )
     # Departure time; MOTIS defaults to "now" when omitted.
     time: datetime | None = None
 
@@ -511,7 +539,13 @@ class Teilstrecke(BaseModel):
 
 class RouteErgebnis(BaseModel):
     destination_id: str
+    # The mode that was actually routed. For a "transit_auto" request this is
+    # the variant the ladder settled on, so the caller can key by it and label
+    # the row without a second lookup.
     mode: Modus
+    # What the caller asked for, which is the only way to tell a "transit"
+    # answer that was pinned from one the ladder chose.
+    angefragter_modus: Modus | None = None
     erreichbar: bool
     duration_s: int | None = None
     umstiege: int | None = None

@@ -1,0 +1,158 @@
+{
+  "requestParameters": {},
+  "from": {
+    "name": "START",
+    "lat": 51.16758,
+    "lon": 13.67797
+  },
+  "to": {
+    "name": "END",
+    "lat": 51.040684,
+    "lon": 13.731863
+  },
+  "direct": [],
+  "itineraries": [
+    {
+      "duration": 2100,
+      "transfers": 0,
+      "startTime": "2026-09-01T06:01:00Z",
+      "endTime": "2026-09-01T06:36:00Z",
+      "legs": [
+        {
+          "mode": "CAR",
+          "duration": 1320,
+          "from": {
+            "name": "START"
+          },
+          "to": {
+            "name": ""
+          },
+          "legGeometry": {
+            "points": "icbr`B{_waYjvvAqfUdpz@g`~@|~f@e{\\~fp@j_Y",
+            "precision": 6,
+            "length": 5
+          }
+        },
+        {
+          "mode": "WALK",
+          "duration": 420,
+          "from": {
+            "name": ""
+          },
+          "to": {
+            "name": "Dresden S-Bf. Freiberger Straße"
+          },
+          "legGeometry": {
+            "points": "yruj`BodpdYsTdVxAxW}Cnb@}WbY",
+            "precision": 6,
+            "length": 5
+          }
+        },
+        {
+          "mode": "TRAM",
+          "duration": 180,
+          "from": {
+            "name": "Dresden S-Bf. Freiberger Straße"
+          },
+          "to": {
+            "name": "Dresden Hauptbahnhof"
+          },
+          "legGeometry": {
+            "points": "{cwj`B{xldY~vEuiBnvAgbE|_BidG~hA{|E",
+            "precision": 6,
+            "length": 5
+          },
+          "routeShortName": "7",
+          "bikesAllowed": false,
+          "tripId": "20260901_08:08_de-DELFI_3328440758"
+        },
+        {
+          "mode": "WALK",
+          "duration": 180,
+          "from": {
+            "name": "Dresden Hauptbahnhof"
+          },
+          "to": {
+            "name": "END"
+          },
+          "legGeometry": {
+            "points": "yhhj`BoieeYdN}VhP`LlDfXyTpz@",
+            "precision": 6,
+            "length": 5
+          }
+        }
+      ]
+    },
+    {
+      "duration": 2040,
+      "transfers": 0,
+      "startTime": "2026-09-01T06:03:00Z",
+      "endTime": "2026-09-01T06:37:00Z",
+      "legs": [
+        {
+          "mode": "CAR",
+          "duration": 1200,
+          "from": {
+            "name": "START"
+          },
+          "to": {
+            "name": ""
+          },
+          "legGeometry": {
+            "points": "icbr`B{_waYf}iAypPp}_A}z_Arte@uvYx_e@xqK",
+            "precision": 6,
+            "length": 5
+          }
+        },
+        {
+          "mode": "WALK",
+          "duration": 480,
+          "from": {
+            "name": ""
+          },
+          "to": {
+            "name": "Dresden Bahnhof Mitte"
+          },
+          "legGeometry": {
+            "points": "apik`BorwdYvJlCrWt^|Sp\\zj@v_@",
+            "precision": 6,
+            "length": 5
+          }
+        },
+        {
+          "mode": "REGIONAL_RAIL",
+          "duration": 180,
+          "from": {
+            "name": "Dresden Bahnhof Mitte"
+          },
+          "to": {
+            "name": "Dresden Hauptbahnhof"
+          },
+          "legGeometry": {
+            "points": "ijfk`BcqtdYhkHrzGtqFlGlzF_zEtgFezN",
+            "precision": 6,
+            "length": 5
+          },
+          "routeShortName": "RE50",
+          "bikesAllowed": false,
+          "tripId": "20260901_07:00_de-DELFI_3369389380"
+        },
+        {
+          "mode": "WALK",
+          "duration": 180,
+          "from": {
+            "name": "Dresden Hauptbahnhof"
+          },
+          "to": {
+            "name": "END"
+          },
+          "legGeometry": {
+            "points": "chfj`B_dbeYxAgPkX{S}NaLaIrV",
+            "precision": 6,
+            "length": 5
+          }
+        }
+      ]
+    }
+  ]
+}

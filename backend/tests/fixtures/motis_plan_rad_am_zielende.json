@@ -1,0 +1,105 @@
+{
+  "requestParameters": {},
+  "from": {
+    "name": "START",
+    "lat": 51.282637,
+    "lon": 12.463172
+  },
+  "to": {
+    "name": "END",
+    "lat": 51.040684,
+    "lon": 13.731863
+  },
+  "direct": [],
+  "itineraries": [
+    {
+      "duration": 6180,
+      "transfers": 1,
+      "startTime": "2026-09-01T06:02:00Z",
+      "endTime": "2026-09-01T07:45:00Z",
+      "legs": [
+        {
+          "mode": "BIKE",
+          "duration": 240,
+          "from": {
+            "name": "START"
+          },
+          "to": {
+            "name": "Leipzig-Liebertwolkwitz"
+          },
+          "legGeometry": {
+            "points": "yk`y`BgcuwVodAydAcu@cjAwm@icDfpAkxA",
+            "precision": 6,
+            "length": 5
+          }
+        },
+        {
+          "mode": "REGIONAL_RAIL",
+          "duration": 1020,
+          "from": {
+            "name": "Leipzig-Liebertwolkwitz"
+          },
+          "to": {
+            "name": "Leipzig Hbf"
+          },
+          "legGeometry": {
+            "points": "k`cy`BybaxV}udBfeScvNhv\\{pIjicAh{Fpfs@",
+            "precision": 6,
+            "length": 5
+          },
+          "routeShortName": "RB113",
+          "bikesAllowed": false,
+          "tripId": "20260901_07:33_de-DELFI_3369386075"
+        },
+        {
+          "mode": "WALK",
+          "duration": 300,
+          "from": {
+            "name": "Leipzig Hbf"
+          },
+          "to": {
+            "name": "Leipzig Hbf"
+          },
+          "legGeometry": {
+            "points": "{b{|`B_vvrV??",
+            "precision": 6,
+            "length": 2
+          }
+        },
+        {
+          "mode": "HIGHSPEED_RAIL",
+          "duration": 3960,
+          "from": {
+            "name": "Leipzig Hbf"
+          },
+          "to": {
+            "name": "Dresden Hauptbahnhof"
+          },
+          "legGeometry": {
+            "points": "_d{|`BisvrV}_Ny|yWrvr@{y``@lsjKkc`NtpcD{qlH",
+            "precision": 6,
+            "length": 5
+          },
+          "routeShortName": "50",
+          "bikesAllowed": false,
+          "tripId": "20260901_08:37_de-DELFI_3369193688"
+        },
+        {
+          "mode": "BIKE",
+          "duration": 120,
+          "from": {
+            "name": "Dresden Hauptbahnhof"
+          },
+          "to": {
+            "name": "END"
+          },
+          "legGeometry": {
+            "points": "c{ej`BcxaeY~Vc_BydAkw@iS`iAuG|Z",
+            "precision": 6,
+            "length": 5
+          }
+        }
+      ]
+    }
+  ]
+}

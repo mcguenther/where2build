@@ -1,0 +1,227 @@
+{
+  "requestParameters": {},
+  "from": {
+    "name": "START",
+    "lat": 50.9539,
+    "lon": 14.3676
+  },
+  "to": {
+    "name": "END",
+    "lat": 51.040684,
+    "lon": 13.731863
+  },
+  "direct": [],
+  "itineraries": [
+    {
+      "duration": 7560,
+      "transfers": 2,
+      "startTime": "2026-09-01T06:25:00Z",
+      "endTime": "2026-09-01T08:31:00Z",
+      "legs": [
+        {
+          "mode": "BIKE",
+          "duration": 1020,
+          "from": {
+            "name": "START"
+          },
+          "to": {
+            "name": "Saupsdorf Am Wachberg"
+          },
+          "legGeometry": {
+            "points": "_d|d`BmlykZxyCpr]~iEjaOb`EtrRfpE|i@",
+            "precision": 6,
+            "length": 5
+          }
+        },
+        {
+          "mode": "BUS",
+          "duration": 600,
+          "from": {
+            "name": "Saupsdorf Am Wachberg"
+          },
+          "to": {
+            "name": "Sebnitz Busbahnhof"
+          },
+          "legGeometry": {
+            "points": "ykdd`B{wuiZ}mRl_g@{aNzxOceCzb^o}Kb_^",
+            "precision": 6,
+            "length": 5
+          },
+          "routeShortName": "268",
+          "bikesAllowed": false,
+          "tripId": "20260901_08:35_de-DELFI_3302487859"
+        },
+        {
+          "mode": "WALK",
+          "duration": 180,
+          "from": {
+            "name": "Sebnitz Busbahnhof"
+          },
+          "to": {
+            "name": "Sebnitz Busbahnhof"
+          },
+          "legGeometry": {
+            "points": "saxe`Ba|~eZ}MuHVwAzE`ArIzE",
+            "precision": 6,
+            "length": 5
+          }
+        },
+        {
+          "mode": "BUS",
+          "duration": 1380,
+          "from": {
+            "name": "Sebnitz Busbahnhof"
+          },
+          "to": {
+            "name": "Bad Schandau Elbbrücke"
+          },
+          "legGeometry": {
+            "points": "i~we`Bq__fZdkCtcr@zwo@bsv@rcVdrnB|sJ`wb@",
+            "precision": 6,
+            "length": 5
+          },
+          "routeShortName": "260",
+          "bikesAllowed": false,
+          "tripId": "20260901_09:05_de-DELFI_3222495876"
+        },
+        {
+          "mode": "WALK",
+          "duration": 300,
+          "from": {
+            "name": "Bad Schandau Elbbrücke"
+          },
+          "to": {
+            "name": "Bad Schandau Nationalparkbahnhof"
+          },
+          "legGeometry": {
+            "points": "",
+            "precision": 6,
+            "length": 0
+          }
+        },
+        {
+          "mode": "SUBURBAN",
+          "duration": 2640,
+          "from": {
+            "name": "Bad Schandau Nationalparkbahnhof"
+          },
+          "to": {
+            "name": "Dresden Hauptbahnhof"
+          },
+          "legGeometry": {
+            "points": "cxzb`B_v{}Y_~[pkxCqdYrqqAip[`wtFuwxCt|uH",
+            "precision": 6,
+            "length": 5
+          },
+          "routeShortName": "S1",
+          "bikesAllowed": false,
+          "tripId": "20260901_09:32_de-DELFI_3369374115"
+        },
+        {
+          "mode": "WALK",
+          "duration": 180,
+          "from": {
+            "name": "Dresden Hauptbahnhof"
+          },
+          "to": {
+            "name": "END"
+          },
+          "legGeometry": {
+            "points": "efhj`Bs`ceYnIcXvEuApJ{IiNvf@",
+            "precision": 6,
+            "length": 5
+          }
+        }
+      ]
+    },
+    {
+      "duration": 6240,
+      "transfers": 1,
+      "startTime": "2026-09-01T07:07:00Z",
+      "endTime": "2026-09-01T08:51:00Z",
+      "legs": [
+        {
+          "mode": "BIKE",
+          "duration": 900,
+          "from": {
+            "name": "START"
+          },
+          "to": {
+            "name": "Hinterhermsdorf Erbgericht"
+          },
+          "legGeometry": {
+            "points": "_d|d`BmlykZtmOc{AdbM~gGbuOt~D~vDrk@",
+            "precision": 6,
+            "length": 5
+          }
+        },
+        {
+          "mode": "BUS",
+          "duration": 2340,
+          "from": {
+            "name": "Hinterhermsdorf Erbgericht"
+          },
+          "to": {
+            "name": "Bad Schandau Nationalparkbahnhof"
+          },
+          "legGeometry": {
+            "points": "_dgc`BgslkZykCv|oD|jBxfbB~yB~buAjcHrodA",
+            "precision": 6,
+            "length": 5
+          },
+          "routeShortName": "241",
+          "bikesAllowed": false,
+          "tripId": "20260901_09:22_de-DELFI_3302519673"
+        },
+        {
+          "mode": "WALK",
+          "duration": 180,
+          "from": {
+            "name": "Bad Schandau Nationalparkbahnhof"
+          },
+          "to": {
+            "name": "Bad Schandau Nationalparkbahnhof"
+          },
+          "legGeometry": {
+            "points": "ag{b`Bcx|}YjD_GvKqWrIaj@yM`lB",
+            "precision": 6,
+            "length": 5
+          }
+        },
+        {
+          "mode": "HIGHSPEED_RAIL",
+          "duration": 1740,
+          "from": {
+            "name": "Bad Schandau Nationalparkbahnhof"
+          },
+          "to": {
+            "name": "Dresden Hauptbahnhof"
+          },
+          "legGeometry": {
+            "points": "cxzb`B_v{}YqaP`r_Digv@~pZy`M~lpEysuCrajK",
+            "precision": 6,
+            "length": 5
+          },
+          "routeShortName": "27",
+          "bikesAllowed": false,
+          "tripId": "20260901_10:02_de-DELFI_3369186120"
+        },
+        {
+          "mode": "WALK",
+          "duration": 60,
+          "from": {
+            "name": "Dresden Hauptbahnhof"
+          },
+          "to": {
+            "name": "END"
+          },
+          "legGeometry": {
+            "points": "wygj`Bm`ceY??",
+            "precision": 6,
+            "length": 2
+          }
+        }
+      ]
+    }
+  ]
+}

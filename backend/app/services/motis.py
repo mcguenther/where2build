@@ -15,6 +15,7 @@ from typing import Any
 from ..cache import DiskCache
 from ..errors import UpstreamError
 from ..schemas import (
+    ZUBRINGER_MODI,
     Geocodeart,
     GeocodeTreffer,
     Koordinate,
@@ -51,6 +52,45 @@ MAX_GEOCODE_RESULTS = 5
 
 # How each API mode maps onto MOTIS query parameters.
 _DIRECT_MODES: dict[str, str] = {"car": "CAR", "bike": "BIKE", "walk": "WALK"}
+
+# How the first stop is reached, per intermodal mode. Measured against the live
+# service on 31.08.2026 (docs/research/routing-motis.md § 9):
+#
+#   WALK          the default.
+#   BIKE          rides to the stop and leaves the bike there. The transit legs
+#                 come back with `bikesAllowed: false`, so nothing is carried.
+#   CAR_PARKING   drives to a car park and walks the rest, which is what
+#                 park-and-ride means. Plain `CAR` was tried too and is wrong
+#                 here: it drives onto the platform and abandons the car
+#                 (Moritzburg -> Dresden: CAR 1320 s + WALK 420 s with
+#                 CAR_PARKING against a bare CAR leg with no parking at all).
+_ACCESS_MODES: dict[str, str] = {
+    "transit": "WALK",
+    "bike_transit": "BIKE",
+    "car_transit": "CAR_PARKING",
+}
+
+# The far end is always on foot, in every variant. `postTransitModes=BIKE` does
+# answer, but it hands the traveller a bike at the destination station that no
+# train carried there -- verified 31.08.2026, the egress leg was BIKE while
+# every transit leg of the same itinerary said `bikesAllowed: false`. A journey
+# nobody can make is worse than no journey.
+_EGRESS_MODE = "WALK"
+
+# Leg modes that are not a public transport service. Everything before the
+# first of these is the way to the stop; everything after the last is the way
+# from it.
+_STREET_LEG_MODES = frozenset({"WALK", "BIKE", "CAR"})
+
+# The rule the user gave, in seconds: a walk to the first stop longer than this
+# is what a bike is for, and a ride longer than this is what a car is for.
+ACCESS_THRESHOLD_S = 600
+
+# What a rung has to save before it is worth climbing. The same ten minutes:
+# on a journey that a bike shortens by a quarter of an hour the short walk to
+# the bus stop is not the point, but three minutes never justify getting the
+# bike out -- let alone the car.
+MIN_SAVING_S = 600
 
 # `one-to-many` routes on the street network. Its `many` list is capped at 128
 # by the server ("onetomany_max_many"), which is what the candidate budget in
@@ -132,6 +172,52 @@ def _teilstrecken(itinerary: dict[str, Any]) -> list[Teilstrecke]:
             )
         )
     return strecken
+
+
+def access_seconds(strecken: list[Teilstrecke]) -> int | None:
+    """How long it takes to reach the first public transport service.
+
+    Everything before the first transit leg counts, which is deliberate: with
+    ``CAR_PARKING`` the way to the platform is a car leg *and* the walk from the
+    car park, and only their sum is the number the rule is about. ``None`` means
+    the itinerary has no transit leg at all -- then there is no feeder to judge.
+    """
+
+    total = 0
+    for strecke in strecken:
+        if strecke.mode not in _STREET_LEG_MODES:
+            return total
+        total += strecke.duration_s
+    return None
+
+
+def parks_the_car(strecken: list[Teilstrecke]) -> bool:
+    """Whether the car is left somewhere and the traveller walks on.
+
+    ``CAR_PARKING`` answers with both shapes: a real park-and-ride, and -- when
+    it finds no car park -- a bare car leg that ends on the platform. The second
+    is a journey with nowhere to leave the car, and saying so is cheaper than
+    pretending it is one.
+    """
+
+    for previous, following in zip(strecken, strecken[1:]):
+        if previous.mode == "CAR" and following.mode == "WALK":
+            return True
+    return False
+
+
+def _minutes(seconds: int | None) -> str:
+    """Minutes, in the shape the German UI writes them."""
+
+    return "—" if seconds is None else f"{round(seconds / 60)} Min."
+
+
+# What each variant is called in a sentence the user reads.
+_MODE_NAMES: dict[str, str] = {
+    "transit": "zu Fuß zum ÖPNV",
+    "bike_transit": "mit dem Rad zum ÖPNV",
+    "car_transit": "mit dem Auto zum ÖPNV",
+}
 
 
 # What MOTIS calls a result, in the words the UI uses.
@@ -233,8 +319,8 @@ class MotisService:
             params["numItineraries"] = "1"
         else:
             params["transitModes"] = "TRANSIT"
-            params["preTransitModes"] = "BIKE" if mode == "bike_transit" else "WALK"
-            params["postTransitModes"] = "WALK"
+            params["preTransitModes"] = _ACCESS_MODES.get(mode, "WALK")
+            params["postTransitModes"] = _EGRESS_MODE
             params["maxPreTransitTime"] = str(self.settings.max_pre_transit_time_s)
             params["numItineraries"] = "2"
         return params
@@ -266,6 +352,10 @@ class MotisService:
     async def route(
         self, origin: Koordinate, destination: Ziel, mode: Modus, time: datetime | None = None
     ) -> RouteErgebnis:
+        if mode == "transit_auto":
+            # Not a mode the router knows -- it is a decision, and it is made in
+            # transit_auto() because it needs more than one answer to make it.
+            return await self.transit_auto(origin, destination, time)
         payload = await self._plan(self._plan_params(origin, destination, mode, time))
         # Direct modes never appear in `itineraries`; transit results never in `direct`.
         candidates = payload.get("direct") or [] if mode in _DIRECT_MODES else payload.get("itineraries") or []
@@ -273,6 +363,7 @@ class MotisService:
             return RouteErgebnis(
                 destination_id=destination.id,
                 mode=mode,
+                angefragter_modus=mode,
                 erreichbar=False,
                 hinweis="Für dieses Ziel wurde keine Verbindung gefunden.",
             )
@@ -281,6 +372,7 @@ class MotisService:
         return RouteErgebnis(
             destination_id=destination.id,
             mode=mode,
+            angefragter_modus=mode,
             erreichbar=True,
             duration_s=int(itinerary.get("duration") or 0),
             umstiege=itinerary.get("transfers"),
@@ -288,6 +380,172 @@ class MotisService:
             ankunftszeit=_parse_time(itinerary.get("endTime")),
             geometry=geometry,
             teilstrecken=_teilstrecken(itinerary),
+        )
+
+    async def transit_auto(
+        self, origin: Koordinate, destination: Ziel, time: datetime | None = None
+    ) -> RouteErgebnis:
+        """The ÖPNV row, with the way to the first stop chosen per destination.
+
+        A destination that pins its ``zubringer`` gets exactly that variant and
+        one request. "automatic" climbs a ladder ordered by how much the
+        traveller has to commit -- foot, bike, car -- and the answer carries the
+        numbers the decision was made on, because a silently substituted mode is
+        a figure nobody can check.
+        """
+
+        pinned = ZUBRINGER_MODI.get(destination.zubringer)
+        if pinned is not None:
+            result = await self.route(origin, destination, pinned, time)
+            return self._as_auto(result, self._pinned_note(result))
+
+        # Foot and bike always, and together: whether the bike helps cannot be
+        # known without asking, and the walk to a bus stop around the corner
+        # says nothing about the two changes that follow it.
+        on_foot, by_bike = await asyncio.gather(
+            self.route(origin, destination, "transit", time),
+            self.route(origin, destination, "bike_transit", time),
+        )
+        walk_access = access_seconds(on_foot.teilstrecken) if on_foot.erreichbar else None
+        bike_access = access_seconds(by_bike.teilstrecken) if by_bike.erreichbar else None
+
+        chosen, reasons = self._better_rung(on_foot, by_bike, walk_access, bike_access)
+
+        # The car is the one rung the clock alone may not unlock: driving to a
+        # station and leaving the car there all day is a commitment, so it takes
+        # the user's own trigger -- a bike feeder over ten minutes -- or a bike
+        # that got nowhere at all.
+        by_car: RouteErgebnis | None = None
+        if (bike_access is not None and bike_access >= ACCESS_THRESHOLD_S) or (
+            not on_foot.erreichbar and not by_bike.erreichbar
+        ):
+            by_car = await self.route(origin, destination, "car_transit", time)
+            chosen, reasons = self._car_rung(chosen, by_car, bike_access, reasons)
+
+        if not chosen.erreichbar:
+            # Nothing was reachable. The service's own sentence stands; all that
+            # is added is which variants were asked.
+            tried = [_MODE_NAMES[r.mode] for r in (on_foot, by_bike, by_car) if r is not None]
+            hinweis = " ".join(
+                part
+                for part in (chosen.hinweis, f"Geprüft wurde {', '.join(tried)}.")
+                if part
+            )
+            return self._as_auto(chosen, hinweis)
+        return self._as_auto(chosen, "Automatisch: " + " ".join(reasons))
+
+    def _better_rung(
+        self,
+        on_foot: RouteErgebnis,
+        by_bike: RouteErgebnis,
+        walk_access: int | None,
+        bike_access: int | None,
+    ) -> tuple[RouteErgebnis, list[str]]:
+        """Foot or bike, and the sentence that says which and why."""
+
+        if not on_foot.erreichbar:
+            if not by_bike.erreichbar:
+                return on_foot, []
+            return by_bike, [
+                "Zu Fuß war keine Haltestelle erreichbar, mit dem Rad schon "
+                f"(Zubringer {_minutes(bike_access)})."
+            ]
+        walk_total = on_foot.duration_s or 0
+        if not by_bike.erreichbar:
+            return on_foot, [
+                f"Fußweg zur ersten Haltestelle {_minutes(walk_access)}; mit dem Rad "
+                "hat der Routendienst keine Verbindung gefunden."
+            ]
+
+        bike_total = by_bike.duration_s or 0
+        saving = walk_total - bike_total
+        long_walk = walk_access is not None and walk_access >= ACCESS_THRESHOLD_S
+        if saving > 0 and (long_walk or saving >= MIN_SAVING_S):
+            trigger = (
+                f"Fußweg zur ersten Haltestelle {_minutes(walk_access)} — ab "
+                f"{_minutes(ACCESS_THRESHOLD_S)} wird auf das Rad umgestellt."
+                if long_walk
+                else f"Fußweg zur ersten Haltestelle nur {_minutes(walk_access)}, "
+                "mit dem Rad ist die ganze Reise aber deutlich kürzer."
+            )
+            return by_bike, [
+                trigger,
+                f"Mit dem Rad {_minutes(bike_access)} zur Haltestelle, "
+                f"Gesamtreise {_minutes(bike_total)} statt {_minutes(walk_total)}.",
+            ]
+        return on_foot, [
+            f"Fußweg zur ersten Haltestelle {_minutes(walk_access)}.",
+            (
+                f"Mit dem Rad wäre die Reise {_minutes(bike_total)} statt "
+                f"{_minutes(walk_total)} — das lohnt den Umstieg nicht."
+            ),
+        ]
+
+    def _car_rung(
+        self,
+        chosen: RouteErgebnis,
+        by_car: RouteErgebnis,
+        bike_access: int | None,
+        reasons: list[str],
+    ) -> tuple[RouteErgebnis, list[str]]:
+        """Whether park-and-ride beats the rung below it, and what to say."""
+
+        if not by_car.erreichbar:
+            return chosen, reasons + [
+                "Für den Weg mit dem Auto zur Haltestelle wurde keine Verbindung gefunden."
+            ]
+        if chosen.erreichbar and (by_car.duration_s or 0) >= (chosen.duration_s or 0):
+            return chosen, reasons + [
+                f"Mit dem Auto zur Haltestelle wären es {_minutes(by_car.duration_s)} — "
+                "das ist nicht schneller."
+            ]
+
+        note = [
+            f"Radweg zur Haltestelle {_minutes(bike_access)} — ab "
+            f"{_minutes(ACCESS_THRESHOLD_S)} wird auf das Auto umgestellt.",
+            f"Mit dem Auto {_minutes(access_seconds(by_car.teilstrecken))} bis zur "
+            f"Haltestelle, Gesamtreise {_minutes(by_car.duration_s)}"
+            + (
+                f" statt {_minutes(chosen.duration_s)}."
+                if chosen.erreichbar
+                else "."
+            ),
+        ]
+        if not parks_the_car(by_car.teilstrecken):
+            note.append(
+                "Einen Park-and-Ride-Platz hat der Routendienst dabei nicht gefunden — "
+                "er setzt das Auto an der Haltestelle ab."
+            )
+        # The first sentence -- what the walk cost -- still stands; the rest of
+        # the bike verdict is superseded by the car.
+        return by_car, (reasons[:1] + note if reasons else note)
+
+    def _pinned_note(self, result: RouteErgebnis) -> str | None:
+        """What a destination with a fixed feeder says about itself."""
+
+        if not result.erreichbar:
+            return result.hinweis
+        name = _MODE_NAMES.get(result.mode, result.mode)
+        note = f"Für dieses Ziel fest auf „{name}“ gestellt (Zubringer "
+        note += f"{_minutes(access_seconds(result.teilstrecken))})."
+        if result.mode == "car_transit" and not parks_the_car(result.teilstrecken):
+            note += (
+                " Einen Park-and-Ride-Platz hat der Routendienst nicht gefunden — "
+                "er setzt das Auto an der Haltestelle ab."
+            )
+        return note
+
+    @staticmethod
+    def _as_auto(result: RouteErgebnis, hinweis: str | None) -> RouteErgebnis:
+        """Mark a result as the answer to a "transit_auto" request.
+
+        ``mode`` stays the variant that was routed, so a caller can key by it and
+        label the row; ``angefragter_modus`` records that nobody asked for that
+        variant by name.
+        """
+
+        return result.model_copy(
+            update={"angefragter_modus": "transit_auto", "hinweis": hinweis or result.hinweis}
         )
 
     async def reachability(
@@ -298,7 +556,9 @@ class MotisService:
         time: datetime | None = None,
     ) -> ReachabilityResponse:
         tasks = [
-            self.route(origin, destination, mode, time)
+            self.transit_auto(origin, destination, time)
+            if mode == "transit_auto"
+            else self.route(origin, destination, mode, time)
             for destination in destinations
             for mode in modes
         ]
