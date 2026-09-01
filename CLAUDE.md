@@ -267,8 +267,13 @@ node scripts/screenshots.mjs
 1. `npm run test` and `pytest` both green — state the counts.
 2. `node scripts/screenshots.mjs`, then **look at the images**. Tests do not
    catch a collapsed layout or an unreadable colour.
-3. Check both themes and a 390 px viewport. No horizontal overflow anywhere.
-4. Print preview still sane if you touched layout.
+3. **Put the pictures of what changed in the chat**, not only the counts. A
+   test count says a thing did not throw; it says nothing about whether the
+   screen reads. Whoever asked for the change is the one who can see that, and
+   they cannot if the images stay in `docs/screenshots/`. Send the views the
+   change actually touched — a handful, not all thirty-seven.
+4. Check both themes and a 390 px viewport. No horizontal overflow anywhere.
+5. Print preview still sane if you touched layout.
 
 Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
