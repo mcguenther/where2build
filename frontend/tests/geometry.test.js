@@ -5,8 +5,11 @@ import {
   buildableArea, minimumRotatedRectangle, rectangularity, shapeClass,
   pointInPolygon, distanceToBoundary, closestBoundaryPoint,
   rectangleCorners, cornersOutside, smallestSetback, footprintFromArea,
-  findPlacement, fitsAnywhere, alignmentToEdge, alignToEdge, edgeCompass
+  findPlacement, fitsAnywhere, alignmentToEdge, alignToEdge, edgeCompass,
+  constrainToEnvelope, neighbourDistances, neighbourSetbackDepths, hasNeighbourHint
 } from "../src/lib/geometry.js";
+import { toLocal } from "../src/lib/projection.js";
+import neighbourAnswer from "./fixtures/neighbours-moelkau.json";
 
 import { realPlot } from "./helpers.js";
 
@@ -261,5 +264,124 @@ describe("Große und vielgliedrige Flurstücke", () => {
     const ordinary = realPlot("concave");
     const fine = buildableArea(ordinary.polygon, ordinary.setbacks, { step: 0.4 });
     expect(polygonArea(fine)).toBeGreaterThan(polygonArea(ordinary.polygon) * 0.6);
+  });
+});
+
+
+/* Mölkau, Flurstück 204 (Lessingweg 44, 650 m²) is the plot this was written
+   against: an ordinary five-cornered building plot rather than a test shape. */
+describe("Den Baukörper im Bebauungsfenster halten", () => {
+  const plot = realPlot("moelkau");
+  const envelope = buildableArea(plot.polygon, plot.setbacks);
+  // 8 x 6 m: the plot is a 47.9 x 13.5 m ribbon, so the window is barely
+  // 7.5 m across and a 10 x 8 m house does not fit into it at any angle.
+  const seat = findPlacement(envelope, 8, 6);
+  const inside = placement => cornersOutside(placement, envelope) === 0;
+
+  it("findet für dieses Flurstück überhaupt ein Fenster und einen Platz darin", () => {
+    expect(envelope.length).toBeGreaterThan(2);
+    expect(seat).not.toBeNull();
+    expect(inside(seat)).toBe(true);
+  });
+
+  it("lässt eine Bewegung, die drinnen bleibt, unangetastet", () => {
+    const wanted = { cx: seat.cx + 0.2, cy: seat.cy + 0.2 };
+    expect(constrainToEnvelope(envelope, seat, wanted)).toEqual(wanted);
+  });
+
+  it("hält weit über die Grenze hinaus gezogen an der Grenze, statt zurückzuspringen", () => {
+    const wanted = { cx: seat.cx + 500, cy: seat.cy };
+    const stop = constrainToEnvelope(envelope, seat, wanted);
+    expect(inside({ ...seat, ...stop })).toBe(true);
+    expect(stop.cx).toBeGreaterThan(seat.cx);
+    expect(stop.cx).toBeLessThan(wanted.cx);
+  });
+
+  it("gleitet an der Grenze entlang, statt stehen zu bleiben", () => {
+    // Diagonal, so far that the full move cannot be legal: the free axis must
+    // still advance -- that is the difference between sliding and blocking.
+    const wanted = { cx: seat.cx + 60, cy: seat.cy + 4 };
+    const stop = constrainToEnvelope(envelope, seat, wanted);
+    expect(inside({ ...seat, ...stop })).toBe(true);
+    expect(stop.cx !== seat.cx || stop.cy !== seat.cy).toBe(true);
+  });
+
+  it("greift nicht, wo es gar kein Fenster gibt", () => {
+    const wanted = { cx: seat.cx + 500, cy: seat.cy + 500 };
+    expect(constrainToEnvelope([], seat, wanted)).toEqual(wanted);
+  });
+
+  it("greift nicht, wenn der Baukörper nirgends hineinpasst", () => {
+    const giant = { ...seat, width: 400, depth: 400 };
+    const wanted = { cx: seat.cx + 500, cy: seat.cy };
+    expect(constrainToEnvelope(envelope, giant, wanted)).toEqual(wanted);
+  });
+
+  it("hält auch auf einem konkaven Flurstück, wo das Fenster einspringt", () => {
+    const concave = realPlot("concave");
+    const window_ = buildableArea(concave.polygon, concave.setbacks);
+    const start = findPlacement(window_, 8, 6);
+    expect(start).not.toBeNull();
+    for (const [dx, dy] of [[300, 0], [-300, 0], [0, 300], [0, -300], [200, 200]]) {
+      const stop = constrainToEnvelope(window_, start, { cx: start.cx + dx, cy: start.cy + dy });
+      expect(cornersOutside({ ...start, ...stop }, window_)).toBe(0);
+    }
+  });
+});
+
+
+/* The neighbour hint. Not a legal requirement -- § 6 Abs. 2 SächsBO puts each
+   building's setback area on its own plot -- but the strip where the two would
+   overlap is worth showing. See
+   docs/research/abstandsflaechen-nachbargebaeude.md.
+
+   The outlines are the 59 buildings Overpass really returned within 125 m of
+   Mölkau, Flurstück 204. */
+describe("Wo die Abstandsfläche des Nachbarn herüberreicht", () => {
+  const plot = realPlot("moelkau");
+  const outlines = neighbourAnswer.gebaeude.map(b => toLocal(b.umriss, plot.anchor));
+
+  it("misst je Grenzabschnitt, wie nah das nächste Gebäude steht", () => {
+    const distances = neighbourDistances(plot.polygon, outlines);
+
+    expect(distances).toHaveLength(plot.polygon.length);
+    expect(distances.every(d => d >= 0)).toBe(true);
+    // Two of the five boundaries have a neighbour inside the 3 m minimum:
+    // 1,74 m and 0,46 m on the recorded data.
+    expect(distances.filter(d => d < 3)).toHaveLength(2);
+  });
+
+  it("vertieft genau die Abschnitte, an denen ein Nachbar zu nah steht", () => {
+    const depths = neighbourSetbackDepths(plot.polygon, plot.setbacks, outlines);
+
+    expect(hasNeighbourHint(plot.setbacks, depths)).toBe(true);
+    const deepened = depths.filter((d, i) => d > plot.setbacks[i] + 1e-9);
+    expect(deepened).toHaveLength(2);
+    // depth + (3 - distance): the neighbour's own minimum, as far as it reaches.
+    depths.forEach(d => expect(d).toBeLessThanOrEqual(3 + 3));
+    expect(polygonArea(buildableArea(plot.polygon, depths)))
+      .toBeLessThan(polygonArea(buildableArea(plot.polygon, plot.setbacks)));
+  });
+
+  it("lässt ohne Nachbarn alles, wie es ist", () => {
+    const depths = neighbourSetbackDepths(plot.polygon, plot.setbacks, []);
+
+    expect(depths).toEqual(plot.setbacks);
+    expect(hasNeighbourHint(plot.setbacks, depths)).toBe(false);
+  });
+
+  it("zählt ein Gebäude auf dem eigenen Flurstück nicht als Nachbarn", () => {
+    const box = boundingBox(plot.polygon);
+    const cx = (box.minX + box.maxX) / 2, cy = (box.minY + box.maxY) / 2;
+    const own = [{ x: cx - 1, y: cy - 1 }, { x: cx + 1, y: cy - 1 },
+                 { x: cx + 1, y: cy + 1 }, { x: cx - 1, y: cy + 1 }];
+
+    expect(neighbourDistances(plot.polygon, [own]).every(d => d === Infinity)).toBe(true);
+  });
+
+  it("sieht weit entfernte Gebäude gar nicht erst an", () => {
+    const far = [[{ x: 900, y: 900 }, { x: 910, y: 900 }, { x: 910, y: 910 }, { x: 900, y: 910 }]];
+
+    expect(neighbourDistances(plot.polygon, far).every(d => d === Infinity)).toBe(true);
   });
 });

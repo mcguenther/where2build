@@ -12,8 +12,9 @@ import PlotsView from "../src/views/PlotsView.vue";
 import PlotView from "../src/views/PlotView.vue";
 import HouseTypesView from "../src/views/HouseTypesView.vue";
 import CompareView from "../src/views/CompareView.vue";
+import WizardView from "../src/views/WizardView.vue";
 import { state, placement, plotById } from "../src/lib/store.js";
-import { realState, mountWithRouter, testRouter } from "./helpers.js";
+import { realState, realPlot, mountWithRouter, testRouter } from "./helpers.js";
 import { buildableArea, cornersOutside, alignmentToEdge, polygonArea, findPlacement } from "../src/lib/geometry.js";
 import { area } from "../src/lib/format.js";
 import { plotMetrics } from "../src/lib/metrics.js";
@@ -28,6 +29,13 @@ beforeEach(() => {
 });
 
 const plot = () => plotById("plot-concave");
+
+/** One keystroke: `setValue` also fires `change`, which is the end of an entry
+ *  and not what typing looks like. */
+const typeInto = async (field, text) => {
+  field.element.value = text;
+  await field.trigger("input");
+};
 
 describe("Lageplan", () => {
   const build = (props = {}) =>
@@ -120,6 +128,140 @@ describe("Lageplan", () => {
     const w = build();
     await w.find("[data-house]").trigger("keydown", { key: "ArrowUp" });
     expect(w.emitted("move")).toBeUndefined();
+  });
+
+  /* Before a house is chosen there is nothing to draw, and drawing one anyway
+     is what made the cadastral check look like a design step. */
+  it("lässt den Baukörper samt seiner Maße weg, wenn keiner gezeigt wird", () => {
+    const w = build({ showBuilding: false });
+    expect(w.find("[data-house]").exists()).toBe(false);
+    // The plot's own dimensions and the setback strip are the point of the view.
+    expect(w.find("path[fill-rule='evenodd']").exists()).toBe(true);
+    // One chain per boundary segment and not one more: the two the house would
+    // have contributed are exactly what "no body shown" has to drop.
+    expect(w.vm.dimensionChains).toHaveLength(w.vm.plot.polygon.length);
+    expect(w.vm.narrowest).toBeNull();
+    expect(w.find("svg").attributes("aria-label")).not.toContain("Baukörper");
+    expect(w.html()).not.toMatch(/NaN|undefined/);
+  });
+
+  it("kommt ohne Baukörper aus, auch wenn keiner übergeben wird", () => {
+    const w = mount(SitePlan, { props: { plot: plot() } });
+    expect(w.find("[data-house]").exists()).toBe(false);
+    expect(w.html()).not.toMatch(/NaN|undefined/);
+  });
+});
+
+/* Pan and zoom are folded into `view`, which is also what the camera is
+   derived from — so the basemap follows the drawing instead of drifting
+   behind a CSS transform. */
+describe("Ausschnitt bewegen", () => {
+  const build = (props = {}) => mount(SitePlan, {
+    props: { plot: plot(), building: placement(plot()), navigable: true, ...props },
+    attachTo: document.body
+  });
+
+  /** jsdom measures nothing; the drawing is told it fills its own viewBox. */
+  const framed = w => {
+    const svg = w.vm.$refs.svg;
+    svg.getBoundingClientRect = () => ({ left: 0, top: 0, width: w.props("width"), height: w.props("height") });
+    svg.setPointerCapture = () => {};
+    return svg;
+  };
+
+  it("zoomt mit dem Rad auf den Zeiger zu", async () => {
+    const w = build();
+    const svg = framed(w);
+    const at = { clientX: 240, clientY: 180 };
+    const before = w.vm.toMetres(at);
+    const scaleBefore = w.vm.view.scale;
+
+    svg.dispatchEvent(new WheelEvent("wheel", { bubbles: true, cancelable: true, ...at, deltaY: -240 }));
+    await nextTick();
+
+    expect(w.vm.view.scale).toBeGreaterThan(scaleBefore);
+    // The metre under the cursor is the fixed point of the zoom.
+    const after = w.vm.toMetres(at);
+    expect(after.x).toBeCloseTo(before.x, 6);
+    expect(after.y).toBeCloseTo(before.y, 6);
+  });
+
+  it("begrenzt den Zoom nach oben und unten", async () => {
+    const w = build();
+    const svg = framed(w);
+    for (let i = 0; i < 60; i++) {
+      svg.dispatchEvent(new WheelEvent("wheel", { bubbles: true, cancelable: true, clientX: 320, clientY: 220, deltaY: -240 }));
+    }
+    await nextTick();
+    expect(w.vm.zoomFactor).toBe(8);
+    for (let i = 0; i < 120; i++) {
+      svg.dispatchEvent(new WheelEvent("wheel", { bubbles: true, cancelable: true, clientX: 320, clientY: 220, deltaY: 240 }));
+    }
+    await nextTick();
+    expect(w.vm.zoomFactor).toBe(0.25);
+  });
+
+  it("verschiebt mit gedrückter Maustaste und hält den gegriffenen Punkt", async () => {
+    const w = build();
+    const svg = framed(w);
+    const grabbed = w.vm.toMetres({ clientX: 300, clientY: 220 });
+    const centreBefore = { x: w.vm.view.mx, y: w.vm.view.my };
+
+    svg.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, clientX: 300, clientY: 220 }));
+    await nextTick();
+    svg.dispatchEvent(new MouseEvent("pointermove", { bubbles: true, clientX: 350, clientY: 260 }));
+    await nextTick();
+
+    expect(w.vm.view.mx).not.toBeCloseTo(centreBefore.x, 6);
+    expect(w.vm.view.my).not.toBeCloseTo(centreBefore.y, 6);
+    const held = w.vm.toMetres({ clientX: 350, clientY: 260 });
+    expect(held.x).toBeCloseTo(grabbed.x, 6);
+    expect(held.y).toBeCloseTo(grabbed.y, 6);
+
+    // A double click puts the fitted framing back.
+    svg.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    await nextTick();
+    expect(w.vm.view.mx).toBeCloseTo(centreBefore.x, 6);
+    expect(w.vm.zoomFactor).toBe(1);
+  });
+
+  it("rührt den Ausschnitt nicht an, solange er nicht bewegbar ist", async () => {
+    const w = build({ navigable: false });
+    const svg = framed(w);
+    const before = { ...w.vm.view };
+    svg.dispatchEvent(new WheelEvent("wheel", { bubbles: true, cancelable: true, clientX: 240, clientY: 180, deltaY: -240 }));
+    svg.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, clientX: 300, clientY: 220 }));
+    svg.dispatchEvent(new MouseEvent("pointermove", { bubbles: true, clientX: 350, clientY: 260 }));
+    await nextTick();
+    expect(w.vm.view).toEqual(before);
+  });
+
+  it("lässt dem Messen und dem Baukörper den Vortritt", async () => {
+    const measuring = build({ measuring: true, interactive: true });
+    const svg = framed(measuring);
+    svg.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, clientX: 300, clientY: 220 }));
+    await nextTick();
+    expect(measuring.vm.panning).toBeNull();
+    expect(measuring.vm.measurePoints).toHaveLength(1);
+
+    const dragging = build({ interactive: true });
+    framed(dragging);
+    const house = dragging.find("[data-house]").element;
+    house.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, clientX: 300, clientY: 220 }));
+    await nextTick();
+    expect(dragging.vm.panning).toBeNull();
+    expect(dragging.vm.dragging).not.toBeNull();
+  });
+
+  it("stellt den Ausschnitt her, sobald ein anderes Flurstück gezeigt wird", async () => {
+    const w = build();
+    const svg = framed(w);
+    svg.dispatchEvent(new WheelEvent("wheel", { bubbles: true, cancelable: true, clientX: 240, clientY: 180, deltaY: -240 }));
+    await nextTick();
+    expect(w.vm.zoomFactor).not.toBe(1);
+    await w.setProps({ plot: plotById("plot-convex"), building: placement(plotById("plot-convex")) });
+    expect(w.vm.zoomFactor).toBe(1);
+    expect(w.vm.panMetres).toEqual({ x: 0, y: 0 });
   });
 });
 
@@ -309,6 +451,74 @@ describe("Grundstücksseite", () => {
     expect(cornersOutside(placement(p), buildableArea(p.polygon, p.setbacks))).toBe(0);
   });
 
+  /* The house may not be dragged out of the buildable window -- unless there
+     is no window to hold it in, which is the only case where the constraint
+     would take away the ability to move the house at all. */
+  it("hält den Baukörper im Fenster, solange es eines gibt", async () => {
+    const w = mountWithRouter(PlotView, { props: { id: "plot-concave" } });
+    const p = plot();
+    const plan = w.findComponent(SitePlan);
+    expect(plan.props("confineToEnvelope")).toBe(true);
+
+    const far = { cx: p.house.cx + 400, cy: p.house.cy + 400 };
+    const allowed = plan.vm.allowedMove(far);
+    expect(allowed).not.toEqual(far);
+    expect(cornersOutside({ ...placement(p), ...allowed },
+                          buildableArea(p.polygon, p.setbacks))).toBe(0);
+  });
+
+  it("lässt den Baukörper frei, wenn die Begrenzung abgeschaltet ist", async () => {
+    const w = mountWithRouter(PlotView, { props: { id: "plot-concave" } });
+    const p = plot();
+    const toggle = w.findAll("button").find(b => b.text().includes("Im Bebauungsfenster halten"));
+    expect(toggle.attributes("aria-pressed")).toBe("true");
+
+    await toggle.trigger("click");
+    expect(p.confineHouse).toBe(false);
+    expect(toggle.attributes("aria-pressed")).toBe("false");
+    const far = { cx: p.house.cx + 400, cy: p.house.cy + 400 };
+    expect(w.findComponent(SitePlan).vm.allowedMove(far)).toEqual(far);
+  });
+
+  /* Mölkau, Flurstück 204: a real 650 m² plot, and narrow enough that the
+     window leaves little room -- exactly where a constraint has to hold. */
+  it("hält den Baukörper auch auf dem Flurstück in Mölkau im Fenster", async () => {
+    const moelkau = { ...realPlot("moelkau"), houseTypeId: "custom",
+                      customSize: { length: 8, width: 6 } };
+    const envelope = buildableArea(moelkau.polygon, moelkau.setbacks);
+    /* The plot is a 47.9 x 13.5 m ribbon running diagonally: unrotated, no
+       8 x 6 m house fits into its window at all. So it is seated first --
+       held inside is a statement about a house that is inside to begin with. */
+    const seat = findPlacement(envelope, 8, 6);
+    expect(seat).not.toBeNull();
+    moelkau.house = { cx: seat.cx, cy: seat.cy, rotation: seat.rotation };
+    state.data.plots.push(moelkau);
+
+    const w = mountWithRouter(PlotView, { props: { id: "plot-moelkau" } });
+    const p = plotById("plot-moelkau");
+    expect(cornersOutside(placement(p), envelope)).toBe(0);
+
+    const plan = w.findComponent(SitePlan);
+    for (const [dx, dy] of [[80, 0], [-80, 0], [0, 80], [0, -80]]) {
+      const allowed = plan.vm.allowedMove({ cx: p.house.cx + dx, cy: p.house.cy + dy });
+      expect(cornersOutside({ ...placement(p), ...allowed }, envelope)).toBe(0);
+    }
+  });
+
+  /* Switching the constraint on with the house already outside would otherwise
+     leave a violation that dragging can no longer undo. */
+  it("setzt den Baukörper zurück ins Fenster, wenn die Begrenzung eingeschaltet wird", async () => {
+    const p = plot();
+    p.confineHouse = false;
+    p.house.cx += 40;
+    const w = mountWithRouter(PlotView, { props: { id: "plot-concave" } });
+    expect(cornersOutside(placement(p), buildableArea(p.polygon, p.setbacks))).toBeGreaterThan(0);
+
+    await w.findAll("button").find(b => b.text().includes("Im Bebauungsfenster halten")).trigger("click");
+    expect(p.confineHouse).toBe(true);
+    expect(cornersOutside(placement(p), buildableArea(p.polygon, p.setbacks))).toBe(0);
+  });
+
   it("koppelt die Abstandstiefe an die Wandhöhe, mit 3 m als Mindestmaß", async () => {
     const w = mountWithRouter(PlotView, { props: { id: "plot-concave" } });
     const p = plot();
@@ -324,10 +534,56 @@ describe("Grundstücksseite", () => {
     expect(plot().houseTypeId).toBe("custom");
     await w.find("#custom-length").setValue("13");
     expect(placement(plot()).width).toBe(13);
-    await w.find("#custom-length").setValue("99");
+    await w.find("#custom-length").setValue("99");   // setValue ends the entry: input, then change
     expect(plot().customSize.length).toBe(30);
     await w.find("#custom-width").setValue("1");
     expect(plot().customSize.width).toBe(4);
+  });
+
+  /* Typing 14 goes through 1, and 1 is not a 4 m house — it is half a number.
+     Clamping on every keystroke rewrote the field under the cursor, so the 1
+     became a 4 and the field ended up on 44. Nothing is corrected until the
+     field is left. */
+  it("schreibt eigene Maße während des Tippens nicht um", async () => {
+    const w = mountWithRouter(PlotView, { props: { id: "plot-concave" } });
+    await w.find("#house-type").setValue("custom");
+    const length = w.find("#custom-length");
+    const stored = plot().customSize.length;
+
+    await typeInto(length, "1");
+    expect(length.element.value).toBe("1");
+    expect(plot().customSize.length).toBe(stored);   // implausible, so not passed on
+    await typeInto(length, "14");
+    expect(length.element.value).toBe("14");
+    expect(plot().customSize.length).toBe(14);
+
+    await length.trigger("change");
+    await nextTick();
+    expect(length.element.value).toBe("14");
+    expect(placement(plot()).width).toBe(14);
+  });
+
+  it("richtet ein endgültig ungültiges Maß erst beim Verlassen des Feldes, und nie auf null", async () => {
+    const w = mountWithRouter(PlotView, { props: { id: "plot-concave" } });
+    await w.find("#house-type").setValue("custom");
+    const length = w.find("#custom-length");
+    await length.setValue("14");
+
+    await typeInto(length, "2");
+    expect(plot().customSize.length).toBe(14);
+    expect(w.text()).toContain("Kantenlängen unter 4 m oder über 30 m");
+    await length.trigger("change");
+    await nextTick();
+    expect(plot().customSize.length).toBe(4);
+    expect(length.element.value).toBe("4");
+
+    // An empty field is no building either: the stored size stays as it was.
+    await typeInto(length, "");
+    await length.trigger("change");
+    await nextTick();
+    expect(plot().customSize.length).toBe(4);
+    expect(Number.isFinite(plot().customSize.width)).toBe(true);
+    expect(length.element.value).toBe("4");
   });
 
   it("schaltet das Messen ein und wieder aus", async () => {
@@ -404,5 +660,59 @@ describe("Vergleich", () => {
   it("listet nur die ausgewählten Kandidaten", () => {
     state.data.selection = ["plot-concave"];
     expect(mountWithRouter(CompareView).findAll("tbody tr")).toHaveLength(1);
+  });
+});
+
+describe("Aufnahme — Schritt Flurstück", () => {
+  /** The wizard reaches stage 3 with a draft in hand; a reload has none. */
+  const atParcelStage = async () => {
+    const w = mountWithRouter(WizardView, { path: "/aufnahme/quelle", props: { stage: "quelle" } });
+    w.vm.draft = plot();
+    await w.setProps({ stage: "flurstueck" });
+    return w;
+  };
+
+  it("prüft den Zuschnitt ohne Baukörper", async () => {
+    // The step asks one question — is this the right parcel — and a house
+    // nobody has planned yet is not part of it.
+    const original = globalThis.fetch;
+    globalThis.fetch = () => new Promise(() => {});   // no basemap in jsdom
+    try {
+      const w = await atParcelStage();
+      const plan = w.findComponent({ name: "SitePlan" });
+      expect(plan.props("building")).toBeNull();
+      expect(plan.props("showBuilding")).toBe(false);
+      expect(w.find("[data-house]").exists()).toBe(false);
+      expect(w.text()).toContain("Passt");
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
+  it("lässt den Ausschnitt dort verschieben und zoomen", async () => {
+    const original = globalThis.fetch;
+    globalThis.fetch = () => new Promise(() => {});
+    try {
+      const w = await atParcelStage();
+      const plan = w.findComponent({ name: "SitePlan" });
+      expect(plan.props("navigable")).toBe(true);
+
+      const svg = plan.vm.$refs.svg;
+      svg.getBoundingClientRect = () => ({ left: 0, top: 0, width: plan.props("width"), height: plan.props("height") });
+      svg.setPointerCapture = () => {};
+      const before = { ...plan.vm.view };
+
+      svg.dispatchEvent(new WheelEvent("wheel", { bubbles: true, cancelable: true, clientX: 260, clientY: 200, deltaY: -240 }));
+      await nextTick();
+      expect(plan.vm.view.scale).toBeGreaterThan(before.scale);
+
+      svg.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, clientX: 260, clientY: 200 }));
+      await nextTick();
+      svg.dispatchEvent(new MouseEvent("pointermove", { bubbles: true, clientX: 300, clientY: 240 }));
+      await nextTick();
+      expect(plan.vm.view.mx).not.toBeCloseTo(before.mx, 6);
+    } finally {
+      globalThis.fetch = original;
+    }
   });
 });

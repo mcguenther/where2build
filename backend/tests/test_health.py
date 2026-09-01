@@ -12,7 +12,7 @@ def test_health_lists_every_service(client: TestClient):
     body = answer.json()
     assert body["status"] == "ok"
     dienste = {entry["name"]: entry for entry in body["dienste"]}
-    assert set(dienste) == {"alkis", "boris", "motis", "poi", "tiles", "basemap", "llm"}
+    assert set(dienste) == {"alkis", "gemarkungen", "boris", "motis", "poi", "tiles", "basemap", "llm"}
     assert dienste["llm"]["konfiguriert"] is True
     assert dienste["alkis"]["endpunkt"].endswith("/wfs")
     assert dienste["basemap"]["endpunkt"].endswith("/styles/liberty")

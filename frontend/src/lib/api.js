@@ -66,6 +66,35 @@ export const readHouseType = url => request("/housetypes/extract", { method: "PO
 export const resolveParcel = query =>
   request("/parcels/resolve", { method: "POST", body: JSON.stringify(query) });
 
+/**
+ * The directory of Saxon Gemarkungen — about 5 300 entries, some 250 kB.
+ *
+ * Fetched whole, once, and filtered in the browser: a request per keystroke
+ * would be slower and no more correct, and the list changes about as often as
+ * the cadastre is redrawn. The pending promise is the cache, so two fields
+ * asking at the same moment share one request. A failure is not cached — the
+ * next attempt tries the service again instead of remembering the outage.
+ */
+let directoryRequest = null;
+export function cadastralDistricts() {
+  if (!directoryRequest) {
+    directoryRequest = request("/gemarkungen").catch(error => {
+      directoryRequest = null;
+      throw error;
+    });
+  }
+  return directoryRequest;
+}
+
+/* Mapped building outlines around a plot, for the neighbour hint. One question
+ * per plot, and the backend caches the answer for a month — an outline moves
+ * about as often as the house it belongs to. */
+export const neighbourBuildings = (lat, lon, umkreis_m = 80) =>
+  request("/neighbours", {
+    method: "POST",
+    body: JSON.stringify({ origin: { lat, lon }, umkreis_m })
+  });
+
 export const landValue = (lat, lon) =>
   request(`/landvalue?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`);
 

@@ -79,12 +79,22 @@ let vectorTiles = 0;
 const countTiles = page =>
   page.on("response", r => { if (/\/api\/basemap\/.*\.pbf/.test(r.url()) && r.status() < 400) vectorTiles++; });
 
+/* The Gemarkung is picked from the register now, not typed into a blank line:
+ * the field carries a generated id, so it is addressed by its label, and the
+ * entry only counts once one of the offered districts is chosen. */
+async function pickDistrict(page, name) {
+  // The label alone is ambiguous: the source radio and the result list carry it too.
+  await page.getByRole("combobox", { name: "Gemarkung" }).fill(name);
+  await page.waitForSelector(".gemarkung__treffer", { timeout: 30000 });
+  await page.locator(".gemarkung__treffer").first().click();
+}
+
 /* There is no example data any more: every screenshot needs a plot that was
  * really resolved through ALKIS first. This is the app's own add flow. */
 async function addPlot(page) {
   await page.click(".page-head .btn");
   await page.getByText("Flurstück direkt").click();
-  await page.fill("#q-cadastral-district", "Liebertwolkwitz");
+  await pickDistrict(page, "Liebertwolkwitz");
   await page.fill("#q-parcel-number", "85/1");
   await page.getByRole("button", { name: "Nachschlagen" }).click();
   await page.waitForSelector(".wizard__preview, .site-plan", { timeout: 60000 });
@@ -135,7 +145,7 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
   await page.click(".page-head .btn");                      // Grundstück hinzufügen
   await shot(page, "assistent-1", mode, narrow ? "-schmal" : "");
   await page.getByText("Flurstück direkt").click();
-  await page.fill("#q-cadastral-district", "Liebertwolkwitz");
+  await pickDistrict(page, "Liebertwolkwitz");
   await page.fill("#q-parcel-number", "85/1");
   await shot(page, "assistent-2", mode, narrow ? "-schmal" : "");
   await page.getByRole("button", { name: "Nachschlagen" }).click();

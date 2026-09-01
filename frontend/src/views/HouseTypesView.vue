@@ -50,7 +50,7 @@
             <div class="field"><label for="manual-width">Breite</label><input id="manual-width" type="number" min="4" max="30" step="0.1" v-model.number="custom.width"></div>
           </div>
           <p class="hint">
-            Ergibt {{ area(custom.length * custom.width, 1) }} bebaute Fläche.
+            Ergibt {{ area(customArea, 1) }} bebaute Fläche.
             Kantenlängen unter 4 m oder über 30 m sind kein Haus, sondern ein Tippfehler.
           </p>
           <button type="button" class="btn btn--secondary" :disabled="!customValid" @click="addCustom">
@@ -157,6 +157,11 @@ export default {
     customValid() {
       const { length, width } = this.custom;
       return length >= 4 && length <= 30 && width >= 4 && width <= 30;
+    },
+    /** An emptied field is not a zero: with a missing edge the area stays "—". */
+    customArea() {
+      const { length, width } = this.custom;
+      return Number.isFinite(length) && Number.isFinite(width) ? length * width : null;
     },
     catalogueScale() {
       const all = this.types.map(t => this.dimensions(t));

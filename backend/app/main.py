@@ -21,16 +21,18 @@ from . import __version__
 from .errors import AppError
 from .routers import (
     basemap,
+    gemarkungen,
     geocode,
     housetypes,
     landvalue,
     listings,
     nearby,
+    neighbours,
     parcels,
     reachability,
     tiles,
 )
-from .deps import nearby_service
+from .deps import gemarkung_directory, nearby_service
 from .schemas import DienstStatus, HealthResponse
 from .settings import get_settings
 from .validation import readable_validation_error
@@ -142,6 +144,7 @@ def create_app() -> FastAPI:
     async def health() -> HealthResponse:
         current = get_settings()
         poi = nearby_service().index_status()
+        verzeichnis = gemarkung_directory()
         return HealthResponse(
             version=__version__,
             dienste=[
@@ -150,6 +153,18 @@ def create_app() -> FastAPI:
                     konfiguriert=bool(current.alkis.wfs_url),
                     endpunkt=current.alkis.wfs_url,
                     hinweis="Flurstücke, amtliche Fläche aus dem Attribut „flaeche“.",
+                ),
+                DienstStatus(
+                    name="gemarkungen",
+                    konfiguriert=verzeichnis is not None,
+                    endpunkt=str(current.alkis.gemarkung_index_path),
+                    hinweis=(
+                        f"{len(verzeichnis)} Gemarkungen, Stand {verzeichnis.stand}, "
+                        "für die Auswahlliste bei der Flurstückseingabe."
+                        if verzeichnis is not None
+                        else "Kein Gemarkungsverzeichnis vorhanden — erzeugen mit: "
+                        "python scripts/build_gemarkung_index.py"
+                    ),
                 ),
                 DienstStatus(
                     name="boris",
@@ -209,12 +224,14 @@ def create_app() -> FastAPI:
 
     for module in (
         parcels,
+        gemarkungen,
         listings,
         housetypes,
         landvalue,
         geocode,
         reachability,
         nearby,
+        neighbours,
         tiles,
         basemap,
     ):

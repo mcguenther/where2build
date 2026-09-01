@@ -4,7 +4,12 @@
     <svg
     ref="svg"
     class="site-plan"
-    :class="{ 'site-plan--dragging': dragging, 'site-plan--measuring': measuring }"
+    :class="{
+      'site-plan--dragging': dragging,
+      'site-plan--measuring': measuring,
+      'site-plan--navigable': navigable && !measuring,
+      'site-plan--panning': panning
+    }"
     :viewBox="`0 0 ${width} ${height}`"
     role="img"
     :aria-label="ariaLabel"
@@ -12,12 +17,20 @@
     @pointermove="pointerMove"
     @pointerup="pointerUp"
     @pointercancel="pointerUp"
+    @wheel="onWheel"
+    @dblclick="onDoubleClick"
     @keydown="onKeydown"
   >
     <defs>
       <marker :id="`dim-${uid}`" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto">
         <line x1="5" y1="1.5" x2="5" y2="8.5" stroke="var(--w2b-map-boundary)" stroke-width="1.2" />
       </marker>
+      <!-- A hatch, not a fill: the statutory setback strip is the only thing on
+           this drawing that gets a solid colour, and this is a hint. -->
+      <pattern :id="`hint-${uid}`" width="7" height="7" patternUnits="userSpaceOnUse"
+               patternTransform="rotate(45)">
+        <line x1="0" y1="0" x2="0" y2="7" stroke="var(--w2b-map-neighbour)" stroke-width="1.1" />
+      </pattern>
     </defs>
 
     <rect v-if="!hasBackdrop" x="0" y="0" :width="width" :height="height" :fill="backgroundFill" />
@@ -29,6 +42,13 @@
       <!-- The setback strip is what gets colour: marked is what may NOT be built on. -->
       <template v-if="showSetbacks && envelope.length">
         <path :d="setbackRing" fill-rule="evenodd" fill="var(--w2b-map-setback)" />
+        <!-- Where the neighbouring building's own minimum setback would reach
+             onto this plot. A hint, never a finding — see
+             docs/research/abstandsflaechen-nachbargebaeude.md. -->
+        <path v-if="neighbourRing" :d="neighbourRing" fill-rule="evenodd"
+              :fill="`url(#hint-${uid})`" opacity=".75" />
+        <polygon v-if="neighbourEnvelope.length" :points="path(neighbourEnvelope)" fill="none"
+                 stroke="var(--w2b-map-neighbour)" stroke-width="1.1" stroke-dasharray="2 3" />
         <polygon :points="path(envelope)" fill="none" stroke="var(--w2b-map-envelope)"
                  stroke-width="1.5" stroke-dasharray="6 4" />
       </template>
@@ -49,7 +69,7 @@
       </template>
 
       <!-- The house: brass, because the user designed it -->
-      <g :class="{ 'plan-handle': interactive }" :tabindex="interactive ? 0 : null"
+      <g v-if="houseVisible" :class="{ 'plan-handle': interactive }" :tabindex="interactive ? 0 : null"
          :role="interactive ? 'button' : null"
          :aria-label="interactive ? 'Baukörper — ziehen oder mit den Pfeiltasten verschieben' : null"
          data-house>
@@ -146,7 +166,7 @@
 import {
   buildableArea, polygonEdges, rectangleCorners, pointInPolygon,
   closestBoundaryPoint, boundingBox, alignmentToEdge, asCounterClockwise,
-  minimumRotatedRectangleCorners
+  minimumRotatedRectangleCorners, constrainToEnvelope, hasNeighbourHint
 } from "../lib/geometry.js";
 import { cameraFor } from "../lib/projection.js";
 import { num } from "../lib/format.js";
@@ -182,14 +202,25 @@ const MAX_LABELLED_EDGES = 16;
 const SCALE_BAR_STEPS = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000];
 const SCALE_BAR_SEGMENT_PX = 56;
 
+/** How far the navigable view may depart from the fitted framing. */
+const MIN_ZOOM = 0.25;
+const MAX_ZOOM = 8;
+
+const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
+
+
 export default {
   name: "SitePlan",
   props: {
     plot: { type: Object, required: true },
-    building: { type: Object, required: true },   // {width, depth, cx, cy, rotation}
+    /** {width, depth, cx, cy, rotation}. Absent where no house is planned yet. */
+    building: { type: Object, default: null },
     width: { type: Number, default: 820 },
     height: { type: Number, default: 620 },
     interactive: { type: Boolean, default: false },
+    /** Hold the dragged footprint inside the buildable envelope. Lifted where
+     *  there is no envelope to hold it in — see `constrainToEnvelope`. */
+    confineToEnvelope: { type: Boolean, default: true },
     compact: { type: Boolean, default: false },
     // "none" by default: a backdrop is a MapLibre instance, and the small
     // plans on cards and in the comparison must not each start one.
@@ -197,6 +228,13 @@ export default {
     northUp: { type: Boolean, default: false },
     showDimensions: { type: Boolean, default: true },
     showSetbacks: { type: Boolean, default: true },
+    /** The cadastral check draws the parcel alone: no house is planned there yet. */
+    showBuilding: { type: Boolean, default: true },
+    /** Let the pointer pan and the wheel zoom the framing, backdrop included. */
+    navigable: { type: Boolean, default: false },
+    /** Per-segment depths a neighbouring building's own minimum would ask for.
+     *  Absent, or equal to the statutory ones, and nothing extra is drawn. */
+    neighbourDepths: { type: Array, default: null },
     /** Fixed pixels per metre. Without it each plan fits its own frame. */
     scale: { type: Number, default: null },
     /** Measuring mode: clicks add points, the run is measured segment by segment. */
@@ -204,11 +242,27 @@ export default {
   },
   emits: ["move", "measured"],
   data() {
-    return { uid: ++instanceCount, dragging: null, mapUnavailable: false, measurePoints: [], measurePointer: null };
+    return {
+      uid: ++instanceCount, dragging: null, mapUnavailable: false,
+      measurePoints: [], measurePointer: null,
+      // Navigation, relative to the fitted framing: a factor on its scale and
+      // an offset of its centre, in metres. Both feed `view`, so the backdrop
+      // follows through the camera watcher instead of drifting behind a
+      // CSS transform on the drawing.
+      zoomFactor: 1,
+      panMetres: { x: 0, y: 0 },
+      panning: null
+    };
   },
   computed: {
+    /** One gate for everything the house draws: a plan without a building, and
+     *  a plan that deliberately hides it, are the same case downstream. */
+    houseVisible() { return this.showBuilding && Boolean(this.building); },
     ariaLabel() {
-      return `Lageplan ${this.plot.name}: Flurstück, farbig markierte Abstandsfläche und Baukörper`;
+      const what = this.houseVisible
+        ? "Flurstück, farbig markierte Abstandsfläche und Baukörper"
+        : "Flurstück und farbig markierte Abstandsfläche";
+      return `Lageplan ${this.plot.name}: ${what}`;
     },
     /** Dimension chains are noise at thumbnail size. */
     dimensionsVisible() { return this.showDimensions && !this.compact; },
@@ -280,7 +334,7 @@ export default {
 
     /* Frame the plot with a margin, then stretch the box to the frame's aspect
        so the drawing fills the panel instead of floating in it. */
-    view() {
+    fit() {
       const box = boundingBox(this.plot.polygon);
       /* A caller that hands us a scale is drawing several plots side by side
          and needs them comparable, so its value wins over our own fit. It is
@@ -288,21 +342,45 @@ export default {
       const scale = Number.isFinite(this.scale) && this.scale > 0 ? this.scale : this.fitBox(box, this.margin);
       return { scale, mx: (box.minX + box.maxX) / 2, my: (box.minY + box.maxY) / 2 };
     },
+    /** The fit as the user has moved it. Everything projects through this —
+     *  `px`/`py` for the drawing and `setCamera` for the ground — so the two
+     *  cannot come apart. Untouched, it is the fit itself. */
+    view() {
+      return {
+        scale: this.fit.scale * this.zoomFactor,
+        mx: this.fit.mx + this.panMetres.x,
+        my: this.fit.my + this.panMetres.y
+      };
+    },
     /* A bar of a fixed ten metres writes its three labels on top of each other
-       the moment the drawing covers a kilometre: the step follows the scale, so
-       each half stays about as wide on screen whatever the plot measures. */
+       the moment the drawing covers a kilometre — and zooming does exactly
+       that. The step follows the scale, so each half stays about as wide on
+       screen whatever the plot measures and however far it is zoomed. */
     scaleBar() {
       const step = SCALE_BAR_STEPS.find(m => m * this.view.scale >= SCALE_BAR_SEGMENT_PX)
         ?? SCALE_BAR_STEPS[SCALE_BAR_STEPS.length - 1];
       return { width: step * this.view.scale, label: num(step, 0), endLabel: `${num(step * 2, 0)} m` };
     },
     envelope() { return buildableArea(this.plot.polygon, this.plot.setbacks); },
+    /** The envelope as it would be if the neighbours' minimum setbacks counted
+     *  against this plot. Empty unless it is actually deeper than our own. */
+    neighbourEnvelope() {
+      if (!this.neighbourDepths || !this.envelope.length) return [];
+      if (!hasNeighbourHint(this.plot.setbacks, this.neighbourDepths)) return [];
+      return buildableArea(this.plot.polygon, this.neighbourDepths);
+    },
+    neighbourRing() {
+      if (!this.neighbourEnvelope.length) return null;
+      const outer = this.envelope.map(v => `${this.p(v).x},${this.p(v).y}`).join("L");
+      const inner = this.neighbourEnvelope.map(v => `${this.p(v).x},${this.p(v).y}`).join("L");
+      return `M${outer}Z M${inner}Z`;
+    },
     setbackRing() {
       const outer = this.plot.polygon.map(v => `${this.p(v).x},${this.p(v).y}`).join("L");
       const inner = this.envelope.map(v => `${this.p(v).x},${this.p(v).y}`).join("L");
       return `M${outer}Z M${inner}Z`;
     },
-    houseCorners() { return rectangleCorners(this.building); },
+    houseCorners() { return this.houseVisible ? rectangleCorners(this.building) : []; },
     outliers() {
       if (!this.envelope.length) return this.houseCorners;
       return this.houseCorners.filter(e => !pointInPolygon(e, this.envelope));
@@ -336,9 +414,11 @@ export default {
       });
 
       const h = this.houseCorners;
-      const houseOffset = -HOUSE_CHAIN_PX * perPixel;
-      chains.push(this.dimensionChain(h[0], h[1], houseOffset, `${num(this.building.width)} m`));
-      chains.push(this.dimensionChain(h[1], h[2], houseOffset, `${num(this.building.depth)} m`));
+      if (this.houseVisible) {
+        const houseOffset = -HOUSE_CHAIN_PX * perPixel;
+        chains.push(this.dimensionChain(h[0], h[1], houseOffset, `${num(this.building.width)} m`));
+        chains.push(this.dimensionChain(h[1], h[2], houseOffset, `${num(this.building.depth)} m`));
+      }
       return chains;
     },
 
@@ -354,6 +434,7 @@ export default {
       const side = (p, q) => Math.hypot(q.x - p.x, q.y - p.y);
       return [[c[0], c[1]], [c[1], c[2]]].map(([p, q]) =>
         this.dimensionChain(p, q, offset, `gesamt ${num(side(p, q), 1)} m`));
+
     },
     measureLine() {
       return this.measurePoints.map(m => { const q = this.p(m); return `${q.x.toFixed(1)},${q.y.toFixed(1)}`; }).join(" ");
@@ -376,7 +457,7 @@ export default {
       return labels;
     },
     narrowest() {
-      if (!this.plot.polygon.length) return null;
+      if (!this.houseVisible || !this.plot.polygon.length) return null;
       let best = { distance: Infinity };
       for (const corner of this.houseCorners) {
         const near = closestBoundaryPoint(corner, this.plot.polygon);
@@ -404,8 +485,10 @@ export default {
     measuring(on) { if (!on) this.clearMeasurement(); },
     "plot.id"() {
       this.clearMeasurement();
+      this.resetView();
       this.rebuildMap();
     },
+    navigable(on) { if (!on) this.resetView(); },
     rotation() { this.setCamera(); },
     view() { this.setCamera(); }
   },
@@ -530,23 +613,73 @@ export default {
       this.measurePointer = null;
       this.$emit("measured", { points: [], length: 0 });
     },
+    /** Back to the framing the plan fits by itself. */
+    resetView() {
+      this.zoomFactor = 1;
+      this.panMetres = { x: 0, y: 0 };
+      this.panning = null;
+    },
+    /* Measuring and moving the house are what the pointer is for wherever they
+       are switched on; panning only gets what is left over. */
     pointerDown(event) {
       if (this.measuring) { this.measureClick(event); return; }
-      if (!this.interactive || !event.target.closest("[data-house]")) return;
-      const point = this.toMetres(event);
-      this.dragging = { dx: this.building.cx - point.x, dy: this.building.cy - point.y };
+      if (this.interactive && this.houseVisible && event.target.closest("[data-house]")) {
+        const point = this.toMetres(event);
+        this.dragging = { dx: this.building.cx - point.x, dy: this.building.cy - point.y };
+        this.$refs.svg.setPointerCapture(event.pointerId);
+        event.preventDefault();
+        return;
+      }
+      if (!this.navigable) return;
+      // The metre the pointer grabbed. It is held under the cursor for as long
+      // as the button is down, so the drawing follows the hand exactly.
+      this.panning = this.toMetres(event);
       this.$refs.svg.setPointerCapture(event.pointerId);
       event.preventDefault();
     },
     pointerMove(event) {
       if (this.measuring) { if (this.measurePoints.length) this.measurePointer = this.toMetres(event); return; }
+      if (this.panning) {
+        const point = this.toMetres(event);
+        this.panMetres = {
+          x: this.panMetres.x + (this.panning.x - point.x),
+          y: this.panMetres.y + (this.panning.y - point.y)
+        };
+        return;
+      }
       if (!this.dragging) return;
       const point = this.toMetres(event);
-      this.$emit("move", { cx: point.x + this.dragging.dx, cy: point.y + this.dragging.dy });
+      this.$emit("move", this.allowedMove({ cx: point.x + this.dragging.dx, cy: point.y + this.dragging.dy }));
     },
-    pointerUp() { this.dragging = null; },
+    /** Where the house may go. Both ways of moving it — the pointer and the
+     *  arrow keys — pass through here, so the constraint cannot hold for one
+     *  of them and not the other. Switched off, the wish is the answer. */
+    allowedMove(wanted) {
+      if (!this.confineToEnvelope || !this.houseVisible) return wanted;
+      return constrainToEnvelope(this.envelope, this.building, wanted);
+    },
+    pointerUp() { this.dragging = null; this.panning = null; },
+    /** Zoom towards the cursor: the metre under it stays where it is. */
+    onWheel(event) {
+      if (!this.navigable || this.measuring) return;
+      event.preventDefault();
+      const next = clamp(this.zoomFactor * Math.exp(-event.deltaY * 0.0015), MIN_ZOOM, MAX_ZOOM);
+      if (next === this.zoomFactor) return;
+      const under = this.toMetres(event);
+      const centre = { x: this.view.mx, y: this.view.my };
+      const ratio = this.zoomFactor / next;
+      this.zoomFactor = next;
+      this.panMetres = {
+        x: under.x - (under.x - centre.x) * ratio - this.fit.mx,
+        y: under.y - (under.y - centre.y) * ratio - this.fit.my
+      };
+    },
+    /** A second click on an empty plan is the way back to the fitted framing. */
+    onDoubleClick() {
+      if (this.navigable && !this.measuring) this.resetView();
+    },
     onKeydown(event) {
-      if (!this.interactive || !event.target.closest("[data-house]")) return;
+      if (!this.interactive || !this.houseVisible || !event.target.closest("[data-house]")) return;
       const step = event.shiftKey ? 1 : 0.25;
       const direction = {
         ArrowLeft: [-step, 0], ArrowRight: [step, 0],
@@ -554,7 +687,9 @@ export default {
       }[event.key];
       if (!direction) return;
       event.preventDefault();
-      this.$emit("move", { cx: this.building.cx + direction[0], cy: this.building.cy + direction[1] });
+      this.$emit("move", this.allowedMove({
+        cx: this.building.cx + direction[0], cy: this.building.cy + direction[1]
+      }));
     }
   }
 };
@@ -565,6 +700,8 @@ export default {
 .site-plan__map{ position: absolute; inset: 0; }
 .site-plan{ display: block; width: 100%; height: auto; touch-action: none; position: relative; }
 .site-plan--dragging{ cursor: grabbing; }
+.site-plan--navigable{ cursor: grab; }
+.site-plan--panning{ cursor: grabbing; }
 .site-plan--measuring{ cursor: crosshair; }
 .site-plan__dimension--measuring{ fill: var(--w2b-map-violation); }
 .site-plan__dimension--overall{ font-size: 9.5px; opacity: .8; }

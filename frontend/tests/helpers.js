@@ -3,6 +3,7 @@ import convex from "./fixtures/parcel-convex.json";
 import concave from "./fixtures/parcel-concave.json";
 import large from "./fixtures/parcel-large.json";
 import manyCorners from "./fixtures/parcel-many-corners.json";
+import moelkau from "./fixtures/parcel-moelkau.json";
 import elk from "./fixtures/housetype-elk.json";
 import reachability from "./fixtures/reachability-liebertwolkwitz.json";
 import { mount } from "@vue/test-utils";
@@ -14,9 +15,11 @@ import { SCHEMA_VERSION } from "../src/lib/sample.js";
 
 export const realHouseType = () => ({ ...houseTypeFromResponse(elk), id: "ht-elk" });
 
-/* Four parcels ALKIS really returned. "large" is 34 799 m² in Moritzburg;
-   "manyCorners" is the 1583 x 198 m strip a district address resolves to. */
-const PARCELS = { convex, concave, large, "many-corners": manyCorners };
+/* Five parcels ALKIS really returned. "large" is 34 799 m² in Moritzburg;
+   "manyCorners" is the 1583 x 198 m strip a district address resolves to;
+   "moelkau" is Flurstück 204 in Mölkau, Lessingweg 44, 650 m² over five
+   boundary points -- an ordinary building plot. */
+const PARCELS = { convex, concave, large, "many-corners": manyCorners, moelkau };
 
 export const realPlot = (shape = "convex", extra = {}) => ({
   ...plotFromCadastre(PARCELS[shape] ?? convex, {

@@ -76,6 +76,13 @@ class AlkisSettings(BaseSettings):
     # Half-edge of the bounding box (metres) used when resolving a coordinate.
     point_buffer_m: float = 1.0
     cache_ttl_s: int = 7 * 24 * 3600
+    # The cadastral district directory served by GET /api/gemarkungen. Built
+    # from this same WFS by scripts/build_gemarkung_index.py and committed --
+    # see app/gemarkung_index.py for why it is not queried per request.
+    gemarkung_index_path: Path = _BACKEND_DIR / "data" / "gemarkungen-sachsen.json"
+    # Browser cache for that answer. Districts change on the order of a
+    # municipal reform, and a redeploy ships a new file anyway.
+    gemarkung_cache_ttl_s: int = 24 * 3600
 
 
 class BorisSettings(BaseSettings):
@@ -178,6 +185,13 @@ class OverpassSettings(BaseSettings):
     origin_precision: int = 3
     # Safety margin added to the queried radius to cover that rounding.
     origin_margin_m: int = 200
+    # Building outlines are asked for in tens of metres, not kilometres, so the
+    # rounding above would turn an 80 m question into a 1 200 m answer -- 1 670
+    # buildings for one plot, measured against Mölkau. Four decimal places is
+    # about 11 m, and the margin covers that.
+    building_origin_precision: int = 4
+    building_radius_step_m: int = 50
+    building_origin_margin_m: int = 25
 
 
 class TilesSettings(BaseSettings):

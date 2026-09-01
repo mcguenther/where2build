@@ -4,4 +4,8 @@
 __pycache__/
 *.pyc
 .pytest_cache/
-data/
+# The POI index is a build artefact (hundreds of MB of extract behind it);
+# the Gemarkung directory next to it is committed, so this is not a whole dir.
+data/poi-sachsen.json*
+data/*.osm.pbf
+*.egg-info/

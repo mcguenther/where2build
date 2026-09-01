@@ -456,6 +456,163 @@ function searchPlacement(envelope, width, depth, options) {
 /** Does this footprint fit anywhere at all? Cheaper to read than findPlacement. */
 export const fitsAnywhere = (envelope, width, depth) => findPlacement(envelope, width, depth) !== null;
 
+/** All four corners inside: the whole validity test for a placed footprint. */
+function insideEnvelope(placement, envelope) {
+  const corners = rectangleCorners(placement);
+  for (let i = 0; i < 4; i++) if (!pointInPolygon(corners[i], envelope)) return false;
+  return true;
+}
+
+/* Sixteen halvings leave the stop within a ten-thousandth of the requested
+ * move — far below a pixel at any scale this plan is drawn at, and a fixed
+ * cost so a pointer move never gets slower the further it travels. */
+const SLIDE_STEPS = 16;
+
+/**
+ * The far end of the longest part of `dx, dy` that keeps the footprint inside.
+ * The whole move first, then bisection between the last position known to be
+ * legal and the requested one.
+ */
+function reachAlong(envelope, shape, from, dx, dy) {
+  const at = t => ({ ...shape, cx: from.cx + dx * t, cy: from.cy + dy * t });
+  if (insideEnvelope(at(1), envelope)) return { cx: from.cx + dx, cy: from.cy + dy };
+  let legal = 0, blocked = 1;
+  for (let i = 0; i < SLIDE_STEPS; i++) {
+    const middle = (legal + blocked) / 2;
+    if (insideEnvelope(at(middle), envelope)) legal = middle; else blocked = middle;
+  }
+  return { cx: from.cx + dx * legal, cy: from.cy + dy * legal };
+}
+
+/**
+ * Where a footprint dragged from `placement` towards `wanted` is allowed to end
+ * up: the position closest to `wanted` that still has all four corners in the
+ * envelope. Returns `{cx, cy}`.
+ *
+ * Three candidates are tried — the whole move, the move in x alone, the move in
+ * y alone — each cut back to the part of it that stays legal, and the one that
+ * comes nearest to `wanted` wins. That is what makes the footprint slide along
+ * a boundary it is pushed into instead of stopping dead against it, and it
+ * leaves a drag far past the boundary standing at the boundary rather than
+ * snapping back to where it started.
+ *
+ * The constraint gives itself up wherever there is nothing to enforce: an
+ * envelope of fewer than three points, a footprint that fits nowhere at this
+ * angle, or one that is already outside. Holding a drag inside a window that
+ * does not exist would only mean the house could not be moved at all; the
+ * violation markers say what is wrong instead.
+ */
+export function constrainToEnvelope(envelope, placement, wanted) {
+  const target = { cx: wanted.cx, cy: wanted.cy };
+  if (!envelope || envelope.length < 3) return target;
+
+  /* Both of these are read a few thousand times below, and a Vue prop charges
+     a proxy trap per property read. Copy once at the door — see plainRing. */
+  const ring = plainRing(envelope);
+  const shape = { width: placement.width, depth: placement.depth, rotation: placement.rotation };
+  if (insideEnvelope({ ...shape, ...target }, ring)) return target;
+
+  if (!findPlacement(ring, shape.width, shape.depth, { rotation: shape.rotation })) return target;
+
+  const from = { cx: placement.cx, cy: placement.cy };
+  // A slide needs somewhere legal to slide from.
+  if (!insideEnvelope({ ...shape, ...from }, ring)) return target;
+
+  const dx = target.cx - from.cx, dy = target.cy - from.cy;
+  let best = from;
+  let shortest = Math.hypot(dx, dy);
+  for (const [mx, my] of [[dx, dy], [dx, 0], [0, dy]]) {
+    if (!mx && !my) continue;
+    const candidate = reachAlong(ring, shape, from, mx, my);
+    const distance = Math.hypot(target.cx - candidate.cx, target.cy - candidate.cy);
+    if (distance < shortest) { shortest = distance; best = candidate; }
+  }
+  return best;
+}
+
+/* § 6 Abs. 5 SächsBO: 0,4 H, at least 3 m. The floor is all that can be used
+   for a neighbour, because no OSM tag gives a wall height — see
+   docs/research/abstandsflaechen-nachbargebaeude.md. */
+const NEIGHBOUR_MINIMUM_M = 3;
+
+/** Beyond this from the boundary a neighbouring wall cannot reach onto us. */
+const NEIGHBOUR_REACH_M = 25;
+
+/** Shortest distance between two segments, or 0 where they cross. */
+function segmentDistance(a1, a2, b1, b2) {
+  return Math.min(
+    distanceToSegment(a1, b1, b2), distanceToSegment(a2, b1, b2),
+    distanceToSegment(b1, a1, a2), distanceToSegment(b2, a1, a2)
+  );
+}
+
+/**
+ * Per boundary segment, how close the nearest neighbouring building comes to
+ * it. `Infinity` where nothing is near enough to matter.
+ *
+ * Indexed like everything `buildableArea` consumes: by the edges of the ring
+ * turned counter-clockwise, not of the ring as it came in.
+ */
+export function neighbourDistances(ring, buildings, options = {}) {
+  const reach = options.reach ?? NEIGHBOUR_REACH_M;
+  const poly = asCounterClockwise(plainRing(ring));
+  const edges = polygonEdges(poly);
+  const distances = edges.map(() => Infinity);
+  if (!Array.isArray(buildings) || !buildings.length) return distances;
+
+  const outlines = [];
+  for (const building of buildings) {
+    const outline = plainRing(Array.isArray(building) ? building : building.ring ?? []);
+    if (outline.length < 3) continue;
+    /* Our own house, if OSM has it, is not a neighbour. A footprint whose
+       centre lies inside the parcel is on this plot, not next to it. */
+    if (pointInPolygon(polygonCentroid(outline), poly)) continue;
+    outlines.push(outline);
+  }
+
+  for (let i = 0; i < edges.length; i++) {
+    const { a, b } = edges[i];
+    for (const outline of outlines) {
+      for (let j = 0; j < outline.length; j++) {
+        const c = outline[j], d = outline[(j + 1) % outline.length];
+        const gap = segmentDistance(a, b, c, d);
+        if (gap < distances[i]) distances[i] = gap;
+      }
+    }
+    if (distances[i] > reach) distances[i] = Infinity;
+  }
+  return distances;
+}
+
+/**
+ * The setback depths as they would have to be for the neighbouring building's
+ * own minimum setback to clear ours.
+ *
+ * Not a legal requirement, and the interface must not present it as one:
+ * § 6 Abs. 2 SächsBO puts each building's setback area on its own plot, so a
+ * neighbour standing too close is their problem, not a deeper obligation for
+ * us. What this marks is the strip where the two areas would overlap — where
+ * the pair of buildings ends up closer than the 3 + 3 m the statute produces
+ * in its minimal case, which is a question for the building authority.
+ *
+ * `depth[i] + max(0, 3 − d[i])`: exactly how far the neighbour's own minimum
+ * reaches across the boundary onto us. Where the neighbour is 3 m clear or
+ * nothing is near, this is the ordinary setback and nothing extra is drawn.
+ */
+export function neighbourSetbackDepths(ring, depths, buildings, options = {}) {
+  const minimum = options.minimum ?? NEIGHBOUR_MINIMUM_M;
+  const own = plainDepths(depths, ring.length);
+  const distances = neighbourDistances(ring, buildings, options);
+  return distances.map((distance, i) => {
+    const base = Array.isArray(own) ? own[i] : own;
+    return Number.isFinite(distance) ? base + Math.max(0, minimum - distance) : base;
+  });
+}
+
+/** Does any segment ask for more than the statutory setback? */
+export const hasNeighbourHint = (own, hint) =>
+  Array.isArray(hint) && hint.some((depth, i) => depth > (Array.isArray(own) ? own[i] : own) + 1e-9);
+
 /**
  * Rotation in degrees that lays the footprint's long side parallel to a parcel
  * edge — normally the street front, which is what people actually build to.

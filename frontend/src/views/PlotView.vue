@@ -49,6 +49,10 @@
                   @click="state.plan.showSetbacks = !state.plan.showSetbacks">Abstandsflächen</button>
           <button type="button" class="toggle" :aria-pressed="String(state.plan.measuring)"
                   @click="toggleMeasuring">Messen</button>
+          <button type="button" class="toggle" :disabled="!hasAnchor"
+                  :title="hasAnchor ? null : 'Ohne Koordinate lassen sich keine Nachbargebäude finden.'"
+                  :aria-pressed="String(showNeighbours)"
+                  @click="toggleNeighbours">Nachbarn</button>
         </div>
 
         <p class="notice" :class="violation ? 'notice--error' : 'notice--good'" role="status">
@@ -60,6 +64,23 @@
             <b>Baukörper liegt im Bebauungsfenster.</b>
             Geringster Grenzabstand {{ metres(narrowestSetback) }}.
           </span>
+        </p>
+
+        <p v-if="showNeighbours" class="notice neighbour-note" role="status">
+          <span v-if="neighboursBusy">Nachbargebäude werden geholt …</span>
+          <span v-else-if="neighboursError">{{ neighboursError }}</span>
+          <span v-else-if="neighbourHint">
+            <b>Schraffiert: hier reicht die Abstandsfläche des Nachbargebäudes herüber.</b>
+            § 6 SächsBO verlangt das nicht von uns — jedes Gebäude hält seine Abstandsfläche
+            auf dem eigenen Grundstück. Wo beide sich überdecken würden, ist das eine Frage
+            an die Bauaufsicht, keine Prüfung. Umrisse aus OpenStreetMap, ohne Wandhöhen,
+            gerechnet mit dem Mindestmaß von 3 m.
+          </span>
+          <span v-else-if="neighbourBuildings.length">
+            <b>Kein Nachbargebäude steht näher als 3 m an der Grenze.</b>
+            {{ neighbourBuildings.length }} Umrisse aus OpenStreetMap geprüft.
+          </span>
+          <span v-else>In der Umgebung ist in OpenStreetMap kein Gebäude erfasst.</span>
         </p>
 
         <p v-if="state.plan.measuring" class="notice measure-bar">
@@ -74,6 +95,7 @@
                   :measuring="state.plan.measuring" @measured="m => (measurement = m)"
                   :backdrop="state.plan.backdrop" :north-up="state.plan.northUp"
                   :show-dimensions="state.plan.showDimensions" :show-setbacks="state.plan.showSetbacks"
+                  :confine-to-envelope="confineHouse" :neighbour-depths="neighbourDepths"
                   @move="moveHouse" />
 
         <div class="plan-foot">
@@ -189,16 +211,24 @@
         <div v-if="isCustomSize" class="custom-size no-print">
           <div class="field">
             <label for="custom-length">Länge</label>
-            <input id="custom-length" type="number" min="4" max="30" step="0.1"
-                   :value="customSize.length" @input="setCustomSize('length', $event.target.value)">
+            <input id="custom-length" type="number" :min="MIN_EDGE" :max="MAX_EDGE" step="0.1"
+                   :value="customField('length')" @input="typeCustomSize('length', $event.target.value)"
+                   @change="commitCustomSize('length')" @blur="commitCustomSize('length')"
+                   @keyup.enter="commitCustomSize('length')">
           </div>
           <div class="field">
             <label for="custom-width">Breite</label>
-            <input id="custom-width" type="number" min="4" max="30" step="0.1"
-                   :value="customSize.width" @input="setCustomSize('width', $event.target.value)">
+            <input id="custom-width" type="number" :min="MIN_EDGE" :max="MAX_EDGE" step="0.1"
+                   :value="customField('width')" @input="typeCustomSize('width', $event.target.value)"
+                   @change="commitCustomSize('width')" @blur="commitCustomSize('width')"
+                   @keyup.enter="commitCustomSize('width')">
           </div>
-          <p class="custom-size__hint">
-            Ergibt {{ area(customSize.length * customSize.width, 1) }} bebaute Fläche.
+          <p class="custom-size__hint" :class="{ 'custom-size__hint--warn': customSizeOutOfRange }">
+            <template v-if="customSizeOutOfRange">
+              Beim Verlassen des Feldes wird auf 4 m bis 30 m gesetzt; gezeichnet ist weiter
+              {{ num(customSize.length, 1) }} × {{ num(customSize.width, 1) }} m.
+            </template>
+            <template v-else>Ergibt {{ area(customSize.length * customSize.width, 1) }} bebaute Fläche.</template>
             Kantenlängen unter 4 m oder über 30 m sind kein Haus, sondern ein Tippfehler.
           </p>
           <button v-if="!naming" type="button" class="btn btn--secondary btn--small" @click="startNaming">
@@ -261,6 +291,17 @@
           <input id="rotation" type="range" min="-90" max="90" step="1"
                  :value="plot.house.rotation" @input="setRotation($event.target.value)">
           <p class="slider__hint">Haus mit der Maus ziehen, mit den Pfeiltasten fein verschieben.</p>
+        </div>
+
+        <div class="confine no-print">
+          <button type="button" class="toggle" :aria-pressed="String(confineHouse)"
+                  @click="toggleConfine">Im Bebauungsfenster halten</button>
+          <p class="slider__hint">
+            Der Baukörper lässt sich dann nicht über die Abstandsflächen hinausschieben:
+            Ziehen und Pfeiltasten enden an der Grenze des Fensters, an der er entlanggleitet.
+            Passt er überhaupt nirgends hinein, greift die Begrenzung nicht — dann ist er frei
+            verschiebbar, und die roten Ecken zeigen, wo er hinausragt.
+          </p>
         </div>
       </section>
 
@@ -345,14 +386,19 @@ import {
   state, plotById, placement, houseTypeById, houseFootprint, save, addHouseType,
   newId, setRoutes, CUSTOM_SIZE, DEFAULT_FOOTPRINT
 } from "../lib/store.js";
-import { reachability } from "../lib/api.js";
+import { reachability, neighbourBuildings as fetchNeighbourBuildings } from "../lib/api.js";
 import { zubringerOf } from "../lib/routes.js";
+import { toLocal } from "../lib/projection.js";
 import { plotMetrics } from "../lib/metrics.js";
 import {
   polygonEdges, edgeCompass, buildableArea, cornersOutside, smallestSetback,
-  alignToEdge, alignmentToEdge
+  alignToEdge, alignmentToEdge, findPlacement, neighbourSetbackDepths, hasNeighbourHint
 } from "../lib/geometry.js";
 import { area, euro, euroPerSqm, metres, num, percent, degrees, date } from "../lib/format.js";
+
+/** Edge lengths a house can plausibly have, in metres. Anything outside is a typo. */
+const MIN_EDGE = 4;
+const MAX_EDGE = 30;
 
 export default {
   name: "PlotView",
@@ -363,10 +409,19 @@ export default {
   },
   data() {
     return {
-      state, CUSTOM_SIZE,
+      state, CUSTOM_SIZE, MIN_EDGE, MAX_EDGE,
+      /** What stands in the two edge-length fields while they are being typed
+       *  in. `null` means nobody is editing, so the stored size is shown. */
+      sizeDraft: { length: null, width: null },
       measurement: { points: [], length: 0 },
       naming: false,
       typeName: "",
+      /** Outlines are not stored with the plot: they are somebody else's data,
+       *  they are large, and the backend keeps them for a month anyway. Only
+       *  the preference lives in the document. */
+      neighbourBuildings: [],
+      neighboursBusy: false,
+      neighboursError: null,
       routesBusy: false,
       routesError: null,
       backdrops: [
@@ -392,6 +447,16 @@ export default {
      * watched computed is evaluated whether or not the template reached it, and
      * the id in the URL may name no plot in this browser at all. */
     customSize() { return this.plot?.customSize || DEFAULT_FOOTPRINT; },
+    /** True while a field holds something that is not a usable edge length —
+     *  an empty field included. The stored size is untouched in that state. */
+    customSizeOutOfRange() {
+      return ["length", "width"].some(field => {
+        const draft = this.sizeDraft[field];
+        if (draft === null) return false;
+        const entered = parseFloat(draft);
+        return !Number.isFinite(entered) || entered < MIN_EDGE || entered > MAX_EDGE;
+      });
+    },
     builtArea() {
       const f = houseFootprint(this.plot);
       return f.width * f.depth;
@@ -400,6 +465,33 @@ export default {
     dimensionLabel() { return `${num(this.customSize.length, 1)} × ${num(this.customSize.width, 1)} m`; },
     metrics() { return plotMetrics(this.plot); },
     envelope() { return buildableArea(this.plot.polygon, this.plot.setbacks); },
+    /* Stored with the plot, and on unless it was switched off: documents
+       written before the setting existed carry no field, and those plots have
+       always been dragged with the house kept inside as of this version. */
+    confineHouse() { return this.plot?.confineHouse !== false; },
+    showNeighbours() { return Boolean(this.plot?.showNeighbours) && this.hasAnchor; },
+    /** The outlines in this plot's own metre frame. */
+    neighbourOutlines() {
+      if (!this.showNeighbours || !this.plot.anchor) return [];
+      return this.neighbourBuildings.map(b => toLocal(b.umriss, this.plot.anchor));
+    },
+    neighbourDepths() {
+      if (!this.neighbourOutlines.length) return null;
+      return neighbourSetbackDepths(this.plot.polygon, this.plot.setbacks, this.neighbourOutlines);
+    },
+    neighbourHint() {
+      return Boolean(this.neighbourDepths)
+        && hasNeighbourHint(this.plot.setbacks, this.neighbourDepths);
+    },
+    /** What the house *is*, apart from where it stands. A change to any of it
+     *  can leave the house outside a window it was inside a moment ago. */
+    houseShape() {
+      // A watcher reads this on every update, including the one that renders
+      // the "no such plot" notice, where there is no house to describe.
+      if (!this.plot) return "";
+      return [this.building.width, this.building.depth, this.building.rotation,
+              ...this.plot.setbacks].join("|");
+    },
     outliers() { return cornersOutside(this.building, this.envelope); },
     violation() { return this.outliers > 0; },
     narrowestSetback() { return smallestSetback(this.building, this.plot.polygon); },
@@ -419,11 +511,26 @@ export default {
     hasPrevious() { return this.index > 0; },
     hasNext() { return this.index < state.data.plots.length - 1; }
   },
+  /* A plot that was left with the neighbour hint on comes back with it on, so
+     the outlines have to be fetched again — they are not in the document. */
+  created() { if (this.showNeighbours) this.loadNeighbours(); },
   watch: {
     /** A default nobody has touched follows the fields above it. */
     dimensionLabel(next, previous) {
       if (this.naming && this.typeName === previous) this.typeName = next;
-    }
+    },
+    /* Another plot in the same view: its outlines are somewhere else. */
+    "plot.id"() {
+      this.neighbourBuildings = [];
+      this.neighboursError = null;
+      if (this.showNeighbours) this.loadNeighbours();
+    },
+    /* Another house type, other dimensions, another angle, deeper setbacks: any
+       of them can push a house that was inside out of the window, and with the
+       constraint on, dragging can no longer be what puts it back. So it is put
+       back once, here. Only the shape is watched — the position is not, or
+       every drag would fight the correction. */
+    houseShape() { this.reseatHouse(); }
   },
   methods: {
     /** Ask the routing service for every located destination at once and keep
@@ -503,6 +610,7 @@ export default {
     setHouseType(id) {
       this.naming = false;
       this.plot.houseTypeId = id;
+      this.sizeDraft = { length: null, width: null };
       if (id === CUSTOM_SIZE) {
         this.plot.customSize ||= {
           length: Math.round(this.building.width * 10) / 10,
@@ -514,10 +622,33 @@ export default {
       }
       save();
     },
-    setCustomSize(field, value) {
-      const v = parseFloat(value);
-      if (!Number.isFinite(v)) return;
-      this.plot.customSize = { ...this.customSize, [field]: Math.min(30, Math.max(4, v)) };
+    customField(field) {
+      const draft = this.sizeDraft[field];
+      return draft === null ? this.customSize[field] : draft;
+    },
+    /**
+     * Typing must never rewrite what is in the field: on the way to 14 the
+     * digit 1 is not a 4 m house, it is half of a number. The text therefore
+     * stands as entered, and only a plausible value reaches the drawing.
+     */
+    typeCustomSize(field, value) {
+      this.sizeDraft[field] = value;
+      const entered = parseFloat(value);
+      if (!Number.isFinite(entered) || entered < MIN_EDGE || entered > MAX_EDGE) return;
+      this.storeCustomSize(field, entered);
+    },
+    /** Leaving the field ends the entry: now it is clamped, and an unusable
+     *  entry falls back to the size that is stored rather than to nothing. */
+    commitCustomSize(field) {
+      const entered = parseFloat(this.sizeDraft[field]);
+      if (Number.isFinite(entered)) {
+        this.storeCustomSize(field, Math.min(MAX_EDGE, Math.max(MIN_EDGE, entered)));
+      }
+      this.sizeDraft[field] = null;
+    },
+    storeCustomSize(field, value) {
+      if (this.customSize[field] === value) return;
+      this.plot.customSize = { ...this.customSize, [field]: value };
       save();
     },
     /** Step one of saving: the catalogue is a list people read later, so a
@@ -548,6 +679,47 @@ export default {
     alignToStreet() {
       const next = alignToEdge(this.plot.polygon, this.envelope, this.building, this.plot.streetEdge ?? 0);
       this.plot.house = { cx: next.cx, cy: next.cy, rotation: Math.round(next.rotation * 10) / 10 };
+      save();
+    },
+    toggleNeighbours() {
+      this.plot.showNeighbours = !this.plot.showNeighbours;
+      save();
+      if (this.plot.showNeighbours) this.loadNeighbours();
+    },
+    /** One question per plot; the backend answers repeats from disk. */
+    async loadNeighbours() {
+      if (!this.plot?.anchor || this.neighbourBuildings.length || this.neighboursBusy) return;
+      this.neighboursBusy = true;
+      this.neighboursError = null;
+      try {
+        const answer = await fetchNeighbourBuildings(this.plot.anchor.lat, this.plot.anchor.lon);
+        this.neighbourBuildings = answer?.gebaeude ?? [];
+      } catch (error) {
+        this.neighboursError = error.message;
+      } finally {
+        this.neighboursBusy = false;
+      }
+    },
+    toggleConfine() {
+      this.plot.confineHouse = !this.confineHouse;
+      save();
+      // Switching it on with the house already outside would otherwise leave a
+      // violation that dragging can no longer undo.
+      this.reseatHouse();
+    },
+    /** Back into the window, once, after something other than a drag put the
+     *  house outside it. Keeps the angle and stays as near the old position as
+     *  the window allows; does nothing if the footprint fits nowhere. */
+    reseatHouse() {
+      if (!this.plot || !this.confineHouse) return;
+      if (!cornersOutside(this.building, this.envelope)) return;
+      const seat = findPlacement(this.envelope, this.building.width, this.building.depth, {
+        rotation: this.building.rotation,
+        near: { x: this.building.cx, y: this.building.cy }
+      });
+      if (!seat) return;
+      this.plot.house.cx = seat.cx;
+      this.plot.house.cy = seat.cy;
       save();
     }
   }
@@ -638,4 +810,8 @@ export default {
 .naming__buttons{ display: flex; flex-wrap: wrap; gap: var(--w2b-space-2); }
 .naming__hint{ font-size: var(--w2b-text-xs); color: var(--w2b-secondary-text); }
 .align{ display: flex; flex-direction: column; gap: var(--w2b-space-2); padding: var(--w2b-space-3) var(--w2b-space-4); border-top: 1px solid var(--w2b-line-faint); }
+.custom-size__hint--warn{ color: var(--w2b-warning-text); }
+.neighbour-note{ font-size: var(--w2b-text-xs); }
+.align, .confine{ display: flex; flex-direction: column; align-items: flex-start; gap: var(--w2b-space-2); padding: var(--w2b-space-3) var(--w2b-space-4); border-top: 1px solid var(--w2b-line-faint); }
+
 </style>
