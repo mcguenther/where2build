@@ -10,7 +10,8 @@ import { mount } from "@vue/test-utils";
 import RouteCards from "../src/components/RouteCards.vue";
 import { state, validate } from "../src/lib/store.js";
 import {
-  routeBounds, fitBounds, toScreen, toPolyline, coordinatesOf, fastestMode, groundWidth
+  routeBounds, fitBounds, toScreen, toPolyline, coordinatesOf, fastestMode, groundWidth,
+  routeAspect, sketchFrame, frameGroundWidth
 } from "../src/lib/routes.js";
 import { realPlot, realRoutes, realDestinations } from "./helpers.js";
 
@@ -142,8 +143,15 @@ describe("Wegekarten mit echten Daten", () => {
     const w = mount(RouteCards, { props: { plot: plot() } });
     const firstCard = w.findAll("article")[0].findAll("polyline");
     const thickest = firstCard[firstCard.length - 1];
-    expect(thickest.attributes("stroke-width")).toBe("3.4");
+    // Stroke widths are user units and follow the frame, so what is asserted
+    // is the relation: the fastest mode is the last drawn, the widest and the
+    // only one at full opacity.
+    const width = line => Number(line.attributes("stroke-width"));
     expect(thickest.attributes("opacity")).toBe("1");
+    firstCard.slice(0, -1).forEach(line => {
+      expect(width(line)).toBeLessThan(width(thickest));
+      expect(line.attributes("opacity")).toBe("0.45");
+    });
   });
 
   it("nennt den Stand der Berechnung und die Quelle", () => {
@@ -237,5 +245,125 @@ describe("Nachprüfbarkeit und Begründung", () => {
     w.findAll(".route-card__links").forEach(p => {
       expect(p.classes()).toContain("no-print");
     });
+  });
+});
+
+describe("Bildformat nach Streckenverlauf", () => {
+  const linesTo = id => ["car", "bike", "transit"]
+    .map(m => coordinatesOf(state.data.plots[0].routes[id].modes[m]?.geometry))
+    .filter(Boolean);
+  const boundsTo = id => routeBounds(linesTo(id));
+
+  it("erkennt, in welche Richtung eine echte Strecke läuft", () => {
+    // Liebertwolkwitz to the Hauptbahnhof: 5.6 km east-west against 7.3 km
+    // north-south, so the route runs up the picture, not across it. The way to
+    // the primary school is the other case — it lies along the village street.
+    expect(routeAspect(boundsTo(HBF))).toBeLessThan(1);
+    expect(routeAspect(boundsTo(SCHOOL))).toBeGreaterThan(1.5);
+  });
+
+  it("gibt der nord-südlichen Strecke ein höheres Bild als der ost-westlichen", () => {
+    const north = sketchFrame(boundsTo(HBF), 620, 1.1, 2.6);
+    const east = sketchFrame(boundsTo(SCHOOL), 620, 1.1, 2.6);
+    expect(north.width).toBe(east.width);
+    expect(north.height).toBeGreaterThan(east.height);
+    // And neither is the 2:1 both used to get regardless of their course.
+    expect(north.height).toBeGreaterThan(310);
+    expect(east.height).toBeLessThan(420);
+  });
+
+  it("hält das Bild in den Grenzen des Formats", () => {
+    // Followed to the letter, the school run would be a strip and a route due
+    // north a column taller than the screen.
+    [HBF, SCHOOL].forEach(id => {
+      const frame = sketchFrame(boundsTo(id), 420, 0.8, 2.2);
+      expect(frame.aspect).toBeGreaterThanOrEqual(0.8);
+      expect(frame.aspect).toBeLessThanOrEqual(2.2);
+      expect(frame.height).toBeLessThanOrEqual(420 / 0.8);
+    });
+    const extreme = { ...boundsTo(HBF), minX: 0, maxX: 1e-9 };
+    expect(sketchFrame(extreme, 420, 0.8, 2.2).aspect).toBe(0.8);
+  });
+
+  it("füllt das Bild, solange der Verlauf im Rahmen des Formats liegt", () => {
+    // The point of fitting the frame to the route: within the clamp the drawing
+    // touches both margins instead of leaving two empty bands.
+    const bounds = boundsTo(SCHOOL);
+    const frame = sketchFrame(bounds, 620, 1.1, 2.6);
+    const fit = fitBounds(bounds, frame.width, frame.height, frame.padding);
+    const drawnWidth = (bounds.maxX - bounds.minX) * fit.scale;
+    const drawnHeight = (bounds.maxY - bounds.minY) * fit.scale;
+    // Not to the pixel: the frame's height is a whole number of user units.
+    expect(drawnWidth / (frame.width - 2 * frame.padding)).toBeGreaterThan(0.99);
+    expect(drawnHeight / (frame.height - 2 * frame.padding)).toBeGreaterThan(0.99);
+  });
+
+  it("misst für die Bildunterschrift den Rahmen, nicht die Strecke", () => {
+    // A route due north spans almost no longitude; its own box would be
+    // labelled a few metres wide while the picture drawn covers kilometres.
+    const bounds = boundsTo(HBF);
+    const frame = sketchFrame(bounds, 620, 1.1, 2.6);
+    const fit = fitBounds(bounds, frame.width, frame.height, frame.padding);
+    const framed = frameGroundWidth(bounds, fit, frame.width);
+    expect(framed).toBeGreaterThan(groundWidth(bounds));
+    expect(framed).toBeLessThan(3 * groundWidth(bounds));
+    expect(frameGroundWidth(bounds, { scale: 0 }, 620)).toBe(0);
+  });
+});
+
+describe("Aufteilung der Zeile", () => {
+  const withDestinations = count => {
+    const source = realDestinations();
+    // The first two keep the ids the recorded routes lead to; anything beyond
+    // that only has to make up the count.
+    const destinations = Array.from({ length: count }, (_, i) => {
+      const original = source[i % source.length];
+      return i < source.length ? original : { ...original, id: `${original.id}-${i}` };
+    });
+    return validate({
+      version: 2, plots: [{ ...realPlot("convex"), routes: realRoutes() }],
+      houseTypes: [], destinations, selection: []
+    });
+  };
+  const columns = wrapper => wrapper.find(".route-grid").attributes("style");
+
+  it("gibt einem einzelnen Ziel die ganze Zeile", () => {
+    state.data = withDestinations(1);
+    const w = mount(RouteCards, { props: { plot: state.data.plots[0] } });
+    expect(columns(w)).toContain("--route-columns: 1");
+    expect(w.find("article").classes()).toContain("route-card--wide");
+  });
+
+  it("teilt die Zeile bei zwei Zielen zur Hälfte", () => {
+    state.data = withDestinations(2);
+    const w = mount(RouteCards, { props: { plot: state.data.plots[0] } });
+    expect(columns(w)).toContain("--route-columns: 2");
+    expect(w.find("article").classes()).not.toContain("route-card--wide");
+  });
+
+  it("stellt vier Ziele zwei mal zwei, nicht drei und eines", () => {
+    state.data = withDestinations(4);
+    expect(columns(mount(RouteCards, { props: { plot: state.data.plots[0] } }))).toContain("--route-columns: 2");
+  });
+
+  it("bricht ab drei Zielen nach dreien um", () => {
+    state.data = withDestinations(5);
+    const style = columns(mount(RouteCards, { props: { plot: state.data.plots[0] } }));
+    expect(style).toContain("--route-columns: 3");
+    // Three across is too narrow below the wide breakpoint.
+    expect(style).toContain("--route-columns-mid: 2");
+  });
+
+  it("zeichnet für die breitere Zeile ein größeres Bild, nicht dasselbe skaliert", () => {
+    // The frame fixes the raster zoom, so a card stretched over the full width
+    // has to be drawn in more user units or its ground arrives blurred.
+    const boxOf = data => {
+      state.data = data;
+      return mount(RouteCards, { props: { plot: state.data.plots[0] } })
+        .find("svg").attributes("viewBox").split(" ").map(Number);
+    };
+    const alone = boxOf(withDestinations(1));
+    const crowded = boxOf(withDestinations(5));
+    expect(alone[2]).toBeGreaterThan(crowded[2]);
   });
 });
