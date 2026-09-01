@@ -87,6 +87,47 @@ export function groundWidth(bounds) {
 }
 
 /**
+ * How wide the fitted frame is on the ground, in metres — the box, not the
+ * route inside it. A route running due north spans almost no longitude, so the
+ * extent of its bounding box says nothing about the picture drawn around it.
+ */
+export function frameGroundWidth(bounds, fit, width) {
+  if (!bounds || !fit || !(fit.scale > 0)) return 0;
+  const meanLatitude = ((bounds.minLat + bounds.maxLat) / 2) * RADIANS_PER_DEGREE;
+  return (width / fit.scale) * 6378137 * Math.cos(meanLatitude);
+}
+
+/**
+ * The proportions of a route: the projected box's width over its height.
+ * Above 1 it runs east-west, below it north-south. This is what decides how
+ * tall a card's drawing has to be — a frame of one fixed shape gives a route
+ * due north two empty margins and a motorway run to the next town a strip.
+ */
+export function routeAspect(bounds) {
+  if (!bounds) return 1;
+  const w = Math.max(bounds.maxX - bounds.minX, 1e-9);
+  const h = Math.max(bounds.maxY - bounds.minY, 1e-9);
+  return w / h;
+}
+
+/**
+ * A drawing frame, in SVG user units, that follows the route's own shape.
+ *
+ * The bounds are clamped before they become a frame: followed exactly, a
+ * commute along the B6 would be a 30-unit strip and a route due north a column
+ * taller than the screen. Inside the clamp the frame is exact, so the fit does
+ * not letterbox and the raster ground fills the picture rather than the paper
+ * colour. The padding is a fraction of the width, not a constant: the same
+ * 12 units that keep a line off the edge of a 300-unit card are invisible on a
+ * 960-unit one.
+ */
+export function sketchFrame(bounds, width, minAspect = 0.8, maxAspect = 2.2) {
+  const padding = Math.round(width / 25);
+  const aspect = Math.min(maxAspect, Math.max(minAspect, routeAspect(bounds)));
+  return { width, height: Math.round((width - 2 * padding) / aspect) + 2 * padding, padding, aspect };
+}
+
+/**
  * Fit the bounding box into `width` x `height` without distorting it: one
  * scale for both axes, the shorter one centred. A stretched map is a wrong map.
  */
@@ -164,8 +205,17 @@ const TILE_PIXELS = 256;
 /** Deepest zoom the WMS proxy is configured for. */
 const MAX_ZOOM = 19;
 
-/** Above this the card is asking for traffic, not for detail. */
+/** Above this the card is asking for traffic, not for detail — measured on the
+ *  300 x 150 frame the cards started out with. A larger frame covers
+ *  proportionally more ground at the same zoom, because the zoom is picked to
+ *  keep a tile around 256 units wide either way, so the budget grows with the
+ *  frame's area rather than holding a card alone in its row to the same two
+ *  dozen tiles as one of three. */
 const MAX_TILES = 24;
+const BASE_FRAME_AREA = 300 * 150;
+
+const tileBudget = (width, height) =>
+  Math.max(MAX_TILES, Math.round((MAX_TILES * width * height) / BASE_FRAME_AREA));
 
 /**
  * Which raster tiles cover the drawn frame, and where each one belongs.
@@ -175,7 +225,7 @@ const MAX_TILES = 24;
  * tile has to be drawn at. Returns `null` when there is no sensible cover,
  * which leaves the flat ground the card already had.
  */
-export function tileCover(fit, width, height, maxTiles = MAX_TILES) {
+export function tileCover(fit, width, height, maxTiles = tileBudget(width, height)) {
   if (!fit || !(fit.scale > 0)) return null;
   const world = 2 * Math.PI * fit.scale;              // SVG units for the whole world
   const zoom = Math.max(0, Math.min(MAX_ZOOM, Math.round(Math.log2(world / TILE_PIXELS))));
