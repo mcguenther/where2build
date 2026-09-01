@@ -1,0 +1,487 @@
+<title>Grundradar-Abgleich</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+:root{
+  --papier:#F6F7F8;
+  --blatt:#FFFFFF;
+  --tinte:#171B20;
+  --tinte-leise:#565F69;
+  --tinte-still:#7C858E;
+  --linie:#DDE2E5;
+  --linie-stark:#C2CACF;
+  --akzent:#0F5F6B;
+  --akzent-hell:#E4EFF0;
+  --akzent-kontur:#9EC3C7;
+  --geprueft:#2C6E49;
+  --geprueft-feld:#E6F0E9;
+  --blockiert:#A8321E;
+  --blockiert-feld:#F6E7E3;
+  --offen:#8A6D1F;
+  --offen-feld:#F4EEDD;
+  --mass-1:.75rem; --mass-2:1rem; --mass-3:1.5rem; --mass-4:2.25rem; --mass-5:3.5rem;
+  --sans:"IBM Plex Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --schmal:"IBM Plex Sans Condensed","IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,"Cascadia Mono",Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --papier:#101418; --blatt:#171C21; --tinte:#E8ECEF; --tinte-leise:#A3ADB5;
+    --tinte-still:#7E8890; --linie:#2A3238; --linie-stark:#3C464E;
+    --akzent:#5FBECB; --akzent-hell:#132A2E; --akzent-kontur:#2E5960;
+    --geprueft:#6FBF8E; --geprueft-feld:#15251C;
+    --blockiert:#E8836C; --blockiert-feld:#2A1815;
+    --offen:#D6B45C; --offen-feld:#26200F;
+  }
+}
+:root[data-theme="dark"]{
+  --papier:#101418; --blatt:#171C21; --tinte:#E8ECEF; --tinte-leise:#A3ADB5;
+  --tinte-still:#7E8890; --linie:#2A3238; --linie-stark:#3C464E;
+  --akzent:#5FBECB; --akzent-hell:#132A2E; --akzent-kontur:#2E5960;
+  --geprueft:#6FBF8E; --geprueft-feld:#15251C;
+  --blockiert:#E8836C; --blockiert-feld:#2A1815;
+  --offen:#D6B45C; --offen-feld:#26200F;
+}
+*{box-sizing:border-box}
+body{background:var(--papier);color:var(--tinte);font-family:var(--sans);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.blatt{max-width:78rem;margin:0 auto;padding:var(--mass-4) var(--mass-2) var(--mass-5)}
+@media(min-width:768px){.blatt{padding:var(--mass-5) var(--mass-4) 5rem}}
+
+/* --- Kopf ------------------------------------------------------------ */
+.kopf{border-bottom:2px solid var(--tinte);padding-bottom:var(--mass-3);display:flex;flex-direction:column;gap:var(--mass-2)}
+.kopf__zeile{display:flex;flex-wrap:wrap;gap:var(--mass-2);align-items:baseline;justify-content:space-between}
+.marke{font-family:var(--mono);font-size:.7rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--akzent)}
+.stand{font-family:var(--mono);font-size:.72rem;color:var(--tinte-still);letter-spacing:.04em}
+h1{font-family:var(--schmal);font-size:clamp(2.1rem,6vw,3.4rem);font-weight:700;line-height:1.02;letter-spacing:-.015em;margin:0;text-wrap:balance}
+.vorspann{font-size:1.075rem;line-height:1.62;color:var(--tinte-leise);max-width:62ch;margin:0}
+.vorspann b{color:var(--tinte);font-weight:600}
+
+/* --- Abschnitte ------------------------------------------------------ */
+section{margin-top:var(--mass-5)}
+.abschnitt-kopf{display:flex;flex-wrap:wrap;align-items:baseline;gap:.4rem var(--mass-2);border-bottom:1px solid var(--linie-stark);padding-bottom:.55rem;margin-bottom:var(--mass-3)}
+.abschnitt-kopf h2{font-family:var(--schmal);font-size:1.5rem;font-weight:600;letter-spacing:-.01em;margin:0;flex:1 1 12rem;min-width:0;text-wrap:balance}
+.abschnitt-kopf .zahl{font-family:var(--mono);font-size:.72rem;font-weight:500;color:var(--tinte-still);min-width:0}
+@media(min-width:560px){.abschnitt-kopf .zahl{white-space:nowrap}}
+p{max-width:66ch}
+section > p{margin:0 0 var(--mass-2)}
+a{color:var(--akzent);text-underline-offset:2px}
+code,.mono{font-family:var(--mono);font-size:.86em}
+code{background:var(--akzent-hell);color:var(--tinte);padding:.1em .35em;border-radius:2px;word-break:break-word}
+
+/* --- Empfehlung: drei Bahnen ----------------------------------------- */
+.bahnen{display:grid;gap:var(--mass-2);grid-template-columns:1fr}
+@media(min-width:900px){.bahnen{grid-template-columns:repeat(3,1fr)}}
+.bahn{background:var(--blatt);border:1px solid var(--linie);border-top:3px solid var(--linie-stark);padding:var(--mass-2);display:flex;flex-direction:column;gap:.7rem}
+.bahn--jetzt{border-top-color:var(--geprueft)}
+.bahn--dann{border-top-color:var(--akzent)}
+.bahn--nein{border-top-color:var(--blockiert)}
+.bahn__marke{font-family:var(--mono);font-size:.67rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase}
+.bahn--jetzt .bahn__marke{color:var(--geprueft)}
+.bahn--dann .bahn__marke{color:var(--akzent)}
+.bahn--nein .bahn__marke{color:var(--blockiert)}
+.bahn h3{font-family:var(--schmal);font-size:1.15rem;font-weight:600;margin:0;line-height:1.25}
+.bahn ul{margin:0;padding-left:1.05rem;display:flex;flex-direction:column;gap:.5rem}
+.bahn li{font-size:.9rem;line-height:1.5;color:var(--tinte-leise)}
+.bahn li b{color:var(--tinte);font-weight:600}
+
+/* --- Matrix ----------------------------------------------------------- */
+.rollfeld{overflow-x:auto;border:1px solid var(--linie);background:var(--blatt)}
+table{border-collapse:collapse;width:100%;min-width:52rem;font-size:.875rem}
+thead th{font-family:var(--mono);font-size:.66rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--tinte-still);
+  text-align:left;padding:.7rem .85rem;border-bottom:1px solid var(--linie-stark);white-space:nowrap;background:var(--blatt);position:sticky;top:0}
+tbody td{padding:.7rem .85rem;border-bottom:1px solid var(--linie);vertical-align:top;line-height:1.45}
+tbody tr:last-child td{border-bottom:0}
+tbody tr td:first-child{border-left:3px solid transparent}
+tr[data-lage="ok"] td:first-child{border-left-color:var(--geprueft)}
+tr[data-lage="aus"] td:first-child{border-left-color:var(--blockiert)}
+tr[data-lage="offen"] td:first-child{border-left-color:var(--offen)}
+.thema{font-weight:600;white-space:nowrap}
+.pfad{font-family:var(--mono);font-size:.76rem;color:var(--tinte-leise);word-break:break-all;display:block;max-width:26rem}
+.zahlen{font-variant-numeric:tabular-nums}
+
+/* Statuscode als Chip -- der gemessene Wert, nicht ein Symbol */
+.code{font-family:var(--mono);font-size:.74rem;font-weight:600;letter-spacing:.02em;padding:.16rem .42rem;border-radius:2px;white-space:nowrap;display:inline-block}
+.code--ok{background:var(--geprueft-feld);color:var(--geprueft);border:1px solid color-mix(in srgb,var(--geprueft) 32%,transparent)}
+.code--aus{background:var(--blockiert-feld);color:var(--blockiert);border:1px solid color-mix(in srgb,var(--blockiert) 32%,transparent)}
+.code--offen{background:var(--offen-feld);color:var(--offen);border:1px solid color-mix(in srgb,var(--offen) 32%,transparent)}
+.notiz{font-size:.82rem;color:var(--tinte-leise);display:block;margin-top:.2rem;max-width:34rem}
+
+/* --- Abdeckungsraster ------------------------------------------------- */
+.raster{display:grid;grid-template-columns:repeat(auto-fill,minmax(9.5rem,1fr));gap:.5rem}
+.feld{background:var(--blatt);border:1px solid var(--linie);border-left:3px solid var(--linie-stark);padding:.6rem .7rem;display:flex;flex-direction:column;gap:.2rem}
+.feld[data-lage="ok"]{border-left-color:var(--geprueft)}
+.feld[data-lage="aus"]{border-left-color:var(--blockiert)}
+.feld[data-lage="offen"]{border-left-color:var(--offen)}
+.feld__name{font-weight:600;font-size:.87rem;line-height:1.2}
+.feld__quelle{font-family:var(--mono);font-size:.68rem;color:var(--tinte-still);letter-spacing:.02em}
+
+/* --- Protokoll -------------------------------------------------------- */
+.protokoll{background:var(--blatt);border:1px solid var(--linie);display:grid;grid-template-columns:1fr}
+@media(min-width:860px){.protokoll{grid-template-columns:1fr 1fr}}
+.protokoll__teil{padding:var(--mass-2);display:flex;flex-direction:column;gap:.6rem;min-width:0}
+.protokoll__teil + .protokoll__teil{border-top:1px solid var(--linie)}
+@media(min-width:860px){.protokoll__teil + .protokoll__teil{border-top:0;border-left:1px solid var(--linie)}}
+.protokoll__marke{font-family:var(--mono);font-size:.66rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--tinte-still)}
+pre{margin:0;font-family:var(--mono);font-size:.76rem;line-height:1.55;overflow-x:auto;color:var(--tinte-leise);background:transparent;padding:0}
+pre b{color:var(--tinte);font-weight:600}
+pre .schl{color:var(--akzent)}
+.ergebnis{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;font-family:var(--mono);font-size:.78rem;font-weight:600}
+.pegel{background:var(--akzent-hell);border:1px solid var(--akzent-kontur);color:var(--tinte);padding:.2rem .5rem;border-radius:2px;font-variant-numeric:tabular-nums}
+
+/* --- Einwurf ---------------------------------------------------------- */
+.einwurf{border-left:3px solid var(--blockiert);background:var(--blockiert-feld);padding:var(--mass-2);display:flex;flex-direction:column;gap:.6rem}
+.einwurf h3{font-family:var(--schmal);font-size:1.1rem;font-weight:600;margin:0}
+.einwurf p{margin:0;font-size:.92rem;color:var(--tinte);max-width:64ch}
+.einwurf + .einwurf{margin-top:var(--mass-2)}
+
+/* --- Fallstricke ------------------------------------------------------ */
+.liste{display:flex;flex-direction:column;gap:var(--mass-2);margin:0;padding:0;list-style:none}
+.liste li{display:grid;grid-template-columns:auto 1fr;gap:.85rem;align-items:start;padding-bottom:var(--mass-2);border-bottom:1px solid var(--linie)}
+.liste li:last-child{border-bottom:0;padding-bottom:0}
+.liste .marker{font-family:var(--mono);font-size:.7rem;font-weight:600;color:var(--tinte-still);padding-top:.28rem;letter-spacing:.06em}
+.liste p{margin:0;font-size:.92rem;color:var(--tinte-leise);max-width:62ch}
+.liste b{color:var(--tinte);font-weight:600}
+
+.fuss{margin-top:var(--mass-5);padding-top:var(--mass-2);border-top:1px solid var(--linie);font-size:.82rem;color:var(--tinte-still);max-width:64ch}
+:focus-visible{outline:2px solid var(--akzent);outline-offset:2px}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="blatt">
+
+<header class="kopf">
+  <div class="kopf__zeile">
+    <span class="marke">Entscheidungsgrundlage · where2build</span>
+    <span class="stand">Prüfstand 01.09.2026 · alle Abrufe per GET</span>
+  </div>
+  <h1>Grundradar-Abgleich</h1>
+  <p class="vorspann">
+    grundradar.de prüft ein Flurstück auf 14 Risikokategorien. Wir prüfen bisher keine.
+    Dieses Blatt sagt, <b>welche davon wir mit belegten Quellen nachbauen können</b>,
+    welche an keiner offenen Schnittstelle hängen — und welche zwei Dinge wir bewusst
+    nicht übernehmen sollten. Jede Zeile trägt den Statuscode, den der Dienst an diesem
+    Tag tatsächlich geantwortet hat; keine Zeile stammt aus einer Dokumentation.
+  </p>
+</header>
+
+<section>
+  <div class="abschnitt-kopf">
+    <h2>Die Empfehlung</h2>
+    <span class="zahl">3 Bahnen</span>
+  </div>
+  <div class="bahnen">
+
+    <article class="bahn bahn--jetzt">
+      <span class="bahn__marke">Jetzt — klein und belegt</span>
+      <h3>Sucheinstieg und die drei Punktabfragen</h3>
+      <ul>
+        <li><b>Adressvorschläge beim Tippen.</b> <code>/api/geocode</code> liefert die Kandidatenliste heute schon — sie hängt nur an keinem Suchfeld. Für das Label („04316 Leipzig · Mölkau") fehlen MOTIS PLZ und Ort; Photon hat beide.</li>
+        <li><b>Karte groß, Werte als Spalte links.</b> Reines Layout, keine neue Quelle. grundradar gibt der Karte 30 % der Breite und stellt die Prüfliste daneben — bei uns ist die Karte heute Beiwerk.</li>
+        <li><b>Lärm, Trinkwasserschutz, Schutzgebiete.</b> Drei Punktabfragen gegen zwei Server, die beide antworten. Der Lärmwert ist unten am echten Flurstück durchgerechnet.</li>
+      </ul>
+    </article>
+
+    <article class="bahn bahn--dann">
+      <span class="bahn__marke">Danach — lohnt, kostet mehr</span>
+      <h3>Wo wir grundradar überholen könnten</h3>
+      <ul>
+        <li><b>Hochwasser HQ100.</b> grundradar schreibt für Sachsen „Daten nicht verfügbar". Der Risikokarten-WFS des Freistaats antwortet <span class="mono">200</span>. Das ist eine Lücke beim Vorbild, kein Gleichstand.</li>
+        <li><b>Baugrund aus Bohrprofilen.</b> <code>geologie/bohrungen</code> liegt offen — grundradar hat diese Kategorie überhaupt nicht. Für jemanden, der ein Haus setzen will, ist sie näher an der Frage als Erdbebenzone&nbsp;0.</li>
+        <li><b>Starkregen (KOSTRA-2020).</b> Rasterdaten des DWD, offenes Verzeichnis. Kein Abfragedienst — muss einmal importiert werden.</li>
+        <li><b>Luftqualität.</b> Eine JSON-API, bundesweit, ohne Schlüssel.</li>
+      </ul>
+    </article>
+
+    <article class="bahn bahn--nein">
+      <span class="bahn__marke">Nicht übernehmen</span>
+      <h3>Zwei Muster, die wir uns nicht einhandeln</h3>
+      <ul>
+        <li><b>Den GrundScore.</b> Eine Zahl aus 14 Kategorien, deren eigener Tooltip „Datenabdeckung 58 %" sagt. Siehe unten.</li>
+        <li><b>Rohwerte in der Oberfläche.</b> Im Screenshot steht <code>Klasse between_20_and_44</code> — ein Feldschlüssel der Quelle, unübersetzt.</li>
+        <li><b>Radon, Altlasten, Mobilfunk</b> jetzt zu versprechen. Für alle drei ist in diesem Durchgang <b>kein offener Endpunkt</b> aufgetaucht. Eine Kategorie, die dauerhaft „OFFEN" zeigt, kostet Vertrauen und liefert nichts.</li>
+      </ul>
+    </article>
+
+  </div>
+</section>
+
+<section>
+  <div class="abschnitt-kopf">
+    <h2>Der Mölkau-Test</h2>
+    <span class="zahl">Flurstück 204 · 51.33652, 12.44176</span>
+  </div>
+  <p>
+    Die Koordinate aus dem grundradar-Screenshot, gestellt an die sächsische Lärmkartierung.
+    Nicht um zu zeigen, dass der Dienst erreichbar ist — sondern dass die Kette bis zur
+    Aussage trägt, die im Vorbild als Karte „Lärm: ROT, Straßenlärm" steht.
+  </p>
+  <div class="protokoll">
+    <div class="protokoll__teil">
+      <span class="protokoll__marke">Anfrage</span>
+<pre><b>GET</b> luis.sachsen.de/arcgis/rest/services
+      /laerm/laermkartierung/MapServer/<b>identify</b>
+
+  <span class="schl">geometry</span>     {"x":12.44176,"y":51.33652}
+  <span class="schl">geometryType</span> esriGeometryPoint
+  <span class="schl">sr</span>           4326
+  <span class="schl">layers</span>       all:4,5,37,36,55,56
+  <span class="schl">tolerance</span>    3
+  <span class="schl">mapExtent</span>    12.43,51.33,12.45,51.34
+  <span class="schl">imageDisplay</span> 600,400,96
+  <span class="schl">f</span>            json</pre>
+    </div>
+    <div class="protokoll__teil">
+      <span class="protokoll__marke">Antwort — 3 Treffer</span>
+<pre>Hauptverkehrsstraßen LDEN (24 h)
+  CATEGORY <b>Lden5559</b>
+  CATEGORY <b>Lden5054</b>
+
+Hauptverkehrsstraßen Ln nachts (22–6 Uhr)
+  CATEGORY <b>Lnight4549</b></pre>
+      <div class="ergebnis">
+        <span class="pegel">L<sub>DEN</sub> 55–59 dB(A)</span>
+        <span class="pegel">L<sub>night</sub> 45–49 dB(A)</span>
+        <span class="mono" style="color:var(--tinte-still);font-weight:500">Quelle: Straßenverkehr</span>
+      </div>
+      <p class="notiz">
+        Die Pegel kommen als <b>5-dB-Band</b>, nicht als Einzelwert. „57 dB" wäre erfunden —
+        korrekt ist die Spanne. Ein Grundstück kann in zwei Bändern zugleich liegen, weil
+        die Isophonen es schneiden.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="abschnitt-kopf">
+    <h2>Die 14 Kategorien von grundradar</h2>
+    <span class="zahl">7 belegt · 3 offen · 4 ungeprüft</span>
+  </div>
+  <p>
+    Nach Quellenlage, nicht nach Aufwand. „Belegt" heißt: ein Dienst hat an diesem Tag auf
+    eine Anfrage geantwortet. „Offen" heißt: gesucht und nichts gefunden. „Ungeprüft" heißt
+    genau das — in diesem Durchgang nicht angefasst.
+  </p>
+  <div class="raster">
+    <div class="feld" data-lage="ok"><span class="feld__name">Lärm</span><span class="feld__quelle">LUIS Sachsen</span></div>
+    <div class="feld" data-lage="ok"><span class="feld__name">Trinkwasserschutz</span><span class="feld__quelle">LUIS Sachsen</span></div>
+    <div class="feld" data-lage="ok"><span class="feld__name">Schutzgebiet</span><span class="feld__quelle">BfN · bundesweit</span></div>
+    <div class="feld" data-lage="ok"><span class="feld__name">Hochwasser</span><span class="feld__quelle">LUIS Sachsen</span></div>
+    <div class="feld" data-lage="ok"><span class="feld__name">Luftqualität</span><span class="feld__quelle">UBA · bundesweit</span></div>
+    <div class="feld" data-lage="ok"><span class="feld__name">Starkregen</span><span class="feld__quelle">DWD KOSTRA · Import</span></div>
+    <div class="feld" data-lage="ok"><span class="feld__name">Hangneigung</span><span class="feld__quelle">BKG DGM200 · zu grob</span></div>
+    <div class="feld" data-lage="aus"><span class="feld__name">Radon</span><span class="feld__quelle">BfS · 403 / Timeout</span></div>
+    <div class="feld" data-lage="aus"><span class="feld__name">Altlasten</span><span class="feld__quelle">Sachsen: keine Daten</span></div>
+    <div class="feld" data-lage="aus"><span class="feld__name">Bodenbewegung</span><span class="feld__quelle">BGR · Pfad unbekannt</span></div>
+    <div class="feld" data-lage="offen"><span class="feld__name">Bebauungsplan</span><span class="feld__quelle">kommunal, uneinheitlich</span></div>
+    <div class="feld" data-lage="offen"><span class="feld__name">Erdbeben</span><span class="feld__quelle">ungeprüft</span></div>
+    <div class="feld" data-lage="offen"><span class="feld__name">Altbergbau</span><span class="feld__quelle">ungeprüft</span></div>
+    <div class="feld" data-lage="offen"><span class="feld__name">Fluglärm</span><span class="feld__quelle">ungeprüft</span></div>
+  </div>
+</section>
+
+<section>
+  <div class="abschnitt-kopf">
+    <h2>Was tatsächlich geantwortet hat</h2>
+    <span class="zahl">Prüfprotokoll</span>
+  </div>
+  <div class="rollfeld">
+    <table>
+      <thead>
+        <tr><th>Thema</th><th>Dienst</th><th>Antwort</th><th>Was daraus folgt</th></tr>
+      </thead>
+      <tbody>
+        <tr data-lage="ok">
+          <td class="thema">Adresssuche</td>
+          <td>Photon (komoot)<span class="pfad">photon.komoot.io/api/?q=…&amp;lang=de&amp;layer=house</span></td>
+          <td><span class="code code--ok">200 JSON</span></td>
+          <td>Liefert für „Lessingweg 44 Leipzig" alle Felder für das Dropdown: Hausnummer, PLZ <span class="zahlen mono">04316</span>, Ort, Ortsteil Mölkau, Bundesland.
+            <span class="notiz">Koordinate <span class="zahlen mono">12.4418, 51.3366</span> — rund 15 m neben dem Punkt im grundradar-Screenshot, dasselbe Grundstück. <b>Keine Behörde:</b> Betrieb bei komoot, keine zugesicherte Verfügbarkeit. Für die Produktion gilt dasselbe wie bei Overpass — selbst betreiben.</span></td>
+        </tr>
+        <tr data-lage="ok">
+          <td class="thema">Adresssuche</td>
+          <td>MOTIS <span class="mono" style="font-size:.72rem">(schon im Backend)</span><span class="pfad">…/api/v1/geocode?text=…&amp;language=de</span></td>
+          <td><span class="code code--ok">200 JSON</span></td>
+          <td>Erster Treffer <code>type: ADDRESS</code>, Hausnummer aufgelöst.
+            <span class="notiz">Aber <code>areas[0].name</code> ist nur „Deutschland" — für ein Label mit PLZ und Ortsteil reicht das nicht.</span></td>
+        </tr>
+        <tr data-lage="aus">
+          <td class="thema">Adresssuche</td>
+          <td>BKG Geokodierungsdienst<span class="pfad">sg.geodatenzentrum.de/gdz_geokodierung__&lt;key&gt;</span></td>
+          <td><span class="code code--aus">400</span></td>
+          <td>Verlangt einen Lizenzschlüssel. Als Abhängigkeit für ein Suchfeld ungeeignet.</td>
+        </tr>
+        <tr data-lage="ok">
+          <td class="thema">Lärm</td>
+          <td>LUIS Sachsen · ArcGIS REST<span class="pfad">luis.sachsen.de/arcgis/rest/services/laerm/laermkartierung</span></td>
+          <td><span class="code code--ok">200 JSON</span></td>
+          <td>Layer für Hauptverkehrsstraßen, Straßenbahn und Flughafen, je L<sub>DEN</sub> und L<sub>night</sub>.
+            <span class="notiz">REST statt WMS heißt: Punktabfrage gibt JSON zurück, kein GetFeatureInfo-Gebastel und kein UTFGrid wie bei BORIS.</span></td>
+        </tr>
+        <tr data-lage="ok">
+          <td class="thema">Alle Umweltdaten SN</td>
+          <td>LUIS Sachsen · Dienstverzeichnis<span class="pfad">luis.sachsen.de/arcgis/rest/services?f=json</span></td>
+          <td><span class="code code--ok">200 JSON</span></td>
+          <td>Ordner <code>laerm</code>, <code>wasser</code>, <code>natur</code>, <code>boden</code>, <code>geologie</code>, <code>luft</code>, <code>altlasten</code>, <code>gewaessernetz</code>.
+            <span class="notiz">Ein Server deckt fünf grundradar-Kategorien ab. <code>altlasten</code> existiert, listet aber <b>keine öffentlichen Dienste</b> — deckt sich mit grundradars eigener Aussage für Sachsen.</span></td>
+        </tr>
+        <tr data-lage="ok">
+          <td class="thema">Hochwasser</td>
+          <td>LUIS · Hochwasserrisikokarte WFS<span class="pfad">…/wasser/hochwasserrisikokarte/MapServer/WFSServer</span></td>
+          <td><span class="code code--ok">200 WFS 2.0</span></td>
+          <td>grundradar zeigt für dieselbe Lage „HQ100-Daten für Sachsen nicht verfügbar". Der Dienst antwortet.</td>
+        </tr>
+        <tr data-lage="ok">
+          <td class="thema">Trinkwasserschutz</td>
+          <td>LUIS · Wasserschutzgebiete WMS<span class="pfad">…/wasser/wasserschutzgebiete/MapServer/WMSServer</span></td>
+          <td><span class="code code--ok">200 WMS 1.3.0</span></td>
+          <td>Zonen I–III als Layer.</td>
+        </tr>
+        <tr data-lage="ok">
+          <td class="thema">Schutzgebiete</td>
+          <td>BfN Geodienste WMS · <b>bundesweit</b><span class="pfad">geodienste.bfn.de/ogc/wms/schutzgebiet</span></td>
+          <td><span class="code code--ok">200 WMS</span> <span class="code code--aus">403 ohne UA</span></td>
+          <td>NSG, LSG, Naturparke, Nationalparke, Biosphärenreservate, Vogelschutz, FFH, Nationale Naturmonumente.
+            <span class="notiz"><b>Der Dienst filtert auf User-Agent.</b> Ohne UA kommt 403 — das sieht wie eine Sperre aus und ist eine Filterregel.</span></td>
+        </tr>
+        <tr data-lage="ok">
+          <td class="thema">Luftqualität</td>
+          <td>UBA Luftdaten-API v3 · <b>bundesweit</b><span class="pfad">luftdaten.umweltbundesamt.de/api/air-data/v3/stations/json</span></td>
+          <td><span class="code code--ok">200 JSON</span></td>
+          <td>Messstationen mit NO₂, PM10, PM2,5. Ohne Schlüssel.
+            <span class="notiz">Der oft zitierte Pfad auf <code>umweltbundesamt.de</code> ist ein <b>301</b> hierher — und heißt dort <code>air-data</code>, nicht <code>air_data</code>. Wer dem 301 nicht folgt, hält die API für tot.</span></td>
+        </tr>
+        <tr data-lage="ok">
+          <td class="thema">Starkregen</td>
+          <td>DWD · KOSTRA-DWD-2020<span class="pfad">opendata.dwd.de/climate_environment/CDC/grids_germany/return_periods/precipitation/KOSTRA/</span></td>
+          <td><span class="code code--ok">200 Index</span></td>
+          <td>Offenes Verzeichnis, Rasterdaten. <b>Kein Abfragedienst</b> — einmaliger Import, dann eigene Punktabfrage.</td>
+        </tr>
+        <tr data-lage="ok">
+          <td class="thema">Gemeinde / Kreis</td>
+          <td>BKG VG250 WFS · <b>bundesweit</b><span class="pfad">sgx.geodatenzentrum.de/wfs_vg250</span></td>
+          <td><span class="code code--ok">200 WFS 2.0</span></td>
+          <td>Offen, ohne Schlüssel. Die Zuordnung Punkt → Gemeinde für den Hebesatz.</td>
+        </tr>
+        <tr data-lage="ok">
+          <td class="thema">Hangneigung</td>
+          <td>BKG DGM200 WMS<span class="pfad">sgx.geodatenzentrum.de/wms_dgm200</span></td>
+          <td><span class="code code--ok">200 WMS 1.3.0</span></td>
+          <td><b>200 m Rasterweite</b> — für ein 650-m²-Grundstück wertlos. Feinere Modelle liegen bei den Ländern.</td>
+        </tr>
+        <tr data-lage="offen">
+          <td class="thema">Hebesatz</td>
+          <td>Destatis GENESIS REST<span class="pfad">www-genesis.destatis.de/genesisWS/rest/2020/</span></td>
+          <td><span class="code code--ok">200 JSON</span> <span class="code code--offen">Tabelle ungeprüft</span></td>
+          <td>Die API antwortet. Der Tabellenabruf (71231 Realsteuern) verlangt einen kostenlosen Account — den haben wir nicht, also ist er <b>nicht geprüft</b>.</td>
+        </tr>
+        <tr data-lage="aus">
+          <td class="thema">Radon</td>
+          <td>BfS<span class="pfad">imis.bfs.de/cgi-public/wms_inspire_rn · imis.bfs.de/ogc/opendata/wms</span></td>
+          <td><span class="code code--aus">403</span> <span class="code code--aus">Timeout</span></td>
+          <td>Auch mit User-Agent 403. Das Geoportal antwortet <span class="mono">200</span>, gibt aber keinen Endpunkt preis. <b>Kein nutzbarer Zugang gefunden.</b></td>
+        </tr>
+        <tr data-lage="aus">
+          <td class="thema">Bodenbewegung</td>
+          <td>BGR BodenBewegungsdienst<span class="pfad">services.bgr.de/wms/boden/bbd/</span></td>
+          <td><span class="code code--aus">400</span></td>
+          <td>Beide versuchten Pfade sind geraten. <code>services.bgr.de/</code> selbst antwortet <span class="mono">200</span> mit einer Kurzlink-Übersicht — dort stünde der richtige Pfad. Nicht weiterverfolgt.</td>
+        </tr>
+        <tr data-lage="aus">
+          <td class="thema">Mobilfunk / Gigabit</td>
+          <td>Gigabit-Grundbuch · Breitband-Monitor<span class="pfad">gigabitgrundbuch.bund.de · breitband-monitor.de</span></td>
+          <td><span class="code code--ok">200 Portal</span> <span class="code code--aus">404 API</span> <span class="code code--aus">TLS-Fehler</span></td>
+          <td>Portalanwendungen ohne offene Schnittstelle. Woher grundradars Prozentwerte (Gigabit 89 %, Glasfaser 32 %) genau stammen, ist offen.</td>
+        </tr>
+        <tr data-lage="aus">
+          <td class="thema">Bebauungsplan</td>
+          <td>XPlanung / XLeitstelle<span class="pfad">xleitstelle.de/xplanung</span></td>
+          <td><span class="code code--ok">200 Portal</span></td>
+          <td>XPlanung ist ein <b>Datenstandard, kein Dienst</b>. Pläne liegen bei den Gemeinden; Leipzig veröffentlicht eigene. Kein einheitlicher Zugang.</td>
+        </tr>
+        <tr data-lage="aus">
+          <td class="thema">Sächsische Umwelt-WMS</td>
+          <td>geraten: <code>geodienste.sachsen.de/wms_smul_*</code></td>
+          <td><span class="code code--aus">403</span></td>
+          <td>Die Namen waren falsch, nicht der Host: der dokumentierte ALKIS-WFS auf demselben Server antwortet <span class="mono">200</span>.
+            <span class="notiz"><b>Zwei Welten:</b> auf <code>geodienste.sachsen.de</code> liegen Kataster und Karten, auf <code>luis.sachsen.de</code> die Umweltfachdaten.</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <div class="abschnitt-kopf">
+    <h2>Zwei Muster, die wir nicht übernehmen</h2>
+    <span class="zahl">Begründung</span>
+  </div>
+
+  <div class="einwurf">
+    <h3>Der GrundScore — „78/100" bei 58 % Datenabdeckung</h3>
+    <p>
+      grundradar rechnet 14 Kategorien zu einer Zahl zusammen und schreibt in denselben
+      Tooltip: <i>„Datenabdeckung 58 % (niedrig). Nicht bewertet: Hochwasser, Fluglärm,
+      Hangneigung +2 weitere."</i> Ein Wert, der zu 42 % aus fehlenden Daten besteht, ist
+      keine Aussage über das Grundstück — er ist eine Aussage über die Datenlage, die wie
+      eine Aussage über das Grundstück aussieht. Genau der Fall, den unser
+      <code>CLAUDE.md</code> ausschließt: ein abgeleiteter Wert mit fehlender Eingabe
+      bleibt <b>—</b>, er wird nicht aus <code>null</code> gerechnet.
+    </p>
+    <p>
+      Wenn eine Zusammenfassung sein muss, dann als Zähler:
+      <b>„2 zu klären · 5 ohne Befund · 4 noch nicht geprüft"</b>. Das steht bei grundradar
+      ohnehin direkt daneben, ist ehrlich und verliert nichts.
+    </p>
+  </div>
+
+  <div class="einwurf">
+    <h3>Rohwerte in der Oberfläche</h3>
+    <p>
+      Im Screenshot steht wörtlich <code>Erhöhtes Radon-Potenzial (Klasse
+      between_20_and_44)</code>. Das ist ein Feldschlüssel der Quelle, unübersetzt in einer
+      deutschsprachigen Oberfläche. Bei uns heißt „die UI ist deutsch" auch: Klassen&shy;schlüssel
+      werden übersetzt, oder das Feld bleibt leer. Dasselbe gilt für die Lärmbänder —
+      <code>Lden5559</code> wird zu <b>„55–59 dB(A)"</b>, nie zu einer erfundenen Einzelzahl.
+    </p>
+  </div>
+</section>
+
+<section>
+  <div class="abschnitt-kopf">
+    <h2>Fallstricke aus diesem Durchgang</h2>
+    <span class="zahl">5 · gehören ins CLAUDE.md</span>
+  </div>
+  <ul class="liste">
+    <li>
+      <span class="marker">403</span>
+      <p><b>Der BfN-WMS filtert auf User-Agent.</b> Ohne UA: 403. Mit beliebigem UA: 200 und vollständige Capabilities. Ein leerer User-Agent ist hier kein Netzwerkproblem, sondern eine Regel.</p>
+    </li>
+    <li>
+      <span class="marker">301</span>
+      <p><b>Die UBA-Luftdaten-API liegt nicht auf <code>umweltbundesamt.de</code>.</b> Der dokumentierte Pfad ist ein 301 auf <code>luftdaten.umweltbundesamt.de</code>, und der Pfad heißt dort <code>air-data</code> mit Bindestrich statt <code>air_data</code>.</p>
+    </li>
+    <li>
+      <span class="marker">HOST</span>
+      <p><b><code>geodienste.sachsen.de</code> und <code>luis.sachsen.de</code> sind zwei Welten.</b> Kataster und Karten auf dem einen, Umweltfachdaten auf dem anderen. Geratene <code>wms_smul_*</code>-Namen auf dem ersten geben 403 — was wie eine Sperre aussieht, aber ein falscher Pfad ist. Der Kontrollabruf des bekannten ALKIS-WFS auf demselben Host gibt 200.</p>
+    </li>
+    <li>
+      <span class="marker">ESRI</span>
+      <p><b>ArcGIS <code>identify</code> braucht <code>mapExtent</code> und <code>imageDisplay</code></b> — obwohl die Abfrage geometrisch nichts damit zu tun hat: die Toleranz wird in <i>Pixeln</i> gerechnet, und ohne Bildgröße gibt es keine Pixel. Fehlt eines von beiden, kommen null Treffer statt einer Fehlermeldung.</p>
+    </li>
+    <li>
+      <span class="marker">dB</span>
+      <p><b>Lärmpegel kommen als 5-dB-Band, nicht als Zahl.</b> <code>Lden5559</code> heißt 55–59 dB(A). Ein Grundstück kann in zwei Bändern zugleich liegen, weil die Isophone es schneidet — im Test lagen <code>Lden5559</code> und <code>Lden5054</code> beide auf dem Punkt.</p>
+    </li>
+  </ul>
+</section>
+
+<p class="fuss">
+  Recherchestand 01.09.2026. Alle Statuscodes stammen aus GET-Abrufen an diesem Tag —
+  kein HEAD, kein Zitat aus einer Dokumentation. Vollständiges Protokoll mit allen
+  Parametern in <code>docs/research/grundradar-datenquellen.md</code>. Was hier
+  „ungeprüft" heißt, ist ungeprüft und nicht etwa nicht vorhanden.
+</p>
+
+</div>
