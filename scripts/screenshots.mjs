@@ -199,8 +199,17 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
     await page.locator(".match-list__option").first().click();
     await shot(page, "ziele", mode);
 
-    // And the routes that follow from it, drawn from the geometry MOTIS sends.
+    // The overview with something on it, and the comparison mode that has to be
+    // asked for. "uebersicht-leer" is the empty state and shows neither.
     await page.click('.main-nav a:nth-child(1)');
+    await page.waitForSelector(".plot-card");
+    await shot(page, "uebersicht", mode);
+    await page.getByRole("button", { name: "Vergleichen" }).click();
+    await page.waitForSelector(".selection-bar");
+    await shot(page, "uebersicht-vergleich", mode);
+    await page.getByRole("button", { name: "Fertig" }).click();
+
+    // And the routes that follow from it, drawn from the geometry MOTIS sends.
     await page.click(".plot-card .btn");
     await page.getByRole("button", { name: "Wege berechnen" }).click();
     await page.waitForSelector(".route-card polyline", { timeout: 60000 });

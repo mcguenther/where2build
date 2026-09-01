@@ -282,5 +282,8 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 - `pytest`: 345 passed, 1 skipped
 - `vitest`: 300 passed, 10 skipped — the 10 are the integration tests, which run
   and pass (308/2) when a backend is up on :8000
-- `scripts/screenshots.mjs`: 37 images plus a print PDF. It fails on console errors, on
-  horizontal overflow, and if not a single vector tile arrived.
+- `scripts/screenshots.mjs`: 41 images plus a print PDF. It fails on console errors, on
+  horizontal overflow, and if not a single vector tile arrived. It also drives
+  the live geocoder, which is slow often enough to blow the 60 s wait on the
+  destinations step — two runs failed there and the third passed with nothing
+  changed. Re-run once before going looking for the bug.
