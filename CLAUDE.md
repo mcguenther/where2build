@@ -272,6 +272,16 @@ from the user directly. Reopen only if the user asks.
   field a district address resolves to has 159 and every chain drawn turned the
   plan into a black band. The overall size (minimum rotated rectangle) is what
   survives; the setback table lists the individual lengths anyway.
+- **A route card's drawing is shaped by the route, and its frame is also the
+  zoom.** One fixed 300 x 150 box gave a commute due north two empty margins and
+  a run along the B6 a strip of nothing. The frame's proportions now come from
+  the projected bounds, clamped by how many cards share the row — and because
+  `tileCover` reads its zoom off the frame, the frame's *width in user units*
+  has to follow the row too: a 300-unit drawing stretched over 1300 px fetches
+  its ground four zoom steps too shallow and shows it blurred, with nothing in
+  the console. The scale caption measures the fitted frame, not the route's own
+  box: a route due north spans almost no longitude and was labelled ten metres
+  wide.
 - **A watched computed is evaluated whether or not the template reached it.**
   `PlotView`'s computeds all read `this.plot`, and a `v-if="plot"` had kept them
   from ever seeing `null`. Adding one watcher was enough to crash the page whose
@@ -329,8 +339,8 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 ## Test and screenshot counts at last check
 
 - `pytest`: 385 passed, 1 skipped
-- `vitest`: 350 passed, 10 skipped — the 10 are the integration tests, which run
-  and pass (358/2) when a backend is up on :8000
+- `vitest`: 360 passed, 10 skipped — the 10 are the integration tests, which run
+  and pass (368/2) when a backend is up on :8000
 - `scripts/screenshots.mjs`: 41 images plus a print PDF. It fails on console
   errors, on horizontal overflow, and if not a single vector tile arrived. It
   also drives the live geocoder, which is slow often enough to blow the 60 s
