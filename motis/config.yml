@@ -1,0 +1,65 @@
+# MOTIS 2.11 configuration for the optional local routing service.
+#
+# Paths are the ones `fetch-data.sh` writes into `motis/data-input/`, which
+# docker compose mounts read-only at /data-input. `motis import` copies this
+# file into the built graph, so `motis server` never reads the inputs again.
+#
+# What is deliberately absent: `tiles` (the app brings its own basemap, and the
+# tile import is the expensive half of a MOTIS build) and `elevators`/`gbfs`
+# (nothing in the app asks for them).
+
+server:
+  host: 0.0.0.0
+  port: 8080
+  data_attribution_link: https://www.opendata-oepnv.de/ht/de/organisation/delfi/startseite
+
+# Street network, addresses and reverse geocoding.
+osm: /data-input/osm.pbf
+
+# Walking, cycling and driving over the OSM network -- /api/v1/one-to-many and
+# the pre-transit feeder legs both need this.
+street_routing: true
+# Transfers routed over real footways instead of the timetable's own transfer
+# times.
+osr_footpath: true
+# /api/v1/geocode and /api/v1/reverse-geocode.
+geocoding: true
+reverse_geocoding: true
+
+timetable:
+  first_day: TODAY
+  num_days: 365
+  # /api/v6/map/stops, which the "Was ist in der Nähe?" step reads.
+  railviz: true
+  with_shapes: true
+  # The DELFI feed has no shapes.txt, so without this every transit leg is a
+  # straight line between stops -- 67 points where Transitous returns 303 for
+  # the same journey. Routing them over OSM instead makes the answer identical
+  # to Transitous, and costs 2 min 47 s of import and 176 MB of graph for a
+  # city-sized extract. Only routes inside the extract can be routed; the rest
+  # keep their straight lines.
+  route_shapes:
+    mode: missing
+    max_stops: 100
+  adjust_footpaths: true
+  max_footpath_length: 12
+  # Stops outside the OSM extract keep their feed coordinates; without this
+  # they would be dropped for want of a street to attach to.
+  preprocess_max_matching_distance: 250.0
+  datasets:
+    # The tag prefixes every stop and trip id MOTIS hands out. Transitous uses
+    # `de-DELFI` for this feed, and the recorded fixtures carry those ids, so a
+    # local instance answers with the same ids only if the tag matches.
+    de-DELFI:
+      path: /data-input/timetable.gtfs.zip
+
+limits:
+  # The backend sends at most 128 destinations per one-to-many call and caps
+  # maxMatchingDistance at 250 m; these are the MOTIS-side counterparts.
+  onetomany_max_many: 128
+  max_max_matching_distance: 250
+  street_routing_max_prepost_transit_seconds: 3600
+  street_routing_max_direct_seconds: 21600
+
+logging:
+  log_level: info

@@ -100,9 +100,36 @@ if you want it separately.
 | **POI directory** | `backend/data` is mounted read-only. Build the index with `python backend/scripts/build_poi_index.py --download` and `/api/nearby` will use it; without it that endpoint says so for the OpenStreetMap categories instead of answering with an empty list. |
 | **Extraction** | Without `LLM_API_KEY` in `backend/.env`, reading a listing page stays switched off. Everything else works. |
 | **Contact address** | Set `APP_CONTACT` before any real use: the Transitous usage policy requires one. |
+| **Own router** | `docker compose --profile local-routing up` runs MOTIS here instead of asking Transitous. See below. |
 
 `backend/.env` is read if it exists and skipped if it does not, so the stack
 comes up either way.
+
+### Routing on your own machine
+
+Routing goes to [Transitous](https://api.transitous.org) by default. That is a
+volunteer service: its policy asks to be contacted before "many requests",
+counts routing itself as resource-intensive, and rules out commercial use
+(`docs/research/routing-motis.md` § 6). Anything past a prototype should bring
+its own router, and the `local-routing` profile is that router.
+
+```bash
+./motis/fetch-data.sh                                   # ~420 MB of input data
+MOTIS_BASE_URL=http://motis:8080 \
+  docker compose --profile local-routing up --build     # first start imports
+```
+
+Without the profile nothing changes: `docker compose up` is still two
+containers and still talks to Transitous.
+
+| | |
+|---|---|
+| **Data** | An OSM extract (Saxony from Geofabrik, ODbL, © OpenStreetMap contributors) and the Germany-wide DELFI GTFS (349 MB, CC-BY 4.0, DELFI e. V.), taken from Transitous' own republished copy so no opendata-oepnv.de account is needed. Attribute both wherever routes are shown. |
+| **Import** | Once, into the `motis-graph` volume: **6 min** and **5.6 GiB peak RSS** for Germany's timetable on a 4-core machine, giving a **3.4 GB** graph. Re-runs are skipped; delete the volume to rebuild. |
+| **Serving** | The graph is memory-mapped, so the server is ready seconds after start and holds **1.7 GiB**. |
+| **Same answers?** | Yes. Geocoding, `/plan`, `one-to-many` and `map/stops` agree with Transitous to the last decimal, and `/api/reachability` comes back character for character identical, route geometry included. Measured 01.09.2026, `docs/research/routing-motis.md` § 5.6. |
+| **Switching back** | The backend's disk cache is keyed on the request, not on which MOTIS answered it. After changing `MOTIS_BASE_URL`, clear `/cache/motis*` or you keep reading the old service's answers. |
+| **Currency** | DELFI publishes weekly, on Mondays. Re-run `fetch-data.sh`, `docker compose down`, `docker volume rm where2build_motis-graph`, and start again. |
 
 ## Tests
 

@@ -200,6 +200,24 @@ from the user directly. Reopen only if the user asks.
   A destination can pin the choice (`zubringer`); absent means automatic. The
   chosen variant is the mode the card names, and `hinweis` carries the numbers,
   so a substituted mode is never silent.
+- **A local MOTIS answers exactly what Transitous answers — once three things
+  in its config are right.** Measured 01.09.2026 against
+  `ghcr.io/motis-project/motis:2.11.2`: geocode, `/plan`, `one-to-many` and
+  `map/stops` agree to the last decimal, and `/api/reachability` comes back
+  character for character identical. The three: the dataset tag must be
+  `de-DELFI`, because it is the prefix of every stop and trip id and the
+  recorded fixtures carry it; `timetable.route_shapes` must be on, because the
+  DELFI feed has no `shapes.txt` and without it every **transit** leg is a
+  straight line between stops (67 points where Transitous returns 303 — street
+  legs were always fine); and `preprocess_max_matching_distance` keeps stops
+  outside the OSM extract from being dropped. Costs, measured: 6 min of import
+  at 5,6 GiB peak RSS, a 3,4 GB graph, 1,7 GiB to serve.
+  See `docs/research/routing-motis.md` § 5.
+- **The backend's disk cache does not know which MOTIS answered.** Its key is
+  the request parameters alone, so changing `MOTIS_BASE_URL` keeps serving the
+  other instance's answers until `/cache/motis*` is deleted. Comparing the two
+  instances without clearing it reports a difference that is not there — and,
+  worse, an agreement that is not there either.
 - **Rank by walking time, never air distance.** Detour ratios reach 2.88x, and
   the nearest thing by air can be unwalkable altogether.
 - **An address is not a plot.** A district address ("Plaußig-Portitz, 04349
@@ -275,6 +293,12 @@ backend/.venv/bin/python -m uvicorn app.main:app --reload --app-dir backend
 # the whole thing in containers: nginx serves the build and proxies /api,
 # so there is one origin and no CORS. No database is involved.
 docker compose up --build      # http://localhost:8080
+
+# routing on this machine instead of Transitous -- opt-in, off by default.
+# fetch-data.sh pulls the OSM extract and the DELFI GTFS; the first start
+# imports for ~3.5 min into the motis-graph volume, after that it is seconds.
+./motis/fetch-data.sh
+MOTIS_BASE_URL=http://motis:8080 docker compose --profile local-routing up --build
 
 # frontend — needs Node >= 22.19: jsdom 30 pulls in undici 8, and on Node 20
 # vitest dies before loading a test with `markAsUncloneable is not a function`.

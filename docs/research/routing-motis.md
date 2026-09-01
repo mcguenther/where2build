@@ -17,7 +17,7 @@
 - **`legGeometry.points` ist ein Google-Encoded-Polyline mit Präzision 6** (nicht 5!). Das Antwortobjekt nennt die Präzision sogar explizit im Feld `legGeometry.precision` — live nachgeprüft, mit Präzision 6 dekodiert liegen die Koordinaten exakt in Sachsen, mit Präzision 5 sind sie um Faktor 10 verschoben und unbrauchbar. Zum Dekodieren im Frontend: `@mapbox/polyline` (npm), Aufruf mit `precision: 6`.
 - **MOTIS liefert selbst keine Kartenkacheln im klassischen Sinn** (kein `{z}/{x}/{y}`-Tile-Endpunkt bei Transitous aktiv). Es gibt zwar einen `tiles`-Feature-Zweig im MOTIS-Quellcode für Self-Hosting (Vektor-Tiles via `tiles.profile`), dieser ist aber bei `api.transitous.org` nicht Teil der öffentlich dokumentierten/getesteten Endpunkte gewesen; die `/api/*/map/*`-Endpunkte, die live erreichbar sind, liefern JSON (Stops, Trips, Routen-Metadaten fürs Debug-UI), keine Bild-/Vektor-Kacheln. Für eine Basiskarte wird also weiterhin ein separater Tile-Anbieter (z. B. OSM-Tiles, MapLibre + OpenMapTiles) benötigt.
 - **Für Isochronen** gibt es `/api/v6/one-to-all` — das ist laut Nutzungsrichtlinie explizit ein "resource-intensive endpoint", **vor Nutzung ist Kontakt über Matrix Pflicht**. Wurde in dieser Recherche daher **nicht** live getestet, nur aus der Spec dokumentiert.
-- **Self-Hosting ist für Sachsen realistisch machbar**: ein `sachsen-latest.osm.pbf` von Geofabrik plus ein GTFS-Datensatz (ganz Deutschland von DELFI/opendata-oepnv.de, oder ein Sachsen-Ausschnitt) reichen. RAM-Bedarf für eine Region der Größe Sachsens dürfte im niedrigen einstelligen GB-Bereich liegen (⚠️ nicht live verifiziert, siehe Abschnitt 4.4).
+- **Self-Hosting ist machbar und wurde am 01.09.2026 durchgeführt** (Abschnitt 5): `ghcr.io/motis-project/motis:2.11.2` mit einem OSM-Extrakt und dem deutschlandweiten DELFI-GTFS. Import 3 min 30 s bei 5,34 GiB Spitzen-RSS, 2,8 GB Graph, Server danach 1,55 GiB RSS. Die lokale Instanz antwortet auf Geocoding, `/plan`, `one-to-many` und `map/stops` identisch zu Transitous; der einzige Unterschied ist die Geometrie der ÖPNV-Teilstrecke (Luftlinie statt nachgeroutetem Linienverlauf, weil der DELFI-GTFS keine `shapes.txt` hat).
 - **Empfehlung für den Grundstücks-Check:** MVP direkt gegen `api.transitous.org` bauen (mit korrektem User-Agent-Header, Attribution-Link, wenigen Requests pro Nutzeraktion, kein serverseitiges Caching-Bypass-Scraping), und Self-Hosting als Fallback/Skalierungsoption für später vormerken, sobald Nutzerzahlen relevanten Traffic erzeugen.
 
 ---
@@ -395,103 +395,204 @@ function legGeometryToGeoJSON(legGeometry) {
 
 ---
 
-## 5. Self-Hosting einer eigenen MOTIS-Instanz für Sachsen
+## 5. Self-Hosting einer eigenen MOTIS-Instanz — 🟢 am 01.09.2026 selbst gebaut und gemessen
 
-### 5.1 Docker-Image
+Der ursprüngliche Abschnitt war eine Sammlung von Schätzungen. Er ist ersetzt
+durch das, was ein tatsächlicher Import und ein tatsächlicher Serverlauf
+ergeben haben. Alles hier Gemessene stammt von einer 4-Kern-Maschine mit 15 GiB
+RAM, Docker 29.3.1, `overlayfs`.
 
-📘 Offizielles Image: **`ghcr.io/motis-project/motis:master`** (aus dem produktiv genutzten `docker-compose.yml` des MOTIS-eigenen "prima"-Projekts, `motis-project/prima`). Es gibt zusätzlich versionierte GitHub-Releases zum direkten Download (`motis-linux-amd64.tar.bz2` etc., ohne Docker), falls kein Container gewünscht ist.
+### 5.1 Image
 
-### 5.2 Nötige Eingabedaten
+🟢 `ghcr.io/motis-project/motis` existiert; die Tag-Liste der Registry
+(739 Tags, direkt über die OCI-API gelesen) endet bei **`2.11.2`**, und
+`latest` zeigt auf denselben Index-Digest wie `2.11.2`
+(`sha256:6055f51e…`) — `latest` ist also nicht `master`, sondern das jüngste
+Release. Plattformen: `linux/amd64` und `linux/arm64`.
 
-1. **OSM-Extrakt:** `sachsen-latest.osm.pbf` von Geofabrik (`https://download.geofabrik.de/europe/germany/sachsen-latest.osm.pbf`). ⚠️ Diese URL konnte in dieser Session **nicht live erreicht werden** (Verbindungsabbruch über den Recherche-Proxy) — Existenz und exakte Dateigröße sind daher **nicht live verifiziert**, aber Geofabrik-Sachsen-Extrakte sind ein seit Jahren etabliertes, öffentlich bekanntes Angebot; die URL-Struktur ist Standard für alle deutschen Bundesländer bei Geofabrik.
-2. **GTFS-Fahrplandaten:** DELFI-Datensatz "Deutschlandweite Sollfahrplandaten (GTFS)" über `opendata-oepnv.de` (Menüpunkt DELFI). 📘 Laut Portal ist der Download **registrierungspflichtig** (kostenlos, aber Account nötig), Updates i. d. R. **montags**. Es gibt keinen von DELFI selbst bereitgestellten Sachsen-Only-Ausschnitt — man lädt entweder den Deutschland-GTFS komplett (funktioniert mit MOTIS problemlos, auch bei einem kleineren OSM-Extrakt, da MOTIS Haltestellen außerhalb des OSM-Bereichs zwar für ÖPNV nutzt, aber ohne Straßen-Routing/Zubringer dorthin) oder filtert selbst z. B. mit `gtfs-filter`/eigenen Skripten auf Sachsen-Haltestellen.
-3. Optional Echtzeitdaten (GTFS-RT): z. B. `https://stc.traines.eu/mirror/german-delfi-gtfs-rt/latest.gtfs-rt.pbf` (📘 wörtlich als Community-Mirror-Beispiel in der offiziellen MOTIS-Doku genannt, für ganz Deutschland).
+Das Image ist ein **Alpine 3.20** mit einem einzigen statischen Binary
+`/motis` (68 MB entpackt), dazu `ui/` und `tiles-profiles/`. Busybox ist an
+Bord (`wget`, `nc`), was für einen Healthcheck reicht. `ENTRYPOINT` ist leer,
+`CMD` ist `/motis server /data`.
 
-### 5.3 Lauffähiges Beispiel: `docker-compose.yml` + `config.yml`
+Verwendet wird ein **fester Tag** (`2.11.2`), nicht `latest` und nicht
+`master`: ein Router, dessen Version sich beim nächsten `docker compose pull`
+ändert, ändert auch seine Antworten.
 
-📘 Basierend auf dem offiziell dokumentierten Workflow (`./motis config` → `./motis import` → `./motis server`) und dem echten `docker-compose.yml`-Muster aus `motis-project/prima`, angepasst auf Sachsen:
+### 5.2 CLI (v2 — anders als v1)
 
-**`docker-compose.yml`:**
-```yaml
-version: "3"
-services:
-  motis-import:
-    image: ghcr.io/motis-project/motis:master
-    volumes:
-      - ./sachsen-latest.osm.pbf:/data-input/sachsen-latest.osm.pbf:ro
-      - ./gtfs-deutschland.zip:/data-input/gtfs-deutschland.zip:ro
-      - ./config.yml:/data-input/config.yml:ro
-      - motis-data:/data:rw
-    working_dir: /data
-    command: /bin/sh -c "/motis import -c /data-input/config.yml"
-
-  motis-server:
-    image: ghcr.io/motis-project/motis:master
-    depends_on:
-      motis-import:
-        condition: service_completed_successfully
-    volumes:
-      - motis-data:/data:rw
-    working_dir: /data
-    ports:
-      - "8080:8080"
-    command: /bin/sh -c "/motis server -c /data-input/config.yml"
-    restart: unless-stopped
-
-volumes:
-  motis-data:
+```
+motis config <datei…>   erzeugt eine minimale config.yml aus den Eingabedateien
+motis import -d DATA -c CONFIG   baut den Graphen
+motis server -d DATA             serviert ihn; die Eingabedateien werden nicht mehr gelesen
 ```
 
-**`config.yml`** (📘 zusammengesetzt aus den offiziell dokumentierten Config-Keys, `docs/setup.md`):
-```yaml
-server:
-  host: 0.0.0.0
-  port: 8080
-  web_folder: ui
-  data_attribution_link: https://www.opendata-oepnv.de/ht/de/organisation/delfi/startseite
+`motis import --filter` kennt die einzelnen Teilschritte (`osr`, `adr`, `tt`,
+`tbd`, `adr_extend`, `osr_footpath`, `matches`, `route_shapes`, `tiles`).
 
-osm: /data-input/sachsen-latest.osm.pbf   # benötigt für Straßenrouting, Geocoding, Reverse-Geocoding
+### 5.3 Eingabedaten — 🟢 gemessene Größen
 
-timetable:
-  first_day: TODAY
-  num_days: 365
-  railviz: true
-  with_shapes: true
-  datasets:
-    de:
-      path: /data-input/gtfs-deutschland.zip
-      # rt:
-      #   - url: https://stc.traines.eu/mirror/german-delfi-gtfs-rt/latest.gtfs-rt.pbf
+| Datei | Quelle | Größe | Lizenz |
+|---|---|---|---|
+| OSM-Extrakt Sachsen | `https://download.geofabrik.de/europe/germany/sachsen-latest.osm.pbf` | ⚠️ in dieser Umgebung **nicht messbar**, s. u. | ODbL, © OpenStreetMap-Mitwirkende |
+| OSM-Extrakt Leipzig (Ersatz für den Testlauf) | `https://download.bbbike.org/osm/bbbike/Leipzig/Leipzig.osm.pbf` | 🟢 **71 859 038 B (68,5 MiB)**, Stand 29.08.2026 | ODbL |
+| DELFI-GTFS Deutschland | `https://api.transitous.org/gtfs/de_DELFI.gtfs.zip` | 🟢 **349 439 776 B (333 MiB)**, Stand 31.08.2026 | CC-BY 4.0, DELFI e. V. |
 
-street_routing: true          # aktiviert BIKE/CAR/WALK-Routing über OSM
-osr_footpath: true            # Fußwege/Umstiege über OSM statt reiner GTFS-Transferzeiten
-geocoding: true
-reverse_geocoding: true
+**Der GTFS-Fund ist der wichtigste dieses Abschnitts.** Der DELFI-Datensatz auf
+`opendata-oepnv.de` ist registrierungspflichtig — aber Transitous stellt seinen
+**gesamten Quelldatensatz** unter `https://api.transitous.org/gtfs/` bereit
+(die Nutzungsrichtlinie verweist selbst darauf: *"There is no need to scrape
+data using the API, you may download our entire source dataset here"*), und
+darin liegt `de_DELFI.gtfs.zip` — dieselbe Datei, die die öffentliche Instanz
+fährt. Ohne Account, und garantiert derselbe Fahrplanstand wie der Dienst,
+gegen den verglichen wird. Dort liegt auch Transitous' eigene
+`config.yml` (445 kB), aus der die Einstellungen unten übernommen sind.
 
-limits:
-  plan_max_results: 20
-  onetoall_max_travel_minutes: 60
-  routing_max_timeout_seconds: 30
+Entpackt sind das 🟢 **3,3 GB**; `stop_times.txt` allein ist 2 975 462 191 B.
+Was **fehlt**: eine `shapes.txt`. Der DELFI-Datensatz enthält keine
+Linienverläufe (siehe 5.6).
 
-logging:
-  log_level: info
+⚠️ **Geofabrik war aus dieser Sandbox nicht erreichbar** — jede Verbindung zu
+`download.geofabrik.de` wurde nach ~7 s vom Egress-Relay abgebrochen
+(`Recv failure: Connection reset by peer`, drei Wiederholungen, auch für die
+HTML-Seite). Das ist eine Eigenschaft dieser Umgebung, keine Aussage über den
+Dienst. Größe und Prüfsumme von `sachsen-latest.osm.pbf` sind daher **nach wie
+vor nicht selbst gemessen**. Für den Testlauf wurde stattdessen der
+BBBike-Extrakt Leipzig genommen; er deckt das Testpaar
+Liebertwolkwitz → Leipzig Hbf vollständig ab. Sachsen ist etwa dreimal so groß
+wie dieser Ausschnitt, der Import-Anteil `osr`+`adr` (35 s von 3 min 30 s)
+wächst entsprechend — der teure Teil ist der deutschlandweite Fahrplan, und der
+ist vom OSM-Ausschnitt unabhängig.
+
+### 5.4 Konfiguration — was tatsächlich lief
+
+`motis/config.yml` im Repo. Die Punkte, die nicht offensichtlich sind:
+
+- **`datasets:` muss den Tag `de-DELFI` tragen.** Der Tag ist das Präfix jeder
+  Stop- und Trip-ID, die MOTIS herausgibt (`de-DELFI_de:14713:11559::01`).
+  Transitous benutzt genau diesen, die aufgezeichneten Fixtures im Repo tragen
+  ihn — mit einem anderen Tag antwortet die lokale Instanz mit anderen IDs.
+- **`tiles:` bleibt weg.** Die App bringt ihre eigene Grundkarte mit, und der
+  Tile-Import ist die teure Hälfte eines MOTIS-Builds.
+- `preprocess_max_matching_distance: 250` — Haltestellen außerhalb des
+  OSM-Ausschnitts behalten ihre Feed-Koordinaten, statt mangels Straße zu
+  verschwinden.
+- `limits.onetomany_max_many: 128` und `max_max_matching_distance: 250` sind
+  die Serverseite dessen, was `backend/app/services/motis.py` sendet.
+
+### 5.5 🟢 Gemessene Kosten
+
+**Import** (Leipzig-OSM + deutschlandweiter DELFI-GTFS, 4 Kerne):
+
+| | ohne `route_shapes` | mit `route_shapes` (so wie eingecheckt) |
+|---|---|---|
+| Wanduhr | **3 min 30 s** | **6 min 07 s** |
+| Spitzen-RSS (Stichprobe alle 10 s) | **5,34 GiB** | **5,64 GiB** |
+| Spitze inkl. Page-Cache | **5,85 GiB** | **5,88 GiB** |
+| Ergebnis auf Platte | **2 905 221 798 B = 2,9 GB** | **3 432 193 576 B = 3,4 GB** |
+
+Das Nachrouten der Linienverläufe kostet also rund **2 min 45 s** und **530 MB**
+und ist der einzige Grund, warum der Import über sechs statt dreieinhalb
+Minuten läuft. Mit einem Sachsen-Extrakt statt Leipzig wird dieser Posten
+größer, weil mehr Linien im Ausschnitt liegen und damit überhaupt geroutet
+werden können.
+
+MOTIS schreibt selbst eine `timing.txt` in das Datenverzeichnis. Aufteilung:
+
+```
+osr           30,3 s   Straßennetz aus dem OSM-Extrakt
+adr            5,0 s   Adressindex
+tt           2 min 19  Fahrplan  (Read Stop Times 35,6 s, Read Frequencies 33,5 s,
+                                  Read Trips 22,1 s, Finalizing 21,2 s)
+adr_extend    13,0 s   Haltestellennamen in den Adressindex
+matches        3,8 s   Haltestelle ↔ Straße
+osr_footpath  34,7 s   Umstiegsfußwege über echte Wege
 ```
 
-**Ablauf:**
+Der Fahrplan ist also zwei Drittel der Zeit und praktisch der gesamte
+Speicherbedarf. `timetable_metrics.json` nach dem Import:
+`507 292` Haltestellen, `2 684 560` Fahrten, `66 199 571` Fahrt×Tag.
+
+Bemerkenswert: `first_day: TODAY`, `num_days: 365` ergibt
+`"firstDay":"2026-08-29","lastDay":"2026-12-13"` — der DELFI-Kalender endet im
+Dezember, MOTIS lädt nicht mehr, als der Feed hergibt. **Ein Fahrplan altert;**
+ohne wöchentliche Aktualisierung liefert die Instanz ab Mitte Dezember keine
+Fahrten mehr.
+
+**Serverbetrieb:** `motis server` ist **wenige Sekunden** nach dem Start
+ansprechbar (der Graph wird gemappt, nicht geladen). Nach den Testabfragen:
+**1,70 GiB RSS**, Spitze 1,74 GiB (ohne die gerouteten Linienverläufe 1,55 GiB).
+Zum Vergleich: das Backend daneben braucht 63 MiB.
+
+**Platte insgesamt:** 0,42 GB Eingabedaten + 3,4 GB Graph + 68 MB Image
+≈ **3,9 GB**. Mit einem Sachsen-Extrakt statt Leipzig eher 3,5 GB, mit einem
+Deutschland-Extrakt (`germany-latest.osm.pbf`, 🟢 5 866 637 019 B bei
+`download.openstreetmap.fr`) deutlich mehr.
+
+### 5.6 🟢 Der lokale Router gegen Transitous — Abgleich
+
+Verglichen wurde mit denselben Anfragen, die `backend/app/services/motis.py`
+stellt, am 01.09.2026, Abfahrt 02.09.2026 08:00 UTC,
+Liebertwolkwitz (51,2686/12,4726) → Leipzig Hbf (51,34547/12,38206):
+
+| Endpunkt | Ergebnis |
+|---|---|
+| `/api/v1/geocode` | 🟢 **identisch** — dieselben zehn Treffer, dieselbe Reihenfolge, dieselben Koordinaten. Unterschiedlich nur der `score` (2. Nachkommastelle) und `areas[0].name` ("Leipzig" lokal, "Deutschland" bei Transitous — Folge des planetenweiten OSM dort). |
+| `/api/v6/plan` (TRANSIT) | 🟢 **identisch** in Dauer, Umstiegen, Abfahrts- und Ankunftszeit, Linien und Halten: 62 min mit Bus 75 + Tram 15, bzw. 49 min mit RB113 ab Großpösna. |
+| `/api/v1/one-to-many` | 🟢 **byte-identisch**, bis auf die letzte Stelle der Fließkomma-Distanzen (`2542.3024253845215`). |
+| `/api/v6/map/stops` | 🟢 **identische Menge** — 21 Haltestellen im Testfenster, gleiche Namen, Koordinaten und `modes`. Transitous liefert zusätzlich `tz`; das Backend liest es nicht. |
+| `/api/reachability` (die App selbst) | 🟢 Auto 16 min, Rad 51 min, `transit_auto` 30 min über Park-and-Ride an der Augustusplatz-Haltestelle — **Zeichen für Zeichen dieselbe Antwort** wie gegen Transitous, samt des deutschen `hinweis`-Textes der Zubringer-Automatik. |
+
+**Der eine echte Unterschied: die Geometrie der ÖPNV-Teilstrecke.**
+
+| Modus | Punkte lokal | Punkte Transitous | gleich? |
+|---|---|---|---|
+| Auto | 512 | 512 | ja |
+| Rad | 501 | 501 | ja |
+| ÖPNV | **67** | **303** | nein |
+
+Ursache: der DELFI-GTFS hat keine `shapes.txt`, also zeichnet MOTIS die
+Bahnstrecke als Luftlinie zwischen den Halten. Der Schalter dagegen ist
+`timetable.route_shapes` (setzt `with_shapes`, `osm` und `street_routing`
+voraus); in Transitous' veröffentlichter `config.yml` steht er nicht, ihre
+Instanz verhält sich aber so, als stünde er dort.
+
+🟢 **Mit `route_shapes: {mode: missing}` verschwindet der Unterschied
+vollständig:** derselbe Lauf liefert für alle drei Teilstrecken exakt dieselbe
+Polyline wie Transitous (Zeichen für Zeichen, 1 074 Zeichen für die
+RB113-Strecke), und die komplette `/api/reachability`-Antwort der App ist
+danach identisch — Auto 512 Punkte, Rad 501, ÖPNV 303, alle gleich. Deshalb
+steht der Schalter in `motis/config.yml`. Fuß-, Rad- und Autostrecken waren
+ohnehin nie betroffen; die kommen aus dem Straßengraphen.
+
+### 5.7 Einbindung ins Repo
+
+`docker-compose.yml`, Profil `local-routing`, zwei Dienste:
+
+- `motis-import` — einmalig, `restart: "no"`, schreibt in das Volume
+  `motis-graph` und legt danach `/data/meta/import_done` an; ein weiterer
+  `up`-Aufruf überspringt den Import.
+- `motis` — `motis server -d /data`, `depends_on: service_completed_successfully`,
+  Healthcheck über den Geocoder (der antwortet erst, wenn der Adressindex
+  gemappt ist).
+
+Der Backend-Dienst bekommt `environment: - MOTIS_BASE_URL` **ohne Wert**:
+Compose reicht die Variable nur durch, wenn sie gesetzt ist, und lässt sie
+sonst ganz weg — `backend/.env` und der eingebaute Standard (Transitous)
+behalten also das letzte Wort, solange niemand etwas anderes verlangt.
+
 ```bash
-docker compose run --rm motis-import
-docker compose up -d motis-server
-# API danach lokal erreichbar unter http://localhost:8080/api/v6/plan?...
+./motis/fetch-data.sh
+MOTIS_BASE_URL=http://motis:8080 docker compose --profile local-routing up --build
 ```
 
-### 5.4 RAM-/Disk-Bedarf und Import-Dauer
+`docker compose up` ohne Profil bleibt unverändert bei zwei Containern.
 
-⚠️ **Hier gibt es keine belastbare, live verifizierte Zahl speziell für Sachsen** — weder die offizielle MOTIS-Doku noch das README nennen konkrete GB-Angaben für eine Region dieser Größe. Was recherchierbar war:
-
-- 📘 MOTIS-README wörtlich: *"MOTIS is optimized for **high performance** with **low memory usage**"*, *"Loading one year of timetable doesn't take much more RAM than loading one month"* — keine absoluten Zahlen.
-- ⚠️ Aus dem Transitous-eigenen (älteren, ggf. nicht mehr voll zutreffenden) Betriebs-Wiki: ein **Import von 6 Ländern** (deutlich größer als Sachsen) lief innerhalb weniger Stunden mit **≤ 64 GB RAM** durch; ein Versuch, **ganz Europa** auf einmal zu importieren, scheiterte selbst mit 100 GB RAM am Adress-Indexierungsschritt. Diese Notizen stammen aber erkennbar aus einer älteren MOTIS-Architektur-Generation (vor dem heutigen `nigiri`-Routing-Kern) und sind nicht 1:1 auf die aktuelle v2/v6-API übertragbar — nur als grobe Größenordnung zu verstehen.
-- **Eigene Einschätzung (nicht verifiziert):** Sachsen hat ca. 3–4 % der Fläche/Bevölkerung Deutschlands. Ein `sachsen-latest.osm.pbf` dürfte im Bereich von einigen hundert MB liegen (zum Vergleich: `germany-latest.osm.pbf` ist mehrere GB groß), der deutschlandweite DELFI-GTFS-Datensatz ist unabhängig vom OSM-Ausschnitt komplett zu laden und dürfte je nach Kompression im Bereich von ~1–2 GB liegen. Für einen Import mit Sachsen-OSM + Deutschland-GTFS ist ein Rechner mit **8–16 GB RAM** und **~20–30 GB freiem Diskspeicher** (Rohdaten + verarbeitete `data/`-Verzeichnisstruktur + evtl. Shape-Cache) als realistischer Startwert zu erwarten; die Import-Dauer dürfte im Bereich **Minuten bis niedrige einstellige Stunden** liegen. **Diese Zahlen sind Schätzungen und sollten vor einem produktiven Self-Hosting-Entscheid durch einen eigenen Test-Import bestätigt werden.**
-- Empfehlung: Vor einem Sachsen-Self-Hosting einen echten Test-Import auf einer Testmaschine fahren und dabei `docker stats`/`time` mitschneiden, statt sich auf diese Schätzung zu verlassen.
+⚠️ **Der Plattencache des Backends kennt die Basis-URL nicht.** Sein
+Schlüssel besteht nur aus den Anfrageparametern, also liefert ein Umschalten
+von Transitous auf die eigene Instanz weiterhin die alten Antworten, bis
+`/cache/motis*` gelöscht ist. Beim Vergleich der beiden Instanzen hat genau das
+zunächst ein falsches Ergebnis vorgetäuscht.
 
 ---
 
@@ -539,7 +640,9 @@ Quelle: `https://transitous.org/api/` (🟢 am 29.08.2026 abgerufen, Text unten 
 8. **`maxPreTransitTime`/`maxPostTransitTime` sind standardmäßig nur 900 s (15 Min.)** — bei Rad-Zubringern (die typischerweise weiter fahren als zu Fuß möglich) muss dieser Wert aktiv erhöht werden (siehe Test 3.3, dort auf 1800 s gesetzt), sonst werden mögliche Rad-Routen mit längerer Zubringerstrecke fälschlich nicht gefunden.
 9. **Keine Kartenkacheln von Transitous nutzbar** — für die Sachsen-Karte im Grundstücks-Check muss ein separater Kartenanbieter eingebunden werden (z. B. offizielle OSM-Tiles unter Beachtung von deren eigener Nutzungsrichtlinie, oder ein selbst gehosteter Vektor-Tile-Stack); MOTIS' `/map/*`-Endpunkte liefern nur Overlay-Daten (Stops, Trips, Routen), keine Grundkarte.
 10. **Fahrpreisdaten (`withFares`) sind experimentell und komplex** (GTFS-Fares-v2-Modell mit `fareTransfers`/`FareTransferRule`) — für den MVP vermutlich zu aufwendig, ggf. erstmal ohne Fahrpreisanzeige starten.
-11. **Geofabrik-Erreichbarkeit in dieser Recherche-Umgebung fehlgeschlagen** — die Sachsen-OSM-URL konnte hier nicht per `curl` erreicht werden (Verbindungsabbruch); das war ein Umgebungsproblem dieser Recherche-Session (Proxy), keine Aussage über die tatsächliche Verfügbarkeit des Dienstes. Vor dem produktiven Self-Hosting-Setup sollte der Download in der Zielumgebung erneut geprüft werden.
+11. **Geofabrik ist aus der Entwicklungsumgebung nicht erreichbar** — am 29.08.2026 und erneut am 01.09.2026 brach jede Verbindung zu `download.geofabrik.de` nach ~7 s ab, auch für die reine HTML-Seite. Das ist der Egress-Proxy dieser Umgebung, keine Aussage über den Dienst; auf einer normalen Maschine ist `sachsen-latest.osm.pbf` der richtige Extrakt. Für einen Testlauf hier tut es ein BBBike-Stadtextrakt (`https://download.bbbike.org/osm/bbbike/Leipzig/Leipzig.osm.pbf`, 68,5 MiB), der Deutschland-Extrakt von `download.openstreetmap.fr` (5,87 GB) wäre die Alternative mit voller Abdeckung.
+12. **Der DELFI-GTFS enthält keine `shapes.txt`** — ohne `timetable.route_shapes` zeichnet eine eigene Instanz jede Bahn- und Busstrecke als Luftlinie zwischen den Halten. Straßenrouten (Fuß, Rad, Auto) sind davon nicht betroffen.
+13. **Der Dataset-Tag ist Teil jeder ID** — `datasets: de-DELFI:` in der Config, sonst antwortet die eigene Instanz mit `de_…` statt `de-DELFI_…` und passt nicht mehr zu den aufgezeichneten Fixtures.
 
 ---
 
@@ -550,6 +653,9 @@ Quelle: `https://transitous.org/api/` (🟢 am 29.08.2026 abgerufen, Text unten 
 - MOTIS Setup-Doku: `https://raw.githubusercontent.com/motis-project/motis/master/docs/setup.md` (📘, Rohdatei direkt geparst)
 - MOTIS/prima Docker-Compose-Beispiel: `https://raw.githubusercontent.com/motis-project/prima/master/docker-compose.yml` (📘, Rohdatei direkt geparst)
 - Transitous API/Policy-Seite: `https://transitous.org/api/` (🟢 live abgerufen 29.08.2026, Text direkt aus HTML extrahiert)
+- Transitous-Quelldatensatz und dessen MOTIS-`config.yml`: `https://api.transitous.org/gtfs/` (🟢 01.09.2026 abgerufen, `de_DELFI.gtfs.zip` heruntergeladen und importiert)
+- GHCR-Tagliste `ghcr.io/motis-project/motis` über die OCI-Registry-API (🟢 01.09.2026, 739 Tags, `latest` = `2.11.2`)
+- MOTIS-Setup-Doku `docs/setup.md`, Stand `master` (📘 01.09.2026 erneut gelesen — Shapes-Abschnitt)
 - Transitous/MOTIS-Notes-Wiki (⚠️ ältere Architektur-Generation, mit Vorsicht zu lesen): `https://github.com/public-transport/transitous/wiki/MOTIS-Notes`
 - Alle Live-Requests aus Abschnitt 3: direkt gegen `https://api.transitous.org` am 29.08.2026, Rohantworten lokal im Scratchpad gespeichert und mit Python nachgeprüft (u. a. Polyline-Dekodierung).
 
