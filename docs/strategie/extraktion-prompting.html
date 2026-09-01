@@ -1,0 +1,503 @@
+<title>Indizien aus dem Inserat</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --primary:#2F4A3A; --primary-light:#456B52; --primary-dark:#1C2E23; --primary-veil:rgba(47,74,58,.10);
+  --secondary:#B5813C; --secondary-text:#7C5620; --secondary-light:#E8D4B0; --secondary-veil:rgba(181,129,60,.16);
+  --sage:#9DB39A; --sage-light:#DCE4DA;
+  --ink:#1E1A16; --graphite:#4A443C; --muted:#6F675C; --line:#DCD3C6; --line-faint:#EBE4D9;
+  --surface:#FAF7F1; --sunken:#F3EFE6; --paper:#F1EBE1; --white:#FFFFFF;
+  --warning:#BE8524; --warning-text:#7C5620; --warning-surface:#F6E9CE;
+  --error:#A8402C; --error-surface:#F2DED8; --good:#2F4A3A; --good-surface:#DEE7DF;
+  --map-ground:#E6E3DC; --map-surface:#EFEDE7; --map-boundary:#1E1A16; --map-halo:#FFFFFF;
+  --map-neighbour:#9A9184; --map-street:#B5813C; --map-street-surface:#D6D2CA;
+  --shadow:0 1px 2px rgba(30,26,22,.05),0 10px 24px -18px rgba(30,26,22,.45);
+  --font-display:"Archivo",system-ui,-apple-system,sans-serif;
+  --font-body:"Public Sans",system-ui,-apple-system,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --primary:#7FA98A; --primary-light:#9BC0A4; --primary-dark:#24382C; --primary-veil:rgba(127,169,138,.14);
+  --secondary:#D9A55E; --secondary-text:#DBB273; --secondary-light:#3E3021; --secondary-veil:rgba(217,165,94,.18);
+  --sage:#6E8470; --sage-light:#26302A;
+  --ink:#F1EBE1; --graphite:#C4BCB0; --muted:#948B7E; --line:#3A342C; --line-faint:#2A2620;
+  --surface:#201C17; --sunken:#191510; --paper:#16130F;
+  --warning:#D8A340; --warning-text:#E3BC72; --warning-surface:#3A2E19;
+  --error:#E0705A; --error-surface:#3B211B; --good:#7FA98A; --good-surface:#1F2C24;
+  --map-ground:#1A1917; --map-surface:#23211D; --map-boundary:#F1EBE1; --map-halo:#16130F;
+  --map-neighbour:#5A544B; --map-street:#8A6A3A; --map-street-surface:#242220;
+  --shadow:0 1px 2px rgba(0,0,0,.5),0 12px 28px -20px rgba(0,0,0,.85);
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --primary:#7FA98A; --primary-light:#9BC0A4; --primary-dark:#24382C; --primary-veil:rgba(127,169,138,.14);
+  --secondary:#D9A55E; --secondary-text:#DBB273; --secondary-light:#3E3021; --secondary-veil:rgba(217,165,94,.18);
+  --sage:#6E8470; --sage-light:#26302A;
+  --ink:#F1EBE1; --graphite:#C4BCB0; --muted:#948B7E; --line:#3A342C; --line-faint:#2A2620;
+  --surface:#201C17; --sunken:#191510; --paper:#16130F;
+  --warning:#D8A340; --warning-text:#E3BC72; --warning-surface:#3A2E19;
+  --error:#E0705A; --error-surface:#3B211B; --good:#7FA98A; --good-surface:#1F2C24;
+  --map-ground:#1A1917; --map-surface:#23211D; --map-boundary:#F1EBE1; --map-halo:#16130F;
+  --map-neighbour:#5A544B; --map-street:#8A6A3A; --map-street-surface:#242220;
+  --shadow:0 1px 2px rgba(0,0,0,.5),0 12px 28px -20px rgba(0,0,0,.85);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--font-body);font-size:16px;line-height:1.6;
+  -webkit-font-smoothing:antialiased;padding:0 0 var(--pad,72px)}
+.wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+.col{max-width:70ch}
+h1,h2,h3{font-family:var(--font-display);text-wrap:balance;line-height:1.15;margin:0}
+h1{font-size:clamp(30px,5vw,46px);font-weight:700;letter-spacing:-.02em}
+h2{font-size:clamp(21px,3vw,27px);font-weight:600;letter-spacing:-.01em}
+h3{font-size:17px;font-weight:600}
+p{margin:0}
+.eyebrow{font-family:var(--font-mono);font-size:11.5px;font-weight:500;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--muted)}
+.lede{font-size:19px;line-height:1.55;color:var(--graphite)}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.stack{display:flex;flex-direction:column;gap:16px}
+section{padding:48px 0;border-top:1px solid var(--line-faint)}
+section:first-of-type{border-top:0}
+.tafel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px;box-shadow:var(--shadow)}
+a{color:var(--primary);text-underline-offset:3px}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:4px}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+<style>
+.hero{padding:64px 0 36px}
+.hero h1{margin:12px 0 18px;max-width:18ch}
+.antwort{display:flex;flex-wrap:wrap;gap:6px 30px;align-items:baseline;margin:6px 0 4px}
+.antwort b{font-family:var(--font-display);font-size:clamp(34px,6vw,54px);font-weight:700;line-height:1;
+  letter-spacing:-.03em;color:var(--primary)}
+.antwort span{font-size:15px;color:var(--muted);max-width:36ch}
+
+/* --- Leiter --- */
+.leiter{display:flex;flex-direction:column;gap:10px;margin-top:28px}
+.sprosse{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;background:var(--surface);
+  border:1px solid var(--line);border-radius:12px;padding:16px 18px;border-left:4px solid var(--s,var(--line))}
+@media(min-width:820px){.sprosse{grid-template-columns:16ch minmax(0,1fr) 13ch;align-items:start;gap:22px}}
+.sprosse-kopf{display:flex;flex-direction:column;gap:3px}
+.sprosse-stufe{font-family:var(--font-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.sprosse-name{font-family:var(--font-display);font-weight:600;font-size:15.5px}
+.sprosse-text{display:flex;flex-direction:column;gap:8px;font-size:14px;color:var(--graphite)}
+.sprosse-text b{color:var(--ink);font-weight:600}
+.ertrag{font-family:var(--font-mono);font-size:12.5px;background:var(--sunken);border:1px solid var(--line-faint);
+  border-radius:7px;padding:8px 10px;color:var(--ink);word-break:break-word}
+.kosten{display:flex;flex-direction:column;gap:4px;align-items:flex-start}
+@media(min-width:820px){.kosten{align-items:flex-end;text-align:right}}
+.kosten .zeit{font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-size:19px;font-weight:500}
+.kosten .art{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.chip{display:inline-block;font-family:var(--font-mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;
+  padding:3px 8px;border-radius:999px;border:1px solid currentColor}
+.chip--kein{color:var(--primary)}
+.chip--llm{color:var(--secondary-text)}
+
+/* --- Kanaltabelle --- */
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line-faint);vertical-align:top}
+th{font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:500}
+td.n{font-family:var(--font-mono);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.scroll{overflow-x:auto}
+tr.gut td:first-child{box-shadow:inset 3px 0 0 var(--primary)}
+tr.schlecht td:first-child{box-shadow:inset 3px 0 0 var(--error)}
+
+/* --- Prompts --- */
+.prompt{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-top:16px}
+.prompt-kopf{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline;justify-content:space-between;
+  padding:12px 16px;border-bottom:1px solid var(--line);background:var(--sunken)}
+.prompt-kopf h3{font-size:14.5px}
+.prompt-kopf .wann{font-family:var(--font-mono);font-size:11px;color:var(--muted)}
+.prompt pre{margin:0;padding:16px;font-family:var(--font-mono);font-size:12.5px;line-height:1.62;
+  white-space:pre-wrap;overflow-x:auto;color:var(--ink)}
+.prompt .warum{padding:12px 16px;border-top:1px solid var(--line-faint);font-size:13px;color:var(--muted);background:var(--sunken)}
+.prompt .warum b{color:var(--graphite)}
+
+.merk{border-left:3px solid var(--secondary);background:var(--secondary-veil);padding:14px 18px;border-radius:0 8px 8px 0}
+.merk p{font-size:14.5px}
+.merk--rot{border-left-color:var(--error);background:var(--error-surface)}
+.paare{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;margin-top:20px}
+.paar{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:15px 17px}
+.paar h3{font-size:14px;margin-bottom:7px}
+.paar p{font-size:13.5px;color:var(--graphite)}
+.paar .mono{font-size:12.5px}
+code{font-family:var(--font-mono);font-size:12.5px;background:var(--sunken);padding:1px 5px;border-radius:4px;
+  border:1px solid var(--line-faint)}
+</style>
+
+<div class="wrap">
+
+<header class="hero">
+  <p class="eyebrow">Extraktionsstrategie · gemessen am Inserat 3499632623</p>
+  <h1>Was ein Modell kann, kann meistens auch ein Muster</h1>
+  <div class="col stack">
+    <div class="antwort">
+      <b>0 Modellaufrufe</b>
+      <span>waren nötig, um dieses Inserat vollständig aufzulösen. Gemessen, nicht geschätzt.</span>
+    </div>
+    <p class="lede">Fläche, Ort, Straße und Flurstücksnummer kamen aus HTML-Attributen, einem
+      Verzeichnis und einer Texterkennung, die 0,49 Sekunden brauchte. Ein Sprachmodell ist in
+      dieser Kette die vierte Stufe — nicht die erste.</p>
+  </div>
+</header>
+
+<section>
+  <div class="col stack">
+    <p class="eyebrow">Fünf Kanäle</p>
+    <h2>Jede Angabe hat einen Kanal, und jeder Kanal hat sein Werkzeug</h2>
+    <p>Ein Inserat ist kein Fließtext mit Beiwerk. Es sind fünf getrennte Datenströme, die
+      unterschiedlich zuverlässig und unterschiedlich teuer zu lesen sind.</p>
+  </div>
+  <div class="scroll" style="margin-top:20px">
+  <table>
+    <thead><tr><th>Kanal</th><th>Werkzeug</th><th>Ergab hier</th><th>Verlässlich?</th><th class="n">Kosten</th></tr></thead>
+    <tbody>
+      <tr class="schlecht">
+        <td><b>Koordinate</b><br><span class="mono" style="font-size:12px;color:var(--muted)">og:latitude / og:longitude</span></td>
+        <td>Regex über <code>&lt;meta&gt;</code></td>
+        <td class="mono">51,244012 / 12,721705</td>
+        <td>Nein — Gemeindemittelpunkt, 6,24 km daneben</td>
+        <td class="n">0 ms</td>
+      </tr>
+      <tr class="gut">
+        <td><b>Attributliste</b><br><span class="mono" style="font-size:12px;color:var(--muted)">Grundstücksfläche, Preis</span></td>
+        <td>HTML-Parser</td>
+        <td class="mono">502 m² · 60.000 €</td>
+        <td>Ja — amtlich deckungsgleich (502 = 502)</td>
+        <td class="n">0 ms</td>
+      </tr>
+      <tr>
+        <td><b>Standortfeld</b><br><span class="mono" style="font-size:12px;color:var(--muted)">04668 Sachsen – Grimma</span></td>
+        <td>HTML-Parser</td>
+        <td class="mono">Gemeinde Grimma</td>
+        <td>Teilweise — richtige Gemeinde, falscher Ortsteil</td>
+        <td class="n">0 ms</td>
+      </tr>
+      <tr>
+        <td><b>Fließtext</b><br><span class="mono" style="font-size:12px;color:var(--muted)">Beschreibung, Lagebeschreibung</span></td>
+        <td>Verzeichnis + Relationsmuster<br>(sonst Modell)</td>
+        <td class="mono">Großbothen · B107 · Bahnhof 1,6 km · Bus 0,3 km</td>
+        <td>Ja, aber nur mit Relation — siehe unten</td>
+        <td class="n">&lt; 10 ms</td>
+      </tr>
+      <tr class="gut">
+        <td><b>Bilder</b><br><span class="mono" style="font-size:12px;color:var(--muted)">4 Stück, 74–641 kB</span></td>
+        <td>Tesseract + Musterfilter</td>
+        <td class="mono">Flurstück 790/11 · Wiesenstraße</td>
+        <td>Ja, wenn ein Amtsauszug dabei ist</td>
+        <td class="n">490 ms</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section>
+  <div class="col stack">
+    <p class="eyebrow">Die Leiter</p>
+    <h2>Erst abklopfen, dann graben</h2>
+    <p>Jede Stufe läuft nur, wenn die darüberliegenden das Flurstück nicht schon bestimmt haben.
+      Der Abbruch ist keine Optimierung, sondern das Entwurfsprinzip: eine gefundene und gegen
+      ALKIS bestätigte Nummer macht jede weitere Stufe überflüssig.</p>
+  </div>
+
+  <div class="leiter">
+
+    <div class="sprosse" style="--s:var(--primary)">
+      <div class="sprosse-kopf"><span class="sprosse-stufe">Stufe 0</span>
+        <span class="sprosse-name">Deterministisch</span>
+        <span class="chip chip--kein">kein Modell</span></div>
+      <div class="sprosse-text">
+        <p>Meta-Tags, JSON-LD, Attributliste. Steht bereits in
+          <code>services/portals.py</code> und braucht nur die Attributliste dazu.</p>
+        <div class="ertrag">flaeche_m2 = 502 · kaufpreis = 60000 · gemeinde = „Grimma“ · plz = 04668</div>
+      </div>
+      <div class="kosten"><span class="zeit">0 ms</span><span class="art">1 HTTP-Abruf</span></div>
+    </div>
+
+    <div class="sprosse" style="--s:var(--primary)">
+      <div class="sprosse-kopf"><span class="sprosse-stufe">Stufe 1</span>
+        <span class="sprosse-name">Muster &amp; Verzeichnis</span>
+        <span class="chip chip--kein">kein Modell</span></div>
+      <div class="sprosse-text">
+        <p>Zwei Regex-Familien über den Fließtext: <b>Kennungen</b> („Flurstück 790/11“,
+          „Gemarkung X“, „Flur 3“) und <b>Entfernungsbehauptungen</b> („Bahnhof 1,6 km“).
+          Dazu ein Abgleich gegen die 5.339 Gemarkungsnamen, die das Projekt schon als Datei hat.</p>
+        <p>Findet Stufe 1 eine <b>vollständige Flurstückskennung</b>, springt die Kette direkt
+          zur Prüfung.</p>
+        <div class="ertrag">gemarkung? = „Großbothen“ (144241) | „Grimma“ (144236) · bahnhof_km = 1,6 · bus_km = 0,3</div>
+      </div>
+      <div class="kosten"><span class="zeit">&lt; 10 ms</span><span class="art">rein lokal</span></div>
+    </div>
+
+    <div class="sprosse" style="--s:var(--primary)">
+      <div class="sprosse-kopf"><span class="sprosse-stufe">Stufe 2</span>
+        <span class="sprosse-name">Texterkennung</span>
+        <span class="chip chip--kein">kein Modell</span></div>
+      <div class="sprosse-text">
+        <p>Tesseract <code>-l deu --psm 6</code> über <b>alle</b> Bilder, dann derselbe
+          Musterfilter wie in Stufe 1. Nicht vorsortieren: das Erkennen ist billiger als das
+          Entscheiden, welches Bild es wert wäre.</p>
+        <p>Abbruch, sobald ein Flurstücksmuster trifft.</p>
+        <div class="ertrag">Bild 2: „Untertitel: Flurstück 790/11“ · „Titel: Wiesenstraße - Großbothen“</div>
+      </div>
+      <div class="kosten"><span class="zeit">490 ms</span><span class="art">pro Kartenbild</span></div>
+    </div>
+
+    <div class="sprosse" style="--s:var(--secondary)">
+      <div class="sprosse-kopf"><span class="sprosse-stufe">Stufe 3</span>
+        <span class="sprosse-name">Sprachmodell auf Text</span>
+        <span class="chip chip--llm">Modell</span></div>
+      <div class="sprosse-text">
+        <p>Nur wenn Stufe 1 mehrere Ortskandidaten liefert und keiner davon eindeutig ist. Das
+          Modell wird <b>nicht</b> nach dem Ort gefragt, sondern nach der <b>Beziehung</b>
+          zwischen Grundstück und jedem genannten Ort. Prompt P1 unten.</p>
+        <div class="ertrag">{ort: „Großbothen“, beziehung: „liegt_in“} · {ort: „Grimma“, beziehung: „entfernt_von“, km: 6}</div>
+      </div>
+      <div class="kosten"><span class="zeit">~2 s</span><span class="art">1 Aufruf · Text</span></div>
+    </div>
+
+    <div class="sprosse" style="--s:var(--secondary)">
+      <div class="sprosse-kopf"><span class="sprosse-stufe">Stufe 4</span>
+        <span class="sprosse-name">Bildmodell</span>
+        <span class="chip chip--llm">Modell</span></div>
+      <div class="sprosse-text">
+        <p>Nur für Bilder, in denen Tesseract Struktur, aber keine lesbaren Muster fand — das
+          Orthofoto dieses Inserats ist genau der Fall: winzige Beschriftungen auf buntem Grund.
+          Prompt P2 unten.</p>
+        <p>Teuerste Stufe. Läuft höchstens über zwei Bilder, nie über Fotos vom Grundstück.</p>
+        <div class="ertrag">hier nicht nötig — Stufe 2 hatte die Nummer bereits</div>
+      </div>
+      <div class="kosten"><span class="zeit">~4 s</span><span class="art">pro Bild</span></div>
+    </div>
+
+  </div>
+</section>
+
+<section>
+  <div class="col stack">
+    <p class="eyebrow">Zwei gemessene Fallen</p>
+    <h2>Wo die billigen Wege kippen</h2>
+  </div>
+  <div class="paare">
+    <div class="paar">
+      <h3>Häufigkeit wählt den falschen Ort</h3>
+      <p>Über die 5.339 Gemarkungsnamen laufen lassen und den häufigsten nehmen, ergibt in
+        diesem Inserat:</p>
+      <p class="mono" style="margin-top:9px;color:var(--error)">Grimma 3× · Großbothen 3× · Höfgen 2×</p>
+      <p style="margin-top:9px">Unentschieden — und alphabetisch gewinnt der falsche. „Grimma“
+        steht dreimal da, weil das Grundstück <em>6 km davon entfernt</em> ist. Ein Ortsname im
+        Text ist kein Ort des Grundstücks.</p>
+    </div>
+    <div class="paar">
+      <h3>Die Behörde signiert mit ihrer eigenen Adresse</h3>
+      <p>Der Straßenfilter zieht aus dem Kartenauszug zwei Treffer:</p>
+      <p class="mono" style="margin-top:9px"><span style="color:var(--primary)">Wiesenstraße</span> ·
+        <span style="color:var(--error)">Olbrichtplatz</span></p>
+      <p style="margin-top:9px">Der zweite ist der Sitz des Landesamts in Dresden, gedruckt in der
+        Fußzeile jedes Geoportal-Auszugs. Fußzeilenband verwerfen — oder Treffer, die neben
+        „Landesamt“, „Dresden“ oder einer Telefonnummer stehen.</p>
+    </div>
+  </div>
+  <div class="col" style="margin-top:20px">
+    <div class="merk"><p>Beide Fallen haben dieselbe Ursache: <b>ein Treffer ohne seine Beziehung
+      ist kein Indiz.</b> Deshalb trägt jedes Indiz im Schema unten mit, <em>wie</em> es zum
+      Grundstück steht — und nicht nur, dass es vorkam.</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="col stack">
+    <p class="eyebrow">Prompts</p>
+    <h2>Nie nach der Antwort fragen, immer nach Indizien</h2>
+    <p>Ein Modell, das nach „dem Flurstück“ gefragt wird, erfindet eines. Ein Modell, das nach
+      belegten Aussagen mit Beziehung und Sicherheit gefragt wird, liefert Material, das die
+      Suche nachher selbst gewichtet. Alle drei Prompts geben deshalb Listen von Indizien
+      zurück, keine Ortsbestimmung.</p>
+  </div>
+
+  <div class="prompt">
+    <div class="prompt-kopf"><h3>P1 · Beziehungen im Fließtext</h3>
+      <span class="wann">Stufe 3 · nur bei mehreren Ortskandidaten · Text-Modell</span></div>
+<pre>Du liest die Beschreibung eines Grundstücksinserats aus Sachsen. Trage
+jeden Ort, jede Straße und jedes Bauwerk ein, das im Text vorkommt, und
+für jeden die BEZIEHUNG zum angebotenen Grundstück.
+
+Erlaubte Beziehungen:
+  liegt_in        Das Grundstück liegt in diesem Ort oder Ortsteil.
+  liegt_an        Das Grundstück grenzt an diese Straße oder dieses Gewässer.
+  entfernt_von    Der Text nennt eine Entfernung oder Fahrzeit dorthin.
+  erwaehnt        Kommt vor, sagt aber nichts über die Lage des Grundstücks.
+
+Regeln:
+- „in der 6 km entfernten Kreisstadt X“ ist entfernt_von, nicht liegt_in.
+- Ein Ortsteil schlägt die Gemeinde: steht beides da, ist der Ortsteil
+  liegt_in und die Gemeinde erwaehnt.
+- Der Sitz eines Amtes, ein Maklerbüro oder ein Ausflugsziel ist erwaehnt.
+- Trage nur ein, was dasteht. Nichts ergänzen, nichts erschließen.
+- Keine Namen, Telefonnummern oder Kontaktdaten.
+
+Gib für jeden Eintrag an:
+  wert          der Name, genau wie im Text
+  beziehung     eine der vier oben
+  entfernung_km Zahl, wenn eine genannt ist, sonst null
+  beleg         der Halbsatz, aus dem du es liest, wörtlich
+  sicherheit    hoch | mittel | gering
+
+TEXT:
+"""{text}"""</pre>
+    <div class="warum"><b>Warum so:</b> Der Text nennt „Grimma“ genauso oft wie „Großbothen“. Die
+      Frage „wo liegt das Grundstück“ lädt zum Raten ein; die Frage „welche Beziehung hat jeder
+      genannte Ort“ hat für jeden Eintrag eine Textstelle als Antwort. Das Feld <code>beleg</code>
+      ist der Grund, warum das prüfbar bleibt — ein Indiz ohne wörtlichen Beleg wird verworfen.</div>
+  </div>
+
+  <div class="prompt">
+    <div class="prompt-kopf"><h3>P2 · Bild, das die Texterkennung nicht lesen konnte</h3>
+      <span class="wann">Stufe 4 · höchstens zwei Bilder · Bildmodell</span></div>
+<pre>Das Bild stammt aus einem Grundstücksinserat. Es kann ein Auszug aus
+einem amtlichen Kartenwerk sein, ein Lageplan, ein Screenshot oder ein
+Foto. Lies ausschließlich ab, was tatsächlich geschrieben steht.
+
+Trage ein, sofern vorhanden:
+  flurstueck     Nummern der Form 790/11, 202 oder 41/e
+  gemarkung      Name der Gemarkung
+  flur           Flurnummer
+  strasse        Straßennamen, die IM Kartenbild stehen
+  hausnummern    Hausnummern, die im Kartenbild stehen
+  massstab       etwa „1:500“
+  herausgeber    etwa „geoportal.sachsen.de“, „Landesamt für Geobasis…“
+  hervorgehoben  Wenn eine Fläche farbig umrandet ist: welche Nummer
+                 steht in oder an dieser Fläche?
+
+Regeln:
+- Die Anschrift des Herausgebers steht meist in der Fußzeile. Ihre Straße
+  gehört NICHT zu strasse — trage sie unter herausgeber ein.
+- Wenn du eine Zahl nicht sicher entziffern kannst, lass sie weg. Eine
+  fehlende Nummer ist brauchbar, eine geratene ist schädlich.
+- Beschreibe das Bild nicht. Nur ablesen.
+
+Gib zu jedem Wert an, wie sicher du ihn lesen konntest:
+  sicher | unsicher</pre>
+    <div class="warum"><b>Warum so:</b> <code>hervorgehoben</code> ist das eigentliche Ziel — auf beiden
+      Kartenbildern dieses Inserats ist die verkaufte Fläche rot umrandet, und die Nummer darin ist
+      die Antwort. Und die ausdrückliche Erlaubnis wegzulassen ist wichtiger als sie aussieht: eine
+      falsch geratene Nummer führt zu einem existierenden, aber fremden Flurstück — dem einen Fehler,
+      den die Prüfung gegen ALKIS <em>nicht</em> fängt.</div>
+  </div>
+
+  <div class="prompt">
+    <div class="prompt-kopf"><h3>P3 · Widerspruch auflösen</h3>
+      <span class="wann">nur wenn Indizien sich widersprechen · Text-Modell</span></div>
+<pre>Aus einem Inserat wurden Indizien für die Lage eines Grundstücks
+gesammelt. Sie widersprechen sich. Beurteile, welchem zu trauen ist.
+
+Bewerte jedes Indiz nach:
+- Wer hat es geschrieben? Eine Behörde (Kartenauszug, Grundbuch) wiegt
+  schwerer als der Anbieter, der Anbieter schwerer als die Plattform.
+- Ist es eine Angabe oder eine Ableitung? Eine gedruckte Flurstücksnummer
+  ist eine Angabe. Ein Kartenpin ist eine Ableitung der Plattform.
+- Kann es Werbung sein? Entfernungen zu Bahnhof, Schule und Einkauf
+  werden zugunsten des Angebots gerundet.
+
+INDIZIEN:
+{indizien}
+
+Antworte mit:
+  reihenfolge   die Indizien, vom belastbarsten zum schwächsten
+  begruendung   je ein Satz, warum es dort steht
+  unvereinbar   welche Paare sich echt ausschließen — und nicht nur
+                unterschiedlich genau sind</pre>
+    <div class="warum"><b>Warum so:</b> Diese Stufe entscheidet nichts über den Ort, sie ordnet nur
+      Quellen. Deshalb kann sie auch nichts erfinden: Sie darf die Indizienliste weder ergänzen noch
+      verändern. Bei diesem Inserat ist die Antwort schon aus der Reihenfolge klar — <code>Kartenauszug
+      des GeoSN</code> vor <code>Fließtext des Anbieters</code> vor <code>Pin der Plattform</code>.</div>
+  </div>
+</section>
+
+<section>
+  <div class="col stack">
+    <p class="eyebrow">Datenform</p>
+    <h2>Ein Indiz, wie es durch die Kette läuft</h2>
+    <p>Alles, was die fünf Stufen finden, hat dieselbe Form. Erst dadurch lässt sich die Suche
+      danach gewichten — und die Karte danach einfärben.</p>
+  </div>
+  <div class="prompt" style="margin-top:20px">
+    <div class="prompt-kopf"><h3>Indiz</h3><span class="wann">backend/app/schemas.py</span></div>
+<pre>art          gemarkung | ortsteil | strasse | hausnummer | flurstueck
+             | flaeche | entfernung | koordinate
+wert         "Großbothen" · "790/11" · 502 · {"ziel":"bahnhof","km":1.6}
+beziehung    liegt_in | liegt_an | entfernt_von | erwaehnt
+quelle       attributliste | metatag | fliesstext | bild-ocr | bild-modell
+             | standortfeld
+beleg        die Textstelle oder der Bildausschnitt, wörtlich
+sicherheit   0.0 … 1.0
+geprueft     null, bis ALKIS den Wert bestätigt oder verworfen hat</pre>
+    <div class="warum"><b>Zwei Felder tragen die ganze Strategie:</b> <code>quelle</code> entscheidet
+      das Gewicht in der Suche, <code>sicherheit</code> entscheidet die Deckkraft auf der Karte.
+      <code>geprueft</code> bleibt <code>null</code>, solange nur behauptet und nicht bestätigt ist —
+      und nur ein <code>geprueft = true</code> darf in der Oberfläche als Ergebnis auftreten.</div>
+  </div>
+</section>
+
+<section>
+  <div class="col stack">
+    <p class="eyebrow">Die Frage nach spaCy</p>
+    <h2>Wofür klassisches NLP taugt — und wofür nicht</h2>
+    <p>Für <em>Namen finden</em> braucht es kein NLP. Das Projekt hat bereits ein Verzeichnis mit
+      allen 5.339 sächsischen Gemarkungen; ein Abgleich dagegen ist genauer als jede
+      Eigennamenerkennung, weil er nur Namen kennt, die es wirklich gibt.</p>
+    <p>Was fehlt, ist die <b>Beziehung</b> — und dafür ist spaCy tatsächlich das kleinere
+      Werkzeug als ein Sprachmodell:</p>
+  </div>
+  <div class="paare">
+    <div class="paar">
+      <h3>Satzgrenzen</h3>
+      <p>Trennt „Ortsrand von Großbothen“ vom folgenden Satz über Grimma, damit eine
+        Entfernungsangabe nicht dem falschen Ort zugeschlagen wird. Das allein löst die
+        Häufigkeitsfalle in vielen Inseraten.</p>
+    </div>
+    <div class="paar">
+      <h3>Präposition und Abhängigkeit</h3>
+      <p><code>in Großbothen</code> gegen <code>in die … entfernte Kreisstadt Grimma</code>: dasselbe
+        „in“, verschiedene Abhängigkeit. Der Parser sieht, dass an Grimma ein
+        <code>entfernte</code> hängt, ein Muster nicht.</p>
+    </div>
+    <div class="paar">
+      <h3>Nicht dafür da</h3>
+      <p>Ortsnamen erkennen (das Verzeichnis ist besser), Zahlen finden (Regex ist besser),
+        Widersprüche werten (dafür ist P3 da). Ein <code>de_core_news_sm</code> kennt
+        „Großbothen“ ohnehin nicht.</p>
+    </div>
+  </div>
+  <div class="col" style="margin-top:20px">
+    <div class="merk"><p><b>Empfehlung:</b> Stufe 1 ohne spaCy bauen — Verzeichnis plus Regex plus
+      eine Handvoll Relationsmuster („OT von“, „Ortsteil“, „entfernte“, „gelegen in“). Erst wenn
+      sich an echten Inseraten zeigt, dass die Muster die Beziehung zu oft verfehlen, ist spaCy die
+      billigere Antwort als P1 — es kostet 40 MB und keine Netzverbindung, P1 kostet einen
+      Modellaufruf pro Inserat.</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="col stack quellen" style="font-size:12.5px;color:var(--muted)">
+    <p class="eyebrow" style="color:var(--muted)">Was hier gemessen wurde</p>
+    <p><b>Texterkennung, live am 01.09.2026:</b> <code>tesseract 5.3.4</code>, <code>-l deu --psm 6</code>,
+      auf allen vier Bildern des Inserats. Kartenauszug 491 ms → <code>flurstueck=790/11</code>,
+      <code>strasse=Wiesenstraße</code>, <code>strasse=Olbrichtplatz</code>. Orthofoto 399 ms → kein
+      Treffer. Die beiden Grundstücksfotos 4.085 ms und 4.567 ms → kein Treffer.
+      <b>Kein einziger falscher Flurstückstreffer in den drei Bildern ohne Kartenauszug</b> — das ist
+      der Grund, warum „alle Bilder erkennen und filtern“ tragfähig ist.</p>
+    <p><b>Verzeichnisabgleich, live:</b> die 5.339 Namen aus
+      <code>backend/data/gemarkungen-sachsen.json</code> gegen den Beschreibungstext, Wortgrenzen
+      exakt: Grimma 3×, Großbothen 3×, Höfgen 2×.</p>
+    <p><b>Nicht geprüft:</b> die drei Prompts sind entworfen, aber noch gegen kein Modell gelaufen —
+      dieses Inserat brauchte sie nicht. Die Zeitangaben für Stufe 3 und 4 sind Erfahrungswerte für
+      einen OpenRouter-Aufruf, keine Messung. Ebenfalls offen: ob eine Vorsortierung der Bilder die
+      9,5 Sekunden Gesamterkennung lohnt — der Abbruch beim ersten Treffer nimmt dem Problem die
+      Schärfe, solange der Kartenauszug nicht das letzte Bild ist.</p>
+  </div>
+</section>
+
+</div>

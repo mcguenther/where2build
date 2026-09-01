@@ -1,0 +1,563 @@
+<title>Die Indizienkarte</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --primary:#2F4A3A; --primary-light:#456B52; --primary-dark:#1C2E23; --primary-veil:rgba(47,74,58,.10);
+  --secondary:#B5813C; --secondary-text:#7C5620; --secondary-light:#E8D4B0; --secondary-veil:rgba(181,129,60,.16);
+  --sage:#9DB39A; --sage-light:#DCE4DA;
+  --ink:#1E1A16; --graphite:#4A443C; --muted:#6F675C; --line:#DCD3C6; --line-faint:#EBE4D9;
+  --surface:#FAF7F1; --sunken:#F3EFE6; --paper:#F1EBE1; --white:#FFFFFF;
+  --warning:#BE8524; --warning-text:#7C5620; --warning-surface:#F6E9CE;
+  --error:#A8402C; --error-surface:#F2DED8; --good:#2F4A3A; --good-surface:#DEE7DF;
+  --map-ground:#E6E3DC; --map-surface:#EFEDE7; --map-boundary:#1E1A16; --map-halo:#FFFFFF;
+  --map-neighbour:#9A9184; --map-street:#B5813C; --map-street-surface:#D6D2CA;
+  --shadow:0 1px 2px rgba(30,26,22,.05),0 10px 24px -18px rgba(30,26,22,.45);
+  --font-display:"Archivo",system-ui,-apple-system,sans-serif;
+  --font-body:"Public Sans",system-ui,-apple-system,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --primary:#7FA98A; --primary-light:#9BC0A4; --primary-dark:#24382C; --primary-veil:rgba(127,169,138,.14);
+  --secondary:#D9A55E; --secondary-text:#DBB273; --secondary-light:#3E3021; --secondary-veil:rgba(217,165,94,.18);
+  --sage:#6E8470; --sage-light:#26302A;
+  --ink:#F1EBE1; --graphite:#C4BCB0; --muted:#948B7E; --line:#3A342C; --line-faint:#2A2620;
+  --surface:#201C17; --sunken:#191510; --paper:#16130F;
+  --warning:#D8A340; --warning-text:#E3BC72; --warning-surface:#3A2E19;
+  --error:#E0705A; --error-surface:#3B211B; --good:#7FA98A; --good-surface:#1F2C24;
+  --map-ground:#1A1917; --map-surface:#23211D; --map-boundary:#F1EBE1; --map-halo:#16130F;
+  --map-neighbour:#5A544B; --map-street:#8A6A3A; --map-street-surface:#242220;
+  --shadow:0 1px 2px rgba(0,0,0,.5),0 12px 28px -20px rgba(0,0,0,.85);
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --primary:#7FA98A; --primary-light:#9BC0A4; --primary-dark:#24382C; --primary-veil:rgba(127,169,138,.14);
+  --secondary:#D9A55E; --secondary-text:#DBB273; --secondary-light:#3E3021; --secondary-veil:rgba(217,165,94,.18);
+  --sage:#6E8470; --sage-light:#26302A;
+  --ink:#F1EBE1; --graphite:#C4BCB0; --muted:#948B7E; --line:#3A342C; --line-faint:#2A2620;
+  --surface:#201C17; --sunken:#191510; --paper:#16130F;
+  --warning:#D8A340; --warning-text:#E3BC72; --warning-surface:#3A2E19;
+  --error:#E0705A; --error-surface:#3B211B; --good:#7FA98A; --good-surface:#1F2C24;
+  --map-ground:#1A1917; --map-surface:#23211D; --map-boundary:#F1EBE1; --map-halo:#16130F;
+  --map-neighbour:#5A544B; --map-street:#8A6A3A; --map-street-surface:#242220;
+  --shadow:0 1px 2px rgba(0,0,0,.5),0 12px 28px -20px rgba(0,0,0,.85);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--font-body);font-size:16px;line-height:1.6;
+  -webkit-font-smoothing:antialiased;padding:0 0 var(--pad,72px)}
+.wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+.col{max-width:70ch}
+h1,h2,h3{font-family:var(--font-display);text-wrap:balance;line-height:1.15;margin:0}
+h1{font-size:clamp(30px,5vw,46px);font-weight:700;letter-spacing:-.02em}
+h2{font-size:clamp(21px,3vw,27px);font-weight:600;letter-spacing:-.01em}
+h3{font-size:17px;font-weight:600}
+p{margin:0}
+.eyebrow{font-family:var(--font-mono);font-size:11.5px;font-weight:500;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--muted)}
+.lede{font-size:19px;line-height:1.55;color:var(--graphite)}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.stack{display:flex;flex-direction:column;gap:16px}
+section{padding:48px 0;border-top:1px solid var(--line-faint)}
+section:first-of-type{border-top:0}
+.tafel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px;box-shadow:var(--shadow)}
+a{color:var(--primary);text-underline-offset:3px}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:4px}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+<style>
+.hero{padding:56px 0 32px}
+.hero h1{margin:12px 0 16px;max-width:16ch}
+
+/* --- Die Bühne --- */
+.buehne{display:grid;grid-template-columns:minmax(0,1fr);gap:0;margin-top:26px;
+  background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--shadow)}
+@media(min-width:920px){.buehne{grid-template-columns:minmax(0,1fr) 330px}}
+.buehne-karte{position:relative;background:var(--map-ground);min-width:0}
+.buehne-karte svg{display:block;width:100%;height:auto}
+.stufenband{position:absolute;left:0;right:0;top:0;display:flex;gap:2px;padding:10px 12px 0}
+.stufenband i{flex:1;height:3px;border-radius:2px;background:var(--line);transition:background .3s}
+.stufenband i.an{background:var(--primary)}
+.kartenmass{position:absolute;right:14px;bottom:12px;max-width:45%;font-family:var(--font-mono);font-size:11.5px;
+  color:var(--muted);display:flex;align-items:center;gap:8px}
+.kartenmass i{display:block;height:2.5px;background:var(--graphite);border-radius:2px;flex:none}
+.kartenmass span{white-space:nowrap}
+.kartenfuss{position:absolute;left:14px;bottom:12px;font-family:var(--font-mono);font-size:11.5px;
+  color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px 11px}
+
+/* --- Protokoll --- */
+.protokoll{border-top:1px solid var(--line);display:flex;flex-direction:column;min-width:0}
+@media(min-width:920px){.protokoll{border-top:0;border-left:1px solid var(--line);min-height:0}}
+.prot-kopf{padding:14px 18px;border-bottom:1px solid var(--line);background:var(--sunken)}
+.prot-kopf h3{font-size:14.5px}
+.prot-kopf p{font-size:12px;color:var(--muted);margin-top:3px}
+.prot-liste{display:flex;flex-direction:column;padding:6px;gap:2px;flex:1;min-height:0;overflow-y:auto;max-height:min(46vh,430px)}
+.ind{display:grid;grid-template-columns:auto 1fr;gap:10px;padding:10px 12px;border-radius:9px;
+  text-align:left;background:transparent;border:0;font:inherit;color:inherit;cursor:pointer;
+  opacity:.3;transition:opacity .3s,background .2s}
+.ind.da{opacity:1}
+.ind.jetzt{background:var(--primary-veil)}
+.ind:hover.da{background:var(--sunken)}
+.ind:focus-visible{outline:2px solid var(--primary);outline-offset:-2px}
+.ind-punkt{width:11px;height:11px;border-radius:3px;margin-top:4px;background:var(--k);flex:none}
+.ind-text{min-width:0}
+.ind-name{display:block;font-size:13.5px;font-weight:500;line-height:1.35}
+.ind-quelle{display:block;font-family:var(--font-mono);font-size:10.5px;letter-spacing:.06em;color:var(--muted);margin-top:3px}
+.ind-staerke{display:flex;align-items:center;gap:7px;margin-top:7px}
+.ind-balken{flex:1;height:5px;border-radius:999px;background:var(--sunken);border:1px solid var(--line-faint);overflow:hidden}
+.ind-balken i{display:block;height:100%;background:var(--k);border-radius:999px;transition:width .4s ease}
+.ind-zahl{font-family:var(--font-mono);font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.prot-fuss{padding:12px 16px;border-top:1px solid var(--line);background:var(--sunken);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.prot-fuss button{font:500 12px/1 var(--font-mono);letter-spacing:.04em;padding:8px 13px;border-radius:8px;
+  border:1px solid var(--line);background:var(--surface);color:var(--graphite);cursor:pointer}
+.prot-fuss button:hover{border-color:var(--primary);color:var(--primary)}
+.prot-fuss button.haupt{background:var(--primary);border-color:var(--primary);color:var(--primary-on)}
+.prot-fuss .rest{margin-left:auto;font-family:var(--font-mono);font-size:11.5px;color:var(--muted)}
+
+/* --- Skala --- */
+.skala{display:flex;flex-direction:column;gap:2px;margin-top:26px}
+.sk{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;padding:13px 16px;border-radius:10px;
+  background:var(--surface);border:1px solid var(--line-faint)}
+@media(min-width:800px){.sk{grid-template-columns:16ch 96px minmax(0,1fr) 8ch;align-items:center;gap:18px}}
+.sk-stufe{font-family:var(--font-display);font-weight:600;font-size:14px}
+.sk-probe{height:34px;border-radius:6px;position:relative;overflow:hidden;background:var(--map-ground);
+  border:1px solid var(--line-faint)}
+.sk-text{font-size:13px;color:var(--graphite)}
+.sk-wert{font-family:var(--font-mono);font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+@media(min-width:800px){.sk-wert{text-align:right}}
+
+.paare{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;margin-top:20px}
+.paar{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:15px 17px}
+.paar h3{font-size:14px;margin-bottom:7px}
+.paar p{font-size:13.5px;color:var(--graphite)}
+.merk{border-left:3px solid var(--secondary);background:var(--secondary-veil);padding:14px 18px;border-radius:0 8px 8px 0}
+.merk p{font-size:14.5px}
+.merk--rot{border-left-color:var(--error);background:var(--error-surface)}
+code{font-family:var(--font-mono);font-size:12.5px;background:var(--sunken);padding:1px 5px;border-radius:4px;
+  border:1px solid var(--line-faint)}
+</style>
+
+<div class="wrap">
+
+<header class="hero">
+  <p class="eyebrow">Oberflächenentwurf · echte Geometrie aus Großbothen</p>
+  <h1>Die Karte zeigt, was man weiß — und wie sicher</h1>
+  <div class="col stack">
+    <p class="lede">Eine Suche, die zwei Minuten läuft, darf nicht zwei Minuten lang nichts zeigen.
+      Jedes Indiz erscheint, sobald es da ist, an der Stelle, für die es spricht — und in einer
+      Deckkraft, die seiner Verlässlichkeit entspricht. Der Ort ist ein Hauch, das bestätigte
+      Flurstück eine gezogene Linie.</p>
+  </div>
+</header>
+
+<section style="border-top:0;padding-top:8px">
+  <div class="buehne">
+    <div class="buehne-karte">
+      <div class="stufenband" id="band"></div>
+      <svg id="karte" viewBox="0 0 1000 660" role="img" aria-label="Karte, auf der die Indizien nacheinander erscheinen"></svg>
+      <div class="kartenfuss" id="kartenfuss"></div>
+      <div class="kartenmass" id="kartenmass"><i></i><span></span></div>
+    </div>
+    <div class="protokoll">
+      <div class="prot-kopf">
+        <h3>Indizienprotokoll</h3>
+        <p>Anklicken springt zu diesem Stand.</p>
+      </div>
+      <div class="prot-liste" id="protokoll"></div>
+      <div class="prot-fuss">
+        <button type="button" id="abspielen" class="haupt">Analyse starten</button>
+        <button type="button" id="zurueck">Zurück</button>
+        <button type="button" id="vor">Weiter</button>
+        <span class="rest" id="restText"></span>
+      </div>
+    </div>
+  </div>
+  <p class="quellen" style="margin-top:12px;font-size:12.5px;color:var(--muted);max-width:78ch">
+    Kein Entwurfsplatzhalter: Gemarkungsumring, 83 Flurstücke, 25 Flächenkandidaten und die drei
+    Straßenabschnitte sind am 01.09.2026 aus ALKIS, OpenStreetMap und dem DELFI-Fahrplan geholt.
+    Ein echter Hintergrund (Orthofoto, Vektorkarte) fehlt hier nur, weil diese Seite keine
+    Kacheln nachladen darf.
+  </p>
+</section>
+
+<section>
+  <div class="col stack">
+    <p class="eyebrow">Die Regel dahinter</p>
+    <h2>Sicherheit ist Fläche und Deckkraft, nicht Farbe</h2>
+    <p>Ein schwaches Indiz sagt etwas über ein großes Gebiet, ein starkes über ein kleines. Das
+      ist keine Metapher, sondern der Sachverhalt — und deshalb tragen beide Größen dieselbe
+      Aussage: <b>je unsicherer, desto größer und blasser; je sicherer, desto kleiner und
+      kräftiger.</b> Die Farbe bleibt dabei frei für die Herkunft.</p>
+  </div>
+
+  <div class="skala" id="skala"></div>
+
+  <div class="col" style="margin-top:22px">
+    <div class="merk"><p>Genau ein Zustand bricht die Skala: <b>bestätigt.</b> Er ist der einzige mit
+      gezogener Kontur und Beschriftung, und er wird erst vergeben, wenn ALKIS das Flurstück
+      geliefert und die Plausibilitätsprüfung nicht widersprochen hat. Alles andere bleibt Wolke.
+      Wer eine Kontur sieht, weiß damit ohne Legende, dass geprüft wurde.</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="col stack">
+    <p class="eyebrow">Vier Entscheidungen</p>
+    <h2>Was diese Oberfläche anders macht</h2>
+  </div>
+  <div class="paare">
+    <div class="paar">
+      <h3>Die Kamera folgt dem Wissen</h3>
+      <p>Der Ausschnitt zoomt nur so weit, wie die Indizien tragen. Ein Sprung auf Hausnummernebene,
+        während erst der Ortsteil bekannt ist, wäre eine Behauptung, die die Daten nicht decken.
+        Der Maßstab unten links ist deshalb Teil der Aussage.</p>
+    </div>
+    <div class="paar">
+      <h3>Widerlegtes verschwindet nicht</h3>
+      <p>Der Pin der Plattform bleibt sichtbar und wird durchgestrichen, sobald ihm ein stärkeres
+        Indiz widerspricht. Wer eine Anzeige selbst nachschlägt, sieht dort diesen Pin — die
+        Oberfläche muss erklären, warum sie woanders hinzeigt.</p>
+    </div>
+    <div class="paar">
+      <h3>Jedes Indiz ist anklickbar</h3>
+      <p>Ein Eintrag im Protokoll führt zu seiner Textstelle im Inserat oder zum Bildausschnitt,
+        aus dem er stammt. Ein Indiz, dessen Beleg man nicht sehen kann, ist in dieser Oberfläche
+        ein Fehler.</p>
+    </div>
+    <div class="paar">
+      <h3>Mehrdeutig ist ein Ergebnis</h3>
+      <p>Bleiben mehrere Kandidaten gleichauf, zeigt die Karte alle — gleich stark, ohne Kontur —
+        und die Kopfzeile sagt „vier mögliche Flurstücke“. Ein Ergebnis wird nie durch Auswahl des
+        erstbesten erzeugt.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="col stack">
+    <p class="eyebrow">Einbau</p>
+    <h2>Wo das im bestehenden Projekt sitzt</h2>
+    <p>Die Bühne oben ist keine neue Anwendung, sondern ein Schritt vor dem heutigen Ergebnis.
+      Der Assistent hat bereits eine Stufe, die aus einem Inserat Felder macht; dazwischen fehlt
+      die Suche.</p>
+  </div>
+  <div class="paare">
+    <div class="paar">
+      <h3>Neue Ansicht</h3>
+      <p><code>SucheView.vue</code> zwischen dem Einfügefeld und <code>PlotView</code>. Options-API,
+        wie alles andere.</p>
+    </div>
+    <div class="paar">
+      <h3>Neue Komponente</h3>
+      <p><code>IndizienKarte.vue</code> — dieselbe Rolle wie <code>SitePlan</code>, nur mit
+        Indizienschichten statt Bauplanung. Geometrie im Browser, wie festgelegt.</p>
+    </div>
+    <div class="paar">
+      <h3>Neuer Endpunkt</h3>
+      <p><code>POST /api/parcels/search</code>, der Indizien annimmt und Kandidaten liefert.
+        Antwortet in Teilstücken, damit die Karte mitwächst.</p>
+    </div>
+    <div class="paar">
+      <h3>Was bleibt</h3>
+      <p><code>plausibility.assess</code> entscheidet weiterhin über „bestätigt“. Die Karte fügt
+        keine Prüfung hinzu, sie zeigt nur deren Ausgang.</p>
+    </div>
+  </div>
+</section>
+
+</div>
+
+<script>
+const KARTE={"gemarkung":{"name":"Großbothen","schluessel":"144241","ring":[[-1337,-1885],[-1292,-1922],[-1244,-1955],[-1140,-1883],[-1202,-1843],[-1242,-1804],[-1189,-1720],[-1120,-1616],[-1053,-1531],[-1014,-1540],[-970,-1578],[-933,-1606],[-857,-1647],[-772,-1684],[-740,-1695],[-671,-1720],[-591,-1711],[-478,-1716],[-354,-1695],[-308,-1711],[-230,-1725],[-159,-1733],[-159,-1807],[-209,-1893],[-255,-2021],[-232,-2059],[-278,-2138],[-347,-2253],[-424,-2314],[-521,-2334],[-601,-2354],[-584,-2447],[-572,-2514],[-559,-2640],[-556,-2680],[-542,-2699],[-526,-2747],[-509,-2855],[-527,-2935],[-500,-2899],[-474,-2783],[-463,-2724],[-438,-2602],[-401,-2465],[-388,-2437],[-351,-2372],[-312,-2337],[-264,-2306],[-211,-2281],[-124,-2258],[-57,-2242],[8,-2216],[51,-2168],[107,-2097],[125,-2071],[152,-2027],[218,-1929],[245,-1907],[332,-1928],[355,-1938],[423,-1968],[476,-2000],[581,-2039],[643,-2044],[717,-2035],[770,-2025],[865,-1987],[874,-1930],[891,-1839],[842,-1817],[863,-1727],[900,-1585],[949,-1419],[996,-1289],[1058,-1093],[1073,-998],[1088,-844],[1097,-744],[1048,-685],[1048,-638],[1047,-613],[1052,-556],[1054,-539],[1059,-518],[1064,-494],[1071,-467],[1086,-422],[1108,-323],[1111,-290],[1134,-223],[1156,-158],[1149,-115],[1119,-100],[1079,-55],[1049,-62],[1010,-43],[965,-38],[942,-62],[928,-40],[847,-60],[812,-36],[808,-13],[799,25],[786,79],[775,116],[763,152],[746,141],[714,119],[691,103],[639,68],[613,50],[586,41],[576,39],[558,54],[542,74],[532,120],[529,146],[524,169],[526,190],[525,225],[523,254],[521,279],[518,313],[512,348],[508,377],[499,416],[482,476],[471,505],[449,563],[434,603],[303,613],[196,601],[104,591],[104,714],[113,754],[206,761],[367,767],[422,774],[469,782],[625,804],[673,810],[780,835],[870,878],[897,893],[961,950],[1005,965],[997,1005],[941,1030],[878,1014],[828,1005],[784,997],[755,989],[697,975],[537,949],[471,938],[445,932],[399,925],[366,925],[279,921],[174,920],[97,915],[-126,892],[-252,876],[-288,869],[-347,856],[-409,849],[-472,848],[-564,829],[-637,804],[-780,753],[-839,717],[-862,713],[-962,817],[-998,730],[-1048,710],[-1093,663],[-1131,596],[-1174,527],[-1192,427],[-1195,324],[-1205,263],[-1206,134],[-1222,23],[-1228,-53],[-1238,-149],[-1253,-249],[-1258,-322],[-1263,-363],[-1270,-424],[-1281,-514],[-1283,-521],[-1302,-600],[-1320,-669],[-1343,-738],[-1352,-810],[-1350,-865],[-1351,-910],[-1353,-1004],[-1349,-1045],[-1339,-1093],[-1331,-1152],[-1322,-1199],[-1350,-1342],[-1341,-1457],[-1345,-1538],[-1346,-1605],[-1335,-1656],[-1343,-1693],[-1353,-1747],[-1351,-1800],[-1346,-1841],[-1343,-1868],[-1337,-1885]]},"pin":{"latlon":[51.244012,12.721705],"xy":[-1350.3,6051.7],"parcel":"Grimma 2537","m2":38284,"dist_m":6235},"plot":{"nr":"790/11","gemarkung":"Großbothen","gemaschl":"144241","kennz":"144241___00790001100","m2":502,"m2_geom":501.5,"latlon":[51.189265,12.741058],"ring":[[-8.14,-17.18],[9.7,-17.17],[9.28,10.15],[-2.72,11.74],[-8.12,12.46],[-8.14,-17.18]]},"kandidaten":[{"nr":"266/1","m2":507,"xy":[-6.6,-1822.4],"amWeg":false},{"nr":"238/3","m2":500,"xy":[160.0,-1711.8],"amWeg":false},{"nr":"561/2","m2":516,"xy":[-592.3,224.7],"amWeg":false},{"nr":"793/4","m2":522,"xy":[27.0,-11.0],"amWeg":true},{"nr":"120/7","m2":505,"xy":[937.8,-203.8],"amWeg":false},{"nr":"792/3","m2":511,"xy":[18.0,-51.7],"amWeg":true},{"nr":"794/4","m2":493,"xy":[40.9,-51.3],"amWeg":true},{"nr":"798/3","m2":521,"xy":[88.0,-49.1],"amWeg":true},{"nr":"115/19","m2":483,"xy":[882.9,-491.6],"amWeg":false},{"nr":"419/6","m2":516,"xy":[-320.5,-339.6],"amWeg":false},{"nr":"364/a","m2":480,"xy":[-87.0,-307.7],"amWeg":false},{"nr":"51/4","m2":494,"xy":[370.9,-108.2],"amWeg":false},{"nr":"790/11","m2":502,"xy":[-0.0,0.0],"amWeg":true},{"nr":"853/5","m2":495,"xy":[-223.7,-484.0],"amWeg":false},{"nr":"120/5","m2":507,"xy":[932.6,-221.3],"amWeg":false},{"nr":"709/a","m2":480,"xy":[734.4,989.8],"amWeg":false},{"nr":"708/2","m2":495,"xy":[724.0,985.6],"amWeg":false},{"nr":"169/g","m2":520,"xy":[595.2,52.6],"amWeg":false},{"nr":"823/2","m2":525,"xy":[293.1,79.9],"amWeg":false},{"nr":"61/a","m2":520,"xy":[445.0,-29.8],"amWeg":false},{"nr":"19/4","m2":483,"xy":[384.8,-270.6],"amWeg":false},{"nr":"172/2","m2":513,"xy":[648.7,-60.0],"amWeg":false},{"nr":"202","m2":510,"xy":[566.6,-283.8],"amWeg":false},{"nr":"165/8","m2":492,"xy":[685.2,-209.6],"amWeg":false},{"nr":"154/3","m2":481,"xy":[771.4,-105.1],"amWeg":false}],"nachbarn":[{"nr":"388/12","m2":7486,"ring":[[-149.0,-20.84],[-130.69,-23.77],[-118.69,-25.69],[-104.8,-27.91],[-98.43,19.57],[-89.07,18.36],[-88.91,22.98],[-53.49,18.41],[-52.0,18.38],[-48.66,17.72],[-37.35,16.21],[-26.13,14.77],[-15.41,13.4],[-15.22,19.53],[-15.15,21.67],[-16.68,20.76],[-35.18,22.53],[-50.09,24.84],[-57.18,30.34],[-56.24,60.0],[-55.04,97.48],[-86.94,97.15],[-111.18,99.17],[-118.53,43.52],[-139.92,46.57],[-145.74,-5.18],[-147.23,-5.02],[-149.0,-20.84]],"amWeg":true},{"nr":"385","m2":3180,"ring":[[-94.53,-67.81],[-60.52,-74.77],[-60.35,-72.46],[-53.49,18.41],[-88.91,22.98],[-89.07,18.36],[-90.47,-22.38],[-91.09,-30.11],[-94.37,-66.07],[-94.53,-67.81]],"amWeg":false},{"nr":"772/3","m2":1775,"ring":[[-8.12,30.16],[23.81,26.68],[25.38,78.98],[16.01,81.87],[-8.21,84.28],[-8.38,76.66],[-8.12,30.16]],"amWeg":true},{"nr":"43/7","m2":1719,"ring":[[23.81,26.68],[48.03,23.46],[55.65,22.74],[60.65,69.38],[45.25,73.84],[25.46,81.77],[25.38,78.98],[23.81,26.68]],"amWeg":true},{"nr":"43/6","m2":1389,"ring":[[55.65,22.74],[63.94,21.95],[79.62,20.11],[85.56,19.42],[91.0,64.1],[83.36,65.09],[62.6,68.81],[60.65,69.38],[55.65,22.74]],"amWeg":false},{"nr":"43/5","m2":1314,"ring":[[85.56,19.42],[94.54,18.36],[115.15,16.11],[119.7,60.33],[108.06,61.37],[91.0,64.1],[85.56,19.42]],"amWeg":false},{"nr":"39/2","m2":1154,"ring":[[39.95,-80.88],[40.42,-112.87],[40.45,-113.78],[77.48,-111.27],[76.73,-96.25],[76.23,-80.84],[39.95,-80.88]],"amWeg":true},{"nr":"37/3","m2":1060,"ring":[[-36.46,-111.66],[5.74,-115.16],[8.43,-80.48],[-7.33,-80.15],[-35.13,-104.46],[-35.26,-105.69],[-36.46,-111.66]],"amWeg":true},{"nr":"801/5","m2":1059,"ring":[[118.12,-72.5],[139.55,-73.13],[142.7,-51.17],[144.73,-36.94],[146.39,-28.92],[135.35,-29.19],[121.26,-29.52],[118.12,-72.5]],"amWeg":true},{"nr":"800/4","m2":1051,"ring":[[94.74,-73.32],[112.59,-72.45],[118.12,-72.5],[121.26,-29.52],[119.77,-29.56],[106.23,-29.88],[97.2,-30.09],[94.74,-73.32]],"amWeg":true},{"nr":"38/4","m2":1006,"ring":[[10.63,-115.16],[23.03,-116.77],[40.5,-116.91],[40.45,-113.78],[40.42,-112.87],[39.95,-80.88],[12.84,-80.53],[10.63,-115.16]],"amWeg":true},{"nr":"787/1","m2":983,"ring":[[-48.66,17.72],[-44.65,-73.49],[-37.43,-74.83],[-34.31,-74.55],[-37.35,16.21],[-48.66,17.72]],"amWeg":true},{"nr":"389/4","m2":959,"ring":[[-120.66,-59.87],[-94.37,-66.07],[-91.09,-30.11],[-104.8,-27.91],[-118.69,-25.69],[-120.66,-59.87]],"amWeg":false},{"nr":"40/4","m2":934,"ring":[[76.23,-80.84],[76.73,-96.25],[77.48,-111.27],[105.46,-109.54],[109.43,-78.6],[76.23,-80.84]],"amWeg":true},{"nr":"786/1","m2":924,"ring":[[-60.35,-72.46],[-58.98,-72.65],[-58.52,-70.89],[-44.65,-73.49],[-48.66,17.72],[-52.0,18.38],[-53.49,18.41],[-60.35,-72.46]],"amWeg":true},{"nr":"788/1","m2":905,"ring":[[-37.35,16.21],[-34.31,-74.55],[-25.34,-73.75],[-26.13,14.77],[-37.35,16.21]],"amWeg":true},{"nr":"795/6","m2":862,"ring":[[47.79,-74.63],[67.71,-74.95],[69.61,-30.75],[50.19,-31.21],[47.79,-74.63]],"amWeg":true},{"nr":"795/3","m2":840,"ring":[[45.2,-31.33],[50.19,-31.21],[69.61,-30.75],[71.04,2.8],[58.63,4.18],[45.32,6.8],[45.2,-31.33]],"amWeg":false},{"nr":"789/1","m2":833,"ring":[[-26.13,14.77],[-25.34,-73.75],[-19.81,-73.26],[-16.84,-69.07],[-15.41,13.4],[-26.13,14.77]],"amWeg":true},{"nr":"388/10","m2":807,"ring":[[-56.24,60.0],[-34.02,59.3],[-32.92,93.14],[-49.26,97.56],[-51.53,97.33],[-55.04,97.48],[-56.24,60.0]],"amWeg":true},{"nr":"388/9","m2":779,"ring":[[-147.23,-5.02],[-145.74,-5.18],[-139.92,46.57],[-118.53,43.52],[-111.18,99.17],[-114.17,99.43],[-118.04,70.15],[-138.5,72.49],[-138.58,71.79],[-142.61,36.14],[-147.23,-5.02]],"amWeg":false},{"nr":"388/11","m2":772,"ring":[[-56.24,60.0],[-57.18,30.34],[-50.09,24.84],[-35.18,22.53],[-34.02,59.3],[-56.24,60.0]],"amWeg":true},{"nr":"388/6","m2":750,"ring":[[-34.02,59.3],[-35.18,22.53],[-16.68,20.76],[-15.15,21.67],[-13.98,58.67],[-34.02,59.3]],"amWeg":true},{"nr":"41/3","m2":703,"ring":[[104.12,-121.93],[119.37,-123.62],[119.33,-115.99],[124.91,-95.29],[126.33,-88.76],[129.93,-78.23],[126.53,-77.97],[118.55,-77.98],[109.43,-78.6],[105.46,-109.54],[104.12,-121.93]],"amWeg":true},{"nr":"43/10","m2":700,"ring":[[83.32,2.05],[95.68,0.52],[108.57,-0.84],[122.31,-1.88],[129.02,-2.89],[129.78,8.42],[114.5,9.98],[115.15,16.11],[94.54,18.36],[85.56,19.42],[83.32,2.05]],"amWeg":false},{"nr":"43/9","m2":678,"ring":[[45.32,6.8],[58.63,4.18],[71.04,2.8],[83.32,2.05],[85.56,19.42],[79.62,20.11],[63.94,21.95],[55.65,22.74],[48.03,23.46],[47.35,18.38],[45.32,6.8]],"amWeg":false},{"nr":"388/5","m2":614,"ring":[[-32.92,93.14],[-34.02,59.3],[-13.98,58.67],[-13.39,76.93],[-15.6,86.65],[-19.28,89.64],[-32.92,93.14]],"amWeg":true},{"nr":"388/7","m2":610,"ring":[[-138.5,72.49],[-118.04,70.15],[-114.17,99.43],[-135.22,101.29],[-138.5,72.49]],"amWeg":false},{"nr":"772/5","m2":575,"ring":[[-8.12,12.46],[-2.72,11.74],[9.28,10.15],[20.77,8.34],[23.27,8.18],[23.81,26.68],[-8.12,30.16],[-8.12,12.46]],"amWeg":true},{"nr":"388/13","m2":568,"ring":[[-91.09,-30.11],[-90.47,-22.38],[-89.07,18.36],[-98.43,19.57],[-104.8,-27.91],[-91.09,-30.11]],"amWeg":false},{"nr":"773/b","m2":559,"ring":[[-16.95,-75.93],[-1.27,-75.98],[10.62,-75.92],[-1.43,-73.92],[-8.44,-69.35],[-11.68,-58.91],[-11.22,-32.67],[-10.44,12.77],[-10.22,19.55],[-15.22,19.53],[-15.41,13.4],[-16.84,-69.07],[-16.95,-75.93]],"amWeg":true},{"nr":"793/4","m2":522,"ring":[[20.77,8.34],[22.02,-31.88],[26.26,-31.78],[33.86,-31.6],[34.29,7.62],[23.27,8.18],[20.77,8.34]],"amWeg":true},{"nr":"798/3","m2":521,"ring":[[79.52,-74.12],[91.36,-73.5],[93.89,-30.17],[81.7,-30.46],[79.52,-74.12]],"amWeg":true},{"nr":"792/3","m2":511,"ring":[[9.94,-32.17],[10.57,-72.76],[23.32,-73.55],[22.02,-31.88],[9.94,-32.17]],"amWeg":true},{"nr":"790/11","m2":502,"ring":[[-8.14,-17.18],[9.7,-17.17],[9.28,10.15],[-2.72,11.74],[-8.12,12.46],[-8.14,-17.18]],"amWeg":true},{"nr":"794/4","m2":493,"ring":[[33.39,-74.1],[45.08,-74.53],[45.2,-31.33],[33.86,-31.6],[33.39,-74.1]],"amWeg":true},{"nr":"792/2","m2":476,"ring":[[9.28,10.15],[9.7,-17.17],[9.94,-32.17],[22.02,-31.88],[20.77,8.34],[9.28,10.15]],"amWeg":true},{"nr":"794/3","m2":423,"ring":[[33.86,-31.6],[45.2,-31.33],[45.32,6.8],[34.29,7.62],[33.86,-31.6]],"amWeg":false},{"nr":"43/8","m2":410,"ring":[[23.81,26.68],[23.27,8.18],[34.29,7.62],[45.32,6.8],[47.35,18.38],[48.03,23.46],[23.81,26.68]],"amWeg":true},{"nr":"790/4","m2":405,"ring":[[-1.22,-70.96],[2.27,-72.24],[10.57,-72.76],[9.94,-32.17],[1.52,-32.37],[-1.22,-70.96]],"amWeg":true},{"nr":"801/3","m2":392,"ring":[[119.77,-29.56],[121.26,-29.52],[135.35,-29.19],[136.7,-4.06],[129.02,-2.89],[122.31,-1.88],[119.77,-29.56]],"amWeg":false},{"nr":"798/2","m2":390,"ring":[[81.7,-30.46],[93.89,-30.17],[95.68,0.52],[83.32,2.05],[81.7,-30.46]],"amWeg":false},{"nr":"797/6","m2":379,"ring":[[70.64,-74.59],[79.52,-74.12],[81.7,-30.46],[73.24,-30.66],[70.64,-74.59]],"amWeg":true},{"nr":"797/3","m2":370,"ring":[[69.61,-30.75],[73.24,-30.66],[81.7,-30.46],[83.32,2.05],[71.04,2.8],[69.61,-30.75]],"amWeg":false},{"nr":"793/7","m2":368,"ring":[[23.54,-73.56],[32.19,-74.05],[33.39,-74.1],[33.86,-31.6],[26.26,-31.78],[23.54,-73.56]],"amWeg":true},{"nr":"800/2","m2":364,"ring":[[106.23,-29.88],[119.77,-29.56],[122.31,-1.88],[108.57,-0.84],[106.23,-29.88]],"amWeg":false},{"nr":"799/3","m2":341,"ring":[[93.89,-30.17],[97.2,-30.09],[106.23,-29.88],[108.57,-0.84],[95.68,0.52],[93.89,-30.17]],"amWeg":false},{"nr":"773/6","m2":337,"ring":[[-15.6,86.65],[-14.18,82.91],[-13.39,76.93],[-13.98,58.67],[-15.15,21.67],[-15.22,19.53],[-10.22,19.55],[-8.38,76.66],[-8.21,84.28],[-15.6,86.65]],"amWeg":true},{"nr":"37/7","m2":305,"ring":[[-35.13,-104.46],[-7.33,-80.15],[-14.29,-80.01],[-17.09,-79.95],[-26.7,-79.99],[-33.6,-87.4],[-35.13,-104.46]],"amWeg":true},{"nr":"40/6","m2":305,"ring":[[77.48,-111.27],[78.52,-123.64],[104.12,-121.93],[105.46,-109.54],[77.48,-111.27]],"amWeg":true},{"nr":"790/6","m2":299,"ring":[[-8.21,-62.46],[-6.53,-66.65],[-1.41,-70.9],[-1.22,-70.96],[1.52,-32.37],[-8.15,-32.6],[-8.21,-62.46]],"amWeg":true},{"nr":"790/10","m2":273,"ring":[[-8.15,-32.6],[1.52,-32.37],[9.94,-32.17],[9.7,-17.17],[-8.14,-17.18],[-8.15,-32.6]],"amWeg":true},{"nr":"795/4","m2":167,"ring":[[45.08,-74.53],[47.79,-74.63],[50.19,-31.21],[45.2,-31.33],[45.08,-74.53]],"amWeg":true},{"nr":"797/4","m2":144,"ring":[[67.71,-74.95],[70.61,-75.0],[70.64,-74.59],[73.24,-30.66],[69.61,-30.75],[67.71,-74.95]],"amWeg":true},{"nr":"799/4","m2":144,"ring":[[91.36,-73.5],[94.74,-73.32],[97.2,-30.09],[93.89,-30.17],[91.36,-73.5]],"amWeg":true},{"nr":"790/7","m2":133,"ring":[[-11.68,-58.91],[-8.44,-69.35],[-1.43,-73.92],[-1.22,-70.96],[-1.41,-70.9],[-6.53,-66.65],[-8.21,-62.46],[-8.15,-32.6],[-11.22,-32.67],[-11.68,-58.91]],"amWeg":true},{"nr":"790/9","m2":122,"ring":[[-11.22,-32.67],[-8.15,-32.6],[-8.14,-17.18],[-8.12,12.46],[-10.44,12.77],[-11.22,-32.67]],"amWeg":true},{"nr":"772/2","m2":93,"ring":[[-8.21,84.28],[16.01,81.87],[25.38,78.98],[25.46,81.77],[9.65,85.48],[-8.15,87.28],[-8.21,84.28]],"amWeg":true},{"nr":"793/5","m2":93,"ring":[[22.02,-31.88],[23.32,-73.55],[23.54,-73.56],[26.26,-31.78],[22.02,-31.88]],"amWeg":true},{"nr":"43/11","m2":92,"ring":[[114.5,9.98],[129.78,8.42],[130.06,14.42],[115.15,16.11],[114.5,9.98]],"amWeg":false},{"nr":"772/6","m2":77,"ring":[[-10.44,12.77],[-8.12,12.46],[-8.12,30.16],[-8.38,76.66],[-10.22,19.55],[-10.44,12.77]],"amWeg":true},{"nr":"800/5","m2":58,"ring":[[94.62,-75.39],[102.54,-75.78],[115.63,-74.66],[117.95,-74.76],[118.12,-72.5],[112.59,-72.45],[94.74,-73.32],[94.62,-75.39]],"amWeg":true},{"nr":"388/4","m2":45,"ring":[[-49.26,97.56],[-32.92,93.14],[-19.28,89.64],[-21.78,91.14],[-32.44,94.77],[-49.26,97.56]],"amWeg":true},{"nr":"795/7","m2":42,"ring":[[47.7,-76.27],[56.29,-76.98],[67.62,-77.15],[67.71,-74.95],[47.79,-74.63],[47.7,-76.27]],"amWeg":true},{"nr":"801/6","m2":41,"ring":[[117.95,-74.76],[132.86,-75.45],[135.5,-73.44],[139.51,-73.4],[139.55,-73.13],[118.12,-72.5],[117.95,-74.76]],"amWeg":true},{"nr":"792/4","m2":35,"ring":[[10.57,-72.76],[10.62,-75.92],[23.39,-75.87],[23.32,-73.55],[10.57,-72.76]],"amWeg":true},{"nr":"790/5","m2":32,"ring":[[-1.43,-73.92],[10.62,-75.92],[10.57,-72.76],[2.27,-72.24],[-1.22,-70.96],[-1.43,-73.92]],"amWeg":true},{"nr":"789/2","m2":26,"ring":[[-25.34,-73.75],[-25.32,-75.72],[-16.95,-75.93],[-16.84,-69.07],[-19.81,-73.26],[-25.34,-73.75]],"amWeg":true},{"nr":"798/4","m2":23,"ring":[[79.42,-76.29],[91.26,-75.23],[91.36,-73.5],[79.52,-74.12],[79.42,-76.29]],"amWeg":true},{"nr":"794/5","m2":22,"ring":[[33.37,-76.27],[45.07,-76.05],[45.08,-74.53],[33.39,-74.1],[33.37,-76.27]],"amWeg":true},{"nr":"793/8","m2":22,"ring":[[23.39,-75.87],[33.37,-76.27],[33.39,-74.1],[32.19,-74.05],[23.54,-73.56],[23.39,-75.87]],"amWeg":true},{"nr":"786/2","m2":21,"ring":[[-58.98,-72.65],[-44.59,-74.65],[-44.65,-73.49],[-58.52,-70.89],[-58.98,-72.65]],"amWeg":true},{"nr":"37/9","m2":20,"ring":[[-33.6,-87.4],[-26.7,-79.99],[-17.09,-79.95],[-32.57,-79.63],[-33.6,-87.4]],"amWeg":true},{"nr":"797/7","m2":20,"ring":[[70.5,-76.94],[79.42,-76.29],[79.52,-74.12],[70.64,-74.59],[70.61,-75.0],[70.5,-76.94]],"amWeg":true},{"nr":"788/2","m2":13,"ring":[[-34.31,-74.55],[-34.29,-75.38],[-25.32,-75.72],[-25.34,-73.75],[-34.31,-74.55]],"amWeg":true},{"nr":"36/8","m2":12,"ring":[[-59.59,-74.93],[-51.9,-77.12],[-32.57,-79.63],[-59.59,-74.93]],"amWeg":true},{"nr":"787/2","m2":7,"ring":[[-44.65,-73.49],[-44.59,-74.65],[-34.29,-75.38],[-34.31,-74.55],[-37.43,-74.83],[-44.65,-73.49]],"amWeg":true},{"nr":"797/5","m2":6,"ring":[[67.62,-77.15],[70.5,-76.94],[70.61,-75.0],[67.71,-74.95],[67.62,-77.15]],"amWeg":true},{"nr":"799/5","m2":6,"ring":[[91.26,-75.23],[94.62,-75.39],[94.74,-73.32],[91.36,-73.5],[91.26,-75.23]],"amWeg":true},{"nr":"795/5","m2":4,"ring":[[45.07,-76.05],[47.7,-76.27],[47.79,-74.63],[45.08,-74.53],[45.07,-76.05]],"amWeg":true},{"nr":"773/7","m2":3,"ring":[[-15.6,86.65],[-13.39,76.93],[-14.18,82.91],[-15.6,86.65]],"amWeg":true},{"nr":"809/2","m2":3,"ring":[[-60.52,-74.77],[-59.59,-74.93],[-58.98,-72.65],[-60.35,-72.46],[-60.52,-74.77]],"amWeg":false},{"nr":"793/6","m2":0,"ring":[[23.32,-73.55],[23.39,-75.87],[23.54,-73.56],[23.32,-73.55]],"amWeg":true}],"strasse":[[[-12.4,88.5],[-12.2,61.4],[-11.9,17.3],[-11.6,-19.4],[-11.1,-59.4],[-10.4,-65.0],[-8.5,-69.3],[-3.3,-73.1],[2.4,-74.4],[8.5,-75.3],[71.4,-74.7],[126.6,-71.0],[147.5,-71.3],[171.1,-72.2],[188.7,-73.5],[234.6,-79.4],[240.1,-81.8],[242.8,-86.0],[243.9,-94.9],[246.7,-111.5],[250.6,-142.2],[252.8,-153.2]],[[171.1,-72.2],[172.3,-62.4],[173.6,-48.9],[176.4,-33.8],[180.8,-18.3],[182.1,-6.6]],[[182.1,-6.6],[182.4,-3.7],[182.1,7.8],[181.5,32.5],[180.8,51.5],[180.0,63.0]]],"bahnhof":{"name":"Bahnhof Großbothen","xy":[1297.9,-563.7],"dist_m":1415},"bus":[{"name":"Großbothen, Wilhelm-Ostwald-Park","xy":[222.4,325.5]},{"name":"Großbothen, Schule","xy":[684.8,86.8]},{"name":"Großbothen, Schule","xy":[687.2,82.8]},{"name":"Großbothen, Colditzer Landstr.","xy":[903.5,-357.6]},{"name":"Großbothen, Colditzer Landstr.","xy":[891.5,-417.3]},{"name":"Schaddel (Großbothen)","xy":[791.7,1057.6]},{"name":"Schaddel (Großbothen)","xy":[777.4,1112.6]}]};
+const SVG = "http://www.w3.org/2000/svg";
+const el = (name, attrs, parent) => {
+  const node = document.createElementNS(SVG, name);
+  for (const key in attrs) node.setAttribute(key, attrs[key]);
+  if (parent) parent.appendChild(node);
+  return node;
+};
+const WIDTH = 1000, HEIGHT = 660;
+
+/* Each stage names the indicium, how far it is to be trusted, and how far the
+   camera may zoom on the strength of it. Half-width is in metres. */
+const STUFEN = [
+  { name: "Kartenpin der Plattform", quelle: "og:latitude — abgeleitet", staerke: 0.10,
+    farbe: "var(--error)", halbbreite: 1100, mitte: [-1350, 6052],
+    fuss: "Ein Punkt ohne Angabe, wie genau er ist" },
+  { name: "Ortsteil „Großbothen“", quelle: "Fließtext — Beziehung liegt_in", staerke: 0.60,
+    farbe: "var(--sage)", halbbreite: 6500, mitte: [-350, 1800],
+    fuss: "Gemarkung 144241 · 1 131 Flurstücke" },
+  { name: "Fläche 502 m²", quelle: "Attributliste — strukturiertes Feld", staerke: 0.90,
+    farbe: "var(--secondary)", halbbreite: 1750, mitte: [170, -400],
+    fuss: "25 Kandidaten im Band ±5 %" },
+  { name: "Bahnhof 1,6 km · Bus 0,3 km", quelle: "Fließtext — wirbt und rundet", staerke: 0.35,
+    farbe: "var(--secondary)", halbbreite: 1750, mitte: [170, -400],
+    fuss: "Ringe ±35 % · grenzen ein, entscheiden nicht" },
+  { name: "Straße „Wiesenstraße“", quelle: "Bild 2 — Texterkennung", staerke: 0.95,
+    farbe: "var(--primary-light)", halbbreite: 190, mitte: [0, 20],
+    fuss: "65 Flurstücke am Weg · 5 der 25 Kandidaten" },
+  { name: "Flurstück 790/11", quelle: "Bild 2 — Texterkennung", staerke: 0.95,
+    farbe: "var(--primary)", halbbreite: 70, mitte: [0, 0],
+    fuss: "Behauptet — noch nicht geprüft" },
+  { name: "Bestätigt gegen ALKIS", quelle: "amtlich — 144241___00790001100", staerke: 1.0,
+    farbe: "var(--primary)", halbbreite: 42, mitte: [0, 0],
+    fuss: "flaeche 502 m² · Plausibilität ohne Einwand" }
+];
+
+const svg = document.getElementById("karte");
+const protocol = document.getElementById("protokoll");
+const band = document.getElementById("band");
+const footer = document.getElementById("kartenfuss");
+const remaining = document.getElementById("restText");
+let stage = 0, playing = false, timer = null;
+let camera = { x: STUFEN[0].mitte[0], y: STUFEN[0].mitte[1], half: STUFEN[0].halbbreite };
+
+const project = ([x, y]) => {
+  const scale = WIDTH / (camera.half * 2);
+  return [(x - camera.x) * scale + WIDTH / 2, (camera.y - y) * scale + HEIGHT / 2];
+};
+const metres = m => m * (WIDTH / (camera.half * 2));
+/* The district wash is full strength while the view is district-sized and
+   gone once the view is a single block: its statement has been superseded. */
+const districtFade = () => Math.max(0, Math.min(1, (camera.half - 260) / 900)) * 0.2;
+const pathOf = ring => ring.map((p, i) => (i ? "L" : "M") + project(p).map(v => v.toFixed(1)).join(" ")).join("") + "Z";
+const lineOf = points => points.map((p, i) => (i ? "L" : "M") + project(p).map(v => v.toFixed(1)).join(" ")).join("");
+
+function draw() {
+  svg.textContent = "";
+  el("rect", { x: 0, y: 0, width: WIDTH, height: HEIGHT, fill: "var(--map-ground)" }, svg);
+
+  /* 1 · the district: a wide, faint wash — the weakest useful statement */
+  if (stage >= 1 && districtFade() > 0.02) {
+    el("path", { d: pathOf(KARTE.gemarkung.ring), fill: "var(--sage)", opacity: districtFade().toFixed(3),
+      stroke: "var(--sage)", "stroke-width": 1.5, "stroke-dasharray": "6 5",
+      "stroke-opacity": (districtFade() * 4).toFixed(3) }, svg);
+    if (camera.half > 1200) {
+      const label = el("text", { x: WIDTH / 2, y: 34, "font-size": 15, "text-anchor": "middle",
+        fill: "var(--graphite)", "font-family": "Archivo, sans-serif", "font-weight": 600,
+        "paint-order": "stroke", stroke: "var(--map-ground)", "stroke-width": 4 }, svg);
+      label.textContent = "Gemarkung Großbothen";
+    }
+  }
+
+  /* 4 · rings before the dots, so the dots stay readable on top */
+  if (stage >= 3) {
+    const nearest = KARTE.bus.map(b => b.xy)
+      .reduce((a, b) => a[0] ** 2 + a[1] ** 2 < b[0] ** 2 + b[1] ** 2 ? a : b);
+    for (const [centre, claim] of [[KARTE.bahnhof.xy, 1600], [nearest, 300]]) {
+      /* A ring far wider than the frame is a wash, not a statement. Drop it. */
+      if (claim * 1.35 > camera.half * 1.8) continue;
+      const [cx, cy] = project(centre);
+      const inner = metres(claim * 0.65), outer = metres(claim * 1.35);
+      el("circle", { cx, cy, r: (inner + outer) / 2, fill: "none", stroke: "var(--secondary)",
+        opacity: ".16", "stroke-width": outer - inner }, svg);
+    }
+  }
+
+  /* 5 · the street: a band the width of the buffer, plus the way itself */
+  if (stage >= 4) {
+    const bandFade = Math.max(0, Math.min(1, (camera.half - 55) / 130)) * 0.24;
+    for (const way of KARTE.strasse) {
+      if (bandFade > 0.02) el("path", { d: lineOf(way), fill: "none", stroke: "var(--primary-light)",
+        opacity: bandFade.toFixed(3), "stroke-width": Math.max(metres(80), 3),
+        "stroke-linecap": "round", "stroke-linejoin": "round" }, svg);
+      el("path", { d: lineOf(way), fill: "none", stroke: "var(--map-street)", "stroke-width": 2.5,
+        "stroke-linecap": "round" }, svg);
+    }
+  }
+
+  /* the cadastre appears only once the camera is close enough to mean anything */
+  if (stage >= 4 && camera.half < 400) {
+    for (const parcel of KARTE.nachbarn) {
+      if (parcel.nr === KARTE.plot.nr) continue;
+      el("path", { d: pathOf(parcel.ring),
+        fill: stage >= 4 && parcel.amWeg ? "var(--primary-veil)" : "transparent",
+        stroke: "var(--map-neighbour)", "stroke-width": 0.9, "stroke-linejoin": "round" }, svg);
+    }
+  }
+
+  /* 3 · the area candidates */
+  if (stage >= 2 && camera.half > 120) {
+    for (const candidate of KARTE.kandidaten) {
+      if (candidate.nr === KARTE.plot.nr) continue;
+      const dim = stage >= 4 && !candidate.amWeg;
+      const [x, y] = project(candidate.xy);
+      el("circle", { cx: x, cy: y, r: dim ? 4 : 6.5, fill: "var(--secondary)",
+        opacity: dim ? ".25" : ".85" }, svg);
+    }
+  }
+
+  /* 6–7 · the parcel itself: the only shape that ever gets a drawn outline */
+  if (stage >= 5) {
+    const confirmed = stage >= 6;
+    el("path", { d: pathOf(KARTE.plot.ring),
+      fill: confirmed ? "var(--primary-veil)" : "var(--secondary-veil)",
+      stroke: confirmed ? "var(--primary)" : "var(--secondary)",
+      "stroke-width": confirmed ? 3.5 : 2.5,
+      "stroke-dasharray": confirmed ? "none" : "8 5", "stroke-linejoin": "round" }, svg);
+    const [cx] = project([0, 0]);
+    const top = Math.min(...KARTE.plot.ring.map(point => project(point)[1]));
+    const label = el("text", { x: Math.min(Math.max(cx, 130), WIDTH - 130),
+      y: Math.max(top - 16, 26), "font-size": 17, "text-anchor": "middle",
+      fill: confirmed ? "var(--primary)" : "var(--secondary-text)",
+      "font-family": "IBM Plex Mono, monospace", "font-weight": 500, "paint-order": "stroke",
+      stroke: "var(--map-halo)", "stroke-width": 4.5, "stroke-linejoin": "round" }, svg);
+    label.textContent = confirmed ? "790/11 · 502 m² · bestätigt" : "790/11 · behauptet";
+  } else if (stage >= 2 && camera.half > 120) {
+    const [x, y] = project([0, 0]);
+    el("circle", { cx: x, cy: y, r: 6.5, fill: "var(--secondary)", opacity: ".85" }, svg);
+  }
+
+  /* 1 · the platform pin stays, and gets struck through once contradicted */
+  const [px, py] = project(KARTE.pin.xy);
+  if (px > -60 && px < WIDTH + 60 && py > -60 && py < HEIGHT + 60) {
+    const refuted = stage >= 1;
+    el("circle", { cx: px, cy: py, r: 9, fill: "var(--map-halo)" }, svg);
+    el("circle", { cx: px, cy: py, r: 6.5, fill: "var(--error)", opacity: refuted ? ".4" : "1" }, svg);
+    if (refuted) {
+      el("line", { x1: px - 9, y1: py - 9, x2: px + 9, y2: py + 9, stroke: "var(--error)", "stroke-width": 2 }, svg);
+      el("line", { x1: px - 9, y1: py + 9, x2: px + 9, y2: py - 9, stroke: "var(--error)", "stroke-width": 2 }, svg);
+    }
+    const note = el("text", { x: px + 14, y: py + 4.5, "font-size": 12.5, fill: "var(--error)",
+      "font-family": "IBM Plex Mono, monospace", "paint-order": "stroke",
+      stroke: "var(--map-ground)", "stroke-width": 3.5 }, svg);
+    note.textContent = refuted ? "Pin — widerlegt" : "Pin der Plattform";
+  }
+
+  /* The scale bar is chrome of the frame, not of the drawing: it stays put
+     whatever slack the layout leaves under the map. */
+  const target = camera.half * 0.5;
+  const step = [10, 25, 50, 100, 250, 500, 1000, 2500, 5000]
+    .reduce((best, v) => Math.abs(v - target) < Math.abs(best - target) ? v : best, 10);
+  const bar = document.getElementById("kartenmass");
+  bar.querySelector("i").style.width = (metres(step) / WIDTH * 100).toFixed(2) + "%";
+  bar.querySelector("span").textContent =
+    step >= 1000 ? (step / 1000).toLocaleString("de-DE") + " km" : step + " m";
+}
+
+/* Camera moves are eased and re-drawn each frame; nothing else animates. */
+const ease = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+let animation = null;
+
+function moveTo(target, done) {
+  if (animation) cancelAnimationFrame(animation);
+  const from = { ...camera };
+  if (still) { camera = { x: target.mitte[0], y: target.mitte[1], half: target.halbbreite }; draw(); if (done) done(); return; }
+  const started = performance.now(), duration = 900;
+  const step = now => {
+    const t = Math.min(1, (now - started) / duration), k = ease(t);
+    camera = {
+      x: from.x + (target.mitte[0] - from.x) * k,
+      y: from.y + (target.mitte[1] - from.y) * k,
+      /* zoom interpolates geometrically, so the pace looks even at every scale */
+      half: Math.exp(Math.log(from.half) + (Math.log(target.halbbreite) - Math.log(from.half)) * k)
+    };
+    draw();
+    if (t < 1) animation = requestAnimationFrame(step); else if (done) done();
+  };
+  animation = requestAnimationFrame(step);
+}
+
+function buildProtocol() {
+  STUFEN.forEach((entry, index) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "ind";
+    button.style.setProperty("--k", entry.farbe);
+    button.innerHTML =
+      '<span class="ind-punkt"></span>' +
+      '<span class="ind-text"><span class="ind-name"></span><span class="ind-quelle"></span>' +
+      '<span class="ind-staerke"><span class="ind-balken"><i></i></span><span class="ind-zahl"></span></span></span>';
+    button.querySelector(".ind-name").textContent = entry.name;
+    button.querySelector(".ind-quelle").textContent = entry.quelle;
+    button.querySelector(".ind-zahl").textContent = entry.staerke.toFixed(2).replace(".", ",");
+    button.addEventListener("click", () => { pause(); goTo(index); });
+    protocol.appendChild(button);
+    el("i", {}, band);
+    band.appendChild(document.createElement("i"));
+  });
+}
+
+function paint() {
+  const entries = protocol.querySelectorAll(".ind");
+  entries.forEach((entry, index) => {
+    entry.classList.toggle("da", index <= stage);
+    entry.classList.toggle("jetzt", index === stage);
+    entry.querySelector(".ind-balken i").style.width =
+      (index <= stage ? STUFEN[index].staerke * 100 : 0) + "%";
+    if (index === stage) entry.scrollIntoView({ block: "nearest" });
+  });
+  band.querySelectorAll("i").forEach((tick, index) => tick.classList.toggle("an", index <= stage));
+  footer.textContent = STUFEN[stage].fuss;
+  remaining.textContent = "Indiz " + (stage + 1) + " von " + STUFEN.length;
+}
+
+function goTo(index, then) {
+  stage = Math.max(0, Math.min(STUFEN.length - 1, index));
+  paint();
+  moveTo(STUFEN[stage], then);
+}
+
+const playButton = document.getElementById("abspielen");
+function pause() {
+  playing = false;
+  clearTimeout(timer);
+  playButton.textContent = stage >= STUFEN.length - 1 ? "Von vorn" : "Weiter abspielen";
+}
+function advance() {
+  if (!playing) return;
+  if (stage >= STUFEN.length - 1) { pause(); return; }
+  goTo(stage + 1, () => { timer = setTimeout(advance, 1100); });
+}
+playButton.addEventListener("click", () => {
+  if (playing) { pause(); return; }
+  playing = true;
+  playButton.textContent = "Anhalten";
+  if (stage >= STUFEN.length - 1) goTo(0, () => { timer = setTimeout(advance, 900); });
+  else advance();
+});
+document.getElementById("vor").addEventListener("click", () => { pause(); goTo(stage + 1); });
+document.getElementById("zurueck").addEventListener("click", () => { pause(); goTo(stage - 1); });
+
+/* The strength scale, drawn with the same marks the map uses. */
+const SKALA = [
+  { stufe: "Ort", wert: "0,1 – 0,3", text: "Gemeinde oder Ortsteil. Ein Hauch über mehrere Quadratkilometer, gestrichelter Rand, keine Beschriftung im Bild.", probe: g => { g.fill = "var(--sage)"; g.opacity = ".18"; g.dash = true; } },
+  { stufe: "Linie", wert: "0,4 – 0,7", text: "Straße oder Gewässer. Ein Band in Pufferbreite entlang der Linie — der Ort ist eingegrenzt, die Seite noch nicht.", probe: g => { g.band = true; } },
+  { stufe: "Ring", wert: "0,2 – 0,4", text: "Entfernungsangabe. Ein Kranz mit weichen Rändern; die Mitte ist ausdrücklich nicht gemeint.", probe: g => { g.ring = true; } },
+  { stufe: "Kandidaten", wert: "0,7 – 0,9", text: "Endliche Menge aus Fläche oder Nummernraum. Punkte, gleich stark, keiner hervorgehoben.", probe: g => { g.dots = true; } },
+  { stufe: "Behauptet", wert: "0,9", text: "Ein Flurstück ist genannt, aber noch nicht gegen ALKIS geprüft. Gestrichelte Kontur.", probe: g => { g.parcel = "dashed"; } },
+  { stufe: "Bestätigt", wert: "1,0", text: "Von ALKIS geliefert, von der Plausibilitätsprüfung nicht beanstandet. Die einzige gezogene Kontur der Karte.", probe: g => { g.parcel = "solid"; } }
+];
+
+const skala = document.getElementById("skala");
+for (const row of SKALA) {
+  const line = document.createElement("div");
+  line.className = "sk";
+  line.innerHTML = '<div class="sk-stufe"></div><div class="sk-probe"></div><div class="sk-text"></div><div class="sk-wert"></div>';
+  line.querySelector(".sk-stufe").textContent = row.stufe;
+  line.querySelector(".sk-text").textContent = row.text;
+  line.querySelector(".sk-wert").textContent = row.wert;
+
+  const sample = el("svg", { viewBox: "0 0 96 34", width: "96", height: "34" });
+  const style = {};
+  row.probe(style);
+  if (style.opacity) el("rect", { x: 3, y: 3, width: 90, height: 28, rx: 4, fill: style.fill,
+    opacity: style.opacity, stroke: style.fill, "stroke-dasharray": "5 4" }, sample);
+  if (style.band) {
+    el("line", { x1: 4, y1: 17, x2: 92, y2: 17, stroke: "var(--primary-light)", opacity: ".26", "stroke-width": 22 }, sample);
+    el("line", { x1: 4, y1: 17, x2: 92, y2: 17, stroke: "var(--map-street)", "stroke-width": 2.5 }, sample);
+  }
+  if (style.ring) el("circle", { cx: 48, cy: 17, r: 11, fill: "none", stroke: "var(--secondary)", opacity: ".4", "stroke-width": 9 }, sample);
+  if (style.dots) for (const x of [24, 40, 56, 72]) el("circle", { cx: x, cy: 17, r: 4.5, fill: "var(--secondary)", opacity: ".85" }, sample);
+  if (style.parcel) el("rect", { x: 33, y: 6, width: 30, height: 22, fill: "var(--primary-veil)",
+    stroke: style.parcel === "solid" ? "var(--primary)" : "var(--secondary)", "stroke-width": style.parcel === "solid" ? 2.5 : 2,
+    "stroke-dasharray": style.parcel === "solid" ? "none" : "6 4" }, sample);
+  line.querySelector(".sk-probe").appendChild(sample);
+  skala.appendChild(line);
+}
+
+buildProtocol();
+paint();
+draw();
+</script>

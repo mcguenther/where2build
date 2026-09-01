@@ -35,7 +35,8 @@ backend/     FastAPI. Proxy and disk cache in front of ALKIS, BORIS, GeoSN
              WMS, MOTIS and the LLM. Owns no geometry maths and no database —
              PostGIS is in the plan, not in the code.
 frontend/    Vite + Vue 3, Options API. Owns ALL geometry.
-docs/        Spec, service research, screenshots.
+docs/        Spec, service research, screenshots. `strategie/` holds the four
+             interactive strategy pages for parcel identification.
 mockup/      The approved UI mock. Historical reference, not built.
 ```
 
@@ -218,6 +219,40 @@ from the user directly. Reopen only if the user asks.
   other instance's answers until `/cache/motis*` is deleted. Comparing the two
   instances without clearing it reports a difference that is not there — and,
   worse, an agreement that is not there either.
+- **The listing pin is the municipality, not the plot.** Measured on a real
+  Kleinanzeigen ad (3499632623, 01.09.2026): `og:latitude/longitude` sat
+  **6 235 m** from the parcel actually offered, because the platform geocodes
+  its own location field ("04668 Sachsen – Grimma"). Resolving that point gives
+  Gemarkung Grimma 2537 at 38 284 m² instead of Großbothen 790/11 at 502 m² —
+  an answer that looks exactly as official as the right one. So there is no
+  radius to search: the *Ortsteil* named in the body text is the usable
+  statement, and the pin is only good for rejecting things.
+- **`ave:flaeche` can be filtered server-side** with `PropertyIsEqualTo` and
+  `PropertyIsBetween`, and it is the strongest cheap filter there is. Gemarkung
+  Großbothen holds 1 131 parcels; adding `flaeche = 502` leaves **one**, and it
+  is the right one. The whole of Stadt Grimma (32 544 parcels, 66 Gemarkungen)
+  leaves 15. Two requests, no model call. Only use the exact value when the
+  listing's number is exact — "ca. 500 m²" has to widen into a band.
+- **`ave:lagebeztxt` is often `"ohne Lage"`**, so a street name cannot be matched
+  against ALKIS as an attribute. Take the way from OSM and buffer it instead: a
+  40 m buffer around Wiesenstraße catches 790/11 at 3 m, and an 80 m buffer cuts
+  the 25 area candidates to 5 — better than the distance rings, which cut them
+  only to 8.
+- **Tesseract reads a Geoportal print's title block, and nothing else on it.**
+  `-l deu --psm 6` on the ad's cadastral extract returned "Flurstück 790/11" and
+  "Wiesenstraße - Großbothen" in 491 ms; the small in-map labels came out as
+  garbage and the orthophoto yielded nothing. The two site photographs produced
+  **no** false parcel numbers, which is why the right design is to OCR every
+  image and filter by pattern rather than classify images first. Watch the
+  footer: `Olbrichtplatz` is the GeoSN's own address, printed on every sheet.
+- **Counting place-name mentions picks the wrong place.** Against the 5 339
+  names in `gemarkungen-sachsen.json`, this ad scores Grimma 3× and Großbothen
+  3× — Grimma appears so often precisely because the plot is 6 km *away* from
+  it. Extract the relation (`liegt_in`, `entfernt_von`), never the frequency.
+- **The geocoder answers with far-away namesakes.** Transitous returns
+  `Großbeeren, Bahnhof` — 134 km away — as the sixth hit for "Großbothen
+  Bahnhof". Discard any geocoder result outside the already-narrowed area before
+  it becomes a search constraint.
 - **Rank by walking time, never air distance.** Detour ratios reach 2.88x, and
   the nearest thing by air can be unwalkable altogether.
 - **An address is not a plot.** A district address ("Plaußig-Portitz, 04349

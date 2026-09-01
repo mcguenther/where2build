@@ -1,0 +1,587 @@
+<title>Fall Großbothen</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --primary:#2F4A3A; --primary-light:#456B52; --primary-dark:#1C2E23; --primary-veil:rgba(47,74,58,.10); --primary-on:#F7F4EE;
+  --secondary:#B5813C; --secondary-text:#7C5620; --secondary-light:#E8D4B0; --secondary-veil:rgba(181,129,60,.16);
+  --sage:#9DB39A; --sage-light:#DCE4DA;
+  --ink:#1E1A16; --graphite:#4A443C; --muted:#6F675C; --line:#DCD3C6; --line-faint:#EBE4D9;
+  --surface:#FAF7F1; --sunken:#F3EFE6; --paper:#F1EBE1; --white:#FFFFFF;
+  --warning:#BE8524; --warning-text:#7C5620; --warning-surface:#F6E9CE;
+  --error:#A8402C; --error-surface:#F2DED8; --good:#2F4A3A; --good-surface:#DEE7DF;
+  --map-ground:#E6E3DC; --map-surface:#EFEDE7; --map-boundary:#1E1A16; --map-halo:#FFFFFF;
+  --map-neighbour:#9A9184; --map-street:#B5813C; --map-street-surface:#D6D2CA;
+  --shadow:0 1px 2px rgba(30,26,22,.05),0 10px 24px -18px rgba(30,26,22,.45);
+  --font-display:"Archivo",system-ui,-apple-system,sans-serif;
+  --font-body:"Public Sans",system-ui,-apple-system,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --primary:#7FA98A; --primary-light:#9BC0A4; --primary-dark:#24382C; --primary-veil:rgba(127,169,138,.14); --primary-on:#12211A;
+  --secondary:#D9A55E; --secondary-text:#DBB273; --secondary-light:#3E3021; --secondary-veil:rgba(217,165,94,.18);
+  --sage:#6E8470; --sage-light:#26302A;
+  --ink:#F1EBE1; --graphite:#C4BCB0; --muted:#948B7E; --line:#3A342C; --line-faint:#2A2620;
+  --surface:#201C17; --sunken:#191510; --paper:#16130F;
+  --warning:#D8A340; --warning-text:#E3BC72; --warning-surface:#3A2E19;
+  --error:#E0705A; --error-surface:#3B211B; --good:#7FA98A; --good-surface:#1F2C24;
+  --map-ground:#1A1917; --map-surface:#23211D; --map-boundary:#F1EBE1; --map-halo:#16130F;
+  --map-neighbour:#5A544B; --map-street:#8A6A3A; --map-street-surface:#242220;
+  --shadow:0 1px 2px rgba(0,0,0,.5),0 12px 28px -20px rgba(0,0,0,.85);
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --primary:#7FA98A; --primary-light:#9BC0A4; --primary-dark:#24382C; --primary-veil:rgba(127,169,138,.14); --primary-on:#12211A;
+  --secondary:#D9A55E; --secondary-text:#DBB273; --secondary-light:#3E3021; --secondary-veil:rgba(217,165,94,.18);
+  --sage:#6E8470; --sage-light:#26302A;
+  --ink:#F1EBE1; --graphite:#C4BCB0; --muted:#948B7E; --line:#3A342C; --line-faint:#2A2620;
+  --surface:#201C17; --sunken:#191510; --paper:#16130F;
+  --warning:#D8A340; --warning-text:#E3BC72; --warning-surface:#3A2E19;
+  --error:#E0705A; --error-surface:#3B211B; --good:#7FA98A; --good-surface:#1F2C24;
+  --map-ground:#1A1917; --map-surface:#23211D; --map-boundary:#F1EBE1; --map-halo:#16130F;
+  --map-neighbour:#5A544B; --map-street:#8A6A3A; --map-street-surface:#242220;
+  --shadow:0 1px 2px rgba(0,0,0,.5),0 12px 28px -20px rgba(0,0,0,.85);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--font-body);font-size:16px;line-height:1.6;
+  -webkit-font-smoothing:antialiased;padding:0 0 var(--pad,72px)}
+.wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+.col{max-width:70ch}
+h1,h2,h3{font-family:var(--font-display);text-wrap:balance;line-height:1.15;margin:0}
+h1{font-size:clamp(30px,5vw,46px);font-weight:700;letter-spacing:-.02em}
+h2{font-size:clamp(21px,3vw,27px);font-weight:600;letter-spacing:-.01em}
+h3{font-size:17px;font-weight:600}
+p{margin:0}
+.eyebrow{font-family:var(--font-mono);font-size:11.5px;font-weight:500;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--muted)}
+.lede{font-size:19px;line-height:1.55;color:var(--graphite)}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.stack{display:flex;flex-direction:column;gap:16px}
+section{padding:48px 0;border-top:1px solid var(--line-faint)}
+section:first-of-type{border-top:0}
+.tafel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px;box-shadow:var(--shadow)}
+a{color:var(--primary);text-underline-offset:3px}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:4px}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+<style>
+.hero{padding:64px 0 40px}
+.hero h1{margin:12px 0 18px;max-width:16ch}
+.zahl{display:flex;flex-wrap:wrap;gap:2px 28px;align-items:baseline;margin-top:8px}
+.zahl b{font-family:var(--font-display);font-size:clamp(38px,7vw,64px);font-weight:700;line-height:1;
+  letter-spacing:-.03em;color:var(--error);font-variant-numeric:tabular-nums}
+.zahl span{font-size:15px;color:var(--muted);max-width:34ch}
+.kanaele{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:32px}
+.kanal{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;
+  border-left:3px solid var(--k,var(--line))}
+.kanal .eyebrow{display:block;margin-bottom:6px}
+.kanal p{font-size:13.5px;color:var(--graphite)}
+.kanal b{font-family:var(--font-mono);font-size:13px;color:var(--ink);font-weight:500}
+
+/* --- Karten --- */
+.karte{background:var(--map-ground);border:1px solid var(--line);border-radius:12px;overflow:hidden;position:relative}
+.karte svg{display:block;width:100%;height:auto}
+.karte--hoch svg{max-width:560px;margin:0 auto}
+.karte-kopf{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline;justify-content:space-between;
+  padding:12px 16px;background:var(--surface);border-bottom:1px solid var(--line)}
+.karte-kopf h3{font-size:15px}
+.karte-kopf .mass{font-family:var(--font-mono);font-size:11.5px;color:var(--muted)}
+.stufen{display:grid;gap:28px;margin-top:28px}
+.stufe{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
+@media(min-width:900px){.stufe{grid-template-columns:minmax(0,1fr) 280px;align-items:start}}
+.stufe-text{display:flex;flex-direction:column;gap:10px}
+.stufe-text p{font-size:14.5px;color:var(--graphite)}
+.rest{font-family:var(--font-display);font-weight:700;font-size:34px;line-height:1;letter-spacing:-.02em;
+  font-variant-numeric:tabular-nums;color:var(--primary)}
+.rest small{display:block;font-family:var(--font-mono);font-size:11px;font-weight:400;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted);margin-top:6px;letter-spacing:.12em}
+.legende{display:flex;flex-wrap:wrap;gap:6px 14px;padding:10px 16px;background:var(--surface);
+  border-top:1px solid var(--line);font-size:12px;color:var(--graphite)}
+.legende span{display:inline-flex;align-items:center;gap:6px}
+.swatch{width:12px;height:12px;border-radius:3px;flex:none}
+.schalter{display:flex;flex-wrap:wrap;gap:6px;padding:10px 16px;background:var(--surface);border-top:1px solid var(--line)}
+.schalter button{font:500 12px/1 var(--font-mono);letter-spacing:.04em;padding:7px 11px;border-radius:999px;
+  border:1px solid var(--line);background:var(--sunken);color:var(--graphite);cursor:pointer}
+.schalter button[aria-pressed="true"]{background:var(--primary);border-color:var(--primary);color:var(--primary-on)}
+/* --- Trichter --- */
+#wege{display:flex;flex-direction:column;gap:24px;margin-top:26px}
+.weg{display:flex;flex-direction:column;gap:3px;padding-left:16px;border-left:3px solid var(--line)}
+.weg--error{border-left-color:var(--error)}
+.weg--primary{border-left-color:var(--primary)}
+.weg--secondary{border-left-color:var(--secondary)}
+.weg-name{font-size:14.5px;margin-bottom:6px;color:var(--graphite)}
+.weg-fazit{font-size:13.5px;color:var(--muted);margin-top:7px;max-width:64ch}
+.tr-zeile{display:grid;grid-template-columns:minmax(0,1fr);gap:4px;padding:11px 14px;border-radius:8px;
+  background:var(--surface);border:1px solid var(--line-faint)}
+@media(min-width:760px){.tr-zeile{grid-template-columns:26ch 1fr 9ch;align-items:center;gap:16px}}
+.tr-zeile.treffer{border-color:var(--primary);background:var(--good-surface)}
+.tr-name{font-size:14px}
+.tr-quelle{font-family:var(--font-mono);font-size:11px;color:var(--muted);letter-spacing:.04em}
+.tr-balken{height:9px;border-radius:999px;background:var(--sunken);overflow:hidden;border:1px solid var(--line-faint)}
+.tr-balken i{display:block;height:100%;background:var(--secondary);border-radius:999px}
+.tr-zeile.treffer .tr-balken i{background:var(--primary)}
+.tr-n{font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-size:15px;font-weight:500;text-align:right}
+
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line-faint)}
+th{font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:500}
+td.n{font-family:var(--font-mono);font-variant-numeric:tabular-nums;text-align:right}
+tr.ist td{background:var(--good-surface)}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.merk{border-left:3px solid var(--secondary);background:var(--secondary-veil);padding:14px 18px;border-radius:0 8px 8px 0}
+.merk p{font-size:14.5px}
+.quellen{font-size:12.5px;color:var(--muted)}
+.quellen code{font-family:var(--font-mono);font-size:11.5px;background:var(--sunken);padding:1px 5px;border-radius:4px;
+  border:1px solid var(--line-faint);word-break:break-all}
+</style>
+
+<div class="wrap">
+
+<header class="hero">
+  <p class="eyebrow">Messung · 01.09.2026 · Kleinanzeigen-Inserat 3499632623</p>
+  <h1>Der Pin zeigt auf den falschen Ort</h1>
+  <div class="col stack">
+    <div class="zahl">
+      <b>6,24 km</b>
+      <span>zwischen dem Kartenpin des Inserats und dem Flurstück, das wirklich verkauft wird.</span>
+    </div>
+    <p class="lede">Ein echtes Baugrundstück in Großbothen, live gegen ALKIS geprüft. Der Fall zeigt,
+      warum die Koordinate der Plattform als Ausgangspunkt untauglich ist — und welche billige
+      Angabe stattdessen in zwei Anfragen zum richtigen Flurstück führt.</p>
+  </div>
+
+  <div class="kanaele">
+    <div class="kanal" style="--k:var(--error)">
+      <span class="eyebrow">Meta-Tags</span>
+      <b>51,244012 / 12,721705</b>
+      <p>Der Gemeindemittelpunkt von Grimma. Nicht das Grundstück.</p>
+    </div>
+    <div class="kanal" style="--k:var(--primary)">
+      <span class="eyebrow">Attributliste</span>
+      <b>502 m² · 60.000 €</b>
+      <p>Strukturiertes Feld „Grundstücksfläche“. Kein Modell nötig.</p>
+    </div>
+    <div class="kanal" style="--k:var(--secondary)">
+      <span class="eyebrow">Fließtext</span>
+      <b>„Großbothen, OT von Grimma“</b>
+      <p>Der Ortsteil steht nur hier — nicht im Standortfeld.</p>
+    </div>
+    <div class="kanal" style="--k:var(--primary)">
+      <span class="eyebrow">Bild 2 von 4</span>
+      <b>„Flurstück 790/11“</b>
+      <p>Ein Geoportal-Auszug als Foto. Die Antwort im Klartext.</p>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="col stack">
+    <p class="eyebrow">Was der naive Weg liefert</p>
+    <h2>Koordinate rein, falsches Flurstück raus — ohne jede Fehlermeldung</h2>
+    <p>Die Koordinate aus den Meta-Tags an ALKIS gegeben, das Flurstück genommen, das den Punkt
+      überdeckt: Das ist der kürzeste denkbare Weg, und er antwortet genauso amtlich wie der richtige.</p>
+  </div>
+  <div class="scroll" style="margin-top:20px">
+  <table>
+    <thead><tr><th>&nbsp;</th><th>Gemarkung</th><th>Flurstück</th><th class="n">Fläche</th><th class="n">Abstand zum Inserat</th></tr></thead>
+    <tbody>
+      <tr><td>Pin&nbsp;→&nbsp;ALKIS</td><td>Grimma</td><td class="mono">2537</td><td class="n">38.284 m²</td><td class="n">—</td></tr>
+      <tr class="ist"><td>Tatsächlich</td><td>Großbothen</td><td class="mono">790/11</td><td class="n">502 m²</td><td class="n">6.235 m</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="col" style="margin-top:18px">
+    <div class="merk"><p>Die Fläche ist um den Faktor <b>76</b> zu groß. Die Plausibilitätsprüfung, die
+      das Projekt bereits hat (<span class="mono">AREA_FACTOR_TOO_LARGE = 4,0</span>), schlägt hier also an —
+      sie erkennt den Fehler, aber sie behebt ihn nicht. Sie sagt „das kann es nicht sein“, nicht „das ist es“.</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="col stack">
+    <p class="eyebrow">Drei Maßstäbe</p>
+    <h2>Die Karte zoomt genau so weit, wie die Indizien reichen</h2>
+    <p>Jeder Maßstab unten entspricht einem Stand des Wissens. Was die Plattform hergibt, reicht für
+      die Gemeinde. Was im Fließtext steht, reicht für die Gemarkung. Was im Bild steht, reicht für
+      das Flurstück.</p>
+  </div>
+
+  <div class="stufen">
+
+    <div class="stufe">
+      <div class="karte karte--hoch">
+        <div class="karte-kopf"><h3>1 · Gemeinde Grimma</h3><span class="mass" id="mass1"></span></div>
+        <svg id="karte1" role="img" aria-label="Der Kartenpin liegt 6,2 km nördlich des Flurstücks"></svg>
+        <div class="legende">
+          <span><i class="swatch" style="background:#A8402C"></i>Gemarkung Grimma — wo der Pin liegt</span>
+          <span><i class="swatch" style="background:var(--primary)"></i>Gemarkung Großbothen — wo das Grundstück liegt</span>
+        </div>
+      </div>
+      <div class="stufe-text">
+        <div class="rest">32.544<small>Flurstücke offen</small></div>
+        <p>Das Standortfeld sagt „04668 Sachsen&nbsp;–&nbsp;Grimma“. Die Stadt Grimma hat
+          <b>66 Gemarkungen</b> und 32.544 Flurstücke. Der Pin liegt in einer davon — der falschen.</p>
+      </div>
+    </div>
+
+    <div class="stufe">
+      <div class="karte">
+        <div class="karte-kopf"><h3>2 · Gemarkung Großbothen</h3><span class="mass" id="mass2"></span></div>
+        <svg id="karte2" role="img" aria-label="25 flächengleiche Kandidaten in Großbothen mit Entfernungsringen"></svg>
+        <div class="schalter" id="schalter2">
+          <button type="button" data-layer="kandidaten" aria-pressed="true">Kandidaten ±5 %</button>
+          <button type="button" data-layer="ringe" aria-pressed="true">Ringe Bahnhof / Bus</button>
+          <button type="button" data-layer="ueberlebende" aria-pressed="true">Nach Doppelring</button>
+        </div>
+        <div class="legende">
+          <span><i class="swatch" style="background:var(--secondary)"></i>Kandidat</span>
+          <span><i class="swatch" style="background:var(--primary)"></i>790/11</span>
+          <span><i class="swatch" style="background:var(--sage)"></i>Bushaltestelle</span>
+        </div>
+      </div>
+      <div class="stufe-text">
+        <div class="rest">1.131 → 25 → 8<small>Flurstücke offen</small></div>
+        <p>„Großbothen“ aus dem Fließtext schlägt im Gemarkungsverzeichnis eindeutig auf den
+          Schlüssel <span class="mono">144241</span> an: 1.131 Flurstücke. Das Flächenband ±5 %
+          lässt 25 übrig, die beiden Entfernungsangaben des Maklers 8.</p>
+        <p>Die Ringe grenzen ein, aber sie entscheiden nicht.</p>
+      </div>
+    </div>
+
+    <div class="stufe">
+      <div class="karte">
+        <div class="karte-kopf"><h3>3 · Flur um die Wiesenstraße</h3><span class="mass" id="mass3"></span></div>
+        <svg id="karte3" role="img" aria-label="Katasterausschnitt mit dem hervorgehobenen Flurstück 790/11"></svg>
+        <div class="legende">
+          <span><i class="swatch" style="background:var(--primary)"></i>790/11 — 502 m²</span>
+          <span><i class="swatch" style="border:1px solid var(--map-neighbour);background:transparent"></i>Nachbarflurstücke aus ALKIS</span>
+          <span id="hover3" class="mono" style="margin-left:auto;color:var(--muted)">Zeiger über ein Flurstück</span>
+        </div>
+      </div>
+      <div class="stufe-text">
+        <div class="rest">1<small>Flurstück — die Antwort</small></div>
+        <p>Genau diesen Ausschnitt zeigt das zweite Bild des Inserats: ein Auszug aus
+          <span class="mono">geoportal.sachsen.de</span> im Maßstab 1:500, überschrieben
+          „Wiesenstraße&nbsp;–&nbsp;Großbothen / Flurstück 790/11“.</p>
+        <p>Die 83 Nachbarflurstücke hier sind live aus dem ALKIS-WFS geholt und stimmen mit den
+          Nummern auf dem Foto überein — 772/5, 792/2, 793/4, 790/10.</p>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<section>
+  <div class="col stack">
+    <p class="eyebrow">Gemessen, nicht geschätzt</p>
+    <h2>Vier Wege, ein Inserat</h2>
+    <p>Vier Wege durch dasselbe Inserat. Alle Zahlen stammen aus
+      <span class="mono">resultType=hits</span>-Anfragen an den ALKIS-WFS des GeoSN am 01.09.2026;
+      die Balken sind logarithmisch, weil zwischen 32.544 und 1 vier Größenordnungen liegen.</p>
+  </div>
+  <div id="wege"></div>
+  <div class="col" style="margin-top:24px">
+    <div class="merk"><p><b>Ortsteil + exakte Fläche = ein Treffer.</b> Zwei HTTP-Anfragen, kein
+      Modellaufruf, keine Triangulation, keine Bilderkennung. Alles Teure ist Rückfallebene,
+      nicht Hauptweg.</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="col stack">
+    <p class="eyebrow">Was der Fall festlegt</p>
+    <h2>Vier Sätze, die die Reihenfolge bestimmen</h2>
+  </div>
+  <div class="scroll" style="margin-top:20px">
+  <table>
+    <thead><tr><th>Befund</th><th>Gemessen</th><th>Folge für die Pipeline</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Das Rauschen ist nicht zufällig, es ist strukturell.</td>
+        <td class="mono">6.235 m, exakt auf Grimma</td>
+        <td>Kein Gauß-Radius um den Pin. Die Plattform geokodiert die <em>Gemeinde</em>, also ist die
+          Gemeinde die Aussage — und der Ortsteil im Text schlägt sie.</td>
+      </tr>
+      <tr>
+        <td>Die Fläche ist das schärfste billige Merkmal.</td>
+        <td class="mono">1.131 → 1</td>
+        <td>Sie steht in einem strukturierten Feld, ist amtlich identisch (502 = 502) und ist
+          serverseitig filterbar (<span class="mono">PropertyIsBetween</span> auf <span class="mono">ave:flaeche</span>).</td>
+      </tr>
+      <tr>
+        <td>Maklerentfernungen sind um Zehnerprozente daneben.</td>
+        <td class="mono">„0,3 km“ Bus → 396 m<br>„1,6 km“ Bahnhof → 1.415 m</td>
+        <td>Nur als weiche Ringe mit ±35 % verwenden, nie als Gleichung. Sie schließen aus, sie
+          bestimmen nicht.</td>
+      </tr>
+      <tr>
+        <td>Die Bilder sind oft die stärkste Quelle.</td>
+        <td class="mono">1 von 4 Bildern trägt die Nummer</td>
+        <td>Bildsichtung gehört <em>vor</em> die Triangulation, nicht dahinter. Sie ist billiger und
+          liefert die Antwort statt einer Einschränkung.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section>
+  <div class="col stack quellen">
+    <p class="eyebrow" style="color:var(--muted)">Methodik</p>
+    <p>Inserat: <code>kleinanzeigen.de/s-anzeige/…/3499632623-207-3929</code>, abgerufen 01.09.2026, HTTP 200,
+      172.727 Bytes. Die Seite liefert serverseitig das vollständige HTML samt
+      <code>og:latitude</code>/<code>og:longitude</code>, Attributliste und Bild-URLs.</p>
+    <p>Kataster: <code>POST https://geodienste.sachsen.de/aaa/public_alkis/vereinf/wfs</code>,
+      WFS 2.0.0, <code>ave:Flurstueck</code>, <code>srsName=urn:ogc:def:crs:EPSG::25833</code>.
+      Flurstück 790/11 = <code>144241___00790001100</code>, <code>flaeche</code> 502,
+      <code>aktualit</code> 2020-04-01, <code>lagebeztxt</code> „ohne Lage“.
+      Polygonfläche aus der Geometrie: 501,5 m².</p>
+    <p>Haltestellen und Bahnhof: <code>api.transitous.org/api/v1/map/stops</code> und
+      <code>/api/v1/geocode</code>. Entfernungen sind Luftlinien (Haversine) vom Flurstücksmittelpunkt
+      51,189265 / 12,741058.</p>
+    <p><b>Ein Wert ist ungeprüft:</b> die Wegstrecken zu Bahnhof und Haltestelle wurden nicht
+      geroutet, nur als Luftlinie gemessen. Der Vergleich mit den Maklerangaben ist damit eine
+      untere Schranke — zu Fuß ist es weiter, nicht näher.</p>
+  </div>
+</section>
+
+</div>
+<script>
+const FALL={"plot":{"nr":"790/11","gemarkung":"Großbothen","gemaschl":"144241","kennz":"144241___00790001100","m2":502,"m2_geom":501.5,"latlon":[51.189265,12.741058],"ring":[[-8.14,-17.18],[9.7,-17.17],[9.28,10.15],[-2.72,11.74],[-8.12,12.46],[-8.14,-17.18]]},"pin":{"latlon":[51.244012,12.721705],"xy":[-1350.3,6051.7],"parcel":"Grimma 2537","m2":38284,"dist_m":6235},"nachbarn":[{"nr":"388/12","m2":7486,"ring":[[-149.0,-20.84],[-130.69,-23.77],[-118.69,-25.69],[-104.8,-27.91],[-98.43,19.57],[-89.07,18.36],[-88.91,22.98],[-53.49,18.41],[-52.0,18.38],[-48.66,17.72],[-37.35,16.21],[-26.13,14.77],[-15.41,13.4],[-15.22,19.53],[-15.15,21.67],[-16.68,20.76],[-35.18,22.53],[-50.09,24.84],[-57.18,30.34],[-56.24,60.0],[-55.04,97.48],[-86.94,97.15],[-111.18,99.17],[-118.53,43.52],[-139.92,46.57],[-145.74,-5.18],[-147.23,-5.02],[-149.0,-20.84]]},{"nr":"385","m2":3180,"ring":[[-94.53,-67.81],[-60.52,-74.77],[-60.35,-72.46],[-53.49,18.41],[-88.91,22.98],[-89.07,18.36],[-90.47,-22.38],[-91.09,-30.11],[-94.37,-66.07],[-94.53,-67.81]]},{"nr":"772/3","m2":1775,"ring":[[-8.12,30.16],[23.81,26.68],[25.38,78.98],[16.01,81.87],[-8.21,84.28],[-8.38,76.66],[-8.12,30.16]]},{"nr":"43/7","m2":1719,"ring":[[23.81,26.68],[48.03,23.46],[55.65,22.74],[60.65,69.38],[45.25,73.84],[25.46,81.77],[25.38,78.98],[23.81,26.68]]},{"nr":"43/6","m2":1389,"ring":[[55.65,22.74],[63.94,21.95],[79.62,20.11],[85.56,19.42],[91.0,64.1],[83.36,65.09],[62.6,68.81],[60.65,69.38],[55.65,22.74]]},{"nr":"43/5","m2":1314,"ring":[[85.56,19.42],[94.54,18.36],[115.15,16.11],[119.7,60.33],[108.06,61.37],[91.0,64.1],[85.56,19.42]]},{"nr":"39/2","m2":1154,"ring":[[39.95,-80.88],[40.42,-112.87],[40.45,-113.78],[77.48,-111.27],[76.73,-96.25],[76.23,-80.84],[39.95,-80.88]]},{"nr":"37/3","m2":1060,"ring":[[-36.46,-111.66],[5.74,-115.16],[8.43,-80.48],[-7.33,-80.15],[-35.13,-104.46],[-35.26,-105.69],[-36.46,-111.66]]},{"nr":"801/5","m2":1059,"ring":[[118.12,-72.5],[139.55,-73.13],[142.7,-51.17],[144.73,-36.94],[146.39,-28.92],[135.35,-29.19],[121.26,-29.52],[118.12,-72.5]]},{"nr":"800/4","m2":1051,"ring":[[94.74,-73.32],[112.59,-72.45],[118.12,-72.5],[121.26,-29.52],[119.77,-29.56],[106.23,-29.88],[97.2,-30.09],[94.74,-73.32]]},{"nr":"38/4","m2":1006,"ring":[[10.63,-115.16],[23.03,-116.77],[40.5,-116.91],[40.45,-113.78],[40.42,-112.87],[39.95,-80.88],[12.84,-80.53],[10.63,-115.16]]},{"nr":"787/1","m2":983,"ring":[[-48.66,17.72],[-44.65,-73.49],[-37.43,-74.83],[-34.31,-74.55],[-37.35,16.21],[-48.66,17.72]]},{"nr":"389/4","m2":959,"ring":[[-120.66,-59.87],[-94.37,-66.07],[-91.09,-30.11],[-104.8,-27.91],[-118.69,-25.69],[-120.66,-59.87]]},{"nr":"40/4","m2":934,"ring":[[76.23,-80.84],[76.73,-96.25],[77.48,-111.27],[105.46,-109.54],[109.43,-78.6],[76.23,-80.84]]},{"nr":"786/1","m2":924,"ring":[[-60.35,-72.46],[-58.98,-72.65],[-58.52,-70.89],[-44.65,-73.49],[-48.66,17.72],[-52.0,18.38],[-53.49,18.41],[-60.35,-72.46]]},{"nr":"788/1","m2":905,"ring":[[-37.35,16.21],[-34.31,-74.55],[-25.34,-73.75],[-26.13,14.77],[-37.35,16.21]]},{"nr":"795/6","m2":862,"ring":[[47.79,-74.63],[67.71,-74.95],[69.61,-30.75],[50.19,-31.21],[47.79,-74.63]]},{"nr":"795/3","m2":840,"ring":[[45.2,-31.33],[50.19,-31.21],[69.61,-30.75],[71.04,2.8],[58.63,4.18],[45.32,6.8],[45.2,-31.33]]},{"nr":"789/1","m2":833,"ring":[[-26.13,14.77],[-25.34,-73.75],[-19.81,-73.26],[-16.84,-69.07],[-15.41,13.4],[-26.13,14.77]]},{"nr":"388/10","m2":807,"ring":[[-56.24,60.0],[-34.02,59.3],[-32.92,93.14],[-49.26,97.56],[-51.53,97.33],[-55.04,97.48],[-56.24,60.0]]},{"nr":"388/9","m2":779,"ring":[[-147.23,-5.02],[-145.74,-5.18],[-139.92,46.57],[-118.53,43.52],[-111.18,99.17],[-114.17,99.43],[-118.04,70.15],[-138.5,72.49],[-138.58,71.79],[-142.61,36.14],[-147.23,-5.02]]},{"nr":"388/11","m2":772,"ring":[[-56.24,60.0],[-57.18,30.34],[-50.09,24.84],[-35.18,22.53],[-34.02,59.3],[-56.24,60.0]]},{"nr":"388/6","m2":750,"ring":[[-34.02,59.3],[-35.18,22.53],[-16.68,20.76],[-15.15,21.67],[-13.98,58.67],[-34.02,59.3]]},{"nr":"41/3","m2":703,"ring":[[104.12,-121.93],[119.37,-123.62],[119.33,-115.99],[124.91,-95.29],[126.33,-88.76],[129.93,-78.23],[126.53,-77.97],[118.55,-77.98],[109.43,-78.6],[105.46,-109.54],[104.12,-121.93]]},{"nr":"43/10","m2":700,"ring":[[83.32,2.05],[95.68,0.52],[108.57,-0.84],[122.31,-1.88],[129.02,-2.89],[129.78,8.42],[114.5,9.98],[115.15,16.11],[94.54,18.36],[85.56,19.42],[83.32,2.05]]},{"nr":"43/9","m2":678,"ring":[[45.32,6.8],[58.63,4.18],[71.04,2.8],[83.32,2.05],[85.56,19.42],[79.62,20.11],[63.94,21.95],[55.65,22.74],[48.03,23.46],[47.35,18.38],[45.32,6.8]]},{"nr":"388/5","m2":614,"ring":[[-32.92,93.14],[-34.02,59.3],[-13.98,58.67],[-13.39,76.93],[-15.6,86.65],[-19.28,89.64],[-32.92,93.14]]},{"nr":"388/7","m2":610,"ring":[[-138.5,72.49],[-118.04,70.15],[-114.17,99.43],[-135.22,101.29],[-138.5,72.49]]},{"nr":"772/5","m2":575,"ring":[[-8.12,12.46],[-2.72,11.74],[9.28,10.15],[20.77,8.34],[23.27,8.18],[23.81,26.68],[-8.12,30.16],[-8.12,12.46]]},{"nr":"388/13","m2":568,"ring":[[-91.09,-30.11],[-90.47,-22.38],[-89.07,18.36],[-98.43,19.57],[-104.8,-27.91],[-91.09,-30.11]]},{"nr":"773/b","m2":559,"ring":[[-16.95,-75.93],[-1.27,-75.98],[10.62,-75.92],[-1.43,-73.92],[-8.44,-69.35],[-11.68,-58.91],[-11.22,-32.67],[-10.44,12.77],[-10.22,19.55],[-15.22,19.53],[-15.41,13.4],[-16.84,-69.07],[-16.95,-75.93]]},{"nr":"793/4","m2":522,"ring":[[20.77,8.34],[22.02,-31.88],[26.26,-31.78],[33.86,-31.6],[34.29,7.62],[23.27,8.18],[20.77,8.34]]},{"nr":"798/3","m2":521,"ring":[[79.52,-74.12],[91.36,-73.5],[93.89,-30.17],[81.7,-30.46],[79.52,-74.12]]},{"nr":"792/3","m2":511,"ring":[[9.94,-32.17],[10.57,-72.76],[23.32,-73.55],[22.02,-31.88],[9.94,-32.17]]},{"nr":"790/11","m2":502,"ring":[[-8.14,-17.18],[9.7,-17.17],[9.28,10.15],[-2.72,11.74],[-8.12,12.46],[-8.14,-17.18]]},{"nr":"794/4","m2":493,"ring":[[33.39,-74.1],[45.08,-74.53],[45.2,-31.33],[33.86,-31.6],[33.39,-74.1]]},{"nr":"792/2","m2":476,"ring":[[9.28,10.15],[9.7,-17.17],[9.94,-32.17],[22.02,-31.88],[20.77,8.34],[9.28,10.15]]},{"nr":"794/3","m2":423,"ring":[[33.86,-31.6],[45.2,-31.33],[45.32,6.8],[34.29,7.62],[33.86,-31.6]]},{"nr":"43/8","m2":410,"ring":[[23.81,26.68],[23.27,8.18],[34.29,7.62],[45.32,6.8],[47.35,18.38],[48.03,23.46],[23.81,26.68]]},{"nr":"790/4","m2":405,"ring":[[-1.22,-70.96],[2.27,-72.24],[10.57,-72.76],[9.94,-32.17],[1.52,-32.37],[-1.22,-70.96]]},{"nr":"801/3","m2":392,"ring":[[119.77,-29.56],[121.26,-29.52],[135.35,-29.19],[136.7,-4.06],[129.02,-2.89],[122.31,-1.88],[119.77,-29.56]]},{"nr":"798/2","m2":390,"ring":[[81.7,-30.46],[93.89,-30.17],[95.68,0.52],[83.32,2.05],[81.7,-30.46]]},{"nr":"797/6","m2":379,"ring":[[70.64,-74.59],[79.52,-74.12],[81.7,-30.46],[73.24,-30.66],[70.64,-74.59]]},{"nr":"797/3","m2":370,"ring":[[69.61,-30.75],[73.24,-30.66],[81.7,-30.46],[83.32,2.05],[71.04,2.8],[69.61,-30.75]]},{"nr":"793/7","m2":368,"ring":[[23.54,-73.56],[32.19,-74.05],[33.39,-74.1],[33.86,-31.6],[26.26,-31.78],[23.54,-73.56]]},{"nr":"800/2","m2":364,"ring":[[106.23,-29.88],[119.77,-29.56],[122.31,-1.88],[108.57,-0.84],[106.23,-29.88]]},{"nr":"799/3","m2":341,"ring":[[93.89,-30.17],[97.2,-30.09],[106.23,-29.88],[108.57,-0.84],[95.68,0.52],[93.89,-30.17]]},{"nr":"773/6","m2":337,"ring":[[-15.6,86.65],[-14.18,82.91],[-13.39,76.93],[-13.98,58.67],[-15.15,21.67],[-15.22,19.53],[-10.22,19.55],[-8.38,76.66],[-8.21,84.28],[-15.6,86.65]]},{"nr":"37/7","m2":305,"ring":[[-35.13,-104.46],[-7.33,-80.15],[-14.29,-80.01],[-17.09,-79.95],[-26.7,-79.99],[-33.6,-87.4],[-35.13,-104.46]]},{"nr":"40/6","m2":305,"ring":[[77.48,-111.27],[78.52,-123.64],[104.12,-121.93],[105.46,-109.54],[77.48,-111.27]]},{"nr":"790/6","m2":299,"ring":[[-8.21,-62.46],[-6.53,-66.65],[-1.41,-70.9],[-1.22,-70.96],[1.52,-32.37],[-8.15,-32.6],[-8.21,-62.46]]},{"nr":"790/10","m2":273,"ring":[[-8.15,-32.6],[1.52,-32.37],[9.94,-32.17],[9.7,-17.17],[-8.14,-17.18],[-8.15,-32.6]]},{"nr":"795/4","m2":167,"ring":[[45.08,-74.53],[47.79,-74.63],[50.19,-31.21],[45.2,-31.33],[45.08,-74.53]]},{"nr":"797/4","m2":144,"ring":[[67.71,-74.95],[70.61,-75.0],[70.64,-74.59],[73.24,-30.66],[69.61,-30.75],[67.71,-74.95]]},{"nr":"799/4","m2":144,"ring":[[91.36,-73.5],[94.74,-73.32],[97.2,-30.09],[93.89,-30.17],[91.36,-73.5]]},{"nr":"790/7","m2":133,"ring":[[-11.68,-58.91],[-8.44,-69.35],[-1.43,-73.92],[-1.22,-70.96],[-1.41,-70.9],[-6.53,-66.65],[-8.21,-62.46],[-8.15,-32.6],[-11.22,-32.67],[-11.68,-58.91]]},{"nr":"790/9","m2":122,"ring":[[-11.22,-32.67],[-8.15,-32.6],[-8.14,-17.18],[-8.12,12.46],[-10.44,12.77],[-11.22,-32.67]]},{"nr":"772/2","m2":93,"ring":[[-8.21,84.28],[16.01,81.87],[25.38,78.98],[25.46,81.77],[9.65,85.48],[-8.15,87.28],[-8.21,84.28]]},{"nr":"793/5","m2":93,"ring":[[22.02,-31.88],[23.32,-73.55],[23.54,-73.56],[26.26,-31.78],[22.02,-31.88]]},{"nr":"43/11","m2":92,"ring":[[114.5,9.98],[129.78,8.42],[130.06,14.42],[115.15,16.11],[114.5,9.98]]},{"nr":"772/6","m2":77,"ring":[[-10.44,12.77],[-8.12,12.46],[-8.12,30.16],[-8.38,76.66],[-10.22,19.55],[-10.44,12.77]]},{"nr":"800/5","m2":58,"ring":[[94.62,-75.39],[102.54,-75.78],[115.63,-74.66],[117.95,-74.76],[118.12,-72.5],[112.59,-72.45],[94.74,-73.32],[94.62,-75.39]]},{"nr":"388/4","m2":45,"ring":[[-49.26,97.56],[-32.92,93.14],[-19.28,89.64],[-21.78,91.14],[-32.44,94.77],[-49.26,97.56]]},{"nr":"795/7","m2":42,"ring":[[47.7,-76.27],[56.29,-76.98],[67.62,-77.15],[67.71,-74.95],[47.79,-74.63],[47.7,-76.27]]},{"nr":"801/6","m2":41,"ring":[[117.95,-74.76],[132.86,-75.45],[135.5,-73.44],[139.51,-73.4],[139.55,-73.13],[118.12,-72.5],[117.95,-74.76]]},{"nr":"792/4","m2":35,"ring":[[10.57,-72.76],[10.62,-75.92],[23.39,-75.87],[23.32,-73.55],[10.57,-72.76]]},{"nr":"790/5","m2":32,"ring":[[-1.43,-73.92],[10.62,-75.92],[10.57,-72.76],[2.27,-72.24],[-1.22,-70.96],[-1.43,-73.92]]},{"nr":"789/2","m2":26,"ring":[[-25.34,-73.75],[-25.32,-75.72],[-16.95,-75.93],[-16.84,-69.07],[-19.81,-73.26],[-25.34,-73.75]]},{"nr":"798/4","m2":23,"ring":[[79.42,-76.29],[91.26,-75.23],[91.36,-73.5],[79.52,-74.12],[79.42,-76.29]]},{"nr":"794/5","m2":22,"ring":[[33.37,-76.27],[45.07,-76.05],[45.08,-74.53],[33.39,-74.1],[33.37,-76.27]]},{"nr":"793/8","m2":22,"ring":[[23.39,-75.87],[33.37,-76.27],[33.39,-74.1],[32.19,-74.05],[23.54,-73.56],[23.39,-75.87]]},{"nr":"786/2","m2":21,"ring":[[-58.98,-72.65],[-44.59,-74.65],[-44.65,-73.49],[-58.52,-70.89],[-58.98,-72.65]]},{"nr":"37/9","m2":20,"ring":[[-33.6,-87.4],[-26.7,-79.99],[-17.09,-79.95],[-32.57,-79.63],[-33.6,-87.4]]},{"nr":"797/7","m2":20,"ring":[[70.5,-76.94],[79.42,-76.29],[79.52,-74.12],[70.64,-74.59],[70.61,-75.0],[70.5,-76.94]]},{"nr":"788/2","m2":13,"ring":[[-34.31,-74.55],[-34.29,-75.38],[-25.32,-75.72],[-25.34,-73.75],[-34.31,-74.55]]},{"nr":"36/8","m2":12,"ring":[[-59.59,-74.93],[-51.9,-77.12],[-32.57,-79.63],[-59.59,-74.93]]},{"nr":"787/2","m2":7,"ring":[[-44.65,-73.49],[-44.59,-74.65],[-34.29,-75.38],[-34.31,-74.55],[-37.43,-74.83],[-44.65,-73.49]]},{"nr":"797/5","m2":6,"ring":[[67.62,-77.15],[70.5,-76.94],[70.61,-75.0],[67.71,-74.95],[67.62,-77.15]]},{"nr":"799/5","m2":6,"ring":[[91.26,-75.23],[94.62,-75.39],[94.74,-73.32],[91.36,-73.5],[91.26,-75.23]]},{"nr":"795/5","m2":4,"ring":[[45.07,-76.05],[47.7,-76.27],[47.79,-74.63],[45.08,-74.53],[45.07,-76.05]]},{"nr":"773/7","m2":3,"ring":[[-15.6,86.65],[-13.39,76.93],[-14.18,82.91],[-15.6,86.65]]},{"nr":"809/2","m2":3,"ring":[[-60.52,-74.77],[-59.59,-74.93],[-58.98,-72.65],[-60.35,-72.46],[-60.52,-74.77]]},{"nr":"793/6","m2":0,"ring":[[23.32,-73.55],[23.39,-75.87],[23.54,-73.56],[23.32,-73.55]]}],"kandidaten":[{"nr":"266/1","m2":507,"xy":[-6.6,-1822.4]},{"nr":"238/3","m2":500,"xy":[160.0,-1711.8]},{"nr":"561/2","m2":516,"xy":[-592.3,224.7]},{"nr":"793/4","m2":522,"xy":[27.0,-11.0]},{"nr":"120/7","m2":505,"xy":[937.8,-203.8]},{"nr":"792/3","m2":511,"xy":[18.0,-51.7]},{"nr":"794/4","m2":493,"xy":[40.9,-51.3]},{"nr":"798/3","m2":521,"xy":[88.0,-49.1]},{"nr":"115/19","m2":483,"xy":[882.9,-491.6]},{"nr":"419/6","m2":516,"xy":[-320.5,-339.6]},{"nr":"364/a","m2":480,"xy":[-87.0,-307.7]},{"nr":"51/4","m2":494,"xy":[370.9,-108.2]},{"nr":"790/11","m2":502,"xy":[-0.0,0.0]},{"nr":"853/5","m2":495,"xy":[-223.7,-484.0]},{"nr":"120/5","m2":507,"xy":[932.6,-221.3]},{"nr":"709/a","m2":480,"xy":[734.4,989.8]},{"nr":"708/2","m2":495,"xy":[724.0,985.6]},{"nr":"169/g","m2":520,"xy":[595.2,52.6]},{"nr":"823/2","m2":525,"xy":[293.1,79.9]},{"nr":"61/a","m2":520,"xy":[445.0,-29.8]},{"nr":"19/4","m2":483,"xy":[384.8,-270.6]},{"nr":"172/2","m2":513,"xy":[648.7,-60.0]},{"nr":"202","m2":510,"xy":[566.6,-283.8]},{"nr":"165/8","m2":492,"xy":[685.2,-209.6]},{"nr":"154/3","m2":481,"xy":[771.4,-105.1]}],"bahnhof":{"name":"Bahnhof Großbothen","xy":[1297.9,-563.7],"dist_m":1415},"bus":[{"name":"Großbothen, Wilhelm-Ostwald-Park","xy":[222.4,325.5]},{"name":"Großbothen, Schule","xy":[684.8,86.8]},{"name":"Großbothen, Schule","xy":[687.2,82.8]},{"name":"Großbothen, Colditzer Landstr.","xy":[903.5,-357.6]},{"name":"Großbothen, Colditzer Landstr.","xy":[891.5,-417.3]},{"name":"Schaddel (Großbothen)","xy":[791.7,1057.6]},{"name":"Schaddel (Großbothen)","xy":[777.4,1112.6]}],"trichter":[{"stufe":"Plattform-Standort „04668 Grimma“","n":32544,"quelle":"Standortfeld"},{"stufe":"+ Fläche genau 502 m²","n":15,"quelle":"Attributliste"},{"stufe":"Ortsteil „Großbothen“ → Gemarkung 144241","n":1131,"quelle":"Fließtext"},{"stufe":"+ Fläche ±5 % (477–527 m²)","n":25,"quelle":"Attributliste"},{"stufe":"+ Doppelring Bahnhof/Bus","n":8,"quelle":"Entfernungsangaben"},{"stufe":"+ Fläche genau 502 m²","n":1,"quelle":"Attributliste"},{"stufe":"OCR „Flurstück 790/11“ im Bild","n":1,"quelle":"Bild 2 von 4"}],"bezirke":[{"name":"Großbothen","schluessel":"144241","ring":[[-1337,-1885],[-1292,-1922],[-1244,-1955],[-1140,-1883],[-1202,-1843],[-1242,-1804],[-1189,-1720],[-1120,-1616],[-1053,-1531],[-1014,-1540],[-970,-1578],[-933,-1606],[-857,-1647],[-772,-1684],[-740,-1695],[-671,-1720],[-591,-1711],[-478,-1716],[-354,-1695],[-308,-1711],[-230,-1725],[-159,-1733],[-159,-1807],[-209,-1893],[-255,-2021],[-232,-2059],[-278,-2138],[-347,-2253],[-424,-2314],[-521,-2334],[-601,-2354],[-584,-2447],[-572,-2514],[-559,-2640],[-556,-2680],[-542,-2699],[-526,-2747],[-509,-2855],[-527,-2935],[-500,-2899],[-474,-2783],[-463,-2724],[-438,-2602],[-401,-2465],[-388,-2437],[-351,-2372],[-312,-2337],[-264,-2306],[-211,-2281],[-124,-2258],[-57,-2242],[8,-2216],[51,-2168],[107,-2097],[125,-2071],[152,-2027],[218,-1929],[245,-1907],[332,-1928],[355,-1938],[423,-1968],[476,-2000],[581,-2039],[643,-2044],[717,-2035],[770,-2025],[865,-1987],[874,-1930],[891,-1839],[842,-1817],[863,-1727],[900,-1585],[949,-1419],[996,-1289],[1058,-1093],[1073,-998],[1088,-844],[1097,-744],[1048,-685],[1048,-638],[1047,-613],[1052,-556],[1054,-539],[1059,-518],[1064,-494],[1071,-467],[1086,-422],[1108,-323],[1111,-290],[1134,-223],[1156,-158],[1149,-115],[1119,-100],[1079,-55],[1049,-62],[1010,-43],[965,-38],[942,-62],[928,-40],[847,-60],[812,-36],[808,-13],[799,25],[786,79],[775,116],[763,152],[746,141],[714,119],[691,103],[639,68],[613,50],[586,41],[576,39],[558,54],[542,74],[532,120],[529,146],[524,169],[526,190],[525,225],[523,254],[521,279],[518,313],[512,348],[508,377],[499,416],[482,476],[471,505],[449,563],[434,603],[303,613],[196,601],[104,591],[104,714],[113,754],[206,761],[367,767],[422,774],[469,782],[625,804],[673,810],[780,835],[870,878],[897,893],[961,950],[1005,965],[997,1005],[941,1030],[878,1014],[828,1005],[784,997],[755,989],[697,975],[537,949],[471,938],[445,932],[399,925],[366,925],[279,921],[174,920],[97,915],[-126,892],[-252,876],[-288,869],[-347,856],[-409,849],[-472,848],[-564,829],[-637,804],[-780,753],[-839,717],[-862,713],[-962,817],[-998,730],[-1048,710],[-1093,663],[-1131,596],[-1174,527],[-1192,427],[-1195,324],[-1205,263],[-1206,134],[-1222,23],[-1228,-53],[-1238,-149],[-1253,-249],[-1258,-322],[-1263,-363],[-1270,-424],[-1281,-514],[-1283,-521],[-1302,-600],[-1320,-669],[-1343,-738],[-1352,-810],[-1350,-865],[-1351,-910],[-1353,-1004],[-1349,-1045],[-1339,-1093],[-1331,-1152],[-1322,-1199],[-1350,-1342],[-1341,-1457],[-1345,-1538],[-1346,-1605],[-1335,-1656],[-1343,-1693],[-1353,-1747],[-1351,-1800],[-1346,-1841],[-1343,-1868],[-1337,-1885]]},{"name":"Grimma","schluessel":"144236","ring":[[-3187,3082],[-2928,2960],[-2847,2916],[-2740,2855],[-2675,2841],[-2714,2916],[-2736,2966],[-2759,3020],[-2488,3079],[-2295,3061],[-2150,3017],[-1860,2923],[-1673,2841],[-1518,2752],[-1382,2646],[-1309,2536],[-1422,2404],[-1547,2307],[-1571,2183],[-1523,1933],[-1219,1459],[-1097,1080],[-945,861],[-817,960],[-618,1121],[-297,1293],[-215,1498],[37,1471],[467,1496],[666,1575],[643,1667],[814,1423],[1062,1266],[1187,1303],[1609,1421],[1746,1400],[1635,1509],[1543,1591],[1478,1635],[1386,1651],[1268,1694],[1155,1717],[1027,1733],[895,1747],[794,1764],[672,1790],[597,1828],[509,1955],[460,2071],[443,2200],[463,2319],[479,2483],[564,2682],[653,2762],[647,2855],[622,2940],[550,3104],[557,3240],[494,3481],[414,3580],[489,3566],[467,3605],[459,3629],[448,3649],[420,3673],[403,3689],[386,3707],[347,3743],[307,3764],[261,3775],[218,3784],[188,3809],[160,3827],[149,3862],[116,3881],[100,3887],[60,3898],[-4,3916],[-51,3943],[-104,3972],[-36,4012],[9,4178],[143,4047],[126,4221],[-1,4345],[176,4296],[249,4090],[342,4096],[445,4020],[428,4369],[466,4496],[555,4481],[494,4710],[422,4684],[386,4784],[366,5080],[364,5206],[332,5326],[357,5480],[406,5621],[424,5865],[443,6000],[435,6083],[423,6301],[395,6389],[323,6397],[40,6644],[-24,6637],[-127,6542],[-218,6456],[-221,6348],[-132,6246],[-225,6143],[-271,6100],[-344,6018],[-450,5893],[-484,5921],[-559,5959],[-605,5982],[-578,6054],[-517,6161],[-535,6268],[-595,6394],[-631,6487],[-698,6527],[-835,6582],[-929,6653],[-1029,6737],[-1110,6681],[-1290,6741],[-1427,6875],[-1595,6977],[-1675,7038],[-1829,7148],[-2076,7269],[-2246,7352],[-2454,7441],[-2677,7500],[-2889,7317],[-3033,7070],[-3273,7005],[-3592,6928],[-3916,6910],[-4059,6860],[-4272,6735],[-4399,6711],[-4345,6406],[-4270,6123],[-4271,5907],[-4288,5661],[-4290,5396],[-4252,4892],[-4397,4706],[-4384,4479],[-4393,4193],[-4244,3914],[-4197,3836],[-4167,3782],[-4145,3743],[-4082,3676],[-4037,3610],[-3975,3524],[-3880,3433],[-3869,3358],[-3603,3252],[-3426,3181],[-3187,3082]]}],"ring_ueberlebende":["823/2","798/3","794/4","792/3","793/4","790/11","708/2","709/a"],"ringe":{"bahnhof_soll_m":1600,"bahnhof_ist_m":1415,"bus_soll_m":300,"bus_ist_m":396},"wege":[{"name":"Weg A · nur das Standortfeld","farbe":"error","schritte":[{"stufe":"„04668 Sachsen – Grimma“","quelle":"Meta-Tags · 0 Modellaufrufe","n":32544},{"stufe":"+ Fläche genau 502 m²","quelle":"Attributliste","n":15}],"fazit":"Bleibt mehrdeutig. 15 Flurstücke, verteilt über 66 Gemarkungen, keines davon bestätigt."},{"name":"Weg B · Ortsteil aus dem Fließtext","farbe":"primary","schritte":[{"stufe":"„Großbothen“ → Gemarkung 144241","quelle":"Fließtext · Verzeichnistreffer","n":1131},{"stufe":"+ Fläche genau 502 m²","quelle":"Attributliste","n":1}],"fazit":"Der Treffer. Zwei HTTP-Anfragen, kein Modellaufruf, keine Bilderkennung."},{"name":"Weg B′ · wenn die Fläche gerundet ist","farbe":"secondary","schritte":[{"stufe":"Gemarkung 144241","quelle":"Fließtext","n":1131},{"stufe":"+ Flächenband ±5 % (477–527 m²)","quelle":"Attributliste","n":25},{"stufe":"+ Doppelring Bahnhof / Bus","quelle":"Entfernungsangaben ±35 %","n":8}],"fazit":"Triangulation grenzt ein, entscheidet aber nicht: 790/11 überlebt — zusammen mit drei seiner direkten Nachbarn."},{"name":"Weg C · das Bild lesen","farbe":"primary","schritte":[{"stufe":"Texterkennung auf Bild 2 von 4: „Flurstück 790/11“","quelle":"OCR · 0 Modellaufrufe","n":1}],"fazit":"Nennt die Antwort, statt sie einzugrenzen — und muss trotzdem gegen ALKIS geprüft werden."}]};
+const SVG = "http://www.w3.org/2000/svg";
+const el = (name, attrs, parent) => {
+  const node = document.createElementNS(SVG, name);
+  for (const key in attrs) node.setAttribute(key, attrs[key]);
+  if (parent) parent.appendChild(node);
+  return node;
+};
+
+/* Local metres are east/north; SVG y grows downward, so north is negated.
+   The box is widened, never cropped, to reach the requested aspect. */
+function fitBox(points, aspect, margin) {
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const [x, y] of points) {
+    if (x < minX) minX = x; if (x > maxX) maxX = x;
+    if (y < minY) minY = y; if (y > maxY) maxY = y;
+  }
+  let width = (maxX - minX) || 1, height = (maxY - minY) || 1;
+  const pad = Math.max(width, height) * margin;
+  width += pad * 2; height += pad * 2;
+  const centreX = (minX + maxX) / 2, centreY = (minY + maxY) / 2;
+  if (width / height < aspect) width = height * aspect; else height = width / aspect;
+  return {
+    width, height,
+    project: ([x, y]) => [(x - centreX) / width * 1000 + 500,
+                          (centreY - y) / height * (1000 / aspect) + (1000 / aspect) / 2],
+    viewBox: `0 0 1000 ${1000 / aspect}`,
+    metresPerUnit: width / 1000
+  };
+}
+
+const path = (ring, box) => ring.map((p, i) => (i ? "L" : "M") + box.project(p).map(v => v.toFixed(1)).join(" ")).join("") + "Z";
+
+function scaleBar(svg, box, y) {
+  const target = box.width * 0.22;
+  const step = [10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000]
+    .reduce((best, v) => Math.abs(v - target) < Math.abs(best - target) ? v : best, 10);
+  const units = step / box.metresPerUnit;
+  const group = el("g", {}, svg);
+  el("line", { x1: 24, y1: y, x2: 24 + units, y2: y, stroke: "currentColor", "stroke-width": 2.5, "stroke-linecap": "butt" }, group);
+  el("line", { x1: 24, y1: y - 4, x2: 24, y2: y + 4, stroke: "currentColor", "stroke-width": 2 }, group);
+  el("line", { x1: 24 + units, y1: y - 4, x2: 24 + units, y2: y + 4, stroke: "currentColor", "stroke-width": 2 }, group);
+  const label = el("text", { x: 24 + units + 8, y: y + 4.5, "font-size": 13, fill: "currentColor" }, group);
+  label.textContent = step >= 1000 ? (step / 1000).toLocaleString("de-DE") + " km" : step + " m";
+  group.setAttribute("font-family", "IBM Plex Mono, monospace");
+  group.setAttribute("opacity", ".75");
+  return step;
+}
+
+const marker = (svg, box, xy, fill, label, radius = 7) => {
+  const [x, y] = box.project(xy);
+  const group = el("g", {}, svg);
+  el("circle", { cx: x, cy: y, r: radius + 2.5, fill: "var(--map-halo)" }, group);
+  el("circle", { cx: x, cy: y, r: radius, fill }, group);
+  if (label) {
+    const text = el("text", { x: x + radius + 7, y: y + 4.5, "font-size": 13, fill: "var(--ink)",
+      "font-family": "IBM Plex Mono, monospace", "paint-order": "stroke",
+      stroke: "var(--map-halo)", "stroke-width": 3.5, "stroke-linejoin": "round" }, group);
+    text.textContent = label;
+  }
+  return group;
+};
+
+/* ---- 1 · Gemeindemaßstab: the pin lands in a different cadastral district ---- */
+(function () {
+  const svg = document.getElementById("karte1");
+  const districts = FALL.bezirke;
+  const box = fitBox(districts.flatMap(d => d.ring).concat([FALL.pin.xy, [0, 0]]), 0.8, 0.04);
+  svg.setAttribute("viewBox", box.viewBox);
+  svg.style.color = "var(--muted)";
+
+  for (const district of districts) {
+    const own = district.schluessel === FALL.plot.gemaschl;
+    el("path", { d: path(district.ring, box),
+      fill: own ? "var(--primary-veil)" : "var(--error-surface)",
+      stroke: own ? "var(--primary)" : "var(--error)",
+      "stroke-width": 1.6, "stroke-linejoin": "round", opacity: own ? "1" : ".9" }, svg);
+    let sumX = 0, sumY = 0;
+    for (const point of district.ring) { sumX += point[0]; sumY += point[1]; }
+    const [cx, cy] = box.project([sumX / district.ring.length, sumY / district.ring.length]);
+    const name = el("text", { x: cx, y: cy, "font-size": 14, "text-anchor": "middle",
+      fill: own ? "var(--primary)" : "var(--error)", "font-family": "Archivo, sans-serif",
+      "font-weight": 600, "paint-order": "stroke", stroke: "var(--map-ground)",
+      "stroke-width": 4, "stroke-linejoin": "round" }, svg);
+    name.textContent = district.name;
+    const key = el("text", { x: cx, y: cy + 15, "font-size": 11.5, "text-anchor": "middle",
+      fill: "var(--muted)", "font-family": "IBM Plex Mono, monospace", "paint-order": "stroke",
+      stroke: "var(--map-ground)", "stroke-width": 3.5 }, svg);
+    key.textContent = district.schluessel;
+  }
+
+  el("path", { d: `M${box.project(FALL.pin.xy).join(" ")}L${box.project([0, 0]).join(" ")}`,
+    stroke: "var(--error)", "stroke-width": 2, "stroke-dasharray": "7 6", fill: "none" }, svg);
+
+  const mid = box.project([FALL.pin.xy[0] / 2, FALL.pin.xy[1] / 2]);
+  const badge = el("g", {}, svg);
+  el("rect", { x: mid[0] - 46, y: mid[1] - 14, width: 92, height: 27, rx: 13.5,
+    fill: "var(--surface)", stroke: "var(--error)", "stroke-width": 1.5 }, badge);
+  const badgeText = el("text", { x: mid[0], y: mid[1] + 5, "font-size": 14.5, "text-anchor": "middle",
+    fill: "var(--error)", "font-family": "IBM Plex Mono, monospace", "font-weight": 500 }, badge);
+  badgeText.textContent = "6,24 km";
+
+  marker(svg, box, FALL.pin.xy, "var(--error)", "Pin des Inserats", 7);
+  marker(svg, box, [0, 0], "var(--primary)", "790/11", 7);
+  document.getElementById("mass1").textContent =
+    "Gemarkungsgrenzen aus ave:KatasterBezirk · " + scaleBar(svg, box, 1000 / 0.8 - 24) + " m Maßstab";
+})();
+
+/* ---- 2 · Gemarkungsmaßstab: candidates and the broker's rings ---- */
+(function () {
+  const svg = document.getElementById("karte2");
+  const ring = FALL.ringe;
+  const nearestStop = FALL.bus.map(b => b.xy)
+    .reduce((a, b) => a[0] ** 2 + a[1] ** 2 < b[0] ** 2 + b[1] ** 2 ? a : b);
+  const box = fitBox(FALL.kandidaten.map(c => c.xy).concat(FALL.bus.map(b => b.xy), [FALL.bahnhof.xy]), 1.45, 0.08);
+  svg.setAttribute("viewBox", box.viewBox);
+  svg.style.color = "var(--muted)";
+
+  const layers = {};
+  for (const name of ["ringe", "kandidaten", "ueberlebende"]) layers[name] = el("g", { id: "L" + name }, svg);
+
+  /* One thick stroked circle, not two filled ones: an annulus that hides nothing behind it. */
+  const annulus = (centre, metres, colour, label) => {
+    const [cx, cy] = box.project(centre);
+    const inner = metres * 0.65, outer = metres * 1.35;
+    const mid = (inner + outer) / 2 / box.metresPerUnit;
+    el("circle", { cx, cy, r: mid, fill: "none", stroke: colour, opacity: ".12",
+      "stroke-width": (outer - inner) / box.metresPerUnit }, layers.ringe);
+    for (const m of [inner, outer])
+      el("circle", { cx, cy, r: m / box.metresPerUnit, fill: "none", stroke: colour,
+        "stroke-width": 1.1, "stroke-dasharray": "5 5", opacity: ".65" }, layers.ringe);
+    const height = 1000 / 1.45;
+    const labelY = Math.min(Math.max(cy - outer / box.metresPerUnit - 8, 16), height - 10);
+    const text = el("text", { x: Math.min(Math.max(cx, 70), 930), y: labelY, "font-size": 12.5,
+      "text-anchor": "middle", fill: colour, "font-family": "IBM Plex Mono, monospace",
+      "paint-order": "stroke", stroke: "var(--map-ground)", "stroke-width": 4 }, layers.ringe);
+    text.textContent = label;
+  };
+  annulus(FALL.bahnhof.xy, ring.bahnhof_soll_m, "var(--secondary-text)", "„Fernbahnhof 1,6 km“");
+  annulus(nearestStop, ring.bus_soll_m, "var(--primary-light)", "„Bus 0,3 km“");
+
+  for (const stop of FALL.bus) marker(svg, box, stop.xy, "var(--sage)", null, 4);
+  marker(svg, box, FALL.bahnhof.xy, "var(--secondary)", "Bahnhof", 6);
+
+  const survivors = new Set(FALL.ring_ueberlebende);
+  for (const candidate of FALL.kandidaten) {
+    if (candidate.nr === FALL.plot.nr) continue;
+    const [x, y] = box.project(candidate.xy);
+    if (survivors.has(candidate.nr))
+      el("circle", { cx: x, cy: y, r: 12, fill: "none", stroke: "var(--secondary-text)", "stroke-width": 2.2 }, layers.ueberlebende);
+    const dot = el("circle", { cx: x, cy: y, r: 6.5, fill: "var(--secondary)" }, layers.kandidaten);
+    dot.appendChild(el("title", {})).textContent = candidate.nr + " · " + candidate.m2 + " m²";
+  }
+  marker(svg, box, [0, 0], "var(--primary)", "790/11", 8);
+  document.getElementById("mass2").textContent = "Luftlinie · Ringe ±35 % · " + scaleBar(svg, box, 1000 / 1.45 - 22) + " m Maßstab";
+
+  const buttons = document.getElementById("schalter2");
+  const apply = () => {
+    for (const button of buttons.querySelectorAll("button"))
+      layers[button.dataset.layer].style.display = button.getAttribute("aria-pressed") === "true" ? "" : "none";
+  };
+  buttons.addEventListener("click", event => {
+    const button = event.target.closest("button");
+    if (!button) return;
+    button.setAttribute("aria-pressed", button.getAttribute("aria-pressed") === "true" ? "false" : "true");
+    apply();
+  });
+  apply();
+})();
+
+/* ---- 3 · Flurmaßstab: the real cadastre, as in the listing's own image ---- */
+(function () {
+  const svg = document.getElementById("karte3");
+  const parcels = FALL.nachbarn;
+  const box = fitBox(parcels.flatMap(p => p.ring), 1.45, 0.02);
+  svg.setAttribute("viewBox", box.viewBox);
+  svg.style.color = "var(--muted)";
+  const readout = document.getElementById("hover3");
+  const idle = readout.textContent;
+
+  el("rect", { x: 0, y: 0, width: 1000, height: 1000 / 1.45, fill: "var(--map-surface)" }, svg);
+
+  for (const parcel of parcels) {
+    if (parcel.nr === FALL.plot.nr) continue;
+    const shape = el("path", { d: path(parcel.ring, box), fill: "transparent",
+      stroke: "var(--map-neighbour)", "stroke-width": 1, "stroke-linejoin": "round" }, svg);
+    shape.style.cursor = "crosshair";
+    const show = () => { readout.textContent = parcel.nr + " · " + parcel.m2 + " m²"; shape.setAttribute("fill", "var(--secondary-veil)"); };
+    const hide = () => { readout.textContent = idle; shape.setAttribute("fill", "transparent"); };
+    shape.addEventListener("pointerenter", show);
+    shape.addEventListener("pointerleave", hide);
+    shape.appendChild(el("title", {})).textContent = parcel.nr + " · " + parcel.m2 + " m²";
+  }
+
+  el("path", { d: path(FALL.plot.ring, box), fill: "var(--primary-veil)", stroke: "var(--primary)",
+    "stroke-width": 3.5, "stroke-linejoin": "round" }, svg);
+  const centre = box.project([0, 0]);
+  el("line", { x1: centre[0], y1: centre[1] - 6, x2: centre[0], y2: centre[1] - 34,
+    stroke: "var(--primary)", "stroke-width": 1.5 }, svg);
+  const label = el("text", { x: centre[0], y: centre[1] - 40, "font-size": 18, "text-anchor": "middle",
+    fill: "var(--primary)", "font-family": "IBM Plex Mono, monospace", "font-weight": 500,
+    "paint-order": "stroke", stroke: "var(--map-halo)", "stroke-width": 4, "stroke-linejoin": "round" }, svg);
+  label.textContent = "790/11";
+  document.getElementById("mass3").textContent = "ALKIS-Geometrie · " + parcels.length + " Flurstücke · " + scaleBar(svg, box, 1000 / 1.45 - 20) + " m Maßstab";
+})();
+
+/* ---- The four paths through the same listing ---- */
+(function () {
+  const host = document.getElementById("wege");
+  const top = 32544;
+  for (const route of FALL.wege) {
+    const block = document.createElement("div");
+    block.className = "weg weg--" + route.farbe;
+    const head = document.createElement("h3");
+    head.className = "weg-name";
+    head.textContent = route.name;
+    block.appendChild(head);
+    for (const step of route.schritte) {
+      const row = document.createElement("div");
+      row.className = "tr-zeile" + (step.n === 1 ? " treffer" : "");
+      row.innerHTML =
+        '<div><div class="tr-name"></div><div class="tr-quelle"></div></div>' +
+        '<div class="tr-balken"><i style="width:' +
+          (Math.log(step.n + 1) / Math.log(top + 1) * 100).toFixed(1) + '%"></i></div>' +
+        '<div class="tr-n">' + step.n.toLocaleString("de-DE") + "</div>";
+      row.querySelector(".tr-name").textContent = step.stufe;
+      row.querySelector(".tr-quelle").textContent = step.quelle;
+      block.appendChild(row);
+    }
+    const verdict = document.createElement("p");
+    verdict.className = "weg-fazit";
+    verdict.textContent = route.fazit;
+    block.appendChild(verdict);
+    host.appendChild(block);
+  }
+})();
+</script>
