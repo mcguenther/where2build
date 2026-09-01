@@ -72,17 +72,45 @@ npm install
 npm run dev                                   # proxies /api to 127.0.0.1:8000
 ```
 
-The frontend runs without the backend: extraction falls back to a worked
-example and says so on screen, naming the reason. Everything the user enters
-lives in `localStorage`; **Daten** exports and imports it as JSON.
+Without the backend the frontend still loads, but nothing that needs a service
+works: every call throws and the page shows the reason instead of a number.
+There is no worked example to fall back to — see *Never show example data*
+below. Everything the user enters lives in `localStorage`; **Daten** exports
+and imports it as JSON.
+
+## Deploying it
+
+Two containers, no database. The backend is a proxy and a disk cache in front
+of the official services; everything a user enters stays in their browser.
+
+```bash
+cp backend/.env.example backend/.env    # optional — only LLM_API_KEY matters
+docker compose up --build               # then open http://localhost:8080
+```
+
+nginx serves the built frontend and proxies `/api` to the backend, so the
+browser only ever sees one origin and CORS never enters into it. The backend
+is not published on the host; reach it through `/api`, or add a `ports:` entry
+if you want it separately.
+
+| | |
+|---|---|
+| **Port** | `WHERE2BUILD_PORT=9000 docker compose up` to serve somewhere other than 8080. |
+| **Cache** | The named volume `backend-cache` holds what the official services answered. Losing it costs time and their bandwidth, not correctness. |
+| **POI directory** | `backend/data` is mounted read-only. Build the index with `python backend/scripts/build_poi_index.py --download` and `/api/nearby` will use it; without it that endpoint says so for the OpenStreetMap categories instead of answering with an empty list. |
+| **Extraction** | Without `LLM_API_KEY` in `backend/.env`, reading a listing page stays switched off. Everything else works. |
+| **Contact address** | Set `APP_CONTACT` before any real use: the Transitous usage policy requires one. |
+
+`backend/.env` is read if it exists and skipped if it does not, so the stack
+comes up either way.
 
 ## Tests
 
 ```bash
-backend/.venv/bin/python -m pytest backend/tests -q   # 315 tests
-cd frontend && npm run test                           # 214 tests
-cd frontend && npm run test:integration               # 10, against a running backend
-node scripts/screenshots.mjs                          # 37 images and a print PDF
+backend/.venv/bin/python -m pytest backend/tests -q   # 385 passed, 1 skipped
+cd frontend && npm run test                           # 350 passed, 10 skipped
+cd frontend && npm run test:integration               # the 10, against a running backend
+node scripts/screenshots.mjs                          # 41 images and a print PDF
 ```
 
 The backend suite touches no network: ALKIS, BORIS, MOTIS, OpenFreeMap and the
@@ -132,6 +160,10 @@ nothing else.
 | `POST` | `/api/reachability` | origin + destinations + modes → durations and route geometry |
 | `GET` | `/api/tiles/{layer}/{z}/{x}/{y}.png` | cached proxy for the GeoSN WMS layers |
 | `POST` | `/api/nearby` | one coordinate → the nearest school, park, tram stop and so on, ranked by walking time; `linien: true` also names the lines calling at each stop |
+| `GET` | `/api/gemarkungen` | `?q=` → the Saxon cadastral districts, served from a committed index; the WFS is never touched |
+| `POST` | `/api/geocode` | `{text, lat?, lon?}` → candidates, never one answer: the same street name matches in three states |
+| `POST` | `/api/neighbours` | one outline → the neighbouring buildings, for showing where a setback area would reach onto the plot |
+| `GET` | `/api/basemap/style.json`, `/api/basemap/{path}` | the vector basemap, rewritten so MapLibre never reaches the internet itself |
 | `GET` | `/api/health` | which services are configured |
 
 ## Configuration

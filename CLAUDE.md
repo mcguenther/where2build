@@ -31,8 +31,9 @@ Keep comments sparse and about *why*, not *what*.
 ## Layout
 
 ```
-backend/     FastAPI + PostGIS. Proxy and cache in front of ALKIS, BORIS,
-             GeoSN WMS, MOTIS and the LLM. Owns no geometry maths.
+backend/     FastAPI. Proxy and disk cache in front of ALKIS, BORIS, GeoSN
+             WMS, MOTIS and the LLM. Owns no geometry maths and no database —
+             PostGIS is in the plan, not in the code.
 frontend/    Vite + Vue 3, Options API. Owns ALL geometry.
 docs/        Spec, service research, screenshots.
 mockup/      The approved UI mock. Historical reference, not built.
@@ -270,6 +271,10 @@ python3 -m venv backend/.venv
 backend/.venv/bin/pip install -e "backend[dev]"
 backend/.venv/bin/python -m pytest backend/tests -q
 backend/.venv/bin/python -m uvicorn app.main:app --reload --app-dir backend
+
+# the whole thing in containers: nginx serves the build and proxies /api,
+# so there is one origin and no CORS. No database is involved.
+docker compose up --build      # http://localhost:8080
 
 # frontend — needs Node >= 22.19: jsdom 30 pulls in undici 8, and on Node 20
 # vitest dies before loading a test with `markAsUncloneable is not a function`.

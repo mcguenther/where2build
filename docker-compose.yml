@@ -1,0 +1,46 @@
+# Two services and no database: the backend is a proxy and a disk cache in
+# front of ALKIS, BORIS, MOTIS, the tile servers and the extraction model, and
+# everything a user enters lives in their own browser.
+#
+#   docker compose up --build      then open http://localhost:8080
+services:
+  backend:
+    build:
+      context: ./backend
+    # Optional: without it every value falls back to the default in
+    # backend/.env.example, and page extraction stays off for want of a key.
+    env_file:
+      - path: ./backend/.env
+        required: false
+    volumes:
+      # Answers from the official services, kept between restarts. Losing it
+      # costs time and other people's bandwidth, not correctness.
+      - backend-cache:/cache
+      # A built OpenStreetMap directory, if there is one. Read-only: the
+      # backend only ever reads it. Absent, /api/nearby says so for those
+      # categories instead of answering with an empty list.
+      - ./backend/data:/app/data:ro
+    healthcheck:
+      # No curl in the slim image, and adding one for this would be the only
+      # reason to have it.
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5).status == 200 else 1)"]
+      interval: 10s
+      timeout: 10s
+      retries: 6
+      start_period: 20s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "${WHERE2BUILD_PORT:-8080}:80"
+    # nginx resolves `backend` once at startup, so it has to be answering by
+    # then — otherwise the container exits and the app looks broken.
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  backend-cache:
