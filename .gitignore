@@ -9,3 +9,6 @@ __pycache__/
 .env
 .cache/
 motis/data-input/
+
+# Build artefact: the official Saxon address coordinates, rebuilt quarterly.
+backend/data/hauskoordinaten-sachsen.json.gz

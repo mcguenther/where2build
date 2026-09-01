@@ -18,6 +18,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import __version__
+from .address_index import AddressIndex
 from .errors import AppError
 from .routers import (
     basemap,
@@ -32,7 +33,7 @@ from .routers import (
     reachability,
     tiles,
 )
-from .deps import gemarkung_directory, nearby_service
+from .deps import address_index, gemarkung_directory, nearby_service
 from .schemas import DienstStatus, HealthResponse
 from .settings import get_settings
 from .validation import readable_validation_error
@@ -94,6 +95,29 @@ def _poi_hinweis(status: dict[str, Any]) -> str:
     return f"{status['anzahl']} Orte aus OpenStreetMap{stand} für {kategorien}. {fahrplan}"
 
 
+def _adressen_hinweis(index: AddressIndex | None) -> str:
+    """What /api/health says about the official Hauskoordinaten.
+
+    Same distinction the POI sentence makes: absent is "not set up here", never
+    "Saxony has no addresses". Naming the fallback matters too — geocoding does
+    not stop working without this file, it only stops being official.
+    """
+
+    if index is None:
+        return (
+            "Keine amtlichen Hauskoordinaten auf diesem Server — die Adresssuche "
+            "beantwortet /api/geocode allein über den Routing-Geocoder (MOTIS), "
+            "dessen Koordinaten nicht amtlich sind. Erzeugen mit: "
+            "python scripts/build_address_index.py --download"
+        )
+    stand = f", Stand {index.stand}" if index.stand else ""
+    return (
+        f"{index.count} amtliche Adressen des GeoSN in {index.street_count} Straßen"
+        f"{stand}. Sie beantworten /api/geocode zuerst; Haltestellen, Orte und "
+        "alles außerhalb Sachsens kommen weiterhin aus MOTIS."
+    )
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
 
@@ -145,6 +169,7 @@ def create_app() -> FastAPI:
         current = get_settings()
         poi = nearby_service().index_status()
         verzeichnis = gemarkung_directory()
+        adressen = address_index()
         return HealthResponse(
             version=__version__,
             dienste=[
@@ -167,6 +192,12 @@ def create_app() -> FastAPI:
                     ),
                 ),
                 DienstStatus(
+                    name="hauskoordinaten",
+                    konfiguriert=adressen is not None,
+                    endpunkt=str(current.addresses.index_path),
+                    hinweis=_adressen_hinweis(adressen),
+                ),
+                DienstStatus(
                     name="boris",
                     konfiguriert=bool(current.boris.wms_url),
                     endpunkt=current.boris.wms_url,
@@ -177,8 +208,10 @@ def create_app() -> FastAPI:
                     konfiguriert=bool(current.motis.base_url),
                     endpunkt=f"{current.motis.base_url.rstrip('/')}/api/v6/plan",
                     hinweis=(
-                        "Routing (/api/reachability) und Adresssuche (/api/geocode); "
-                        "öffentliche Instanz nur für den Prototyp."
+                        "Routing (/api/reachability) und in /api/geocode alles, was die "
+                        "amtlichen Hauskoordinaten nicht beantworten: Haltestellen, Orte "
+                        "und Adressen außerhalb Sachsens. Öffentliche Instanz nur für "
+                        "den Prototyp."
                     ),
                 ),
                 DienstStatus(
