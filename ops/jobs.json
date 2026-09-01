@@ -1,0 +1,50 @@
+{
+  "_comment": [
+    "Recurring jobs, as data: adding the next one means adding an entry here,",
+    "not writing code. JSON rather than YAML because the runner ships in the",
+    "backend image and PyYAML is not one of its dependencies -- a scheduler",
+    "that needs a new dependency to read its own job list is not future-proof.",
+    "",
+    "schedule  five-field cron, evaluated in UTC.",
+    "command   argv, run without a shell, so no quoting traps.",
+    "why       printed by `list` and in every log line. A job nobody can",
+    "          explain is a job nobody dares delete.",
+    "",
+    "Nothing retries on its own. A failed import that retried would hide a",
+    "genuinely broken feed behind three more failures, and the next scheduled",
+    "run is the retry -- a weekly job has six days of slack."
+  ],
+  "jobs": [
+    {
+      "name": "cache-sweep",
+      "schedule": "17 3 * * *",
+      "command": [
+        "python",
+        "-m",
+        "app.cache",
+        "--json"
+      ],
+      "why": "Keeps the disk cache under APP_CACHE_MAX_BYTES. Nightly, because a ceiling that is never swept to is not a ceiling."
+    },
+    {
+      "name": "poi-index",
+      "schedule": "20 4 1 */3 *",
+      "command": [
+        "python",
+        "scripts/build_poi_index.py",
+        "--download"
+      ],
+      "why": "The OpenStreetMap places behind /api/nearby. Quarterly is the cadence the Overpass policy is content with. The API reads its index at startup, so the backend has to be restarted after a rebuild for the new one to take effect."
+    },
+    {
+      "name": "address-index",
+      "schedule": "50 4 1 */3 *",
+      "command": [
+        "python",
+        "scripts/build_address_index.py",
+        "--download"
+      ],
+      "why": "The official Saxon address coordinates. The GeoSN republishes quarterly. The API reads its index at startup, so the backend has to be restarted after a rebuild for the new one to take effect."
+    }
+  ]
+}

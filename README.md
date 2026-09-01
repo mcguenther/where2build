@@ -105,6 +105,34 @@ if you want it separately.
 `backend/.env` is read if it exists and skipped if it does not, so the stack
 comes up either way.
 
+### Recurring jobs
+
+```bash
+docker compose --profile scheduled-jobs up -d
+docker compose exec scheduler python scripts/run_jobs.py list
+docker compose exec scheduler python scripts/run_jobs.py run cache-sweep
+```
+
+The jobs live in [`ops/jobs.json`](ops/jobs.json) — adding the next one is a
+new entry there, not new code. `list` prints each job's schedule, the reason it
+exists and when it last ran with what exit code. Nothing retries on its own: a
+failed import that retried would hide a genuinely broken feed behind three more
+failures, and the next scheduled run is the retry.
+
+The scheduler runs from the backend image and touches only the shared volumes,
+so it needs no Docker socket — mounting that would hand a container root on the
+host for the sake of a few timed commands. Rebuilding an index writes into
+`backend/data`, and the API reads its indexes at startup, so the backend has to
+be restarted afterwards for a new one to take effect.
+
+**The MOTIS refresh is deliberately not one of these jobs.** It stops a service
+and replaces a volume, which is a host-side operation, so it stays a host cron
+entry:
+
+```cron
+40 2 * * 1  cd /srv/where2build && ./motis/fetch-data.sh && docker compose --profile local-routing up -d --force-recreate motis-import motis
+```
+
 ### Routing on your own machine
 
 Routing goes to [Transitous](https://api.transitous.org) by default. That is a

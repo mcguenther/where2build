@@ -16,18 +16,36 @@ WORKDIR /app
 # Dependencies first: the sources change far more often than pyproject.toml, so
 # this layer survives most rebuilds.
 COPY pyproject.toml ./
-RUN pip install --no-cache-dir . && pip uninstall -y where2build-backend
+# osmium links against expat at runtime, and the slim image does not carry it:
+# the wheel installs cleanly and then fails on import with
+# "libexpat.so.1: cannot open shared object file", which looks like a broken
+# package rather than a missing system library.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends libexpat1 \
+ && rm -rf /var/lib/apt/lists/*
+
+# The "poi" extra brings osmium, which only the index build needs — but the
+# scheduler runs that build from this image, so leaving it out makes that
+# job fail on an import nobody can fix from outside the container.
+RUN pip install --no-cache-dir ".[poi]" && pip uninstall -y where2build-backend
 
 COPY app ./app
+# The scheduler runs these, and it runs from this same image — the jobs are
+# the build scripts, so leaving them out makes the scheduler an empty shell.
+COPY scripts ./scripts
 # The committed Gemarkung directory travels in the image, so the container is
 # complete on its own. Compose mounts the same folder over it read-only, which
 # is how a POI index built afterwards gets in without a rebuild.
 COPY data ./data
 
 # The cache is written at runtime; the volume is mounted over it.
+# /state belongs to the scheduler and holds one small record per job. Both are
+# volume mount points: created here so they carry the right owner, because a
+# volume mounted over a path the image does not know arrives owned by root and
+# the unprivileged process cannot write its lock.
 RUN useradd --system --uid 10001 app \
- && mkdir -p /cache \
- && chown -R app:app /cache
+ && mkdir -p /cache /state \
+ && chown -R app:app /cache /state
 USER app
 
 EXPOSE 8000
