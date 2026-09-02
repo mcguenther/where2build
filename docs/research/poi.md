@@ -924,6 +924,96 @@ gaps.
 
 ---
 
+## 12. Scope — how far the index reaches, and how far it can be extended
+
+**Added 2026-09-02**, after the index existed. Everything below was measured on
+the built artefact, not estimated.
+
+### 12.1 The scope is a command-line argument, not a design decision ✅
+
+`build_poi_index.py` has nothing about Saxony in it beyond two defaults:
+
+```python
+DEFAULT_EXTRACT_URL = "https://download.geofabrik.de/europe/germany/sachsen-latest.osm.pbf"
+DEFAULT_OUTPUT      = BACKEND_DIR / "data" / "poi-sachsen.json"
+```
+
+Both are overridable (`--url`, `--out`, or a file path as the positional
+argument), and the API reads whichever file `NEARBY_POI_INDEX_PATH` names. So
+another region is a different extract and a different output path — no code
+change. Any `.osm.pbf` works; Geofabrik publishes one per Land, per country and
+per continent, and a BBBike box extract is read by the same script.
+
+**So yes, it extends arbitrarily.** What it costs is the only real question.
+
+### 12.2 What one region costs, measured ✅
+
+The index built on 2026-09-01 from a Leipzig-region box (see 12.4):
+
+| | |
+|---|---|
+| entries | 5 682 |
+| file on disk | 718 kB of JSON |
+| load into the grid | **66 ms** |
+| resident afterwards | **2,2 MB** (peak during load 4,3 MB) |
+
+Per entry that is ~126 bytes on disk and ~390 bytes in memory. The numbers that
+matter for a bigger scope follow from those two figures, and both are linear —
+the grid is a dict of buckets, and a query touches only the buckets near the
+point, so **query time does not grow with the index**, only with local density.
+
+Projected from the per-entry cost against § 4.1's taginfo count of **22 622**
+features for all of Saxony: ~2,8 MB of JSON, ~9 MB resident, ~0,3 s to load.
+Germany is roughly 25x Saxony by population; that lands near 70 MB of JSON and
+220 MB resident, which is the same wall the Hauskoordinaten file hits — one
+process is fine, N worker processes multiply it. That is the point at which the
+file should become SQLite, not before.
+
+The build, not the serving, is the expensive half: reading a 250 MB extract with
+pyosmium is minutes and the download is the bulk of it. It runs quarterly
+(`ops/jobs.json`), so this does not matter.
+
+### 12.3 What is region-specific, and it is not the geometry ✅
+
+Three things in the pipeline know they are looking at Saxony, and only one of
+them is a real limit:
+
+1. **The tag mapping** (`app/poi_index.categorise`) is plain OSM tags —
+   `amenity=school`, `leisure=playground`, `shop=supermarket`. Those are global.
+   Nothing to change for another region.
+2. **The school-type classifier** matches `Grundschule|Oberschule|Gymnasium|…`
+   against the name string (§ 4.2). That is German, and the school-type
+   vocabulary is *per Land*: `Oberschule` is Saxon, Bavaria says `Mittelschule`,
+   Berlin `Sekundarschule`. Outside Saxony the classifier degrades to "no type
+   derived" — it does not produce a wrong answer, it produces none.
+3. **The exclusions in § 4.2** (`leisure=garden`, `landuse=allotments`) were
+   measured on Saxon data. The reasoning is not Saxon — a front garden is not a
+   park anywhere — but the counts that justify it are.
+
+Everything else — transit stops, walking times — comes from MOTIS and follows
+whatever the OSM extract and the GTFS feed behind that instance cover, which is
+Germany for both Transitous and the local instance (`de-DELFI`).
+
+### 12.4 The artefact on this machine was not Saxony ⚠️
+
+Worth writing down because it is invisible from the outside: the
+`poi-sachsen.json` built on 2026-09-01 carries
+`quelle: "../motis/data-input/osm.pbf"`, and that file's PBF header says
+
+```
+box: (12.02/50.98  12.92/51.59)      generator: https://download.BBBike.org
+```
+
+— a box around Leipzig, 69 MB, not the 5 682-of-22 622 statewide extract the
+name implies. The name of the output file is a default, not a claim about its
+contents, and nothing in the pipeline checks the two agree. **The index carries
+its own `quelle` and `datenstand`; read those, not the filename.**
+
+Fixing this is a rebuild with `--download` (which is what the `poi-index` job
+does), not a code change. The gap is a reason to keep the source in the metadata
+and to show it, not to distrust the build.
+
+
 ## 11. Sources
 
 Fetched live on 2026-08-29, HTTP 200 unless noted.

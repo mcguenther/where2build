@@ -286,6 +286,22 @@ from the user directly. Reopen only if the user asks.
   `PlotView`'s computeds all read `this.plot`, and a `v-if="plot"` had kept them
   from ever seeing `null`. Adding one watcher was enough to crash the page whose
   whole job is to explain that the id in the URL names no plot here.
+- **The basemap has a palette, and it is not a preference.** A drawing sits *on*
+  the backdrop, so a near-white ground under a dark page loses the plot outline
+  in its own glare. OpenFreeMap serves `styles/dark` (neutral near-black) and
+  `styles/fiord` (blue-grey); `dark` is the one that sits next to this app's
+  warm near-black paper. The variant travels in the URL
+  (`/api/basemap/style.json?variant=dark`) so the two documents cache
+  separately, and the *browser* decides which one, because only the browser
+  knows what `system` resolved to. MapLibre also draws its own controls and
+  ships them white — restyled through the palette tokens in `base.css`, with
+  the icons reached by a filter because they are background images.
+- **The POI index's filename is a default, not a claim.** `poi-sachsen.json`
+  built from a Leipzig-region BBBike box is still called that; the extract it
+  really came from is in the file's own `quelle`, and its `datenstand` is the
+  extract's timestamp. Read those. Scope itself is a command-line argument
+  (`--url`, `--out`) — see README, "Reach of the POI index", and
+  `docs/research/poi.md` § 12.
 - **"Something is selected" is not a signal that anybody selected anything.**
   `addPlot` puts every new plot into `state.data.selection`, so opening the
   overview's comparison mode when the selection is non-empty means opening it
@@ -338,9 +354,9 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 385 passed, 1 skipped
-- `vitest`: 360 passed, 10 skipped — the 10 are the integration tests, which run
-  and pass (368/2) when a backend is up on :8000
+- `pytest`: 422 passed
+- `vitest`: 367 passed — plus the integration file, excluded by `npm run test`
+  and 8 passed / 2 skipped when a backend is up on :8000
 - `scripts/screenshots.mjs`: 41 images plus a print PDF. It fails on console
   errors, on horizontal overflow, and if not a single vector tile arrived. It
   also drives the live geocoder, which is slow often enough to blow the 60 s
