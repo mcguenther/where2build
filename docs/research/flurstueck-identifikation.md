@@ -197,7 +197,114 @@ it becomes a ring.
 
 ---
 
-## 8. What is still unverified ⚠️
+## 8. The tolerance staircase ✅
+
+Rather than choosing one area tolerance, start hard and open up only when a rung
+comes back empty. Each rung is one `resultType=hits` request. Measured against
+Gemarkung 144241 around the listing's 502 m²:
+
+| Rung | Band | Candidates |
+|---|---|---|
+| ±0 % | 502–502 | **1** |
+| ±0,5 % | 500–504 | 2 |
+| ±1 % | 497–507 | 5 |
+| ±2 % | 492–512 | 12 |
+| ±5 % | 477–527 | 25 |
+| ±10 % | 452–552 | 46 |
+| ±20 % | 402–602 | 83 |
+
+Two rules follow.
+
+**The rungs come from the wording, not from a constant.** "502 m²" is exact and
+starts at ±0 %; "ca. 500 m²" starts at ±1 %; "ab 450 m²" is a one-sided bound and
+never a band at all.
+
+**Confirm one rung wider.** The loop stops at the first rung that returns
+anything, which risks stopping on a coincidence. So after the stop, open the next
+rung and score the extra candidates. Here ±0 % yields 790/11 alone; ±0,5 % adds
+`238/3` at 500 m², 1 730 m away and not on the Wiesenstraße — it loses clearly, so
+the stop holds. One extra request buys the difference between "a hit" and "a hit
+that survived a challenge". ⚠️ It only catches the neighbouring-rung case; if the
+right parcel were far outside the band, it would not help.
+
+---
+
+## 9. `ave:tntxt` is a free land-use filter ✅
+
+Every `ave:Flurstueck` carries `tntxt` — the actual land use with the area share
+per kind. 790/11 is `Wohnbaufläche;502`; a carriageway parcel is
+`Straßenverkehr;1062`. `PropertyIsLike` filters it server-side:
+
+| Filter in Gemarkung 144241 | Parcels |
+|---|---|
+| none | 1 131 |
+| Wohnbaufläche only | 446 |
+| area band ±5 % | 25 |
+| area band ±5 % **+ Wohnbaufläche** | **16** |
+
+**Use it soft, not hard.** That 790/11 happens to be recorded as Wohnbaufläche is
+luck: an unbuilt building plot can just as legitimately be Landwirtschaft or
+Gartenland. The value is official; the inference "Baugrundstück ⇒ Wohnbaufläche"
+is not, and only official *facts* may exclude.
+
+The same field also hands over the street surfaces — the parcels whose use is
+`Straßenverkehr` are the carriageway, authoritative and as polygons, with no OSM
+request.
+
+---
+
+## 10. OCR and rotation: upscale first ✅
+
+Listing images are rotated and tilted. Measured on the same Geoportal print
+(Tesseract 5.3.4, Pillow Lanczos, medians of three runs including process start;
+"found" = the parcel number read correctly):
+
+| Rotation | `--psm 6` | `--psm 1` | 2× then `--psm 6` | 2× then `--psm 1` |
+|---|---|---|---|---|
+| 0° | ✅ 460 ms | ✅ 651 ms | ✅ 780 ms | ✅ 909 ms |
+| 3° tilt | ✅ 470 ms | ✅ 678 ms | ✅ 778 ms | ✅ 948 ms |
+| 7° tilt | ❌ | ❌ | ✅ 769 ms | ❌ |
+| 90° | ❌ | ✅ 576 ms | ❌ | ✅ 910 ms |
+| 180° | ❌ | ❌ 682 ms | ❌ | ✅ 1 003 ms |
+| 270° | ❌ | ✅ 526 ms | ❌ | ✅ 1 003 ms |
+| 15° tilt | ❌ | ❌ | ❌ | ❌ |
+
+**Upscaling is the fix, not orientation detection.** A 2× Lanczos upscale (long
+edge ≥ 1500 px) repaired `--psm 1`'s blindness to a 180° flip, repaired the 7°
+tilt with no deskewing, and raised OSD's confidence from ~1,0 to ~3,0. Real phone
+photos already exceed 1500 px, so the 2× columns are the honest proxy for
+production input.
+
+**The ladder: upscale → `--psm 6` → `--psm 1` only if no pattern matched.**
+Worst case ~1,7 s, and the second pass runs only when the first came back empty.
+
+**An OSD pre-pass does not earn its cost.** Same total time, on *every* image,
+plus three failure modes: at native size it reports the *complement* for ±90
+(r090 → `Rotate: 270`), so a wrong sign silently flips the page; it exits
+`rc=1` "Too few characters" on the orthophoto; and it claimed `Rotate: 180` at
+confidence 0,72 on one of the site photographs, which a blanket pre-pass would
+have acted on. If used anyway: apply `rotate(-R)`, gate on Latin script and
+confidence ≥ 1,5, treat a non-zero exit as "no opinion", and never lower
+`min_characters_to_try`.
+
+**Do not build deskewing.** Below 10° it is unnecessary after upscaling; at 15°
+it did not help even when given the exact angle.
+
+### Trap: a garbled number is worse than none ✅
+
+At 7° and native size the reader returned `Flurstück 790717` — it found the word
+and corrupted the digits. An empty answer is harmless; a plausible wrong number
+resolves to a real but foreign parcel, and that is exactly the error that
+validating against ALKIS cannot catch. This is the real reason to upscale.
+
+⚠️ Untested: `--dpi 300` as a hint (every run logged "Invalid resolution 0 dpi.
+Using 70 instead"), Leptonica/OpenCV deskewing (neither available in this
+sandbox), and whether the script-plus-confidence gate generalises beyond this
+one image.
+
+---
+
+## 11. What is still unverified ⚠️
 
 * The three prompts in `docs/strategie/extraktion-prompting.html` are drafted
   but have not been run against a model — this listing did not need them.

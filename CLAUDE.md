@@ -245,6 +245,46 @@ from the user directly. Reopen only if the user asks.
   **no** false parcel numbers, which is why the right design is to OCR every
   image and filter by pattern rather than classify images first. Watch the
   footer: `Olbrichtplatz` is the GeoSN's own address, printed on every sheet.
+- **`ave:tntxt` carries the actual land use, with the area share per kind** —
+  790/11 is `Wohnbaufläche;502`, a carriageway parcel is `Straßenverkehr;1062`.
+  It rides along with every feature, and `PropertyIsLike` filters it
+  server-side: in Gemarkung Großbothen the ±5 % area band plus Wohnbaufläche
+  goes 25 → 16. Use it as a *soft* signal only — an unbuilt building plot can
+  legitimately be Landwirtschaft or Gartenland, so "Baugrundstück ⇒
+  Wohnbaufläche" is an inference, not an official fact. The same field is where
+  street surfaces come from: no OSM request needed to draw a carriageway.
+- **For OCR, upscaling beats rotation handling.** Measured on the ad's Geoportal
+  print: a 2x Lanczos upscale (long edge ≥ 1500 px) fixed `--psm 1`'s blindness
+  to a 180° flip, fixed a 7° tilt with no deskewing at all, and lifted the
+  orientation detector's confidence from ~1,0 to ~3,0. So: **upscale, then
+  `--psm 6`, and only if no pattern matched `--psm 1`** (~780 ms + ~910 ms).
+  An OSD pre-pass costs the same on *every* image and adds three failure modes —
+  it reports the *complement* for ±90 at native size, it exits with "Too few
+  characters" on an orthophoto, and it claimed `Rotate: 180` at confidence 0,72
+  on one of the site photographs. Do not build deskewing: below 10° it is
+  unnecessary after upscaling, above 15° it did not help even with the exact
+  angle given.
+- **A garbled parcel number is worse than none.** At 7° and native size the
+  reader returned `Flurstück 790717` — it found the word and corrupted the
+  digits. An empty answer is harmless; a plausible wrong number resolves to a
+  real but foreign parcel, and that is precisely the error validating against
+  ALKIS does **not** catch.
+- **`SitePlan` draws no streets at all.** What makes its map look right is a
+  MapLibre instance underneath carrying OpenFreeMap's `liberty` vector style,
+  while the SVG holds its own parcel fill to `fill-opacity: .42`. The two map
+  tokens `--w2b-map-street-surface` and `--w2b-map-existing` are declared and
+  never used. Any new map component should take the same backdrop rather than
+  hand-drawing streets — and copy the two techniques that do the work: a halo
+  stroke under every line (6 px `--w2b-map-halo` beneath 2,2 px
+  `--w2b-map-boundary`) and `paint-order: stroke fill` with a 3,4 px halo on
+  every label.
+- **A search map must never frame tighter than its own doubt.** The first
+  Indizienkarte zoomed to whatever had just been found and thereby hid the other
+  parcels that still matched the stated area. The camera is derived from the
+  *live candidate set* plus the new indicium, with 35 % slack and a 120 m
+  minimum half-width, so even a confirmed parcel is never shown without its
+  neighbours. And a layer whose extent dwarfs the frame stops informing and
+  starts tinting: the district wash and the street buffer fade out on the way in.
 - **Counting place-name mentions picks the wrong place.** Against the 5 339
   names in `gemarkungen-sachsen.json`, this ad scores Grimma 3× and Großbothen
   3× — Grimma appears so often precisely because the plot is 6 km *away* from
