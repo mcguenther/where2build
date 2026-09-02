@@ -304,7 +304,98 @@ one image.
 
 ---
 
-## 11. What is still unverified ⚠️
+## 11. Named landmarks: a ranker, never a filter ✅
+
+Listings name excursion destinations. Turning those into distance rings is the
+most dangerous idea in the design, and the same listing settles it.
+
+⚠️ **Verification note:** `overpass-api.de` was unreachable from this sandbox
+(the agent proxy dropped the tunnel mid-exchange, reproduced 8×). The Overpass
+figures below come from the `maps.mail.ru/osm/tools/overpass` mirror, a
+full-planet 0.7.62.4 instance whose `timestamp_osm_base` was current. The ALKIS
+WFS and the Transitous geocoder were reached directly.
+
+### The measurement that decides it
+
+The listing names **Kloster Nimbschen** and **Schiffsmühle Höfgen**. The parcel
+is in Gemarkung Großbothen.
+
+| Landmark | To nearest Gemarkung edge | 1 km disc ∩ Gemarkung | 2 km disc ∩ Gemarkung |
+|---|---|---|---|
+| Kloster Nimbschen | 1.92 km | **0 %** | 1 % |
+| Schiffmühle Höfgen | 1.81 km | **0 %** | 2 % |
+| Cospudener See | 28.27 km | 0 % | 0 % |
+
+**As a hard filter, either landmark would have eliminated the correct answer.**
+They only cover the Gemarkung at ~5 km — the radius at which they stop
+constraining anything. The listing named them as places to visit, and nothing in
+the sentence structure separates that from "adjacent to". That is the
+frequency trap one level up, and the reason prompt P1 asks for the relation.
+
+### How much each kind constrains
+
+Reference: Gemarkung Großbothen is **5.928 km²** with 1 131 parcels (191/km²),
+measured from its `ave:KatasterBezirk` outline.
+
+| Evidence | Kind | Extent | Search area at 1 km | vs Gemarkung |
+|---|---|---|---|---|
+| Gemarkung Großbothen | area, official | 2 522 × 3 980 m | 5.93 km² | 1× |
+| Kloster Nimbschen (`way/54111480`) | point-like | 26 × 50 m | 3.14 km² | 0.5× |
+| Schiffmühle (`way/307571618`) | point-like | 15 × 11 m | 3.14 km² | 0.5× |
+| Cospudener See (`relation/285950`) | extended | 1 688 × 3 932 m | 17.40 km² | 2.9× |
+| B 107 | line, 247 ways | 34.4 km in one bbox | 68.83 km² | 11.6× |
+
+Cross-checked against real parcel counts with `fes:BBOX` on `ave:geometrie`
+(which works — a useful mechanism in its own right): a 2 × 2 km box around
+Kloster Nimbschen holds **407** parcels, a 4 × 4 km box **2 888**.
+
+So a point landmark *with a stated distance* is genuinely tighter than a
+Gemarkung. A point landmark with only "in der Nähe" is not evidence of location
+at all, as the table above shows.
+
+### Distance is to the boundary, not the centroid
+
+Buffering the Cospudener See polygon by 1 km gives 17.40 km² (13.01 km² of it
+land, once the water is subtracted); a 1 km disc about its centroid gives
+3.14 km² **and does not reach the lake's own north and south ends** — it is a
+4 km long lake. The two sets barely overlap: the centroid is not a coarser
+answer, it is a different place. The constraint is an annulus,
+`buffer(geom, r) \ geom`, and for a line it is a corridor whose area grows
+linearly with length.
+
+The backend owns no geometry maths today. Two honest routes: Shapely in the
+backend for this one path, or a `fes:BBOX` pre-filter plus an exact test on the
+returned candidates — the same shape as the existing `ave:flaeche` filtering.
+
+### A bare name is a 1-in-500 shot
+
+Across Saxony: `Bahnhofstraße` appears in **2 918** OSM ways, `Dorfstraße` in
+**4 043** — roughly 400–970 distinct streets each, spread over 220 × 170 km.
+Neither occurs in Gemarkung Großbothen at all. **Gemarkung plus street name is
+essentially unique; a street name alone is worthless.** The same holds for
+landmarks: 8 of the 46 objects returned around Nimbschen are a hotel, a
+guesthouse, a chapel, a ferry terminal and a viewpoint named *after* the
+landmark, and the geocoder's top hit for "Schiffsmühle Höfgen" is the restaurant.
+
+### What the existing code cannot do
+
+`POI_CATEGORIES` is `schule, kindergarten, park, spielplatz, supermarkt, arzt` —
+no `natural=water`, no `historic=*`, no `highway` with `ref`, so none of these
+landmarks is representable. Beyond the category list there are three deeper gaps:
+there is no name lookup at all (`PoiIndex.nearest` goes from a point to a
+category, never from a name to a place, and `PoiEntry.name` is stored but never
+searched); `entries_from_elements` reduces every way and relation to `out center`,
+so extent is discarded and a 4.4 km² lake would enter the index as one point; and
+the backend owns no buffer or intersection.
+
+⚠️ Not verified: the exact position of 790/11 relative to the landmarks — the
+1.8/1.9 km figures are to the nearest edge of the whole Gemarkung, so the true
+miss is at least that and probably larger. Overpass counts come from a Saxony
+bounding box, which clips in a little of Brandenburg, Thuringia and Bohemia.
+
+---
+
+## 12. What is still unverified ⚠️
 
 * The three prompts in `docs/strategie/extraktion-prompting.html` are drafted
   but have not been run against a model — this listing did not need them.

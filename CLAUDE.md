@@ -289,6 +289,30 @@ from the user directly. Reopen only if the user asks.
   names in `gemarkungen-sachsen.json`, this ad scores Grimma 3× and Großbothen
   3× — Grimma appears so often precisely because the plot is 6 km *away* from
   it. Extract the relation (`liegt_in`, `entfernt_von`), never the frequency.
+- **A landmark named in a listing is usually somewhere to visit, not a
+  neighbour.** The Grimma ad names Kloster Nimbschen and Schiffsmühle Höfgen; a
+  1 km ring around either contains **0 %** of Gemarkung Großbothen, where the
+  plot actually is — both are ~1,9 km from the nearest Gemarkung edge, and they
+  only cover it at ~5 km, i.e. once they constrain nothing. As a hard filter
+  either would have deleted the right answer. Point-like landmarks (under ~200 m:
+  monastery, mill, station) are worth ranking with, but only when the text states
+  a distance; extended ones (lake, forest, Bundesstraße) can only ever *refute*.
+  A 1 km buffer round the Cospudener See polygon is 17,4 km² against 5,9 km² for
+  a whole Gemarkung, and the B 107 corridor is 68,8 km².
+- **Distance to an extended feature is measured from its boundary.** A 1 km disc
+  about the Cospudener See's centroid covers 3,14 km² and does not even reach the
+  4 km long lake's own ends — it is not a coarser version of the buffer, it is a
+  different place. The constraint is an annulus, `buffer(geom, r) \ geom`.
+- **`fes:BBOX` works on `ave:geometrie`.** Verified: a 2 x 2 km box round Kloster
+  Nimbschen returns `numberMatched="407"`. That is the cheap way to combine a
+  spatial claim with the WFS without putting geometry maths in the backend —
+  pre-filter server-side, then test exactly on what comes back.
+- **A street name without a containing area is a 1-in-500 shot.** Saxony holds
+  2 918 OSM ways named `Bahnhofstraße` and 4 043 named `Dorfstraße` — roughly
+  400 to 970 distinct streets each, spread over 220 km. Inside one Gemarkung a
+  street name is essentially unique; on its own it is nothing. The same trap
+  catches landmarks: 8 of 46 objects around Nimbschen are a hotel, a chapel, a
+  ferry terminal and a viewpoint named after it.
 - **The geocoder answers with far-away namesakes.** Transitous returns
   `Großbeeren, Bahnhof` — 134 km away — as the sixth hit for "Großbothen
   Bahnhof". Discard any geocoder result outside the already-narrowed area before

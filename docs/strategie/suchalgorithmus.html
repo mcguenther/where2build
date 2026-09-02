@@ -451,6 +451,87 @@ erfolglos    wenn die Prüfung widerspricht</pre>
 
 <section>
   <div class="col stack">
+    <p class="eyebrow">Genannte Orte, die keine Adressen sind</p>
+    <h2>Landmarken ranken, sie filtern nicht</h2>
+    <p>Inserate nennen Ausflugsziele: „Kloster Nimbschen“, „Schiffsmühle Höfgen“, „Cospudener See“,
+      „über die B107“. Die naheliegende Idee ist, daraus Ringe zu machen. Am echten Fall gemessen
+      ist das die gefährlichste Idee des ganzen Entwurfs.</p>
+  </div>
+
+  <div class="col" style="margin-top:20px">
+    <div class="merk merk--rot"><p><b>Beide Landmarken aus diesem Inserat hätten die richtige
+      Antwort gelöscht.</b> Ein 1-km-Ring um Kloster Nimbschen enthält <b>0 %</b> der Gemarkung
+      Großbothen; um die Schiffsmühle ebenfalls 0 %. Beide liegen rund 1,9 km vom nächsten
+      Gemarkungsrand entfernt. Erst bei 5 km decken sie die Gemarkung ab — also genau dann, wenn sie
+      aufhören, etwas einzuschränken.</p>
+      <p>Der Grund ist derselbe wie bei der Häufigkeitsfalle, eine Ebene höher: Der Text nennt sie
+      als <em>Ziele in der Umgebung</em>, nicht als Nachbarn. Nichts im Satzbau unterscheidet
+      „liegt an“ von „lohnt einen Ausflug“ — außer der Beziehung, die P1 ausdrücklich abfragt.</p></div>
+  </div>
+
+  <div class="scroll" style="margin-top:22px">
+  <table>
+    <thead><tr><th>Indiz</th><th>Art</th><th class="n">Ausdehnung</th><th class="n">Suchgebiet bei 1 km</th><th class="n">gegenüber Gemarkung</th></tr></thead>
+    <tbody>
+      <tr class="gut"><td><b>Gemarkung Großbothen</b></td><td>Fläche, amtlich</td><td class="n">2 522 × 3 980 m</td><td class="n">5,93 km²</td><td class="n">1×</td></tr>
+      <tr><td>Kloster Nimbschen (Ruine)</td><td>punktförmig</td><td class="n">26 × 50 m</td><td class="n">3,14 km²</td><td class="n">0,5×</td></tr>
+      <tr><td>Schiffsmühle Höfgen</td><td>punktförmig</td><td class="n">15 × 11 m</td><td class="n">3,14 km²</td><td class="n">0,5×</td></tr>
+      <tr><td>Cospudener See</td><td>ausgedehnt</td><td class="n">1 688 × 3 932 m</td><td class="n">17,40 km²</td><td class="n">2,9×</td></tr>
+      <tr><td>B 107</td><td>Linie, 247 Wege</td><td class="n">34,4 km im Ausschnitt</td><td class="n">68,83 km²</td><td class="n">11,6×</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="paare">
+    <div class="paar">
+      <h3>Punktförmig: als Ranker, nur mit Beziehung</h3>
+      <p>Kloster und Mühle sind unter 60 m groß und lösen sich schon heute über den
+        MOTIS-Geocoder auf — Bauaufwand null. Ein 2 × 2 km-Kasten um das Kloster enthält
+        <b>407</b> Flurstücke, gemessen über <code>fes:BBOX</code> auf <code>ave:geometrie</code>;
+        eine Gemarkung enthält 1 131.</p>
+      <p>Aber das gilt nur mit einer <em>ausdrücklichen</em> Entfernung im Text („500 m vom
+        Kloster“). Ein bloßes „in der Nähe von“ ist weich, sonst passiert genau das oben.</p>
+    </div>
+    <div class="paar">
+      <h3>Ausgedehnt: nur zum Widerlegen</h3>
+      <p>See, Wald und Bundesstraße können nichts eingrenzen — ein Korridor wächst linear mit der
+        Länge der Linie. Sie können aber <em>widersprechen</em>: ein Kandidat 28 km vom genannten
+        See passt nicht zu „am Cospudener See“. Das ist ihr einziger Nutzen und ein echter.</p>
+    </div>
+    <div class="paar">
+      <h3>Abstand zur Kante, nicht zum Mittelpunkt</h3>
+      <p>„500 m vom See“ heißt 500 m von seinem <b>Ufer</b>. Beim Cospudener See ergibt der Puffer
+        um das Polygon 17,40 km², die Scheibe um den Mittelpunkt 3,14 km² — und die trifft die Nord-
+        und Südenden des 4 km langen Sees nicht einmal. Das ist keine gröbere Näherung, das ist ein
+        anderer Ort.</p>
+      <p>Die Form ist außerdem ein Ring, kein Kreis: die Wasserfläche selbst muss abgezogen werden.</p>
+    </div>
+    <div class="paar">
+      <h3>Der Name allein ist wertlos</h3>
+      <p>„Bahnhofstraße“ kommt in Sachsen in 2 918 OSM-Wegen vor, „Dorfstraße“ in 4 043 — grob
+        400 bis 970 verschiedene Straßen, über 220 km verteilt. Erst <em>innerhalb</em> einer
+        Gemarkung wird ein Straßenname praktisch eindeutig: in Großbothen gibt es weder die eine
+        noch die andere.</p>
+      <p>Dieselbe Regel gilt für Landmarken: 8 der 46 Treffer rund um Nimbschen sind Hotel,
+        Gasthaus, Kapelle und Aussichtspunkt, die nach der Landmarke heißen.</p>
+    </div>
+  </div>
+
+  <div class="col" style="margin-top:22px">
+    <div class="merk"><p><b>Einordnung in die Rangfolge von Phase 4</b> — nach Trennschärfe,
+      gemessen: Gemarkungsname → <code>ave:flaeche</code> → Straßenname <em>innerhalb</em> der
+      Gemarkung → Landmarke <em>mit</em> genannter Entfernung → Landmarke ohne Entfernung (nur weich)
+      → ausgedehnte Landmarke (nur widerlegend) → Straßenname allein → Häufigkeit (schon widerlegt).</p>
+      <p><b>Was dafür gebaut werden müsste:</b> ein Name-zu-Objekt-Auflöser, der die
+      <em>Geometrie</em> behält statt nur <code>out center</code>; die Beziehungsextraktion aus P1,
+      die „liegt an“ von „Ausflugsziel“ trennt; Puffer, Differenz und Verschnitt — entweder Shapely
+      im Backend oder ein <code>fes:BBOX</code>-Vorfilter mit exakter Nachprüfung, wie es die
+      Flächensuche schon macht; und eine Regel, die abgeleitete Namen verwirft.</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="col stack">
     <p class="eyebrow">Ausgänge</p>
     <h2>Drei Enden, und keines heißt „vermutlich“</h2>
   </div>
