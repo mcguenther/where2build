@@ -275,12 +275,19 @@ Each of these is verified, not assumed — the details are in
 
 ## Not done yet
 
-- **No persistence on the server.** Plots live in the browser. PostGIS and the
-  ALKIS/Hauskoordinaten import (step 1 of the plan) are still open, so address
-  lookup currently borrows the MOTIS geocoder and says so in its response.
-- **The basemap cache has no size limit.** Vector tiles are up to ~1 MB and the
-  TTL is seven days; real traffic would need a sweeper.
+- **No persistence on the server.** Plots live in the browser, and PostGIS is
+  still in the plan rather than the code. Addresses no longer wait on it: the
+  Hauskoordinaten import landed, so `/api/geocode` answers from the official
+  register and only falls back to the MOTIS geocoder for what the register does
+  not hold. A spatial join between addresses and parcels is what PostGIS is
+  still wanted for.
 - **The vector style is a light one, in dark mode too.**
+- **Boundary labels crowd on parcels with many short sides.** Every segment is
+  labelled up to sixteen of them, and adjacent near-parallel sides can overlap;
+  the overall size stays readable. Real label placement, rather than offset
+  rings, is what would fix it.
+- **The dimension figures get small on a narrow screen.** Nothing overflows, but
+  at 390 px they are hard to read.
 
 ## Attribution
 
