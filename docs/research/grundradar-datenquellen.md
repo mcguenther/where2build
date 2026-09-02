@@ -348,3 +348,96 @@ Geprüft und verworfen:
 Die amtliche Kartierung ist die richtige und einzige belastbare Quelle. Was
 sich verbessern lässt, ist **wie** wir sie abfragen — Flurstück statt Punkt —
 und **wie ehrlich** wir über ihre Lücken sind.
+
+---
+
+# Nachtrag 02.09.2026 (2) — die drei Lücken, noch einmal angefasst
+
+## 7. Radon: doch vorhanden
+
+`luft/radonvorsorgegebiete` auf `luis.sachsen.de`. Beim ersten Durchgang
+übersehen, weil ich den `luft`-Ordner nur bis zum vierzehnten Eintrag gelistet
+und danach nach „strahl" gesucht hatte. **Erst die vollständige Inventur aller
+173 Dienste hat ihn gefunden** — Lehre: Ordner ganz auslesen, nicht das
+Stichwort raten.
+
+| Prüfung | Ergebnis |
+| --- | --- |
+| Objekte | ✅ 107 Gemeinden, nach § 121 StrlSchG ausgewiesen |
+| Mölkau 204 | „nein" — Leipzig ist kein Vorsorgegebiet |
+| Kontrollpunkt Johanngeorgenstadt | „ja" (`NAME: Stadt Johanngeorgenstadt`) |
+| Kontrollpunkt Schneeberg | „ja" (`NAME: Stadt Schneeberg`) |
+
+Ohne die zwei Kontrollpunkte wäre „0 Treffer" nicht von „Layer leer" zu
+unterscheiden gewesen. Das ist zugleich **besser als grundradar**: dort steht
+eine modellierte Potenzialklasse (`between_20_and_44`), hier die
+rechtsverbindliche Ausweisung.
+
+## 8. Hangneigung: eine Kulisse, kein Neigungswert
+
+`landwirtschaft/hangneigung_ausbringung`, Layer `HANGNEIGUNG_20PROZENT`,
+224 631 Objekte. Flurstück 204 liegt nicht darin. Das ist eine
+**Ja/Nein-Kulisse aus dem Düngerecht**, kein Geländemodell — „unter 20 %" ist
+alles, was sie hergibt. Ein echter Neigungswert bräuchte das Landes-DGM.
+
+## 9. Altlasten: belastbares Nein
+
+Über alle 173 Fachdienste gesucht (`altlast`, `salka`, `schadstoff`,
+`kontamin`, `verdacht`): **kein Treffer**. Der Ordner `altlasten` existiert und
+listet `services: []`. Das SALKA ist nicht öffentlich. Auskunft gibt der
+Landkreis.
+
+## 10. Mobilfunk: Umgebungsgrenze, kein Befund
+
+`mobilfunk-monitoring.de` → 502 beim CONNECT durch den Proxy,
+`breitband-monitor.de` → TLS-Fehler (`unrecognized name`),
+`gigabitgrundbuch.bund.de` → Portal 200, aber keine Datenschnittstelle.
+**Das ist eine Grenze unserer Umgebung, kein Beleg, dass es nichts gibt.**
+
+## 11. minScale ist rechenbar — und damit steuerbar
+
+ArcGIS bildet den Maßstab als
+`(bbox_breite_m / bild_breite_px) * dpi / 0,0254`. Bei 10 km Fenster und
+512 px:
+
+| dpi | Maßstab | Antwort |
+| --- | --- | --- |
+| 60 | 1:46 137 | zeichnet (130 168 B) |
+| 64 | 1:49 213 | zeichnet |
+| **65** | **1:49 982** | **zeichnet** |
+| **66** | **1:50 750** | **leer (2 231 B)** |
+| 96 | 1:73 819 | leer |
+
+Die Schwelle liegt exakt bei `minScale`. Also:
+`dpi = min(96, minScale * 0,0254 * breite_px / bbox_breite_m)` — dann
+verschwindet der Layer nie stumm. `size` wirkt gleichwertig (2048 px zeichnet
+bei dpi 96), kostet aber die vierfache Datenmenge.
+
+## 12. Werte für Flurstück 204 — alle abgerufen
+
+| Prüfung | Wert | Quelle |
+| --- | --- | --- |
+| Bodenrichtwert | **280 €/m²**, Stichtag 01.01.2026, Baureifes Land, Wohnbaufläche, EFH, Richtwertgrundstück **800 m²**, Zone 71300250 | BORIS Sachsen |
+| Lärm | L_DEN **50–59 dB(A)** (Flurstück), 50–54 am Punkt; L_night 45–49; keine Straßenbahn, kein Fluglärm | LfULG |
+| Trinkwasserschutz | kein Gebiet (4 Layer je 0) | LfULG |
+| Schutzgebiet | LSG „Östliche Rietzschke – Stünz" zwischen **350 und 400 m** (grundradar: „etwa 380 m" — unabhängig bestätigt); zweites LSG ≤ 1 km; kein NSG | LfULG |
+| Hochwasser | nicht betroffen (Gefährdung + Risikogebiete je 0) | LfULG |
+| Radon | kein Vorsorgegebiet | LfULG |
+| Hangneigung | nicht über 20 % | LfULG |
+| Boden | „Hortisol über erodierter Parabraunerde aus gemischtem Schluff über tiefem periglaziärem Kies führendem Lehm" | BK50 |
+| Bohrungen | 91 im Umkreis 500 m, 14 im Umkreis 300 m; nächste **82 m**, Endteufe 5,0 m; eine von 2019 in 147 m mit 21 m | Aufschlussdatenbank |
+| Luft | Leipzig-Mitte, **4,6 km**: NO₂ 13,1 · PM10 11,8 · PM2,5 6,0 · O₃ 55,5 µg/m³ | UBA |
+
+**Fallstrick UBA:** die drei nächstgelegenen Stationen (1,9–3,0 km, Präfixe
+`z_GUAN` und `zDDR_`) liefern **keine Messwerte**, obwohl ihr Feld
+„active to" leer ist. Erst Leipzig-Mitte in 4,6 km antwortet — dieselbe
+Station und Entfernung, die grundradar nennt. Also: die nächste Station
+wählen, **die tatsächlich Werte liefert**, nicht die nächste auf der Karte.
+
+## 13. Der Bodenrichtwert kann mehr, als grundradar zeigt
+
+Die GetFeatureInfo-Antwort führt `FLAECHE_TEXT = 'f800'` (das fiktive
+Richtwertgrundstück misst 800 m²) und verlinkt die **Umrechnungstabelle** des
+Gutachterausschusses. Unser Flurstück hat 650 m². grundradar zeigt nur die
+280 €/m²; der Umrechnungsschritt auf die tatsächliche Fläche ist ein Feld, in
+dem wir sachlich weiter sind.

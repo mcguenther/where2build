@@ -1,0 +1,553 @@
+<title>Standortprüfung Mölkau</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  --primary:#2F4A3A; --primary-light:#456B52; --primary-dark:#1C2E23;
+  --primary-veil:rgba(47,74,58,.10); --primary-on:#F7F4EE;
+  --secondary:#B5813C; --secondary-text:#7C5620; --secondary-veil:rgba(181,129,60,.16);
+  --sage:#9DB39A; --sage-light:#DCE4DA;
+  --ink:#1E1A16; --graphite:#4A443C; --muted:#6F675C;
+  --line:#DCD3C6; --line-faint:#EBE4D9;
+  --surface:#FAF7F1; --surface-sunken:#F3EFE6; --paper:#F1EBE1; --white:#FFFFFF;
+  --warning:#BE8524; --warning-text:#7C5620; --warning-surface:#F6E9CE;
+  --error:#A8402C; --error-surface:#F2DED8;
+  --good:#2F4A3A; --good-surface:#DEE7DF;
+  --map-ground:#E6E3DC; --map-surface:#EFEDE7; --map-boundary:#1E1A16;
+  --map-neighbour:#9A9184; --map-street-surface:#D6D2CA; --map-selection:#456B52;
+  /* Lärmbänder: eine Farbe, hell nach dunkel, Helligkeit monoton geprüft */
+  --db1:#F4DDD6; --db2:#E8B4A4; --db3:#D68A72; --db4:#BE5C41; --db5:#8E3221;
+  --sans:"Public Sans",ui-sans-serif,system-ui,-apple-system,sans-serif;
+  --display:"Archivo","Public Sans",ui-sans-serif,system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --r-s:3px; --r-m:6px; --r-l:10px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --primary:#8FB79C; --primary-light:#A8CBB2; --primary-dark:#0F1A13;
+  --primary-veil:rgba(143,183,156,.13); --primary-on:#10160F;
+  --secondary:#D2A164; --secondary-text:#E0BC8B; --secondary-veil:rgba(210,161,100,.18);
+  --sage:#7E9480; --sage-light:#26302A;
+  --ink:#F0EBE2; --graphite:#CFC7BA; --muted:#9A9184;
+  --line:#37312A; --line-faint:#282320;
+  --surface:#191614; --surface-sunken:#211D1A; --paper:#141110; --white:#221E1A;
+  --warning:#D6A342; --warning-text:#E4C081; --warning-surface:#2E2513;
+  --error:#E08A70; --error-surface:#2E1A15;
+  --good:#8FB79C; --good-surface:#1A241C;
+  --map-ground:#232019; --map-surface:#2A2621; --map-boundary:#E5DFD4;
+  --map-neighbour:#6B6459; --map-street-surface:#312C25; --map-selection:#8FB79C;
+  --db1:#3A2620; --db2:#5C382C; --db3:#8A4A34; --db4:#B85F3F; --db5:#E08A63;
+}}
+:root[data-theme="dark"]{
+  --primary:#8FB79C; --primary-light:#A8CBB2; --primary-dark:#0F1A13;
+  --primary-veil:rgba(143,183,156,.13); --primary-on:#10160F;
+  --secondary:#D2A164; --secondary-text:#E0BC8B; --secondary-veil:rgba(210,161,100,.18);
+  --sage:#7E9480; --sage-light:#26302A;
+  --ink:#F0EBE2; --graphite:#CFC7BA; --muted:#9A9184;
+  --line:#37312A; --line-faint:#282320;
+  --surface:#191614; --surface-sunken:#211D1A; --paper:#141110; --white:#221E1A;
+  --warning:#D6A342; --warning-text:#E4C081; --warning-surface:#2E2513;
+  --error:#E08A70; --error-surface:#2E1A15;
+  --good:#8FB79C; --good-surface:#1A241C;
+  --map-ground:#232019; --map-surface:#2A2621; --map-boundary:#E5DFD4;
+  --map-neighbour:#6B6459; --map-street-surface:#312C25; --map-selection:#8FB79C;
+  --db1:#3A2620; --db2:#5C382C; --db3:#8A4A34; --db4:#B85F3F; --db5:#E08A63;
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5}
+.hinweisleiste{background:var(--primary);color:var(--primary-on);padding:.55rem 1rem;font-size:.78rem;
+  display:flex;flex-wrap:wrap;gap:.35rem 1rem;align-items:baseline}
+.hinweisleiste b{font-weight:600}
+.hinweisleiste .mono{font-family:var(--mono);opacity:.85}
+.leiste{display:flex;align-items:center;gap:.7rem;padding:.7rem 1rem;background:var(--surface);
+  border-bottom:1px solid var(--line)}
+.marke{font-family:var(--display);font-weight:700;font-size:1.05rem;letter-spacing:-.01em}
+.marke span{color:var(--primary)}
+.leiste .schritte{margin-left:auto;display:flex;gap:.3rem;font-size:.76rem;color:var(--muted)}
+.leiste .schritte b{color:var(--ink);font-weight:600}
+
+.buehne{display:grid;grid-template-columns:1fr;gap:0;min-height:0}
+@media(max-width:959px){
+  /* Auf dem Telefon gehoert die Karte direkt unter die Suche, nicht hinter die ganze Spalte. */
+  .spalte{display:contents}
+  .suchfeld{order:1;background:var(--surface);border-bottom:1px solid var(--line)}
+  .karte{order:2}
+  .rollen{order:3;background:var(--surface);border-top:1px solid var(--line);overflow:visible}
+}
+@media(min-width:960px){.buehne{grid-template-columns:400px 1fr;height:calc(100vh - 96px);min-height:620px}}
+
+/* ---- linke Spalte ---- */
+.spalte{background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.suchfeld{padding:.85rem;border-bottom:1px solid var(--line);position:relative}
+.suchfeld label{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:.35rem}
+.eingabe{display:flex;align-items:center;gap:.5rem;background:var(--surface-sunken);
+  border:1px solid var(--line);border-radius:var(--r-m);padding:.1rem .6rem}
+.eingabe:focus-within{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-veil)}
+.eingabe input{flex:1;border:0;background:transparent;color:var(--ink);font:inherit;padding:.55rem 0;outline:none;min-width:0}
+.eingabe svg{flex:none;color:var(--muted)}
+.zaehler{font-family:var(--mono);font-size:.66rem;color:var(--muted);white-space:nowrap}
+.zaehler b{color:var(--primary);font-weight:600}
+.liste{position:absolute;left:.85rem;right:.85rem;top:calc(100% - .5rem);z-index:30;background:var(--white);
+  border:1px solid var(--line);border-radius:var(--r-m);box-shadow:0 10px 28px rgba(30,26,22,.16);overflow:hidden}
+.liste[hidden]{display:none}
+.treffer{display:flex;gap:.55rem;align-items:baseline;padding:.5rem .65rem;cursor:pointer;border:0;
+  background:transparent;width:100%;text-align:left;font:inherit;color:var(--ink)}
+.treffer:hover,.treffer[aria-selected="true"]{background:var(--primary-veil)}
+.treffer__adr{font-weight:600;font-size:.88rem}
+.treffer__ort{font-size:.78rem;color:var(--muted);margin-left:auto;text-align:right;white-space:nowrap}
+.liste__fuss{padding:.4rem .65rem;border-top:1px solid var(--line-faint);font-family:var(--mono);
+  font-size:.64rem;color:var(--muted);background:var(--surface-sunken)}
+
+.rollen{overflow-y:auto;flex:1;min-height:0}
+.block{padding:.85rem;border-bottom:1px solid var(--line-faint)}
+.block__marke{font-family:var(--mono);font-size:.64rem;letter-spacing:.11em;text-transform:uppercase;
+  color:var(--muted);margin:0 0 .4rem}
+.block h2{font-family:var(--display);font-size:1.02rem;font-weight:600;margin:0 0 .15rem;line-height:1.25}
+.block p{margin:0;font-size:.83rem;color:var(--graphite)}
+.zeile{display:flex;justify-content:space-between;gap:.8rem;padding:.3rem 0;font-size:.85rem;
+  border-bottom:1px solid var(--line-faint)}
+.zeile:last-child{border-bottom:0}
+.zeile dt{color:var(--muted)}
+.zeile dd{margin:0;font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+dl{margin:.35rem 0 0}
+.wert{font-family:var(--display);font-size:1.9rem;font-weight:700;letter-spacing:-.02em;line-height:1}
+.wert small{font-size:.95rem;font-weight:600;color:var(--muted);margin-left:.15rem}
+
+/* Prüfliste */
+.pruefkopf{display:flex;align-items:baseline;gap:.5rem;flex-wrap:wrap;margin-bottom:.2rem}
+.zaehlband{display:flex;gap:.3rem;flex-wrap:wrap;margin:.45rem 0 .1rem}
+.chip{font-family:var(--mono);font-size:.66rem;padding:.2rem .45rem;border-radius:var(--r-s);
+  border:1px solid transparent;white-space:nowrap}
+.chip--gut{background:var(--good-surface);color:var(--good);border-color:color-mix(in srgb,var(--good) 28%,transparent)}
+.chip--warn{background:var(--warning-surface);color:var(--warning-text);border-color:color-mix(in srgb,var(--warning) 34%,transparent)}
+.chip--offen{background:var(--surface-sunken);color:var(--muted);border-color:var(--line)}
+.pruefung{display:grid;grid-template-columns:auto 1fr;gap:.15rem .6rem;padding:.55rem 0;border-bottom:1px solid var(--line-faint)}
+.pruefung:last-child{border-bottom:0}
+.punkt{width:9px;height:9px;border-radius:50%;margin-top:.42rem;flex:none}
+.punkt--gut{background:var(--good)} .punkt--warn{background:var(--warning)}
+.punkt--offen{background:var(--line);border:1px solid var(--muted)}
+.pruefung__kopf{display:flex;justify-content:space-between;gap:.6rem;align-items:baseline}
+.pruefung__name{font-weight:600;font-size:.88rem}
+.pruefung__wert{font-family:var(--mono);font-size:.78rem;font-variant-numeric:tabular-nums;
+  text-align:right;white-space:nowrap}
+.pruefung__wert.gut{color:var(--good)} .pruefung__wert.warn{color:var(--warning-text)}
+.pruefung__wert.offen{color:var(--muted)}
+.pruefung__text{grid-column:2;font-size:.78rem;color:var(--muted);line-height:1.45}
+.pruefung__quelle{grid-column:2;font-family:var(--mono);font-size:.64rem;color:var(--muted);opacity:.8;margin-top:.15rem}
+
+/* ---- Karte ---- */
+.karte{position:relative;background:var(--map-ground);min-height:420px;display:flex;flex-direction:column}
+@media(min-width:960px){.karte{min-height:0}}
+.karte svg{flex:1;width:100%;height:100%;display:block;min-height:420px}
+.karte__kopf{position:absolute;top:.7rem;left:.7rem;right:.7rem;display:flex;gap:.5rem;
+  align-items:flex-start;justify-content:space-between;pointer-events:none;flex-wrap:wrap}
+.tafel{background:color-mix(in srgb,var(--surface) 94%,transparent);border:1px solid var(--line);
+  border-radius:var(--r-m);padding:.5rem .6rem;pointer-events:auto;backdrop-filter:blur(6px);
+  box-shadow:0 2px 10px rgba(30,26,22,.10)}
+.schalter{display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.82rem;font-weight:500}
+.schalter input{position:absolute;opacity:0;width:0;height:0}
+.gleis{width:34px;height:19px;border-radius:10px;background:var(--line);position:relative;transition:background .15s;flex:none}
+.gleis::after{content:"";position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;
+  background:var(--white);box-shadow:0 1px 3px rgba(0,0,0,.28);transition:transform .15s}
+.schalter input:checked + .gleis{background:var(--primary)}
+.schalter input:checked + .gleis::after{transform:translateX(15px)}
+.schalter input:focus-visible + .gleis{box-shadow:0 0 0 3px var(--primary-veil)}
+.legende{margin-top:.5rem;display:none;gap:.15rem;flex-direction:column}
+.legende[data-an="1"]{display:flex}
+.legende__zeile{display:flex;align-items:center;gap:.4rem;font-family:var(--mono);font-size:.66rem;color:var(--graphite)}
+.legende__feld{width:16px;height:10px;border:1px solid color-mix(in srgb,var(--map-boundary) 25%,transparent);flex:none}
+.karte__fuss{position:absolute;bottom:.7rem;left:.7rem;right:.7rem;display:flex;justify-content:space-between;
+  align-items:flex-end;gap:.5rem;pointer-events:none;flex-wrap:wrap}
+.massstab{font-family:var(--mono);font-size:.66rem;color:var(--graphite);background:color-mix(in srgb,var(--surface) 90%,transparent);
+  padding:.3rem .45rem;border-radius:var(--r-s);border:1px solid var(--line)}
+.massstab__balken{display:block;height:4px;border:1px solid var(--map-boundary);border-top:0;margin-top:2px}
+.quelle{font-family:var(--mono);font-size:.62rem;color:var(--muted);background:color-mix(in srgb,var(--surface) 90%,transparent);
+  padding:.25rem .4rem;border-radius:var(--r-s);max-width:22rem;text-align:right}
+.parzelle{fill:var(--map-surface);stroke:var(--map-neighbour);stroke-width:.5;vector-effect:non-scaling-stroke}
+.parzelle--ziel{fill:var(--primary-veil);stroke:var(--primary);stroke-width:2.2;vector-effect:non-scaling-stroke}
+.nummer{font-family:var(--mono);font-size:5px;fill:var(--muted);text-anchor:middle;dominant-baseline:middle}
+.nummer--ziel{fill:var(--primary);font-weight:600;font-size:7px}
+.band{stroke:none;opacity:.72}
+.fuss{padding:.8rem 1rem;border-top:1px solid var(--line);background:var(--surface);
+  font-size:.76rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:.3rem 1.2rem}
+.fuss b{color:var(--graphite);font-weight:600}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="hinweisleiste">
+  <b>Mockup — jede Zahl auf dieser Seite ist abgerufen, keine ist erfunden.</b>
+  <span class="mono">Flurstück 204, Gemarkung Mölkau · Abrufe 01.–02.09.2026</span>
+</div>
+
+<div class="leiste">
+  <span class="marke">where2<span>build</span></span>
+  <span class="schritte"><b>Standort</b> · Haus · Ziele · Vergleich</span>
+</div>
+
+<div class="buehne">
+  <!-- ========== linke Spalte ========== -->
+  <aside class="spalte">
+    <div class="suchfeld">
+      <label for="q">Adresse, Flurstück oder Koordinate</label>
+      <div class="eingabe">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="q" type="text" value="Lessingweg 44" autocomplete="off" spellcheck="false"
+               role="combobox" aria-expanded="false" aria-controls="treffer" aria-autocomplete="list">
+        <span class="zaehler" id="zaehler" title="So oft wurde seit dem ersten Zeichen wirklich gesucht">
+          <b>0</b> Abfragen</span>
+      </div>
+      <div class="liste" id="treffer" role="listbox" aria-label="Adressvorschläge" hidden></div>
+    </div>
+
+    <div class="rollen">
+      <section class="block">
+        <p class="block__marke">Standort</p>
+        <h2>Lessingweg 44</h2>
+        <p>04316 Leipzig · Ortsteil Mölkau · Sachsen</p>
+        <dl>
+          <div class="zeile"><dt>Amtliche Hauskoordinate</dt><dd>51,33655 · 12,44181</dd></div>
+          <div class="zeile"><dt>Gemeinde</dt><dd>Stadt Leipzig</dd></div>
+        </dl>
+      </section>
+
+      <section class="block">
+        <p class="block__marke">Flurstück</p>
+        <h2>Gemarkung Mölkau · Nr. 204</h2>
+        <dl>
+          <div class="zeile"><dt>Fläche, amtlich</dt><dd>650 m²</dd></div>
+          <div class="zeile"><dt>Lagebezeichnung</dt><dd>Lessingweg 44</dd></div>
+          <div class="zeile"><dt>Gemarkungsschlüssel</dt><dd>145592</dd></div>
+        </dl>
+      </section>
+
+      <section class="block">
+        <p class="block__marke">Bodenrichtwert</p>
+        <div class="wert">280 <small>€/m²</small></div>
+        <p style="margin-top:.3rem">Wohnbaufläche · Baureifes Land · Stichtag 01.01.2026</p>
+        <dl>
+          <div class="zeile"><dt>Richtwertgrundstück</dt><dd>800 m²</dd></div>
+          <div class="zeile"><dt>Dieses Flurstück</dt><dd>650 m²</dd></div>
+          <div class="zeile"><dt>Richtwertzone</dt><dd>71300250</dd></div>
+        </dl>
+        <p style="margin-top:.45rem;font-size:.78rem">
+          Der Richtwert gilt für ein gedachtes Grundstück von 800 m². Für 650 m² ist er
+          nach der Umrechnungstabelle des Gutachterausschusses anzupassen — diesen Schritt
+          zeigt grundradar nicht.
+        </p>
+      </section>
+
+      <section class="block">
+        <div class="pruefkopf">
+          <p class="block__marke" style="margin:0">Prüfungen</p>
+        </div>
+        <div class="zaehlband">
+          <span class="chip chip--gut">6 ohne Befund</span>
+          <span class="chip chip--warn">2 zu beachten</span>
+          <span class="chip chip--offen">3 offen</span>
+        </div>
+        <p style="font-size:.76rem;color:var(--muted);margin-top:.3rem">
+          Kein Gesamtscore: eine Zahl aus elf Prüfungen, von denen drei keine Daten haben,
+          wäre eine Aussage über die Datenlage, nicht über das Grundstück.
+        </p>
+
+        <div style="margin-top:.5rem">
+          <div class="pruefung">
+            <span class="punkt punkt--warn"></span>
+            <div class="pruefung__kopf"><span class="pruefung__name">Lärm</span>
+              <span class="pruefung__wert warn">50–59 dB(A)</span></div>
+            <p class="pruefung__text">Straßenverkehr. Über das ganze Flurstück gerechnet, das zwei
+              Bänder schneidet; am Gebäude 50–54. Nachts 45–49 dB(A). Keine Straßenbahn, kein Fluglärm.</p>
+            <p class="pruefung__quelle">LfULG Umgebungslärmkartierung · Flurstücksumring</p>
+          </div>
+
+          <div class="pruefung">
+            <span class="punkt punkt--warn"></span>
+            <div class="pruefung__kopf"><span class="pruefung__name">Baugrund</span>
+              <span class="pruefung__wert warn">14 Bohrungen</span></div>
+            <p class="pruefung__text">Hortisol über erodierter Parabraunerde aus gemischtem Schluff
+              über tiefem periglaziärem Kies führendem Lehm. Nächste Bohrung 82 m, Endteufe 5,0 m;
+              eine von 2019 in 147 m mit 21 m Tiefe.</p>
+            <p class="pruefung__quelle">LfULG BK50 · Aufschlussdatenbank, Umkreis 300 m</p>
+          </div>
+
+          <div class="pruefung">
+            <span class="punkt punkt--gut"></span>
+            <div class="pruefung__kopf"><span class="pruefung__name">Hochwasser</span>
+              <span class="pruefung__wert gut">nicht betroffen</span></div>
+            <p class="pruefung__text">Weder Gefährdungsfläche noch Risikogebiet am Flurstück.</p>
+            <p class="pruefung__quelle">LfULG Hochwassergefährdung · Risikogebiete</p>
+          </div>
+
+          <div class="pruefung">
+            <span class="punkt punkt--gut"></span>
+            <div class="pruefung__kopf"><span class="pruefung__name">Radon</span>
+              <span class="pruefung__wert gut">kein Vorsorgegebiet</span></div>
+            <p class="pruefung__text">Leipzig gehört nicht zu den 107 nach § 121 StrlSchG
+              ausgewiesenen Gemeinden. Gegenprobe: Schneeberg und Johanngeorgenstadt tun es.</p>
+            <p class="pruefung__quelle">LfULG Radonvorsorgegebiete</p>
+          </div>
+
+          <div class="pruefung">
+            <span class="punkt punkt--gut"></span>
+            <div class="pruefung__kopf"><span class="pruefung__name">Trinkwasserschutz</span>
+              <span class="pruefung__wert gut">kein Schutzgebiet</span></div>
+            <p class="pruefung__text">Kein Grundwasser-, Fließgewässer-, Talsperren- oder
+              Heilquellenschutzgebiet.</p>
+            <p class="pruefung__quelle">LfULG Wasserschutzgebiete, 4 Layer</p>
+          </div>
+
+          <div class="pruefung">
+            <span class="punkt punkt--gut"></span>
+            <div class="pruefung__kopf"><span class="pruefung__name">Schutzgebiet</span>
+              <span class="pruefung__wert gut">350–400 m entfernt</span></div>
+            <p class="pruefung__text">Landschaftsschutzgebiet „Östliche Rietzschke – Stünz" in
+              350–400 m, ein zweites innerhalb 1 km. Kein Naturschutzgebiet, kein FFH-Gebiet
+              auf dem Flurstück.</p>
+            <p class="pruefung__quelle">LfULG Schutzgebiete · BfN bundesweit</p>
+          </div>
+
+          <div class="pruefung">
+            <span class="punkt punkt--gut"></span>
+            <div class="pruefung__kopf"><span class="pruefung__name">Luftqualität</span>
+              <span class="pruefung__wert gut">NO₂ 13,1 µg/m³</span></div>
+            <p class="pruefung__text">Station Leipzig-Mitte, 4,6 km. PM10 11,8 · PM2,5 6,0 ·
+              O₃ 55,5 µg/m³, Mittel aus 48 Stundenwerten. Drei Stationen liegen näher, liefern
+              aber keine Messwerte.</p>
+            <p class="pruefung__quelle">UBA Luftdaten-API, 25.–26.08.2026</p>
+          </div>
+
+          <div class="pruefung">
+            <span class="punkt punkt--gut"></span>
+            <div class="pruefung__kopf"><span class="pruefung__name">Hangneigung</span>
+              <span class="pruefung__wert gut">unter 20 %</span></div>
+            <p class="pruefung__text">Nicht in der Kulisse der Flächen über 20 % Neigung. Ein
+              genauer Neigungswert braucht das Landes-DGM — das Bundesmodell hat 200 m Rasterweite
+              und sagt über 650 m² nichts.</p>
+            <p class="pruefung__quelle">LfULG Hangneigungskulisse</p>
+          </div>
+
+          <div class="pruefung">
+            <span class="punkt punkt--offen"></span>
+            <div class="pruefung__kopf"><span class="pruefung__name">Starkregen</span>
+              <span class="pruefung__wert offen">—</span></div>
+            <p class="pruefung__text">KOSTRA-DWD-2020 liegt als Raster zum Herunterladen vor,
+              nicht als Abfragedienst. Bis zum Import bleibt das Feld leer.</p>
+            <p class="pruefung__quelle">noch nicht eingebunden</p>
+          </div>
+
+          <div class="pruefung">
+            <span class="punkt punkt--offen"></span>
+            <div class="pruefung__kopf"><span class="pruefung__name">Altlasten</span>
+              <span class="pruefung__wert offen">keine Daten</span></div>
+            <p class="pruefung__text">Für Sachsen ist kein flächendeckender Altlastendienst
+              öffentlich — geprüft über alle 173 Fachdienste des Landes.</p>
+            <p class="pruefung__quelle">Auskunft beim Landkreis einholen</p>
+          </div>
+
+          <div class="pruefung">
+            <span class="punkt punkt--offen"></span>
+            <div class="pruefung__kopf"><span class="pruefung__name">Mobilfunk</span>
+              <span class="pruefung__wert offen">ungeprüft</span></div>
+            <p class="pruefung__text">Die Portale der Bundesnetzagentur waren aus unserer Umgebung
+              nicht erreichbar. Das ist keine Aussage über die Versorgung.</p>
+            <p class="pruefung__quelle">offen</p>
+          </div>
+        </div>
+      </section>
+    </div>
+  </aside>
+
+  <!-- ========== Karte ========== -->
+  <div class="karte">
+    <svg id="plan" role="img" aria-label="Lageplan mit Flurstück 204 und Nachbarflurstücken"></svg>
+    <div class="karte__kopf">
+      <div class="tafel">
+        <label class="schalter">
+          <input type="checkbox" id="laermAn">
+          <span class="gleis"></span>
+          <span>Lärm (Straße, 24 h)</span>
+        </label>
+        <div class="legende" id="legende" data-an="0">
+          <div class="legende__zeile"><span class="legende__feld" style="background:var(--db1)"></span>50–54 dB(A)</div>
+          <div class="legende__zeile"><span class="legende__feld" style="background:var(--db2)"></span>55–59</div>
+          <div class="legende__zeile"><span class="legende__feld" style="background:var(--db3)"></span>60–64</div>
+          <div class="legende__zeile"><span class="legende__feld" style="background:var(--db4)"></span>65–69</div>
+          <div class="legende__zeile"><span class="legende__feld" style="background:var(--db5)"></span>70–74</div>
+        </div>
+      </div>
+      <div class="tafel" style="max-width:15rem">
+        <div style="font-family:var(--mono);font-size:.64rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase">Flurstück</div>
+        <div style="font-family:var(--display);font-weight:600;font-size:1rem">204 · 650 m²</div>
+      </div>
+    </div>
+    <div class="karte__fuss">
+      <div class="massstab">
+        <span id="mzahl">50 m</span>
+        <span class="massstab__balken" id="mbalken" style="width:80px"></span>
+      </div>
+      <div class="quelle">Flurstücke: ALKIS Sachsen (GeoSN) · Isophonen: LfULG Umgebungslärmkartierung ·
+        beides für dieses Fenster abgerufen</div>
+    </div>
+  </div>
+</div>
+
+<div class="fuss">
+  <span><b>Eingetippt wird laufend, gesucht wird selten.</b> Die Suche wartet 120 ms Tastenruhe ab — der Zähler oben zeigt, wie oft sie in dieser Sitzung wirklich lief.</span>
+  <span><b>Lokal:</b> 990.090 amtliche Hauskoordinaten, gemessen 12–75 ms je Suche. Kein fremder Dienst im Anfragepfad.</span>
+</div>
+
+<script id="daten" type="application/json">{"parzellen":[{"nr":"328","nen":"","flaeche":"623","lage":"Paunsdorfer Straße 53","ring":[[-5.74,-74.01],[36.19,-92.82],[41.66,-80.46],[-0.53,-61.54],[-1.36,-63.51],[-5.74,-74.01]]},{"nr":"331","nen":"","flaeche":"612","lage":"Paunsdorfer Straße 61","ring":[[16.76,-25.01],[15.83,-26.88],[10.83,-37.11],[52.56,-55.67],[58.04,-43.39],[16.76,-25.01]]},{"nr":"213","nen":"7","flaeche":"680","lage":"Paunsdorfer Straße 75","ring":[[94.07,114.61],[99.56,112.15],[122.4,101.94],[127.54,113.62],[133.31,126.74],[100.97,130.22],[99.06,125.96],[94.07,114.61]]},{"nr":"192","nen":"","flaeche":"420","lage":"Goetheweg; Goetheweg 12","ring":[[-142.7,-24.25],[-148.73,-36.89],[-125.94,-47.74],[-121.66,-49.76],[-115.68,-37.09],[-142.7,-24.25]]},{"nr":"179","nen":"","flaeche":"550","lage":"Körnerweg 14","ring":[[-118.8,-76.44],[-105.96,-41.72],[-115.68,-37.09],[-121.66,-49.76],[-125.94,-47.74],[-134.28,-70.76],[-118.8,-76.44]]},{"nr":"189","nen":"","flaeche":"673","lage":"Lessingweg 33","ring":[[-69.87,45.23],[-24.81,23.65],[-18.99,35.83],[-63.86,57.32],[-67.71,49.59],[-68.39,48.21],[-69.87,45.23]]},{"nr":"188","nen":"","flaeche":"676","lage":"Lessingweg 31","ring":[[-75.88,33.15],[-30.63,11.47],[-24.81,23.65],[-69.87,45.23],[-74.11,36.7],[-75.88,33.15]]},{"nr":"205","nen":"","flaeche":"649","lage":"Lessingweg 46","ring":[[-15.4,17.9],[27.92,-2.75],[28.89,-0.82],[33.97,9.29],[-9.57,30.08],[-15.4,17.9]]},{"nr":"213","nen":"6","flaeche":"376","lage":"Uhlandweg 2","ring":[[85.58,80.52],[102.94,72.82],[103.62,72.56],[104.09,72.43],[104.55,72.35],[105.0,72.3],[105.43,72.29],[105.84,72.3],[106.22,72.34],[106.59,72.41],[106.93,72.49],[107.25,72.58],[107.55,72.69],[107.84,72.81],[108.14,72.95],[108.45,73.12],[108.76,73.32],[109.07,73.55],[109.39,73.81],[109.69,74.11],[109.99,74.45],[110.28,74.82],[110.54,75.24],[110.78,75.69],[114.68,84.5],[91.76,94.47],[85.58,80.52]]},{"nr":"187","nen":"","flaeche":"679","lage":"Lessingweg 29","ring":[[-81.88,21.05],[-36.45,-0.71],[-30.63,11.47],[-75.88,33.15],[-80.6,23.61],[-81.88,21.05]]},{"nr":"332","nen":"","flaeche":"604","lage":"Paunsdorfer Straße 63","ring":[[22.85,-12.99],[21.92,-14.8],[16.76,-25.01],[58.04,-43.39],[63.52,-31.11],[22.85,-12.99]]},{"nr":"204","nen":"","flaeche":"650","lage":"Lessingweg 44","ring":[[21.92,-14.8],[22.85,-12.99],[27.92,-2.75],[-15.4,17.9],[-21.22,5.72],[21.92,-14.8]]},{"nr":"212","nen":"2","flaeche":"474","lage":"Goetheweg 19","ring":[[-105.9,51.29],[-89.45,42.88],[-83.01,41.23],[-74.11,36.7],[-69.87,45.23],[-68.39,48.21],[-80.81,54.75],[-83.09,55.16],[-99.43,63.79],[-99.87,62.94],[-105.9,51.29]]},{"nr":"212","nen":"6","flaeche":"465","lage":"Goetheweg 21","ring":[[-92.7,76.37],[-62.39,60.17],[-56.28,72.07],[-86.06,88.5],[-92.7,76.37]]},{"nr":"212","nen":"4","flaeche":"11","lage":"Goetheweg 19","ring":[[-99.43,63.79],[-83.09,55.16],[-80.81,54.75],[-99.23,64.17],[-99.43,63.79]]},{"nr":"212","nen":"3","flaeche":"17","lage":"Goetheweg 20","ring":[[-80.81,54.75],[-68.39,48.21],[-67.71,49.59],[-76.69,54.02],[-80.81,54.75]]},{"nr":"212","nen":"5","flaeche":"452","lage":"Goetheweg 20","ring":[[-99.23,64.17],[-80.81,54.75],[-76.69,54.02],[-67.71,49.59],[-63.86,57.32],[-62.39,60.17],[-92.7,76.37],[-94.38,73.3],[-97.13,68.15],[-99.23,64.17]]},{"nr":"85","nen":"b","flaeche":"18210","lage":"Stünz-Mölkauer Weg; Stünz-Mölkauer Weg 13","ring":[[-416.06,83.46],[-410.9,64.85],[-397.33,36.8],[-310.82,34.62],[-216.89,32.17],[-121.38,29.71],[-105.24,62.7],[-88.27,87.77],[-87.75,88.84],[-153.55,90.47],[-218.54,92.1],[-283.53,93.82],[-348.53,95.49],[-413.38,97.29],[-416.06,83.46]]},{"nr":"85","nen":"","flaeche":"50990","lage":"Stünz-Mölkauer Weg 13","ring":[[-413.38,97.29],[-348.53,95.49],[-283.53,93.82],[-218.54,92.1],[-153.55,90.47],[-87.75,88.84],[-75.9,113.46],[-58.82,147.5],[-57.3,150.58],[-54.45,156.35],[-44.83,175.51],[-16.76,210.28],[3.47,232.64],[-386.32,241.89],[-404.23,146.29],[-413.38,97.29]]},{"nr":"335","nen":"","flaeche":"580","lage":"Paunsdorfer Straße 67","ring":[[34.92,11.24],[74.45,-6.28],[79.92,6.08],[40.83,23.4],[39.85,21.35],[34.92,11.24]]},{"nr":"209","nen":"","flaeche":"950","lage":"Uhlandweg 7","ring":[[8.12,67.14],[34.96,54.3],[40.67,67.02],[48.26,83.89],[37.17,89.29],[26.33,94.84],[25.83,95.04],[25.51,95.13],[25.21,95.2],[24.92,95.24],[24.64,95.26],[24.07,95.26],[23.76,95.22],[23.43,95.16],[23.09,95.07],[22.75,94.96],[22.43,94.82],[22.14,94.66],[21.87,94.49],[21.64,94.32],[21.42,94.15],[21.22,93.96],[21.02,93.74],[20.82,93.5],[20.62,93.23],[20.44,92.93],[14.15,79.78],[8.12,67.14]]},{"nr":"338","nen":"","flaeche":"330","lage":"Paunsdorfer Straße 73","ring":[[68.44,40.69],[90.85,30.78],[96.32,43.13],[74.82,52.62],[73.92,53.04],[68.44,40.69]]},{"nr":"182","nen":"","flaeche":"460","lage":"Lessingweg 21","ring":[[-98.96,-56.73],[-94.44,-58.87],[-69.82,-70.63],[-63.79,-58.0],[-94.06,-43.58],[-98.96,-56.73]]},{"nr":"210","nen":"","flaeche":"600","lage":"Uhlandweg 5","ring":[[34.96,54.3],[50.82,47.86],[59.56,62.62],[65.69,76.24],[48.26,83.89],[40.67,67.02],[34.96,54.3]]},{"nr":"202","nen":"","flaeche":"640","lage":"Lessingweg; Lessingweg 40","ring":[[-32.83,-18.61],[9.88,-38.97],[10.83,-37.11],[15.83,-26.88],[-27.01,-6.43],[-32.83,-18.61]]},{"nr":"214","nen":"","flaeche":"840","lage":"Uhlandweg 10","ring":[[-36.8,145.11],[11.89,116.76],[12.15,116.62],[12.53,116.44],[12.89,116.3],[13.24,116.19],[13.59,116.11],[13.91,116.04],[14.23,116.0],[14.55,115.98],[14.88,115.97],[15.23,115.98],[15.6,116.01],[15.99,116.07],[16.39,116.16],[16.68,116.25],[16.96,116.34],[17.34,116.5],[17.69,116.67],[18.01,116.86],[18.31,117.05],[18.58,117.25],[18.82,117.45],[19.06,117.67],[19.29,117.91],[19.52,118.17],[19.75,118.47],[19.96,118.79],[20.17,119.15],[20.3,119.42],[28.98,138.01],[-36.8,145.11]]},{"nr":"213","nen":"b","flaeche":"910","lage":"Uhlandweg 4","ring":[[47.26,97.82],[53.11,95.01],[66.37,89.1],[74.02,106.44],[85.27,131.93],[63.37,134.3],[53.6,112.18],[47.26,97.82]]},{"nr":"87","nen":"d","flaeche":"810","lage":"Paunsdorfer Straße; Paunsdorfer Straße 52","ring":[[100.29,4.26],[141.35,-14.16],[148.69,2.27],[107.64,20.69],[100.29,4.26]]},{"nr":"336","nen":"","flaeche":"570","lage":"Paunsdorfer Straße 69","ring":[[40.83,23.4],[79.92,6.08],[85.39,18.43],[46.67,35.58],[45.71,33.6],[40.83,23.4]]},{"nr":"155","nen":"","flaeche":"850","lage":"Lessingweg; Lessingweg 19","ring":[[-141.49,-129.06],[-100.07,-147.38],[-90.75,-126.34],[-111.8,-117.04],[-122.66,-123.73],[-136.37,-117.65],[-141.49,-129.06]]},{"nr":"212","nen":"h","flaeche":"690","lage":"Uhlandweg; Uhlandweg 9","ring":[[-42.45,99.13],[-25.48,91.12],[-10.93,116.17],[-31.63,128.22],[-41.51,111.23],[-42.45,99.13]]},{"nr":"206","nen":"","flaeche":"650","lage":"Lessingweg 48","ring":[[-9.57,30.08],[33.97,9.29],[34.92,11.24],[39.85,21.35],[-3.75,42.26],[-9.57,30.08]]},{"nr":"208","nen":"","flaeche":"420","lage":"Lessingweg 50a","ring":[[2.08,54.5],[29.23,41.5],[34.96,54.3],[8.12,67.14],[2.08,54.5]]},{"nr":"207","nen":"","flaeche":"650","lage":"Lessingweg 50","ring":[[-3.75,42.26],[39.85,21.35],[40.83,23.4],[45.71,33.6],[29.23,41.5],[2.08,54.5],[-3.75,42.26]]},{"nr":"213","nen":"d","flaeche":"450","lage":"Uhlandweg 6","ring":[[33.43,121.56],[53.6,112.18],[63.37,134.3],[40.56,136.8],[33.43,121.56]]},{"nr":"329","nen":"","flaeche":"630","lage":"Paunsdorfer Straße 55","ring":[[-0.53,-61.54],[41.66,-80.46],[47.12,-68.03],[4.79,-49.16],[3.85,-51.04],[-0.53,-61.54]]},{"nr":"84","nen":"y","flaeche":"730","lage":"Körnerweg 7, 7a","ring":[[-136.37,-117.65],[-122.66,-123.73],[-111.8,-117.04],[-102.23,-92.29],[-121.91,-84.92],[-128.85,-103.7],[-136.37,-117.65]]},{"nr":"212","nen":"f","flaeche":"430","lage":"Goetheweg; Goetheweg 24","ring":[[-72.34,112.94],[-43.76,96.56],[-42.45,99.13],[-41.51,111.23],[-65.31,125.06],[-72.34,112.94]]},{"nr":"333","nen":"","flaeche":"600","lage":"Paunsdorfer Straße 65","ring":[[22.85,-12.99],[63.52,-31.11],[68.99,-18.63],[28.89,-0.82],[27.92,-2.75],[22.85,-12.99]]},{"nr":"181","nen":"","flaeche":"630","lage":"Körnerweg; Körnerweg 10","ring":[[-103.4,-82.21],[-83.96,-89.75],[-83.42,-89.93],[-83.09,-90.01],[-82.77,-90.06],[-82.47,-90.09],[-81.89,-90.1],[-81.59,-90.07],[-81.28,-90.02],[-80.94,-89.95],[-80.6,-89.85],[-80.21,-89.69],[-79.88,-89.54],[-79.59,-89.36],[-79.32,-89.19],[-79.08,-89.0],[-78.87,-88.81],[-78.66,-88.61],[-78.46,-88.39],[-78.26,-88.13],[-78.07,-87.85],[-77.89,-87.54],[-69.82,-70.63],[-94.44,-58.87],[-103.4,-82.21]]},{"nr":"190","nen":"","flaeche":"1060","lage":"Lessingweg 35","ring":[[-63.86,57.32],[-18.99,35.83],[-10.36,53.89],[-32.49,64.47],[-31.27,67.13],[-53.41,77.7],[-56.28,72.07],[-62.39,60.17],[-63.86,57.32]]},{"nr":"208","nen":"a","flaeche":"270","lage":"Uhlandweg 5","ring":[[29.23,41.5],[45.71,33.6],[46.67,35.58],[52.3,47.25],[50.82,47.86],[34.96,54.3],[29.23,41.5]]},{"nr":"212","nen":"k","flaeche":"660","lage":"Lessingweg; Lessingweg 37","ring":[[-48.58,87.12],[-4.55,66.12],[1.28,78.28],[-25.48,91.12],[-42.45,99.13],[-43.76,96.56],[-48.58,87.12]]},{"nr":"213","nen":"c","flaeche":"340","lage":"Uhlandweg 6","ring":[[28.72,108.5],[28.8,108.27],[28.95,107.95],[29.11,107.66],[29.27,107.4],[29.45,107.16],[29.63,106.95],[29.82,106.75],[30.03,106.55],[30.28,106.36],[30.55,106.17],[30.85,105.99],[31.07,105.88],[42.5,100.1],[47.26,97.82],[53.6,112.18],[33.43,121.56],[28.98,112.03],[28.87,111.8],[28.74,111.47],[28.64,111.16],[28.57,110.86],[28.52,110.57],[28.49,110.29],[28.48,109.72],[28.51,109.41],[28.56,109.09],[28.64,108.75],[28.72,108.5]]},{"nr":"213","nen":"2","flaeche":"490","lage":"Uhlandweg 2a","ring":[[74.02,106.44],[93.25,97.85],[94.49,100.64],[91.42,108.58],[94.07,114.61],[99.06,125.96],[100.97,130.22],[85.27,131.93],[74.02,106.44]]},{"nr":"212","nen":"e","flaeche":"460","lage":"Goetheweg; Goetheweg 23","ring":[[-79.22,100.69],[-50.01,84.34],[-48.58,87.12],[-43.76,96.56],[-72.34,112.94],[-75.08,108.21],[-79.22,100.69]]},{"nr":"213","nen":"1","flaeche":"400","lage":"Uhlandweg 2","ring":[[66.37,89.1],[85.58,80.52],[91.76,94.47],[93.25,97.85],[74.02,106.44],[66.37,89.1]]},{"nr":"334","nen":"","flaeche":"590","lage":"Paunsdorfer Straße 65","ring":[[28.89,-0.82],[68.99,-18.63],[74.45,-6.28],[34.92,11.24],[33.97,9.29],[28.89,-0.82]]},{"nr":"191","nen":"","flaeche":"590","lage":"Lessingweg 37","ring":[[-53.41,77.7],[-31.27,67.13],[-32.49,64.47],[-10.36,53.89],[-4.55,66.12],[-48.58,87.12],[-50.01,84.34],[-53.41,77.7]]},{"nr":"185","nen":"2","flaeche":"396","lage":"Lessingweg 27","ring":[[-68.38,-23.43],[-51.2,-31.64],[-42.24,-12.87],[-59.3,-4.72],[-68.38,-23.43]]},{"nr":"203","nen":"","flaeche":"640","lage":"Lessingweg; Lessingweg 42","ring":[[-27.01,-6.43],[15.83,-26.88],[16.76,-25.01],[21.92,-14.8],[-21.22,5.72],[-27.01,-6.43]]},{"nr":"211","nen":"","flaeche":"570","lage":"Uhlandweg; Uhlandweg 3","ring":[[50.82,47.86],[52.3,47.25],[68.44,40.69],[73.92,53.04],[74.82,52.62],[82.12,68.93],[65.69,76.24],[59.56,62.62],[50.82,47.86]]},{"nr":"216","nen":"6","flaeche":"3554","lage":"Lessingweg","ring":[[-221.52,-297.68],[-214.3,-310.12],[-214.04,-309.78],[-213.81,-309.53],[-213.59,-309.3],[-213.35,-309.09],[-213.09,-308.88],[-212.8,-308.67],[-199.7,-300.27],[-181.2,-288.36],[-172.05,-282.47],[-162.69,-276.44],[-149.55,-268.1],[-149.21,-267.9],[-148.88,-267.73],[-148.56,-267.59],[-148.25,-267.47],[-147.94,-267.38],[-147.64,-267.3],[-147.31,-267.24],[-146.96,-267.19],[-146.59,-267.16],[-146.2,-267.15],[-145.8,-267.17],[-145.43,-267.22],[-145.08,-267.28],[-144.76,-267.36],[-144.45,-267.45],[-144.15,-267.55],[-143.85,-267.68],[-143.53,-267.84],[-143.21,-268.02],[-142.88,-268.23],[-122.81,-282.25],[-105.59,-294.28],[-94.56,-301.99],[-88.2,-293.01],[-109.53,-278.15],[-126.8,-266.02],[-127.04,-265.84],[-127.29,-265.62],[-127.51,-265.4],[-127.7,-265.18],[-127.86,-264.95],[-128.02,-264.72],[-128.16,-264.47],[-128.3,-264.19],[-128.42,-263.88],[-128.52,-263.59],[-128.59,-263.3],[-128.65,-262.98],[-128.68,-262.67],[-128.69,-262.37],[-128.66,-261.82],[-128.61,-261.53],[-128.54,-261.23],[-128.45,-260.91],[-128.34,-260.63],[-122.06,-246.34],[-126.18,-244.52],[-126.67,-244.27],[-126.95,-244.09],[-127.2,-243.9],[-127.42,-243.71],[-127.62,-243.52],[-127.8,-243.32],[-127.98,-243.09],[-128.16,-242.83],[-128.32,-242.55],[-128.48,-242.23],[-128.64,-241.7],[-128.7,-241.33],[-128.74,-240.97],[-128.75,-240.63],[-128.75,-240.31],[-128.73,-239.98],[-128.7,-239.65],[-128.64,-239.29],[-128.56,-238.93],[-128.46,-238.59],[-124.61,-229.89],[-118.97,-217.14],[-113.3,-204.32],[-107.62,-191.51],[-101.96,-178.7],[-96.28,-165.88],[-90.62,-153.07],[-84.95,-140.27],[-79.29,-127.46],[-73.07,-113.41],[-72.83,-112.91],[-72.66,-112.63],[-72.48,-112.38],[-72.3,-112.15],[-72.11,-111.95],[-71.92,-111.76],[-71.69,-111.58],[-71.44,-111.4],[-71.17,-111.23],[-70.86,-111.07],[-81.52,-105.46],[-90.75,-126.34],[-100.07,-147.38],[-105.76,-160.22],[-115.13,-181.23],[-124.83,-203.17],[-132.46,-220.73],[-140.2,-237.99],[-146.25,-251.75],[-156.34,-258.24],[-172.36,-268.52],[-188.36,-278.79],[-204.36,-289.07],[-216.64,-296.96],[-216.88,-297.1],[-217.19,-297.27],[-217.49,-297.41],[-217.79,-297.53],[-218.09,-297.63],[-218.41,-297.73],[-218.75,-297.8],[-219.03,-297.85],[-219.63,-297.9],[-219.96,-297.91],[-220.28,-297.9],[-220.6,-297.87],[-220.93,-297.82],[-221.28,-297.75],[-221.52,-297.68]]},{"nr":"88","nen":"a","flaeche":"6000","lage":"Paunsdorfer Straße","ring":[[107.64,20.69],[148.69,2.27],[189.73,-16.2],[216.77,44.74],[134.82,81.61],[125.07,59.38],[107.64,20.69]]},{"nr":"212","nen":"d","flaeche":"470","lage":"Goetheweg 22","ring":[[-86.06,88.5],[-56.28,72.07],[-53.41,77.7],[-50.01,84.34],[-79.22,100.69],[-84.76,90.87],[-86.06,88.5]]},{"nr":"213","nen":"5","flaeche":"166","lage":"ohne Lage","ring":[[91.76,94.47],[114.68,84.5],[117.34,90.51],[94.49,100.64],[93.25,97.85],[91.76,94.47]]},{"nr":"213","nen":"4","flaeche":"57","lage":"ohne Lage","ring":[[91.42,108.58],[94.49,100.64],[99.56,112.15],[94.07,114.61],[91.42,108.58]]},{"nr":"213","nen":"3","flaeche":"314","lage":"ohne Lage","ring":[[94.49,100.64],[117.34,90.51],[122.4,101.94],[99.56,112.15],[94.49,100.64]]},{"nr":"216","nen":"5","flaeche":"3394","lage":"Goetheweg; Lessingweg; Stünzer Weg","ring":[[-259.33,-252.85],[-253.43,-264.98],[-251.47,-269.02],[-243.6,-285.21],[-232.83,-307.35],[-227.77,-317.75],[-223.71,-323.58],[-219.39,-328.05],[-213.93,-332.41],[-206.77,-334.45],[-206.11,-334.51],[-214.87,-316.2],[-215.03,-315.82],[-215.14,-315.51],[-215.23,-315.2],[-215.31,-314.89],[-215.37,-314.57],[-215.41,-314.22],[-215.44,-313.72],[-215.44,-313.38],[-215.41,-313.06],[-215.38,-312.75],[-215.32,-312.42],[-215.23,-312.08],[-215.09,-311.62],[-214.97,-311.3],[-214.84,-311.01],[-214.69,-310.73],[-214.52,-310.44],[-214.32,-310.15],[-221.52,-297.68],[-221.79,-297.6],[-222.12,-297.48],[-222.43,-297.34],[-222.71,-297.2],[-222.99,-297.04],[-223.27,-296.86],[-223.56,-296.65],[-223.78,-296.48],[-223.96,-296.31],[-224.21,-296.07],[-224.44,-295.82],[-224.64,-295.57],[-224.82,-295.31],[-225.01,-295.03],[-225.18,-294.72],[-225.29,-294.5],[-232.33,-279.82],[-240.12,-263.59],[-245.36,-252.66],[-245.49,-252.36],[-245.63,-252.03],[-245.73,-251.71],[-245.81,-251.41],[-245.88,-251.1],[-245.94,-250.77],[-245.97,-250.41],[-245.99,-250.09],[-245.98,-249.74],[-245.96,-249.39],[-245.92,-249.06],[-245.86,-248.74],[-245.79,-248.43],[-245.69,-248.11],[-245.57,-247.78],[-245.43,-247.46],[-239.42,-234.35],[-231.96,-217.99],[-228.44,-210.26],[-224.63,-201.58],[-217.02,-185.25],[-209.51,-168.88],[-199.98,-147.96],[-194.17,-135.21],[-184.63,-114.28],[-174.69,-92.46],[-166.03,-73.49],[-165.85,-73.18],[-165.66,-72.89],[-165.46,-72.62],[-165.25,-72.39],[-165.05,-72.18],[-164.83,-71.98],[-164.59,-71.78],[-164.32,-71.59],[-164.02,-71.41],[-163.7,-71.24],[-156.52,-56.66],[-156.68,-56.2],[-156.76,-55.88],[-156.81,-55.58],[-156.85,-55.28],[-156.85,-54.73],[-156.83,-54.44],[-156.79,-54.13],[-156.71,-53.81],[-156.61,-53.47],[-148.73,-36.89],[-142.7,-24.25],[-136.68,-11.62],[-130.66,1.02],[-126.72,9.28],[-124.64,13.65],[-118.53,26.2],[-112.27,38.72],[-109.05,45.21],[-105.9,51.29],[-99.87,62.94],[-99.43,63.79],[-99.23,64.17],[-97.13,68.15],[-94.38,73.3],[-92.7,76.37],[-86.06,88.5],[-84.76,90.87],[-79.22,100.69],[-75.08,108.21],[-72.34,112.94],[-65.31,125.06],[-65.06,125.5],[-57.62,138.15],[-58.82,147.5],[-75.9,113.46],[-87.75,88.84],[-88.27,87.77],[-105.24,62.7],[-121.38,29.71],[-126.22,19.26],[-159.09,-48.71],[-163.13,-57.22],[-198.1,-130.52],[-200.08,-135.55],[-223.03,-182.56],[-259.33,-252.85]]},{"nr":"200","nen":"","flaeche":"640","lage":"ohne Lage","ring":[[-44.47,-42.99],[-1.36,-63.51],[-0.53,-61.54],[3.85,-51.04],[-38.65,-30.8],[-44.47,-42.99]]}],"laerm":[{"cat":"Lden5054","ring":[[81.1,109.5],[71.1,109.5],[71.1,119.5],[81.1,119.5],[81.1,109.5]]},{"cat":"Lden5054","ring":[[61.1,119.5],[51.1,119.5],[51.1,129.5],[61.1,129.5],[61.1,119.5]]},{"cat":"Lden7074","ring":[[196.1,199.5],[191.1,199.5],[191.1,179.5],[181.1,179.5],[181.1,169.5],[171.1,169.5],[171.1,149.5],[161.1,149.5],[161.1,109.5],[151.1,109.5],[151.1,89.5],[141.1,89.5],[141.1,69.5],[131.1,69.5],[131.1,39.5],[121.1,39.5],[121.1,19.5],[111.1,19.5],[111.1,-0.5],[101.1,-0.5],[101.1,-20.5],[91.1,-20.5],[91.1,-50.5],[81.1,-50.5],[81.1,-70.5],[71.1,-70.5],[71.1,-90.5],[61.1,-90.5],[61.1,-120.5],[51.1,-120.5],[51.1,-140.5],[41.1,-140.5],[41.1,-160.5],[31.1,-160.5],[31.1,-180.5],[21.1,-180.5],[21.1,-210.5],[11.1,-210.5],[11.1,-230.5],[1.1,-230.5],[1.1,-250.5],[-8.9,-250.5],[-8.9,-280.5],[-18.9,-280.5],[-18.9,-290.5],[-28.9,-290.5],[-28.9,-310.5],[-38.9,-310.5],[-38.9,-340.5],[-48.9,-340.5],[-48.9,-350.5],[-58.9,-350.5],[-58.9,-355.5],[-78.9,-355.5],[-78.9,-340.5],[-68.9,-340.5],[-68.9,-320.5],[-58.9,-320.5],[-58.9,-290.5],[-48.9,-290.5],[-48.9,-270.5],[-38.9,-270.5],[-38.9,-250.5],[-28.9,-250.5],[-28.9,-230.5],[-18.9,-230.5],[-18.9,-200.5],[-8.9,-200.5],[-8.9,-180.5],[1.1,-180.5],[1.1,-160.5],[11.1,-160.5],[11.1,-140.5],[21.1,-140.5],[21.1,-120.5],[31.1,-120.5],[31.1,-100.5],[41.1,-100.5],[41.1,-70.5],[51.1,-70.5],[51.1,-50.5],[61.1,-50.5],[61.1,-40.5],[71.1,-40.5],[71.1,-10.5],[81.1,-10.5],[81.1,19.5],[91.1,19.5],[91.1,39.5],[101.1,39.5],[101.1,59.5],[111.1,59.5],[111.1,79.5],[121.1,79.5],[121.1,109.5],[131.1,109.5],[131.1,129.5],[141.1,129.5],[141.1,149.5],[151.1,149.5],[151.1,169.5],[161.1,169.5],[161.1,199.5],[171.1,199.5],[171.1,219.5],[181.1,219.5],[181.1,239.5],[191.1,239.5],[191.1,259.5],[196.1,259.5],[196.1,199.5]]},{"cat":"Lden6569","ring":[[111.1,-50.5],[101.1,-50.5],[101.1,-70.5],[91.1,-70.5],[91.1,-100.5],[81.1,-100.5],[81.1,-120.5],[71.1,-120.5],[71.1,-140.5],[61.1,-140.5],[61.1,-160.5],[51.1,-160.5],[51.1,-180.5],[31.1,-180.5],[31.1,-160.5],[41.1,-160.5],[41.1,-140.5],[51.1,-140.5],[51.1,-120.5],[61.1,-120.5],[61.1,-90.5],[71.1,-90.5],[71.1,-70.5],[81.1,-70.5],[81.1,-50.5],[91.1,-50.5],[91.1,-20.5],[101.1,-20.5],[101.1,-0.5],[111.1,-0.5],[111.1,19.5],[121.1,19.5],[121.1,39.5],[131.1,39.5],[131.1,69.5],[141.1,69.5],[141.1,89.5],[151.1,89.5],[151.1,109.5],[161.1,109.5],[161.1,149.5],[171.1,149.5],[171.1,139.5],[181.1,139.5],[181.1,109.5],[171.1,109.5],[171.1,89.5],[161.1,89.5],[161.1,69.5],[151.1,69.5],[151.1,39.5],[141.1,39.5],[141.1,29.5],[131.1,29.5],[131.1,9.5],[121.1,9.5],[121.1,-10.5],[111.1,-10.5],[111.1,-50.5]]},{"cat":"Lden6064","ring":[[41.1,-70.5],[41.1,-80.5],[31.1,-80.5],[31.1,-60.5],[21.1,-60.5],[21.1,-50.5],[41.1,-50.5],[41.1,-70.5]]},{"cat":"Lden5559","ring":[[31.1,-80.5],[21.1,-80.5],[21.1,-70.5],[31.1,-70.5],[31.1,-80.5]]},{"cat":"Lden5054","ring":[[41.1,9.5],[31.1,9.5],[31.1,19.5],[41.1,19.5],[41.1,9.5]]},{"cat":"Lden5054","ring":[[21.1,9.5],[11.1,9.5],[11.1,19.5],[21.1,19.5],[21.1,9.5]]},{"cat":"Lden6569","ring":[[41.1,-70.5],[41.1,-50.5],[51.1,-50.5],[51.1,-70.5],[41.1,-70.5]]},{"cat":"Lden6064","ring":[[101.1,-60.5],[101.1,-50.5],[111.1,-50.5],[111.1,-60.5],[101.1,-60.5]]},{"cat":"Lden6064","ring":[[51.1,-50.5],[41.1,-50.5],[41.1,-30.5],[51.1,-30.5],[51.1,-50.5]]},{"cat":"Lden6569","ring":[[51.1,-50.5],[51.1,-30.5],[61.1,-30.5],[61.1,9.5],[81.1,9.5],[81.1,-10.5],[71.1,-10.5],[71.1,-40.5],[61.1,-40.5],[61.1,-50.5],[51.1,-50.5]]},{"cat":"Lden6064","ring":[[196.1,119.5],[191.1,119.5],[191.1,99.5],[196.1,99.5],[196.1,59.5],[191.1,59.5],[191.1,39.5],[181.1,39.5],[181.1,19.5],[171.1,19.5],[171.1,9.5],[161.1,9.5],[161.1,-30.5],[151.1,-30.5],[151.1,-40.5],[141.1,-40.5],[141.1,-50.5],[111.1,-50.5],[111.1,-10.5],[121.1,-10.5],[121.1,9.5],[131.1,9.5],[131.1,29.5],[141.1,29.5],[141.1,39.5],[151.1,39.5],[151.1,69.5],[161.1,69.5],[161.1,89.5],[171.1,89.5],[171.1,109.5],[181.1,109.5],[181.1,139.5],[171.1,139.5],[171.1,149.5],[181.1,149.5],[181.1,159.5],[191.1,159.5],[191.1,169.5],[196.1,169.5],[196.1,119.5]]},{"cat":"Lden5054","ring":[[51.1,-10.5],[41.1,-10.5],[41.1,-0.5],[51.1,-0.5],[51.1,-10.5]]},{"cat":"Lden5559","ring":[[81.1,109.5],[81.1,119.5],[91.1,119.5],[91.1,109.5],[81.1,109.5]]},{"cat":"Lden5559","ring":[[196.1,-100.5],[191.1,-100.5],[191.1,-150.5],[181.1,-150.5],[181.1,-160.5],[171.1,-160.5],[171.1,-170.5],[181.1,-170.5],[181.1,-190.5],[171.1,-190.5],[171.1,-200.5],[161.1,-200.5],[161.1,-190.5],[151.1,-190.5],[151.1,-220.5],[161.1,-220.5],[161.1,-240.5],[171.1,-240.5],[171.1,-250.5],[181.1,-250.5],[181.1,-260.5],[171.1,-260.5],[171.1,-310.5],[151.1,-310.5],[151.1,-320.5],[171.1,-320.5],[171.1,-350.5],[181.1,-350.5],[181.1,-355.5],[41.1,-355.5],[41.1,-350.5],[61.1,-350.5],[61.1,-330.5],[41.1,-330.5],[41.1,-340.5],[31.1,-340.5],[31.1,-355.5],[-18.9,-355.5],[-18.9,-350.5],[-8.9,-350.5],[-8.9,-340.5],[1.1,-340.5],[1.1,-330.5],[-8.9,-330.5],[-8.9,-320.5],[1.1,-320.5],[1.1,-310.5],[21.1,-310.5],[21.1,-300.5],[31.1,-300.5],[31.1,-280.5],[41.1,-280.5],[41.1,-270.5],[51.1,-270.5],[51.1,-240.5],[61.1,-240.5],[61.1,-220.5],[81.1,-220.5],[81.1,-210.5],[61.1,-210.5],[61.1,-200.5],[71.1,-200.5],[71.1,-190.5],[91.1,-190.5],[91.1,-170.5],[101.1,-170.5],[101.1,-150.5],[111.1,-150.5],[111.1,-120.5],[121.1,-120.5],[121.1,-90.5],[101.1,-90.5],[101.1,-80.5],[111.1,-80.5],[111.1,-70.5],[101.1,-70.5],[101.1,-60.5],[111.1,-60.5],[111.1,-50.5],[141.1,-50.5],[141.1,-40.5],[151.1,-40.5],[151.1,-30.5],[161.1,-30.5],[161.1,9.5],[171.1,9.5],[171.1,19.5],[181.1,19.5],[181.1,39.5],[191.1,39.5],[191.1,59.5],[196.1,59.5],[196.1,-100.5]]},{"cat":"Lden6064","ring":[[61.1,-210.5],[61.1,-240.5],[51.1,-240.5],[51.1,-270.5],[41.1,-270.5],[41.1,-280.5],[31.1,-280.5],[31.1,-300.5],[21.1,-300.5],[21.1,-310.5],[1.1,-310.5],[1.1,-320.5],[-8.9,-320.5],[-8.9,-290.5],[1.1,-290.5],[1.1,-280.5],[11.1,-280.5],[11.1,-260.5],[21.1,-260.5],[21.1,-240.5],[31.1,-240.5],[31.1,-220.5],[41.1,-220.5],[41.1,-190.5],[31.1,-190.5],[31.1,-180.5],[51.1,-180.5],[51.1,-160.5],[61.1,-160.5],[61.1,-140.5],[71.1,-140.5],[71.1,-120.5],[81.1,-120.5],[81.1,-100.5],[91.1,-100.5],[91.1,-70.5],[111.1,-70.5],[111.1,-80.5],[101.1,-80.5],[101.1,-90.5],[121.1,-90.5],[121.1,-120.5],[111.1,-120.5],[111.1,-150.5],[101.1,-150.5],[101.1,-170.5],[91.1,-170.5],[91.1,-190.5],[71.1,-190.5],[71.1,-200.5],[61.1,-200.5],[61.1,-210.5]]},{"cat":"Lden6064","ring":[[1.1,-160.5],[-8.9,-160.5],[-8.9,-120.5],[11.1,-120.5],[11.1,-130.5],[1.1,-130.5],[1.1,-160.5]]},{"cat":"Lden6569","ring":[[1.1,-160.5],[1.1,-130.5],[11.1,-130.5],[11.1,-120.5],[21.1,-120.5],[21.1,-140.5],[11.1,-140.5],[11.1,-160.5],[1.1,-160.5]]},{"cat":"Lden6064","ring":[[21.1,-120.5],[11.1,-120.5],[11.1,-110.5],[21.1,-110.5],[21.1,-120.5]]},{"cat":"Lden6064","ring":[[21.1,-90.5],[11.1,-90.5],[11.1,-80.5],[21.1,-80.5],[21.1,-90.5]]},{"cat":"Lden5054","ring":[[21.1,-80.5],[11.1,-80.5],[11.1,-70.5],[21.1,-70.5],[21.1,-80.5]]},{"cat":"Lden6569","ring":[[21.1,-120.5],[21.1,-80.5],[41.1,-80.5],[41.1,-100.5],[31.1,-100.5],[31.1,-120.5],[21.1,-120.5]]},{"cat":"Lden5559","ring":[[-8.9,-120.5],[-8.9,-150.5],[-28.9,-150.5],[-28.9,-140.5],[-38.9,-140.5],[-38.9,-120.5],[-48.9,-120.5],[-48.9,-110.5],[-28.9,-110.5],[-28.9,-100.5],[-8.9,-100.5],[-8.9,-120.5]]},{"cat":"Lden5559","ring":[[-28.9,-80.5],[-38.9,-80.5],[-38.9,-70.5],[-28.9,-70.5],[-28.9,-80.5]]},{"cat":"Lden6569","ring":[[196.1,259.5],[191.1,259.5],[191.1,239.5],[181.1,239.5],[181.1,219.5],[171.1,219.5],[171.1,199.5],[161.1,199.5],[161.1,169.5],[151.1,169.5],[151.1,149.5],[141.1,149.5],[141.1,129.5],[131.1,129.5],[131.1,109.5],[121.1,109.5],[121.1,79.5],[111.1,79.5],[111.1,59.5],[101.1,59.5],[101.1,39.5],[91.1,39.5],[91.1,19.5],[71.1,19.5],[71.1,39.5],[81.1,39.5],[81.1,59.5],[91.1,59.5],[91.1,79.5],[101.1,79.5],[101.1,99.5],[111.1,99.5],[111.1,129.5],[121.1,129.5],[121.1,149.5],[131.1,149.5],[131.1,179.5],[141.1,179.5],[141.1,199.5],[151.1,199.5],[151.1,219.5],[161.1,219.5],[161.1,239.5],[171.1,239.5],[171.1,259.5],[181.1,259.5],[181.1,289.5],[191.1,289.5],[191.1,309.5],[196.1,309.5],[196.1,259.5]]},{"cat":"Lden5559","ring":[[196.1,609.5],[196.1,599.5],[191.1,599.5],[191.1,589.5],[196.1,589.5],[196.1,559.5],[191.1,559.5],[191.1,549.5],[181.1,549.5],[181.1,479.5],[196.1,479.5],[196.1,459.5],[191.1,459.5],[191.1,429.5],[181.1,429.5],[181.1,419.5],[196.1,419.5],[196.1,399.5],[191.1,399.5],[191.1,369.5],[181.1,369.5],[181.1,359.5],[191.1,359.5],[191.1,349.5],[171.1,349.5],[171.1,339.5],[161.1,339.5],[161.1,299.5],[151.1,299.5],[151.1,279.5],[141.1,279.5],[141.1,259.5],[131.1,259.5],[131.1,249.5],[121.1,249.5],[121.1,229.5],[111.1,229.5],[111.1,209.5],[101.1,209.5],[101.1,189.5],[91.1,189.5],[91.1,149.5],[81.1,149.5],[81.1,119.5],[71.1,119.5],[71.1,109.5],[81.1,109.5],[81.1,99.5],[71.1,99.5],[71.1,49.5],[51.1,49.5],[51.1,39.5],[41.1,39.5],[41.1,19.5],[31.1,19.5],[31.1,9.5],[51.1,9.5],[51.1,-0.5],[41.1,-0.5],[41.1,-10.5],[51.1,-10.5],[51.1,-20.5],[61.1,-20.5],[61.1,-30.5],[41.1,-30.5],[41.1,-50.5],[21.1,-50.5],[21.1,-70.5],[11.1,-70.5],[11.1,-90.5],[21.1,-90.5],[21.1,-110.5],[11.1,-110.5],[11.1,-120.5],[1.1,-120.5],[1.1,-90.5],[-8.9,-90.5],[-8.9,-80.5],[-18.9,-80.5],[-18.9,-60.5],[-8.9,-60.5],[-8.9,-50.5],[1.1,-50.5],[1.1,-40.5],[-8.9,-40.5],[-8.9,-20.5],[1.1,-20.5],[1.1,-10.5],[-8.9,-10.5],[-8.9,-0.5],[1.1,-0.5],[1.1,29.5],[11.1,29.5],[11.1,39.5],[21.1,39.5],[21.1,69.5],[31.1,69.5],[31.1,89.5],[11.1,89.5],[11.1,99.5],[21.1,99.5],[21.1,119.5],[11.1,119.5],[11.1,139.5],[21.1,139.5],[21.1,169.5],[31.1,169.5],[31.1,209.5],[41.1,209.5],[41.1,239.5],[51.1,239.5],[51.1,269.5],[61.1,269.5],[61.1,309.5],[91.1,309.5],[91.1,339.5],[101.1,339.5],[101.1,349.5],[111.1,349.5],[111.1,359.5],[101.1,359.5],[101.1,379.5],[111.1,379.5],[111.1,419.5],[141.1,419.5],[141.1,449.5],[151.1,449.5],[151.1,479.5],[161.1,479.5],[161.1,489.5],[81.1,489.5],[81.1,569.5],[191.1,569.5],[191.1,579.5],[171.1,579.5],[171.1,589.5],[141.1,589.5],[141.1,599.5],[101.1,599.5],[101.1,589.5],[91.1,589.5],[91.1,599.5],[51.1,599.5],[51.1,629.5],[41.1,629.5],[41.1,619.5],[31.1,619.5],[31.1,629.5],[21.1,629.5],[21.1,619.5],[11.1,619.5],[11.1,609.5],[-118.9,609.5],[-118.9,599.5],[-168.9,599.5],[-168.9,609.5],[-188.9,609.5],[-188.9,619.5],[-208.9,619.5],[-208.9,609.5],[-248.9,609.5],[-248.9,599.5],[-268.9,599.5],[-268.9,579.5],[-288.9,579.5],[-288.9,569.5],[-298.9,569.5],[-298.9,559.5],[-318.9,559.5],[-318.9,549.5],[-348.9,549.5],[-348.9,539.5],[-378.9,539.5],[-378.9,529.5],[-458.9,529.5],[-458.9,519.5],[-468.9,519.5],[-468.9,529.5],[-538.9,529.5],[-538.9,539.5],[-548.9,539.5],[-548.9,519.5],[-598.9,519.5],[-598.9,529.5],[-638.9,529.5],[-638.9,539.5],[-658.9,539.5],[-658.9,549.5],[-668.9,549.5],[-668.9,569.5],[-688.9,569.5],[-688.9,559.5],[-698.9,559.5],[-698.9,569.5],[-718.9,569.5],[-718.9,579.5],[-758.9,579.5],[-758.9,589.5],[-778.9,589.5],[-778.9,599.5],[-748.9,599.5],[-748.9,589.5],[-708.9,589.5],[-708.9,579.5],[-658.9,579.5],[-658.9,559.5],[-618.9,559.5],[-618.9,549.5],[-508.9,549.5],[-508.9,559.5],[-468.9,559.5],[-468.9,569.5],[-408.9,569.5],[-408.9,579.5],[-368.9,579.5],[-368.9,589.5],[-338.9,589.5],[-338.9,599.5],[-298.9,599.5],[-298.9,609.5],[-258.9,609.5],[-258.9,619.5],[-228.9,619.5],[-228.9,629.5],[-208.9,629.5],[-208.9,639.5],[-148.9,639.5],[-148.9,649.5],[-118.9,649.5],[-118.9,659.5],[31.1,659.5],[31.1,649.5],[91.1,649.5],[91.1,639.5],[141.1,639.5],[141.1,629.5],[161.1,629.5],[161.1,619.5],[171.1,619.5],[171.1,609.5],[196.1,609.5]]},{"cat":"Lden5559","ring":[[61.1,119.5],[61.1,129.5],[51.1,129.5],[51.1,119.5],[61.1,119.5]]},{"cat":"Lden5559","ring":[[21.1,9.5],[21.1,19.5],[11.1,19.5],[11.1,9.5],[21.1,9.5]]},{"cat":"Lden6064","ring":[[196.1,309.5],[191.1,309.5],[191.1,289.5],[181.1,289.5],[181.1,259.5],[171.1,259.5],[171.1,239.5],[161.1,239.5],[161.1,219.5],[151.1,219.5],[151.1,199.5],[141.1,199.5],[141.1,179.5],[131.1,179.5],[131.1,149.5],[121.1,149.5],[121.1,129.5],[111.1,129.5],[111.1,99.5],[101.1,99.5],[101.1,79.5],[91.1,79.5],[91.1,59.5],[81.1,59.5],[81.1,39.5],[71.1,39.5],[71.1,19.5],[81.1,19.5],[81.1,9.5],[61.1,9.5],[61.1,-20.5],[51.1,-20.5],[51.1,9.5],[41.1,9.5],[41.1,39.5],[51.1,39.5],[51.1,49.5],[71.1,49.5],[71.1,99.5],[81.1,99.5],[81.1,109.5],[91.1,109.5],[91.1,119.5],[81.1,119.5],[81.1,149.5],[91.1,149.5],[91.1,189.5],[101.1,189.5],[101.1,209.5],[111.1,209.5],[111.1,229.5],[121.1,229.5],[121.1,249.5],[131.1,249.5],[131.1,259.5],[141.1,259.5],[141.1,269.5],[151.1,269.5],[151.1,299.5],[161.1,299.5],[161.1,339.5],[171.1,339.5],[171.1,349.5],[191.1,349.5],[191.1,359.5],[181.1,359.5],[181.1,369.5],[191.1,369.5],[191.1,389.5],[196.1,389.5],[196.1,309.5]]},{"cat":"Lden5054","ring":[[-948.9,-340.5],[-958.9,-340.5],[-958.9,-350.5],[-968.9,-350.5],[-968.9,-355.5],[-1228.9,-355.5],[-1228.9,-350.5],[-1248.9,-350.5],[-1248.9,-340.5],[-1288.9,-340.5],[-1288.9,-330.5],[-1278.9,-330.5],[-1278.9,-320.5],[-1298.9,-320.5],[-1298.9,-310.5],[-1308.9,-310.5],[-1308.9,-320.5],[-1328.9,-320.5],[-1328.9,-330.5],[-1358.9,-330.5],[-1358.9,-340.5],[-1378.9,-340.5],[-1378.9,-350.5],[-1388.9,-350.5],[-1388.9,-340.5],[-1408.9,-340.5],[-1408.9,-330.5],[-1418.9,-330.5],[-1418.9,-340.5],[-1428.9,-340.5],[-1428.9,-330.5],[-1438.9,-330.5],[-1438.9,-310.5],[-1428.9,-310.5],[-1428.9,-300.5],[-1408.9,-300.5],[-1408.9,-290.5],[-1388.9,-290.5],[-1388.9,-280.5],[-1378.9,-280.5],[-1378.9,-270.5],[-1368.9,-270.5],[-1368.9,-280.5],[-1358.9,-280.5],[-1358.9,-270.5],[-1338.9,-270.5],[-1338.9,-260.5],[-1328.9,-260.5],[-1328.9,-270.5],[-1318.9,-270.5],[-1318.9,-260.5],[-1288.9,-260.5],[-1288.9,-230.5],[-1268.9,-230.5],[-1268.9,-220.5],[-1248.9,-220.5],[-1248.9,-230.5],[-1238.9,-230.5],[-1238.9,-220.5],[-1228.9,-220.5],[-1228.9,-210.5],[-1218.9,-210.5],[-1218.9,-200.5],[-1208.9,-200.5],[-1208.9,-190.5],[-1188.9,-190.5],[-1188.9,-180.5],[-1178.9,-180.5],[-1178.9,-170.5],[-1168.9,-170.5],[-1168.9,-160.5],[-1158.9,-160.5],[-1158.9,-190.5],[-1168.9,-190.5],[-1168.9,-200.5],[-1158.9,-200.5],[-1158.9,-210.5],[-1168.9,-210.5],[-1168.9,-220.5],[-1138.9,-220.5],[-1138.9,-210.5],[-1118.9,-210.5],[-1118.9,-200.5],[-1088.9,-200.5],[-1088.9,-210.5],[-1078.9,-210.5],[-1078.9,-220.5],[-1048.9,-220.5],[-1048.9,-230.5],[-1008.9,-230.5],[-1008.9,-240.5],[-998.9,-240.5],[-998.9,-230.5],[-988.9,-230.5],[-988.9,-240.5],[-978.9,-240.5],[-978.9,-260.5],[-968.9,-260.5],[-968.9,-270.5],[-958.9,-270.5],[-958.9,-290.5],[-948.9,-290.5],[-948.9,-300.5],[-918.9,-300.5],[-918.9,-280.5],[-908.9,-280.5],[-908.9,-260.5],[-898.9,-260.5],[-898.9,-290.5],[-888.9,-290.5],[-888.9,-280.5],[-868.9,-280.5],[-868.9,-270.5],[-878.9,-270.5],[-878.9,-260.5],[-888.9,-260.5],[-888.9,-250.5],[-868.9,-250.5],[-868.9,-240.5],[-848.9,-240.5],[-848.9,-230.5],[-828.9,-230.5],[-828.9,-220.5],[-818.9,-220.5],[-818.9,-230.5],[-798.9,-230.5],[-798.9,-240.5],[-768.9,-240.5],[-768.9,-230.5],[-758.9,-230.5],[-758.9,-240.5],[-748.9,-240.5],[-748.9,-230.5],[-738.9,-230.5],[-738.9,-240.5],[-718.9,-240.5],[-718.9,-230.5],[-688.9,-230.5],[-688.9,-220.5],[-678.9,-220.5],[-678.9,-230.5],[-668.9,-230.5],[-668.9,-220.5],[-658.9,-220.5],[-658.9,-210.5],[-628.9,-210.5],[-628.9,-220.5],[-598.9,-220.5],[-598.9,-210.5],[-568.9,-210.5],[-568.9,-200.5],[-558.9,-200.5],[-558.9,-180.5],[-538.9,-180.5],[-538.9,-190.5],[-488.9,-190.5],[-488.9,-170.5],[-478.9,-170.5],[-478.9,-180.5],[-458.9,-180.5],[-458.9,-170.5],[-438.9,-170.5],[-438.9,-180.5],[-398.9,-180.5],[-398.9,-170.5],[-388.9,-170.5],[-388.9,-160.5],[-378.9,-160.5],[-378.9,-170.5],[-348.9,-170.5],[-348.9,-180.5],[-328.9,-180.5],[-328.9,-190.5],[-338.9,-190.5],[-338.9,-200.5],[-328.9,-200.5],[-328.9,-190.5],[-318.9,-190.5],[-318.9,-180.5],[-308.9,-180.5],[-308.9,-170.5],[-318.9,-170.5],[-318.9,-160.5],[-328.9,-160.5],[-328.9,-170.5],[-338.9,-170.5],[-338.9,-160.5],[-348.9,-160.5],[-348.9,-130.5],[-338.9,-130.5],[-338.9,-110.5],[-328.9,-110.5],[-328.9,-100.5],[-318.9,-100.5],[-318.9,-90.5],[-308.9,-90.5],[-308.9,-70.5],[-318.9,-70.5],[-318.9,-60.5],[-308.9,-60.5],[-308.9,-50.5],[-318.9,-50.5],[-318.9,-40.5],[-298.9,-40.5],[-298.9,-30.5],[-288.9,-30.5],[-288.9,-20.5],[-298.9,-20.5],[-298.9,9.5],[-288.9,9.5],[-288.9,29.5],[-268.9,29.5],[-268.9,39.5],[-278.9,39.5],[-278.9,49.5],[-258.9,49.5],[-258.9,69.5],[-248.9,69.5],[-248.9,89.5],[-238.9,89.5],[-238.9,119.5],[-248.9,119.5],[-248.9,139.5],[-258.9,139.5],[-258.9,149.5],[-248.9,149.5],[-248.9,159.5],[-258.9,159.5],[-258.9,169.5],[-278.9,169.5],[-278.9,209.5],[-298.9,209.5],[-298.9,239.5],[-318.9,239.5],[-318.9,249.5],[-308.9,249.5],[-308.9,259.5],[-318.9,259.5],[-318.9,269.5],[-328.9,269.5],[-328.9,279.5],[-338.9,279.5],[-338.9,299.5],[-348.9,299.5],[-348.9,309.5],[-368.9,309.5],[-368.9,339.5],[-378.9,339.5],[-378.9,349.5],[-388.9,349.5],[-388.9,359.5],[-408.9,359.5],[-408.9,369.5],[-418.9,369.5],[-418.9,379.5],[-428.9,379.5],[-428.9,389.5],[-438.9,389.5],[-438.9,399.5],[-498.9,399.5],[-498.9,429.5],[-508.9,429.5],[-508.9,459.5],[-548.9,459.5],[-548.9,479.5],[-538.9,479.5],[-538.9,489.5],[-558.9,489.5],[-558.9,499.5],[-538.9,499.5],[-538.9,509.5],[-558.9,509.5],[-558.9,499.5],[-588.9,499.5],[-588.9,479.5],[-598.9,479.5],[-598.9,469.5],[-608.9,469.5],[-608.9,479.5],[-618.9,479.5],[-618.9,469.5],[-638.9,469.5],[-638.9,479.5],[-658.9,479.5],[-658.9,499.5],[-648.9,499.5],[-648.9,519.5],[-658.9,519.5],[-658.9,529.5],[-668.9,529.5],[-668.9,519.5],[-678.9,519.5],[-678.9,529.5],[-688.9,529.5],[-688.9,539.5],[-678.9,539.5],[-678.9,559.5],[-668.9,559.5],[-668.9,549.5],[-658.9,549.5],[-658.9,539.5],[-638.9,539.5],[-638.9,529.5],[-598.9,529.5],[-598.9,519.5],[-548.9,519.5],[-548.9,539.5],[-538.9,539.5],[-538.9,529.5],[-468.9,529.5],[-468.9,519.5],[-458.9,519.5],[-458.9,529.5],[-378.9,529.5],[-378.9,539.5],[-348.9,539.5],[-348.9,549.5],[-318.9,549.5],[-318.9,559.5],[-298.9,559.5],[-298.9,569.5],[-288.9,569.5],[-288.9,579.5],[-268.9,579.5],[-268.9,599.5],[-248.9,599.5],[-248.9,589.5],[-228.9,589.5],[-228.9,599.5],[-208.9,599.5],[-208.9,609.5],[-198.9,609.5],[-198.9,619.5],[-188.9,619.5],[-188.9,609.5],[-168.9,609.5],[-168.9,599.5],[-118.9,599.5],[-118.9,609.5],[11.1,609.5],[11.1,619.5],[21.1,619.5],[21.1,629.5],[31.1,629.5],[31.1,619.5],[41.1,619.5],[41.1,629.5],[51.1,629.5],[51.1,599.5],[91.1,599.5],[91.1,589.5],[171.1,589.5],[171.1,579.5],[191.1,579.5],[191.1,569.5],[81.1,569.5],[81.1,529.5],[71.1,529.5],[71.1,499.5],[81.1,499.5],[81.1,489.5],[161.1,489.5],[161.1,479.5],[151.1,479.5],[151.1,449.5],[141.1,449.5],[141.1,419.5],[111.1,419.5],[111.1,379.5],[101.1,379.5],[101.1,359.5],[111.1,359.5],[111.1,349.5],[101.1,349.5],[101.1,339.5],[91.1,339.5],[91.1,309.5],[61.1,309.5],[61.1,269.5],[51.1,269.5],[51.1,239.5],[41.1,239.5],[41.1,209.5],[31.1,209.5],[31.1,169.5],[21.1,169.5],[21.1,139.5],[11.1,139.5],[11.1,119.5],[21.1,119.5],[21.1,99.5],[11.1,99.5],[11.1,89.5],[31.1,89.5],[31.1,69.5],[21.1,69.5],[21.1,39.5],[11.1,39.5],[11.1,29.5],[1.1,29.5],[1.1,-0.5],[-18.9,-0.5],[-18.9,-10.5],[1.1,-10.5],[1.1,-20.5],[-8.9,-20.5],[-8.9,-40.5],[1.1,-40.5],[1.1,-50.5],[-8.9,-50.5],[-8.9,-60.5],[-18.9,-60.5],[-18.9,-80.5],[-8.9,-80.5],[-8.9,-90.5],[1.1,-90.5],[1.1,-120.5],[-8.9,-120.5],[-8.9,-100.5],[-28.9,-100.5],[-28.9,-110.5],[-48.9,-110.5],[-48.9,-120.5],[-38.9,-120.5],[-38.9,-150.5],[-18.9,-150.5],[-18.9,-160.5],[-28.9,-160.5],[-28.9,-180.5],[-38.9,-180.5],[-38.9,-190.5],[-48.9,-190.5],[-48.9,-210.5],[-58.9,-210.5],[-58.9,-240.5],[-68.9,-240.5],[-68.9,-270.5],[-78.9,-270.5],[-78.9,-280.5],[-108.9,-280.5],[-108.9,-260.5],[-128.9,-260.5],[-128.9,-250.5],[-138.9,-250.5],[-138.9,-260.5],[-148.9,-260.5],[-148.9,-270.5],[-158.9,-270.5],[-158.9,-300.5],[-168.9,-300.5],[-168.9,-310.5],[-178.9,-310.5],[-178.9,-340.5],[-188.9,-340.5],[-188.9,-355.5],[-368.9,-355.5],[-368.9,-350.5],[-358.9,-350.5],[-358.9,-340.5],[-378.9,-340.5],[-378.9,-355.5],[-388.9,-355.5],[-388.9,-340.5],[-408.9,-340.5],[-408.9,-350.5],[-418.9,-350.5],[-418.9,-340.5],[-438.9,-340.5],[-438.9,-350.5],[-418.9,-350.5],[-418.9,-355.5],[-458.9,-355.5],[-458.9,-340.5],[-468.9,-340.5],[-468.9,-350.5],[-478.9,-350.5],[-478.9,-355.5],[-948.9,-355.5],[-948.9,-340.5],[-938.9,-340.5],[-938.9,-350.5],[-908.9,-350.5],[-908.9,-340.5],[-918.9,-340.5],[-918.9,-330.5],[-898.9,-330.5],[-898.9,-320.5],[-918.9,-320.5],[-918.9,-310.5],[-928.9,-310.5],[-928.9,-330.5],[-948.9,-330.5],[-948.9,-340.5]]},{"cat":"Lden5054","ring":[[-38.9,-80.5],[-28.9,-80.5],[-28.9,-70.5],[-38.9,-70.5],[-38.9,-80.5]]},{"cat":"Lden5054","ring":[[-48.9,-50.5],[-48.9,-60.5],[-38.9,-60.5],[-38.9,-50.5],[-48.9,-50.5]]},{"cat":"Lden5054","ring":[[-58.9,89.5],[-58.9,79.5],[-48.9,79.5],[-48.9,89.5],[-58.9,89.5]]},{"cat":"Lden5054","ring":[[-58.9,19.5],[-58.9,9.5],[-48.9,9.5],[-48.9,19.5],[-58.9,19.5]]},{"cat":"Lden5054","ring":[[-78.9,79.5],[-78.9,69.5],[-68.9,69.5],[-68.9,79.5],[-78.9,79.5]]},{"cat":"Lden5054","ring":[[-78.9,-60.5],[-68.9,-60.5],[-68.9,-50.5],[-78.9,-50.5],[-78.9,-60.5]]},{"cat":"Lden5054","ring":[[-28.9,99.5],[-28.9,89.5],[-18.9,89.5],[-18.9,99.5],[-28.9,99.5]]},{"cat":"Lden5054","ring":[[-128.9,-60.5],[-118.9,-60.5],[-118.9,-50.5],[-128.9,-50.5],[-128.9,-60.5]]},{"cat":"Lden5054","ring":[[-118.9,-20.5],[-118.9,-30.5],[-108.9,-30.5],[-108.9,-20.5],[-118.9,-20.5]]}],"vorschlaege":{"L":[{"strasse":"L.-F.-Schönherr-Straße","hnr":"15","plz":"08523","ort":"Plauen","ortsteil":"Westend"},{"strasse":"L.-F.-Schönherr-Straße","hnr":"19","plz":"08523","ort":"Plauen","ortsteil":"Westend"},{"strasse":"L.-F.-Schönherr-Straße","hnr":"26","plz":"08523","ort":"Plauen","ortsteil":"Westend"},{"strasse":"L.-F.-Schönherr-Straße","hnr":"28","plz":"08523","ort":"Plauen","ortsteil":"Westend"},{"strasse":"L.-F.-Schönherr-Straße","hnr":"30","plz":"08523","ort":"Plauen","ortsteil":"Westend"},{"strasse":"L.-F.-Schönherr-Straße","hnr":"32","plz":"08523","ort":"Plauen","ortsteil":"Westend"}],"Le":[{"strasse":"Leanderweg","hnr":"1","plz":"04277","ort":"Leipzig","ortsteil":"Marienbrunn"},{"strasse":"Leanderweg","hnr":"10","plz":"04277","ort":"Leipzig","ortsteil":"Marienbrunn"},{"strasse":"Leanderweg","hnr":"12","plz":"04277","ort":"Leipzig","ortsteil":"Marienbrunn"},{"strasse":"Leanderweg","hnr":"2","plz":"04277","ort":"Leipzig","ortsteil":"Marienbrunn"},{"strasse":"Leanderweg","hnr":"3","plz":"04277","ort":"Leipzig","ortsteil":"Marienbrunn"},{"strasse":"Leanderweg","hnr":"4","plz":"04277","ort":"Leipzig","ortsteil":"Marienbrunn"}],"Les":[{"strasse":"Les-Epesses-Straße","hnr":"1","plz":"04288","ort":"Leipzig","ortsteil":"Liebertwolkwitz"},{"strasse":"Les-Epesses-Straße","hnr":"10","plz":"04288","ort":"Leipzig","ortsteil":"Liebertwolkwitz"},{"strasse":"Les-Epesses-Straße","hnr":"11","plz":"04288","ort":"Leipzig","ortsteil":"Liebertwolkwitz"},{"strasse":"Les-Epesses-Straße","hnr":"12","plz":"04288","ort":"Leipzig","ortsteil":"Liebertwolkwitz"},{"strasse":"Les-Epesses-Straße","hnr":"13","plz":"04288","ort":"Leipzig","ortsteil":"Liebertwolkwitz"},{"strasse":"Les-Epesses-Straße","hnr":"2","plz":"04288","ort":"Leipzig","ortsteil":"Liebertwolkwitz"}],"Less":[{"strasse":"Lessaer Straße","hnr":"1","plz":"01619","ort":"Zeithain","ortsteil":"Röderau-Bobersen"},{"strasse":"Lessaer Straße","hnr":"10","plz":"01619","ort":"Zeithain","ortsteil":"Röderau-Bobersen"},{"strasse":"Lessaer Straße","hnr":"11","plz":"01619","ort":"Zeithain","ortsteil":"Röderau-Bobersen"},{"strasse":"Lessaer Straße","hnr":"12","plz":"01619","ort":"Zeithain","ortsteil":"Röderau-Bobersen"},{"strasse":"Lessaer Straße","hnr":"13","plz":"01619","ort":"Zeithain","ortsteil":"Röderau-Bobersen"},{"strasse":"Lessaer Straße","hnr":"14","plz":"01619","ort":"Zeithain","ortsteil":"Röderau-Bobersen"}],"Lessi":[{"strasse":"Lessinggasse","hnr":"1","plz":"01920","ort":"Elstra","ortsteil":"Elstra"},{"strasse":"Lessinggasse","hnr":"10","plz":"01920","ort":"Elstra","ortsteil":"Elstra"},{"strasse":"Lessinggasse","hnr":"11","plz":"01920","ort":"Elstra","ortsteil":"Elstra"},{"strasse":"Lessinggasse","hnr":"13","plz":"01920","ort":"Elstra","ortsteil":"Elstra"},{"strasse":"Lessinggasse","hnr":"1a","plz":"01920","ort":"Elstra","ortsteil":"Elstra"},{"strasse":"Lessinggasse","hnr":"2","plz":"01920","ort":"Elstra","ortsteil":"Elstra"}],"Lessin":[{"strasse":"Lessinggasse","hnr":"1","plz":"01920","ort":"Elstra","ortsteil":"Elstra"},{"strasse":"Lessinggasse","hnr":"10","plz":"01920","ort":"Elstra","ortsteil":"Elstra"},{"strasse":"Lessinggasse","hnr":"11","plz":"01920","ort":"Elstra","ortsteil":"Elstra"},{"strasse":"Lessinggasse","hnr":"13","plz":"01920","ort":"Elstra","ortsteil":"Elstra"},{"strasse":"Lessinggasse","hnr":"1a","plz":"01920","ort":"Elstra","ortsteil":"Elstra"},{"strasse":"Lessinggasse","hnr":"2","plz":"01920","ort":"Elstra","ortsteil":"Elstra"}],"Lessing":[{"strasse":"Lessinggasse","hnr":"1","plz":"01920","ort":"Elstra","ortsteil":"Elstra"},{"strasse":"Lessinggasse","hnr":"10","plz":"01920","ort":"Elstra","ortsteil":"Elstra"},{"strasse":"Lessinggasse","hnr":"11","plz":"01920","ort":"Elstra","ortsteil":"Elstra"},{"strasse":"Lessinggasse","hnr":"13","plz":"01920","ort":"Elstra","ortsteil":"Elstra"},{"strasse":"Lessinggasse","hnr":"1a","plz":"01920","ort":"Elstra","ortsteil":"Elstra"},{"strasse":"Lessinggasse","hnr":"2","plz":"01920","ort":"Elstra","ortsteil":"Elstra"}],"Lessingw":[{"strasse":"Lessingweg","hnr":"1","plz":"01855","ort":"Sebnitz","ortsteil":"Sebnitz"},{"strasse":"Lessingweg","hnr":"1","plz":"04316","ort":"Leipzig","ortsteil":"Mölkau"},{"strasse":"Lessingweg","hnr":"1","plz":"04720","ort":"Döbeln","ortsteil":"Döbeln"},{"strasse":"Lessingweg","hnr":"1","plz":"09212","ort":"Limbach-Oberfrohna","ortsteil":"Kändler"},{"strasse":"Lessingweg","hnr":"1","plz":"09356","ort":"St. Egidien","ortsteil":"St. Egidien"},{"strasse":"Lessingweg","hnr":"10","plz":"04316","ort":"Leipzig","ortsteil":"Mölkau"}],"Lessingwe":[{"strasse":"Lessingweg","hnr":"1","plz":"01855","ort":"Sebnitz","ortsteil":"Sebnitz"},{"strasse":"Lessingweg","hnr":"1","plz":"04316","ort":"Leipzig","ortsteil":"Mölkau"},{"strasse":"Lessingweg","hnr":"1","plz":"04720","ort":"Döbeln","ortsteil":"Döbeln"},{"strasse":"Lessingweg","hnr":"1","plz":"09212","ort":"Limbach-Oberfrohna","ortsteil":"Kändler"},{"strasse":"Lessingweg","hnr":"1","plz":"09356","ort":"St. Egidien","ortsteil":"St. Egidien"},{"strasse":"Lessingweg","hnr":"10","plz":"04316","ort":"Leipzig","ortsteil":"Mölkau"}],"Lessingweg":[{"strasse":"Lessingweg","hnr":"1","plz":"01855","ort":"Sebnitz","ortsteil":"Sebnitz"},{"strasse":"Lessingweg","hnr":"1","plz":"04316","ort":"Leipzig","ortsteil":"Mölkau"},{"strasse":"Lessingweg","hnr":"1","plz":"04720","ort":"Döbeln","ortsteil":"Döbeln"},{"strasse":"Lessingweg","hnr":"1","plz":"09212","ort":"Limbach-Oberfrohna","ortsteil":"Kändler"},{"strasse":"Lessingweg","hnr":"1","plz":"09356","ort":"St. Egidien","ortsteil":"St. Egidien"},{"strasse":"Lessingweg","hnr":"10","plz":"04316","ort":"Leipzig","ortsteil":"Mölkau"}],"Lessingweg 4":[{"strasse":"Lessingweg","hnr":"4","plz":"04316","ort":"Leipzig","ortsteil":"Mölkau"},{"strasse":"Lessingweg","hnr":"4","plz":"04720","ort":"Döbeln","ortsteil":"Döbeln"},{"strasse":"Lessingweg","hnr":"4","plz":"09212","ort":"Limbach-Oberfrohna","ortsteil":"Kändler"},{"strasse":"Lessingweg","hnr":"4","plz":"09356","ort":"St. Egidien","ortsteil":"St. Egidien"},{"strasse":"Lessingweg","hnr":"40","plz":"04316","ort":"Leipzig","ortsteil":"Mölkau"},{"strasse":"Lessingweg","hnr":"41","plz":"04316","ort":"Leipzig","ortsteil":"Mölkau"}],"Lessingweg 44":[{"strasse":"Lessingweg","hnr":"44","plz":"04316","ort":"Leipzig","ortsteil":"Mölkau"}]},"fenster":{"x0":-112,"x1":112,"y0":-84,"y1":84}}</script>
+<script>
+(function(){
+  "use strict";
+  var D = JSON.parse(document.getElementById("daten").textContent);
+  var F = D.fenster, NS = "http://www.w3.org/2000/svg";
+  var svg = document.getElementById("plan");
+  var breite = F.x1 - F.x0, hoehe = F.y1 - F.y0;
+  svg.setAttribute("viewBox", F.x0 + " " + (-F.y1) + " " + breite + " " + hoehe);
+  svg.setAttribute("preserveAspectRatio", "xMidYMid slice");
+
+  function pfad(ring){
+    var d = "", i;
+    for (i = 0; i < ring.length; i++) d += (i ? "L" : "M") + ring[i][0] + " " + (-ring[i][1]);
+    return d + "Z";
+  }
+  function el(name, attrs){
+    var n = document.createElementNS(NS, name), k;
+    for (k in attrs) n.setAttribute(k, attrs[k]);
+    return n;
+  }
+  function mitte(ring){
+    var x = 0, y = 0, i;
+    for (i = 0; i < ring.length - 1; i++){ x += ring[i][0]; y += ring[i][1]; }
+    var n = ring.length - 1;
+    return [x / n, y / n];
+  }
+
+  // Untergrund
+  svg.appendChild(el("rect", {x: F.x0, y: -F.y1, width: breite, height: hoehe, fill: "var(--map-ground)"}));
+
+  // Lärmbänder -- unter den Flurstücken, damit die Grenzen lesbar bleiben
+  var farbe = {Lden5054:"var(--db1)", Lden5559:"var(--db2)", Lden6064:"var(--db3)",
+               Lden6569:"var(--db4)", Lden7074:"var(--db5)", LdenAb75:"var(--db5)"};
+  var reihenfolge = ["Lden5054","Lden5559","Lden6064","Lden6569","Lden7074","LdenAb75"];
+  var gLaerm = el("g", {id: "laerm", opacity: "0", "aria-hidden": "true"});
+  reihenfolge.forEach(function(cat){
+    D.laerm.forEach(function(b){
+      if (b.cat !== cat) return;
+      gLaerm.appendChild(el("path", {d: pfad(b.ring), fill: farbe[cat] || "var(--db1)", "class": "band"}));
+    });
+  });
+  svg.appendChild(gLaerm);
+
+  // Flurstücke
+  var gP = el("g", {});
+  var ziel = null;
+  D.parzellen.forEach(function(p){
+    if (p.nr === "204") { ziel = p; return; }
+    gP.appendChild(el("path", {d: pfad(p.ring), "class": "parzelle"}));
+  });
+  svg.appendChild(gP);
+
+  // Nummern nur für Flurstücke, die groß genug im Bild liegen
+  var gN = el("g", {});
+  D.parzellen.forEach(function(p){
+    var c = mitte(p.ring);
+    if (c[0] < F.x0 + 8 || c[0] > F.x1 - 8 || c[1] < F.y0 + 6 || c[1] > F.y1 - 6) return;
+    if (p.nr === "204") return;
+    // Splitterflurstuecke tragen keine Nummer -- sie ueberlagern sonst einander.
+    var xs = p.ring.map(function(q){ return q[0]; }), ys = p.ring.map(function(q){ return q[1]; });
+    if (Math.max.apply(null, xs) - Math.min.apply(null, xs) < 13) return;
+    if (Math.max.apply(null, ys) - Math.min.apply(null, ys) < 9) return;
+    var t = el("text", {x: c[0], y: -c[1], "class": "nummer"});
+    t.textContent = p.nen ? p.nr + "/" + p.nen : p.nr;
+    gN.appendChild(t);
+  });
+  svg.appendChild(gN);
+
+  // Zielflurstück zuletzt, damit nichts darüber liegt
+  if (ziel){
+    svg.appendChild(el("path", {d: pfad(ziel.ring), "class": "parzelle--ziel"}));
+    var c = mitte(ziel.ring);
+    var t = el("text", {x: c[0], y: -c[1], "class": "nummer nummer--ziel"});
+    t.textContent = "204";
+    svg.appendChild(t);
+  }
+
+  // Maßstabsbalken: 50 m in Bildschirmpixeln
+  function massstab(){
+    var b = svg.getBoundingClientRect();
+    if (!b.width) return;
+    var proMeter = Math.max(b.width / breite, b.height / hoehe); // slice
+    var stufen = [5, 10, 20, 25, 50, 100, 200], gewaehlt = stufen[0], i;
+    for (i = 0; i < stufen.length; i++){
+      var px = stufen[i] * proMeter;
+      if (px <= 140){ gewaehlt = stufen[i]; } else break;
+    }
+    document.getElementById("mbalken").style.width = (gewaehlt * proMeter) + "px";
+    document.getElementById("mzahl").textContent = gewaehlt + " m";
+  }
+  window.addEventListener("resize", massstab);
+  massstab();
+
+  // Lärm ein/aus
+  var schalter = document.getElementById("laermAn"), legende = document.getElementById("legende");
+  schalter.addEventListener("change", function(){
+    gLaerm.setAttribute("opacity", schalter.checked ? "1" : "0");
+    legende.setAttribute("data-an", schalter.checked ? "1" : "0");
+  });
+
+  // ---- Adressvorschläge: entprellt, nicht je Tastendruck ----
+  var eingabe = document.getElementById("q"), liste = document.getElementById("treffer"),
+      zaehler = document.getElementById("zaehler").querySelector("b");
+  var timer = null, laeufe = 0, WARTE = 120;
+
+  function suche(q){
+    laeufe++; zaehler.textContent = laeufe;
+    var key = q.trim(), tr = D.vorschlaege[key] || null;
+    if (!tr){ // längster passender Präfix aus der Aufzeichnung
+      var beste = null;
+      Object.keys(D.vorschlaege).forEach(function(k){
+        if (key.toLowerCase().indexOf(k.toLowerCase()) === 0 && (!beste || k.length > beste.length)) beste = k;
+      });
+      tr = beste ? D.vorschlaege[beste] : [];
+    }
+    zeige(tr, key);
+  }
+  function zeige(tr, key){
+    liste.textContent = "";
+    if (!key || !tr.length){ liste.hidden = true; eingabe.setAttribute("aria-expanded","false"); return; }
+    tr.slice(0, 6).forEach(function(t, i){
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "treffer"; b.setAttribute("role","option");
+      b.setAttribute("aria-selected", i === 0 ? "true" : "false");
+      var a = document.createElement("span"); a.className = "treffer__adr";
+      a.textContent = t.strasse + " " + t.hnr;
+      var o = document.createElement("span"); o.className = "treffer__ort";
+      o.textContent = t.plz + " " + t.ort + (t.ortsteil && t.ortsteil !== t.ort ? " · " + t.ortsteil : "");
+      b.appendChild(a); b.appendChild(o);
+      b.addEventListener("click", function(){
+        eingabe.value = t.strasse + " " + t.hnr; liste.hidden = true;
+        eingabe.setAttribute("aria-expanded","false");
+      });
+      liste.appendChild(b);
+    });
+    var f = document.createElement("div");
+    f.className = "liste__fuss";
+    f.textContent = "amtliche Hauskoordinaten Sachsen · 990.090 Adressen · lokal";
+    liste.appendChild(f);
+    liste.hidden = false; eingabe.setAttribute("aria-expanded","true");
+  }
+  eingabe.addEventListener("input", function(){
+    var v = eingabe.value;
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(function(){ suche(v); }, WARTE);
+  });
+  eingabe.addEventListener("blur", function(){
+    setTimeout(function(){ liste.hidden = true; eingabe.setAttribute("aria-expanded","false"); }, 160);
+  });
+  eingabe.addEventListener("focus", function(){ if (eingabe.value) suche(eingabe.value); });
+})();
+</script>
