@@ -153,7 +153,7 @@ pre .schl{color:var(--akzent)}
 <header class="kopf">
   <div class="kopf__zeile">
     <span class="marke">Entscheidungsgrundlage · where2build</span>
-    <span class="stand">Prüfstand 01.09.2026 · alle Abrufe per GET</span>
+    <span class="stand">Prüfstand 01.–02.09.2026 · alle Abrufe per GET</span>
   </div>
   <h1>Grundradar-Abgleich</h1>
   <p class="vorspann">
@@ -176,9 +176,9 @@ pre .schl{color:var(--akzent)}
       <span class="bahn__marke">Jetzt — klein und belegt</span>
       <h3>Sucheinstieg und die drei Punktabfragen</h3>
       <ul>
-        <li><b>Adressvorschläge beim Tippen.</b> <code>/api/geocode</code> liefert die Kandidatenliste heute schon — sie hängt nur an keinem Suchfeld. Für das Label („04316 Leipzig · Mölkau") fehlen MOTIS PLZ und Ort; Photon hat beide.</li>
+        <li><b>Adressvorschläge beim Tippen — aus einer 49-MB-Datei.</b> Die amtlichen Hauskoordinaten Sachsens liefern alle Felder fürs Dropdown, ohne fremden Dienst im Anfragepfad. Gemessen: <span class="mono">12–75 ms</span> je Tastendruck.</li>
         <li><b>Karte groß, Werte als Spalte links.</b> Reines Layout, keine neue Quelle. grundradar gibt der Karte 30 % der Breite und stellt die Prüfliste daneben — bei uns ist die Karte heute Beiwerk.</li>
-        <li><b>Lärm, Trinkwasserschutz, Schutzgebiete.</b> Drei Punktabfragen gegen zwei Server, die beide antworten. Der Lärmwert ist unten am echten Flurstück durchgerechnet.</li>
+        <li><b>Lärm, Trinkwasserschutz, Schutzgebiete.</b> Drei Abfragen gegen zwei Server, die beide antworten — <b>mit dem Flurstücksumring</b>, nicht mit einem Punkt. Unten am echten Grundstück durchgerechnet.</li>
       </ul>
     </article>
 
@@ -208,49 +208,192 @@ pre .schl{color:var(--akzent)}
 
 <section>
   <div class="abschnitt-kopf">
+    <h2>Adresssuche ohne fremden Dienst</h2>
+    <span class="zahl">9,2 GB gegen 49 MB</span>
+  </div>
+  <p>
+    Photon ist quelloffen und selbst zu betreiben — aber der vorgebaute
+    Deutschland-Index ist <b>9,2 GB</b> groß, stammt vom 21.07.2025 und braucht eine
+    OpenSearch-Instanz daneben. Für 990 000 sächsische Adressen ist das
+    unverhältnismäßig. Die amtliche Quelle liegt schon in unserer Recherche und ist
+    kleiner, aktueller und rechtlich die richtige.
+  </p>
+  <div class="rollfeld">
+    <table>
+      <thead><tr><th>Weg</th><th>Umfang</th><th>Stand</th><th>Was er kostet</th></tr></thead>
+      <tbody>
+        <tr data-lage="ok">
+          <td class="thema">Hauskoordinaten Sachsen<br><span class="mono" style="font-size:.72rem;font-weight:400">amtlich, GeoSN</span></td>
+          <td class="zahlen"><b>48,9 MB</b> ZIP<br><span class="notiz" style="margin:0">990.090 Adressen</span></td>
+          <td class="zahlen">02.07.2026<br><span class="notiz" style="margin:0">quartalsweise</span></td>
+          <td>Ein Download, ein Index. <b>Kein Dienst im Anfragepfad.</b>
+            <span class="notiz">Gemessen mit SQLite und naivem <code>LIKE 'präfix%'</code>, ohne FTS5: „Bautzner" <b>11,7 ms</b>, „Lessingw" <b>43,9 ms</b>, „Lessingweg 44" <b>75,0 ms</b>. Für ein entprelltes Feld reicht das mit Abstand.</span></td>
+        </tr>
+        <tr data-lage="offen">
+          <td class="thema">Photon selbst gehostet</td>
+          <td class="zahlen"><b>9,20 GB</b> Index<br><span class="notiz" style="margin:0">ganz Deutschland</span></td>
+          <td class="zahlen">21.07.2025<br><span class="notiz" style="margin:0">13 Monate alt</span></td>
+          <td>Dazu eine OpenSearch-Instanz als Laufzeitabhängigkeit.
+            <span class="notiz">Der Zeiger <code>photon-db-de-latest.tar.bz2</code> ist <b>tot (404)</b>, obwohl das Verzeichnis ihn listet. Erst sinnvoll, wenn das Produkt Sachsen verlässt.</span></td>
+        </tr>
+        <tr data-lage="aus">
+          <td class="thema">photon.komoot.io</td>
+          <td>—</td>
+          <td>laufend</td>
+          <td>Fremder Server im Anfragepfad jeder Tasteneingabe. Gleiche Überlegung wie bei Overpass: eine öffentliche Instanz trägt kein fremdes Produkt.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="margin-top:1rem">
+    <b>Die amtliche Koordinate ist dabei nicht schlechter.</b> Für Lessingweg 44 liegt sie
+    <span class="mono">2,1 m</span> neben Photons OSM-Koordinate und <span class="mono">4,9 m</span>
+    neben dem Punkt aus grundradars Screenshot. Sie ist nur örtlich begrenzt — deshalb bleibt
+    <code>/api/geocode</code> (MOTIS) der Rückfall für alles, was keine sächsische Hausadresse
+    ist: Ortsteile, Flurstückslagen, Ziele außerhalb.
+  </p>
+</section>
+
+<section>
+  <div class="abschnitt-kopf">
     <h2>Der Mölkau-Test</h2>
     <span class="zahl">Flurstück 204 · 51.33652, 12.44176</span>
   </div>
   <p>
-    Die Koordinate aus dem grundradar-Screenshot, gestellt an die sächsische Lärmkartierung.
-    Nicht um zu zeigen, dass der Dienst erreichbar ist — sondern dass die Kette bis zur
-    Aussage trägt, die im Vorbild als Karte „Lärm: ROT, Straßenlärm" steht.
+    Das Flurstück aus dem grundradar-Screenshot, gestellt an die sächsische Lärmkartierung.
+    Nicht um zu zeigen, dass der Dienst erreichbar ist — sondern um die Frage zu klären,
+    <b>mit welcher Geometrie</b> man ihn fragt. Das ändert das Ergebnis.
   </p>
   <div class="protokoll">
     <div class="protokoll__teil">
-      <span class="protokoll__marke">Anfrage</span>
-<pre><b>GET</b> luis.sachsen.de/arcgis/rest/services
-      /laerm/laermkartierung/MapServer/<b>identify</b>
+      <span class="protokoll__marke">Anfrage — mit dem Flurstück, nicht mit einem Punkt</span>
+<pre><b>GET</b> …/laerm/laermkartierung/MapServer/<b>4</b>/<b>query</b>
 
-  <span class="schl">geometry</span>     {"x":12.44176,"y":51.33652}
-  <span class="schl">geometryType</span> esriGeometryPoint
-  <span class="schl">sr</span>           4326
-  <span class="schl">layers</span>       all:4,5,37,36,55,56
-  <span class="schl">tolerance</span>    3
-  <span class="schl">mapExtent</span>    12.43,51.33,12.45,51.34
-  <span class="schl">imageDisplay</span> 600,400,96
+  <span class="schl">geometry</span>     {"rings":[[…6 Stützpunkte…]],
+                "spatialReference":{"wkid":25833}}
+  <span class="schl">geometryType</span> esriGeometryPolygon
+  <span class="schl">inSR</span>         25833
+  <span class="schl">spatialRel</span>   esriSpatialRelIntersects
+  <span class="schl">outFields</span>    CATEGORY
   <span class="schl">f</span>            json</pre>
+      <p class="notiz">Der Umring kommt aus dem ALKIS-WFS, den wir schon
+      abfragen: <b>Nr 204 · 650 m² · Mölkau · Lessingweg 44</b> — identisch zu
+      grundradars Kopfzeile.</p>
     </div>
     <div class="protokoll__teil">
-      <span class="protokoll__marke">Antwort — 3 Treffer</span>
-<pre>Hauptverkehrsstraßen LDEN (24 h)
-  CATEGORY <b>Lden5559</b>
-  CATEGORY <b>Lden5054</b>
+      <span class="protokoll__marke">Antwort</span>
+<pre>Punkt (Adresskoordinate, auf dem Gebäude)
+  LDEN    <b>Lden5054</b>
+  Lnight  <b>Lnight4549</b>
 
-Hauptverkehrsstraßen Ln nachts (22–6 Uhr)
-  CATEGORY <b>Lnight4549</b></pre>
+Flurstück 204 (650 m²)
+  LDEN    <b>Lden5054</b> + <b>Lden5559</b>
+  Lnight  <b>Lnight4549</b></pre>
       <div class="ergebnis">
-        <span class="pegel">L<sub>DEN</sub> 55–59 dB(A)</span>
+        <span class="pegel">L<sub>DEN</sub> 50–59 dB(A)</span>
         <span class="pegel">L<sub>night</sub> 45–49 dB(A)</span>
         <span class="mono" style="color:var(--tinte-still);font-weight:500">Quelle: Straßenverkehr</span>
       </div>
       <p class="notiz">
-        Die Pegel kommen als <b>5-dB-Band</b>, nicht als Einzelwert. „57 dB" wäre erfunden —
-        korrekt ist die Spanne. Ein Grundstück kann in zwei Bändern zugleich liegen, weil
-        die Isophonen es schneiden.
+        Das Grundstück liegt in <b>zwei Bändern</b> — die Isophone schneidet es. Der Punkt
+        allein sagt 50–54 und verschweigt die lautere Hälfte. Pegel kommen als 5-dB-Band,
+        nie als Einzelwert: „57 dB" wäre erfunden.
       </p>
     </div>
   </div>
+</section>
+
+<section>
+  <div class="abschnitt-kopf">
+    <h2>Den Lärmlayer anzeigen — und was „kein Wert" heißt</h2>
+    <span class="zahl">2 Fallstricke · 1 Regel</span>
+  </div>
+  <p>
+    Der Layer lässt sich einblenden: der Dienst meldet <code>WMSServer</code> und
+    <code>FeatureServer</code>, spiegelt CORS-Header zurück und der Browser darf direkt
+    zugreifen. Zwei Dinge stehen im Weg, beide lösbar.
+  </p>
+
+  <div class="protokoll">
+    <div class="protokoll__teil">
+      <span class="protokoll__marke">Fallstrick 1 — MapLibre spricht 3857, der WMS nicht</span>
+      <p class="notiz" style="max-width:none">
+        Der WMS führt <b>EPSG:4326 und 25833</b>, aber <b>kein 3857</b>. MapLibres
+        Rasterquelle fordert Kacheln mit <code>{bbox-epsg-3857}</code> an — eine gewöhnliche
+        WMS-Quelle scheitert also stillschweigend.
+      </p>
+<pre><b>GET</b> …/MapServer/<b>export</b>
+  <span class="schl">bbox</span>     1384000,6690000,1386000,6692000
+  <span class="schl">bboxSR</span>   <b>3857</b>
+  <span class="schl">imageSR</span>  <b>3857</b>
+  <span class="schl">layers</span>   show:4
+  <span class="schl">format</span>   png32   <span class="schl">transparent</span> true
+
+<b>200</b>  image/png  512×512  22.325 Bytes
+Access-Control-Allow-Origin: ✓</pre>
+      <p class="notiz" style="max-width:none">
+        Der ArcGIS-<code>export</code>-Endpunkt <b>reprojiziert serverseitig</b>. Damit ist er
+        der Weg für die Rasterüberlagerung, nicht der WMS.
+      </p>
+    </div>
+    <div class="protokoll__teil">
+      <span class="protokoll__marke">Fallstrick 2 — leeres Bild ohne Fehler</span>
+      <p class="notiz" style="max-width:none">
+        Layer 4 trägt <code>minScale: 50000</code>. Oberhalb 1:50.000 liefert der Dienst ein
+        <b>leeres Bild und keine Fehlermeldung</b>. Die Umschaltfläche muss das wissen —
+        entweder erst ab der passenden Zoomstufe aktiv sein oder sagen, dass der Layer näher
+        dran erscheint.
+      </p>
+      <span class="protokoll__marke" style="margin-top:.4rem">Die Bänderskala, vollständig</span>
+<pre>L<sub>DEN</sub>    45–49 · 50–54 · 55–59 · 60–64
+        65–69 · 70–74 · <b>ab 75</b>
+L<sub>night</sub>  45–49 · 50–54 · 55–59 · 60–64
+        65–69 · <b>ab 70</b></pre>
+      <p class="notiz" style="max-width:none">
+        Unterste kartierte Stufe ist <b>45–49 dB(A)</b>. „Kein Treffer, aber im kartierten
+        Gebiet" heißt damit belegbar <b>unter 45 dB(A)</b>.
+      </p>
+    </div>
+  </div>
+
+  <div class="einwurf" style="margin-top:1.5rem;border-left-color:var(--offen);background:var(--offen-feld)">
+    <h3>„Kein Wert" ist nicht „leise" — und das ist der eigentliche Fallstrick</h3>
+    <p>
+      Die Umgebungslärmkartierung ist nach BImSchG Teil 6 auf Ballungsräume und
+      Hauptverkehrswege begrenzt. Gemessen wurde die Zahl der Straßenlärm-Polygone im
+      Umkreis von 300 m:
+    </p>
+    <div class="raster" style="margin:.3rem 0">
+      <div class="feld" data-lage="ok"><span class="feld__name">Leipzig Zentrum</span><span class="feld__quelle">109 Polygone</span></div>
+      <div class="feld" data-lage="ok"><span class="feld__name">Dresden Altmarkt</span><span class="feld__quelle">94 Polygone</span></div>
+      <div class="feld" data-lage="ok"><span class="feld__name">Leipzig Mölkau</span><span class="feld__quelle">68 Polygone</span></div>
+      <div class="feld" data-lage="ok"><span class="feld__name">Wurzen · 16.000 Ew.</span><span class="feld__quelle">38 Polygone</span></div>
+      <div class="feld" data-lage="ok"><span class="feld__name">Chemnitz Zentrum</span><span class="feld__quelle">9 Polygone</span></div>
+      <div class="feld" data-lage="aus"><span class="feld__name">Geithain · 6.000 Ew.</span><span class="feld__quelle">0 — nicht kartiert</span></div>
+      <div class="feld" data-lage="aus"><span class="feld__name">Rechenberg-Bienenmühle</span><span class="feld__quelle">0 — nicht kartiert</span></div>
+    </div>
+    <p>
+      Ein Grundstück in Geithain bekommt <b>keinen Wert</b> — und das darf nie als grüne
+      Ampel erscheinen. Daraus folgt die Regel, zwei Abfragen statt einer:
+      <b>(1)</b> Treffer auf dem Flurstück → Spanne ausgeben.
+      <b>(2)</b> Kein Treffer, aber Polygone innerhalb von 2 km → „unter 45 dB(A)".
+      <b>(3)</b> Nichts in 2 km → <b>„für diesen Ort nicht kartiert"</b>, kein Wert, keine Farbe.
+    </p>
+    <p>
+      Der Layer <code>Kartierungsgebiet</code> taugt dafür <b>nicht</b>: er ist eine
+      <code>esriGeometryPolyline</code> mit 4.637 Objekten — das kartierte Straßennetz mit
+      Verkehrsmengen, keine Flächenmaske. Eine Punktabfrage darauf trifft nie.
+    </p>
+  </div>
+
+  <p style="margin-top:1.5rem">
+    <b>Bessere Wege als die Lärmkarte gibt es nicht.</b> Aus den Verkehrsmengen
+    (<code>DTV_LK2022</code> liegt vor) nach RLS-19 zu rechnen hieße, eine Zahl zu erfinden,
+    wo keine gemessene steht — Bebauung und Abschirmung fehlen ohnehin. Abstand zur nächsten
+    Hauptstraße wäre eine Korrelation, keine Aussage. Und eine bundesweite Alternative
+    existiert nicht: die Kartierung ist Ländersache. Was sich verbessern lässt, ist
+    <b>wie</b> wir fragen — Flurstück statt Punkt — und wie ehrlich wir über die Lücken sind.
+  </p>
 </section>
 
 <section>
@@ -451,7 +594,7 @@ Hauptverkehrsstraßen Ln nachts (22–6 Uhr)
 <section>
   <div class="abschnitt-kopf">
     <h2>Fallstricke aus diesem Durchgang</h2>
-    <span class="zahl">5 · gehören ins CLAUDE.md</span>
+    <span class="zahl">7 · gehören ins CLAUDE.md</span>
   </div>
   <ul class="liste">
     <li>
@@ -468,7 +611,15 @@ Hauptverkehrsstraßen Ln nachts (22–6 Uhr)
     </li>
     <li>
       <span class="marker">ESRI</span>
-      <p><b>ArcGIS <code>identify</code> braucht <code>mapExtent</code> und <code>imageDisplay</code></b> — obwohl die Abfrage geometrisch nichts damit zu tun hat: die Toleranz wird in <i>Pixeln</i> gerechnet, und ohne Bildgröße gibt es keine Pixel. Fehlt eines von beiden, kommen null Treffer statt einer Fehlermeldung.</p>
+      <p><b>ArcGIS <code>identify</code> misst seine Toleranz in <i>Pixeln</i> — benutzt es nicht für Sachaussagen.</b> Es braucht <code>mapExtent</code> und <code>imageDisplay</code>, obwohl die Abfrage geometrisch nichts damit zu tun hat, und ohne beides kommen null Treffer statt einer Fehlermeldung. Schlimmer: bei <code>tolerance=3</code> und dem hier gewählten Ausschnitt entsprachen 3 px rund <b>7 m</b> — der Dienst meldete ein Nachbarpolygon als Treffer. <b>Für Sachaussagen ist <code>/&lt;layer&gt;/query</code> mit <code>esriSpatialRelIntersects</code> der richtige Weg</b>, weil er die echte Geometrie schneidet und keinen Maßstab kennt.</p>
+    </li>
+    <li>
+      <span class="marker">3857</span>
+      <p><b>Der Lärm-WMS kann kein Web Mercator.</b> Er führt 4326 und 25833, aber nicht 3857 — MapLibres <code>{bbox-epsg-3857}</code>-Rasterquelle scheitert also. Der ArcGIS-<code>export</code>-Endpunkt mit <code>bboxSR=3857&amp;imageSR=3857</code> reprojiziert dagegen serverseitig und setzt CORS-Header.</p>
+    </li>
+    <li>
+      <span class="marker">SCALE</span>
+      <p><b><code>minScale: 50000</code> liefert ein leeres Bild statt einer Meldung.</b> Oberhalb 1:50.000 zeichnet der Lärmlayer nichts — was wie ein kaputter Layer aussieht und eine Maßstabsgrenze ist.</p>
     </li>
     <li>
       <span class="marker">dB</span>
@@ -478,10 +629,16 @@ Hauptverkehrsstraßen Ln nachts (22–6 Uhr)
 </section>
 
 <p class="fuss">
-  Recherchestand 01.09.2026. Alle Statuscodes stammen aus GET-Abrufen an diesem Tag —
+  Recherchestand 01.–02.09.2026. Alle Statuscodes stammen aus GET-Abrufen an diesen Tagen —
   kein HEAD, kein Zitat aus einer Dokumentation. Vollständiges Protokoll mit allen
   Parametern in <code>docs/research/grundradar-datenquellen.md</code>. Was hier
   „ungeprüft" heißt, ist ungeprüft und nicht etwa nicht vorhanden.
+  <br><br>
+  <b>Korrigiert am 02.09.2026:</b> die erste Fassung nannte für Flurstück 204
+  L<sub>DEN</sub> 55–59 dB(A), ermittelt per <code>identify</code> mit Pixeltoleranz. Die
+  exakte Abfrage mit dem Flurstücksumring sagt <b>50–59 dB(A)</b> über das Grundstück und
+  50–54 dB(A) am Gebäudepunkt. Der alte Wert lag zufällig nahe an der richtigen Antwort,
+  war aber falsch begründet und bei anderem Zoom anders ausgefallen.
 </p>
 
 </div>

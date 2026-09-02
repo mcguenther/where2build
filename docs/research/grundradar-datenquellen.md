@@ -157,3 +157,194 @@ Oberfläche. Deutschsprachige UI heißt auch: Klassenschlüssel werden
   kommen null Treffer statt einer Fehlermeldung.
 - **Lärmpegel kommen als 5-dB-Band,** nicht als Zahl (`Lden5559`). Ein Wert
   wie „57 dB" wäre erfunden; korrekt ist „55–59 dB(A)".
+
+---
+
+# Nachtrag 02.09.2026 — Adresssuche lokal, und wie der Lärmwert richtig entsteht
+
+Zwei Rückfragen, beide mit Abrufen beantwortet. Der zweite Teil **korrigiert
+eine Zahl aus dem ersten Durchgang**.
+
+## 5. Adresssuche ohne fremden Dienst
+
+### 5.1 Photon selbst betreiben — geht, lohnt für Sachsen aber nicht
+
+| Prüfung | Ergebnis |
+| --- | --- |
+| Vorgebauter Deutschland-Index | ✅ `download1.graphhopper.com/public/extracts/by-country-code/de/photon-db-de-250720.tar.bz2` |
+| Größe | **9,20 GB** (9 881 965 371 Bytes, per Range-Request ermittelt, kein Volldownload) |
+| Datenstand | `Last-Modified: 21.07.2025` — zum Prüfzeitpunkt **über 13 Monate alt** |
+| `photon-db-de-latest.tar.bz2` | ❌ **404** — der „latest"-Zeiger ist tot, obwohl das Verzeichnis ihn mit 81 Bytes listet. Wer darauf verlinkt, baut auf einen Link, der nicht auflöst. |
+
+Dazu kommt eine OpenSearch-/Elasticsearch-Instanz als Laufzeitabhängigkeit.
+Für ein Sachsen-Produkt ist das unverhältnismäßig: 9,2 GB und ein Suchcluster,
+um 990 000 sächsische Adressen zu finden.
+
+### 5.2 Die amtliche Alternative — 49 MB, und sie ist die bessere Quelle
+
+**Hauskoordinaten Sachsen**, bereits in `geodaten-sachsen.md` dokumentiert,
+hier auf Eignung für Tippvorschläge geprüft:
+
+- Download ✅ **51 236 896 Bytes (48,9 MB)** in 3,9 s, entpackt
+  `hk_sn_adressen_20260702.txt`, **206 MB**, **990 090 Datensätze**.
+- Datenstand **02.07.2026**, quartalsweise — also aktueller als der
+  Photon-Deutschlandindex.
+- Die Felder decken das Dropdown vollständig ab: `str`, `hnr`, `adz`,
+  `postplz`, `postonm`, `postott` (Ortsteil), `ostwert`/`nordwert` in
+  EPSG:25833.
+
+Die Adresse aus dem grundradar-Screenshot steht wörtlich drin:
+
+```
+…;140;Stadt Leipzig;0260;Mölkau;02642;Lessingweg;44;;33;321807.526;5690358.877;04316;Leipzig;;Mölkau
+```
+
+**Lagevergleich** (nach EPSG:4326 umgerechnet):
+
+| Quelle | lat | lon | Abstand zur amtlichen Koordinate |
+| --- | --- | --- | --- |
+| Hauskoordinaten (amtlich) | 51.33655 | 12.44181 | — |
+| Photon (OSM) | 51.33656 | 12.44184 | **2,1 m** |
+| grundradar (Screenshot) | 51.33652 | 12.44176 | 4,9 m |
+
+Die amtliche Quelle ist also nicht schlechter, sondern nur örtlich begrenzt.
+
+**Tauglichkeit als Typeahead gemessen** — CSV nach SQLite, ein Index auf einer
+zusammengesetzten Suchspalte, `LIKE 'präfix%'`:
+
+| | |
+| --- | --- |
+| Aufbau | 15,4 s, 143 MB SQLite-Datei |
+| „Bautzner" | **11,7 ms** |
+| „Lessingw" | **43,9 ms** |
+| „Prager Str" | **53,6 ms** |
+| „Lessingweg 44" | **75,0 ms** |
+
+Naiv, ohne FTS5 und ohne Optimierung. Für ein entprelltes Suchfeld
+(150–200 ms) reicht das mit Abstand; mit FTS5-Präfixindex ginge es deutlich
+schneller. **Kein externer Dienst im Anfragepfad, keine Rate-Limit-Frage,
+keine fremde Verfügbarkeit.**
+
+### 5.3 Empfehlung
+
+Hauskoordinaten als Primärquelle für Sachsen, `/api/geocode` (MOTIS) als
+Rückfall für alles, was keine sächsische Hausadresse ist — Ortsteile,
+Flurstückslagen, Ziele außerhalb. Photon nur, falls das Produkt Sachsen
+verlässt; dann als eigene Instanz, nicht gegen komoots Server.
+
+## 6. Lärm — Anzeige, Abfrage und eine Korrektur
+
+### 6.1 Korrektur des Mölkau-Werts
+
+Im ersten Durchgang stand hier **„L_DEN 55–59 dB(A)"** für Flurstück 204,
+ermittelt per ArcGIS `identify` mit `tolerance=3`. Das war falsch begründet
+und in der Zahl irreführend.
+
+`identify` rechnet die Toleranz in **Bildpunkten**. Bei dem gewählten
+`mapExtent`/`imageDisplay` entsprachen 3 px rund **7 m** — der Treffer
+`Lden5559` kam also von einem Nachbarpolygon, nicht vom Punkt. Die exakte
+Punkt-in-Polygon-Abfrage über `…/4/query` mit
+`spatialRel=esriSpatialRelIntersects` sagt:
+
+| Abfragegeometrie | L_DEN | L_night |
+| --- | --- | --- |
+| **Punkt** (Adresskoordinate, liegt auf dem Gebäude) | `Lden5054` → **50–54 dB(A)** | `Lnight4549` → 45–49 dB(A) |
+| **Flurstück 204** (650 m², Umring aus ALKIS) | `Lden5054` + `Lden5559` → **50–59 dB(A)** | `Lnight4549` → 45–49 dB(A) |
+
+Das Grundstück liegt tatsächlich in zwei Bändern — der alte Wert war zufällig
+in der Nähe der richtigen Antwort, aber aus dem falschen Grund und bei anderem
+Zoom anders ausgefallen.
+
+**Daraus folgt die Methode:** nicht den Punkt abfragen, sondern **den
+Flurstücksumring**, den wir aus ALKIS ohnehin schon haben. Das ist fachlich
+richtig (ein Grundstück hat keine Punktlage), reproduzierbar (kein
+Maßstabsparameter) und liefert eine Spanne statt einer Scheingenauigkeit.
+
+Verifiziert: ALKIS-BBOX-Abfrage am Screenshot-Punkt liefert 20 Flurstücke,
+darunter `Nr 204 | 650 m² | Mölkau | Lessingweg 44` — identisch zu grundradars
+Kopfzeile. Der Umring hat 6 Stützpunkte und geht unverändert als
+`esriGeometryPolygon` in die Lärmabfrage.
+
+### 6.2 Die vollständige Bänderskala
+
+| Layer | Kategorien |
+| --- | --- |
+| Straße L_DEN (4) | `Lden4549`, `5054`, `5559`, `6064`, `6569`, `7074`, `LdenAb75` |
+| Straße L_night (5) | `Lnight4549`, `5054`, `5559`, `6064`, `6569`, `LnightAb70` |
+| Straßenbahn L_DEN (55) | ab `Lden5054` |
+| Flughafen L_DEN (37) | ab `Lden5054` |
+
+Unterste kartierte Stufe beim Straßenlärm ist **45–49 dB(A)**. „Kein Treffer,
+aber im kartierten Gebiet" heißt also belegbar „unter 45 dB(A)".
+
+### 6.3 Abdeckung — der eigentliche Fallstrick
+
+Anzahl Straßenlärm-Polygone im Umkreis von 300 m:
+
+| Ort | Straßenlärm | Bewertung |
+| --- | --- | --- |
+| Leipzig Zentrum | 109 | kartiert |
+| Dresden Altmarkt | 94 | kartiert |
+| Leipzig Mölkau | 68 | kartiert |
+| Wurzen (16 000 Ew.) | 38 | kartiert |
+| Chemnitz Zentrum | 9 | kartiert |
+| **Geithain (6 000 Ew.)** | **0** | **nicht kartiert** |
+| **Rechenberg-Bienenmühle (Dorf)** | **0** | **nicht kartiert** |
+
+Die Umgebungslärmkartierung ist nach BImSchG Teil 6 auf Ballungsräume und
+Hauptverkehrswege begrenzt. In Geithain gibt es **keine Daten** — und „keine
+Daten" darf niemals als „leise" oder grün erscheinen.
+
+**Regel, die daraus folgt** (zwei Abfragen statt einer):
+
+1. Treffer auf dem Flurstück → Spanne ausgeben.
+2. Kein Treffer, aber Polygone **innerhalb von 2 km** → „unter 45 dB(A)",
+   belegbar leise.
+3. Kein Treffer und nichts in 2 km → **„für diesen Ort nicht kartiert"**.
+   Kein Wert, keine Farbe, keine Ampel.
+
+⚠️ `Kartierungsgebiet` (Layer 52) taugt dafür **nicht**: es ist eine
+`esriGeometryPolyline` mit 4 637 Objekten — das kartierte Straßennetz mit
+Verkehrsmengen (`DTV_LK2022`), keine Flächenmaske. Eine Punktabfrage darauf
+trifft nie.
+
+### 6.4 Den Layer anzeigen — geht, mit zwei Fallstricken
+
+Der Dienst meldet `supportedExtensions: FeatureServer, KmlServer, WFSServer,
+WMSServer`, `maxRecordCount: 5000`, native SR **25833**.
+
+| Prüfung | Ergebnis |
+| --- | --- |
+| WMS `GetCapabilities` | ✅ 200 |
+| **CORS** | ✅ `Access-Control-Allow-Origin` spiegelt den Origin (`http://localhost:5173` getestet) — der Browser darf direkt zugreifen |
+| GetFeatureInfo-Formate | u. a. `application/geo+json`, `text/plain`, `text/html` |
+| **EPSG:3857** | ❌ **nicht unterstützt** (nur 4326, 25833 und exotische) |
+| ArcGIS `export` mit `bboxSR=3857&imageSR=3857` | ✅ 200, `image/png`, 512×512, CORS-Header gesetzt — **der Server reprojiziert selbst** |
+
+**Fallstrick 1:** MapLibres Raster-Quelle fordert Kacheln mit
+`{bbox-epsg-3857}` an. Der WMS kann 3857 nicht — eine gewöhnliche
+WMS-Rasterquelle scheitert also. Der Weg ist der **ArcGIS-`export`-Endpunkt**,
+der serverseitig nach 3857 rechnet.
+
+**Fallstrick 2:** Layer 4 hat `minScale: 50000` — oberhalb 1:50 000 liefert der
+Dienst ein **leeres Bild ohne Fehlermeldung**. Die Umschaltfläche muss also
+entweder erst ab der passenden Zoomstufe aktiv sein oder sagen, dass der Layer
+erst näher dran erscheint.
+
+### 6.5 Gibt es bessere Wege als die Lärmkarte?
+
+Geprüft und verworfen:
+
+- **Aus Verkehrsmengen rechnen.** `DTV_LK2022` liegt an Layer 52 vor, und
+  RLS-19/DIN 18005 wären der Rechenweg. Das hieße, eine Zahl zu erfinden, wo
+  keine gemessene steht — und es ersetzt keine Kartierung, weil Bebauung und
+  Abschirmung fehlen. Nein.
+- **Abstand zur nächsten Hauptstraße als Ersatzmaß.** Wäre eine Korrelation,
+  keine Aussage. Nein.
+- **Bundesweite Alternative.** Existiert nicht: die Kartierung ist Ländersache;
+  bundesweit einheitlich gibt es nur die EEA-Meldungen und das Schienennetz des
+  EBA (dessen Geoportal über den Proxy 502 gab — ungeprüft).
+
+Die amtliche Kartierung ist die richtige und einzige belastbare Quelle. Was
+sich verbessern lässt, ist **wie** wir sie abfragen — Flurstück statt Punkt —
+und **wie ehrlich** wir über ihre Lücken sind.
