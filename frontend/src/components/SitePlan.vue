@@ -171,6 +171,7 @@ import {
 import { cameraFor } from "../lib/projection.js";
 import { num } from "../lib/format.js";
 import { BACKDROPS } from "../lib/basemap.js";
+import { darkTheme } from "../lib/store.js";
 // MapLibre 6 ships named exports only — there is no default.
 // Its worker URL is set once in main.js; see the note there.
 import { Map as MapLibreMap } from "maplibre-gl";
@@ -285,6 +286,9 @@ export default {
     wantsBackdrop() { return this.backdrop !== "none" && Boolean(this.plot.anchor); },
     hasBackdrop() { return this.wantsBackdrop && !this.mapUnavailable; },
     backgroundFill() { return this.backdrop === "aerial" ? "var(--w2b-map-green)" : "var(--w2b-map-ground)"; },
+    /** Which palette the vector backdrop should be drawn in. Deliberately not
+     *  a function of whether the last build succeeded — see `rebuildMap`. */
+    darkBackdrop() { return darkTheme(); },
 
     /** The outline in counter-clockwise order, so "outward" is one fixed sign.
      *  A cadastral ring arrives either way round, and the old chains offset by
@@ -482,6 +486,9 @@ export default {
     // underneath itself, so the map is torn down and rebuilt.
     wantsBackdrop() { this.rebuildMap(); },
     backdrop() { this.rebuildMap(); },
+    // Only the vector backdrop has a palette; the aerial photo and the
+    // cadastral map are the authority's own raster and look the same either way.
+    darkBackdrop() { if (this.backdrop === "map") this.rebuildMap(); },
     measuring(on) { if (!on) this.clearMeasurement(); },
     "plot.id"() {
       this.clearMeasurement();

@@ -262,6 +262,12 @@ class BasemapSettings(BaseSettings):
     upstream_url: str = "https://tiles.openfreemap.org"
     # Path of the style document below the upstream, without a leading slash.
     style_path: str = "styles/liberty"
+    # The same map for a dark interface. A drawing sits *on* the backdrop, so a
+    # near-white ground under a dark page is not a preference but a glare
+    # source. OpenFreeMap serves two dark styles: `dark` is a neutral near-black
+    # (rgb(12,12,12)), `fiord` a blue-grey (#45516E) -- the former is the one
+    # that sits next to this app's warm near-black paper without a colour cast.
+    dark_style_path: str = "styles/dark"
     # Prefix the rewritten URLs point at. Same-origin on purpose: the browser
     # must not need any host but ours.
     public_prefix: str = "/api/basemap"

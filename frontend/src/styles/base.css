@@ -188,3 +188,23 @@ table.data-table tbody tr:last-child td{ border-bottom: 0; }
 @media (prefers-reduced-motion: reduce){
   *, *::before, *::after{ animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* ---------- MapLibre's own controls ----------
+ * The zoom buttons and the attribution pill are drawn by MapLibre, not by us,
+ * and its stylesheet paints them white. On the dark backdrop that is a bright
+ * patch in the corner of an otherwise dark map -- the exact glare the dark
+ * style exists to avoid. The palette is put back through the tokens; the icons
+ * are background images with a fill baked in, so they can only be reached with
+ * a filter. */
+.maplibregl-ctrl-group{
+  background: var(--w2b-surface);
+  box-shadow: var(--w2b-shadow);
+}
+.maplibregl-ctrl-group button + button{ border-top: 1px solid var(--w2b-line); }
+.maplibregl-ctrl-group button:not(:disabled):hover{ background: var(--w2b-primary-veil); }
+.maplibregl-ctrl-group button .maplibregl-ctrl-icon{ filter: var(--w2b-map-control-icons); }
+.maplibregl-ctrl-attrib.maplibregl-compact{ background: var(--w2b-surface); }
+.maplibregl-ctrl-attrib,
+.maplibregl-ctrl-attrib-inner{ color: var(--w2b-muted); }
+.maplibregl-ctrl-attrib a{ color: var(--w2b-graphite); }
+.maplibregl-ctrl-attrib-button{ filter: var(--w2b-map-control-icons); }

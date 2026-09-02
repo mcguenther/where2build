@@ -18,6 +18,7 @@ from fastapi.testclient import TestClient
 from .conftest import BASEMAP_URL, fixture_json, fixture_text
 
 STYLE_URL = f"{BASEMAP_URL}/styles/liberty"
+DARK_STYLE_URL = f"{BASEMAP_URL}/styles/dark"
 TILEJSON_URL = f"{BASEMAP_URL}/planet"
 TILE_PATH = "planet/20260823_080002_pt/14/8798/5484.pbf"
 TILE_URL = f"{BASEMAP_URL}/{TILE_PATH}"
@@ -86,6 +87,39 @@ def test_style_is_served_from_the_cache_on_the_second_call(client: TestClient):
 
     assert route.call_count == 1
     assert answer.headers["x-cache"] == "HIT"
+
+
+@respx.mock
+def test_the_dark_variant_asks_for_the_dark_style(client: TestClient):
+    """A near-white ground under a dark page is a glare source, not a taste."""
+
+    light = respx.get(STYLE_URL).mock(return_value=_style_answer())
+    dark = respx.get(DARK_STYLE_URL).mock(return_value=_style_answer())
+
+    assert client.get("/api/basemap/style.json?variant=dark").status_code == 200
+
+    assert dark.call_count == 1
+    assert light.call_count == 0
+
+
+@respx.mock
+def test_the_two_variants_do_not_share_a_cache_entry(client: TestClient):
+    # One URL, two documents: the light style must never be handed to a dark
+    # page, and the difference is invisible until it is on screen.
+    light = respx.get(STYLE_URL).mock(return_value=_style_answer())
+    dark = respx.get(DARK_STYLE_URL).mock(return_value=_style_answer())
+
+    client.get("/api/basemap/style.json")
+    answer = client.get("/api/basemap/style.json?variant=dark")
+
+    assert light.call_count == 1 and dark.call_count == 1
+    assert answer.headers["x-cache"] == "MISS"
+
+
+def test_a_variant_nobody_serves_is_refused(client: TestClient):
+    # Rather than quietly falling back: a typo that returns the light map looks
+    # like the dark style is broken.
+    assert client.get("/api/basemap/style.json?variant=sepia").status_code == 422
 
 
 @respx.mock

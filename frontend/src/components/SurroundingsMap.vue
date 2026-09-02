@@ -41,6 +41,7 @@
  */
 import { Map as MapLibreMap, Marker, NavigationControl } from "maplibre-gl";
 import { vectorStyle } from "../lib/basemap.js";
+import { darkTheme } from "../lib/store.js";
 import { toWgs84 } from "../lib/projection.js";
 import { rectangleCorners } from "../lib/geometry.js";
 import { openStreetMapPlace, openStreetMapRoute } from "../lib/mapLinks.js";
@@ -96,6 +97,9 @@ export default {
     routedDestinations() {
       return this.destinations.filter(d => Number.isFinite(d.lat) && Number.isFinite(d.lon));
     },
+    /** Which palette the ground is drawn in. Deliberately not a function of
+     *  `unavailable` — a flag that feeds the rebuild rebuilds forever. */
+    darkGround() { return darkTheme(); },
     routeLines() {
       return this.routedDestinations.map(d => d.line).filter(line => Array.isArray(line) && line.length > 1);
     }
@@ -105,6 +109,10 @@ export default {
   watch: {
     // A different plot is a different place: rebuild rather than pan.
     "plot.id"() { this.rebuild(); },
+    // MapLibre cannot swap a style under its own custom layers, so a changed
+    // palette is a rebuild. The camera is carried across it: a theme switch
+    // must not throw away where the user had panned to.
+    darkGround() { this.rebuild({ keepCamera: true }); },
     located() { this.drawMarkers(); },
     routedDestinations() { this.drawMarkers(); this.drawRoutes(); },
     houseOutline() { this.setData("house", this.houseOutline); }
@@ -121,7 +129,8 @@ export default {
           style,
           center: [this.plot.anchor.lon, this.plot.anchor.lat],
           zoom: 15,
-          attributionControl: { compact: true }
+          attributionControl: { compact: true },
+          ...(this._camera || {})
         });
         this._map.addControl(new NavigationControl({ showCompass: false }), "top-right");
         // One missing icon or tile is not a broken map -- the same rule the
@@ -135,7 +144,10 @@ export default {
           this.drawOutlines();
           this.drawRoutes();
           this.drawMarkers();
-          this.frame();
+          // Only frame afresh when there is nothing to return to; a rebuild
+          // that kept the camera has already been put back where it was.
+          if (this._camera) this._camera = null;
+          else this.frame();
         });
         // "idle" means every tile for the current view has arrived and been
         // drawn. Anything that photographs this map waits for it.
@@ -149,7 +161,13 @@ export default {
         this.unavailable = error.message;
       }
     },
-    rebuild() {
+    rebuild({ keepCamera = false } = {}) {
+      if (keepCamera && this._map) {
+        this._camera = {
+          center: this._map.getCenter(), zoom: this._map.getZoom(),
+          bearing: this._map.getBearing(), pitch: this._map.getPitch()
+        };
+      }
       this.destroy();
       this.unavailable = null;
       this.$nextTick(() => this.build());

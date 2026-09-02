@@ -66,6 +66,11 @@
   --w2b-map-violation:      #A8402C;
   --w2b-map-selection:       #456B52;
   --w2b-map-green:         #DCE4DA;
+  /* MapLibre draws its own controls -- zoom buttons, attribution pill -- and
+   * ships them light. Their surfaces take the tokens below; the icons are
+   * background images with a baked-in dark fill, so the palette can only reach
+   * them through a filter. */
+  --w2b-map-control-icons: none;
 
   /* ---------- Corner radii: one per order of magnitude ---------- */
   --w2b-radius-xs:   5px;
@@ -155,6 +160,7 @@
     --w2b-map-violation:      #E0705A;
     --w2b-map-selection:       #9BC0A4;
     --w2b-map-green:         #26302A;
+    --w2b-map-control-icons: invert(1);
 
     --w2b-shadow:      0 1px 2px rgba(0,0,0,.5), 0 12px 28px -20px rgba(0,0,0,.85);
     --w2b-shadow-high: 0 2px 8px rgba(0,0,0,.6), 0 28px 56px -26px rgba(0,0,0,.95);
@@ -211,6 +217,7 @@
   --w2b-map-violation:      #E0705A;
   --w2b-map-selection:       #9BC0A4;
   --w2b-map-green:         #26302A;
+  --w2b-map-control-icons: invert(1);
 
   --w2b-shadow:      0 1px 2px rgba(0,0,0,.5), 0 12px 28px -20px rgba(0,0,0,.85);
   --w2b-shadow-high: 0 2px 8px rgba(0,0,0,.6), 0 28px 56px -26px rgba(0,0,0,.95);
