@@ -1,0 +1,183 @@
+<title>Standortprüfung Mölkau</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  --primary:#2F4A3A; --primary-light:#456B52; --primary-veil:rgba(47,74,58,.10); --primary-on:#F7F4EE;
+  --secondary:#B5813C; --secondary-text:#7C5620;
+  --sage-light:#DCE4DA;
+  --ink:#1E1A16; --graphite:#4A443C; --muted:#6F675C;
+  --line:#DCD3C6; --line-faint:#EBE4D9;
+  --surface:#FAF7F1; --surface-sunken:#F3EFE6; --paper:#F1EBE1; --white:#FFFFFF;
+  --warning:#BE8524; --warning-text:#7C5620; --warning-surface:#F6E9CE;
+  --good:#2F4A3A; --good-surface:#DEE7DF;
+  /* Karte */
+  --map-wohnen:#EDEAE2; --map-gruen:#DCE4DA; --map-gewerbe:#E4E1DA; --map-strasse:#D6D2CA;
+  --map-grenze:#8C8478; --map-halo:#FFFFFF;
+  --map-gebaeude:#B9B2A6; --map-gebaeude-kante:#8C8478;
+  --map-ziel:#2F4A3A; --map-ziel-fuellung:rgba(47,74,58,.13);
+  --db1:#F4DDD6; --db2:#E8B4A4; --db3:#D68A72; --db4:#BE5C41; --db5:#8E3221;
+  --sans:"Public Sans",ui-sans-serif,system-ui,-apple-system,sans-serif;
+  --display:"Archivo","Public Sans",ui-sans-serif,system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --r-m:6px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --primary:#8FB79C; --primary-light:#A8CBB2; --primary-veil:rgba(143,183,156,.13); --primary-on:#10160F;
+  --secondary:#D2A164; --secondary-text:#E0BC8B; --sage-light:#26302A;
+  --ink:#F0EBE2; --graphite:#CFC7BA; --muted:#9A9184;
+  --line:#37312A; --line-faint:#282320;
+  --surface:#191614; --surface-sunken:#211D1A; --paper:#141110; --white:#221E1A;
+  --warning:#D6A342; --warning-text:#E4C081; --warning-surface:#2E2513;
+  --good:#8FB79C; --good-surface:#1A241C;
+  --map-wohnen:#262219; --map-gruen:#20291F; --map-gewerbe:#2A261F; --map-strasse:#332E27;
+  --map-grenze:#6E665A; --map-halo:#0D0B09;
+  --map-gebaeude:#4A4339; --map-gebaeude-kante:#6E665A;
+  --map-ziel:#8FB79C; --map-ziel-fuellung:rgba(143,183,156,.16);
+  --db1:#3A2620; --db2:#5C382C; --db3:#8A4A34; --db4:#B85F3F; --db5:#E08A63;
+}}
+:root[data-theme="dark"]{
+  --primary:#8FB79C; --primary-light:#A8CBB2; --primary-veil:rgba(143,183,156,.13); --primary-on:#10160F;
+  --secondary:#D2A164; --secondary-text:#E0BC8B; --sage-light:#26302A;
+  --ink:#F0EBE2; --graphite:#CFC7BA; --muted:#9A9184;
+  --line:#37312A; --line-faint:#282320;
+  --surface:#191614; --surface-sunken:#211D1A; --paper:#141110; --white:#221E1A;
+  --warning:#D6A342; --warning-text:#E4C081; --warning-surface:#2E2513;
+  --good:#8FB79C; --good-surface:#1A241C;
+  --map-wohnen:#262219; --map-gruen:#20291F; --map-gewerbe:#2A261F; --map-strasse:#332E27;
+  --map-grenze:#6E665A; --map-halo:#0D0B09;
+  --map-gebaeude:#4A4339; --map-gebaeude-kante:#6E665A;
+  --map-ziel:#8FB79C; --map-ziel-fuellung:rgba(143,183,156,.16);
+  --db1:#3A2620; --db2:#5C382C; --db3:#8A4A34; --db4:#B85F3F; --db5:#E08A63;
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5}
+.hinweisleiste{background:var(--primary);color:var(--primary-on);padding:.5rem 1rem;font-size:.76rem;
+  display:flex;flex-wrap:wrap;gap:.3rem 1rem;align-items:baseline}
+.hinweisleiste b{font-weight:600}
+.hinweisleiste .mono{font-family:var(--mono);opacity:.85}
+.leiste{display:flex;align-items:center;gap:.7rem;padding:.6rem 1rem;background:var(--surface);border-bottom:1px solid var(--line)}
+.marke{font-family:var(--display);font-weight:700;font-size:1.05rem;letter-spacing:-.01em}
+.marke span{color:var(--primary)}
+.leiste .schritte{margin-left:auto;display:flex;gap:.3rem;font-size:.76rem;color:var(--muted)}
+.leiste .schritte b{color:var(--ink);font-weight:600}
+.buehne{display:grid;grid-template-columns:minmax(0,1fr)}
+@media(min-width:960px){.buehne{grid-template-columns:392px minmax(0,1fr);height:calc(100vh - 92px);min-height:640px}}
+.spalte{background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.suchfeld{padding:.8rem;border-bottom:1px solid var(--line);position:relative}
+.suchfeld label{display:block;font-family:var(--mono);font-size:.64rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.35rem}
+.eingabe{display:flex;align-items:center;gap:.5rem;background:var(--surface-sunken);border:1px solid var(--line);border-radius:var(--r-m);padding:.1rem .6rem}
+.eingabe:focus-within{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-veil)}
+.eingabe input{flex:1;border:0;background:transparent;color:var(--ink);font:inherit;padding:.5rem 0;outline:none;min-width:0}
+.eingabe svg{flex:none;color:var(--muted)}
+.erkannt{font-family:var(--mono);font-size:.63rem;padding:.15rem .4rem;border-radius:3px;white-space:nowrap;
+  background:var(--primary-veil);color:var(--primary);border:1px solid color-mix(in srgb,var(--primary) 26%,transparent)}
+.erkannt[data-sicher="0"]{background:var(--warning-surface);color:var(--warning-text);border-color:color-mix(in srgb,var(--warning) 32%,transparent)}
+.erkannt:empty{display:none}
+.suchfuss{display:flex;justify-content:space-between;gap:.5rem;margin-top:.35rem;font-family:var(--mono);font-size:.63rem;color:var(--muted)}
+.suchfuss b{color:var(--primary)}
+.liste{position:absolute;left:.8rem;right:.8rem;top:calc(100% - .9rem);z-index:30;background:var(--white);
+  border:1px solid var(--line);border-radius:var(--r-m);box-shadow:0 10px 28px rgba(30,26,22,.18);overflow:hidden}
+.liste[hidden]{display:none}
+.treffer{display:flex;gap:.55rem;align-items:baseline;padding:.45rem .6rem;cursor:pointer;border:0;background:transparent;width:100%;text-align:left;font:inherit;color:var(--ink)}
+.treffer:hover,.treffer[aria-selected="true"]{background:var(--primary-veil)}
+.treffer__adr{font-weight:600;font-size:.87rem}
+.treffer__ort{font-size:.77rem;color:var(--muted);margin-left:auto;text-align:right;white-space:nowrap}
+.liste__fuss{padding:.35rem .6rem;border-top:1px solid var(--line-faint);font-family:var(--mono);font-size:.62rem;color:var(--muted);background:var(--surface-sunken)}
+.rollen{overflow-y:auto;flex:1;min-height:0}
+.block{padding:.8rem;border-bottom:1px solid var(--line-faint)}
+.block__marke{font-family:var(--mono);font-size:.63rem;letter-spacing:.11em;text-transform:uppercase;color:var(--muted);margin:0 0 .35rem}
+.block h2{font-family:var(--display);font-size:1rem;font-weight:600;margin:0 0 .1rem;line-height:1.25}
+.block p{margin:0;font-size:.82rem;color:var(--graphite)}
+.zeile{display:flex;justify-content:space-between;gap:.8rem;padding:.28rem 0;font-size:.84rem;border-bottom:1px solid var(--line-faint)}
+.zeile:last-child{border-bottom:0}
+.zeile dt{color:var(--muted)} .zeile dd{margin:0;font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+dl{margin:.3rem 0 0}
+.wert{font-family:var(--display);font-size:1.85rem;font-weight:700;letter-spacing:-.02em;line-height:1}
+.wert small{font-size:.9rem;font-weight:600;color:var(--muted);margin-left:.15rem}
+.zaehlband{display:flex;gap:.3rem;flex-wrap:wrap;margin:.4rem 0 .1rem}
+.chip{font-family:var(--mono);font-size:.65rem;padding:.18rem .42rem;border-radius:3px;border:1px solid transparent;white-space:nowrap}
+.chip--good{background:var(--good-surface);color:var(--good);border-color:color-mix(in srgb,var(--good) 28%,transparent)}
+.chip--note{background:var(--warning-surface);color:var(--warning-text);border-color:color-mix(in srgb,var(--warning) 34%,transparent)}
+.chip--open{background:var(--surface-sunken);color:var(--muted);border-color:var(--line)}
+.pruefung{display:grid;grid-template-columns:auto 1fr;gap:.12rem .55rem;padding:.5rem 0;border-bottom:1px solid var(--line-faint)}
+.pruefung:last-child{border-bottom:0}
+.punkt{width:9px;height:9px;border-radius:50%;margin-top:.4rem;flex:none}
+.punkt--good{background:var(--good)} .punkt--note{background:var(--warning)}
+.punkt--open{background:transparent;border:1px solid var(--muted)}
+.pruefung__kopf{display:flex;justify-content:space-between;gap:.6rem;align-items:baseline}
+.pruefung__name{font-weight:600;font-size:.87rem}
+.pruefung__wert{font-family:var(--mono);font-size:.77rem;font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.pruefung__wert.good{color:var(--good)} .pruefung__wert.note{color:var(--warning-text)} .pruefung__wert.open{color:var(--muted)}
+.pruefung__text{grid-column:2;font-size:.78rem;color:var(--muted);line-height:1.45}
+.einordnung{grid-column:2;margin:.35rem 0 .1rem;padding:.45rem .55rem;background:var(--surface-sunken);
+  border-left:2px solid var(--warning);border-radius:0 4px 4px 0}
+.einordnung__kopf{margin:0;font-size:.79rem;color:var(--ink);line-height:1.45}
+.einordnung__stufe{display:inline-block;font-family:var(--mono);font-size:.63rem;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--warning-text);background:var(--warning-surface);
+  border:1px solid color-mix(in srgb,var(--warning) 34%,transparent);border-radius:3px;
+  padding:.1rem .32rem;margin-right:.4rem;vertical-align:.05em}
+.einordnung__notizen{margin:.3rem 0 0;padding-left:.9rem;display:flex;flex-direction:column;gap:.15rem}
+.einordnung__notizen li{font-size:.76rem;color:var(--muted);line-height:1.4}
+.einordnung__quelle{margin:.3rem 0 0;font-family:var(--mono);font-size:.61rem;color:var(--muted);opacity:.85}
+.rohtext{grid-column:2;margin-top:.3rem}
+.rohtext summary{font-family:var(--mono);font-size:.65rem;color:var(--muted);cursor:pointer}
+.rohtext p{margin:.25rem 0 0;font-size:.74rem;color:var(--muted);font-style:italic;line-height:1.4}
+.pruefung__quelle{grid-column:2;font-family:var(--mono);font-size:.63rem;color:var(--muted);opacity:.8;margin-top:.12rem}
+/* ---- Karte ---- */
+.karte{position:relative;background:var(--map-wohnen);min-height:440px;overflow:hidden;min-width:0}
+#plan{width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+#plan.plan--zieht{cursor:grabbing}
+#plan:focus-visible{outline:2px solid var(--primary);outline-offset:-2px}
+.grenze{transition:opacity .15s}
+.plan--laerm .grenze{opacity:.5}
+.strassenname{font-family:var(--sans);font-size:11px;font-weight:500;fill:var(--muted);text-anchor:middle;
+  paint-order:stroke;stroke:var(--map-halo);stroke-width:3px;stroke-linejoin:round;letter-spacing:.02em}
+.flstnr{font-family:var(--mono);font-size:10px;fill:var(--graphite);text-anchor:middle;dominant-baseline:middle;
+  paint-order:stroke;stroke:var(--map-halo);stroke-width:2.6px;stroke-linejoin:round}
+.flstnr--ziel{font-size:14px;font-weight:500;fill:var(--map-ziel)}
+.karte__kopf{position:absolute;top:.7rem;left:.7rem;right:.7rem;display:flex;gap:.5rem;align-items:flex-start;justify-content:space-between;pointer-events:none;flex-wrap:wrap}
+.tafel{background:color-mix(in srgb,var(--surface) 93%,transparent);border:1px solid var(--line);border-radius:var(--r-m);
+  padding:.45rem .55rem;pointer-events:auto;backdrop-filter:blur(6px);box-shadow:0 2px 10px rgba(30,26,22,.10)}
+.tafel__marke{font-family:var(--mono);font-size:.6rem;letter-spacing:.11em;text-transform:uppercase;color:var(--muted);margin:0 0 .3rem}
+.schalter{display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.81rem;font-weight:500}
+.schalter + .schalter{margin-top:.3rem}
+/* Auf dem Luftbild brauchen Grenzen und Schrift mehr Halo, um zu tragen. */
+.plan--ortho .grenze{stroke:var(--map-halo);opacity:.85}
+/* Auf dem Luftbild verdecken gefuellte Gebaeude genau das, was man sehen will. */
+.plan--ortho .gebaeude{fill:none;stroke:var(--map-halo);stroke-width:1.1;opacity:.75}
+.plan--ortho .flstnr{fill:#FFFFFF;stroke:rgba(0,0,0,.65);stroke-width:3px}
+.plan--ortho .flstnr--ziel{fill:#FFFFFF}
+.plan--ortho .strassenname{fill:#FFFFFF;stroke:rgba(0,0,0,.6);stroke-width:3.4px}
+.schalter input{position:absolute;opacity:0;width:1px;height:1px}
+.gleis{width:32px;height:18px;border-radius:9px;background:var(--line);position:relative;transition:background .15s;flex:none}
+.gleis::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--white);box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .15s}
+.schalter input:checked + .gleis{background:var(--primary)}
+.schalter input:checked + .gleis::after{transform:translateX(14px)}
+.schalter input:focus-visible + .gleis{box-shadow:0 0 0 3px var(--primary-veil)}
+.legende{margin-top:.45rem;display:none;gap:.12rem;flex-direction:column}
+.legende[data-an="1"]{display:flex}
+.legende__zeile{display:flex;align-items:center;gap:.4rem;font-family:var(--mono);font-size:.65rem;color:var(--graphite)}
+.legende__feld{width:15px;height:9px;border:1px solid color-mix(in srgb,var(--map-grenze) 40%,transparent);flex:none}
+.knoepfe{display:flex;flex-direction:column;gap:.25rem}
+.knopf{width:30px;height:30px;border:1px solid var(--line);background:color-mix(in srgb,var(--surface) 93%,transparent);
+  color:var(--ink);border-radius:var(--r-m);cursor:pointer;font:600 15px/1 var(--sans);pointer-events:auto;
+  display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
+.knopf:hover{background:var(--surface);border-color:var(--primary)}
+.knopf--klein{font-size:10px;font-family:var(--mono);font-weight:500}
+.karte__fuss{position:absolute;bottom:.7rem;left:.7rem;right:.7rem;display:flex;justify-content:space-between;align-items:flex-end;gap:.5rem;pointer-events:none;flex-wrap:wrap}
+.massstab{background:color-mix(in srgb,var(--surface) 90%,transparent);padding:.3rem .45rem;border-radius:4px;border:1px solid var(--line)}
+.massstab text{font-family:var(--mono);font-size:9px;fill:var(--graphite)}
+.quelle{font-family:var(--mono);font-size:.61rem;color:var(--muted);background:color-mix(in srgb,var(--surface) 90%,transparent);padding:.25rem .4rem;border-radius:4px;max-width:21rem;text-align:right}
+.fuss{padding:.7rem 1rem;border-top:1px solid var(--line);background:var(--surface);font-size:.75rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:.3rem 1.2rem}
+.fuss b{color:var(--graphite);font-weight:600}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+@media(max-width:959px){
+  .spalte{display:contents}
+  .suchfeld{order:1;background:var(--surface);border-bottom:1px solid var(--line);min-width:0}
+  .karte{order:2;height:62vh}
+  .rollen{order:3;background:var(--surface);border-top:1px solid var(--line);overflow:visible;min-width:0}
+}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>

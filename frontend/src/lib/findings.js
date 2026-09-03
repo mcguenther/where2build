@@ -55,6 +55,82 @@ function join(parts) {
 const SOURCE_NAMES = { road: "Straßenverkehr", tram: "Straßenbahn", air: "Fluglärm", rail: "Schienenverkehr" };
 
 /**
+ * How loud is that, in terms someone can picture?
+ *
+ * The bands are the survey's own 5 dB steps; what each one gets is a plain
+ * label and one everyday consequence. The consequences are qualitative on
+ * purpose: L_DEN is a rating level over 24 hours with evening and night
+ * penalties, not a sound you could stand next to, so "as loud as a hairdryer"
+ * would be wrong. What can honestly be said is what the level costs you —
+ * whether the traffic intrudes on a conversation in the garden, whether a
+ * window can stay open.
+ *
+ * The reference values are the WHO's, as reproduced in the UBA position paper
+ * on the WHO environmental noise guidelines (2019): for road traffic, L_DEN
+ * 53 dB(A) and L_night 45 dB(A) are the levels it recommends not exceeding,
+ * and above L_DEN 65 dB(A) the cardiovascular risk rises measurably.
+ */
+const NOISE_LEVELS = [
+  { upTo: 49, label: "leise",
+    everyday: "Der Verkehr ist auf dem Grundstück kaum wahrnehmbar." },
+  { upTo: 54, label: "mäßig",
+    everyday: "Der Verkehr ist hörbar, ein Gespräch im Garten stört er nicht." },
+  { upTo: 59, label: "deutlich hörbar",
+    everyday: "Der Verkehr ist dauernd da; im Garten hebt man beim Sprechen die Stimme." },
+  { upTo: 64, label: "laut",
+    everyday: "Bei geöffnetem Fenster stört der Verkehr Gespräch und Fernsehen." },
+  { upTo: 69, label: "sehr laut",
+    everyday: "Dauerhaft laut. Ruhiges Wohnen setzt Schallschutzfenster voraus." },
+  { upTo: Infinity, label: "sehr laut",
+    everyday: "Sehr hohe Dauerbelastung. Schallschutz ist hier keine Frage der Bequemlichkeit." }
+];
+
+/** WHO values per source, as reproduced by the UBA (2019), in dB(A). */
+export const WHO_LIMITS = {
+  road: { den: 53, night: 45 },
+  rail: { den: 54, night: 44 },
+  air: { den: 45, night: 40 }
+};
+const RISK_DEN = 65;
+
+const levelFor = value => NOISE_LEVELS.find(band => value <= band.upTo);
+
+/**
+ * Put a measured span in everyday terms and against the recommended value.
+ *
+ * The louder end of the span decides the wording: a plot that reaches 59 dB(A)
+ * somewhere is not described by its quiet corner.
+ */
+export function noiseInterpretation(daySpan, nightSpan, source = "road") {
+  if (!daySpan) return null;
+  const loudest = daySpan[1] === null ? daySpan[0] : daySpan[1];
+  const band = levelFor(loudest);
+  const limits = WHO_LIMITS[source] ?? WHO_LIMITS.road;
+
+  const notes = [];
+  if (loudest > limits.den) {
+    notes.push(`Über dem Wert von ${limits.den} dB(A), den die WHO für Straßenverkehr empfiehlt.`);
+  } else {
+    notes.push(`Unter dem Wert von ${limits.den} dB(A), den die WHO für Straßenverkehr empfiehlt.`);
+  }
+  if (loudest >= RISK_DEN) {
+    notes.push(`Ab ${RISK_DEN} dB(A) steigt das Herz-Kreislauf-Risiko nachweislich.`);
+  }
+  if (nightSpan) {
+    const nightLoudest = nightSpan[1] === null ? nightSpan[0] : nightSpan[1];
+    notes.push(nightLoudest > limits.night
+      ? `Nachts über der Empfehlung von ${limits.night} dB(A) — bei gekipptem Fenster kann der Verkehr den Schlaf stören.`
+      : `Nachts unter der Empfehlung von ${limits.night} dB(A).`);
+  }
+  return {
+    label: band.label,
+    everyday: band.everyday,
+    notes,
+    source: "WHO-Leitlinien, wiedergegeben im UBA-Positionspapier 2019"
+  };
+}
+
+/**
  * Noise.
  *
  * Three outcomes, not two. A hit gives the range. No hit inside a mapped area
@@ -106,10 +182,12 @@ export function noiseFinding(data) {
   // reaches that band anywhere is worth a note -- even when its quieter half
   // pulls the lower bound down.
   const loudest = Math.max(...sources.flatMap(key => day[key]).map(readBand).filter(Boolean).map(b => b[0]));
+  const main = sources.includes("road") ? "road" : sources[0];
   return {
     status: loudest >= 55 ? NOTE : GOOD,
     value: spanText(daySpan),
-    text: sentences.join(" ")
+    text: sentences.join(" "),
+    interpretation: noiseInterpretation(daySpan, nightSpan, main)
   };
 }
 
@@ -180,20 +258,81 @@ export function airQualityFinding(data) {
 }
 
 /**
- * Ground: the soil map's own description plus how much drilling evidence sits
- * nearby. Neither is a verdict — both are what a surveyor would look up first.
+ * What the soil map's own wording means for someone building on it.
  *
- * @param {{soilText: string, boreholes: number, radiusM: number,
- *          nearestM: number, nearestDepthM: number, deepest: Object}} data
+ * "Hortisol über erodierter Parabraunerde aus gemischtem Schluff über tiefem
+ * periglaziärem Kies führendem Lehm" is precise and tells a buyer nothing. The
+ * words that carry the practical meaning are the grain sizes, and the soil map
+ * spells them out in plain German — so the classification reads them straight
+ * out of the text rather than parsing the KA5 code beside it.
+ *
+ * Clay, loam and silt make a cohesive soil: it holds water and drains slowly.
+ * Sand and gravel make a coarse one that drains fast. Which of the two a plot
+ * sits on decides whether soaking rainwater away on site is even a candidate,
+ * and that is a question the buyer will have to answer anyway.
+ *
+ * What it deliberately does not say is anything about bearing capacity. A
+ * 1:50 000 soil map is not a ground investigation, and the sentence says so.
+ */
+const COHESIVE_WORDS = ["ton", "lehm", "schluff"];
+const COARSE_WORDS = ["sand", "kies"];
+
+/** Air capacity class from the soil-parameter map, as its legend defines it. */
+const AIR_CAPACITY = {
+  LK_I: { label: "sehr gering", range: "< 2 Vol.-%", drains: false },
+  LK_II: { label: "gering", range: "2 – 5 Vol.-%", drains: false },
+  LK_III: { label: "mittel", range: "5 – 13 Vol.-%", drains: null },
+  LK_IV: { label: "hoch", range: "13 – 26 Vol.-%", drains: true },
+  LK_V: { label: "sehr hoch", range: "ab 26 Vol.-%", drains: true }
+};
+
+export function classifySoil(soilText, airCapacityClass = null) {
+  const text = String(soilText ?? "").toLowerCase();
+  if (!text) return null;
+  const cohesive = COHESIVE_WORDS.filter(word => text.includes(word));
+  const coarse = COARSE_WORDS.filter(word => text.includes(word));
+  if (!cohesive.length && !coarse.length) return null;
+
+  const capitalise = word => word[0].toUpperCase() + word.slice(1);
+  const grains = [...cohesive, ...coarse].map(capitalise);
+  const kind = cohesive.length && coarse.length ? "gemischt"
+             : cohesive.length ? "bindig" : "rollig";
+  const air = airCapacityClass ? AIR_CAPACITY[airCapacityClass] ?? null : null;
+
+  const sentences = [];
+  sentences.push(kind === "bindig"
+    ? `Bindiger Boden (${grains.join(", ")}) — er hält Wasser und lässt es langsam durch.`
+    : kind === "rollig"
+      ? `Rolliger Boden (${grains.join(", ")}) — Wasser läuft rasch ab.`
+      : `Gemischter Boden (${grains.join(", ")}) — bindige und rollige Lagen wechseln sich ab.`);
+  if (air) {
+    sentences.push(`Luftkapazität ${air.label} (${air.range}).`);
+  }
+  if (kind === "bindig" && air && air.drains === true) {
+    sentences.push("Ob Regenwasser vor Ort versickern kann, ist damit offen und muss geprüft werden.");
+  } else if (kind === "bindig") {
+    sentences.push("Regenwasser versickert hier voraussichtlich schlecht — ein Anschluss oder eine Rigole ist einzuplanen.");
+  }
+  return { kind, grains, air, text: sentences.join(" ") };
+}
+
+/**
+ * Ground: what the soil is, what drilling evidence sits nearby, and the plain
+ * statement that neither replaces a ground investigation.
+ *
+ * @param {{soilText: string, airCapacityClass: string, boreholes: number,
+ *          radiusM: number, nearestM: number, nearestDepthM: number,
+ *          deepest: Object}} data
  */
 export function groundFinding(data) {
-  const { soilText = null, boreholes = 0, radiusM = 300,
+  const { soilText = null, airCapacityClass = null, boreholes = 0, radiusM = 300,
           nearestM = null, nearestDepthM = null, deepest = null } = data ?? {};
   if (!soilText && !boreholes) {
     return { status: OPEN, value: "—", text: "Keine Bodenkarte und keine Aufschlussdaten am Ort." };
   }
+  const soil = classifySoil(soilText, airCapacityClass);
   const parts = [];
-  if (soilText) parts.push(`${soilText}.`);
+  if (soil) parts.push(soil.text);
   if (boreholes) {
     parts.push(`${boreholes} ${boreholes === 1 ? "Bohrung" : "Bohrungen"} im Umkreis von ${num(radiusM, 0)} m.`);
     if (nearestM !== null) {
@@ -204,10 +343,13 @@ export function groundFinding(data) {
       parts.push(`Tiefste in der Nähe ${num(deepest.depthM, 0)} m${deepest.year ? ` (${deepest.year})` : ""}.`);
     }
   }
+  parts.push("Die Bodenkarte 1:50.000 ersetzt keine Baugrunduntersuchung.");
   return {
     status: NOTE,
-    value: boreholes ? `${boreholes} ${boreholes === 1 ? "Bohrung" : "Bohrungen"}` : "Bodenkarte",
-    text: parts.join(" ")
+    value: soil ? soil.kind : "Bodenkarte",
+    text: parts.join(" "),
+    soil,
+    detail: soilText ?? null
   };
 }
 

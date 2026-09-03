@@ -441,3 +441,91 @@ Richtwertgrundstück misst 800 m²) und verlinkt die **Umrechnungstabelle** des
 Gutachterausschusses. Unser Flurstück hat 650 m². grundradar zeigt nur die
 280 €/m²; der Umrechnungsschritt auf die tatsächliche Fläche ist ein Feld, in
 dem wir sachlich weiter sind.
+
+---
+
+# Nachtrag 02.09.2026 (3) — Einordnung statt Rohwert
+
+## 14. Lärm: was 55–59 dB(A) für den Alltag heißt
+
+Die Schwellen sind nicht erfunden, sondern aus dem **UBA-Positionspapier zu
+den WHO-Leitlinien für Umgebungslärm (2019)** gelesen (PDF abgerufen und im
+Text durchsucht):
+
+| Quelle | L_DEN | L_night |
+| --- | --- | --- |
+| Straßenverkehr | **53 dB(A)** | **45 dB(A)** |
+| Schienenverkehr | 54 dB(A) | 44 dB(A) |
+| Luftverkehr | 45 dB(A) | 40 dB(A) |
+
+Dazu im selben Papier: **ab 65 dB(A) L_DEN** steigt das
+Herz-Kreislauf-Risiko nachweislich.
+
+**Warum kein „so laut wie ein Staubsauger".** L_DEN ist ein über 24 Stunden
+gemittelter Beurteilungspegel mit Zuschlägen für Abend und Nacht — kein
+Geräusch, neben dem man stehen kann. Ein Gegenstandsvergleich wäre schlicht
+falsch. Ehrlich sagen lässt sich, **was der Pegel kostet**: ob der Verkehr ein
+Gespräch im Garten stört, ob ein Fenster nachts offen bleiben kann. Die
+Stufen in `findings.js` sind deshalb so formuliert, und die Einordnung nennt
+ihre Quelle mit.
+
+Für das Grundstück maßgeblich ist das **lautere Ende der Spanne**: ein
+Flurstück, das irgendwo 59 dB(A) erreicht, wird nicht von seiner leisen Ecke
+beschrieben.
+
+## 15. Baugrund: die Bodenkarte übersetzen
+
+Der Satz aus der BK50 — „Hortisol ueber erodierter Parabraunerde aus
+gemischtem Schluff ueber tiefem periglaziaerem Kies fuehrendem Lehm" — ist
+korrekt und für einen Käufer wertlos. Die praktische Aussage steckt in den
+**Korngrößen**, und die stehen dort im Klartext. Klassifiziert wird deshalb
+aus dem deutschen Text, nicht aus dem KA5-Code daneben:
+
+| Wort | Lesart |
+| --- | --- |
+| Ton, Lehm, Schluff | **bindig** — hält Wasser, gibt es langsam ab |
+| Sand, Kies | **rollig** — Wasser läuft rasch ab |
+| beides | **gemischt** |
+
+Dazu kommt aus `boden/bodenkennwerte` die **Luftkapazität als Stufe**, deren
+Klassengrenzen aus der Legende des Dienstes stammen (`/legend?f=json`, live
+gelesen):
+
+`LK I < 2` · `LK II 2–5` · `LK III 5–13` · `LK IV 13–26` · `LK V ab 26 Vol.-%`
+
+Flurstück 204 hat **LK IV (hoch)** bei gemischtem Boden. Daraus wird kein
+Versickerungsversprechen, sondern: *„Ob Regenwasser vor Ort versickern kann,
+ist damit offen und muss geprüft werden."*
+
+**Was nicht gesagt wird:** irgendetwas zur Tragfähigkeit. Jede Ausgabe endet
+mit „Die Bodenkarte 1:50.000 ersetzt keine Baugrunduntersuchung."
+
+## 16. Luftbild als Ebene
+
+| Prüfung | Ergebnis |
+| --- | --- |
+| `geodienste.sachsen.de/wms_geosn_dop-rgb/guest` | ✅ 200, WMS 1.3.0 |
+| Layer | `sn_dop_020` (20 cm Bodenauflösung) |
+| CRS | ✅ **EPSG:3857**, 25833 und 4326 — anders als der Lärm-WMS |
+| CORS | ✅ Origin wird gespiegelt |
+| GetMap 2000×2000 px über 420 m | ✅ 1,08 MB JPEG |
+
+In der Anwendung also eine gewöhnliche MapLibre-Rasterquelle. **Im Mockup
+nicht** — die Artifact-CSP blockt fremde Bilder, deshalb liegt dort ein
+einmal abgerufener Ausschnitt als `data:`-URI (Qualität 60, 501 kB).
+
+Zwei Darstellungsregeln, die sich aus dem Bild ergeben: über dem Luftbild
+werden die **Nutzungsflächen ausgeblendet** und die **Gebäude nur als Umriss**
+gezeichnet, sonst verdeckt das Kataster genau das, was man sehen wollte. Und
+der Lärmschleier geht auf halbe Deckkraft, sonst verschwindet das Foto.
+
+## 17. Ein Prozessfehler, dreimal derselbe
+
+Drei Korrekturen gingen verloren, weil ich sie in der **zusammengesetzten**
+`standort-mockup.html` gemacht hatte und danach aus den Bausteinen neu
+gebaut habe: die Reihenfolge der Media Query, die Höhe des
+Maßstabsbalkens und die ganze Straßennamen-Logik.
+
+Der Mockup wird jetzt aus `mockup/build/` mit `python3 mockup/build/bauen.py`
+erzeugt, und die 832-kB-Ausgabe wird nicht mehr von Hand angefasst. Bei einer
+Datei mit einem base64-Luftbild darin ist das keine Stilfrage.

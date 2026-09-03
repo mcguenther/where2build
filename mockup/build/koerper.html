@@ -1,0 +1,131 @@
+
+<div class="hinweisleiste">
+  <b>Mockup — jede Zahl ist abgerufen, jeder Prüftext ist erzeugt, keiner geschrieben.</b>
+  <span class="mono">Flurstück 204, Gemarkung Mölkau · Abrufe 01.–02.09.2026</span>
+</div>
+
+<div class="leiste">
+  <span class="marke">where2<span>build</span></span>
+  <span class="schritte"><b>Standort</b> · Haus · Ziele · Vergleich</span>
+</div>
+
+<div class="buehne">
+  <aside class="spalte">
+    <div class="suchfeld">
+      <label for="q">Adresse, Flurstück oder Koordinate</label>
+      <div class="eingabe">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="q" type="text" value="Lessingweg 44" autocomplete="off" spellcheck="false"
+               role="combobox" aria-expanded="false" aria-controls="treffer" aria-autocomplete="list">
+        <span class="erkannt" id="erkannt" data-sicher="1"></span>
+      </div>
+      <div class="suchfuss">
+        <span id="gesucht">gesucht in: <b>—</b></span>
+        <span><b id="zaehler">0</b> Abfragen</span>
+      </div>
+      <div class="liste" id="treffer" role="listbox" aria-label="Vorschläge" hidden></div>
+    </div>
+
+    <div class="rollen">
+      <section class="block">
+        <p class="block__marke">Standort</p>
+        <h2>Lessingweg 44</h2>
+        <p>04316 Leipzig · Ortsteil Mölkau · Sachsen</p>
+        <dl>
+          <div class="zeile"><dt>Amtliche Hauskoordinate</dt><dd>51,33655 · 12,44181</dd></div>
+          <div class="zeile"><dt>Gemeinde</dt><dd>Stadt Leipzig</dd></div>
+        </dl>
+      </section>
+
+      <section class="block">
+        <p class="block__marke">Flurstück</p>
+        <h2>Gemarkung Mölkau · Nr. 204</h2>
+        <dl>
+          <div class="zeile"><dt>Fläche, amtlich</dt><dd>650 m²</dd></div>
+          <div class="zeile"><dt>Lagebezeichnung</dt><dd>Lessingweg 44</dd></div>
+          <div class="zeile"><dt>Gemarkungsschlüssel</dt><dd>145592</dd></div>
+        </dl>
+      </section>
+
+      <section class="block">
+        <p class="block__marke">Bodenrichtwert</p>
+        <div class="wert">280 <small>€/m²</small></div>
+        <p style="margin-top:.28rem">Wohnbaufläche · Baureifes Land · Stichtag 01.01.2026</p>
+        <dl>
+          <div class="zeile"><dt>Richtwertgrundstück</dt><dd>800 m²</dd></div>
+          <div class="zeile"><dt>Dieses Flurstück</dt><dd>650 m²</dd></div>
+          <div class="zeile"><dt>Richtwertzone</dt><dd>71300250</dd></div>
+        </dl>
+        <p style="margin-top:.4rem;font-size:.77rem">
+          Der Richtwert gilt für ein gedachtes Grundstück von 800 m². Für 650 m² ist er
+          nach der Umrechnungstabelle des Gutachterausschusses anzupassen.
+        </p>
+      </section>
+
+      <section class="block">
+        <p class="block__marke">Prüfungen</p>
+        <div class="zaehlband">
+          @@ZAEHLBAND@@
+        </div>
+        <p style="font-size:.76rem;color:var(--muted);margin-top:.28rem">
+          Kein Gesamtscore: eine Zahl aus elf Prüfungen, von denen drei keine Daten haben,
+          beschriebe die Datenlage, nicht das Grundstück.
+        </p>
+        <div style="margin-top:.45rem">
+@@PRUEFLISTE@@
+        </div>
+      </section>
+    </div>
+  </aside>
+
+  <div class="karte">
+    <svg id="plan" tabindex="0" role="img"
+         aria-label="Lageplan: Flurstück 204 in Mölkau mit Nachbarflurstücken, Gebäuden und Straßen. Ziehen zum Verschieben, Mausrad zum Zoomen.">
+      <g id="welt"></g>
+      <g id="schrift"></g>
+    </svg>
+    <div class="karte__kopf">
+      <div class="tafel">
+        <p class="tafel__marke">Ebenen</p>
+        <label class="schalter">
+          <input type="checkbox" id="orthoAn">
+          <span class="gleis"></span>
+          <span>Luftbild</span>
+        </label>
+        <label class="schalter">
+          <input type="checkbox" id="laermAn">
+          <span class="gleis"></span>
+          <span>Lärm (Straße, 24 h)</span>
+        </label>
+        <div class="legende" id="legende" data-an="0">
+          <div class="legende__zeile"><span class="legende__feld" style="background:var(--db1)"></span>50–54 dB(A)</div>
+          <div class="legende__zeile"><span class="legende__feld" style="background:var(--db2)"></span>55–59</div>
+          <div class="legende__zeile"><span class="legende__feld" style="background:var(--db3)"></span>60–64</div>
+          <div class="legende__zeile"><span class="legende__feld" style="background:var(--db4)"></span>65–69</div>
+          <div class="legende__zeile"><span class="legende__feld" style="background:var(--db5)"></span>70–74</div>
+        </div>
+      </div>
+      <div class="knoepfe">
+        <button class="knopf" id="rein" type="button" aria-label="Näher heranzoomen">+</button>
+        <button class="knopf" id="raus" type="button" aria-label="Weiter herauszoomen">−</button>
+        <button class="knopf knopf--klein" id="zurueck" type="button" aria-label="Ansicht zurücksetzen">1:1</button>
+      </div>
+    </div>
+    <div class="karte__fuss">
+      <svg class="massstab" width="170" height="34" aria-label="Maßstabsbalken">
+        <rect id="mb1" x="4" y="6" width="35" height="5" fill="var(--map-grenze)"></rect>
+        <rect id="mb2" x="39" y="6" width="35" height="5" fill="none" stroke="var(--map-grenze)" stroke-width="1"></rect>
+        <line x1="4" y1="11.5" id="mlinie" x2="74" y2="11.5" stroke="var(--map-grenze)" stroke-width="1"></line>
+        <text id="manfang" x="6" y="23" text-anchor="middle">0</text>
+        <text id="mmitte" x="39" y="23" text-anchor="middle">25</text>
+        <text id="mende" x="74" y="23" text-anchor="end">50 m</text>
+      </svg>
+      <div class="quelle">Flurstücke, Gebäude und Nutzungsarten: ALKIS Sachsen (GeoSN) · Luftbild (DOP, 20 cm) und Isophonen: GeoSN bzw. LfULG · Straßennamen aus den Lagebezeichnungen abgeleitet</div>
+    </div>
+  </div>
+</div>
+
+<div class="fuss">
+  <span><b>Erkannt statt geraten:</b> das Feld liest, ob Adresse, Flurstück oder Koordinate getippt wird — probier <span class="mono">51.33652, 12.44176</span> oder <span class="mono">Mölkau 85/1</span>.</span>
+  <span><b>Entprellt:</b> 120 ms Tastenruhe. 990.090 amtliche Hauskoordinaten, lokal, 12–75 ms je Suche.</span>
+</div>

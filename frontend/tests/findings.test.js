@@ -8,6 +8,7 @@ import { describe, it, expect } from "vitest";
 import {
   noiseFinding, designationFinding, airQualityFinding, groundFinding,
   unavailableFinding, tallyFindings, tallyText, readBand, bandSpan,
+  classifySoil, noiseInterpretation, WHO_LIMITS,
   GOOD, NOTE, OPEN
 } from "../src/lib/findings.js";
 
@@ -36,6 +37,7 @@ describe("noiseFinding", () => {
     expect(f.text).toContain("Nachts 45–49 dB(A).");
     expect(f.text).toContain("schneidet mehrere Bänder");
     expect(f.text).toContain("Straßenbahn und Fluglärm: nicht kartiert.");
+    expect(f.interpretation.label).toBe("deutlich hörbar");
   });
 
   it("separates 'below the lowest band' from 'not surveyed'", () => {
@@ -112,26 +114,101 @@ describe("airQualityFinding", () => {
   });
 });
 
+describe("classifySoil", () => {
+  // The real BK50 wording for Flurstück 204 -- the sentence a buyer cannot use.
+  const MOELKAU = "Hortisol ueber erodierter Parabraunerde aus gemischtem Schluff "
+    + "ueber tiefem periglaziaerem Kies fuehrendem Lehm";
+
+  it("reads the grain sizes out of the map's own German", () => {
+    const s = classifySoil(MOELKAU, "LK_IV");
+    expect(s.kind).toBe("gemischt");          // Schluff + Lehm, dazu Kies
+    expect(s.grains).toEqual(expect.arrayContaining(["Lehm", "Schluff", "Kies"]));
+    expect(s.air).toMatchObject({ label: "hoch", range: "13 – 26 Vol.-%" });
+  });
+
+  it("calls clay and loam cohesive and says what that costs", () => {
+    const s = classifySoil("Pseudogley aus Lehm über Ton");
+    expect(s.kind).toBe("bindig");
+    expect(s.text).toContain("hält Wasser");
+    expect(s.text).toContain("Rigole");
+  });
+
+  it("leaves the drainage question open when the air capacity contradicts the texture", () => {
+    const s = classifySoil("Parabraunerde aus Lehm", "LK_V");
+    expect(s.kind).toBe("bindig");
+    expect(s.text).toContain("offen und muss geprüft werden");
+    expect(s.text).not.toContain("Rigole");
+  });
+
+  it("calls sand and gravel coarse", () => {
+    const s = classifySoil("Podsol aus Sand über Kies");
+    expect(s.kind).toBe("rollig");
+    expect(s.text).toContain("läuft rasch ab");
+  });
+
+  it("gives nothing when no grain size is named", () => {
+    expect(classifySoil("Hortisol über erodierter Parabraunerde")).toBeNull();
+  });
+});
+
 describe("groundFinding", () => {
-  it("puts the soil description and the drilling evidence together", () => {
+  const MOELKAU = "Hortisol ueber erodierter Parabraunerde aus gemischtem Schluff "
+    + "ueber tiefem periglaziaerem Kies fuehrendem Lehm";
+
+  it("classifies the soil and keeps the drilling evidence beside it", () => {
     const f = groundFinding({
-      soilText: "Hortisol über erodierter Parabraunerde",
+      soilText: MOELKAU, airCapacityClass: "LK_IV",
       boreholes: 14, radiusM: 300, nearestM: 82, nearestDepthM: 5,
       deepest: { depthM: 21, year: 2019 }
     });
-    expect(f.value).toBe("14 Bohrungen");
-    expect(f.text).toContain("Hortisol über erodierter Parabraunerde.");
+    expect(f.value).toBe("gemischt");
+    expect(f.text).toContain("Gemischter Boden");
+    expect(f.text).toContain("Luftkapazität hoch");
     expect(f.text).toContain("14 Bohrungen im Umkreis von 300 m.");
     expect(f.text).toContain("Nächste 82 m entfernt, Endteufe 5,0 m.");
     expect(f.text).toContain("Tiefste in der Nähe 21 m (2019).");
+    // The one sentence that must always be there.
+    expect(f.text).toContain("ersetzt keine Baugrunduntersuchung");
+    expect(f.detail).toBe(MOELKAU);
   });
 
   it("uses the singular for one borehole", () => {
-    expect(groundFinding({ boreholes: 1, nearestM: 40 }).value).toBe("1 Bohrung");
+    expect(groundFinding({ boreholes: 1, nearestM: 40 }).text).toContain("1 Bohrung im Umkreis");
   });
 
   it("stays open with nothing behind it", () => {
     expect(groundFinding({}).status).toBe(OPEN);
+  });
+});
+
+describe("noiseInterpretation", () => {
+  it("describes the plot by its louder end, not its quiet corner", () => {
+    const i = noiseInterpretation([50, 59], [45, 49], "road");
+    expect(i.label).toBe("deutlich hörbar");
+    expect(i.everyday).toContain("hebt man beim Sprechen die Stimme");
+    expect(i.notes[0]).toContain("Über dem Wert von 53 dB(A)");
+    expect(i.notes.join(" ")).toContain("Nachts über der Empfehlung von 45 dB(A)");
+  });
+
+  it("says so plainly when the plot is below the recommendation", () => {
+    const i = noiseInterpretation([45, 49], [40, 44], "road");
+    expect(i.label).toBe("leise");
+    expect(i.notes[0]).toContain("Unter dem Wert von 53 dB(A)");
+    expect(i.notes.join(" ")).toContain("Nachts unter der Empfehlung");
+  });
+
+  it("names the cardiovascular threshold once it is reached", () => {
+    const i = noiseInterpretation([65, 69], null, "road");
+    expect(i.label).toBe("sehr laut");
+    expect(i.notes.join(" ")).toContain("Ab 65 dB(A) steigt das Herz-Kreislauf-Risiko");
+  });
+
+  it("carries its source", () => {
+    expect(noiseInterpretation([50, 54], null).source).toContain("UBA-Positionspapier 2019");
+  });
+
+  it("gives nothing without a measurement", () => {
+    expect(noiseInterpretation(null, null)).toBeNull();
   });
 });
 
