@@ -319,6 +319,31 @@ from the user directly. Reopen only if the user asks.
   it becomes a search constraint.
 - **Rank by walking time, never air distance.** Detour ratios reach 2.88x, and
   the nearest thing by air can be unwalkable altogether.
+- **Let the hard filters decide and the weights only order.** "Bestätigt" means
+  plausibility raised no objection *and* exactly one candidate survives the
+  filters that are official facts — a parcel key resolved against ALKIS, the
+  Gemarkung, `ave:flaeche` when the listing's figure is exact. Everything
+  inferential (a rounded area, a street buffer, land use, distance claims) only
+  ranks. That removes the lead threshold entirely and means uncalibrated weights
+  can never produce a wrong answer, only an unhelpful ordering — which is why
+  this can ship without a corpus of solved listings.
+- **A wrong Gemarkung anchor returns nothing, as long as the area is exact.**
+  Measured on the three district names the Grimma ad contains: with
+  `flaeche = 502` Großbothen gives 1, Grimma 0, Höfgen 0 — so run the staircase
+  against every place candidate and let the area pick. One rung wider it inverts:
+  at ±0,5 % Grimma yields **26** against Großbothen's 2, because it is the bigger
+  district. The place named most often is also the one that manufactures the most
+  false candidates, so from that rung on the relation has to be right.
+- **The anchor's size is not a reason to give up.** A proposed "refuse anchors
+  over 60 000 parcels" rule was refuted by measuring it: **Stadt Leipzig has
+  112 588 Flurstücke and Dresden 108 558**, and Leipzig plus an exact 502 m²
+  still leaves 78 — a scoreable set. Cap the *candidate set after the hard
+  filters*, never the anchor.
+- **When no single parcel can be named, name the common envelope.** The smallest
+  unit every surviving candidate shares is a real answer: the 25 area candidates
+  share Gemarkung Großbothen, the 5 that survive the street buffer share
+  *Wiesenstraße in Großbothen*. It must never be drawn like a hit, though — halo
+  and drawn contour stay reserved for a confirmed parcel.
 - **An address is not a plot.** A district address ("Plaußig-Portitz, 04349
   Leipzig") geocodes to a point in a field, and the parcel under it is not the
   one in the listing. `/api/parcels/resolve` takes `expected_area_m2` and

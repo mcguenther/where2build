@@ -236,13 +236,15 @@ code{font-family:var(--font-mono);font-size:12.5px;background:var(--sunken);padd
         <span class="sprosse-name">Texterkennung</span>
         <span class="chip chip--kein">kein Modell</span></div>
       <div class="sprosse-text">
-        <p>Tesseract <code>-l deu --psm 6</code> über <b>alle</b> Bilder, dann derselbe
-          Musterfilter wie in Stufe 1. Nicht vorsortieren: das Erkennen ist billiger als das
-          Entscheiden, welches Bild es wert wäre.</p>
-        <p>Abbruch, sobald ein Flurstücksmuster trifft.</p>
+        <p>Erst die lange Kante auf ≥ 1 500 px vergrößern — das ist der eigentliche Trick und
+          repariert 180°-Drehung wie 7°-Kippung auf einmal. Dann Tesseract
+          <code>-l deu --psm 6</code> über <b>alle</b> Bilder, und nur wo kein Muster traf,
+          <code>--psm 1</code>, das die Vierteldrehungen selbst korrigiert.</p>
+        <p>Nicht vorsortieren, keine Orientierungserkennung vorweg: das Erkennen ist billiger als
+          das Entscheiden, welches Bild es wert wäre. Abbruch, sobald ein Flurstücksmuster trifft.</p>
         <div class="ertrag">Bild 2: „Untertitel: Flurstück 790/11“ · „Titel: Wiesenstraße - Großbothen“</div>
       </div>
-      <div class="kosten"><span class="zeit">490 ms</span><span class="art">pro Kartenbild</span></div>
+      <div class="kosten"><span class="zeit">0,8–1,7 s</span><span class="art">pro Kartenbild</span></div>
     </div>
 
     <div class="sprosse" style="--s:var(--secondary)">
@@ -258,18 +260,20 @@ code{font-family:var(--font-mono);font-size:12.5px;background:var(--sunken);padd
       <div class="kosten"><span class="zeit">~2 s</span><span class="art">1 Aufruf · Text</span></div>
     </div>
 
-    <div class="sprosse" style="--s:var(--secondary)">
+    <div class="sprosse" style="--s:var(--line)">
       <div class="sprosse-kopf"><span class="sprosse-stufe">Stufe 4</span>
         <span class="sprosse-name">Bildmodell</span>
-        <span class="chip chip--llm">Modell</span></div>
+        <span class="chip" style="color:var(--muted)">vorerst nicht gebaut</span></div>
       <div class="sprosse-text">
-        <p>Nur für Bilder, in denen Tesseract Struktur, aber keine lesbaren Muster fand — das
-          Orthofoto dieses Inserats ist genau der Fall: winzige Beschriftungen auf buntem Grund.
-          Prompt P2 unten.</p>
-        <p>Teuerste Stufe. Läuft höchstens über zwei Bilder, nie über Fotos vom Grundstück.</p>
+        <p><b>Entscheidung vom 02.09.2026: fällt weg.</b> Nachdem gemessen war, dass ein 2×-Upscale
+          plus <code>psm 6</code> → <code>psm 1</code> auch gedrehte und gekippte Dokumente liest,
+          bleibt für ein Bildmodell nur ein Fall übrig: ein Inserat, dessen einziger Katasterbeleg
+          ein Luftbild mit eingezeichneten Grenzen ist.</p>
+        <p>Prompt P2 unten bleibt trotzdem stehen — er ist geschrieben und kostet nichts, solange er
+          nicht aufgerufen wird. Gebaut wird er, sobald ein solches Inserat auftaucht.</p>
         <div class="ertrag">hier nicht nötig — Stufe 2 hatte die Nummer bereits</div>
       </div>
-      <div class="kosten"><span class="zeit">~4 s</span><span class="art">pro Bild</span></div>
+      <div class="kosten"><span class="zeit">—</span><span class="art">zurückgestellt</span></div>
     </div>
 
   </div>
@@ -355,7 +359,7 @@ TEXT:
 
   <div class="prompt">
     <div class="prompt-kopf"><h3>P2 · Bild, das die Texterkennung nicht lesen konnte</h3>
-      <span class="wann">Stufe 4 · höchstens zwei Bilder · Bildmodell</span></div>
+      <span class="wann">Stufe 4 · zurückgestellt · liegt bereit</span></div>
 <pre>Das Bild stammt aus einem Grundstücksinserat. Es kann ein Auszug aus
 einem amtlichen Kartenwerk sein, ein Lageplan, ein Screenshot oder ein
 Foto. Lies ausschließlich ab, was tatsächlich geschrieben steht.

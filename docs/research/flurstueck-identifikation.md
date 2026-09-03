@@ -395,7 +395,99 @@ bounding box, which clips in a little of Brandenburg, Thuringia and Bohemia.
 
 ---
 
-## 12. What is still unverified ⚠️
+## 12. The verdict rests on hard filters, not on weights ✅
+
+There is no corpus of solved listings to calibrate against, and it turns out one
+is not needed to ship — provided the responsibilities are split:
+
+* **Hard filters decide.** Only official *facts*: a parcel key resolved against
+  ALKIS, the Gemarkung, and `ave:flaeche` when the listing's figure is exact.
+* **Soft scoring orders.** Everything inferential: a rounded area, the street
+  buffer, land use, distance claims, landmarks.
+
+`bestaetigt` therefore means "plausibility raised no objection **and** exactly
+one candidate survives the hard filters", not "the leader is far enough ahead".
+The lead threshold disappears, and uncalibrated weights can no longer produce a
+wrong answer — only a list in a slightly unhelpful order.
+
+### Wrong anchors return nothing — at an exact area ✅
+
+The anchor is a hard filter, so a mis-read relation ("Grimma" instead of
+"Großbothen") would be the one route to a confidently wrong answer. Measured
+against all three Gemarkung names the listing text contains:
+
+| Area constraint | Großbothen | Grimma | Höfgen |
+|---|---|---|---|
+| **exact (502 m²)** | **1** | 0 | 0 |
+| ±0,5 % | 2 | **26** | 0 |
+| ±1 % | 5 | **45** | 0 |
+| ±5 % | 25 | **206** | 2 |
+
+**At an exact area the relation extraction is unnecessary** — run the staircase
+against every place candidate and the area picks the right one; the wrong
+anchors come back empty.
+
+**One rung out, that inverts.** Gemarkung Grimma is much larger and yields 26
+against Großbothen's 2 — so the place that is named more often *and* is bigger
+produces the most false candidates. From here the relation has to be right, which
+is exactly where spaCy or prompt P1 earn their cost, and nowhere earlier.
+
+### The anchor's size is not an abort criterion ✅
+
+A proposed rule — refuse an anchor holding more than 60 000 parcels — was
+refuted by measuring it:
+
+| Anchor | Parcels | + `flaeche = 502` |
+|---|---|---|
+| Gemarkung Großbothen | 1 131 | 1 |
+| Stadt Grimma | 32 544 | 15 |
+| **Stadt Leipzig** | **112 588** | **78** |
+| Stadt Dresden | 108 558 | not measured |
+
+Leipzig and Dresden both sit far above the cap and would have been rejected —
+yet Leipzig plus the exact area leaves 78 candidates, a perfectly scoreable set.
+So the abort belongs on the **candidate set after the hard filters** (~500), not
+on the anchor.
+
+---
+
+## 13. The common envelope ✅
+
+"Ambiguous" is not a failure as long as the answer says what *is* settled. Take
+the smallest unit every surviving candidate shares and show that:
+
+| After | Candidates | Common envelope |
+|---|---|---|
+| area band ±5 % | 25 | Gemarkung Großbothen |
+| + both rings | 8 | Gemarkung Großbothen (3 of the 8 are not on the Wiesenstraße) |
+| + street buffer | 5 | **Wiesenstraße, Gemarkung Großbothen** |
+| + exact area | 1 | Flurstück 790/11 |
+
+For the land value and for travel times the envelope is often enough — the
+Bodenrichtwert is zonal, and routes from one street differ by metres. Only the
+area and the boundaries genuinely need the individual parcel.
+
+The envelope must never look like a hit: no halo, no drawn contour. Those stay
+reserved for a confirmed parcel.
+
+---
+
+## 14. Streaming: NDJSON, because there is no database ✅
+
+The map has to grow while the search runs. Server-Sent Events would need the
+indicia posted first and fetched back under an id — server-side job state that
+nothing would clean up. Polling has the same problem. **NDJSON over a chunked
+POST response** keeps one endpoint, one call, no state:
+`StreamingResponse` on the FastAPI side, `fetch` plus `body.getReader()` in the
+browser, one JSON object per line.
+
+It is already provisioned: `frontend/nginx.conf` sets `proxy_buffering off` and
+a 300 s timeout on `/api/`, put there for the listing extraction. A stream from
+the same place needs no configuration change.
+
+---
+
+## 15. What is still unverified ⚠️
 
 * The three prompts in `docs/strategie/extraktion-prompting.html` are drafted
   but have not been run against a model — this listing did not need them.
