@@ -1,0 +1,1137 @@
+<meta charset="utf-8">
+<title>where2build von innen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:wght@400;500;600&display=swap">
+
+<style>
+/* Colours, type and spacing are the project's own tokens
+   (frontend/src/styles/tokens.css), reproduced so this page can stand alone.
+   The colour law is extended by one axis only: who runs a thing. */
+:root{
+  --ink:#1E1A16;
+  --graphite:#4A443C;
+  --muted:#6F675C;
+  --line:#DCD3C6;
+  --line-faint:#EBE4D9;
+  --surface:#FAF7F1;
+  --sunken:#F3EFE6;
+  --paper:#F1EBE1;
+
+  --loden:#2F4A3A;
+  --loden-light:#456B52;
+  --brass:#B5813C;
+  --brass-text:#7C5620;
+  --brick:#A8402C;
+
+  /* Ownership: where a box actually runs. */
+  --own-browser-line:#456B52;
+  --own-browser-fill:rgba(69,107,82,.10);
+  --own-server-line:#2F4A3A;
+  --own-server-fill:rgba(47,74,58,.13);
+  --own-official-line:#4A443C;
+  --own-official-fill:rgba(74,68,60,.08);
+  --own-foreign-line:#B5813C;
+  --own-foreign-fill:rgba(181,129,60,.15);
+
+  --shadow:0 1px 2px rgba(30,26,22,.05), 0 10px 24px -18px rgba(30,26,22,.45);
+
+  --font-display:"Archivo",system-ui,-apple-system,sans-serif;
+  --font-body:"Public Sans",system-ui,-apple-system,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+
+  color-scheme:light;
+}
+
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ink:#F1EBE1;
+    --graphite:#C4BCB0;
+    --muted:#948B7E;
+    --line:#3A342C;
+    --line-faint:#2A2620;
+    --surface:#201C17;
+    --sunken:#191510;
+    --paper:#16130F;
+
+    --loden:#7FA98A;
+    --loden-light:#9BC0A4;
+    --brass:#D9A55E;
+    --brass-text:#DBB273;
+    --brick:#E0705A;
+
+    --own-browser-line:#9BC0A4;
+    --own-browser-fill:rgba(155,192,164,.13);
+    --own-server-line:#7FA98A;
+    --own-server-fill:rgba(127,169,138,.16);
+    --own-official-line:#C4BCB0;
+    --own-official-fill:rgba(196,188,176,.09);
+    --own-foreign-line:#D9A55E;
+    --own-foreign-fill:rgba(217,165,94,.16);
+
+    --shadow:0 1px 2px rgba(0,0,0,.5), 0 12px 28px -20px rgba(0,0,0,.85);
+    color-scheme:dark;
+  }
+}
+
+:root[data-theme="dark"]{
+  --ink:#F1EBE1;
+  --graphite:#C4BCB0;
+  --muted:#948B7E;
+  --line:#3A342C;
+  --line-faint:#2A2620;
+  --surface:#201C17;
+  --sunken:#191510;
+  --paper:#16130F;
+
+  --loden:#7FA98A;
+  --loden-light:#9BC0A4;
+  --brass:#D9A55E;
+  --brass-text:#DBB273;
+  --brick:#E0705A;
+
+  --own-browser-line:#9BC0A4;
+  --own-browser-fill:rgba(155,192,164,.13);
+  --own-server-line:#7FA98A;
+  --own-server-fill:rgba(127,169,138,.16);
+  --own-official-line:#C4BCB0;
+  --own-official-fill:rgba(196,188,176,.09);
+  --own-foreign-line:#D9A55E;
+  --own-foreign-fill:rgba(217,165,94,.16);
+
+  --shadow:0 1px 2px rgba(0,0,0,.5), 0 12px 28px -20px rgba(0,0,0,.85);
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--font-body);
+  font-size:15px;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+.huelle{max-width:1440px;margin:0 auto;padding:0 24px 72px}
+
+/* ---------- Kopf ---------- */
+.kopf{padding:56px 0 28px;border-bottom:1px solid var(--line)}
+.kopf .marke{
+  font-family:var(--font-mono);font-size:11px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--muted);margin:0 0 14px
+}
+.kopf h1{
+  font-family:var(--font-display);font-weight:700;font-size:clamp(34px,5vw,52px);
+  line-height:1.04;letter-spacing:-.022em;margin:0;text-wrap:balance;max-width:20ch
+}
+.kopf .vorspann{margin:18px 0 0;max-width:64ch;color:var(--graphite);font-size:16.5px}
+.zahlen{display:flex;flex-wrap:wrap;gap:0;margin:30px 0 0;border-top:1px solid var(--line-faint)}
+.zahl{padding:14px 26px 12px 0;margin-right:26px;border-right:1px solid var(--line-faint)}
+.zahl:last-child{border-right:0}
+.zahl b{
+  display:block;font-family:var(--font-display);font-weight:600;font-size:26px;
+  line-height:1.1;font-variant-numeric:tabular-nums
+}
+.zahl span{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted)}
+
+/* ---------- Steuerung ---------- */
+.steuerung{
+  display:flex;flex-wrap:wrap;gap:28px;align-items:flex-end;
+  padding:26px 0 22px;border-bottom:1px solid var(--line)
+}
+.gruppe{display:flex;flex-direction:column;gap:9px;min-width:0}
+.gruppe > h2{
+  font-family:var(--font-mono);font-size:10.5px;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--muted);margin:0;font-weight:500
+}
+.knopfreihe{display:flex;flex-wrap:wrap;gap:7px}
+button{font:inherit;cursor:pointer}
+.knopf{
+  border:1px solid var(--line);background:var(--surface);color:var(--graphite);
+  border-radius:999px;padding:6px 15px;font-size:13.5px;font-weight:500;
+  transition:border-color .12s,background .12s,color .12s
+}
+.knopf:hover{border-color:var(--loden);color:var(--ink)}
+.knopf[aria-pressed="true"]{background:var(--loden);border-color:var(--loden);color:var(--paper)}
+:root[data-theme="dark"] .knopf[aria-pressed="true"],
+.knopf[aria-pressed="true"]{color:var(--surface)}
+.knopf:focus-visible,.node:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+
+/* ---------- Zeichnung ---------- */
+.zeichnung{margin:0;padding:26px 0 0}
+.rahmen{overflow-x:auto;overflow-y:hidden;padding-bottom:8px}
+#karte{display:block;min-width:1080px;width:100%;height:auto;color:var(--graphite)}
+#karte text{font-family:var(--font-body)}
+
+.zone{fill:none;stroke:var(--line);stroke-width:1;stroke-dasharray:2 5;rx:16}
+.zone-titel{font-family:var(--font-mono);font-size:11px;letter-spacing:.12em;fill:var(--muted)}
+.zone-notiz{font-size:12.5px;fill:var(--muted)}
+
+.node{cursor:pointer}
+.node rect{stroke-width:1.4;rx:9;transition:opacity .18s}
+.node .titel{font-family:var(--font-display);font-weight:600;font-size:13.5px;fill:var(--ink)}
+.node .zeile{font-family:var(--font-mono);font-size:10.5px;fill:var(--muted)}
+.node .marke{font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;fill:var(--muted)}
+.node:hover rect{stroke-width:2.4}
+
+.own-browser rect{stroke:var(--own-browser-line);fill:var(--own-browser-fill)}
+.own-server rect{stroke:var(--own-server-line);fill:var(--own-server-fill)}
+.own-official rect{stroke:var(--own-official-line);fill:var(--own-official-fill)}
+.own-foreign rect{stroke:var(--own-foreign-line);fill:var(--own-foreign-fill)}
+.optional rect{stroke-dasharray:6 4}
+
+.node.gewaehlt rect{stroke-width:2.8}
+.edge,.kante-schrift{pointer-events:none}
+.edge{fill:none;stroke:currentColor;stroke-width:1.5}
+.edge.gestrichelt{stroke-dasharray:5 4}
+.kante-schrift{font-family:var(--font-mono);font-size:10px;fill:var(--muted)}
+
+/* Ablaufmodus: alles, was nicht dazugehört, tritt zurück. */
+#karte[data-flow] .node:not(.aktiv){opacity:.2}
+#karte[data-flow] .edge:not(.aktiv){opacity:.1}
+#karte[data-flow] .kante-schrift:not(.aktiv){opacity:.15}
+#karte[data-mode="lokal"] [data-mode="prototyp"]{opacity:.32}
+#karte[data-mode="prototyp"] [data-mode="lokal"]{opacity:.32}
+
+.zeichnung figcaption{
+  margin-top:14px;color:var(--muted);font-size:13px;max-width:78ch
+}
+
+/* ---------- Legende ---------- */
+.legende{
+  display:flex;flex-wrap:wrap;gap:8px 22px;margin:18px 0 0;padding:14px 0 0;
+  border-top:1px solid var(--line-faint)
+}
+.legende div{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--graphite)}
+.legende i{width:22px;height:13px;border-radius:4px;border:1.4px solid;flex:none}
+.lg-browser{border-color:var(--own-browser-line);background:var(--own-browser-fill)}
+.lg-server{border-color:var(--own-server-line);background:var(--own-server-fill)}
+.lg-official{border-color:var(--own-official-line);background:var(--own-official-fill)}
+.lg-foreign{border-color:var(--own-foreign-line);background:var(--own-foreign-fill)}
+.lg-optional{border-color:var(--muted);border-style:dashed;background:none}
+
+/* ---------- Deck: Steckbrief + Ablauf ---------- */
+.deck{display:grid;grid-template-columns:1.55fr 1fr;gap:24px;margin:44px 0 0;align-items:start}
+.tafel{
+  background:var(--surface);border:1px solid var(--line);border-radius:14px;
+  padding:26px 28px 28px;box-shadow:var(--shadow)
+}
+.tafel h2{
+  font-family:var(--font-display);font-weight:600;font-size:23px;letter-spacing:-.01em;
+  margin:0;text-wrap:balance
+}
+.ort{
+  display:inline-flex;align-items:center;gap:7px;margin:0 0 12px;
+  font-family:var(--font-mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase
+}
+.ort i{width:9px;height:9px;border-radius:3px;border:1.4px solid;flex:none}
+.tafel p{margin:14px 0 0;color:var(--graphite);max-width:62ch}
+.tafel p.warum{color:var(--ink)}
+.daten{margin:22px 0 0;border-top:1px solid var(--line-faint)}
+.daten div{
+  display:grid;grid-template-columns:150px 1fr;gap:16px;padding:9px 0;
+  border-bottom:1px solid var(--line-faint)
+}
+.daten dt{
+  font-family:var(--font-mono);font-size:10.5px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);margin:2px 0 0
+}
+.daten dd{margin:0;font-size:13.5px;color:var(--ink);overflow-wrap:anywhere}
+.daten dd code{font-family:var(--font-mono);font-size:12.5px}
+.falle{
+  margin:22px 0 0;padding:14px 16px;border-radius:10px;
+  background:var(--sunken);border-left:3px solid var(--brass)
+}
+.falle b{
+  display:block;font-family:var(--font-mono);font-size:10.5px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--brass-text);margin-bottom:5px
+}
+.falle span{font-size:13.5px;color:var(--graphite)}
+
+.ablauf ol{margin:16px 0 0;padding:0;list-style:none;counter-reset:schritt}
+.ablauf li{
+  counter-increment:schritt;position:relative;padding:0 0 16px 38px;font-size:13.5px;
+  color:var(--graphite);border-left:1px solid var(--line);margin-left:11px
+}
+.ablauf li:last-child{border-left-color:transparent;padding-bottom:0}
+.ablauf li::before{
+  content:counter(schritt);position:absolute;left:-11px;top:0;width:22px;height:22px;
+  border-radius:50%;background:var(--surface);border:1px solid var(--line);
+  display:grid;place-items:center;font-family:var(--font-mono);font-size:11px;color:var(--muted)
+}
+.ablauf .keine-hops{
+  margin:16px 0 0;font-size:13.5px;color:var(--graphite)
+}
+.ablauf .liste{display:flex;flex-direction:column;gap:6px;margin-top:14px}
+.ablauf .liste button{
+  text-align:left;border:1px solid var(--line);background:var(--surface);
+  border-radius:10px;padding:9px 13px;font-size:13.5px;color:var(--ink);
+  display:flex;justify-content:space-between;gap:12px;align-items:baseline
+}
+.ablauf .liste button:hover{border-color:var(--loden)}
+.ablauf .liste em{
+  font-style:normal;font-family:var(--font-mono);font-size:10.5px;color:var(--muted);
+  white-space:nowrap
+}
+
+/* ---------- Tabelle ---------- */
+.tabelle{margin:56px 0 0}
+.tabelle h2{
+  font-family:var(--font-display);font-weight:600;font-size:26px;letter-spacing:-.012em;margin:0
+}
+.tabelle > p{margin:10px 0 20px;color:var(--muted);max-width:70ch;font-size:14px}
+.tabellenrahmen{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:820px;font-size:13.5px}
+thead th{
+  text-align:left;font-family:var(--font-mono);font-size:10px;letter-spacing:.11em;
+  text-transform:uppercase;color:var(--muted);font-weight:500;
+  padding:0 14px 9px 0;border-bottom:1px solid var(--line)
+}
+tbody td{padding:11px 14px 11px 0;border-bottom:1px solid var(--line-faint);vertical-align:top;color:var(--graphite)}
+tbody td:first-child{color:var(--ink);font-weight:500;width:20%}
+tbody tr:hover td{background:var(--sunken)}
+.pille{
+  display:inline-block;padding:2px 9px;border-radius:999px;border:1px solid;
+  font-family:var(--font-mono);font-size:10px;letter-spacing:.06em;white-space:nowrap
+}
+.p-browser{border-color:var(--own-browser-line);color:var(--loden-light)}
+.p-server{border-color:var(--own-server-line);color:var(--loden)}
+.p-official{border-color:var(--own-official-line);color:var(--graphite)}
+.p-foreign{border-color:var(--own-foreign-line);color:var(--brass-text)}
+td code{font-family:var(--font-mono);font-size:12.5px;color:var(--muted)}
+
+footer{
+  margin:56px 0 0;padding:22px 0 0;border-top:1px solid var(--line);
+  color:var(--muted);font-size:12.5px;max-width:76ch
+}
+
+@media (max-width:900px){
+  .deck{grid-template-columns:1fr}
+  .huelle{padding:0 16px 56px}
+  .kopf{padding:36px 0 22px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{transition:none!important;animation:none!important}
+}
+</style>
+
+<div class="huelle">
+
+<header class="kopf">
+  <p class="marke">where2build · Grundstücks-Check Sachsen</p>
+  <h1>Welcher Dienst antwortet hier eigentlich?</h1>
+  <p class="vorspann">
+    Die Anwendung rechnet Grundstücke durch: amtliche Flurstücke, Bodenrichtwert,
+    Abstandsflächen, Wege. Fast nichts davon ist eigene Rechenleistung — es ist
+    das Zusammenführen von neun fremden Diensten hinter einem eigenen Server, plus
+    einer Geometrie, die den Browser nie verlässt. Auf jedes Kästchen klicken.
+  </p>
+  <div class="zahlen">
+    <div class="zahl"><b>2</b><span>Container</span></div>
+    <div class="zahl"><b>11</b><span>API-Endpunkte</span></div>
+    <div class="zahl"><b>9</b><span>fremde Dienste</span></div>
+    <div class="zahl"><b>0</b><span>Datenbanken</span></div>
+    <div class="zahl"><b>0</b><span>Serveraufrufe fürs Hausstellen</span></div>
+  </div>
+</header>
+
+<section class="steuerung">
+  <div class="gruppe">
+    <h2>Betriebsart</h2>
+    <div class="knopfreihe" id="modusreihe">
+      <button class="knopf" data-mode="prototyp" aria-pressed="true">Prototyp</button>
+      <button class="knopf" data-mode="lokal" aria-pressed="false">Eigenbetrieb</button>
+    </div>
+  </div>
+  <div class="gruppe" style="flex:1">
+    <h2>Ablauf verfolgen</h2>
+    <div class="knopfreihe" id="ablaufreihe"></div>
+  </div>
+</section>
+
+<figure class="zeichnung">
+  <div class="rahmen">
+    <svg id="karte" viewBox="0 0 1400 1000" role="img" data-mode="prototyp"
+      aria-label="Systemzeichnung: Browser, eigener Server und fremde Dienste in drei Bändern; jeder Aufruf nach draußen läuft durch den Disk-Cache des Backends."></svg>
+  </div>
+  <figcaption>
+    Drei Bänder, von oben nach unten: was im Browser läuft, was auf dem eigenen
+    Server läuft, was jemand anderem gehört. Jeder Pfeil nach draußen kreuzt das
+    Zwischenspeicher-Band — das ist keine Zeichenfreiheit, sondern der Weg jeder
+    Antwort. Unten die Bauläufe, die nach Zeitplan die Dateien links füllen und
+    nie in einer Anfrage vorkommen.
+  </figcaption>
+</figure>
+
+<section class="legende">
+  <div><i class="lg-browser"></i> läuft im Browser des Nutzers</div>
+  <div><i class="lg-server"></i> läuft auf deinem Server</div>
+  <div><i class="lg-official"></i> amtlicher Dienst, fremder Server</div>
+  <div><i class="lg-foreign"></i> fremder Dienst, kein Amt</div>
+  <div><i class="lg-optional"></i> abschaltbar oder gar nicht eingerichtet</div>
+</section>
+
+<section class="deck">
+  <article class="tafel" id="steckbrief"></article>
+  <aside class="tafel ablauf" id="ablauftafel"></aside>
+</section>
+
+<section class="tabelle">
+  <h2>Dienste im Überblick</h2>
+  <p>
+    Wofür jeder Dienst da ist, wo er läuft, wie lange seine Antwort liegen bleibt
+    und ob die Anwendung ohne ihn noch etwas taugt.
+  </p>
+  <div class="tabellenrahmen">
+    <table>
+      <thead>
+        <tr><th>Dienst</th><th>Wofür</th><th>Wo</th><th>Zwischenspeicher</th><th>Ohne ihn</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>ALKIS-WFS (GeoSN)</td>
+          <td>Flurstücksumring, amtliche Fläche, Flurstückskennzeichen</td>
+          <td><span class="pille p-official">amtlich, fremd</span></td>
+          <td><code>7 Tage</code></td>
+          <td>keine Flurstücke — das Kernstück fehlt</td>
+        </tr>
+        <tr>
+          <td>BORIS Sachsen</td>
+          <td>Bodenrichtwert je Zone, mit Stichtag</td>
+          <td><span class="pille p-official">amtlich, fremd</span></td>
+          <td><code>30 Tage</code></td>
+          <td>Preisvergleich bleibt „—“, alles andere läuft</td>
+        </tr>
+        <tr>
+          <td>GeoSN-WMS</td>
+          <td>Luftbild, WebAtlas und ALKIS als Rasterebenen unter der Zeichnung</td>
+          <td><span class="pille p-official">amtlich, fremd</span></td>
+          <td><code>30 Tage</code></td>
+          <td>Kartenebene bleibt leer, Maße stimmen weiter</td>
+        </tr>
+        <tr>
+          <td>OpenFreeMap</td>
+          <td>Vektor-Hintergrundkarte, hell und dunkel</td>
+          <td><span class="pille p-foreign">fremd</span></td>
+          <td><code>7 Tage</code></td>
+          <td>Hintergrund fehlt; Rasterebenen bleiben</td>
+        </tr>
+        <tr>
+          <td>Transitous (MOTIS)</td>
+          <td>Routing, Haltestellen, Geokodier-Rückfall</td>
+          <td><span class="pille p-foreign">fremd, freiwillig</span></td>
+          <td><code>1 h / 24 h / 7 T</code></td>
+          <td>keine Wege und keine Haltestellen</td>
+        </tr>
+        <tr>
+          <td>MOTIS auf dieser Maschine</td>
+          <td>dasselbe, aus eigenem Graphen statt vom Freiwilligendienst</td>
+          <td><span class="pille p-server">eigener Server</span></td>
+          <td><code>gleicher Cache</code></td>
+          <td>Voreinstellung: aus, dann antwortet Transitous</td>
+        </tr>
+        <tr>
+          <td>OpenRouter (LLM)</td>
+          <td>Inseratsseite holen und in Felder strukturieren</td>
+          <td><span class="pille p-foreign">fremd</span></td>
+          <td><code>ohne Ablauf</code></td>
+          <td>Aufnahme per URL aus; Eintippen bleibt</td>
+        </tr>
+        <tr>
+          <td>Inserats-Portale</td>
+          <td>die Seite selbst — teils schon ohne Modell auslesbar</td>
+          <td><span class="pille p-foreign">fremd</span></td>
+          <td><code>über den LLM-Cache</code></td>
+          <td>Einfügefeld statt URL</td>
+        </tr>
+        <tr>
+          <td>Overpass-API</td>
+          <td>Nachbargebäude; Umgebungsorte, solange kein Verzeichnis gebaut ist</td>
+          <td><span class="pille p-foreign">fremd</span></td>
+          <td><code>30 Tage</code></td>
+          <td>Voreinstellung: aus. Nachbargebäude fehlen</td>
+        </tr>
+        <tr>
+          <td>Gemarkungs-Verzeichnis</td>
+          <td>5 339 Gemarkungen für die Auswahlliste</td>
+          <td><span class="pille p-server">eigene Datei</span></td>
+          <td><code>eingecheckt</code></td>
+          <td>ist immer da — deshalb ist es eine Datei</td>
+        </tr>
+        <tr>
+          <td>Amtliche Hauskoordinaten</td>
+          <td>Adresse → amtliche Koordinate, vor jedem Geocoder</td>
+          <td><span class="pille p-server">eigene Datei</span></td>
+          <td><code>quartalsweise</code></td>
+          <td>MOTIS geokodiert — nur eben nicht amtlich</td>
+        </tr>
+        <tr>
+          <td>POI-Verzeichnis (OSM)</td>
+          <td>Schule, Kita, Park, Spielplatz, Supermarkt, Arztpraxis</td>
+          <td><span class="pille p-server">eigene Datei</span></td>
+          <td><code>quartalsweise</code></td>
+          <td>diese sechs Kategorien sagen „nicht eingerichtet“</td>
+        </tr>
+        <tr>
+          <td>Geometrie-Kern</td>
+          <td>Abstandsflächen, Bauhülle, Platzierung, Kollision</td>
+          <td><span class="pille p-browser">Browser</span></td>
+          <td><code>—</code></td>
+          <td>gibt es nicht — er ist die Anwendung</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<footer>
+  Gezeichnet aus dem Stand des Repositorys: <code>backend/app/settings.py</code>,
+  <code>docker-compose.yml</code>, <code>ops/jobs.json</code> und den Notizen in
+  <code>CLAUDE.md</code>. Zahlen und Fallstricke stammen aus den gemessenen
+  Belegen unter <code>docs/research/</code>, nicht aus Schätzungen.
+</footer>
+
+</div>
+
+<script>
+/* The drawing and the profile panel are generated from one array, so a box and
+   its description cannot drift apart. Coordinates are on a 1400 x 1000 grid:
+   four bands, five columns in the request path, one rail for local files. */
+
+const COL = [356, 560, 764, 968, 1172];   // request-path columns, 180 wide
+const MID = COL.map(x => x + 90);
+
+const NODES = [
+  /* ---------- Band 1: the user's browser ---------- */
+  {
+    id: "spa", own: "browser", kind: "box", x: 56, y: 90, w: 272, h: 88,
+    title: "Ansichten & Assistent",
+    lines: ["Vue 3 · Options API · Vite", "8 Ansichten, 4-Schritt-Aufnahme"],
+    ort: "Im Browser des Nutzers",
+    text: [
+      "Die ganze Oberfläche ist eine Einseiten-Anwendung: Aufnahme-Assistent, Grundstücksliste, Lageplan, Umgebung, Haustypen, Ziele, Vergleich, Daten.",
+      "Sie ist die einzige Stelle, die das Backend überhaupt anspricht — und sie spricht nur mit der eigenen Herkunft, nie direkt mit einer Behörde."
+    ],
+    daten: [["Ruft auf", "/api/… über nginx"], ["Zustand", "localStorage, kein Konto"], ["Druck", "print.css stylt dieselbe Seite um"]]
+  },
+  {
+    id: "geometry", own: "browser", kind: "box", x: 397, y: 90, w: 272, h: 88,
+    title: "Geometrie-Kern",
+    lines: ["geometry.js · Meter (EPSG 25833)", "Abstandsflächen, Bauhülle, Kollision"],
+    ort: "Im Browser des Nutzers",
+    text: [
+      "Puffern, Drehen, Kollision und Bauhülle rechnen hier, während gezogen wird — ohne einen einzigen Serveraufruf. Shapely im Backend gibt es dafür bewusst nicht.",
+      "Abstandstiefe ist eine Größe je Umringkante, nicht ein globaler Wert: § 6 SächsBO misst aus der Wandhöhe und setzt 3 m als Sockel."
+    ],
+    daten: [["Läuft", "im Browser, beim Ziehen"], ["Rechnet in", "projizierten Metern, nie in Grad"], ["Fläche", "amtliche Fläche zählt, nicht die aus dem Polygon"]],
+    falle: "Reale Flurstücke sind häufig konkav. Halbebenen-Schnitt ist nur für konvexe Ringe ein korrekter Versatz nach innen und liefert auf einem L-Grundstück gar nichts — deshalb eine nach innen verzerrte Gitterkontur als Rückfall."
+  },
+  {
+    id: "maplibre", own: "browser", kind: "box", x: 738, y: 90, w: 272, h: 88,
+    title: "MapLibre GL",
+    lines: ["Lageplan · Umgebungskarte", "Grund ausschließlich über /api"],
+    ort: "Im Browser des Nutzers",
+    text: [
+      "Der Hintergrund unter der Zeichnung. Der Vektorstil kommt umgeschrieben aus dem eigenen Backend, die Rasterebenen aus dem eigenen Kachel-Proxy — der Browser braucht keine Route ins Internet.",
+      "Ein Kartenhintergrund ist eine eigene MapLibre-Instanz, deshalb starten Karten auf Karten und im Vergleich keine."
+    ],
+    daten: [["Stil", "/api/basemap/style.json?variant=…"], ["Kacheln", "/api/tiles/{layer}/{z}/{x}/{y}.png"]],
+    falle: "Der Worker muss ausdrücklich gesetzt werden. MapLibre sucht ihn neben dem eigenen Modul — nach dem Bündeln also im App-Chunk, wo Vite nie eine Datei ablegt. Die Anfrage läuft ins Leere, Vektorkacheln werden nie zerlegt, die Karte bleibt leer — ohne eine einzige Fehlermeldung."
+  },
+  {
+    id: "storage", own: "browser", kind: "box", x: 1079, y: 90, w: 272, h: 88,
+    title: "localStorage",
+    lines: ["Grundstücke, Ziele, Haustypen", "kein Konto, keine Datenbank"],
+    ort: "Im Browser des Nutzers",
+    text: [
+      "Alles, was der Nutzer eingibt, bleibt auf seinem Gerät. Es gibt keinen Serverzustand, keine Anmeldung und keine Datenbank im ganzen Projekt.",
+      "Das Auslese-Schema führt bewusst keine Namen und Telefonnummern — es können also gar keine personenbezogenen Daten irgendwo landen."
+    ],
+    daten: [["Speichert", "Zustand als JSON, mit Schemaversion"], ["Fällt aus", "auf eine Sitzung im Arbeitsspeicher zurück"]]
+  },
+
+  /* ---------- Band 2: your own server ---------- */
+  {
+    id: "nginx", own: "server", kind: "bar", x: 356, y: 286, w: 996, h: 46,
+    title: "nginx · Port 8080",
+    right: "liefert das gebaute Frontend · proxyt /api → backend:8000 · eine Origin, kein CORS",
+    ort: "Auf deinem Server",
+    text: [
+      "Ein Container liefert das Build und reicht /api weiter. Weil beides unter derselben Herkunft liegt, kommt CORS im Betrieb gar nicht erst vor.",
+      "Das Backend ist nach außen nicht veröffentlicht; erreichbar ist es nur über diesen Pfad."
+    ],
+    daten: [["Port", "8080, per WHERE2BUILD_PORT änderbar"], ["Startet", "erst wenn das Backend gesund meldet"]]
+  },
+  {
+    id: "fastapi", own: "server", kind: "bar", x: 356, y: 352, w: 996, h: 42,
+    title: "FastAPI · uvicorn",
+    right: "besitzt keine Geometrie und keine Datenbank — weiterreichen, zwischenspeichern, übersetzen",
+    ort: "Auf deinem Server",
+    text: [
+      "Der Teil, den ein Browser nicht kann: mit den Behördendiensten sprechen, deren Antworten aufheben und Seiten in Felder verwandeln. Elf Endpunkte, kein Geometriecode.",
+      "Jeder fremde Dienst wird ausschließlich über Einstellungen adressiert; kein Anbieter ist fest verdrahtet."
+    ],
+    daten: [["Fehlertexte", "deutsch, im Feld detail"], ["Zustand", "keiner — nur Cache auf Platte"], ["Health", "/api/health nennt jeden Dienst"]]
+  },
+  {
+    id: "ep-listings", own: "server", kind: "chip", x: COL[0], y: 406, w: 180, h: 74,
+    mark: "AUFNAHME",
+    lines: ["/api/listings/extract", "/api/housetypes/extract"],
+    ort: "Auf deinem Server",
+    text: [
+      "Nimmt eine URL oder eingefügten Text und gibt Felder zurück — jedes mit der Quelle, aus der es stammt. Was nicht gefunden wurde, bleibt leer statt geraten.",
+      "Beim Haustyp ist das Holen auf die Domain des Herstellers beschränkt."
+    ],
+    daten: [["Ohne LLM-Schlüssel", "aus; alles andere läuft weiter"], ["Zuerst", "der Portal-Adapter, dann erst das Modell"]]
+  },
+  {
+    id: "ep-parcels", own: "server", kind: "chip", x: COL[1], y: 406, w: 180, h: 74,
+    mark: "FLURSTÜCK",
+    lines: ["/api/parcels/resolve", "/api/geocode", "/api/gemarkungen"],
+    ort: "Auf deinem Server",
+    text: [
+      "Adresse, Koordinate oder Gemarkung plus Zähler/Nenner werden zu GeoJSON in EPSG:4326 samt amtlicher Fläche. Mehrere Flurstücke werden vereinigt, die amtlichen Flächen summiert.",
+      "Die Gemarkungsliste kommt aus einer eingecheckten Datei; der WFS wird dafür nie angefragt."
+    ],
+    daten: [["Prüft", "Plausibilität gegen die erwartete Fläche"], ["Zwischenspeicher", "7 Tage"]],
+    falle: "Eine Adresse ist kein Grundstück. Eine Ortsteil-Adresse geokodiert auf einen Punkt im Feld, und das Flurstück darunter ist nicht das aus dem Inserat. Der Unterschied PLACE gegen ADDRESS ist das schärfste der drei Signale."
+  },
+  {
+    id: "ep-landvalue", own: "server", kind: "chip", x: COL[2], y: 406, w: 180, h: 74,
+    mark: "PREIS",
+    lines: ["/api/landvalue"],
+    ort: "Auf deinem Server",
+    text: [
+      "Eine Koordinate hinein, €/m² mit Zone und Stichtag heraus. Der Vergleich gegen den Angebotspreis passiert danach im Browser, gegen die amtliche Fläche."
+    ],
+    daten: [["Zwischenspeicher", "30 Tage"], ["Fehlt der Wert", "bleibt die Zeile „—“, nichts wird gerechnet"]]
+  },
+  {
+    id: "ep-maps", own: "server", kind: "chip", x: COL[3], y: 406, w: 180, h: 74,
+    mark: "KARTE",
+    lines: ["/api/tiles/{z}/{x}/{y}", "/api/basemap/style.json"],
+    ort: "Auf deinem Server",
+    text: [
+      "Zwei Proxys: einer schneidet die Behörden-WMS in XYZ-Kacheln, einer schreibt den Vektorstil so um, dass jede URL darin wieder hierher zeigt.",
+      "Deshalb funktioniert die Karte auch in einem abgeschotteten Netz."
+    ],
+    daten: [["Raster", "EPSG:3857, PNG, 30 Tage"], ["Vektor", "Stil, Glyphen, Sprite, Kacheln — 7 Tage"]],
+    falle: "Vektorkacheln kommen gzip-komprimiert an und dürfen unterwegs nicht ausgepackt werden — der rohe Bytestrom und die ursprüngliche Content-Encoding gehören zusammen, sonst sieht der Browser Müll."
+  },
+  {
+    id: "ep-routing", own: "server", kind: "chip", x: COL[4], y: 406, w: 180, h: 74,
+    mark: "WEGE & UMGEBUNG",
+    lines: ["/api/reachability", "/api/nearby", "/api/neighbours"],
+    ort: "Auf deinem Server",
+    text: [
+      "Wege zu gespeicherten Zielen mit Auto, Rad, ÖPNV und der besten Kombination; dazu die nächste Schule, Kita, Haltestelle — nach Gehzeit sortiert, nie nach Luftlinie.",
+      "Der Zubringer zur ersten Haltestelle wird gewählt, nicht angenommen: Rad gewinnt nur, wenn es schneller ist und der Fußweg mindestens zehn Minuten dauert."
+    ],
+    daten: [["Routing", "MOTIS /api/v6/plan"], ["Matrix", "one-to-many, POST, max. 128 Ziele"], ["Zwischenspeicher", "1 h · Haltestellen 24 h · Matrix 7 T"]],
+    falle: "one-to-many ist ein POST. Auf GET werden wiederholte many-Parameter stillschweigend zusammengefasst — drei Ziele kamen als eine Dauer zurück, und dieselben drei umsortiert als fehlender Parameter."
+  },
+  {
+    id: "cache", own: "server", kind: "bar", x: 356, y: 496, w: 996, h: 46,
+    title: "Disk-Cache · /cache",
+    right: "ALKIS 7 T · BORIS 30 T · Kacheln 30 T · Karte 7 T · MOTIS 1 h · Overpass 30 T · Deckel 100 MB",
+    ort: "Auf deinem Server",
+    text: [
+      "Jede Antwort von draußen liegt hier, deshalb kreuzt jeder Pfeil nach unten dieses Band. Das ist keine Optimierung: ein Flurstücksumring ändert sich zwischen zwei Seitenaufrufen nicht, und jeder Modellaufruf kostet Geld.",
+      "Der Deckel gilt für das ganze Verzeichnis, nicht je Dienst — was tatsächlich vollläuft, ist das Volume. Ein nächtlicher Lauf kehrt aus."
+    ],
+    daten: [["Liegt in", "Named Volume backend-cache"], ["Schlüssel", "nur die Anfrageparameter"], ["Verlust", "kostet Zeit und fremde Bandbreite, nicht Richtigkeit"]],
+    falle: "Der Cache weiß nicht, welcher MOTIS geantwortet hat. Nach dem Umstellen von MOTIS_BASE_URL werden weiter die Antworten der anderen Instanz ausgeliefert, bis /cache/motis* gelöscht ist — ein Vergleich der beiden Instanzen meldet sonst einen Unterschied, den es nicht gibt, und schlimmer: eine Übereinstimmung, die es auch nicht gibt."
+  },
+  {
+    id: "idx-gemarkung", own: "server", kind: "box", x: 56, y: 286, w: 272, h: 62,
+    title: "Gemarkungs-Verzeichnis",
+    lines: ["5 339 Einträge · 490 kB", "eingecheckt · kein WFS-Aufruf"],
+    ort: "Datei auf deinem Server",
+    text: [
+      "Alle sächsischen Gemarkungen für die Auswahlliste bei der Flurstückseingabe. Einmal gebaut, mitgeliefert, aus der Datei beantwortet."
+    ],
+    daten: [["Gebaut von", "scripts/build_gemarkung_index.py"], ["Browser-Cache", "24 h"]],
+    falle: "ave:KatasterBezirk gibt seine Geometrie nicht her: ohne Präfix wird die Anfrage abgelehnt, mit Präfix kommt der Umring trotzdem mit — rund 5 kB je Gemarkung, 28 MB für alle. Deshalb einmal bauen statt je Anfrage fragen."
+  },
+  {
+    id: "idx-address", own: "server", kind: "box", x: 56, y: 358, w: 272, h: 62, optional: true,
+    title: "Amtliche Hauskoordinaten",
+    lines: ["GeoSN · quartalsweise", "optional — sonst MOTIS"],
+    ort: "Datei auf deinem Server",
+    text: [
+      "Jede Adresse Sachsens mit ihrer Katasterkoordinate. Sie beantwortet /api/geocode zuerst; Haltestellen, Orte und alles außerhalb Sachsens kommen weiter aus MOTIS.",
+      "Fehlt die Datei, hört die Adresssuche nicht auf zu funktionieren — sie hört auf, amtlich zu sein."
+    ],
+    daten: [["Gebaut von", "scripts/build_address_index.py --download"], ["Anteil", "höchstens vier von fünf Treffern"]]
+  },
+  {
+    id: "idx-poi", own: "server", kind: "box", x: 56, y: 430, w: 272, h: 62, optional: true,
+    title: "POI-Verzeichnis (OSM)",
+    lines: ["Schule, Kita, Park, Markt …", "optional — sonst Overpass"],
+    ort: "Datei auf deinem Server",
+    text: [
+      "Sechs Alltagskategorien aus einem OpenStreetMap-Auszug, offline gebaut. Haltestellen stehen nicht drin — die kommen aus dem Fahrplan.",
+      "Fehlt die Datei, sagt der Endpunkt genau das: „kein Datenbestand eingerichtet“ — und nie „nichts in der Nähe“."
+    ],
+    daten: [["Gebaut von", "scripts/build_poi_index.py --download"], ["Reichweite", "steht in der Datei, nicht im Dateinamen"]],
+    falle: "Namensindizierte Geocoder sind kein Ersatz: 88 % der sächsischen Spielplätze haben gar keinen Namen, unter dem sie indiziert werden könnten."
+  },
+  {
+    id: "motis-local", own: "server", kind: "box", x: 56, y: 502, w: 272, h: 62, optional: true, mode: "lokal",
+    title: "MOTIS auf dieser Maschine",
+    lines: ["Profil local-routing · 2.11.2", "3,4 GB Graph · 1,7 GiB RSS"],
+    ort: "Container auf deinem Server",
+    text: [
+      "Derselbe Router wie Transitous, nur eben deiner. Gemessen antwortet er auf Geokodierung, /plan, one-to-many und map/stops bis zur letzten Nachkommastelle gleich.",
+      "Anschalten heißt: MOTIS_BASE_URL auf http://motis:8080 und das Profil local-routing starten. Der erste Start importiert einige Minuten, danach Sekunden."
+    ],
+    daten: [["Eingaben", "OSM-Auszug + DELFI-GTFS"], ["Import", "≈ 6 min, 5,6 GiB Spitzenlast"], ["Voreinstellung", "aus"]],
+    falle: "Drei Dinge müssen in der Konfiguration stimmen: das Datensatz-Kürzel muss de-DELFI heißen, timetable.route_shapes muss an sein — sonst ist jede ÖPNV-Teilstrecke eine gerade Linie zwischen zwei Haltestellen — und preprocess_max_matching_distance hält Haltestellen außerhalb des Auszugs im Bestand."
+  },
+
+  /* ---------- Band 3: somebody else's servers ---------- */
+  {
+    id: "portals", own: "foreign", kind: "box", x: COL[0], y: 646, w: 180, h: 76,
+    title: "Inserats-Portale",
+    lines: ["kleinanzeigen.de: og-Tags", "immobilienscout24.de: 401"],
+    ort: "Fremder Server",
+    text: [
+      "Kleinanzeigen liefert die volle Seite samt og:latitude und og:longitude — die Meta-Tags lesen spart den Modellaufruf und das Geokodieren gleich mit.",
+      "Immobilienscout24 antwortet jeder serverseitigen Anfrage mit 401, durch httpx wie durch alle drei Fetch-Engines. Die Anwendung fragt deshalb gar nicht erst und zeigt sofort das Einfügefeld."
+    ],
+    daten: [["Kennung", "Browser-User-Agent, sonst Challenge-Seite"], ["Unbekannte Domain", "erst web_fetch, dann Meta-Tags, dann Volltext"]]
+  },
+  {
+    id: "alkis", own: "official", kind: "box", x: COL[1], y: 646, w: 180, h: 76,
+    title: "ALKIS-WFS · GeoSN",
+    lines: ["geodienste.sachsen.de", "Umring + amtliche Fläche"],
+    ort: "Amtlicher Dienst, fremder Server",
+    text: [
+      "Das Liegenschaftskataster: Flurstücksumring, Kennzeichen und das Attribut flaeche, das für alles Preisliche gilt. Geliefert wird ETRS89/UTM33N.",
+      "Ohne diesen Dienst gibt es kein Grundstück — er ist der einzige, der nicht ersetzbar ist."
+    ],
+    daten: [["Protokoll", "WFS 2.0.0, GetFeature"], ["Region", "nur Sachsen"], ["Zwischenspeicher", "7 Tage"]],
+    falle: "Jede gespeicherte Abfrage außer GetFeatureById verlangt den CRS-Parameter, und Ad-hoc-Filter müssen Attribute mit dem Präfix ave: ansprechen. Beide Fehler kommen als dieselbe generische HTML-400-Seite zurück — den Fehlertext zu lesen bringt nichts."
+  },
+  {
+    id: "boris", own: "official", kind: "box", x: COL[2], y: 646, w: 180, h: 76,
+    title: "BORIS Sachsen",
+    lines: ["landesvermessung.sachsen.de", "Bodenrichtwert je Zone"],
+    ort: "Amtlicher Dienst, fremder Server",
+    text: [
+      "Kein WFS, kein Vektordownload — der einzige programmatische Weg hinein ist ein WMS-GetFeatureInfo auf ein 50-Meter-Fenster um den Punkt.",
+      "Der Endpunkt trägt das Stichtagsjahr im Pfad; einmal im Jahr nachsehen."
+    ],
+    daten: [["Protokoll", "WMS GetFeatureInfo, text/plain"], ["Zwischenspeicher", "30 Tage"]],
+    falle: "INFO_FORMAT=application/json liefert UTFGrid statt GeoJSON und scheitert auf der kombinierten Ebene ganz. Also text/plain oder GML."
+  },
+  {
+    id: "geosn-wms", own: "official", kind: "box", x: COL[3], y: 646, w: 180, h: 76,
+    title: "GeoSN-WMS (Raster)",
+    lines: ["Luftbild, WebAtlas, ALKIS", "EPSG:3857 · GetMap"],
+    ort: "Amtlicher Dienst, fremder Server",
+    text: [
+      "Drei Rasterebenen unter der Zeichnung. Sie gehen durch den eigenen Proxy, weil ein Orthophoto sich zwischen zwei Seitenaufrufen nicht ändert und jede Kachel auf die Platte gehört."
+    ],
+    daten: [["Ebenen", "dop · webatlas · alkis"], ["Zwischenspeicher", "30 Tage"]],
+    falle: "Die Behördendienste senden sehr wohl CORS-Kopfzeilen — nachgeprüft mit GET und Origin. Der Proxy verdient seinen Platz trotzdem, nur aus anderen Gründen: Cache, ein Vertrag, kein Schlüssel im Browser."
+  },
+  {
+    id: "transitous", own: "foreign", kind: "box", x: COL[4], y: 646, w: 180, h: 76, mode: "prototyp",
+    title: "Transitous · MOTIS",
+    lines: ["api.transitous.org", "Freiwilligendienst"],
+    ort: "Fremder Server, freiwillig betrieben",
+    text: [
+      "Routing, Haltestellen aus dem Fahrplan und der Geokodier-Rückfall für alles, was die amtlichen Hauskoordinaten nicht beantworten.",
+      "Die Nutzungsbedingungen verlangen eine Kontaktadresse in der Kennung und bitten vor „vielen Anfragen“ um Rücksprache. Für alles jenseits eines Prototyps gehört ein eigener Router her."
+    ],
+    daten: [["Endpunkte", "v6/plan · v1/one-to-many · v1/geocode"], ["Gleichzeitig", "höchstens 2 Anfragen"], ["Zwischenspeicher", "1 h"]],
+    falle: "legGeometry ist eine Polylinie mit Genauigkeit 6. Mit der üblichen 5 dekodiert liegt die Route um den Faktor zehn daneben. Und REGIONAL_RAIL ist kein Synonym für S-Bahn — eine echte S-Bahn-Haltestelle trägt beides."
+  },
+  {
+    id: "openrouter", own: "foreign", kind: "box", x: COL[0], y: 740, w: 180, h: 76, optional: true,
+    title: "OpenRouter (LLM)",
+    lines: ["OpenAI-kompatibel", "ohne Schlüssel: aus"],
+    ort: "Fremder Server",
+    text: [
+      "Liest eine Inseratsseite und strukturiert sie gegen ein Schema. Kein Anbieter ist verdrahtet: der Wechsel ist eine geänderte LLM_BASE_URL.",
+      "Ohne Schlüssel bleibt das Auslesen aus; alles andere funktioniert weiter."
+    ],
+    daten: [["Aufrufe", "zwei je Seite"], ["Zwischenspeicher", "Seitentext, ohne Ablauf"]],
+    falle: "response_format mit json_schema und strict wird nicht eingehalten, solange im selben Aufruf tools: [web_fetch] aktiv ist — an drei Modellen nachgeprüft. Deshalb zwei Aufrufe: erst holen, dann strukturieren."
+  },
+  {
+    id: "openfreemap", own: "foreign", kind: "box", x: COL[3], y: 740, w: 180, h: 76,
+    title: "OpenFreeMap",
+    lines: ["tiles.openfreemap.org", "Vektorstil hell + dunkel"],
+    ort: "Fremder Server",
+    text: [
+      "Die Vektor-Hintergrundkarte. Der Stil wird serverseitig umgeschrieben, bis jede URL darin auf das eigene Backend zeigt — Glyphen, Sprite, TileJSON und Kacheln inbegriffen.",
+      "Welche Variante geladen wird, entscheidet der Browser, weil nur er weiß, wozu „System“ sich gerade aufgelöst hat."
+    ],
+    daten: [["Stile", "styles/liberty · styles/dark"], ["Zwischenspeicher", "7 Tage"]],
+    falle: "Ein Hintergrund hat eine Palette, und die ist keine Geschmacksfrage: eine fast weiße Fläche unter einer dunklen Seite verschluckt den Flurstücksumring im eigenen Blendlicht."
+  },
+  {
+    id: "overpass", own: "foreign", kind: "box", x: COL[4], y: 740, w: 180, h: 76, optional: true,
+    title: "Overpass-API",
+    lines: ["aus, bis eingeschaltet", "Prototyp-Abkürzung"],
+    ort: "Fremder Server",
+    text: [
+      "Live-Abfragen auf OpenStreetMap: Nachbargebäude immer, die sechs Umgebungskategorien nur, solange kein eigenes Verzeichnis gebaut ist.",
+      "Das Handbuch nennt „eine App für mehr als OSM-Mapper, die sich auf die öffentlichen Instanzen als Backend stützt“ ausdrücklich problematisch und nennt als Richtwert rund 10 000 Anfragen und 1 GB am Tag. Ein Einzelnutzer-Prototyp hinter einem 30-Tage-Cache liegt drei Größenordnungen darunter — ein Produkt mit Nutzern nicht."
+    ],
+    daten: [["Voreinstellung", "aus (OVERPASS_ENABLED)"], ["Gleichzeitig", "eine Anfrage"], ["Zwischenspeicher", "30 Tage"]]
+  },
+
+  /* ---------- Band 4: build time, never in a request ---------- */
+  {
+    id: "scheduler", own: "server", kind: "box", x: 56, y: 894, w: 272, h: 62, optional: true,
+    title: "Scheduler (optional)",
+    lines: ["Profil scheduled-jobs", "Cron in UTC · ops/jobs.json"],
+    ort: "Container auf deinem Server",
+    text: [
+      "Läuft aus dem Backend-Image und rührt nur die gemeinsamen Volumes an — kein Docker-Socket, der wäre Root auf dem Host für vier zeitgesteuerte Befehle.",
+      "Nichts wiederholt sich von selbst: ein Wiederholungslauf würde einen echt kaputten Datenstand hinter drei weiteren Fehlschlägen verstecken. Der nächste geplante Lauf ist die Wiederholung."
+    ],
+    daten: [["Jobs", "Cache-Kehren nachts, Indizes quartalsweise"], ["Neuer Job", "ein Eintrag in ops/jobs.json, kein Code"]]
+  },
+  {
+    id: "b-gemarkung", own: "server", kind: "box", x: 356, y: 894, w: 236, h: 62,
+    title: "build_gemarkung_index",
+    lines: ["ALKIS-WFS → 490 kB JSON", "einmal gebaut, eingecheckt"],
+    ort: "Baulauf auf deinem Server",
+    text: ["Zieht alle 5 339 sächsischen Gemarkungen aus dem WFS und legt sie als Datei ab. Läuft praktisch nie wieder — Gemarkungen ändern sich im Takt einer Gebietsreform."],
+    daten: [["Quelle", "ALKIS-WFS, ave:KatasterBezirk"], ["Ziel", "backend/data/gemarkungen-sachsen.json"]]
+  },
+  {
+    id: "b-address", own: "server", kind: "box", x: 608, y: 894, w: 236, h: 62, optional: true,
+    title: "build_address_index",
+    lines: ["GeoSN-Download → .json.gz", "quartalsweise"],
+    ort: "Baulauf auf deinem Server",
+    text: ["Der GeoSN veröffentlicht alle Adressen des Landes mit Katasterkoordinate als Quartalsdownload. Der Baulauf macht daraus die Datei, die /api/geocode zuerst befragt."],
+    daten: [["Quelle", "Nextcloud-Freigabe des GeoSN"], ["Ziel", "backend/data/hauskoordinaten-sachsen.json.gz"]],
+    falle: "Die Freigabe antwortet auf HEAD mit 401 und auf GET mit 200 — eine Erreichbarkeitsprüfung muss also ein GET mit Range-Kopfzeile sein."
+  },
+  {
+    id: "b-poi", own: "server", kind: "box", x: 860, y: 894, w: 236, h: 62, optional: true,
+    title: "build_poi_index",
+    lines: ["Geofabrik-Auszug → JSON", "quartalsweise"],
+    ort: "Baulauf auf deinem Server",
+    text: ["Lädt den OSM-Auszug, prüft ihn gegen die veröffentlichte MD5 und schreibt die sechs Kategorien als flache Punktdatei. Das ist die Produktionsantwort, nicht Overpass."],
+    daten: [["Quelle", "Geofabrik oder BBBike, per --url frei"], ["Ziel", "backend/data/poi-sachsen.json"]]
+  },
+  {
+    id: "b-motis", own: "server", kind: "box", x: 1112, y: 894, w: 236, h: 62, optional: true,
+    title: "motis import",
+    lines: ["OSM + DELFI-GTFS → Graph", "Host-Cron, nicht im Scheduler"],
+    ort: "Baulauf auf deinem Server",
+    text: ["Baut den Routing-Graphen ins Volume. Bewusst kein Scheduler-Job: der Lauf hält einen Dienst an und tauscht ein Volume — das ist eine Sache für den Host, nicht für einen Container."],
+    daten: [["Dauer", "≈ 6 min, danach Sekunden zum Start"], ["Ziel", "Volume motis-graph"]]
+  }
+];
+
+const ZONES = [
+  { x: 24, y: 52, w: 1352, h: 176, label: "IM BROWSER DES NUTZERS",
+    note: { x: 214, y: 206, text: "Abstandsflächen, Bauhülle und Kollision rechnen hier — beim Ziehen, ohne Serveraufruf." } },
+  { x: 24, y: 246, w: 1352, h: 338, label: "AUF DEINEM SERVER",
+    note: { x: 1352, y: 270, anchor: "end", text: "docker compose · zwei Container · keine Datenbank" } },
+  { x: 24, y: 608, w: 1352, h: 224, label: "FREMDE SERVER — keiner davon deiner" },
+  { x: 24, y: 856, w: 1352, h: 124, label: "BAUZEIT — nie im Anfrageweg" }
+];
+
+const EDGES = [
+  { id: "e-spa", d: "M 192 178 V 280", label: { x: 200, y: 236, text: "fetch /api/… — der einzige Weg nach draußen" } },
+  { id: "e-maplibre", d: "M 874 178 V 280", label: { x: 882, y: 236, text: "Stil und Kacheln, nur von hier" } },
+  { id: "e-proxy", d: "M 700 332 V 346", label: { x: 712, y: 347, text: "/api → backend:8000" } },
+  { id: "e-ticks", d: "M 446 394 V 406 M 650 394 V 406 M 854 394 V 406 M 1058 394 V 406 M 1262 394 V 406", plain: true },
+  { id: "e-bus", d: "M 356 373 H 342 M 342 300 V 533", plain: true, label: { x: 60, y: 578, text: "liest lokal" } },
+  { id: "e-bus-1", d: "M 342 317 H 334" },
+  { id: "e-bus-2", d: "M 342 389 H 334" },
+  { id: "e-bus-3", d: "M 342 461 H 334" },
+  { id: "e-bus-4", d: "M 342 533 H 334", dashed: true, mode: "lokal" },
+  { id: "e-out-0", d: "M 446 480 V 640", label: { x: 454, y: 570, text: "GET mit Browser-Kennung" } },
+  { id: "e-out-1", d: "M 650 480 V 640", label: { x: 658, y: 596, text: "WFS 2.0.0 · GetFeature" } },
+  { id: "e-out-2", d: "M 854 480 V 640", label: { x: 862, y: 570, text: "GetFeatureInfo · text/plain" } },
+  { id: "e-out-3", d: "M 1058 480 V 640", label: { x: 1066, y: 596, text: "WMS GetMap" } },
+  { id: "e-out-4", d: "M 1262 480 V 640", mode: "prototyp",
+    label: { x: 1270, y: 570, text: "v6/plan" } },
+  { id: "e-llm", d: "M 380 480 V 560 H 300 V 772 H 348", dashed: true,
+    label: { x: 296, y: 600, anchor: "end", text: "zwei Aufrufe" } },
+  { id: "e-ofm", d: "M 1120 480 V 560 H 1160 V 772 H 1154", label: { x: 1166, y: 600, text: "Stil + Kacheln" } },
+  { id: "e-ovp", d: "M 1330 480 V 560 H 1364 V 772 H 1358", dashed: true,
+    label: { x: 1358, y: 600, anchor: "end", text: "nur wenn an" } },
+  { id: "e-sched", d: "M 328 925 H 348", dashed: true,
+    label: { x: 340, y: 884, anchor: "middle", text: "startet nach Plan" } }
+];
+
+const FLOWS = [
+  {
+    id: "aufnahme", name: "Inserat aufnehmen", hops: "3 Dienste",
+    nodes: ["spa", "nginx", "fastapi", "ep-listings", "cache", "portals", "openrouter"],
+    edges: ["e-spa", "e-proxy", "e-ticks", "e-out-0", "e-llm"],
+    steps: [
+      "Der Assistent schickt die URL an <code>/api/listings/extract</code>. Mehr verlässt den Browser nicht — Namen und Telefonnummern stehen nicht einmal im Schema.",
+      "Zuerst der Portal-Adapter: kleinanzeigen.de liefert <code>og:latitude</code> und <code>og:longitude</code> in den Meta-Tags. Damit entfallen Modellaufruf und Geokodierung ganz.",
+      "immobilienscout24.de antwortet Servern mit 401. Es wird gar nicht erst gefragt; stattdessen erscheint das Einfügefeld.",
+      "Sonst zwei Modellaufrufe: erst die Seite holen, dann den Text gegen das Schema strukturieren. Zusammen in einem Aufruf hält kein Modell das Schema ein.",
+      "Zurück kommt jedes Feld mit seiner Quelle. Der Seitentext bleibt ohne Ablauf im Cache — ein zweiter Blick aufs selbe Inserat kostet nichts."
+    ]
+  },
+  {
+    id: "flurstueck", name: "Flurstücke auflösen", hops: "2 Dienste",
+    nodes: ["spa", "nginx", "fastapi", "ep-parcels", "idx-address", "idx-gemarkung", "cache", "alkis", "transitous"],
+    edges: ["e-spa", "e-proxy", "e-ticks", "e-bus", "e-bus-1", "e-bus-2", "e-out-1", "e-out-4"],
+    steps: [
+      "Die Adresse geht an <code>/api/geocode</code>. Die amtlichen Hauskoordinaten antworten zuerst; Haltestellen, Orte und alles außerhalb Sachsens kommen aus MOTIS.",
+      "Wer stattdessen Gemarkung und Flurstücksnummer eingibt, bekommt die Auswahlliste aus der eingecheckten Datei — der WFS wird dafür nie gefragt.",
+      "<code>/api/parcels/resolve</code> holt die Umringe aus dem ALKIS-WFS. Ein Grundstück ist ein <em>Satz</em> Flurstücke: Geometrien werden vereinigt, amtliche Flächen summiert.",
+      "Die Antwort trägt einen Plausibilitätsblock. Ob der Treffer ein PLACE oder eine ADDRESS war, ist das schärfste Signal dafür, dass die Adresse auf ein Feld statt auf das Grundstück zeigt.",
+      "Sieben Tage im Cache. Danach rechnet der Browser weiter: Fläche, Rechteckigkeit, Straßenfront."
+    ]
+  },
+  {
+    id: "preis", name: "Preis einordnen", hops: "1 Dienst",
+    nodes: ["spa", "nginx", "fastapi", "ep-landvalue", "cache", "boris"],
+    edges: ["e-spa", "e-proxy", "e-ticks", "e-out-2"],
+    steps: [
+      "<code>/api/landvalue</code> bekommt eine Koordinate und fragt BORIS mit einem WMS-GetFeatureInfo auf ein 50-Meter-Fenster.",
+      "Die Antwort ist <code>text/plain</code>, nicht JSON: das JSON-Format dieses Dienstes ist UTFGrid und scheitert auf der kombinierten Ebene ganz.",
+      "Zurück kommen €/m², Zone und Stichtag. 30 Tage im Cache — ein Bodenrichtwert gilt ein Jahr.",
+      "Der Vergleich passiert im Browser, gegen die <em>amtliche</em> Fläche. Fehlt der Angebotspreis, bleibt die Abweichung „—“ statt „−100 %“."
+    ]
+  },
+  {
+    id: "haus", name: "Haus stellen", hops: "kein Dienst",
+    nodes: ["spa", "geometry", "storage"],
+    edges: [],
+    steps: [
+      "Kein einziger Serveraufruf. Der ganze Vorgang lebt zwischen drei Kästchen im obersten Band.",
+      "<code>buildableArea</code> versetzt den Umring nach innen. Weil reale Flurstücke häufig konkav sind, ist das eine nach innen verzerrte Gitterkontur — eine Näherung darf nie großzügiger sein als das Gesetz.",
+      "Die Abstandstiefe hängt an der einzelnen Umringkante: 0,4 H mit 3 m als Sockel, gemessen aus der Wandhöhe.",
+      "<code>findPlacement</code> setzt den Baukörper, Ziehen und Drehen prüfen die Ecken gegen die Hülle. Wer die Straßenfront anklickt, richtet daran aus.",
+      "Gespeichert wird in <code>localStorage</code>. Es gibt keinen Ort, an dem das sonst noch läge."
+    ]
+  },
+  {
+    id: "karte", name: "Karte zeichnen", hops: "2 Dienste",
+    nodes: ["maplibre", "nginx", "fastapi", "ep-maps", "cache", "geosn-wms", "openfreemap"],
+    edges: ["e-maplibre", "e-proxy", "e-ticks", "e-out-3", "e-ofm"],
+    steps: [
+      "MapLibre lädt <code>/api/basemap/style.json</code>. Der Proxy schreibt jede URL darin um — TileJSON, Glyphen, Sprite, Kacheln —, bis sie wieder hierher zeigt.",
+      "Welche Variante, entscheidet der Browser: nur er weiß, wozu die Einstellung „System“ sich gerade aufgelöst hat. Hell und dunkel liegen als getrennte Dokumente im Cache.",
+      "Die Rasterebenen kommen aus <code>/api/tiles/{layer}/{z}/{x}/{y}.png</code>: Luftbild, WebAtlas und ALKIS, aus den GeoSN-WMS in XYZ-Kacheln geschnitten.",
+      "Damit braucht der Browser keine Route ins Internet — das ist der Grund, warum die Karte auch hinter einer Firewall steht."
+    ]
+  },
+  {
+    id: "wege", name: "Wege und Umgebung", hops: "1–3 Dienste",
+    nodes: ["spa", "nginx", "fastapi", "ep-routing", "cache", "transitous", "motis-local", "idx-poi", "overpass"],
+    edges: ["e-spa", "e-proxy", "e-ticks", "e-bus", "e-bus-3", "e-bus-4", "e-out-4", "e-ovp"],
+    steps: [
+      "<code>/api/reachability</code> rechnet je Ziel Auto, Rad, Fuß und ÖPNV über <code>/api/v6/plan</code>. Direkte Auto- und Radrouten kommen in <code>direct[]</code> zurück, nicht in <code>itineraries[]</code>.",
+      "Der Zubringer zur ersten Haltestelle wird gewählt, nicht angenommen: das Rad gewinnt nur, wenn es schneller ist <em>und</em> der Fußweg mindestens zehn Minuten dauert. Das Auto kommt erst danach in Frage.",
+      "<code>/api/nearby</code> fragt zuerst die Haltestellen — die kommen aus dem Fahrplan, weil kein OSM-Tag in Sachsen eine S-Bahn-Haltestelle ausweist.",
+      "Schule, Kita, Park, Spielplatz, Markt und Arztpraxis kommen aus dem eigenen POI-Verzeichnis; ohne das aus Overpass, sofern eingeschaltet — sonst sagt der Endpunkt, dass hier kein Bestand eingerichtet ist.",
+      "Sortiert wird nach Gehzeit, nie nach Luftlinie: Umwegfaktoren erreichen 2,88, und der nächste Spielplatz nach Luftlinie kann jenseits der Elbe liegen."
+    ]
+  }
+];
+
+const ORTKLASSE = {
+  browser: "own-browser", server: "own-server",
+  official: "own-official", foreign: "own-foreign"
+};
+
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/* ---------- Zeichnung aufbauen ---------- */
+
+function nodeMarkup(n) {
+  const cls = ["node", ORTKLASSE[n.own]];
+  if (n.optional) cls.push("optional");
+  const attrs = [
+    'class="' + cls.join(" ") + '"',
+    'data-id="' + n.id + '"',
+    'tabindex="0"', 'role="button"',
+    'aria-label="' + esc(n.title || n.mark) + '"'
+  ];
+  if (n.mode) attrs.push('data-mode="' + n.mode + '"');
+
+  let inner = '<rect x="' + n.x + '" y="' + n.y + '" width="' + n.w + '" height="' + n.h + '"></rect>';
+
+  if (n.kind === "bar") {
+    const base = n.y + n.h / 2 + 5;
+    inner += '<text class="titel" x="' + (n.x + 16) + '" y="' + base + '">' + esc(n.title) + "</text>";
+    inner += '<text class="zeile" x="' + (n.x + n.w - 16) + '" y="' + base + '" text-anchor="end">' + esc(n.right) + "</text>";
+  } else if (n.kind === "chip") {
+    inner += '<text class="marke" x="' + (n.x + 12) + '" y="' + (n.y + 20) + '">' + esc(n.mark) + "</text>";
+    n.lines.forEach((line, i) => {
+      inner += '<text class="zeile" x="' + (n.x + 12) + '" y="' + (n.y + 38 + i * 14) + '">' + esc(line) + "</text>";
+    });
+  } else {
+    const titleY = n.y + (n.h >= 80 ? 28 : n.h >= 70 ? 26 : 23);
+    inner += '<text class="titel" x="' + (n.x + 14) + '" y="' + titleY + '">' + esc(n.title) + "</text>";
+    n.lines.forEach((line, i) => {
+      inner += '<text class="zeile" x="' + (n.x + 14) + '" y="' + (titleY + 20 + i * 14) + '">' + esc(line) + "</text>";
+    });
+  }
+  return "<g " + attrs.join(" ") + ">" + inner + "</g>";
+}
+
+function edgeMarkup(e) {
+  const cls = ["edge"];
+  if (e.dashed) cls.push("gestrichelt");
+  const marker = e.plain ? "" : ' marker-end="url(#pfeil)"';
+  const mode = e.mode ? ' data-mode="' + e.mode + '"' : "";
+  let out = '<path class="' + cls.join(" ") + '" data-id="' + e.id + '" d="' + e.d + '"' + marker + mode + "></path>";
+  if (e.label) {
+    const anchor = e.label.anchor ? ' text-anchor="' + e.label.anchor + '"' : "";
+    out += '<text class="kante-schrift" data-id="' + e.id + '" x="' + e.label.x + '" y="' + e.label.y + '"' + anchor + mode + ">"
+      + esc(e.label.text) + "</text>";
+  }
+  return out;
+}
+
+const karte = document.getElementById("karte");
+karte.innerHTML =
+  '<defs><marker id="pfeil" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">'
+  + '<path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path></marker></defs>'
+  + ZONES.map(z => {
+      let s = '<rect class="zone" x="' + z.x + '" y="' + z.y + '" width="' + z.w + '" height="' + z.h + '" rx="16"></rect>'
+        + '<text class="zone-titel" x="' + (z.x + 16) + '" y="' + (z.y + 24) + '">' + esc(z.label) + "</text>";
+      if (z.note) s += '<text class="zone-notiz" x="' + z.note.x + '" y="' + z.note.y + '"'
+        + (z.note.anchor ? ' text-anchor="' + z.note.anchor + '"' : "") + ">" + esc(z.note.text) + "</text>";
+      return s;
+    }).join("")
+  + NODES.map(nodeMarkup).join("")
+  + EDGES.map(edgeMarkup).join("");
+
+/* ---------- Steckbrief ---------- */
+
+const ORTFARBE = {
+  browser: "var(--own-browser-line)", server: "var(--own-server-line)",
+  official: "var(--own-official-line)", foreign: "var(--own-foreign-line)"
+};
+
+const UEBERSICHT =
+  '<p class="ort"><i style="border-color:var(--own-server-line);background:var(--own-server-fill)"></i>Gesamtbild</p>'
+  + "<h2>Zwei Container, neun fremde Dienste, keine Datenbank</h2>"
+  + "<p class=\"warum\">Das Backend besitzt keine Geometrie und keinen Zustand. Es reicht weiter, speichert Antworten zwischen und übersetzt Seiten in Felder. Alles, was gerechnet wird, rechnet der Browser; alles, was der Nutzer eingibt, bleibt dort.</p>"
+  + "<p>Kein fremder Dienst ist fest verdrahtet — jeder hängt an einer Einstellung mit eigenem Präfix. Was davon abschaltbar ist, ist gestrichelt gezeichnet: die Anwendung sagt dann, dass hier nichts eingerichtet ist, statt eine leere Liste auszugeben.</p>"
+  + '<dl class="daten">'
+  + "<div><dt>Unersetzbar</dt><dd>ALKIS — ohne den Umring und die amtliche Fläche gibt es kein Grundstück.</dd></div>"
+  + "<div><dt>Ersetzbar</dt><dd>MOTIS und Overpass laufen wahlweise auf der eigenen Maschine, das Modell hinter jedem OpenAI-kompatiblen Endpunkt.</dd></div>"
+  + "<div><dt>Verzichtbar</dt><dd>Bodenrichtwert, Kartenhintergrund und Auslesen — fehlt eines, bleibt die Zeile leer und der Rest rechnet weiter.</dd></div>"
+  + "<div><dt>Nirgends</dt><dd>Konto, Datenbank, Serverzustand, Kontaktdaten.</dd></div>"
+  + "</dl>"
+  + '<div class="falle"><b>Woher die Zahlen kommen</b><span>Jede Angabe hier steht so im Repository: Endpunkte und Fristen in <code>backend/app/settings.py</code>, die Container in <code>docker-compose.yml</code>, die Bauläufe in <code>ops/jobs.json</code>. Die Fallstricke sind gemessene Belege aus <code>docs/research/</code>, keine Vermutungen.</span></div>';
+
+const steckbrief = document.getElementById("steckbrief");
+const ablauftafel = document.getElementById("ablauftafel");
+
+function zeigeSteckbrief(id) {
+  const n = NODES.find(x => x.id === id);
+  if (!n) { steckbrief.innerHTML = UEBERSICHT; return; }
+  const name = n.title || n.mark;
+  let html = '<p class="ort"><i style="border-color:' + ORTFARBE[n.own] + ';background:var(--own-'
+    + (n.own === "browser" ? "browser" : n.own === "server" ? "server" : n.own === "official" ? "official" : "foreign")
+    + '-fill)"></i>' + esc(n.ort) + (n.optional ? " · abschaltbar" : "") + "</p>";
+  html += "<h2>" + esc(name) + "</h2>";
+  html += n.text.map((p, i) => '<p class="' + (i === 0 ? "warum" : "") + '">' + p + "</p>").join("");
+  if (n.daten) {
+    html += '<dl class="daten">' + n.daten.map(row =>
+      "<div><dt>" + esc(row[0]) + "</dt><dd>" + row[1] + "</dd></div>").join("") + "</dl>";
+  }
+  if (n.falle) html += '<div class="falle"><b>Was hier schon Zeit gekostet hat</b><span>' + n.falle + "</span></div>";
+  html += '<p style="margin-top:22px"><button class="knopf" data-zurueck="1">Zurück zum Gesamtbild</button></p>';
+  steckbrief.innerHTML = html;
+}
+
+/* ---------- Ablauf ---------- */
+
+function flowListe() {
+  return "<h2>Sechs Abläufe</h2>"
+    + '<p style="font-size:13.5px">Einen auswählen — die Zeichnung zeigt dann nur, was daran beteiligt ist.</p>'
+    + '<div class="liste">' + FLOWS.map(f =>
+        '<button data-flow="' + f.id + '">' + esc(f.name) + "<em>" + esc(f.hops) + "</em></button>").join("")
+    + "</div>";
+}
+
+function zeigeAblauf(id) {
+  const f = FLOWS.find(x => x.id === id);
+  if (!f) { ablauftafel.innerHTML = flowListe(); return; }
+  ablauftafel.innerHTML = "<h2>" + esc(f.name) + "</h2>"
+    + '<p class="ort" style="margin:8px 0 0"><i style="border-color:var(--own-foreign-line);background:var(--own-foreign-fill)"></i>'
+    + esc(f.hops) + " beteiligt</p>"
+    + "<ol>" + f.steps.map(s => "<li>" + s + "</li>").join("") + "</ol>"
+    + '<p style="margin-top:20px"><button class="knopf" data-flow="">Alle Abläufe</button></p>';
+}
+
+/* ---------- Verdrahtung ---------- */
+
+const ablaufreihe = document.getElementById("ablaufreihe");
+ablaufreihe.innerHTML = '<button class="knopf" data-flow="" aria-pressed="true">Gesamtbild</button>'
+  + FLOWS.map(f => '<button class="knopf" data-flow="' + f.id + '" aria-pressed="false">' + esc(f.name) + "</button>").join("");
+
+function setzeAblauf(id) {
+  const f = FLOWS.find(x => x.id === id);
+  karte.querySelectorAll(".aktiv").forEach(el => el.classList.remove("aktiv"));
+  if (f) {
+    karte.dataset.flow = f.id;
+    f.nodes.forEach(nid => {
+      const g = karte.querySelector('.node[data-id="' + nid + '"]');
+      if (g) g.classList.add("aktiv");
+    });
+    f.edges.forEach(eid => {
+      karte.querySelectorAll('[data-id="' + eid + '"]').forEach(el => el.classList.add("aktiv"));
+    });
+  } else {
+    karte.removeAttribute("data-flow");
+  }
+  ablaufreihe.querySelectorAll("button").forEach(b =>
+    b.setAttribute("aria-pressed", String(b.dataset.flow === (f ? f.id : ""))));
+  zeigeAblauf(f ? f.id : null);
+}
+
+function waehle(id) {
+  karte.querySelectorAll(".node.gewaehlt").forEach(g => g.classList.remove("gewaehlt"));
+  const g = id && karte.querySelector('.node[data-id="' + id + '"]');
+  if (g) g.classList.add("gewaehlt");
+  zeigeSteckbrief(id);
+}
+
+karte.addEventListener("click", ev => {
+  const g = ev.target.closest(".node");
+  if (g) waehle(g.dataset.id);
+});
+karte.addEventListener("keydown", ev => {
+  if (ev.key !== "Enter" && ev.key !== " ") return;
+  const g = ev.target.closest(".node");
+  if (!g) return;
+  ev.preventDefault();
+  waehle(g.dataset.id);
+});
+
+document.addEventListener("click", ev => {
+  const flowKnopf = ev.target.closest("[data-flow]");
+  if (flowKnopf && !karte.contains(flowKnopf)) {
+    setzeAblauf(flowKnopf.dataset.flow || null);
+    return;
+  }
+  if (ev.target.closest("[data-zurueck]")) waehle(null);
+});
+
+document.getElementById("modusreihe").addEventListener("click", ev => {
+  const b = ev.target.closest("[data-mode]");
+  if (!b) return;
+  karte.dataset.mode = b.dataset.mode;
+  document.querySelectorAll("#modusreihe button").forEach(x =>
+    x.setAttribute("aria-pressed", String(x === b)));
+});
+
+waehle(null);
+setzeAblauf(null);
+</script>
