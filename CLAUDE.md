@@ -69,6 +69,21 @@ from the user directly. Reopen only if the user asks.
   so only the 3 m floor is computable.
   See `docs/research/abstandsflaechen-nachbargebaeude.md`.
 - Region is Saxony only; ALKIS and BORIS are state-specific.
+- **The sentence under a check is composed, not written.** Every finding comes
+  from a template in `frontend/src/lib/findings.js`: structured input from one
+  service, fixed German text out. No model writes UI copy. That keeps the
+  wording reviewable, keeps the same plot reading the same way twice, and makes
+  it impossible for a missing input to turn into a sentence that sounds
+  confident. The templates take the data's shape seriously — noise is a band so
+  the text says a range, a designation is a yes or no so the text is a yes or a
+  no.
+- **The search field reads what was typed before it looks anything up**
+  (`frontend/src/lib/queryInput.js`). Three signals settle almost everything: a
+  German address never begins with a digit, so a leading digit rules the address
+  index out; a coordinate is two numbers that land inside Germany; a parcel
+  denominator (`85/1`) cannot occur in an address. Where two readings stay
+  plausible — "Lessingweg 44" and "Mölkau 204" are the same shape — the answer
+  says so and both local indexes are asked, rather than one being guessed.
 - **Never show example data.** There is no sample state and no fallback: when a
   service fails, the German `detail` from the backend is shown instead. Tests
   run on recorded real responses in `frontend/tests/fixtures/`, not on invented
@@ -400,7 +415,7 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 ## Test and screenshot counts at last check
 
 - `pytest`: 385 passed, 1 skipped
-- `vitest`: 360 passed, 10 skipped — the 10 are the integration tests, which run
+- `vitest`: 401 passed, 10 skipped — the 10 are the integration tests, which run
   and pass (368/2) when a backend is up on :8000
 - `scripts/screenshots.mjs`: 41 images plus a print PDF. It fails on console
   errors, on horizontal overflow, and if not a single vector tile arrived. It
