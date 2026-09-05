@@ -35,7 +35,8 @@ backend/     FastAPI. Proxy and disk cache in front of ALKIS, BORIS, GeoSN
              WMS, MOTIS and the LLM. Owns no geometry maths and no database —
              PostGIS is in the plan, not in the code.
 frontend/    Vite + Vue 3, Options API. Owns ALL geometry.
-docs/        Spec, service research, screenshots.
+docs/        Spec, service research, screenshots. `strategie/` holds the four
+             interactive strategy pages for parcel identification.
 mockup/      The approved UI mock. Historical reference, not built.
 ```
 
@@ -233,8 +234,131 @@ from the user directly. Reopen only if the user asks.
   other instance's answers until `/cache/motis*` is deleted. Comparing the two
   instances without clearing it reports a difference that is not there — and,
   worse, an agreement that is not there either.
+- **The listing pin is the municipality, not the plot.** Measured on a real
+  Kleinanzeigen ad (3499632623, 01.09.2026): `og:latitude/longitude` sat
+  **6 235 m** from the parcel actually offered, because the platform geocodes
+  its own location field ("04668 Sachsen – Grimma"). Resolving that point gives
+  Gemarkung Grimma 2537 at 38 284 m² instead of Großbothen 790/11 at 502 m² —
+  an answer that looks exactly as official as the right one. So there is no
+  radius to search: the *Ortsteil* named in the body text is the usable
+  statement, and the pin is only good for rejecting things.
+- **`ave:flaeche` can be filtered server-side** with `PropertyIsEqualTo` and
+  `PropertyIsBetween`, and it is the strongest cheap filter there is. Gemarkung
+  Großbothen holds 1 131 parcels; adding `flaeche = 502` leaves **one**, and it
+  is the right one. The whole of Stadt Grimma (32 544 parcels, 66 Gemarkungen)
+  leaves 15. Two requests, no model call. Only use the exact value when the
+  listing's number is exact — "ca. 500 m²" has to widen into a band.
+- **`ave:lagebeztxt` is often `"ohne Lage"`**, so a street name cannot be matched
+  against ALKIS as an attribute. Take the way from OSM and buffer it instead: a
+  40 m buffer around Wiesenstraße catches 790/11 at 3 m, and an 80 m buffer cuts
+  the 25 area candidates to 5 — better than the distance rings, which cut them
+  only to 8.
+- **Tesseract reads a Geoportal print's title block, and nothing else on it.**
+  `-l deu --psm 6` on the ad's cadastral extract returned "Flurstück 790/11" and
+  "Wiesenstraße - Großbothen" in 491 ms; the small in-map labels came out as
+  garbage and the orthophoto yielded nothing. The two site photographs produced
+  **no** false parcel numbers, which is why the right design is to OCR every
+  image and filter by pattern rather than classify images first. Watch the
+  footer: `Olbrichtplatz` is the GeoSN's own address, printed on every sheet.
+- **`ave:tntxt` carries the actual land use, with the area share per kind** —
+  790/11 is `Wohnbaufläche;502`, a carriageway parcel is `Straßenverkehr;1062`.
+  It rides along with every feature, and `PropertyIsLike` filters it
+  server-side: in Gemarkung Großbothen the ±5 % area band plus Wohnbaufläche
+  goes 25 → 16. Use it as a *soft* signal only — an unbuilt building plot can
+  legitimately be Landwirtschaft or Gartenland, so "Baugrundstück ⇒
+  Wohnbaufläche" is an inference, not an official fact. The same field is where
+  street surfaces come from: no OSM request needed to draw a carriageway.
+- **For OCR, upscaling beats rotation handling.** Measured on the ad's Geoportal
+  print: a 2x Lanczos upscale (long edge ≥ 1500 px) fixed `--psm 1`'s blindness
+  to a 180° flip, fixed a 7° tilt with no deskewing at all, and lifted the
+  orientation detector's confidence from ~1,0 to ~3,0. So: **upscale, then
+  `--psm 6`, and only if no pattern matched `--psm 1`** (~780 ms + ~910 ms).
+  An OSD pre-pass costs the same on *every* image and adds three failure modes —
+  it reports the *complement* for ±90 at native size, it exits with "Too few
+  characters" on an orthophoto, and it claimed `Rotate: 180` at confidence 0,72
+  on one of the site photographs. Do not build deskewing: below 10° it is
+  unnecessary after upscaling, above 15° it did not help even with the exact
+  angle given.
+- **A garbled parcel number is worse than none.** At 7° and native size the
+  reader returned `Flurstück 790717` — it found the word and corrupted the
+  digits. An empty answer is harmless; a plausible wrong number resolves to a
+  real but foreign parcel, and that is precisely the error validating against
+  ALKIS does **not** catch.
+- **`SitePlan` draws no streets at all.** What makes its map look right is a
+  MapLibre instance underneath carrying OpenFreeMap's `liberty` vector style,
+  while the SVG holds its own parcel fill to `fill-opacity: .42`. The two map
+  tokens `--w2b-map-street-surface` and `--w2b-map-existing` are declared and
+  never used. Any new map component should take the same backdrop rather than
+  hand-drawing streets — and copy the two techniques that do the work: a halo
+  stroke under every line (6 px `--w2b-map-halo` beneath 2,2 px
+  `--w2b-map-boundary`) and `paint-order: stroke fill` with a 3,4 px halo on
+  every label.
+- **A search map must never frame tighter than its own doubt.** The first
+  Indizienkarte zoomed to whatever had just been found and thereby hid the other
+  parcels that still matched the stated area. The camera is derived from the
+  *live candidate set* plus the new indicium, with 35 % slack and a 120 m
+  minimum half-width, so even a confirmed parcel is never shown without its
+  neighbours. And a layer whose extent dwarfs the frame stops informing and
+  starts tinting: the district wash and the street buffer fade out on the way in.
+- **Counting place-name mentions picks the wrong place.** Against the 5 339
+  names in `gemarkungen-sachsen.json`, this ad scores Grimma 3× and Großbothen
+  3× — Grimma appears so often precisely because the plot is 6 km *away* from
+  it. Extract the relation (`liegt_in`, `entfernt_von`), never the frequency.
+- **A landmark named in a listing is usually somewhere to visit, not a
+  neighbour.** The Grimma ad names Kloster Nimbschen and Schiffsmühle Höfgen; a
+  1 km ring around either contains **0 %** of Gemarkung Großbothen, where the
+  plot actually is — both are ~1,9 km from the nearest Gemarkung edge, and they
+  only cover it at ~5 km, i.e. once they constrain nothing. As a hard filter
+  either would have deleted the right answer. Point-like landmarks (under ~200 m:
+  monastery, mill, station) are worth ranking with, but only when the text states
+  a distance; extended ones (lake, forest, Bundesstraße) can only ever *refute*.
+  A 1 km buffer round the Cospudener See polygon is 17,4 km² against 5,9 km² for
+  a whole Gemarkung, and the B 107 corridor is 68,8 km².
+- **Distance to an extended feature is measured from its boundary.** A 1 km disc
+  about the Cospudener See's centroid covers 3,14 km² and does not even reach the
+  4 km long lake's own ends — it is not a coarser version of the buffer, it is a
+  different place. The constraint is an annulus, `buffer(geom, r) \ geom`.
+- **`fes:BBOX` works on `ave:geometrie`.** Verified: a 2 x 2 km box round Kloster
+  Nimbschen returns `numberMatched="407"`. That is the cheap way to combine a
+  spatial claim with the WFS without putting geometry maths in the backend —
+  pre-filter server-side, then test exactly on what comes back.
+- **A street name without a containing area is a 1-in-500 shot.** Saxony holds
+  2 918 OSM ways named `Bahnhofstraße` and 4 043 named `Dorfstraße` — roughly
+  400 to 970 distinct streets each, spread over 220 km. Inside one Gemarkung a
+  street name is essentially unique; on its own it is nothing. The same trap
+  catches landmarks: 8 of 46 objects around Nimbschen are a hotel, a chapel, a
+  ferry terminal and a viewpoint named after it.
+- **The geocoder answers with far-away namesakes.** Transitous returns
+  `Großbeeren, Bahnhof` — 134 km away — as the sixth hit for "Großbothen
+  Bahnhof". Discard any geocoder result outside the already-narrowed area before
+  it becomes a search constraint.
 - **Rank by walking time, never air distance.** Detour ratios reach 2.88x, and
   the nearest thing by air can be unwalkable altogether.
+- **Let the hard filters decide and the weights only order.** "Bestätigt" means
+  plausibility raised no objection *and* exactly one candidate survives the
+  filters that are official facts — a parcel key resolved against ALKIS, the
+  Gemarkung, `ave:flaeche` when the listing's figure is exact. Everything
+  inferential (a rounded area, a street buffer, land use, distance claims) only
+  ranks. That removes the lead threshold entirely and means uncalibrated weights
+  can never produce a wrong answer, only an unhelpful ordering — which is why
+  this can ship without a corpus of solved listings.
+- **A wrong Gemarkung anchor returns nothing, as long as the area is exact.**
+  Measured on the three district names the Grimma ad contains: with
+  `flaeche = 502` Großbothen gives 1, Grimma 0, Höfgen 0 — so run the staircase
+  against every place candidate and let the area pick. One rung wider it inverts:
+  at ±0,5 % Grimma yields **26** against Großbothen's 2, because it is the bigger
+  district. The place named most often is also the one that manufactures the most
+  false candidates, so from that rung on the relation has to be right.
+- **The anchor's size is not a reason to give up.** A proposed "refuse anchors
+  over 60 000 parcels" rule was refuted by measuring it: **Stadt Leipzig has
+  112 588 Flurstücke and Dresden 108 558**, and Leipzig plus an exact 502 m²
+  still leaves 78 — a scoreable set. Cap the *candidate set after the hard
+  filters*, never the anchor.
+- **When no single parcel can be named, name the common envelope.** The smallest
+  unit every surviving candidate shares is a real answer: the 25 area candidates
+  share Gemarkung Großbothen, the 5 that survive the street buffer share
+  *Wiesenstraße in Großbothen*. It must never be drawn like a hit, though — halo
+  and drawn contour stay reserved for a confirmed parcel.
 - **An address is not a plot.** A district address ("Plaußig-Portitz, 04349
   Leipzig") geocodes to a point in a field, and the parcel under it is not the
   one in the listing. `/api/parcels/resolve` takes `expected_area_m2` and
@@ -301,6 +425,22 @@ from the user directly. Reopen only if the user asks.
   `PlotView`'s computeds all read `this.plot`, and a `v-if="plot"` had kept them
   from ever seeing `null`. Adding one watcher was enough to crash the page whose
   whole job is to explain that the id in the URL names no plot here.
+- **The basemap has a palette, and it is not a preference.** A drawing sits *on*
+  the backdrop, so a near-white ground under a dark page loses the plot outline
+  in its own glare. OpenFreeMap serves `styles/dark` (neutral near-black) and
+  `styles/fiord` (blue-grey); `dark` is the one that sits next to this app's
+  warm near-black paper. The variant travels in the URL
+  (`/api/basemap/style.json?variant=dark`) so the two documents cache
+  separately, and the *browser* decides which one, because only the browser
+  knows what `system` resolved to. MapLibre also draws its own controls and
+  ships them white — restyled through the palette tokens in `base.css`, with
+  the icons reached by a filter because they are background images.
+- **The POI index's filename is a default, not a claim.** `poi-sachsen.json`
+  built from a Leipzig-region BBBike box is still called that; the extract it
+  really came from is in the file's own `quelle`, and its `datenstand` is the
+  extract's timestamp. Read those. Scope itself is a command-line argument
+  (`--url`, `--out`) — see README, "Reach of the POI index", and
+  `docs/research/poi.md` § 12.
 - **"Something is selected" is not a signal that anybody selected anything.**
   `addPlot` puts every new plot into `state.data.selection`, so opening the
   overview's comparison mode when the selection is non-empty means opening it
@@ -414,9 +554,9 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 385 passed, 1 skipped
-- `vitest`: 411 passed, 10 skipped — the 10 are the integration tests, which run
-  and pass (368/2) when a backend is up on :8000
+- `pytest`: 422 passed
+- `vitest`: 367 passed — plus the integration file, excluded by `npm run test`
+  and 8 passed / 2 skipped when a backend is up on :8000
 - `scripts/screenshots.mjs`: 41 images plus a print PDF. It fails on console
   errors, on horizontal overflow, and if not a single vector tile arrived. It
   also drives the live geocoder, which is slow often enough to blow the 60 s

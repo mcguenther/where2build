@@ -239,7 +239,19 @@ class BasemapService:
         self.cache.set_bytes(cache_key, _pack(proxied))
         return proxied
 
-    async def style(self) -> tuple[Any, bool]:
+    def style_path(self, *, dark: bool = False) -> str:
+        """Which upstream style document a variant asks for.
+
+        A dark variant that is not configured falls back to the light one
+        rather than 404-ing: a backdrop with the wrong palette is still a
+        backdrop, and losing the map entirely is the worse outcome.
+        """
+
+        if dark and self.settings.dark_style_path:
+            return self.settings.dark_style_path
+        return self.settings.style_path
+
+    async def style(self, *, dark: bool = False) -> tuple[Any, bool]:
         """The style document with every upstream URL pointing back at us.
 
         Every URL comes out relative. The browser is the only party that knows
@@ -247,7 +259,7 @@ class BasemapService:
         proxy that is not the origin FastAPI sees -- so it does the expanding.
         """
 
-        proxied = await self.fetch(self.settings.style_path)
+        proxied = await self.fetch(self.style_path(dark=dark))
         document = self.json_document(proxied)
         if not isinstance(document, dict) or "layers" not in document:
             raise UpstreamError(

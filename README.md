@@ -97,13 +97,41 @@ if you want it separately.
 |---|---|
 | **Port** | `WHERE2BUILD_PORT=9000 docker compose up` to serve somewhere other than 8080. |
 | **Cache** | The named volume `backend-cache` holds what the official services answered. Losing it costs time and their bandwidth, not correctness. |
-| **POI directory** | `backend/data` is mounted read-only. Build the index with `python backend/scripts/build_poi_index.py --download` and `/api/nearby` will use it; without it that endpoint says so for the OpenStreetMap categories instead of answering with an empty list. |
+| **POI directory** | `backend/data` is mounted read-only. Build the index with `python backend/scripts/build_poi_index.py --download` and `/api/nearby` will use it; without it that endpoint says so for the OpenStreetMap categories instead of answering with an empty list. The default extract is all of Saxony; `--url` and `--out` take any other region — see [Reach of the POI index](#reach-of-the-poi-index). |
 | **Extraction** | Without `LLM_API_KEY` in `backend/.env`, reading a listing page stays switched off. Everything else works. |
 | **Contact address** | Set `APP_CONTACT` before any real use: the Transitous usage policy requires one. |
 | **Own router** | `docker compose --profile local-routing up` runs MOTIS here instead of asking Transitous. See below. |
 
 `backend/.env` is read if it exists and skipped if it does not, so the stack
 comes up either way.
+
+### Recurring jobs
+
+```bash
+docker compose --profile scheduled-jobs up -d
+docker compose exec scheduler python scripts/run_jobs.py list
+docker compose exec scheduler python scripts/run_jobs.py run cache-sweep
+```
+
+The jobs live in [`ops/jobs.json`](ops/jobs.json) — adding the next one is a
+new entry there, not new code. `list` prints each job's schedule, the reason it
+exists and when it last ran with what exit code. Nothing retries on its own: a
+failed import that retried would hide a genuinely broken feed behind three more
+failures, and the next scheduled run is the retry.
+
+The scheduler runs from the backend image and touches only the shared volumes,
+so it needs no Docker socket — mounting that would hand a container root on the
+host for the sake of a few timed commands. Rebuilding an index writes into
+`backend/data`, and the API reads its indexes at startup, so the backend has to
+be restarted afterwards for a new one to take effect.
+
+**The MOTIS refresh is deliberately not one of these jobs.** It stops a service
+and replaces a volume, which is a host-side operation, so it stays a host cron
+entry:
+
+```cron
+40 2 * * 1  cd /srv/where2build && ./motis/fetch-data.sh && docker compose --profile local-routing up -d --force-recreate motis-import motis
+```
 
 ### Routing on your own machine
 
@@ -130,6 +158,38 @@ containers and still talks to Transitous.
 | **Same answers?** | Yes. Geocoding, `/plan`, `one-to-many` and `map/stops` agree with Transitous to the last decimal, and `/api/reachability` comes back character for character identical, route geometry included. Measured 01.09.2026, `docs/research/routing-motis.md` § 5.6. |
 | **Switching back** | The backend's disk cache is keyed on the request, not on which MOTIS answered it. After changing `MOTIS_BASE_URL`, clear `/cache/motis*` or you keep reading the old service's answers. |
 | **Currency** | DELFI publishes weekly, on Mondays. Re-run `fetch-data.sh`, `docker compose down`, `docker volume rm where2build_motis-graph`, and start again. |
+
+### Reach of the POI index
+
+`/api/nearby` answers the six OpenStreetMap categories — school, kindergarten,
+park, playground, supermarket, doctor — from a file the backend builds from an
+OSM extract. Stops and stations do not come from that file; they come from the
+timetable, which covers Germany either way.
+
+**Saxony is the scope, and it is the minimum.** Nothing in the code knows about
+Saxony: `build_poi_index.py` names an extract and an output path as defaults
+and takes `--url` and `--out` for anything else, and the API reads whichever
+file `NEARBY_POI_INDEX_PATH` points at. Another Land, all of Germany or a
+single city is a different extract, not a code change.
+
+What it costs, measured on the built index rather than estimated: **5 682
+entries, 718 kB on disk, 66 ms to load, 2,2 MB resident** — about 126 bytes per
+entry stored and 390 in memory. Query time does not grow with the index; the
+grid only touches the buckets near the point. Projected forward, all of Saxony
+(22 622 features, counted from taginfo) is ~2,8 MB and ~9 MB resident; Germany
+lands near 70 MB and ~220 MB, which is where the file should become SQLite —
+one process holds it comfortably, several worker processes multiply it.
+
+One caveat that is invisible from outside: **the index carries the extract it
+was built from in `quelle`, and the filename is only a default.** An index
+built from a city box is still called `poi-sachsen.json`. Read the metadata,
+not the name.
+
+Two things degrade outside Saxony, and neither produces a wrong answer: the
+school-type classifier reads German school names (`Oberschule` is Saxon;
+Bavaria says `Mittelschule`) and simply derives no type elsewhere, and the tag
+exclusions were justified on Saxon counts. Details in
+[`docs/research/poi.md`](docs/research/poi.md) § 12.
 
 ## Tests
 
@@ -209,6 +269,11 @@ No provider is wired in. The client is OpenAI-compatible, so switching is a
 change to `LLM_BASE_URL` and nothing else. `APP_USER_AGENT` must carry a real
 contact address before any real use of Transitous.
 
+The basemap follows the interface: `BASEMAP_STYLE_PATH` (default
+`styles/liberty`) is the light map, `BASEMAP_DARK_STYLE_PATH` (default
+`styles/dark`) the dark one, and the browser asks for the variant that matches
+the resolved theme. Clearing the dark path serves the light style to everyone.
+
 ## Things that already cost time
 
 Each of these is verified, not assumed — the details are in
@@ -247,12 +312,20 @@ Each of these is verified, not assumed — the details are in
 
 ## Not done yet
 
-- **No persistence on the server.** Plots live in the browser. PostGIS and the
-  ALKIS/Hauskoordinaten import (step 1 of the plan) are still open, so address
-  lookup currently borrows the MOTIS geocoder and says so in its response.
-- **The basemap cache has no size limit.** Vector tiles are up to ~1 MB and the
-  TTL is seven days; real traffic would need a sweeper.
-- **The vector style is a light one, in dark mode too.**
+- **No persistence on the server.** Plots live in the browser, and PostGIS is
+  still in the plan rather than the code. Addresses no longer wait on it: the
+  Hauskoordinaten import landed, so `/api/geocode` answers from the official
+  register and only falls back to the MOTIS geocoder for what the register does
+  not hold. A spatial join between addresses and parcels is what PostGIS is
+  still wanted for.
+- **Boundary labels crowd on parcels with many short sides.** Every segment is
+  labelled up to sixteen of them, and adjacent near-parallel sides can overlap;
+  the overall size stays readable. Real label placement, rather than offset
+  rings, is what would fix it —
+  [the design for that is written down](docs/lageplan-beschriftung.md),
+  including why it is not being built yet.
+- **The dimension figures get small on a narrow screen.** Nothing overflows, but
+  at 390 px they are hard to read.
 
 ## Attribution
 

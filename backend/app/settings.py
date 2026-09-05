@@ -39,6 +39,11 @@ class AppSettings(BaseSettings):
         description="Allowed browser origins; defaults cover the Vite dev and preview servers.",
     )
     cache_dir: Path = Path(".cache")
+    # Ceiling over the whole cache tree, swept by scripts/sweep_cache.py on a
+    # schedule rather than on every write: measuring the tree costs a walk, and
+    # the answers being evicted are cheap to fetch again. The sweeper reads the
+    # same APP_CACHE_MAX_BYTES, so both agree without either importing the other.
+    cache_max_bytes: int = 100 * 1024 * 1024
     # Sent to every upstream service. Deliberately carries no contact address:
     # a mail address in here would travel to ALKIS, BORIS, the tile servers and
     # the extraction provider alike, none of which asks for one.
@@ -83,6 +88,30 @@ class AlkisSettings(BaseSettings):
     # Browser cache for that answer. Districts change on the order of a
     # municipal reform, and a redeploy ships a new file anyway.
     gemarkung_cache_ttl_s: int = 24 * 3600
+
+
+class AddressSettings(BaseSettings):
+    """Official Saxon address coordinates (env prefix ``ADDRESSES_``).
+
+    The GeoSN publishes every address in the state with its cadastral
+    coordinate as one quarterly download. ``scripts/build_address_index.py``
+    turns that into the file named here, and ``POST /api/geocode`` answers from
+    it before it falls back to the routing geocoder. The file is a build
+    artefact and may legitimately be absent -- see ``app/address_index.py``.
+    """
+
+    model_config = SettingsConfigDict(env_prefix="ADDRESSES_", env_file=_ENV_FILE, extra="ignore")
+
+    index_path: Path = _BACKEND_DIR / "data" / "hauskoordinaten-sachsen.json.gz"
+    # Nextcloud share of the GeoSN open-data area. Answers 401 to HEAD and 200
+    # to GET, so a reachability check has to be a GET with a Range header.
+    download_url: str = (
+        "https://geocloud.landesvermessung.sachsen.de/public.php/dav/files/"
+        "B3HnXbDDgAkw69a/hk_sn_ascii.zip"
+    )
+    # How many official hits may take the front of a geocode answer. Four of
+    # five, so a matching stop or place is never pushed off the list entirely.
+    max_candidates: int = 4
 
 
 class BorisSettings(BaseSettings):
@@ -233,6 +262,12 @@ class BasemapSettings(BaseSettings):
     upstream_url: str = "https://tiles.openfreemap.org"
     # Path of the style document below the upstream, without a leading slash.
     style_path: str = "styles/liberty"
+    # The same map for a dark interface. A drawing sits *on* the backdrop, so a
+    # near-white ground under a dark page is not a preference but a glare
+    # source. OpenFreeMap serves two dark styles: `dark` is a neutral near-black
+    # (rgb(12,12,12)), `fiord` a blue-grey (#45516E) -- the former is the one
+    # that sits next to this app's warm near-black paper without a colour cast.
+    dark_style_path: str = "styles/dark"
     # Prefix the rewritten URLs point at. Same-origin on purpose: the browser
     # must not need any host but ours.
     public_prefix: str = "/api/basemap"
@@ -270,6 +305,7 @@ class Settings(BaseSettings):
 
     app: AppSettings = Field(default_factory=AppSettings)
     alkis: AlkisSettings = Field(default_factory=AlkisSettings)
+    addresses: AddressSettings = Field(default_factory=AddressSettings)
     boris: BorisSettings = Field(default_factory=BorisSettings)
     motis: MotisSettings = Field(default_factory=MotisSettings)
     nearby: NearbySettings = Field(default_factory=NearbySettings)

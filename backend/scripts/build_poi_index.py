@@ -30,6 +30,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -251,7 +252,10 @@ def main(argv: list[str] | None = None) -> int:
     downloaded: Path | None = None
     extract = args.extract
     if args.download:
-        downloaded = extract or (BACKEND_DIR / ".cache" / "osm" / Path(args.url).name)
+        # APP_CACHE_DIR when it is set: in a container the package directory is
+        # not writable, and the scheduler runs this as an unprivileged user.
+        cache_root = Path(os.environ.get("APP_CACHE_DIR") or (BACKEND_DIR / ".cache"))
+        downloaded = extract or (cache_root / "osm" / Path(args.url).name)
         extract = download(args.url, downloaded, verify_checksum=not args.no_checksum)
 
     if not extract.is_file():

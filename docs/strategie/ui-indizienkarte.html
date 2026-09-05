@@ -1,0 +1,904 @@
+<title>Die Indizienkarte</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --primary:#2F4A3A; --primary-light:#456B52; --primary-dark:#1C2E23; --primary-veil:rgba(47,74,58,.10);
+  --secondary:#B5813C; --secondary-text:#7C5620; --secondary-light:#E8D4B0; --secondary-veil:rgba(181,129,60,.16);
+  --sage:#9DB39A; --sage-light:#DCE4DA;
+  --ink:#1E1A16; --graphite:#4A443C; --muted:#6F675C; --line:#DCD3C6; --line-faint:#EBE4D9;
+  --surface:#FAF7F1; --sunken:#F3EFE6; --paper:#F1EBE1; --white:#FFFFFF;
+  --warning:#BE8524; --warning-text:#7C5620; --warning-surface:#F6E9CE;
+  --error:#A8402C; --error-surface:#F2DED8; --good:#2F4A3A; --good-surface:#DEE7DF;
+  --map-ground:#E6E3DC; --map-surface:#EFEDE7; --map-boundary:#1E1A16; --map-halo:#FFFFFF;
+  --map-neighbour:#9A9184; --map-street:#B5813C; --map-street-surface:#D6D2CA;
+  --shadow:0 1px 2px rgba(30,26,22,.05),0 10px 24px -18px rgba(30,26,22,.45);
+  --font-display:"Archivo",system-ui,-apple-system,sans-serif;
+  --font-body:"Public Sans",system-ui,-apple-system,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --primary:#7FA98A; --primary-light:#9BC0A4; --primary-dark:#24382C; --primary-veil:rgba(127,169,138,.14);
+  --secondary:#D9A55E; --secondary-text:#DBB273; --secondary-light:#3E3021; --secondary-veil:rgba(217,165,94,.18);
+  --sage:#6E8470; --sage-light:#26302A;
+  --ink:#F1EBE1; --graphite:#C4BCB0; --muted:#948B7E; --line:#3A342C; --line-faint:#2A2620;
+  --surface:#201C17; --sunken:#191510; --paper:#16130F;
+  --warning:#D8A340; --warning-text:#E3BC72; --warning-surface:#3A2E19;
+  --error:#E0705A; --error-surface:#3B211B; --good:#7FA98A; --good-surface:#1F2C24;
+  --map-ground:#1A1917; --map-surface:#23211D; --map-boundary:#F1EBE1; --map-halo:#16130F;
+  --map-neighbour:#5A544B; --map-street:#8A6A3A; --map-street-surface:#242220;
+  --shadow:0 1px 2px rgba(0,0,0,.5),0 12px 28px -20px rgba(0,0,0,.85);
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --primary:#7FA98A; --primary-light:#9BC0A4; --primary-dark:#24382C; --primary-veil:rgba(127,169,138,.14);
+  --secondary:#D9A55E; --secondary-text:#DBB273; --secondary-light:#3E3021; --secondary-veil:rgba(217,165,94,.18);
+  --sage:#6E8470; --sage-light:#26302A;
+  --ink:#F1EBE1; --graphite:#C4BCB0; --muted:#948B7E; --line:#3A342C; --line-faint:#2A2620;
+  --surface:#201C17; --sunken:#191510; --paper:#16130F;
+  --warning:#D8A340; --warning-text:#E3BC72; --warning-surface:#3A2E19;
+  --error:#E0705A; --error-surface:#3B211B; --good:#7FA98A; --good-surface:#1F2C24;
+  --map-ground:#1A1917; --map-surface:#23211D; --map-boundary:#F1EBE1; --map-halo:#16130F;
+  --map-neighbour:#5A544B; --map-street:#8A6A3A; --map-street-surface:#242220;
+  --shadow:0 1px 2px rgba(0,0,0,.5),0 12px 28px -20px rgba(0,0,0,.85);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--font-body);font-size:16px;line-height:1.6;
+  -webkit-font-smoothing:antialiased;padding:0 0 var(--pad,72px)}
+.wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+.col{max-width:70ch}
+h1,h2,h3{font-family:var(--font-display);text-wrap:balance;line-height:1.15;margin:0}
+h1{font-size:clamp(30px,5vw,46px);font-weight:700;letter-spacing:-.02em}
+h2{font-size:clamp(21px,3vw,27px);font-weight:600;letter-spacing:-.01em}
+h3{font-size:17px;font-weight:600}
+p{margin:0}
+.eyebrow{font-family:var(--font-mono);font-size:11.5px;font-weight:500;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--muted)}
+.lede{font-size:19px;line-height:1.55;color:var(--graphite)}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.stack{display:flex;flex-direction:column;gap:16px}
+section{padding:48px 0;border-top:1px solid var(--line-faint)}
+section:first-of-type{border-top:0}
+.tafel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px;box-shadow:var(--shadow)}
+a{color:var(--primary);text-underline-offset:3px}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:4px}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+<style>
+.hero{padding:56px 0 32px}
+.hero h1{margin:12px 0 16px;max-width:16ch}
+
+.buehne{display:grid;grid-template-columns:minmax(0,1fr);gap:0;margin-top:26px;
+  background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--shadow)}
+@media(min-width:920px){.buehne{grid-template-columns:minmax(0,1fr) 336px;align-items:start}}
+.buehne-karte{position:relative;background:var(--map-ground);min-width:0}
+.buehne-karte svg.karte{display:block;width:100%;height:auto}
+.stufenband{position:absolute;left:0;right:0;top:0;display:flex;gap:2px;padding:9px 11px 0;z-index:2}
+.stufenband i{flex:1;height:3px;border-radius:2px;background:var(--line);transition:background .35s}
+.stufenband i.an{background:var(--primary)}
+.kartenfuss{position:absolute;left:14px;top:24px;z-index:2;font-family:var(--font-mono);font-size:11.5px;
+  color:var(--graphite);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px 11px;
+  max-width:calc(100% - 120px)}
+.wartemarke{position:absolute;right:14px;top:14px;font-family:var(--font-mono);font-size:11px;letter-spacing:.06em;
+  color:var(--secondary-text);background:var(--secondary-veil);border:1px solid var(--secondary);
+  border-radius:999px;padding:4px 10px}
+.wartemarke[hidden]{display:none}
+
+.protokoll{border-top:1px solid var(--line);display:flex;flex-direction:column;min-width:0}
+@media(min-width:920px){.protokoll{border-top:0;border-left:1px solid var(--line);min-height:0}}
+.prot-kopf{padding:14px 18px;border-bottom:1px solid var(--line);background:var(--sunken)}
+.prot-kopf h3{font-size:14.5px}
+.prot-kopf p{font-size:12px;color:var(--muted);margin-top:3px}
+.prot-liste{display:flex;flex-direction:column;padding:6px;gap:2px;flex:1;min-height:0;overflow-y:auto;
+  max-height:min(44vh,392px)}
+.ind{display:grid;grid-template-columns:auto 1fr;gap:10px;padding:10px 12px;border-radius:9px;
+  text-align:left;background:transparent;border:0;font:inherit;color:inherit;cursor:pointer;
+  opacity:.3;transition:opacity .35s,background .2s}
+.ind.da{opacity:1}
+.ind.jetzt{background:var(--primary-veil)}
+.ind:hover.da{background:var(--sunken)}
+.ind:focus-visible{outline:2px solid var(--primary);outline-offset:-2px}
+.ind-punkt{width:11px;height:11px;border-radius:3px;margin-top:4px;background:var(--k);flex:none}
+.ind-text{min-width:0}
+.ind-name{display:block;font-size:13.5px;font-weight:500;line-height:1.35}
+.ind-quelle{display:block;font-family:var(--font-mono);font-size:10.5px;letter-spacing:.06em;color:var(--muted);margin-top:3px}
+.ind-staerke{display:flex;align-items:center;gap:7px;margin-top:7px}
+.ind-balken{flex:1;height:5px;border-radius:999px;background:var(--sunken);border:1px solid var(--line-faint);overflow:hidden}
+.ind-balken i{display:block;height:100%;background:var(--k);border-radius:999px;transition:width .5s ease}
+.ind-zahl{font-family:var(--font-mono);font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.ind-rest{font-family:var(--font-mono);font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.ind.weg{opacity:.45}
+.ind.weg .ind-name{text-decoration:line-through}
+.beleg{grid-column:1/-1;margin-top:10px;padding-top:11px;border-top:1px dashed var(--line);
+  display:flex;flex-direction:column;gap:9px}
+.beleg[hidden]{display:none}
+.beleg-titel{font-family:var(--font-mono);font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.beleg-text{font-size:12.5px;line-height:1.5;color:var(--graphite);background:var(--sunken);
+  border:1px solid var(--line-faint);border-radius:7px;padding:9px 11px}
+.beleg-text mark{background:var(--secondary-veil);color:var(--ink);padding:0 2px;border-radius:2px}
+.beleg img{width:100%;border-radius:7px;border:1px solid var(--line);display:block;background:var(--white)}
+.beleg-fuss{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.beleg-fuss button{font:500 11.5px/1 var(--font-mono);padding:7px 11px;border-radius:7px;cursor:pointer;
+  border:1px solid var(--line);background:var(--surface);color:var(--graphite)}
+.beleg-fuss button:hover{border-color:var(--error);color:var(--error)}
+.beleg-fuss span{font-size:11.5px;color:var(--muted)}
+.huelle{padding:11px 18px;border-bottom:1px solid var(--line);background:var(--good-surface);
+  font-size:13px;display:flex;gap:9px;align-items:baseline;flex-wrap:wrap}
+.huelle b{font-family:var(--font-display);font-size:14px;font-weight:600;color:var(--primary)}
+.huelle span{color:var(--graphite);font-size:12.5px}
+.prot-fuss{padding:12px 16px;border-top:1px solid var(--line);background:var(--sunken);
+  display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.prot-fuss button{font:500 12px/1 var(--font-mono);letter-spacing:.04em;padding:8px 12px;border-radius:8px;
+  border:1px solid var(--line);background:var(--surface);color:var(--graphite);cursor:pointer}
+.prot-fuss button:hover{border-color:var(--primary);color:var(--primary)}
+.prot-fuss button.haupt{background:var(--primary);border-color:var(--primary);color:var(--primary-on)}
+.prot-fuss .stand{margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--muted)}
+
+.skala{display:flex;flex-direction:column;gap:2px;margin-top:26px}
+.sk{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;padding:13px 16px;border-radius:10px;
+  background:var(--surface);border:1px solid var(--line-faint)}
+@media(min-width:800px){.sk{grid-template-columns:15ch 104px minmax(0,1fr) 8ch;align-items:center;gap:18px}}
+.sk-stufe{font-family:var(--font-display);font-weight:600;font-size:14px}
+.sk-probe{height:36px;border-radius:6px;overflow:hidden;background:var(--map-ground);border:1px solid var(--line-faint)}
+.sk-text{font-size:13px;color:var(--graphite)}
+.sk-wert{font-family:var(--font-mono);font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+@media(min-width:800px){.sk-wert{text-align:right}}
+
+.paare{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;margin-top:20px}
+.paar{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:15px 17px}
+.paar h3{font-size:14px;margin-bottom:7px}
+.paar p{font-size:13.5px;color:var(--graphite)}
+.paar p + p{margin-top:8px}
+.merk{border-left:3px solid var(--secondary);background:var(--secondary-veil);padding:14px 18px;border-radius:0 8px 8px 0}
+.merk p{font-size:14.5px}
+.merk--rot{border-left-color:var(--error);background:var(--error-surface)}
+code{font-family:var(--font-mono);font-size:12.5px;background:var(--sunken);padding:1px 5px;border-radius:4px;
+  border:1px solid var(--line-faint)}
+.quellen{font-size:12.5px;color:var(--muted)}
+</style>
+
+<div class="wrap">
+
+<header class="hero">
+  <p class="eyebrow">Oberflächenentwurf · echte Geometrie aus Großbothen</p>
+  <h1>Die Karte zeigt, was man weiß — und wie sicher</h1>
+  <div class="col stack">
+    <p class="lede">Eine Suche, die zwei Minuten läuft, darf nicht zwei Minuten lang nichts zeigen.
+      Jedes Indiz erscheint, sobald es da ist, an der Stelle, für die es spricht, in einer Deckkraft,
+      die seiner Verlässlichkeit entspricht — und der Ausschnitt bleibt immer weit genug, dass alle
+      noch möglichen Flurstücke sichtbar bleiben.</p>
+  </div>
+</header>
+
+<section style="border-top:0;padding-top:8px">
+  <div class="buehne">
+    <div class="buehne-karte">
+      <div class="stufenband" id="band"></div>
+      <svg class="karte" id="karte" viewBox="0 0 1000 800" role="img"
+           aria-label="Karte, auf der die Indizien nacheinander erscheinen"></svg>
+      <div class="kartenfuss" id="kartenfuss"></div>
+      <div class="wartemarke" id="wartemarke" hidden></div>
+    </div>
+    <div class="protokoll">
+      <div class="prot-kopf">
+        <h3>Indizienprotokoll</h3>
+        <p>Anklicken springt zu diesem Stand.</p>
+      </div>
+      <div class="huelle" id="huelle"></div>
+      <div class="prot-liste" id="protokoll"></div>
+      <div class="prot-fuss">
+        <button type="button" id="abspielen" class="haupt">Analyse starten</button>
+        <button type="button" id="zurueck">Zurück</button>
+        <button type="button" id="vor">Weiter</button>
+        <button type="button" id="sturm">Alles auf einmal</button>
+        <span class="stand" id="stand"></span>
+      </div>
+    </div>
+  </div>
+  <p class="quellen" style="margin-top:12px;max-width:78ch">
+    Kein Entwurfsplatzhalter: Gemarkungsumring, 62 Flurstücke, 27 Straßenflurstücke, 25 Flächen­kandidaten
+    und die Straßenachsen sind am 01.09.2026 aus ALKIS, OpenStreetMap und dem DELFI-Fahrplan geholt. Die
+    Straßenflächen kommen aus dem Kataster selbst — <code>ave:tntxt</code> weist sie als
+    „Straßenverkehr“ aus. In der echten Anwendung liegt darunter zusätzlich der Vektor-Hintergrund,
+    den <code>SitePlan</code> schon benutzt; diese Seite darf keine Kacheln nachladen.
+  </p>
+</section>
+
+<section>
+  <div class="col stack">
+    <p class="eyebrow">Zwei Regeln für den Ausschnitt</p>
+    <h2>Die Kamera folgt den Kandidaten, nicht dem Indiz</h2>
+    <p>Der erste Entwurf zoomte auf das, was gerade gefunden wurde — und versteckte damit genau die
+      Flurstücke, die noch in Frage kamen. Das ist der Fehler, den eine Suchoberfläche nicht machen
+      darf: Sie darf nie enger stehen als ihr eigener Zweifel.</p>
+  </div>
+  <div class="paare">
+    <div class="paar">
+      <h3>Regel 1 — der Rahmen ist der Kandidatenbestand</h3>
+      <p>Der Ausschnitt umfasst <em>alle</em> noch möglichen Flurstücke, plus 35 % Luft, plus die
+        Geometrie des neuen Indizes. Erst wenn ein Kandidat ausscheidet, darf der Ausschnitt enger
+        werden.</p>
+      <p>Zusätzlich eine harte Untergrenze von 120 m Halbbreite: selbst das bestätigte Flurstück wird
+        nie ohne seine Nachbarn gezeigt. Ein Flurstück ohne Umgebung ist nicht prüfbar.</p>
+    </div>
+    <div class="paar">
+      <h3>Regel 2 — mindestens zwei Sekunden pro Indiz</h3>
+      <p>Indizien kommen unregelmäßig: die Attributliste sofort, die Texterkennung nach einer halben
+        Sekunde, das Modell nach zwei. Kämen drei gleichzeitig, wäre die Animation ein Zucken.</p>
+      <p>Also eine Warteschlange: jedes Indiz steht mindestens 2 s, der Kameraflug dauert 900 ms, und
+        was schneller eintrifft, wartet sichtbar. Der Zähler oben rechts sagt, wie viele anstehen.
+        Klicken im Protokoll überspringt die Schlange — der Mensch wartet nie auf die Animation.</p>
+    </div>
+  </div>
+  <div class="col" style="margin-top:20px">
+    <div class="merk"><p>Der Knopf <b>„Alles auf einmal“</b> wirft alle sieben Indizien gleichzeitig
+      ein. Die Schlange arbeitet sie trotzdem im Zweisekundentakt ab — so sieht man, was passiert,
+      wenn eine Suche schneller antwortet als ein Mensch schauen kann.</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="col stack">
+    <p class="eyebrow">Die Regel dahinter</p>
+    <h2>Sicherheit ist Fläche und Deckkraft, nicht Farbe</h2>
+    <p>Ein schwaches Indiz sagt etwas über ein großes Gebiet, ein starkes über ein kleines. Das ist
+      keine Metapher, sondern der Sachverhalt — und deshalb tragen beide Größen dieselbe Aussage:
+      <b>je unsicherer, desto größer und blasser; je sicherer, desto kleiner und kräftiger.</b>
+      Die Farbe bleibt frei für die Herkunft.</p>
+  </div>
+
+  <div class="skala" id="skala"></div>
+
+  <div class="col" style="margin-top:22px">
+    <div class="merk"><p>Genau ein Zustand bricht die Skala: <b>bestätigt.</b> Er ist der einzige mit
+      Halo und gezogener Kontur — dieselbe Linienführung, die <code>SitePlan</code> für das Flurstück
+      benutzt: 6 px Halo unter 2,2 px Kontur. Er wird erst vergeben, wenn ALKIS das Flurstück
+      geliefert und die Plausibilitätsprüfung nicht widersprochen hat. Wer diese Linie sieht, weiß
+      ohne Legende, dass geprüft wurde.</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="col stack">
+    <p class="eyebrow">Angeglichen</p>
+    <h2>Was von <code>SitePlan</code> übernommen wurde</h2>
+    <p>Damit die Suchkarte und der Lageplan wie dasselbe Werkzeug aussehen, folgt sie dessen
+      Rezept — und das Rezept war überraschend: <b><code>SitePlan</code> zeichnet gar keine
+      Straßen.</b> Was dort so gut aussieht, ist ein MapLibre-Vektorhintergrund, über dem das
+      SVG seine eigene Füllung auf 42 % zurücknimmt.</p>
+  </div>
+  <div class="paare">
+    <div class="paar">
+      <h3>Halo unter der Linie</h3>
+      <p>6 px <code>--map-halo</code> unter 2,2 px <code>--map-boundary</code>, beide
+        <code>stroke-linejoin="round"</code>. Ohne das verschwindet eine Grenze im Luftbild.
+        Beschriftungen tragen dasselbe Prinzip als <code>paint-order: stroke fill</code> mit
+        3,4 px Halo.</p>
+    </div>
+    <div class="paar">
+      <h3>Straßen aus dem Kataster</h3>
+      <p>Statt OSM-Linien zu stricken: die Flurstücke, deren <code>ave:tntxt</code>
+        „Straßenverkehr“ sagt, sind die Fahrbahn — amtlich, als Fläche, in
+        <code>--map-street-surface</code> mit ruhiger Kante. Der Name kommt als
+        <code>textPath</code> auf der OSM-Achse.</p>
+    </div>
+    <div class="paar">
+      <h3>Zurückgenommene Füllung</h3>
+      <p>Nachbarflurstücke bekommen <code>--map-surface</code> bei 42 % statt gar keiner Füllung.
+        Erst dadurch liest sich das Kataster als Gewebe und nicht als Drahtgitter.</p>
+    </div>
+    <div class="paar">
+      <h3>Maßstabsleiste und Nordpfeil</h3>
+      <p>Die zweigeteilte Leiste aus <code>SitePlan</code>, gerundete Schrittweiten, jede Hälfte
+        mindestens 56 px. Beide sitzen außerhalb jeder Transformation.</p>
+    </div>
+  </div>
+  <div class="col" style="margin-top:20px">
+    <div class="merk"><p><b>Für den Einbau heißt das:</b> <code>IndizienKarte.vue</code> bekommt
+      dieselbe MapLibre-Instanz wie <code>SitePlan</code> — mit <code>backdrop</code>-Umschalter und
+      demselben <code>mapUnavailable</code>-Rückfall. Handgezeichnete SVG-Straßen bleiben immer
+      dünner als echte Kartografie; sie sind hier nur drin, weil diese Seite offline ist.</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="col stack">
+    <p class="eyebrow">Vier Entscheidungen</p>
+    <h2>Was diese Oberfläche anders macht</h2>
+  </div>
+  <div class="paare">
+    <div class="paar">
+      <h3>Widerlegtes verschwindet nicht</h3>
+      <p>Der Pin der Plattform bleibt sichtbar und wird durchgestrichen, sobald ihm ein stärkeres
+        Indiz widerspricht. Wer die Anzeige selbst nachschlägt, sieht dort diesen Pin — die
+        Oberfläche muss erklären, warum sie woanders hinzeigt.</p>
+    </div>
+    <div class="paar">
+      <h3>Überholte Schichten verblassen</h3>
+      <p>Ein Indiz, dessen Gebiet viel größer ist als der Ausschnitt, sagt nichts mehr — es färbt
+        nur noch alles ein. Gemarkungsfläche und Straßenpuffer blenden deshalb aus, sobald die
+        Kamera unter ihre Größenordnung fällt.</p>
+    </div>
+    <div class="paar">
+      <h3>Jedes Indiz ist anklickbar</h3>
+      <p>Ein Eintrag im Protokoll führt zu seiner Textstelle im Inserat oder zum Bildausschnitt,
+        aus dem er stammt. Ein Indiz, dessen Beleg man nicht sehen kann, ist in dieser Oberfläche
+        ein Fehler.</p>
+    </div>
+    <div class="paar">
+      <h3>Mehrdeutig ist ein Ergebnis</h3>
+      <p>Bleiben mehrere Kandidaten gleichauf, zeigt die Karte alle — gleich stark, ohne Kontur —
+        und die Kopfzeile sagt „vier mögliche Flurstücke“. Ein Ergebnis wird nie durch Auswahl des
+        erstbesten erzeugt.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="col stack">
+    <p class="eyebrow">Einbau</p>
+    <h2>Wo das im bestehenden Projekt sitzt</h2>
+    <p>Die Bühne oben ist keine neue Anwendung, sondern ein Schritt vor dem heutigen Ergebnis. Der
+      Assistent hat bereits eine Stufe, die aus einem Inserat Felder macht; dazwischen fehlt die
+      Suche.</p>
+  </div>
+  <div class="paare">
+    <div class="paar">
+      <h3>Neue Ansicht</h3>
+      <p><code>SucheView.vue</code> zwischen dem Einfügefeld und <code>PlotView</code>. Options-API,
+        wie alles andere.</p>
+    </div>
+    <div class="paar">
+      <h3>Neue Komponente</h3>
+      <p><code>IndizienKarte.vue</code> — dieselbe Rolle wie <code>SitePlan</code>, dieselbe
+        MapLibre-Anbindung, nur mit Indizienschichten statt Bauplanung.</p>
+    </div>
+    <div class="paar">
+      <h3>Neuer Endpunkt</h3>
+      <p><code>POST /api/parcels/search</code>, der Indizien annimmt und Kandidaten liefert.
+        Antwortet in Teilstücken, damit die Karte mitwächst.</p>
+    </div>
+    <div class="paar">
+      <h3>Was bleibt</h3>
+      <p><code>plausibility.assess</code> entscheidet weiterhin über „bestätigt“. Die Karte fügt
+        keine Prüfung hinzu, sie zeigt nur deren Ausgang.</p>
+    </div>
+  </div>
+</section>
+
+</div>
+
+<script>
+const KARTE={"gemarkung":{"name":"Großbothen","schluessel":"144241","ring":[[-1337,-1885],[-1292,-1922],[-1244,-1955],[-1140,-1883],[-1202,-1843],[-1242,-1804],[-1189,-1720],[-1120,-1616],[-1053,-1531],[-1014,-1540],[-970,-1578],[-933,-1606],[-857,-1647],[-772,-1684],[-740,-1695],[-671,-1720],[-591,-1711],[-478,-1716],[-354,-1695],[-308,-1711],[-230,-1725],[-159,-1733],[-159,-1807],[-209,-1893],[-255,-2021],[-232,-2059],[-278,-2138],[-347,-2253],[-424,-2314],[-521,-2334],[-601,-2354],[-584,-2447],[-572,-2514],[-559,-2640],[-556,-2680],[-542,-2699],[-526,-2747],[-509,-2855],[-527,-2935],[-500,-2899],[-474,-2783],[-463,-2724],[-438,-2602],[-401,-2465],[-388,-2437],[-351,-2372],[-312,-2337],[-264,-2306],[-211,-2281],[-124,-2258],[-57,-2242],[8,-2216],[51,-2168],[107,-2097],[125,-2071],[152,-2027],[218,-1929],[245,-1907],[332,-1928],[355,-1938],[423,-1968],[476,-2000],[581,-2039],[643,-2044],[717,-2035],[770,-2025],[865,-1987],[874,-1930],[891,-1839],[842,-1817],[863,-1727],[900,-1585],[949,-1419],[996,-1289],[1058,-1093],[1073,-998],[1088,-844],[1097,-744],[1048,-685],[1048,-638],[1047,-613],[1052,-556],[1054,-539],[1059,-518],[1064,-494],[1071,-467],[1086,-422],[1108,-323],[1111,-290],[1134,-223],[1156,-158],[1149,-115],[1119,-100],[1079,-55],[1049,-62],[1010,-43],[965,-38],[942,-62],[928,-40],[847,-60],[812,-36],[808,-13],[799,25],[786,79],[775,116],[763,152],[746,141],[714,119],[691,103],[639,68],[613,50],[586,41],[576,39],[558,54],[542,74],[532,120],[529,146],[524,169],[526,190],[525,225],[523,254],[521,279],[518,313],[512,348],[508,377],[499,416],[482,476],[471,505],[449,563],[434,603],[303,613],[196,601],[104,591],[104,714],[113,754],[206,761],[367,767],[422,774],[469,782],[625,804],[673,810],[780,835],[870,878],[897,893],[961,950],[1005,965],[997,1005],[941,1030],[878,1014],[828,1005],[784,997],[755,989],[697,975],[537,949],[471,938],[445,932],[399,925],[366,925],[279,921],[174,920],[97,915],[-126,892],[-252,876],[-288,869],[-347,856],[-409,849],[-472,848],[-564,829],[-637,804],[-780,753],[-839,717],[-862,713],[-962,817],[-998,730],[-1048,710],[-1093,663],[-1131,596],[-1174,527],[-1192,427],[-1195,324],[-1205,263],[-1206,134],[-1222,23],[-1228,-53],[-1238,-149],[-1253,-249],[-1258,-322],[-1263,-363],[-1270,-424],[-1281,-514],[-1283,-521],[-1302,-600],[-1320,-669],[-1343,-738],[-1352,-810],[-1350,-865],[-1351,-910],[-1353,-1004],[-1349,-1045],[-1339,-1093],[-1331,-1152],[-1322,-1199],[-1350,-1342],[-1341,-1457],[-1345,-1538],[-1346,-1605],[-1335,-1656],[-1343,-1693],[-1353,-1747],[-1351,-1800],[-1346,-1841],[-1343,-1868],[-1337,-1885]]},"pin":{"latlon":[51.244012,12.721705],"xy":[-1350.3,6051.7],"parcel":"Grimma 2537","m2":38284,"dist_m":6235},"plot":{"nr":"790/11","gemarkung":"Großbothen","gemaschl":"144241","kennz":"144241___00790001100","m2":502,"m2_geom":501.5,"latlon":[51.189265,12.741058],"ring":[[-8.14,-17.18],[9.7,-17.17],[9.28,10.15],[-2.72,11.74],[-8.12,12.46],[-8.14,-17.18]]},"kandidaten":[{"nr":"266/1","m2":507,"xy":[-6.6,-1822.4]},{"nr":"238/3","m2":500,"xy":[160.0,-1711.8]},{"nr":"561/2","m2":516,"xy":[-592.3,224.7]},{"nr":"793/4","m2":522,"xy":[27.0,-11.0]},{"nr":"120/7","m2":505,"xy":[937.8,-203.8]},{"nr":"792/3","m2":511,"xy":[18.0,-51.7]},{"nr":"794/4","m2":493,"xy":[40.9,-51.3]},{"nr":"798/3","m2":521,"xy":[88.0,-49.1]},{"nr":"115/19","m2":483,"xy":[882.9,-491.6]},{"nr":"419/6","m2":516,"xy":[-320.5,-339.6]},{"nr":"364/a","m2":480,"xy":[-87.0,-307.7]},{"nr":"51/4","m2":494,"xy":[370.9,-108.2]},{"nr":"790/11","m2":502,"xy":[-0.0,0.0]},{"nr":"853/5","m2":495,"xy":[-223.7,-484.0]},{"nr":"120/5","m2":507,"xy":[932.6,-221.3]},{"nr":"709/a","m2":480,"xy":[734.4,989.8]},{"nr":"708/2","m2":495,"xy":[724.0,985.6]},{"nr":"169/g","m2":520,"xy":[595.2,52.6]},{"nr":"823/2","m2":525,"xy":[293.1,79.9]},{"nr":"61/a","m2":520,"xy":[445.0,-29.8]},{"nr":"19/4","m2":483,"xy":[384.8,-270.6]},{"nr":"172/2","m2":513,"xy":[648.7,-60.0]},{"nr":"202","m2":510,"xy":[566.6,-283.8]},{"nr":"165/8","m2":492,"xy":[685.2,-209.6]},{"nr":"154/3","m2":481,"xy":[771.4,-105.1]}],"nachbarn":[{"nr":"39/2","m2":1154,"ring":[[39.95,-80.88],[40.42,-112.87],[40.45,-113.78],[77.48,-111.27],[76.73,-96.25],[76.23,-80.84],[39.95,-80.88]],"nutzung":"Landwirtschaft"},{"nr":"801/3","m2":392,"ring":[[119.77,-29.56],[121.26,-29.52],[135.35,-29.19],[136.7,-4.06],[129.02,-2.89],[122.31,-1.88],[119.77,-29.56]],"nutzung":"Wohnbaufläche"},{"nr":"40/4","m2":934,"ring":[[76.23,-80.84],[76.73,-96.25],[77.48,-111.27],[105.46,-109.54],[109.43,-78.6],[76.23,-80.84]],"nutzung":"Landwirtschaft"},{"nr":"37/7","m2":305,"ring":[[-35.13,-104.46],[-7.33,-80.15],[-14.29,-80.01],[-17.09,-79.95],[-26.7,-79.99],[-33.6,-87.4],[-35.13,-104.46]],"nutzung":"Wohnbaufläche"},{"nr":"792/2","m2":476,"ring":[[9.28,10.15],[9.7,-17.17],[9.94,-32.17],[22.02,-31.88],[20.77,8.34],[9.28,10.15]],"nutzung":"Wohnbaufläche"},{"nr":"43/5","m2":1314,"ring":[[85.56,19.42],[94.54,18.36],[115.15,16.11],[119.7,60.33],[108.06,61.37],[91.0,64.1],[85.56,19.42]],"nutzung":"Wohnbaufläche"},{"nr":"388/13","m2":568,"ring":[[-91.09,-30.11],[-90.47,-22.38],[-89.07,18.36],[-98.43,19.57],[-104.8,-27.91],[-91.09,-30.11]],"nutzung":"Industrie- und Gewerbefläche / Industrie und Gewerbe"},{"nr":"388/5","m2":614,"ring":[[-32.92,93.14],[-34.02,59.3],[-13.98,58.67],[-13.39,76.93],[-15.6,86.65],[-19.28,89.64],[-32.92,93.14]],"nutzung":"Wohnbaufläche"},{"nr":"43/8","m2":410,"ring":[[23.81,26.68],[23.27,8.18],[34.29,7.62],[45.32,6.8],[47.35,18.38],[48.03,23.46],[23.81,26.68]],"nutzung":"Wohnbaufläche"},{"nr":"388/7","m2":610,"ring":[[-138.5,72.49],[-118.04,70.15],[-114.17,99.43],[-135.22,101.29],[-138.5,72.49]],"nutzung":"Wohnbaufläche"},{"nr":"43/10","m2":700,"ring":[[83.32,2.05],[95.68,0.52],[108.57,-0.84],[122.31,-1.88],[129.02,-2.89],[129.78,8.42],[114.5,9.98],[115.15,16.11],[94.54,18.36],[85.56,19.42],[83.32,2.05]],"nutzung":"Wohnbaufläche"},{"nr":"794/3","m2":423,"ring":[[33.86,-31.6],[45.2,-31.33],[45.32,6.8],[34.29,7.62],[33.86,-31.6]],"nutzung":"Wohnbaufläche"},{"nr":"798/2","m2":390,"ring":[[81.7,-30.46],[93.89,-30.17],[95.68,0.52],[83.32,2.05],[81.7,-30.46]],"nutzung":"Wohnbaufläche"},{"nr":"795/3","m2":840,"ring":[[45.2,-31.33],[50.19,-31.21],[69.61,-30.75],[71.04,2.8],[58.63,4.18],[45.32,6.8],[45.2,-31.33]],"nutzung":"Wohnbaufläche"},{"nr":"793/4","m2":522,"ring":[[20.77,8.34],[22.02,-31.88],[26.26,-31.78],[33.86,-31.6],[34.29,7.62],[23.27,8.18],[20.77,8.34]],"nutzung":"Wohnbaufläche"},{"nr":"388/11","m2":772,"ring":[[-56.24,60.0],[-57.18,30.34],[-50.09,24.84],[-35.18,22.53],[-34.02,59.3],[-56.24,60.0]],"nutzung":"Wohnbaufläche"},{"nr":"800/2","m2":364,"ring":[[106.23,-29.88],[119.77,-29.56],[122.31,-1.88],[108.57,-0.84],[106.23,-29.88]],"nutzung":"Wohnbaufläche"},{"nr":"41/3","m2":703,"ring":[[104.12,-121.93],[119.37,-123.62],[119.33,-115.99],[124.91,-95.29],[126.33,-88.76],[129.93,-78.23],[126.53,-77.97],[118.55,-77.98],[109.43,-78.6],[105.46,-109.54],[104.12,-121.93]],"nutzung":"Wohnbaufläche"},{"nr":"43/6","m2":1389,"ring":[[55.65,22.74],[63.94,21.95],[79.62,20.11],[85.56,19.42],[91.0,64.1],[83.36,65.09],[62.6,68.81],[60.65,69.38],[55.65,22.74]],"nutzung":"Wohnbaufläche"},{"nr":"388/6","m2":750,"ring":[[-34.02,59.3],[-35.18,22.53],[-16.68,20.76],[-15.15,21.67],[-13.98,58.67],[-34.02,59.3]],"nutzung":"Wohnbaufläche"},{"nr":"388/9","m2":779,"ring":[[-147.23,-5.02],[-145.74,-5.18],[-139.92,46.57],[-118.53,43.52],[-111.18,99.17],[-114.17,99.43],[-118.04,70.15],[-138.5,72.49],[-138.58,71.79],[-142.61,36.14],[-147.23,-5.02]],"nutzung":"Landwirtschaft"},{"nr":"802/3","m2":385,"ring":[[135.35,-29.19],[146.39,-28.92],[144.73,-36.94],[150.86,-38.47],[150.56,-10.22],[150.49,-5.1],[136.7,-4.06],[135.35,-29.19]],"nutzung":"Wohnbaufläche"},{"nr":"799/3","m2":341,"ring":[[93.89,-30.17],[97.2,-30.09],[106.23,-29.88],[108.57,-0.84],[95.68,0.52],[93.89,-30.17]],"nutzung":"Wohnbaufläche"},{"nr":"772/3","m2":1775,"ring":[[-8.12,30.16],[23.81,26.68],[25.38,78.98],[16.01,81.87],[-8.21,84.28],[-8.38,76.66],[-8.12,30.16]],"nutzung":"Wohnbaufläche"},{"nr":"43/9","m2":678,"ring":[[45.32,6.8],[58.63,4.18],[71.04,2.8],[83.32,2.05],[85.56,19.42],[79.62,20.11],[63.94,21.95],[55.65,22.74],[48.03,23.46],[47.35,18.38],[45.32,6.8]],"nutzung":"Wohnbaufläche"},{"nr":"388/10","m2":807,"ring":[[-56.24,60.0],[-34.02,59.3],[-32.92,93.14],[-49.26,97.56],[-51.53,97.33],[-55.04,97.48],[-56.24,60.0]],"nutzung":"Wohnbaufläche"},{"nr":"43/7","m2":1719,"ring":[[23.81,26.68],[48.03,23.46],[55.65,22.74],[60.65,69.38],[45.25,73.84],[25.46,81.77],[25.38,78.98],[23.81,26.68]],"nutzung":"Wohnbaufläche"},{"nr":"797/3","m2":370,"ring":[[69.61,-30.75],[73.24,-30.66],[81.7,-30.46],[83.32,2.05],[71.04,2.8],[69.61,-30.75]],"nutzung":"Wohnbaufläche"},{"nr":"797/4","m2":144,"ring":[[67.71,-74.95],[70.61,-75.0],[70.64,-74.59],[73.24,-30.66],[69.61,-30.75],[67.71,-74.95]],"nutzung":"Wohnbaufläche"},{"nr":"773/7","m2":3,"ring":[[-15.6,86.65],[-13.39,76.93],[-14.18,82.91],[-15.6,86.65]],"nutzung":"Wohnbaufläche"},{"nr":"801/5","m2":1059,"ring":[[118.12,-72.5],[139.55,-73.13],[142.7,-51.17],[144.73,-36.94],[146.39,-28.92],[135.35,-29.19],[121.26,-29.52],[118.12,-72.5]],"nutzung":"Wohnbaufläche"},{"nr":"793/5","m2":93,"ring":[[22.02,-31.88],[23.32,-73.55],[23.54,-73.56],[26.26,-31.78],[22.02,-31.88]],"nutzung":"Wohnbaufläche"},{"nr":"787/1","m2":983,"ring":[[-48.66,17.72],[-44.65,-73.49],[-37.43,-74.83],[-34.31,-74.55],[-37.35,16.21],[-48.66,17.72]],"nutzung":"Industrie- und Gewerbefläche / Handel und Dienstleistung"},{"nr":"790/6","m2":299,"ring":[[-8.21,-62.46],[-6.53,-66.65],[-1.41,-70.9],[-1.22,-70.96],[1.52,-32.37],[-8.15,-32.6],[-8.21,-62.46]],"nutzung":"Landwirtschaft"},{"nr":"799/4","m2":144,"ring":[[91.36,-73.5],[94.74,-73.32],[97.2,-30.09],[93.89,-30.17],[91.36,-73.5]],"nutzung":"Wohnbaufläche"},{"nr":"788/1","m2":905,"ring":[[-37.35,16.21],[-34.31,-74.55],[-25.34,-73.75],[-26.13,14.77],[-37.35,16.21]],"nutzung":"Industrie- und Gewerbefläche / Handel und Dienstleistung"},{"nr":"793/7","m2":368,"ring":[[23.54,-73.56],[32.19,-74.05],[33.39,-74.1],[33.86,-31.6],[26.26,-31.78],[23.54,-73.56]],"nutzung":"Wohnbaufläche"},{"nr":"792/3","m2":511,"ring":[[9.94,-32.17],[10.57,-72.76],[23.32,-73.55],[22.02,-31.88],[9.94,-32.17]],"nutzung":"Wohnbaufläche"},{"nr":"795/6","m2":862,"ring":[[47.79,-74.63],[67.71,-74.95],[69.61,-30.75],[50.19,-31.21],[47.79,-74.63]],"nutzung":"Wohnbaufläche"},{"nr":"793/6","m2":0,"ring":[[23.32,-73.55],[23.39,-75.87],[23.54,-73.56],[23.32,-73.55]],"nutzung":"Wohnbaufläche"},{"nr":"786/1","m2":924,"ring":[[-60.35,-72.46],[-58.98,-72.65],[-58.52,-70.89],[-44.65,-73.49],[-48.66,17.72],[-52.0,18.38],[-53.49,18.41],[-60.35,-72.46]],"nutzung":"Industrie- und Gewerbefläche / Handel und Dienstleistung"},{"nr":"794/4","m2":493,"ring":[[33.39,-74.1],[45.08,-74.53],[45.2,-31.33],[33.86,-31.6],[33.39,-74.1]],"nutzung":"Wohnbaufläche"},{"nr":"797/6","m2":379,"ring":[[70.64,-74.59],[79.52,-74.12],[81.7,-30.46],[73.24,-30.66],[70.64,-74.59]],"nutzung":"Wohnbaufläche"},{"nr":"809/2","m2":3,"ring":[[-60.52,-74.77],[-59.59,-74.93],[-58.98,-72.65],[-60.35,-72.46],[-60.52,-74.77]],"nutzung":"Industrie- und Gewerbefläche / Handel und Dienstleistung"},{"nr":"795/4","m2":167,"ring":[[45.08,-74.53],[47.79,-74.63],[50.19,-31.21],[45.2,-31.33],[45.08,-74.53]],"nutzung":"Wohnbaufläche"},{"nr":"772/5","m2":575,"ring":[[-8.12,12.46],[-2.72,11.74],[9.28,10.15],[20.77,8.34],[23.27,8.18],[23.81,26.68],[-8.12,30.16],[-8.12,12.46]],"nutzung":"Landwirtschaft"},{"nr":"800/4","m2":1051,"ring":[[94.74,-73.32],[112.59,-72.45],[118.12,-72.5],[121.26,-29.52],[119.77,-29.56],[106.23,-29.88],[97.2,-30.09],[94.74,-73.32]],"nutzung":"Wohnbaufläche"},{"nr":"789/1","m2":833,"ring":[[-26.13,14.77],[-25.34,-73.75],[-19.81,-73.26],[-16.84,-69.07],[-15.41,13.4],[-26.13,14.77]],"nutzung":"Industrie- und Gewerbefläche / Handel und Dienstleistung"},{"nr":"798/3","m2":521,"ring":[[79.52,-74.12],[91.36,-73.5],[93.89,-30.17],[81.7,-30.46],[79.52,-74.12]],"nutzung":"Wohnbaufläche"},{"nr":"790/4","m2":405,"ring":[[-1.22,-70.96],[2.27,-72.24],[10.57,-72.76],[9.94,-32.17],[1.52,-32.37],[-1.22,-70.96]],"nutzung":"Wohnbaufläche"},{"nr":"40/6","m2":305,"ring":[[77.48,-111.27],[78.52,-123.64],[104.12,-121.93],[105.46,-109.54],[77.48,-111.27]],"nutzung":"Landwirtschaft"},{"nr":"45/2","m2":2225,"ring":[[119.37,-123.62],[119.46,-153.58],[120.84,-180.51],[139.22,-178.4],[160.54,-176.1],[161.61,-162.51],[162.32,-153.36],[163.74,-144.35],[163.92,-142.76],[165.29,-130.2],[119.37,-123.62]],"nutzung":"Wohnbaufläche"},{"nr":"790/11","m2":502,"ring":[[-8.14,-17.18],[9.7,-17.17],[9.28,10.15],[-2.72,11.74],[-8.12,12.46],[-8.14,-17.18]],"nutzung":"Wohnbaufläche"},{"nr":"790/10","m2":273,"ring":[[-8.15,-32.6],[1.52,-32.37],[9.94,-32.17],[9.7,-17.17],[-8.14,-17.18],[-8.15,-32.6]],"nutzung":"Wohnbaufläche"},{"nr":"43/11","m2":92,"ring":[[114.5,9.98],[129.78,8.42],[130.06,14.42],[115.15,16.11],[114.5,9.98]],"nutzung":"Wohnbaufläche"},{"nr":"37/9","m2":20,"ring":[[-33.6,-87.4],[-26.7,-79.99],[-17.09,-79.95],[-32.57,-79.63],[-33.6,-87.4]],"nutzung":"Wohnbaufläche"},{"nr":"388/12","m2":7486,"ring":[[-149.0,-20.84],[-130.69,-23.77],[-118.69,-25.69],[-104.8,-27.91],[-98.43,19.57],[-89.07,18.36],[-88.91,22.98],[-53.49,18.41],[-52.0,18.38],[-48.66,17.72],[-37.35,16.21],[-26.13,14.77],[-15.41,13.4],[-15.22,19.53],[-15.15,21.67],[-16.68,20.76],[-35.18,22.53],[-50.09,24.84],[-57.18,30.34],[-56.24,60.0],[-55.04,97.48],[-86.94,97.15],[-111.18,99.17],[-118.53,43.52],[-139.92,46.57],[-145.74,-5.18],[-147.23,-5.02],[-149.0,-20.84]],"nutzung":"Wohnbaufläche"},{"nr":"385","m2":3180,"ring":[[-94.53,-67.81],[-60.52,-74.77],[-60.35,-72.46],[-53.49,18.41],[-88.91,22.98],[-89.07,18.36],[-90.47,-22.38],[-91.09,-30.11],[-94.37,-66.07],[-94.53,-67.81]],"nutzung":"Wohnbaufläche"},{"nr":"389/4","m2":959,"ring":[[-120.66,-59.87],[-94.37,-66.07],[-91.09,-30.11],[-104.8,-27.91],[-118.69,-25.69],[-120.66,-59.87]],"nutzung":"Fläche gemischter Nutzung"},{"nr":"40/5","m2":2388,"ring":[[78.52,-123.64],[80.42,-146.19],[83.49,-182.61],[90.99,-181.75],[120.84,-180.51],[119.46,-153.58],[119.37,-123.62],[104.12,-121.93],[78.52,-123.64]],"nutzung":"Wohnbaufläche"},{"nr":"38/4","m2":1006,"ring":[[10.63,-115.16],[23.03,-116.77],[40.5,-116.91],[40.45,-113.78],[40.42,-112.87],[39.95,-80.88],[12.84,-80.53],[10.63,-115.16]],"nutzung":"Wohnbaufläche"},{"nr":"37/3","m2":1060,"ring":[[-36.46,-111.66],[5.74,-115.16],[8.43,-80.48],[-7.33,-80.15],[-35.13,-104.46],[-35.26,-105.69],[-36.46,-111.66]],"nutzung":"Wohnbaufläche"}],"strassenflaechen":[{"nr":"388/4","m2":45,"ring":[[-49.26,97.56],[-32.92,93.14],[-19.28,89.64],[-21.78,91.14],[-32.44,94.77],[-49.26,97.56]],"nutzung":"Straßenverkehr"},{"nr":"772/2","m2":93,"ring":[[-8.21,84.28],[16.01,81.87],[25.38,78.98],[25.46,81.77],[9.65,85.48],[-8.15,87.28],[-8.21,84.28]],"nutzung":"Straßenverkehr"},{"nr":"773/b","m2":559,"ring":[[-16.95,-75.93],[-1.27,-75.98],[10.62,-75.92],[-1.43,-73.92],[-8.44,-69.35],[-11.68,-58.91],[-11.22,-32.67],[-10.44,12.77],[-10.22,19.55],[-15.22,19.53],[-15.41,13.4],[-16.84,-69.07],[-16.95,-75.93]],"nutzung":"Straßenverkehr"},{"nr":"773/5","m2":849,"ring":[[-49.35,100.91],[-49.26,97.56],[-32.44,94.77],[-21.78,91.14],[-19.28,89.64],[-15.6,86.65],[-8.21,84.28],[-8.15,87.28],[9.65,85.48],[25.46,81.77],[45.25,73.84],[60.65,69.38],[62.6,68.81],[83.36,65.09],[91.0,64.1],[108.06,61.37],[119.7,60.33],[134.14,58.44],[142.84,57.71],[151.94,56.94],[164.26,55.96],[179.71,55.05],[183.82,54.76],[193.45,56.79],[198.37,57.83],[176.9,58.54],[164.17,59.58],[142.03,61.38],[106.9,65.08],[83.69,68.58],[63.44,72.21],[46.44,77.19],[35.33,80.59],[35.15,84.39],[25.49,86.41],[-11.93,92.06],[-15.01,92.76],[-49.35,100.91]],"nutzung":"Straßenverkehr"},{"nr":"790/5","m2":32,"ring":[[-1.43,-73.92],[10.62,-75.92],[10.57,-72.76],[2.27,-72.24],[-1.22,-70.96],[-1.43,-73.92]],"nutzung":"Straßenverkehr"},{"nr":"787/2","m2":7,"ring":[[-44.65,-73.49],[-44.59,-74.65],[-34.29,-75.38],[-34.31,-74.55],[-37.43,-74.83],[-44.65,-73.49]],"nutzung":"Straßenverkehr"},{"nr":"795/5","m2":4,"ring":[[45.07,-76.05],[47.7,-76.27],[47.79,-74.63],[45.08,-74.53],[45.07,-76.05]],"nutzung":"Straßenverkehr"},{"nr":"792/4","m2":35,"ring":[[10.57,-72.76],[10.62,-75.92],[23.39,-75.87],[23.32,-73.55],[10.57,-72.76]],"nutzung":"Straßenverkehr"},{"nr":"786/2","m2":21,"ring":[[-58.98,-72.65],[-44.59,-74.65],[-44.65,-73.49],[-58.52,-70.89],[-58.98,-72.65]],"nutzung":"Straßenverkehr"},{"nr":"795/7","m2":42,"ring":[[47.7,-76.27],[56.29,-76.98],[67.62,-77.15],[67.71,-74.95],[47.79,-74.63],[47.7,-76.27]],"nutzung":"Straßenverkehr"},{"nr":"794/5","m2":22,"ring":[[33.37,-76.27],[45.07,-76.05],[45.08,-74.53],[33.39,-74.1],[33.37,-76.27]],"nutzung":"Straßenverkehr"},{"nr":"773/6","m2":337,"ring":[[-15.6,86.65],[-14.18,82.91],[-13.39,76.93],[-13.98,58.67],[-15.15,21.67],[-15.22,19.53],[-10.22,19.55],[-8.38,76.66],[-8.21,84.28],[-15.6,86.65]],"nutzung":"Straßenverkehr"},{"nr":"42/3","m2":26,"ring":[[139.51,-73.4],[162.59,-75.23],[167.64,-70.75],[167.76,-66.43],[167.72,-66.56],[167.51,-67.18],[167.26,-67.77],[166.99,-68.32],[166.7,-68.85],[166.4,-69.33],[166.08,-69.79],[165.75,-70.21],[165.41,-70.6],[165.07,-70.97],[164.73,-71.3],[164.39,-71.61],[164.04,-71.89],[163.7,-72.15],[163.35,-72.39],[162.98,-72.63],[162.58,-72.87],[162.15,-73.09],[161.7,-73.3],[161.23,-73.5],[160.72,-73.68],[160.19,-73.85],[159.63,-73.99],[159.05,-74.1],[158.44,-74.18],[157.8,-74.24],[157.14,-74.25],[157.01,-74.25],[139.55,-73.13],[139.51,-73.4]],"nutzung":"Straßenverkehr"},{"nr":"790/7","m2":133,"ring":[[-11.68,-58.91],[-8.44,-69.35],[-1.43,-73.92],[-1.22,-70.96],[-1.41,-70.9],[-6.53,-66.65],[-8.21,-62.46],[-8.15,-32.6],[-11.22,-32.67],[-11.68,-58.91]],"nutzung":"Straßenverkehr"},{"nr":"809/1","m2":1062,"ring":[[-59.59,-74.93],[-32.57,-79.63],[-17.09,-79.95],[-14.29,-80.01],[-7.33,-80.15],[8.43,-80.48],[12.84,-80.53],[39.95,-80.88],[76.23,-80.84],[109.43,-78.6],[118.55,-77.98],[126.53,-77.97],[129.93,-78.23],[152.41,-79.92],[171.56,-81.34],[186.12,-83.58],[196.41,-85.16],[174.68,-78.13],[167.76,-66.43],[167.64,-70.75],[162.59,-75.23],[139.51,-73.4],[135.5,-73.44],[132.86,-75.45],[117.95,-74.76],[115.63,-74.66],[102.54,-75.78],[94.62,-75.39],[91.26,-75.23],[79.42,-76.29],[70.5,-76.94],[67.62,-77.15],[56.29,-76.98],[47.7,-76.27],[45.07,-76.05],[33.37,-76.27],[23.39,-75.87],[10.62,-75.92],[-1.27,-75.98],[-16.95,-75.93],[-25.32,-75.72],[-34.29,-75.38],[-44.59,-74.65],[-58.98,-72.65],[-59.59,-74.93]],"nutzung":"Straßenverkehr"},{"nr":"797/5","m2":6,"ring":[[67.62,-77.15],[70.5,-76.94],[70.61,-75.0],[67.71,-74.95],[67.62,-77.15]],"nutzung":"Straßenverkehr"},{"nr":"793/8","m2":22,"ring":[[23.39,-75.87],[33.37,-76.27],[33.39,-74.1],[32.19,-74.05],[23.54,-73.56],[23.39,-75.87]],"nutzung":"Straßenverkehr"},{"nr":"36/8","m2":12,"ring":[[-59.59,-74.93],[-51.9,-77.12],[-32.57,-79.63],[-59.59,-74.93]],"nutzung":"Straßenverkehr"},{"nr":"790/9","m2":122,"ring":[[-11.22,-32.67],[-8.15,-32.6],[-8.14,-17.18],[-8.12,12.46],[-10.44,12.77],[-11.22,-32.67]],"nutzung":"Straßenverkehr"},{"nr":"788/2","m2":13,"ring":[[-34.31,-74.55],[-34.29,-75.38],[-25.32,-75.72],[-25.34,-73.75],[-34.31,-74.55]],"nutzung":"Straßenverkehr"},{"nr":"789/2","m2":26,"ring":[[-25.34,-73.75],[-25.32,-75.72],[-16.95,-75.93],[-16.84,-69.07],[-19.81,-73.26],[-25.34,-73.75]],"nutzung":"Straßenverkehr"},{"nr":"772/6","m2":77,"ring":[[-10.44,12.77],[-8.12,12.46],[-8.12,30.16],[-8.38,76.66],[-10.22,19.55],[-10.44,12.77]],"nutzung":"Straßenverkehr"},{"nr":"800/5","m2":58,"ring":[[94.62,-75.39],[102.54,-75.78],[115.63,-74.66],[117.95,-74.76],[118.12,-72.5],[112.59,-72.45],[94.74,-73.32],[94.62,-75.39]],"nutzung":"Straßenverkehr"},{"nr":"798/4","m2":23,"ring":[[79.42,-76.29],[91.26,-75.23],[91.36,-73.5],[79.52,-74.12],[79.42,-76.29]],"nutzung":"Straßenverkehr"},{"nr":"797/7","m2":20,"ring":[[70.5,-76.94],[79.42,-76.29],[79.52,-74.12],[70.64,-74.59],[70.61,-75.0],[70.5,-76.94]],"nutzung":"Straßenverkehr"},{"nr":"799/5","m2":6,"ring":[[91.26,-75.23],[94.62,-75.39],[94.74,-73.32],[91.36,-73.5],[91.26,-75.23]],"nutzung":"Straßenverkehr"},{"nr":"801/6","m2":41,"ring":[[117.95,-74.76],[132.86,-75.45],[135.5,-73.44],[139.51,-73.4],[139.55,-73.13],[118.12,-72.5],[117.95,-74.76]],"nutzung":"Straßenverkehr"}],"achsen":[[[-12.4,88.5],[-12.2,61.4],[-11.9,17.3],[-11.6,-19.4],[-11.1,-59.4],[-10.4,-65.0],[-8.5,-69.3],[-3.3,-73.1],[2.4,-74.4],[8.5,-75.3],[71.4,-74.7],[126.6,-71.0],[147.5,-71.3],[171.1,-72.2],[188.7,-73.5],[234.6,-79.4],[240.1,-81.8],[242.8,-86.0],[243.9,-94.9],[246.7,-111.5],[250.6,-142.2],[252.8,-153.2]],[[171.1,-72.2],[172.3,-62.4],[173.6,-48.9],[176.4,-33.8],[180.8,-18.3],[182.1,-6.6]],[[182.1,-6.6],[182.4,-3.7],[182.1,7.8],[181.5,32.5],[180.8,51.5],[180.0,63.0]]],"bahnhof":{"name":"Bahnhof Großbothen","xy":[1297.9,-563.7],"dist_m":1415},"bus":[{"name":"Großbothen, Wilhelm-Ostwald-Park","xy":[222.4,325.5]},{"name":"Großbothen, Schule","xy":[684.8,86.8]},{"name":"Großbothen, Schule","xy":[687.2,82.8]},{"name":"Großbothen, Colditzer Landstr.","xy":[903.5,-357.6]},{"name":"Großbothen, Colditzer Landstr.","xy":[891.5,-417.3]},{"name":"Schaddel (Großbothen)","xy":[791.7,1057.6]},{"name":"Schaddel (Großbothen)","xy":[777.4,1112.6]}],"ueberlebende":{"ringe":["823/2","798/3","794/4","792/3","793/4","790/11","708/2","709/a"],"strasse":["793/4","792/3","794/4","798/3","790/11"]},"treppe":[{"pct":"0","band":"502–502","n":1},{"pct":"0,5","band":"500–504","n":2},{"pct":"1","band":"497–507","n":5},{"pct":"2","band":"492–512","n":12},{"pct":"5","band":"477–527","n":25},{"pct":"10","band":"452–552","n":46},{"pct":"20","band":"402–602","n":83}]};
+const SVG = "http://www.w3.org/2000/svg";
+const el = (name, attrs, parent) => {
+  const node = document.createElementNS(SVG, name);
+  for (const key in attrs) node.setAttribute(key, attrs[key]);
+  if (parent) parent.appendChild(node);
+  return node;
+};
+const BELEG_BILD = "data:image/jpeg;base64,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HTz49aCGQ+XMBKhHQ01O7MVNCw+WsAWZhMKdnVIrLHF90WCGvBa8Agd8hPhYGkuEEAPnYMq/geEUWy1K7otFjXMLHtD89wRwrIpIY3ExU8ER9nNjAKy0wibQpfgxmQwxOyyGJhPu1gBKlPTQ1AxNDFIP9bQVfwPCYR3dkKPpmHFSU1Ocx0sUYPdzWAFSfAyV258ERcOznNBKysJhTfdjRVSMZ0bXlwfA12ewcMgqUcLYyfTZGxh7ta3GVfwmEst0W2EFvy/dVp9PC92ZIInu9nOYCSsnCYULrwRSfktMaWg4b3VNoAIADs9wVewmEl2KV2ef/DKIy+o630+/zsCy2RtY3a1oYPwtGAFdwimUm0RGNGO5jXsIexrh4cMhW4qGljeZmUtPHI77xEYyVmYCYSya+6zzL5aIL5bp7fUOIilGHYVqxWOk0/aYrbTA+hF91exhMDwjk9aRVY47bPyY74Y5iC6CN+Oxe0FQNDTOP/pacHz6YWXhMKLZLhF+ixHH6eA1jGNHs1uMqL6aGTL3QQOJ8sBKyUwpss0mqoxGUdOwH/hoMf8ATCvhgHG0AewAVzCI22ysYpKijeFVEVUqLBERSAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIrYcVXcfKUym6Joobj5TcfKUxuiaKG4+U3HylMbomihuPlNx8pTG6Joobj5TcfKUxuiaKG4+U3HylMbomihuPlNx8pTG6Joobj5TcfKUxuiaKG4+U3HylMbomihuPlNx8pTG6Joobj5TcfKUxuiaKG4+U3HylMbomihuPlNx8pTG6Joobj5TcfKUxuiaKG4+U3HylMbomihuPlNx8pTG6Joobj5TcfKUxuiaKG4+U3HylMbomihuPlNx8pTG6Joobj5TcfKUxuiaKG4+U3HylMbomihuPlNx8pTG6Joobj5TcfKUxuiaKG4+U3HylMbomihuPlNx8pTG6Joobj5TcfKUxuiaKG4+U3HylMbomihuPlNx8pTG6Joobj5TcfKUxuiaKG4+U3HylMbomihuPlNx8pTG6Joobj5TcfKUxuiaKG4+U3HylMbomihuPlNx8pTG6Joobj5TcfKUxuiaKG4+U3HylMbomihuPlNx8pTG6Joobj5TcfKUxuiaKG4+U3HylMbomihuPlNx8pTG6Joobj5TcfKUxuiaKG4+U3HylMbomihuPlNx8pTG6Joobj5TcfKUxuiaKG4+U3HylMbomihuPlNx8pTG6Joobj5TcfKUxuiaKG4+U3HylMbomihuPlNx8pTG6Joobj5TcfKUxuiaKG4+U3HylMbomihuPlNx8pTG6Joobj5TcfKUxuiaKG4+U3HylMbomihkpkpTG6JorZPv4VAS4cpTG6LqZVqQkMJ9wqZIYHe6lJk7qj//Z";
+const WIDTH = 1000, HEIGHT = 800;
+
+/* Camera rules. MIN_HALF keeps the confirmed parcel from ever being shown
+   without its neighbours; SLACK is the air around the live candidate set. */
+const MIN_HALF = 120;      // metres
+const SLACK = 1.35;
+const MIN_DWELL = 2000;    // ms an indicium is guaranteed to stand
+const FLIGHT = 900;        // ms of camera travel
+
+/* Every stage names the indicium, how far it may be trusted, and — the point of
+   the rework — which parcels are still possible once it is in. The camera is
+   derived from that set, never from the indicium alone. */
+const ALLE = KARTE.kandidaten.map(c => c.nr);
+const STUFEN = [
+  { name: "Kartenpin der Plattform", quelle: "og:latitude — abgeleitet", staerke: 0.10,
+    beleg: { art: "text", wert: 'og:latitude content="51.244012016937226"\nog:longitude content="12.721704808849294"\nog:locality content="Sachsen - Grimma"', treffer: "Grimma" },
+    farbe: "var(--error)", offen: null, zeigt: [KARTE.pin.xy], mindest: 900,
+    fuss: "Ein Punkt ohne Angabe, wie genau er ist" },
+  { name: "Ortsteil „Großbothen“", quelle: "Fließtext — Beziehung liegt_in", staerke: 0.60,
+    beleg: { art: "text", wert: "Bei diesem Angebot handelt es sich um ein erschlossenes Baugrundstück in Großbothen, einem OT von Grimma.", treffer: "Großbothen" },
+    farbe: "var(--sage)", offen: null, zeigt: KARTE.gemarkung.ring.concat([KARTE.pin.xy]),
+    fuss: "Gemarkung 144241 · 1 131 Flurstücke" },
+  { name: "Fläche 502 m² (±5 %)", quelle: "Attributliste — strukturiertes Feld", staerke: 0.90,
+    beleg: { art: "text", wert: "Grundstücksfläche\n502 m²", treffer: "502 m²" },
+    farbe: "var(--secondary)", offen: ALLE,
+    fuss: "25 Kandidaten im Band 477–527 m²" },
+  { name: "Bahnhof 1,6 km · Bus 0,3 km", quelle: "Fließtext — wirbt und rundet", staerke: 0.35,
+    beleg: { art: "text", wert: "Entfernungen:\nFlughafen 40,5 km\nFernbahnhof 1,6 km\nBus 0,3 km", treffer: "Fernbahnhof 1,6 km" },
+    farbe: "var(--secondary)", offen: KARTE.ueberlebende.ringe,
+    fuss: "8 Kandidaten · Ringe ±35 %, grenzen ein, entscheiden nicht" },
+  { name: "Straße „Wiesenstraße“", quelle: "Bild 2 — Texterkennung", staerke: 0.95,
+    beleg: { art: "bild", wert: BELEG_BILD, hinweis: "Bild 2 von 4 · Kopfzeile · tesseract -l deu --psm 6 · 491 ms" },
+    farbe: "var(--primary-light)", offen: KARTE.ueberlebende.strasse,
+    fuss: "5 Kandidaten am Weg · 80-m-Puffer" },
+  { name: "Flurstück 790/11", quelle: "Bild 2 — Texterkennung", staerke: 0.95,
+    beleg: { art: "bild", wert: BELEG_BILD, hinweis: "Bild 2 von 4 · Kopfzeile · dieselbe Erkennung" },
+    farbe: "var(--primary)", offen: [KARTE.plot.nr],
+    fuss: "Behauptet — noch nicht geprüft" },
+  { name: "Bestätigt gegen ALKIS", quelle: "amtlich — 144241___00790001100", staerke: 1.0,
+    beleg: { art: "text", wert: "<flstkennz>144241___00790001100</flstkennz>\n<gemarkung>Großbothen</gemarkung>\n<flaeche>502</flaeche>\n<tntxt>Wohnbaufläche;502</tntxt>", treffer: "502" },
+    farbe: "var(--primary)", offen: [KARTE.plot.nr],
+    fuss: "flaeche 502 m² · Wohnbaufläche · Plausibilität ohne Einwand" }
+];
+
+const svg = document.getElementById("karte");
+const protocol = document.getElementById("protokoll");
+const band = document.getElementById("band");
+const footer = document.getElementById("kartenfuss");
+const waiting = document.getElementById("wartemarke");
+const status = document.getElementById("stand");
+let stage = 0;
+let camera = null;
+
+const byNumber = new Map(KARTE.kandidaten.map(c => [c.nr, c]));
+const parcelByNumber = new Map(KARTE.nachbarn.map(p => [p.nr, p]));
+
+/* The frame a stage is entitled to: every parcel still in play, plus whatever
+   geometry the new indicium itself contributes. */
+function frameFor(index) {
+  const points = [];
+  const step = STUFEN[index];
+  const offen = (() => {
+    for (let i = index; i >= 0; i--)
+      if (!verworfen.has(i) && STUFEN[i].offen) return STUFEN[i].offen;
+    return null;
+  })();
+  if (offen) {
+    for (const number of offen) {
+      const parcel = parcelByNumber.get(number);
+      if (parcel) points.push(...parcel.ring);
+      else if (byNumber.has(number)) points.push(byNumber.get(number).xy);
+    }
+  }
+  if (step.zeigt) points.push(...step.zeigt);
+  if (!points.length) points.push([0, 0]);
+
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const [x, y] of points) {
+    if (x < minX) minX = x; if (x > maxX) maxX = x;
+    if (y < minY) minY = y; if (y > maxY) maxY = y;
+  }
+  const aspect = WIDTH / HEIGHT;
+  let half = Math.max((maxX - minX) / 2, (maxY - minY) / 2 * aspect) * SLACK;
+  half = Math.max(half, step.mindest || MIN_HALF);
+  return { x: (minX + maxX) / 2, y: (minY + maxY) / 2, half };
+}
+
+const project = ([x, y]) => {
+  const scale = WIDTH / (camera.half * 2);
+  return [(x - camera.x) * scale + WIDTH / 2, (camera.y - y) * scale + HEIGHT / 2];
+};
+const metres = m => m * (WIDTH / (camera.half * 2));
+const pathOf = ring => ring.map((p, i) => (i ? "L" : "M") + project(p).map(v => v.toFixed(1)).join(" ")).join("") + "Z";
+const lineOf = points => points.map((p, i) => (i ? "L" : "M") + project(p).map(v => v.toFixed(1)).join(" ")).join("");
+
+/* A layer whose extent dwarfs the frame no longer says anything — it only tints
+   everything. Both the district wash and the street buffer fade out on the way in. */
+const districtFade = () => Math.max(0, Math.min(1, (camera.half - 300) / 1100)) * 0.2;
+const bufferFade = () => Math.max(0, Math.min(1, (camera.half - 70) / 160)) * 0.22;
+
+const verworfen = new Set();
+
+/* The live set is the newest surviving indicium's, not necessarily this stage's:
+   discarding one has to give its narrowing back. */
+function liveSet() {
+  for (let i = stage; i >= 0; i--)
+    if (!verworfen.has(i) && STUFEN[i].offen) return STUFEN[i].offen;
+  return null;
+}
+
+/* The smallest thing every remaining candidate has in common — shown when no
+   single parcel can be named. */
+function huelleFor(offen) {
+  if (!offen) return { text: "Lage noch nicht eingegrenzt", detail: "kein Kandidat bestimmt" };
+  if (offen.length === 1 && stage >= 6 && !verworfen.has(6))
+    return { text: "Flurstück " + offen[0], detail: "bestätigt gegen ALKIS" };
+  if (offen.length === 1)
+    return { text: "Flurstück " + offen[0], detail: "behauptet, noch nicht geprüft" };
+  const amWeg = new Set(KARTE.ueberlebende.strasse);
+  if (offen.every(nr => amWeg.has(nr)))
+    return { text: "Wiesenstraße, Großbothen", detail: offen.length + " Flurstücke — welches, ist offen" };
+  return { text: "Gemarkung Großbothen", detail: offen.length + " Flurstücke — welches, ist offen" };
+}
+
+function draw() {
+  svg.textContent = "";
+  const live = new Set(liveSet() || []);
+  el("rect", { x: 0, y: 0, width: WIDTH, height: HEIGHT, fill: "var(--map-ground)" }, svg);
+
+  if (stage >= 1 && districtFade() > 0.02) {
+    el("path", { d: pathOf(KARTE.gemarkung.ring), fill: "var(--sage)",
+      opacity: districtFade().toFixed(3), stroke: "var(--sage)", "stroke-width": 1.5,
+      "stroke-dasharray": "6 5", "stroke-opacity": Math.min(1, districtFade() * 4).toFixed(3) }, svg);
+    if (camera.half > 1400) {
+      const label = el("text", { x: WIDTH / 2, y: 78, "font-size": 15, "text-anchor": "middle",
+        fill: "var(--graphite)", "font-family": "Archivo, sans-serif", "font-weight": 600,
+        "paint-order": "stroke fill", stroke: "var(--map-halo)", "stroke-width": 4,
+        "stroke-linejoin": "round" }, svg);
+      label.textContent = "Gemarkung Großbothen";
+    }
+  }
+
+  /* Distance rings, but only while they still fit the frame. */
+  if (stage >= 3) {
+    const nearest = KARTE.bus.map(b => b.xy)
+      .reduce((a, b) => a[0] ** 2 + a[1] ** 2 < b[0] ** 2 + b[1] ** 2 ? a : b);
+    for (const [centre, claim] of [[KARTE.bahnhof.xy, 1600], [nearest, 300]]) {
+      if (claim * 1.35 > camera.half * 1.9) continue;
+      const [cx, cy] = project(centre);
+      const inner = metres(claim * 0.65), outer = metres(claim * 1.35);
+      el("circle", { cx, cy, r: (inner + outer) / 2, fill: "none", stroke: "var(--secondary)",
+        opacity: ".13", "stroke-width": outer - inner }, svg);
+    }
+  }
+
+  /* The street buffer that the OCR'd street name stands for. */
+  if (stage >= 4 && bufferFade() > 0.02) {
+    for (const way of KARTE.achsen)
+      el("path", { d: lineOf(way), fill: "none", stroke: "var(--primary-light)",
+        opacity: bufferFade().toFixed(3), "stroke-width": Math.max(metres(80), 3),
+        "stroke-linecap": "round", "stroke-linejoin": "round" }, svg);
+  }
+
+  const closeUp = camera.half < 520;
+
+  /* Cadastral carriageway, straight from ave:tntxt = Straßenverkehr. */
+  if (closeUp) {
+    for (const street of KARTE.strassenflaechen)
+      el("path", { d: pathOf(street.ring), fill: "var(--map-street-surface)",
+        stroke: "var(--map-neighbour)", "stroke-width": 0.8, "stroke-linejoin": "round" }, svg);
+
+    /* Neighbouring parcels: a held-back fill, so the cadastre reads as a fabric. */
+    for (const parcel of KARTE.nachbarn.concat(stage >= 5 ? [] : [KARTE.plot])) {
+      if (parcel.nr === KARTE.plot.nr && stage >= 5) continue;
+      const still = live.has(parcel.nr);
+      el("path", { d: pathOf(parcel.ring),
+        fill: still ? "var(--secondary-veil)" : "var(--map-surface)",
+        "fill-opacity": still ? 1 : 0.42,
+        stroke: still ? "var(--secondary)" : "var(--map-neighbour)",
+        "stroke-width": still ? 1.8 : 1.1, "stroke-linejoin": "round" }, svg);
+    }
+
+    /* The street name, on its OSM axis, in the body face — a name is prose. */
+    const axis = KARTE.achsen.reduce((a, b) => (a.length > b.length ? a : b));
+    const id = "achse-wiesenstrasse";
+    let defs = el("defs", {}, svg);
+    el("path", { id, d: lineOf(axis), fill: "none" }, defs);
+    const name = el("text", { "font-size": 11.5, "font-family": "Public Sans, sans-serif",
+      "font-weight": 500, "letter-spacing": ".04em", fill: "var(--map-boundary)",
+      "text-anchor": "middle", "paint-order": "stroke fill", stroke: "var(--map-halo)",
+      "stroke-width": 3, "stroke-linejoin": "round", dy: "0.32em" }, svg);
+    const textPath = el("textPath", { startOffset: "62%" }, name);
+    textPath.setAttribute("href", "#" + id);
+    textPath.textContent = "Wiesenstraße";
+  }
+
+  /* Candidates that are not drawn as parcels (outside the close-up extract). */
+  if (stage >= 2) {
+    for (const candidate of KARTE.kandidaten) {
+      if (candidate.nr === KARTE.plot.nr) continue;
+      if (closeUp && parcelByNumber.has(candidate.nr)) continue;
+      const still = live.has(candidate.nr);
+      const [x, y] = project(candidate.xy);
+      el("circle", { cx: x, cy: y, r: still ? 6.5 : 4, fill: "var(--secondary)",
+        opacity: still ? ".85" : ".22" }, svg);
+    }
+  }
+
+  /* The subject parcel — the only shape that ever gets halo plus drawn contour. */
+  if (stage >= 5) {
+    const confirmed = stage >= 6;
+    el("path", { d: pathOf(KARTE.plot.ring), fill: "var(--map-surface)", "fill-opacity": 0.42 }, svg);
+    el("path", { d: pathOf(KARTE.plot.ring), fill: "none", stroke: "var(--map-halo)",
+      "stroke-width": 6, "stroke-linejoin": "round" }, svg);
+    el("path", { d: pathOf(KARTE.plot.ring), fill: "none",
+      stroke: confirmed ? "var(--map-boundary)" : "var(--secondary)",
+      "stroke-width": confirmed ? 2.2 : 2, "stroke-dasharray": confirmed ? "none" : "7 5",
+      "stroke-linejoin": "round" }, svg);
+    if (confirmed)
+      for (const vertex of KARTE.plot.ring.slice(0, -1)) {
+        const [vx, vy] = project(vertex);
+        el("rect", { x: vx - 2.5, y: vy - 2.5, width: 5, height: 5, fill: "var(--map-halo)",
+          stroke: "var(--map-boundary)", "stroke-width": 1.4 }, svg);
+      }
+    const [cx] = project([0, 0]);
+    const top = Math.min(...KARTE.plot.ring.map(point => project(point)[1]));
+    const label = el("text", { x: Math.min(Math.max(cx, 140), WIDTH - 140),
+      y: Math.max(top - 16, 30), "font-size": 16, "text-anchor": "middle",
+      fill: confirmed ? "var(--map-boundary)" : "var(--secondary-text)",
+      "font-family": "IBM Plex Mono, monospace", "font-weight": 500,
+      "paint-order": "stroke fill", stroke: "var(--map-halo)", "stroke-width": 3.4,
+      "stroke-linejoin": "round" }, svg);
+    label.textContent = confirmed ? "790/11 · 502 m² · bestätigt" : "790/11 · behauptet";
+  } else if (stage >= 2 && !closeUp) {
+    const [x, y] = project([0, 0]);
+    el("circle", { cx: x, cy: y, r: 6.5, fill: "var(--secondary)", opacity: ".85" }, svg);
+  }
+
+  /* The platform pin never disappears; once contradicted it is struck through. */
+  const [px, py] = project(KARTE.pin.xy);
+  if (px > -40 && px < WIDTH + 40 && py > -40 && py < HEIGHT + 40) {
+    const refuted = stage >= 1;
+    el("circle", { cx: px, cy: py, r: 9, fill: "var(--map-halo)" }, svg);
+    el("circle", { cx: px, cy: py, r: 6.5, fill: "var(--error)", opacity: refuted ? ".4" : "1" }, svg);
+    if (refuted) {
+      el("line", { x1: px - 9, y1: py - 9, x2: px + 9, y2: py + 9, stroke: "var(--error)", "stroke-width": 2 }, svg);
+      el("line", { x1: px - 9, y1: py + 9, x2: px + 9, y2: py - 9, stroke: "var(--error)", "stroke-width": 2 }, svg);
+    }
+    const note = el("text", { x: px + 14, y: py + 4.5, "font-size": 12.5, fill: "var(--error)",
+      "font-family": "IBM Plex Mono, monospace", "paint-order": "stroke fill",
+      stroke: "var(--map-ground)", "stroke-width": 3.4, "stroke-linejoin": "round" }, svg);
+    note.textContent = refuted ? "Pin — widerlegt" : "Pin der Plattform";
+  }
+
+  northArrow();
+  scaleBar();
+}
+
+function northArrow() {
+  const group = el("g", { transform: `translate(${WIDTH - 52}, 62)` }, svg);
+  el("circle", { r: 24, fill: "var(--map-halo)", opacity: ".65" }, group);
+  el("path", { d: "M0,-20 L6.5,11 L0,4.5 L-6.5,11 Z", fill: "var(--map-boundary)" }, group);
+  const letter = el("text", { x: 0, y: 36, "font-size": 13, "text-anchor": "middle",
+    fill: "var(--map-boundary)", "font-family": "Archivo, sans-serif", "font-weight": 600,
+    "paint-order": "stroke fill", stroke: "var(--map-halo)", "stroke-width": 3 }, group);
+  letter.textContent = "N";
+}
+
+/* SitePlan's two-half checker bar: rounded steps only, each half at least 56 px. */
+const SCALE_STEPS = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000];
+function scaleBar() {
+  const step = SCALE_STEPS.find(m => metres(m) >= 56) ?? 5000;
+  const w = metres(step);
+  const group = el("g", { transform: `translate(38, ${HEIGHT - 34})` }, svg);
+  el("rect", { x: 0, y: -5, width: w, height: 5, fill: "var(--map-boundary)" }, group);
+  el("rect", { x: w, y: -5, width: w, height: 5, fill: "none", stroke: "var(--map-boundary)", "stroke-width": 1.2 }, group);
+  el("line", { x1: 0, y1: 0, x2: w * 2, y2: 0, stroke: "var(--map-boundary)", "stroke-width": 1.2 }, group);
+  const text = (x, anchor, value) => {
+    const node = el("text", { x, y: 15, "text-anchor": anchor, "font-size": 9.5,
+      "font-family": "IBM Plex Mono, monospace", fill: "var(--map-boundary)",
+      "paint-order": "stroke fill", stroke: "var(--map-halo)", "stroke-width": 3 }, group);
+    node.textContent = value;
+  };
+  const show = m => (m >= 1000 ? (m / 1000).toLocaleString("de-DE") + " km" : String(m));
+  text(0, "middle", "0");
+  text(w, "middle", show(step));
+  text(w * 2, "end", step * 2 >= 1000 ? (step * 2 / 1000).toLocaleString("de-DE") + " km" : step * 2 + " m");
+}
+
+/* ---- Camera flight ---- */
+const ease = t => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+let animation = null;
+
+function flyTo(target, done) {
+  if (animation) cancelAnimationFrame(animation);
+  if (still || !camera) { camera = { ...target }; draw(); if (done) done(); return; }
+  const from = { ...camera };
+  const started = performance.now();
+  const tick = now => {
+    const k = ease(Math.min(1, (now - started) / FLIGHT));
+    camera = {
+      x: from.x + (target.x - from.x) * k,
+      y: from.y + (target.y - from.y) * k,
+      /* geometric interpolation, so the pace looks even at every scale */
+      half: Math.exp(Math.log(from.half) + (Math.log(target.half) - Math.log(from.half)) * k)
+    };
+    draw();
+    if (k < 1) animation = requestAnimationFrame(tick); else if (done) done();
+  };
+  animation = requestAnimationFrame(tick);
+}
+
+/* ---- The queue: nothing is shown for less than MIN_DWELL ---- */
+let queue = [];
+let shownAt = 0;
+let draining = null;
+
+function enqueue(indices) {
+  queue.push(...indices.filter(i => !queue.includes(i)));
+  paintQueue();
+  drain();
+}
+
+function drain() {
+  if (draining || !queue.length) return;
+  const wait = Math.max(0, MIN_DWELL - (performance.now() - shownAt));
+  draining = setTimeout(() => {
+    draining = null;
+    const next = queue.shift();
+    paintQueue();
+    show(next, () => { drain(); });
+  }, wait);
+}
+
+function paintQueue() {
+  waiting.hidden = queue.length === 0;
+  if (queue.length) waiting.textContent = queue.length + " Indiz" + (queue.length > 1 ? "ien" : "") + " warten";
+}
+
+function show(index, done) {
+  stage = Math.max(0, Math.min(STUFEN.length - 1, index));
+  shownAt = performance.now();
+  paint();
+  flyTo(frameFor(stage), done);
+}
+
+function jump(index) {           /* a click beats the queue — a person never waits */
+  clearTimeout(draining); draining = null;
+  queue = []; paintQueue();
+  stopPlaying();
+  show(index);
+}
+
+function paint() {
+  const entries = protocol.querySelectorAll(".ind");
+  entries.forEach((entry, index) => {
+    entry.classList.toggle("da", index <= stage);
+    entry.classList.toggle("jetzt", index === stage);
+    entry.querySelector(".ind-balken i").style.width =
+      (index <= stage && !verworfen.has(index) ? STUFEN[index].staerke * 100 : 0) + "%";
+    entry.classList.toggle("weg", verworfen.has(index));
+    const beleg = entry.querySelector(".beleg");
+    if (beleg) beleg.hidden = index !== stage;
+    if (index === stage) entry.scrollIntoView({ block: "nearest" });
+  });
+  const huelle = huelleFor(liveSet());
+  document.getElementById("huelle").innerHTML = "<b></b><span></span>";
+  document.getElementById("huelle").querySelector("b").textContent = huelle.text;
+  document.getElementById("huelle").querySelector("span").textContent = huelle.detail;
+  band.querySelectorAll("i").forEach((tick, index) => tick.classList.toggle("an", index <= stage));
+  footer.textContent = STUFEN[stage].fuss;
+  const open = liveSet();
+  status.textContent = open
+    ? open.length + (open.length === 1 ? " Flurstück offen" : " Flurstücke offen")
+    : "noch kein Kandidat";
+}
+
+/* ---- Controls ---- */
+const playButton = document.getElementById("abspielen");
+let playing = false, playTimer = null;
+
+function stopPlaying() {
+  playing = false;
+  clearTimeout(playTimer);
+  playButton.textContent = stage >= STUFEN.length - 1 ? "Von vorn" : "Weiter abspielen";
+}
+function step() {
+  if (!playing) return;
+  if (stage >= STUFEN.length - 1) { stopPlaying(); return; }
+  show(stage + 1, () => { playTimer = setTimeout(step, MIN_DWELL - FLIGHT); });
+}
+playButton.addEventListener("click", () => {
+  if (playing) { stopPlaying(); return; }
+  clearTimeout(draining); draining = null; queue = []; paintQueue();
+  playing = true;
+  playButton.textContent = "Anhalten";
+  if (stage >= STUFEN.length - 1) show(0, () => { playTimer = setTimeout(step, MIN_DWELL - FLIGHT); });
+  else step();
+});
+document.getElementById("vor").addEventListener("click", () => jump(stage + 1));
+document.getElementById("zurueck").addEventListener("click", () => jump(stage - 1));
+document.getElementById("sturm").addEventListener("click", () => {
+  clearTimeout(draining); draining = null; queue = []; stopPlaying();
+  show(0, () => enqueue(STUFEN.map((_, i) => i).slice(1)));
+});
+
+/* ---- The strength scale, drawn with the marks the map itself uses ---- */
+const SKALA = [
+  { stufe: "Ort", wert: "0,1 – 0,3", text: "Gemeinde oder Ortsteil. Ein Hauch über mehrere Quadratkilometer, gestrichelter Rand.", probe: "flaeche" },
+  { stufe: "Linie", wert: "0,4 – 0,7", text: "Straße oder Gewässer. Ein Band in Pufferbreite entlang der Linie — der Ort ist eingegrenzt, die Seite noch nicht.", probe: "band" },
+  { stufe: "Ring", wert: "0,2 – 0,4", text: "Entfernungsangabe. Ein Kranz mit weichen Rändern; die Mitte ist ausdrücklich nicht gemeint.", probe: "ring" },
+  { stufe: "Kandidaten", wert: "0,7 – 0,9", text: "Endliche Menge aus Fläche oder Nummernraum. Gleich stark, keiner hervorgehoben.", probe: "punkte" },
+  { stufe: "Behauptet", wert: "0,9", text: "Ein Flurstück ist genannt, aber noch nicht gegen ALKIS geprüft. Gestrichelte Kontur, kein Halo.", probe: "behauptet" },
+  { stufe: "Bestätigt", wert: "1,0", text: "Von ALKIS geliefert, von der Plausibilitätsprüfung nicht beanstandet. Halo und gezogene Kontur — wie im Lageplan.", probe: "bestaetigt" }
+];
+const skala = document.getElementById("skala");
+for (const row of SKALA) {
+  const line = document.createElement("div");
+  line.className = "sk";
+  line.innerHTML = '<div class="sk-stufe"></div><div class="sk-probe"></div><div class="sk-text"></div><div class="sk-wert"></div>';
+  line.querySelector(".sk-stufe").textContent = row.stufe;
+  line.querySelector(".sk-text").textContent = row.text;
+  line.querySelector(".sk-wert").textContent = row.wert;
+  const sample = el("svg", { viewBox: "0 0 104 36", width: "104", height: "36" });
+  if (row.probe === "flaeche")
+    el("rect", { x: 3, y: 3, width: 98, height: 30, rx: 4, fill: "var(--sage)", opacity: ".2",
+      stroke: "var(--sage)", "stroke-dasharray": "5 4" }, sample);
+  if (row.probe === "band") {
+    el("line", { x1: 4, y1: 18, x2: 100, y2: 18, stroke: "var(--primary-light)", opacity: ".24", "stroke-width": 22 }, sample);
+    el("line", { x1: 4, y1: 18, x2: 100, y2: 18, stroke: "var(--map-street-surface)", "stroke-width": 6 }, sample);
+  }
+  if (row.probe === "ring")
+    el("circle", { cx: 52, cy: 18, r: 11, fill: "none", stroke: "var(--secondary)", opacity: ".38", "stroke-width": 9 }, sample);
+  if (row.probe === "punkte")
+    for (const x of [28, 44, 60, 76]) el("circle", { cx: x, cy: 18, r: 4.5, fill: "var(--secondary)", opacity: ".85" }, sample);
+  if (row.probe === "behauptet")
+    el("rect", { x: 37, y: 6, width: 30, height: 24, fill: "var(--map-surface)", "fill-opacity": ".42",
+      stroke: "var(--secondary)", "stroke-width": 2, "stroke-dasharray": "6 4" }, sample);
+  if (row.probe === "bestaetigt") {
+    el("rect", { x: 37, y: 6, width: 30, height: 24, fill: "var(--map-surface)", "fill-opacity": ".42" }, sample);
+    el("rect", { x: 37, y: 6, width: 30, height: 24, fill: "none", stroke: "var(--map-halo)", "stroke-width": 6 }, sample);
+    el("rect", { x: 37, y: 6, width: 30, height: 24, fill: "none", stroke: "var(--map-boundary)", "stroke-width": 2.2 }, sample);
+  }
+  line.querySelector(".sk-probe").appendChild(sample);
+  skala.appendChild(line);
+}
+
+/* ---- Build the protocol ---- */
+STUFEN.forEach((entry, index) => {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "ind";
+  button.style.setProperty("--k", entry.farbe);
+  button.innerHTML =
+    '<span class="ind-punkt"></span><span class="ind-text">' +
+    '<span class="ind-name"></span><span class="ind-quelle"></span>' +
+    '<span class="ind-staerke"><span class="ind-balken"><i></i></span>' +
+    '<span class="ind-zahl"></span><span class="ind-rest"></span></span></span>';
+  button.querySelector(".ind-name").textContent = entry.name;
+  button.querySelector(".ind-quelle").textContent = entry.quelle;
+  button.querySelector(".ind-zahl").textContent = entry.staerke.toFixed(2).replace(".", ",");
+  button.querySelector(".ind-rest").textContent = entry.offen ? "· " + entry.offen.length + " offen" : "";
+
+  const beleg = document.createElement("div");
+  beleg.className = "beleg";
+  beleg.hidden = true;
+  const titel = document.createElement("span");
+  titel.className = "beleg-titel";
+  titel.textContent = "Beleg";
+  beleg.appendChild(titel);
+  if (entry.beleg.art === "bild") {
+    const bild = document.createElement("img");
+    bild.src = entry.beleg.wert;
+    bild.alt = "Ausschnitt aus dem Inseratsbild, aus dem dieses Indiz gelesen wurde";
+    beleg.appendChild(bild);
+    const hinweis = document.createElement("span");
+    hinweis.className = "beleg-titel";
+    hinweis.style.textTransform = "none";
+    hinweis.style.letterSpacing = ".02em";
+    hinweis.textContent = entry.beleg.hinweis;
+    beleg.appendChild(hinweis);
+  } else {
+    const text = document.createElement("p");
+    text.className = "beleg-text";
+    const raw = entry.beleg.wert;
+    if (entry.beleg.treffer && raw.includes(entry.beleg.treffer)) {
+      const at = raw.indexOf(entry.beleg.treffer);
+      text.append(raw.slice(0, at));
+      const mark = document.createElement("mark");
+      mark.textContent = entry.beleg.treffer;
+      text.append(mark, raw.slice(at + entry.beleg.treffer.length));
+    } else text.textContent = raw;
+    text.style.whiteSpace = "pre-wrap";
+    beleg.appendChild(text);
+  }
+  const fuss = document.createElement("div");
+  fuss.className = "beleg-fuss";
+  const knopf = document.createElement("button");
+  knopf.type = "button";
+  knopf.textContent = "Indiz verwerfen";
+  knopf.addEventListener("click", event => {
+    event.stopPropagation();
+    if (verworfen.has(index)) verworfen.delete(index); else verworfen.add(index);
+    knopf.textContent = verworfen.has(index) ? "Wieder verwenden" : "Indiz verwerfen";
+    paint();
+    flyTo(frameFor(stage));
+  });
+  const note = document.createElement("span");
+  note.textContent = "Die Suche läuft ohne dieses Indiz neu.";
+  fuss.append(knopf, note);
+  beleg.appendChild(fuss);
+  button.appendChild(beleg);
+
+  button.addEventListener("click", () => jump(index));
+  protocol.appendChild(button);
+  band.appendChild(document.createElement("i"));
+});
+
+camera = frameFor(0);
+paint();
+draw();
+</script>

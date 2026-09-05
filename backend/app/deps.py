@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from .address_index import AddressIndex, load_index as load_address_index
 from .gemarkung_index import GemarkungDirectory, load_directory
 from .services.alkis import AlkisService
 from .services.basemap import BasemapService
@@ -36,6 +37,17 @@ def gemarkung_directory() -> GemarkungDirectory | None:
     """
 
     return load_directory(get_settings().alkis.gemarkung_index_path)
+
+
+@lru_cache(maxsize=1)
+def address_index() -> AddressIndex | None:
+    """The official Hauskoordinaten, read from disk once per process.
+
+    Tens of megabytes of JSON: parsing it per request would cost more than the
+    upstream call it replaces. ``None`` when the file was never built here.
+    """
+
+    return load_address_index(get_settings().addresses.index_path)
 
 
 @lru_cache(maxsize=1)
@@ -91,6 +103,7 @@ def reset_services() -> None:
     for factory in (
         alkis_service,
         gemarkung_directory,
+        address_index,
         boris_service,
         motis_service,
         overpass_service,

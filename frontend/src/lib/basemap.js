@@ -8,6 +8,8 @@
  * firewall — and what stopped it working when the style was loaded directly.
  */
 
+import { darkTheme } from "./store.js";
+
 const MAP_STYLE_URL = "/api/basemap/style.json";
 
 /**
@@ -18,12 +20,17 @@ const MAP_STYLE_URL = "/api/basemap/style.json";
  * then the relative tile URLs inside that TileJSON go nowhere, which is a
  * silent failure: the style never finishes loading and no tile is ever asked
  * for. So every URL is made absolute here, against this page.
+ *
+ * The palette follows the interface. A drawing sits *on* the backdrop, so a
+ * near-white ground under a dark page is not a matter of taste — it is a glare
+ * source with the plot outline lost in it. The variant travels in the URL, so
+ * the two documents cache separately.
  */
-export async function vectorStyle() {
+export async function vectorStyle(dark = darkTheme()) {
   // A style that does not arrive means no backdrop, not a page that waits
   // forever: the drawing is what matters and it needs no network at all.
   const signal = AbortSignal.timeout ? AbortSignal.timeout(15000) : undefined;
-  const response = await fetch(MAP_STYLE_URL, { signal });
+  const response = await fetch(`${MAP_STYLE_URL}?variant=${dark ? "dark" : "light"}`, { signal });
   if (!response.ok) throw new Error(`Kartenstil nicht ladbar (HTTP ${response.status})`);
   const style = await response.json();
   const origin = window.location.origin;
@@ -68,7 +75,7 @@ export const GEOSN = "© GeoSN, dl-de/by-2-0";
 
 /** What each backdrop offers. `none` keeps the drawing on plain paper. */
 export const BACKDROPS = {
-  map: vectorStyle,
+  map: () => vectorStyle(),
   aerial: async () => rasterStyle("dop", GEOSN),
   cadastre: async () => rasterStyle("alkis", GEOSN)
 };

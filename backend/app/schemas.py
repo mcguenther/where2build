@@ -514,10 +514,23 @@ class GeocodeTreffer(Koordinate):
     art: Geocodeart = "sonstiges"
 
 
+# What the answer says once the official addresses are on this server. The
+# routing geocoder is still named: it contributes the stops, the places and
+# everything outside Saxony, and a mixed list has to say which half is which.
+GEOCODE_HINWEIS_AMTLICH = (
+    "Treffer mit dem Zusatz „amtliche Hauskoordinate“ stammen aus den Hauskoordinaten "
+    "des GeoSN{stand} und sind die vom Kataster geführte Koordinate des Hauses. Die "
+    "übrigen kommen aus dem Routing-Geocoder (Transitous, OpenStreetMap und "
+    "Fahrplandaten) — die bitte auf der Karte prüfen."
+)
+GEOCODE_QUELLE = "MOTIS / Transitous (DELFI-GTFS, OpenStreetMap)"
+GEOCODE_QUELLE_AMTLICH = "Amtliche Hauskoordinaten (GeoSN, dl-de/by-2-0)"
+
+
 class GeocodeResponse(BaseModel):
     treffer: list[GeocodeTreffer]
     hinweis: str = GEOCODE_HINWEIS
-    quelle: str = "MOTIS / Transitous (DELFI-GTFS, OpenStreetMap)"
+    quelle: str = GEOCODE_QUELLE
 
 
 class ReachabilityRequest(BaseModel):

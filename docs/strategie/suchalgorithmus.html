@@ -1,0 +1,1136 @@
+<title>Der Suchlauf</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --primary:#2F4A3A; --primary-light:#456B52; --primary-dark:#1C2E23; --primary-veil:rgba(47,74,58,.10);
+  --secondary:#B5813C; --secondary-text:#7C5620; --secondary-light:#E8D4B0; --secondary-veil:rgba(181,129,60,.16);
+  --sage:#9DB39A; --sage-light:#DCE4DA;
+  --ink:#1E1A16; --graphite:#4A443C; --muted:#6F675C; --line:#DCD3C6; --line-faint:#EBE4D9;
+  --surface:#FAF7F1; --sunken:#F3EFE6; --paper:#F1EBE1; --white:#FFFFFF;
+  --warning:#BE8524; --warning-text:#7C5620; --warning-surface:#F6E9CE;
+  --error:#A8402C; --error-surface:#F2DED8; --good:#2F4A3A; --good-surface:#DEE7DF;
+  --map-ground:#E6E3DC; --map-surface:#EFEDE7; --map-boundary:#1E1A16; --map-halo:#FFFFFF;
+  --map-neighbour:#9A9184; --map-street:#B5813C; --map-street-surface:#D6D2CA;
+  --shadow:0 1px 2px rgba(30,26,22,.05),0 10px 24px -18px rgba(30,26,22,.45);
+  --font-display:"Archivo",system-ui,-apple-system,sans-serif;
+  --font-body:"Public Sans",system-ui,-apple-system,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --primary:#7FA98A; --primary-light:#9BC0A4; --primary-dark:#24382C; --primary-veil:rgba(127,169,138,.14);
+  --secondary:#D9A55E; --secondary-text:#DBB273; --secondary-light:#3E3021; --secondary-veil:rgba(217,165,94,.18);
+  --sage:#6E8470; --sage-light:#26302A;
+  --ink:#F1EBE1; --graphite:#C4BCB0; --muted:#948B7E; --line:#3A342C; --line-faint:#2A2620;
+  --surface:#201C17; --sunken:#191510; --paper:#16130F;
+  --warning:#D8A340; --warning-text:#E3BC72; --warning-surface:#3A2E19;
+  --error:#E0705A; --error-surface:#3B211B; --good:#7FA98A; --good-surface:#1F2C24;
+  --map-ground:#1A1917; --map-surface:#23211D; --map-boundary:#F1EBE1; --map-halo:#16130F;
+  --map-neighbour:#5A544B; --map-street:#8A6A3A; --map-street-surface:#242220;
+  --shadow:0 1px 2px rgba(0,0,0,.5),0 12px 28px -20px rgba(0,0,0,.85);
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --primary:#7FA98A; --primary-light:#9BC0A4; --primary-dark:#24382C; --primary-veil:rgba(127,169,138,.14);
+  --secondary:#D9A55E; --secondary-text:#DBB273; --secondary-light:#3E3021; --secondary-veil:rgba(217,165,94,.18);
+  --sage:#6E8470; --sage-light:#26302A;
+  --ink:#F1EBE1; --graphite:#C4BCB0; --muted:#948B7E; --line:#3A342C; --line-faint:#2A2620;
+  --surface:#201C17; --sunken:#191510; --paper:#16130F;
+  --warning:#D8A340; --warning-text:#E3BC72; --warning-surface:#3A2E19;
+  --error:#E0705A; --error-surface:#3B211B; --good:#7FA98A; --good-surface:#1F2C24;
+  --map-ground:#1A1917; --map-surface:#23211D; --map-boundary:#F1EBE1; --map-halo:#16130F;
+  --map-neighbour:#5A544B; --map-street:#8A6A3A; --map-street-surface:#242220;
+  --shadow:0 1px 2px rgba(0,0,0,.5),0 12px 28px -20px rgba(0,0,0,.85);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--font-body);font-size:16px;line-height:1.6;
+  -webkit-font-smoothing:antialiased;padding:0 0 var(--pad,72px)}
+.wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+.col{max-width:70ch}
+h1,h2,h3{font-family:var(--font-display);text-wrap:balance;line-height:1.15;margin:0}
+h1{font-size:clamp(30px,5vw,46px);font-weight:700;letter-spacing:-.02em}
+h2{font-size:clamp(21px,3vw,27px);font-weight:600;letter-spacing:-.01em}
+h3{font-size:17px;font-weight:600}
+p{margin:0}
+.eyebrow{font-family:var(--font-mono);font-size:11.5px;font-weight:500;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--muted)}
+.lede{font-size:19px;line-height:1.55;color:var(--graphite)}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.stack{display:flex;flex-direction:column;gap:16px}
+section{padding:48px 0;border-top:1px solid var(--line-faint)}
+section:first-of-type{border-top:0}
+.tafel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px;box-shadow:var(--shadow)}
+a{color:var(--primary);text-underline-offset:3px}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:4px}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+<style>
+.hero{padding:60px 0 34px}
+.hero h1{margin:12px 0 18px;max-width:18ch}
+.kette{display:flex;flex-wrap:wrap;gap:7px;margin-top:22px;align-items:center}
+.kette span{font-family:var(--font-mono);font-size:12px;letter-spacing:.03em;padding:6px 11px;border-radius:999px;
+  border:1px solid var(--line);background:var(--surface);color:var(--graphite);white-space:nowrap}
+.kette span.stark{border-color:var(--primary);color:var(--primary);background:var(--primary-veil)}
+.kette b{color:var(--muted);font-weight:400;font-family:var(--font-mono);font-size:12px}
+
+/* --- Phasen --- */
+.phasen{display:flex;flex-direction:column;gap:10px;margin-top:26px}
+.ph{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden;
+  border-left:4px solid var(--p,var(--line))}
+.ph-kopf{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;padding:15px 18px;align-items:baseline}
+@media(min-width:780px){.ph-kopf{grid-template-columns:5ch minmax(0,1fr) auto;gap:18px}}
+.ph-nr{font-family:var(--font-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.ph-name{font-family:var(--font-display);font-weight:600;font-size:16px}
+.ph-name small{display:block;font-family:var(--font-body);font-weight:400;font-size:13.5px;color:var(--graphite);margin-top:4px}
+.ph-kosten{font-family:var(--font-mono);font-size:11.5px;color:var(--muted);white-space:nowrap}
+.ph pre{margin:0;padding:16px 18px;border-top:1px solid var(--line-faint);background:var(--sunken);
+  font-family:var(--font-mono);font-size:12.5px;line-height:1.6;white-space:pre;overflow-x:auto;color:var(--ink)}
+.ph .abbruch{padding:12px 18px;border-top:1px solid var(--line-faint);font-size:13px;color:var(--muted)}
+.ph .abbruch b{color:var(--error);font-weight:500}
+
+/* --- Treppe --- */
+.treppe{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px 12px;margin-top:22px}
+.tr-zeile{display:grid;grid-template-columns:7ch 1fr 5ch;gap:12px;align-items:center;padding:5px 0;
+  border-radius:6px;transition:background .15s}
+.tr-zeile:hover{background:var(--sunken)}
+.tr-pct{font-family:var(--font-mono);font-size:12.5px;font-variant-numeric:tabular-nums;color:var(--graphite);text-align:right}
+.tr-bar{height:14px;border-radius:3px;background:var(--sunken);border:1px solid var(--line-faint);overflow:hidden;position:relative}
+.tr-bar i{display:block;height:100%;background:var(--primary);border-radius:0 3px 3px 0;opacity:.42}
+.tr-zeile.halt .tr-bar i{opacity:1}
+.tr-zeile.pruef .tr-bar i{opacity:.72;background:var(--secondary)}
+.tr-n{font-family:var(--font-mono);font-size:13px;font-variant-numeric:tabular-nums;font-weight:500}
+.tr-kopf{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:12px}
+.tr-kopf h3{font-size:14.5px}
+.tr-kopf span{font-family:var(--font-mono);font-size:11px;color:var(--muted)}
+.tr-legende{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:12px;padding-top:11px;border-top:1px solid var(--line-faint);
+  font-size:12px;color:var(--muted)}
+.tr-legende span{display:inline-flex;align-items:center;gap:6px}
+.tr-legende i{width:12px;height:12px;border-radius:3px;flex:none}
+
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line-faint);vertical-align:top}
+th{font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:500}
+td.n{font-family:var(--font-mono);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+tr.gut td{background:var(--good-surface)}
+.scroll{overflow-x:auto}
+.merk{border-left:3px solid var(--secondary);background:var(--secondary-veil);padding:14px 18px;border-radius:0 8px 8px 0}
+.merk p{font-size:14.5px}
+.merk p + p{margin-top:9px}
+.merk--rot{border-left-color:var(--error);background:var(--error-surface)}
+.paare{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;margin-top:20px}
+.paar{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:15px 17px}
+.paar h3{font-size:14px;margin-bottom:7px}
+.paar p{font-size:13.5px;color:var(--graphite)}
+.paar p + p{margin-top:8px}
+code{font-family:var(--font-mono);font-size:12.5px;background:var(--sunken);padding:1px 5px;border-radius:4px;
+  border:1px solid var(--line-faint)}
+.kasten{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-top:18px}
+.kasten-kopf{padding:12px 16px;border-bottom:1px solid var(--line);background:var(--sunken);
+  font-family:var(--font-display);font-weight:600;font-size:14.5px}
+.kasten pre{margin:0;padding:16px;font-family:var(--font-mono);font-size:12.5px;line-height:1.62;
+  white-space:pre;overflow-x:auto;color:var(--ink)}
+.quellen{font-size:12.5px;color:var(--muted)}
+.zustand{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:20px}
+.zu{border-radius:12px;padding:15px 17px;border:1px solid var(--line);background:var(--surface);
+  border-top:3px solid var(--z,var(--line))}
+.zu h3{font-family:var(--font-mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px;color:var(--z)}
+.zu p{font-size:13.5px;color:var(--graphite)}
+/* --- Register --- */
+.reg{display:flex;flex-direction:column;gap:8px;margin-top:24px}
+.re{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:15px 18px;
+  border-left:4px solid var(--r,var(--secondary));display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+@media(min-width:880px){.re{grid-template-columns:23ch minmax(0,1fr);gap:22px}}
+.re-frage{display:flex;flex-direction:column;gap:5px}
+.re-frage b{font-family:var(--font-display);font-size:14.5px;font-weight:600}
+.re-wahl{font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--r,var(--secondary))}
+.re-text{display:flex;flex-direction:column;gap:7px;font-size:13.5px;color:var(--graphite)}
+.re-text .warum b, .re-text .merkmal b{color:var(--ink);font-weight:600}
+.re-text .merkmal{padding-top:7px;border-top:1px dashed var(--line-faint)}
+</style>
+
+<div class="wrap">
+
+<header class="hero">
+  <p class="eyebrow">Algorithmus-Entwurf · gemessen am Inserat 3499632623</p>
+  <h1>Sechs Phasen, und jede darf abbrechen</h1>
+  <div class="col stack">
+    <p class="lede">Der Suchlauf ist keine Pipeline, die durchläuft, sondern eine Treppe, die so früh
+      wie möglich stehenbleibt. Der glückliche Fall — Ortsteil im Text, exakte Fläche in der
+      Attributliste — kostet vier Anfragen und keinen Modellaufruf. Alles Weitere ist Rückfallebene.</p>
+    <div class="kette">
+      <span class="stark">0 Ernten</span><b>→</b>
+      <span class="stark">1 Anker</span><b>→</b>
+      <span class="stark">2 Raum</span><b>→</b>
+      <span class="stark">3 Toleranz-Treppe</span><b>→</b>
+      <span>4 Weiche Bewertung</span><b>→</b>
+      <span class="stark">5 Prüfen</span><b>→</b>
+      <span class="stark">6 Antwort</span>
+    </div>
+    <p style="font-size:13px;color:var(--muted)">Kräftig: die Phasen, die dieser Fall tatsächlich
+      durchlaufen hat. Phase 4 wurde nicht gebraucht.</p>
+  </div>
+</header>
+
+<section>
+  <div class="col stack">
+    <p class="eyebrow">Der Ablauf</p>
+    <h2>Was jede Phase tut, was sie kostet, wo sie aufgibt</h2>
+  </div>
+
+  <div class="phasen">
+
+    <div class="ph" style="--p:var(--primary)">
+      <div class="ph-kopf"><span class="ph-nr">Phase 0</span>
+        <span class="ph-name">Ernten<small>Indizien sammeln, ohne zu suchen. Die Leiter aus dem
+          Extraktionspapier, mit einem Kurzschluss am Ende.</small></span>
+        <span class="ph-kosten">1 Abruf · 0–2 s</span></div>
+<pre>indizien = []
+indizien += aus_html(seite)          Meta-Tags, Attributliste, Standortfeld
+indizien += aus_text(beschreibung)   Muster + Gemarkungsverzeichnis
+
+WENN kein vollständiges Flurstück:
+    für bild in bilder:              lange Kante auf ≥ 1500 px skalieren
+        text = ocr(bild, "psm 6")
+        WENN kein Muster: text = ocr(bild, "psm 1")
+        indizien += muster(text)
+        WENN Flurstück gefunden: brich ab
+
+WENN Ortsbeziehung unklar:
+    indizien += modell(beschreibung, P1)
+
+KURZSCHLUSS
+WENN indizien enthält gemarkung UND flurstueck:
+    → springe direkt zu Phase 5</pre>
+      <div class="abbruch"><b>Abbruch:</b> keiner. Diese Phase liefert immer etwas, und sei es
+        nur die leere Menge.</div>
+    </div>
+
+    <div class="ph" style="--p:var(--primary)">
+      <div class="ph-kopf"><span class="ph-nr">Phase 1</span>
+        <span class="ph-name">Anker wählen<small>Der kleinste räumliche Behälter, dem zu trauen ist.
+          Nicht der genaueste Punkt — der engste <em>Behälter</em>.</small></span>
+        <span class="ph-kosten">0 Anfragen</span></div>
+<pre>anker = erster Treffer in dieser Reihenfolge:
+
+    gemarkung aus Bild-Texterkennung      Vertrauen 1,00
+    gemarkung aus Ortsteilname            0,60   über das Verzeichnis
+    gemeinde aus Standortfeld / PLZ       0,35
+    — sonst: ABBRUCH
+
+Der Pin geht NIE in den Anker ein.
+Er darf nur widerlegen, nie begrenzen.</pre>
+      <div class="abbruch"><b>Abbruch „zu wenig Ortsangabe“:</b> wenn nicht einmal eine Gemeinde
+        feststeht. Die Oberfläche fragt dann nach Gemarkung und Nummer von Hand — das ist die
+        einzige Angabe, die ein Mensch ohne uns liefern kann.</div>
+    </div>
+
+    <div class="ph" style="--p:var(--primary)">
+      <div class="ph-kopf"><span class="ph-nr">Phase 2</span>
+        <span class="ph-name">Raum aufspannen<small>Wie groß ist der Heuhaufen? Eine Zählanfrage,
+          bevor irgendeine Geometrie geladen wird — und keine Abbruchbedingung.</small></span>
+        <span class="ph-kosten">1 Anfrage · nur zur Anzeige</span></div>
+<pre>raum = zaehle(anker)      1 131  Gemarkung Großbothen
+                         32 544  Stadt Grimma
+                        112 588  Stadt Leipzig      ← alle drei brauchbar
+
+Der Anker darf beliebig groß sein. Abgebrochen wird nicht
+nach seiner Größe, sondern nach dem, was Phase 3 übriglässt.
+
+raum ist nur eine Anzeige: die Oberfläche sagt
+„1 131 Flurstücke kommen in Frage“, während sie weitersucht.</pre>
+      <div class="abbruch"><b>Kein Abbruch hier.</b> Gemessen: Stadt Leipzig hat 112 588
+        Flurstücke, und mit der exakten Fläche bleiben davon <b>78</b> — eine Menge, die sich
+        bewerten lässt. Ein großer Anker ist also kein Grund aufzuhören, nur ein Grund, die
+        weiteren Merkmale zu brauchen.</div>
+    </div>
+
+    <div class="ph" style="--p:var(--secondary)">
+      <div class="ph-kopf"><span class="ph-nr">Phase 3</span>
+        <span class="ph-name">Toleranz-Treppe<small>Hart anfangen, nur bei Bedarf aufmachen — und
+          eine Stufe weiter gegenprüfen. Siehe unten.</small></span>
+        <span class="ph-kosten">1–5 Anfragen</span></div>
+<pre>stufen = treppe_aus_schreibweise(flaeche_angabe)
+
+für stufe in stufen:
+    kandidaten = alkis(anker, band(stufe))
+    WENN |kandidaten| ≥ 1: brich ab
+
+BESTÄTIGUNGSSTUFE
+zusatz = alkis(anker, band(naechste_stufe)) ohne kandidaten
+WENN zusatz nicht leer:
+    bewerte zusatz mit → dann gilt die enge Stufe nur,
+    wenn der beste Zusatzkandidat klar schlechter liegt.</pre>
+      <div class="abbruch"><b>Abbruch „zu viele Kandidaten“:</b> bleiben nach der letzten Stufe
+        mehr als etwa 500 übrig, ist nichts mehr zu bewerten — das passiert, wenn es weder eine
+        Flächenangabe noch eine Nummer gibt. Dann fragt die Oberfläche nach der Fläche, statt zu
+        suchen. Traf keine Stufe, ist die Flächenangabe unbrauchbar, und Phase 4 muss allein
+        tragen.</div>
+    </div>
+
+    <div class="ph" style="--p:var(--secondary)">
+      <div class="ph-kopf"><span class="ph-nr">Phase 4</span>
+        <span class="ph-name">Weiche Bewertung<small>Nur wenn mehr als ein Kandidat übrig ist — und nur,
+          um sie in eine Reihenfolge zu bringen.</small></span>
+        <span class="ph-kosten">0–3 Anfragen</span></div>
+<pre>für merkmal in [strasse, nutzungsart, entfernungsringe]:
+    WENN merkmal nicht in indizien: weiter
+    punkte = bewerte(kandidaten, merkmal)      Trapez, Untergrenze 0,05
+
+Diese Phase ORDNET nur. Sie entscheidet nie über „bestätigt“ —
+darum darf sie mit ungeeichten Gewichten laufen.
+
+Reihenfolge ist gemessen, nicht geraten:
+    strasse            25 → 5    1 Overpass-Anfrage
+    nutzungsart        25 → 16   0 Anfragen (ave:tntxt liegt bei)
+    entfernungsringe   25 → 8    1 one-to-many, 128 Ziele auf einmal
+
+NIE multiplizieren — die Indizien sind korreliert.
+NIE hart schneiden — außer bei amtlichen Werten.</pre>
+      <div class="abbruch"><b>Kein Abbruch:</b> diese Phase entfernt niemanden, sie ordnet nur.
+        Ausscheiden darf allein die Prüfung in Phase 5.</div>
+    </div>
+
+    <div class="ph" style="--p:var(--primary)">
+      <div class="ph-kopf"><span class="ph-nr">Phase 5</span>
+        <span class="ph-name">Prüfen<small>Die einzige Phase, die „gefunden“ sagen darf — und die
+          auch scheitern darf.</small></span>
+        <span class="ph-kosten">1 Anfrage · mit Geometrie</span></div>
+<pre>hole geometrie, flaeche, tntxt für die Kandidaten
+
+HARTE Filter sind nur amtliche Tatsachen:
+    Flurstückskennung, gegen ALKIS aufgelöst
+    Gemarkung
+    ave:flaeche — aber nur, wenn die Angabe im Inserat exakt ist
+
+bestaetigt   plausibility.assess ohne Einwand
+             UND nach den harten Filtern bleibt GENAU EINER
+mehrdeutig   ohne Einwand, aber mehr als einer
+erfolglos    die Prüfung widerspricht
+
+Kein Schwellwert. Keine Gewichte. Kein „vermutlich“.</pre>
+      <div class="abbruch"><b>Wichtig:</b> „erfolglos“ ist ein gültiges Ergebnis. Ein Suchlauf, der
+        immer etwas liefert, liefert irgendwann etwas Falsches.</div>
+    </div>
+
+    <div class="ph" style="--p:var(--sage)">
+      <div class="ph-kopf"><span class="ph-nr">Phase 6</span>
+        <span class="ph-name">Antwort<small>Immer alles zurückgeben, nie nur das Ergebnis.</small></span>
+        <span class="ph-kosten">0 Anfragen</span></div>
+<pre>{ status:      bestaetigt | mehrdeutig | erfolglos
+  kandidaten:  alle, mit Punkten und Geometrie
+  indizien:    alle, mit Quelle, Beleg und Sicherheit
+  weg:         welche Phasen liefen, was sie kosteten }</pre>
+      <div class="abbruch">Die Karte färbt aus <code>indizien</code>, die Liste rankt aus
+        <code>kandidaten</code>, und <code>weg</code> ist das, was die Oberfläche während des
+        Laufens anzeigt.</div>
+    </div>
+
+  </div>
+</section>
+
+<section>
+  <div class="col stack">
+    <p class="eyebrow">Phase 3 im Detail</p>
+    <h2>Sich an die Toleranz herantasten</h2>
+    <p>Eine feste Toleranz ist immer falsch: zu eng, und der richtige Kandidat fällt raus; zu weit,
+      und es bleiben Dutzende. Also nicht raten, sondern <b>hart anfangen und nur aufmachen, wenn
+      nichts übrig bleibt</b> — jede Stufe kostet eine Zählanfrage.</p>
+    <p>Die Zahlen unten sind gemessen: Gemarkung Großbothen, 1 131 Flurstücke, Flächenbänder um
+      die 502 m² aus dem Inserat.</p>
+  </div>
+
+  <div class="treppe">
+    <div class="tr-kopf"><h3>Kandidaten je Toleranzstufe</h3>
+      <span>Gemarkung 144241 · gemessen 01.09.2026</span></div>
+    <div id="treppe"></div>
+    <div class="tr-legende">
+      <span><i style="background:var(--primary)"></i>Haltestufe — hier bricht die Schleife ab</span>
+      <span><i style="background:var(--secondary);opacity:.72"></i>Bestätigungsstufe</span>
+      <span><i style="background:var(--primary);opacity:.42"></i>nie erreicht</span>
+    </div>
+  </div>
+
+  <div class="col stack" style="margin-top:26px">
+    <h3 style="font-size:17px">Die Treppe kommt aus der Schreibweise, nicht aus einer Konstanten</h3>
+  </div>
+  <div class="scroll" style="margin-top:14px">
+  <table>
+    <thead><tr><th>Im Inserat steht</th><th>Bedeutet</th><th>Stufen</th></tr></thead>
+    <tbody>
+      <tr class="gut"><td class="mono">„502 m²“</td><td>exakt, amtlich übernommen</td><td class="mono">0 · 0,5 · 1 · 2 · 5 %</td></tr>
+      <tr><td class="mono">„ca. 500 m²“ · „rund 500 m²“</td><td>gerundet, Stufe 0 ist sinnlos</td><td class="mono">1 · 2 · 5 · 10 %</td></tr>
+      <tr><td class="mono">„ab 450 m²“</td><td>untere Schranke, kein Band</td><td class="mono">450 … ∞</td></tr>
+      <tr><td class="mono">„450–600 m²“</td><td>Bereich, wörtlich nehmen</td><td class="mono">genau dieser</td></tr>
+      <tr><td class="mono">keine Angabe</td><td>—</td><td class="mono">keine Flächenstufe</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="col" style="margin-top:22px">
+    <div class="merk merk--rot"><p><b>Die Gefahr beim Herantasten:</b> die Schleife hält bei der
+      ersten Stufe, die <em>irgendetwas</em> liefert — auch wenn das ein Zufallstreffer ist und das
+      richtige Flurstück eine Stufe weiter läge.</p>
+      <p><b>Deshalb die Bestätigungsstufe.</b> Nach dem Halt wird eine Stufe weiter aufgemacht und
+      geprüft, ob die Zusatzkandidaten schlechter liegen. In diesem Fall: Stufe 0 liefert allein
+      790/11; Stufe 0,5 % bringt <span class="mono">238/3</span> mit 500 m² dazu — 1 730 m entfernt,
+      nicht an der Wiesenstraße, und die Fläche stimmt nicht exakt. Es verliert klar, also gilt der
+      Halt.</p>
+      <p>Diese eine Zusatzanfrage ist der Preis dafür, dass ein knapper Treffer nicht als sicherer
+      Treffer verkauft wird. Sie fängt allerdings nur den Nachbarfall — läge das richtige Flurstück
+      weit außerhalb, hilft auch sie nicht.</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="col stack">
+    <p class="eyebrow">Phase 1 im Detail</p>
+    <h2>Mehrere Orte im Text? Alle ausprobieren</h2>
+    <p>Der Anker ist ein <em>harter</em> Filter — wenn die Beziehungserkennung den falschen Ort
+      wählt, ist die ganze Suche falsch. Das klingt nach einem Risiko, das sorgfältige
+      Sprachverarbeitung erfordert. Gemessen ist es das nur manchmal.</p>
+    <p>Der Text nennt drei Namen, die im Gemarkungsverzeichnis stehen. Statt zu raten, welcher
+      gemeint ist, läuft die Treppe gegen <b>jeden</b> — es sind Zählanfragen, sie kosten fast
+      nichts.</p>
+  </div>
+
+  <div class="scroll" style="margin-top:20px">
+  <table>
+    <thead><tr><th>Flächenangabe</th><th class="n">Großbothen</th><th class="n">Grimma</th><th class="n">Höfgen</th><th>Was das heißt</th></tr></thead>
+    <tbody>
+      <tr class="gut"><td><b>exakt (502 m²)</b></td><td class="n">1</td><td class="n">0</td><td class="n">0</td><td>Die Fläche entscheidet den Ort mit. Beziehung nicht nötig.</td></tr>
+      <tr><td>±0,5 %</td><td class="n">2</td><td class="n">26</td><td class="n">0</td><td>Kippt sofort — der falsche Anker liefert mehr Treffer als der richtige.</td></tr>
+      <tr><td>±1 %</td><td class="n">5</td><td class="n">45</td><td class="n">0</td><td>Beziehung entscheidet.</td></tr>
+      <tr><td>±5 %</td><td class="n">25</td><td class="n">206</td><td class="n">2</td><td>Beziehung entscheidet.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="col" style="margin-top:22px">
+    <div class="merk"><p><b>Bei exakter Fläche ist die Beziehungserkennung entbehrlich.</b> Die
+      falschen Anker liefern schlicht nichts. Genau ein Ort produziert genau ein Flurstück — die
+      Zuordnung fällt als Nebenprodukt ab, ohne dass ein Satz analysiert werden musste.</p>
+      <p><b>Eine Stufe weiter kehrt sich das um.</b> Gemarkung Grimma ist die größere und liefert
+      bei ±0,5 % schon 26 Kandidaten gegen 2 in Großbothen. Der häufiger genannte <em>und</em>
+      größere Ort erzeugt also die meisten falschen Kandidaten — die Häufigkeitsfalle mit
+      umgekehrtem Vorzeichen. Ab hier muss die Beziehung stimmen.</p></div>
+  </div>
+
+  <div class="col stack" style="margin-top:28px">
+    <h3 style="font-size:17px">Was daraus für die Beziehungserkennung folgt</h3>
+    <p>Der Aufwand richtet sich danach, wie die Fläche im Inserat steht. Drei Stufen, in dieser
+      Reihenfolge:</p>
+  </div>
+  <div class="paare">
+    <div class="paar">
+      <h3>1 · Muster — reicht meistens</h3>
+      <p>Eine Handvoll Auslöser um den Namen herum: <span class="mono">„OT von“</span>,
+        <span class="mono">„Ortsteil“</span>, <span class="mono">„am Ortsrand von“</span>,
+        <span class="mono">„gelegen in“</span> → <code>liegt_in</code>;
+        <span class="mono">„… km entfernte“</span>, <span class="mono">„Fahrminuten nach“</span>
+        → <code>entfernt_von</code>.</p>
+      <p>Auf diesem Inserat genügt das: „am Ortsrand von Großbothen“ und „die ca. 6 km entfernte
+        Kreisstadt Grimma“ sind beide Musterfälle. Kosten: unter 10 ms, keine Abhängigkeit.</p>
+    </div>
+    <div class="paar">
+      <h3>2 · spaCy — wenn die Muster zu oft danebenliegen</h3>
+      <p>Zwei Dinge kann es, die eine Musterliste nicht kann. <b>Satzgrenzen:</b> „…von Großbothen
+        gelegen.“ und „Über die B107 … 6 km entfernte … Grimma.“ sind zwei Sätze, also kann die
+        Entfernung nicht an Großbothen hängen. <b>Abhängigkeiten:</b> in „die ca. 6 km entfernte
+        Kreisstadt Grimma“ hängt <em>entfernte</em> attributiv an <em>Grimma</em> — der Parser
+        sieht die Beziehung strukturell, nicht über ein Stichwort, und trägt damit auch
+        Formulierungen, die auf keiner Liste stehen.</p>
+      <p><b>Wofür es <em>nicht</em> da ist:</b> Ortsnamen erkennen. <code>de_core_news_sm</code>
+        kennt „Großbothen“ nicht; das Verzeichnis mit 5 339 Namen ist dafür genauer, weil es nur
+        existierende Namen kennt. Kosten: ~15–45 MB, keine Netzverbindung, wenige Millisekunden.</p>
+    </div>
+    <div class="paar">
+      <h3>3 · P1 — für alles Übrige</h3>
+      <p>Ungewöhnliche Formulierungen, Ironie, Aufzählungen ohne Satzbau. Kostet einen Aufruf, ein
+        paar Sekunden und kann eine Beziehung erfinden — deshalb verlangt P1 zu jedem Eintrag
+        einen wörtlichen <code>beleg</code>, und ein Indiz ohne Beleg wird verworfen.</p>
+      <p>Aufgerufen wird P1 nur, wenn Stufe 1 mehrere Orte ohne klare Beziehung liefert
+        <em>und</em> die Fläche nicht exakt ist — nach der Tabelle oben also genau dann, wenn es
+        auch etwas nützt.</p>
+    </div>
+    <div class="paar">
+      <h3>Und wenn die Beziehung falsch ist?</h3>
+      <p>Dann ist der Anker falsch, und das ist der einzige Weg, auf dem dieser Algorithmus eine
+        selbstbewusst falsche Antwort geben kann. Deshalb: Anker aus einem <em>amtlichen Bild</em>
+        (Gemarkung auf einem Katasterauszug) zählt als Tatsache; Anker aus einer <em>Textbeziehung</em>
+        verlangt eine zweite unabhängige Bestätigung, bevor „bestätigt“ ausgegeben wird.</p>
+      <p>Am billigsten ist diese Bestätigung ohnehin die exakte Fläche — siehe Tabelle.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="col stack">
+    <p class="eyebrow">Phase 0 im Detail</p>
+    <h2>Bilder: erst größer machen, dann drehen lassen</h2>
+    <p>Inseratsbilder sind gedreht — Handyfotos, gescannte Auszüge, aus einem PDF gezogene Seiten.
+      Die naheliegende Antwort wäre eine Orientierungserkennung vorweg. Die Messung sagt etwas
+      anderes.</p>
+  </div>
+  <div class="scroll" style="margin-top:20px">
+  <table>
+    <thead><tr><th>Drehung</th><th class="n">psm 6</th><th class="n">psm 1</th><th class="n">psm 6, vorher 2× vergrößert</th><th class="n">psm 1, vorher 2× vergrößert</th></tr></thead>
+    <tbody>
+      <tr><td>0°</td><td class="n">✓ 460 ms</td><td class="n">✓ 651 ms</td><td class="n">✓ 780 ms</td><td class="n">✓ 909 ms</td></tr>
+      <tr><td>3° gekippt</td><td class="n">✓ 470 ms</td><td class="n">✓ 678 ms</td><td class="n">✓ 778 ms</td><td class="n">✓ 948 ms</td></tr>
+      <tr><td>7° gekippt</td><td class="n">✗ 512 ms</td><td class="n">✗ 562 ms</td><td class="n">✓ 769 ms</td><td class="n">✗ 882 ms</td></tr>
+      <tr><td>90°</td><td class="n">✗</td><td class="n">✓ 576 ms</td><td class="n">✗</td><td class="n">✓ 910 ms</td></tr>
+      <tr><td>180°</td><td class="n">✗</td><td class="n">✗ 682 ms</td><td class="n">✗</td><td class="n">✓ 1 003 ms</td></tr>
+      <tr><td>270°</td><td class="n">✗</td><td class="n">✓ 526 ms</td><td class="n">✗</td><td class="n">✓ 1 003 ms</td></tr>
+      <tr><td>15° gekippt</td><td class="n">✗</td><td class="n">✗</td><td class="n">✗</td><td class="n">✗</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="paare">
+    <div class="paar">
+      <h3>Vergrößern schlägt Drehen</h3>
+      <p>Eine 2×-Lanczos-Vergrößerung heilt fast jeden Fehlschlag: sie repariert die 180°-Blindheit
+        von <code>psm 1</code>, sie repariert die 7°-Kippung ganz ohne Entzerrung, und sie hebt die
+        Zuversicht der Orientierungserkennung von ~1,0 auf ~3,0.</p>
+      <p>Also: lange Kante auf mindestens 1 500 px normieren, bevor irgendetwas anderes passiert.
+        Für echte Handyfotos ist das ohnehin ein Nulldurchgang.</p>
+    </div>
+    <div class="paar">
+      <h3>Zwei Durchläufe statt Vorerkennung</h3>
+      <p><code>psm 6</code> zuerst (~780 ms), und nur wenn kein Muster traf, <code>psm 1</code>
+        (~910 ms). Zusammen decken sie 0°, 3°, 7° und alle drei Vierteldrehungen ab. Schlimmster
+        Fall 1,7 s — und der zweite Lauf startet nur, wenn der erste leer war.</p>
+      <p>Die Orientierungserkennung vorweg kostet dieselbe Zeit <em>bei jedem Bild</em> und bringt
+        drei neue Fehlerquellen mit.</p>
+    </div>
+    <div class="paar">
+      <h3>Warum keine Orientierungserkennung</h3>
+      <p>Sie meldet bei 743 × 1052 px für 90° und 270° jeweils den <em>Komplementwert</em> — wer
+        das Vorzeichen falsch herum implementiert, dreht die Seite um 180° und merkt es nicht.</p>
+      <p>Auf einem der Grundstücksfotos meldete sie <span class="mono">Rotate: 180</span> mit
+        Zuversicht 0,72 — ein pauschaler Vorlauf hätte das Foto grundlos auf den Kopf gestellt.
+        Auf dem Orthofoto bricht sie mit „Too few characters“ ab.</p>
+    </div>
+    <div class="paar">
+      <h3>Keine Entzerrung bauen</h3>
+      <p>Unter 10° ist sie nach dem Vergrößern unnötig. Über 15° half sie auch dann nicht, als der
+        exakte Winkel bekannt war. Eine so schiefe Aufnahme gehört neu fotografiert, nicht
+        entzerrt.</p>
+    </div>
+  </div>
+  <div class="col" style="margin-top:20px">
+    <div class="merk merk--rot"><p><b>Der gefährliche Fehlschlag:</b> bei 7° und Originalgröße las
+      die Erkennung <span class="mono">„Flurstück 790717“</span> — sie fand das Wort und verdarb die
+      Ziffern. Eine leere Antwort ist harmlos, eine plausibel falsche Nummer nicht: sie führt zu
+      einem existierenden, aber fremden Flurstück, und genau diesen Fehler fängt die Prüfung gegen
+      ALKIS <em>nicht</em>. Das ist der eigentliche Grund für das Vergrößern.</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="col stack">
+    <p class="eyebrow">Ein neues Merkmal</p>
+    <h2>Die Nutzungsart liegt schon bei</h2>
+    <p><code>ave:tntxt</code> trägt an jedem Flurstück die tatsächliche Nutzung samt Flächenanteil —
+      790/11 ist <span class="mono">Wohnbaufläche;502</span>, ein Straßenflurstück ist
+      <span class="mono">Straßenverkehr;1062</span>. Das Feld kommt mit jeder Antwort mit und ist
+      mit <code>PropertyIsLike</code> serverseitig filterbar.</p>
+  </div>
+  <div class="scroll" style="margin-top:18px">
+  <table>
+    <thead><tr><th>Filter in Gemarkung 144241</th><th class="n">Flurstücke</th></tr></thead>
+    <tbody>
+      <tr><td>ohne weiteren Filter</td><td class="n">1 131</td></tr>
+      <tr><td>nur Wohnbaufläche</td><td class="n">446</td></tr>
+      <tr><td>Flächenband ±5 %</td><td class="n">25</td></tr>
+      <tr class="gut"><td>Flächenband ±5 % <b>+ Wohnbaufläche</b></td><td class="n">16</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="col" style="margin-top:20px">
+    <div class="merk"><p><b>Aber weich, nicht hart.</b> Dass 790/11 als Wohnbaufläche geführt wird,
+      ist Glück: ein unbebautes Baugrundstück kann amtlich genauso gut Landwirtschaft oder
+      Gartenland sein. Der Wert ist amtlich, aber der Schluss „Baugrundstück ⇒ Wohnbaufläche“ ist es
+      nicht — und nur amtliche <em>Tatsachen</em> dürfen hart ausschließen, nicht amtlich klingende
+      <em>Schlüsse</em>.</p>
+      <p>Nebenbei liefert dasselbe Feld die Straßenflächen für die Karte: was
+      <span class="mono">Straßenverkehr</span> sagt, ist die Fahrbahn — amtlich, als Fläche, ohne
+      einen einzigen OSM-Abruf.</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="col stack">
+    <p class="eyebrow">Genannte Orte, die keine Adressen sind</p>
+    <h2>Landmarken ranken, sie filtern nicht</h2>
+    <p>Inserate nennen Ausflugsziele: „Kloster Nimbschen“, „Schiffsmühle Höfgen“, „Cospudener See“,
+      „über die B107“. Die naheliegende Idee ist, daraus Ringe zu machen. Am echten Fall gemessen
+      ist das die gefährlichste Idee des ganzen Entwurfs.</p>
+  </div>
+
+  <div class="col" style="margin-top:20px">
+    <div class="merk merk--rot"><p><b>Beide Landmarken aus diesem Inserat hätten die richtige
+      Antwort gelöscht.</b> Ein 1-km-Ring um Kloster Nimbschen enthält <b>0 %</b> der Gemarkung
+      Großbothen; um die Schiffsmühle ebenfalls 0 %. Beide liegen rund 1,9 km vom nächsten
+      Gemarkungsrand entfernt. Erst bei 5 km decken sie die Gemarkung ab — also genau dann, wenn sie
+      aufhören, etwas einzuschränken.</p>
+      <p>Der Grund ist derselbe wie bei der Häufigkeitsfalle, eine Ebene höher: Der Text nennt sie
+      als <em>Ziele in der Umgebung</em>, nicht als Nachbarn. Nichts im Satzbau unterscheidet
+      „liegt an“ von „lohnt einen Ausflug“ — außer der Beziehung, die P1 ausdrücklich abfragt.</p></div>
+  </div>
+
+  <div class="scroll" style="margin-top:22px">
+  <table>
+    <thead><tr><th>Indiz</th><th>Art</th><th class="n">Ausdehnung</th><th class="n">Suchgebiet bei 1 km</th><th class="n">gegenüber Gemarkung</th></tr></thead>
+    <tbody>
+      <tr class="gut"><td><b>Gemarkung Großbothen</b></td><td>Fläche, amtlich</td><td class="n">2 522 × 3 980 m</td><td class="n">5,93 km²</td><td class="n">1×</td></tr>
+      <tr><td>Kloster Nimbschen (Ruine)</td><td>punktförmig</td><td class="n">26 × 50 m</td><td class="n">3,14 km²</td><td class="n">0,5×</td></tr>
+      <tr><td>Schiffsmühle Höfgen</td><td>punktförmig</td><td class="n">15 × 11 m</td><td class="n">3,14 km²</td><td class="n">0,5×</td></tr>
+      <tr><td>Cospudener See</td><td>ausgedehnt</td><td class="n">1 688 × 3 932 m</td><td class="n">17,40 km²</td><td class="n">2,9×</td></tr>
+      <tr><td>B 107</td><td>Linie, 247 Wege</td><td class="n">34,4 km im Ausschnitt</td><td class="n">68,83 km²</td><td class="n">11,6×</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="paare">
+    <div class="paar">
+      <h3>Punktförmig: als Ranker, nur mit Beziehung</h3>
+      <p>Kloster und Mühle sind unter 60 m groß und lösen sich schon heute über den
+        MOTIS-Geocoder auf — Bauaufwand null. Ein 2 × 2 km-Kasten um das Kloster enthält
+        <b>407</b> Flurstücke, gemessen über <code>fes:BBOX</code> auf <code>ave:geometrie</code>;
+        eine Gemarkung enthält 1 131.</p>
+      <p>Aber das gilt nur mit einer <em>ausdrücklichen</em> Entfernung im Text („500 m vom
+        Kloster“). Ein bloßes „in der Nähe von“ ist weich, sonst passiert genau das oben.</p>
+    </div>
+    <div class="paar">
+      <h3>Ausgedehnt: nur zum Widerlegen</h3>
+      <p>See, Wald und Bundesstraße können nichts eingrenzen — ein Korridor wächst linear mit der
+        Länge der Linie. Sie können aber <em>widersprechen</em>: ein Kandidat 28 km vom genannten
+        See passt nicht zu „am Cospudener See“. Das ist ihr einziger Nutzen und ein echter.</p>
+    </div>
+    <div class="paar">
+      <h3>Abstand zur Kante, nicht zum Mittelpunkt</h3>
+      <p>„500 m vom See“ heißt 500 m von seinem <b>Ufer</b>. Beim Cospudener See ergibt der Puffer
+        um das Polygon 17,40 km², die Scheibe um den Mittelpunkt 3,14 km² — und die trifft die Nord-
+        und Südenden des 4 km langen Sees nicht einmal. Das ist keine gröbere Näherung, das ist ein
+        anderer Ort.</p>
+      <p>Die Form ist außerdem ein Ring, kein Kreis: die Wasserfläche selbst muss abgezogen werden.</p>
+    </div>
+    <div class="paar">
+      <h3>Der Name allein ist wertlos</h3>
+      <p>„Bahnhofstraße“ kommt in Sachsen in 2 918 OSM-Wegen vor, „Dorfstraße“ in 4 043 — grob
+        400 bis 970 verschiedene Straßen, über 220 km verteilt. Erst <em>innerhalb</em> einer
+        Gemarkung wird ein Straßenname praktisch eindeutig: in Großbothen gibt es weder die eine
+        noch die andere.</p>
+      <p>Dieselbe Regel gilt für Landmarken: 8 der 46 Treffer rund um Nimbschen sind Hotel,
+        Gasthaus, Kapelle und Aussichtspunkt, die nach der Landmarke heißen.</p>
+    </div>
+  </div>
+
+  <div class="col" style="margin-top:22px">
+    <div class="merk"><p><b>Einordnung in die Rangfolge von Phase 4</b> — nach Trennschärfe,
+      gemessen: Gemarkungsname → <code>ave:flaeche</code> → Straßenname <em>innerhalb</em> der
+      Gemarkung → Landmarke <em>mit</em> genannter Entfernung → Landmarke ohne Entfernung (nur weich)
+      → ausgedehnte Landmarke (nur widerlegend) → Straßenname allein → Häufigkeit (schon widerlegt).</p>
+      <p><b>Was dafür gebaut werden müsste:</b> ein Name-zu-Objekt-Auflöser, der die
+      <em>Geometrie</em> behält statt nur <code>out center</code>; die Beziehungsextraktion aus P1,
+      die „liegt an“ von „Ausflugsziel“ trennt; Puffer, Differenz und Verschnitt — entweder Shapely
+      im Backend oder ein <code>fes:BBOX</code>-Vorfilter mit exakter Nachprüfung, wie es die
+      Flächensuche schon macht; und eine Regel, die abgeleitete Namen verwirft.</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="col stack">
+    <p class="eyebrow">Ohne Eichmenge starten</p>
+    <h2>Die Gewichte entscheiden nichts — deshalb dürfen sie falsch sein</h2>
+    <p>Es gibt keine zwölf gelösten Inserate zum Kalibrieren, und es braucht sie auch nicht, wenn
+      man die Zuständigkeiten sauber trennt: <b>Harte Filter entscheiden, weiche Bewertung
+      ordnet.</b></p>
+  </div>
+
+  <div class="scroll" style="margin-top:20px">
+  <table>
+    <thead><tr><th>Merkmal</th><th>Ist es eine amtliche Tatsache?</th><th>Rolle</th></tr></thead>
+    <tbody>
+      <tr class="gut"><td>Flurstückskennung, gegen ALKIS aufgelöst</td><td>ja</td><td><b>hart</b> — entscheidet</td></tr>
+      <tr class="gut"><td>Gemarkung</td><td>ja</td><td><b>hart</b> — entscheidet</td></tr>
+      <tr class="gut"><td><code>ave:flaeche</code> bei exakter Angabe</td><td>ja</td><td><b>hart</b> — entscheidet</td></tr>
+      <tr><td><code>ave:flaeche</code> bei „ca.“</td><td>Wert ja, Toleranz nein</td><td>weich — ordnet</td></tr>
+      <tr><td>Straßenlage über OSM-Puffer</td><td>nein, abgeleitet</td><td>weich — ordnet</td></tr>
+      <tr><td>Nutzungsart <code>ave:tntxt</code></td><td>Wert ja, der Schluss nein</td><td>weich — ordnet</td></tr>
+      <tr><td>Entfernungsangaben, Landmarken</td><td>nein, Werbung</td><td>weich — ordnet</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="col" style="margin-top:22px">
+    <div class="merk"><p><b>Was daraus folgt:</b> <code>VORSPRUNG_MIN</code> entfällt ersatzlos.
+      „Bestätigt“ heißt nicht mehr „der Beste liegt weit genug vorn“, sondern <b>„nach den harten
+      Filtern ist genau einer übrig“</b>. Ungeeichte Gewichte können damit nie eine falsche Antwort
+      erzeugen — nur eine Liste in etwas ungünstiger Reihenfolge.</p>
+      <p>Und der Testfall läuft weiter durch: Gemarkung aus dem Fließtext plus exakte Fläche sind
+      beide hart, sie lassen genau ein Flurstück übrig, also „bestätigt“ — ohne dass eine einzige
+      Zahl aus Phase 4 gebraucht wurde.</p></div>
+  </div>
+
+  <div class="col stack" style="margin-top:26px">
+    <h3 style="font-size:17px">Und die Bestätigungsstufe?</h3>
+    <p>Sie bleibt, ändert aber ihre Bedeutung. Wenn die Fläche <em>exakt</em> angegeben ist, ist
+      Stufe 0 ein harter Filter — die Zusatzkandidaten einer weiteren Stufe erfüllen ihn per
+      Definition nicht und können den Treffer nicht kippen. Sie werden der Nutzerin trotzdem
+      gezeigt, als „andere Flurstücke ähnlicher Größe in der Nähe“, nicht als Einwand.</p>
+    <p>Steht dort „ca. 500 m²“, gibt es überhaupt keinen harten Flächenfilter. Dann gilt: genau
+      einer übrig <em>und</em> ein zweites hartes Merkmal (Nummer oder Gemarkung + Straße) — sonst
+      lautet die Antwort „mehrdeutig“, und zwar auch dann, wenn ein Kandidat weit vorn liegt.</p>
+  </div>
+
+  <div class="col stack" style="margin-top:26px">
+    <h3 style="font-size:17px">Welche Konstanten dann noch übrig bleiben</h3>
+  </div>
+  <div class="scroll" style="margin-top:14px">
+  <table>
+    <thead><tr><th>Konstante</th><th>Wert</th><th>Was passiert, wenn sie falsch ist</th></tr></thead>
+    <tbody>
+      <tr><td>Toleranzstufen</td><td class="mono">0 · 0,5 · 1 · 2 · 5 %</td><td>Zu eng: eine Stufe mehr, eine Anfrage mehr. Zu weit: mehr Kandidaten, Antwort „mehrdeutig“. Beides selbstkorrigierend.</td></tr>
+      <tr><td>Obergrenze Kandidatenbestand</td><td class="mono">~500</td><td>Zu klein: Abbruch, wo eine Bewertung noch gegangen wäre. Zu groß: eine langsame Bewertung. Harmlos — der Anker selbst ist unbegrenzt.</td></tr>
+      <tr><td>Ring-Toleranz</td><td class="mono">±35 %</td><td>Nur Reihenfolge.</td></tr>
+      <tr><td>Quellengewichte</td><td class="mono">1,00 … 0,10</td><td>Nur Reihenfolge.</td></tr>
+      <tr><td>Trapez-Untergrenze</td><td class="mono">0,05</td><td>Nur Reihenfolge — sie verhindert lediglich, dass ein Ausreißer jemanden löscht.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="col" style="margin-top:18px">
+    <p style="font-size:13.5px;color:var(--muted)">Keine dieser fünf kann eine falsche Antwort
+      erzeugen. Sie können den Lauf verteuern oder die Liste ungünstig sortieren — mehr nicht. Das
+      ist der Grund, warum ohne Eichmenge angefangen werden kann.</p>
+  </div>
+</section>
+
+<section>
+  <div class="col stack">
+    <p class="eyebrow">Wenn es nicht für ein Flurstück reicht</p>
+    <h2>Die gemeinsame Hülle</h2>
+    <p>„Mehrdeutig“ ist kein Fehlschlag, solange die Antwort sagt, <em>was</em> feststeht. Bleiben
+      fünf Kandidaten übrig und liegen alle fünf an derselben Straße, dann ist die Straße das
+      Ergebnis — nicht „nichts gefunden“.</p>
+    <p>Also: die kleinste Einheit bestimmen, die <b>alle</b> verbliebenen Kandidaten gemeinsam
+      haben, und die zeigen. Gemessen an den echten Kandidatenmengen aus Großbothen:</p>
+  </div>
+
+  <div class="scroll" style="margin-top:20px">
+  <table>
+    <thead><tr><th>Nach welchem Schritt</th><th class="n">Kandidaten</th><th>Gemeinsame Hülle — das wird angezeigt</th></tr></thead>
+    <tbody>
+      <tr><td>Flächenband ±5 %</td><td class="n">25</td><td>Gemarkung Großbothen</td></tr>
+      <tr><td>+ Doppelring</td><td class="n">8</td><td>Gemarkung Großbothen <span style="color:var(--muted)">— 3 der 8 liegen nicht an der Wiesenstraße</span></td></tr>
+      <tr class="gut"><td>+ Straßenpuffer</td><td class="n">5</td><td><b>Wiesenstraße, Gemarkung Großbothen</b></td></tr>
+      <tr class="gut"><td>+ exakte Fläche</td><td class="n">1</td><td>Flurstück 790/11</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="kasten">
+    <div class="kasten-kopf">Die Hülle wird von unten nach oben gesucht</div>
+<pre>huelle(kandidaten):
+    WENN |kandidaten| == 1:                    → das Flurstück
+    WENN alle an derselben Straße:             → Straße + Gemarkung
+    WENN alle in derselben Gemarkung:          → Gemarkung
+    WENN alle in derselben Gemeinde:           → Gemeinde
+    sonst:                                     → „Lage nicht eingegrenzt“</pre>
+  </div>
+
+  <div class="paare">
+    <div class="paar">
+      <h3>Was die Oberfläche daraus macht</h3>
+      <p>Die Karte färbt die Hülle ein und die Kopfzeile benennt sie: <em>„An der Wiesenstraße in
+        Großbothen — welches der fünf Flurstücke, ist offen.“</em> Die fünf werden gleich stark
+        gezeigt, keines mit Kontur.</p>
+    </div>
+    <div class="paar">
+      <h3>Warum das mehr ist als Kosmetik</h3>
+      <p>Für Bodenrichtwert und Erreichbarkeit reicht die Hülle oft schon: der Richtwert gilt
+        zonenweise, und Wege ab einer Straße unterscheiden sich um Meter. Nur die Fläche und die
+        Grenzen brauchen wirklich das einzelne Flurstück.</p>
+    </div>
+    <div class="paar">
+      <h3>Der ehrliche Teil</h3>
+      <p>Die Hülle darf nie so aussehen wie ein Treffer. Kein Halo, keine gezogene Kontur — das
+        bleibt dem bestätigten Flurstück vorbehalten. Eine eingefärbte Straße ist eine Aussage über
+        eine Straße, nicht über ein Grundstück.</p>
+    </div>
+    <div class="paar">
+      <h3>Weitermachen von hier</h3>
+      <p>Aus der Hülle folgt direkt die nächste Frage an den Menschen: bei fünf Flurstücken an einer
+        Straße ist die Hausnummer die billigste fehlende Angabe. Die Oberfläche fragt danach, statt
+        allgemein „bitte Gemarkung und Nummer eintragen“ zu sagen.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="col stack">
+    <p class="eyebrow">Wenn Indizien sich widersprechen</p>
+    <h2>Vorschlagen, melden, verwerfen lassen</h2>
+    <p>Ein Kartenauszug nennt Gemarkung A, das Standortfeld sagt Gemeinde B, und beide können recht
+      haben — der Verkäufer könnte den Auszug eines anderen Grundstücks beigelegt haben. Der
+      Algorithmus entscheidet das nicht still.</p>
+  </div>
+  <div class="kasten">
+    <div class="kasten-kopf">Regel bei Widerspruch</div>
+<pre>1  VORSCHLAGEN   Dem zuverlässigsten Indiz folgen — Rangfolge nach Herkunft:
+                 amtlicher Auszug > Attributliste > Fließtext > Plattform-Pin
+
+2  MELDEN        Der Widerspruch steht sichtbar über dem Ergebnis, nicht in
+                 einem Protokoll. „Bild und Standortfeld widersprechen sich.“
+
+3  BELEGEN       Zu jedem beteiligten Indiz den Beleg zeigen: den Bildausschnitt,
+                 aus dem gelesen wurde, oder den Satz, in dem es steht.
+
+4  VERWERFEN     Ein Indiz lässt sich abwählen. Die Suche läuft ohne es neu —
+                 sie ist billig genug dafür.</pre>
+  </div>
+  <div class="col" style="margin-top:18px">
+    <div class="merk"><p><b>Schritt 3 ist der wichtige.</b> Ein Widerspruch, den man nicht
+      nachsehen kann, ist für die Nutzerin nicht auflösbar — sie müsste raten. Der Ausschnitt aus
+      dem Kartenbild, auf dem <span class="mono">„Flurstück 790/11“</span> steht, beantwortet die
+      Frage in einer Sekunde. Deshalb trägt jedes Indiz seinen <code>beleg</code> mit: bei Text die
+      Fundstelle, bei Texterkennung das Bildrechteck.</p>
+      <p>Die Indizienkarte zeigt das im Protokoll — Eintrag aufklappen, Beleg ansehen, gegebenenfalls
+      verwerfen.</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="col stack">
+    <p class="eyebrow">Schnittstelle</p>
+    <h2>Wie die Suche antwortet, während sie läuft</h2>
+    <p>Die Karte soll mitwachsen, also muss der Endpunkt liefern, bevor er fertig ist. Drei
+      Bauarten kommen in Frage, und die Wahl fällt hier nicht nach Geschmack, sondern nach einer
+      Projekteigenschaft: <b>es gibt keine Datenbank.</b></p>
+  </div>
+  <div class="scroll" style="margin-top:20px">
+  <table>
+    <thead><tr><th>Bauart</th><th>Braucht Serverzustand?</th><th>Bewertung</th></tr></thead>
+    <tbody>
+      <tr class="gut"><td><b>NDJSON über eine gechunkte POST-Antwort</b></td><td>nein</td><td><b>Empfehlung.</b> Ein Endpunkt, ein Aufruf, die Indizien gehen im Rumpf mit. <code>StreamingResponse</code> in FastAPI, im Browser <code>fetch</code> + <code>body.getReader()</code>. Eine JSON-Zeile je Ereignis.</td></tr>
+      <tr><td>Server-Sent Events</td><td><b>ja</b></td><td><code>EventSource</code> kann nur GET. Die Indizien müssten vorher per POST abgelegt und über eine Kennung wieder abgeholt werden — zwei Endpunkte und ein Auftragszustand, den niemand aufräumt.</td></tr>
+      <tr><td>Abfragen im Takt (Polling)</td><td><b>ja</b></td><td>Dasselbe Zustandsproblem, dazu Latenz und Leerlauf.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="col" style="margin-top:20px">
+    <div class="merk"><p><b>Und es ist bereits vorbereitet:</b> <code>frontend/nginx.conf</code> setzt
+      für <code>/api/</code> schon <code>proxy_buffering off</code> und ein Zeitlimit von 300 s —
+      gedacht für die Inserats-Extraktion, die eine Seite holt und ein Modell fragt. Ein Strom aus
+      demselben Ort kommt ohne eine einzige Konfigurationsänderung durch.</p>
+      <p>Jede Zeile ist ein Ereignis derselben vier Arten:
+      <code>indiz</code> · <code>kandidaten</code> · <code>phase</code> · <code>ergebnis</code>.
+      Die Karte braucht nur die erste und die zweite, das Protokoll die dritte.</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="col stack">
+    <p class="eyebrow">Ausgänge</p>
+    <h2>Drei Enden, und keines heißt „vermutlich“</h2>
+  </div>
+  <div class="zustand">
+    <div class="zu" style="--z:var(--primary)">
+      <h3>bestätigt</h3>
+      <p>ALKIS hat geliefert, die Plausibilitätsprüfung schweigt, und der Zweitbeste liegt klar
+        zurück. Nur dieser Zustand darf in der Oberfläche als Ergebnis auftreten — und nur er
+        bekommt die gezogene Kontur auf der Karte.</p>
+    </div>
+    <div class="zu" style="--z:var(--secondary)">
+      <h3>mehrdeutig</h3>
+      <p>Alles geprüft, aber zwei oder mehr Kandidaten liegen gleichauf. Die Karte zeigt sie alle,
+        gleich stark. Die Kopfzeile sagt „vier mögliche Flurstücke“, nicht „gefunden“.</p>
+    </div>
+    <div class="zu" style="--z:var(--error)">
+      <h3>erfolglos</h3>
+      <p>Der Anker fehlt, der Raum ist zu groß, oder die Prüfung widerspricht. Die Oberfläche bietet
+        die Handeingabe an — Gemarkung und Flurstücksnummer stehen im Kaufvertrag.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="col stack">
+    <p class="eyebrow">Woher die Daten kommen</p>
+    <h2>Kein Overpass im Betrieb — der Auszug liegt längst da</h2>
+    <p>Der Straßenfilter ist das stärkste Zweitmerkmal (25 → 5), braucht aber OpenStreetMap. Zur
+      Laufzeit die öffentliche Overpass-Instanz zu fragen, verbietet sich für ein ausgeliefertes
+      Produkt — deren eigenes Handbuch nennt genau das als problematisch. Die Antwort steht schon
+      im Projekt, an zwei Stellen.</p>
+  </div>
+
+  <div class="paare">
+    <div class="paar">
+      <h3>Der Auszug wird bereits geladen</h3>
+      <p><code>motis/fetch-data.sh</code> holt für das Profil <code>local-routing</code> ohnehin
+        <span class="mono">sachsen-latest.osm.pbf</span> von Geofabrik — das komplette sächsische
+        Straßennetz, CC-BY, ohne Ratenbegrenzung.</p>
+      <p><b>„Extrakt“ heißt genau diese Datei:</b> ein regionaler Ausschnitt der weltweiten
+        OSM-Datenbank als <code>.osm.pbf</code>, den Geofabrik täglich neu erzeugt.</p>
+    </div>
+    <div class="paar">
+      <h3>Das Leseverfahren gibt es auch schon</h3>
+      <p><code>scripts/build_poi_index.py</code> liest denselben Dateityp mit
+        <code>pyosmium</code> und schreibt <code>data/poi-sachsen.json</code>. Die API liest das
+        Ergebnis danach mit der Standardbibliothek — <code>osmium</code> ist ein Extra für den
+        Bau, keine Laufzeitabhängigkeit.</p>
+      <p>Der Straßenindex ist derselbe Vorgang mit einem anderen Filter: benannte
+        <code>highway</code>-Wege statt Schulen und Supermärkte.</p>
+    </div>
+    <div class="paar">
+      <h3>MOTIS selbst hilft nicht</h3>
+      <p>Es importiert das <code>.pbf</code> zwar, veröffentlicht daraus aber keine Straßen —
+        seine Schnittstellen sind Fahrplan und Route. Aus dem Routing lassen sich also keine
+        Straßengeometrien „herausnehmen“; gelesen werden muss dieselbe Datei noch einmal.</p>
+      <p>Das ist kein Nachteil: der Bau läuft ohnehin getrennt und etwa einmal im Quartal.</p>
+    </div>
+    <div class="paar">
+      <h3>Schlüssel ist Name <em>plus</em> Gemarkung</h3>
+      <p>Ein Straßenname allein ist wertlos — „Bahnhofstraße“ kommt sachsenweit in 2 918 Wegen vor.
+        Nachgeschlagen wird immer erst, wenn der Anker feststeht, also genügt je Weg der Name und
+        ein grober Umgriff; die Geometrie wird nur für die Wege im Anker geladen.</p>
+      <p><b>Ungemessen:</b> wie groß dieser Index wird. Das sollte das Bauskript beim ersten Lauf
+        selbst ausgeben.</p>
+    </div>
+  </div>
+
+  <div class="col stack" style="margin-top:30px">
+    <h3 style="font-size:17px">Räumliche Prüfungen: vorfiltern, dann exakt nachrechnen</h3>
+    <p>Für Straßenpuffer und Landmarkenringe braucht es Puffer, Differenz und Verschnitt. Statt den
+      Kandidatenraum im Backend zu vermessen, macht es die Suche wie die Flächensuche schon heute:
+      <b>grob serverseitig vorfiltern, exakt auf dem Rückgabesatz prüfen.</b></p>
+  </div>
+  <div class="kasten">
+    <div class="kasten-kopf">Zwei Schritte statt einer Geometriebibliothek im Anfrageweg</div>
+<pre>1  VORFILTER   fes:BBOX auf ave:geometrie
+              verifiziert: 2 × 2 km um Kloster Nimbschen → 407 Flurstücke
+              Der WFS wirft weg, was gar nicht in Frage kommt.
+
+2  NACHPRÜFUNG  auf den zurückgegebenen Polygonen, exakt
+              Abstand zur Straßenachse, Abstand zur Uferlinie,
+              Ring statt Scheibe: buffer(geom, r) \ geom</pre>
+  </div>
+  <div class="col" style="margin-top:18px">
+    <div class="merk"><p><b>Und das braucht keine neue Abhängigkeit.</b> <code>shapely&gt;=2.0</code>
+      steht bereits unter den Kernabhängigkeiten des Backends und wird in
+      <code>services/alkis.py</code> längst benutzt — <code>by_point</code> entscheidet damit,
+      welches Flurstück eine Koordinate überdeckt.</p>
+      <p>Der Projektgrundsatz „Geometrie läuft im Browser“ zielt auf die <em>interaktive</em>
+      Geometrie — Puffern, Drehen und Kollision, während gezogen wird. Ein Abstandstest auf 25
+      Polygonen im Suchweg ist dieselbe Art Nutzung wie das vorhandene
+      <code>covers()</code> und widerspricht dem nicht.</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="col stack">
+    <p class="eyebrow">Ausdrücklich nicht</p>
+    <h2>Was der Algorithmus nicht tut</h2>
+  </div>
+  <div class="paare">
+    <div class="paar">
+      <h3>Keinen Radius um den Pin</h3>
+      <p>Der Pin lag im Testfall 6 235 m daneben, und zwar systematisch — er ist der geokodierte
+        Gemeindename. Ein Radius, der ihn einschließt, schließt die halbe Gemeinde ein.</p>
+    </div>
+    <div class="paar">
+      <h3>Keine Häufigkeitszählung</h3>
+      <p>„Grimma“ steht dreimal im Text, „Großbothen“ dreimal — und Grimma ist falsch. Ortsnamen
+        werden über ihre Beziehung gewertet, nie über ihre Anzahl.</p>
+    </div>
+    <div class="paar">
+      <h3>Keine harten Ringe</h3>
+      <p>Maklerentfernungen waren 12 % und 32 % daneben. Als Gleichung gelesen löschen sie den
+        richtigen Kandidaten; als Trapez mit Untergrenze schieben sie ihn nur nach unten.</p>
+    </div>
+    <div class="paar">
+      <h3>Kein Modell für die Antwort</h3>
+      <p>Ein Modell liefert Indizien mit Beleg und Sicherheit. Welches Flurstück es ist, entscheidet
+        ALKIS — sonst ist die Antwort so gut wie die Halluzination, die sie erzeugt hat.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="col stack">
+    <p class="eyebrow">Register</p>
+    <h2>Unsichere Entscheidungen, festgehalten</h2>
+    <p>Nichts davon ist gemessen. Jede Zeile nennt, was gewählt wurde, warum, und — das ist der
+      Punkt — <b>woran man merken wird, dass die Wahl falsch war.</b> Ohne dieses letzte Feld ist
+      eine Annahme nicht revidierbar, sondern nur vergessen.</p>
+  </div>
+
+  <div class="reg">
+
+    <div class="re" style="--r:var(--primary)">
+      <div class="re-frage"><b>Nutzungsart</b><span class="re-wahl">weich</span></div>
+      <div class="re-text">
+        <p class="warum"><b>Warum:</b> <code>ave:tntxt</code> ist amtlich, aber der Schluss
+          „Baugrundstück ⇒ Wohnbaufläche“ ist es nicht — ein unbebautes Grundstück kann
+          Landwirtschaft oder Gartenland sein. Als harter Filter würde er 25 → 16 schaffen und
+          gelegentlich das Richtige löschen.</p>
+        <p class="merkmal"><b>Falsch, wenn:</b> über ein Dutzend Inserate hinweg nie ein
+          Baugrundstück auftaucht, das <em>nicht</em> Wohnbaufläche ist. Dann ist der harte Filter
+          gratis und wird nachgezogen.</p>
+      </div>
+    </div>
+
+    <div class="re" style="--r:var(--primary)">
+      <div class="re-frage"><b>Bildmodell</b><span class="re-wahl">nicht bauen</span></div>
+      <div class="re-text">
+        <p class="warum"><b>Warum:</b> Die Texterkennungs-Leiter (vergrößern → psm 6 → psm 1) deckt
+          gedrehte und gekippte Dokumente ab und kostet nichts pro Aufruf. Ein Bildmodell bräuchte
+          es nur für den Orthofoto-Fall mit winzigen Beschriftungen.</p>
+        <p class="merkmal"><b>Falsch, wenn:</b> ein Inserat auftaucht, dessen einziger
+          Katasterbeleg ein Luftbild mit eingezeichneten Grenzen ist — dann liest die Leiter nichts
+          und die Suche fällt auf die Fläche zurück. Prompt P2 liegt fertig in der
+          Extraktionsstrategie.</p>
+      </div>
+    </div>
+
+    <div class="re" style="--r:var(--secondary)">
+      <div class="re-frage"><b>Toleranzstufen aus der Schreibweise</b><span class="re-wahl">geschätzt</span></div>
+      <div class="re-text">
+        <p class="warum"><b>Warum:</b> „ca. 500 m²“ auf ±1 % beginnen zu lassen ist eine Setzung.
+          Es könnte ±2 % oder ±10 % heißen, je nachdem, wie der Anbieter rundet.</p>
+        <p class="merkmal"><b>Falsch, wenn:</b> die Treppe regelmäßig zwei oder drei Stufen
+          durchläuft, bevor sie etwas findet. Jede leere Stufe ist eine verschenkte Anfrage und ein
+          Hinweis, dass der Startwert zu eng sitzt.</p>
+      </div>
+    </div>
+
+    <div class="re" style="--r:var(--secondary)">
+      <div class="re-frage"><b>Anker aus einer Textbeziehung</b><span class="re-wahl">braucht Zweitbeleg</span></div>
+      <div class="re-text">
+        <p class="warum"><b>Warum:</b> Der Anker ist hart, also ist eine falsche Beziehung der
+          einzige Weg zu einer selbstbewusst falschen Antwort. Bei exakter Fläche erledigt sich das
+          von selbst (gemessen: falsche Anker liefern 0), bei gerundeter nicht.</p>
+        <p class="merkmal"><b>Falsch, wenn:</b> die Forderung nach einem Zweitbeleg so oft
+          „mehrdeutig“ erzwingt, dass die Suche unbrauchbar wird. Dann muss die Beziehungserkennung
+          besser werden, nicht die Regel schwächer.</p>
+      </div>
+    </div>
+
+    <div class="re" style="--r:var(--secondary)">
+      <div class="re-frage"><b>Straßenpuffer 40 m / 80 m</b><span class="re-wahl">an einem Fall geeicht</span></div>
+      <div class="re-text">
+        <p class="warum"><b>Warum:</b> 790/11 liegt 3 m von der Achse; 80 m ließ 5 der 25
+          Kandidaten übrig. An genau einem Grundstück gemessen.</p>
+        <p class="merkmal"><b>Falsch, wenn:</b> ein Grundstück in zweiter Reihe liegt — ein
+          Hinterliegergrundstück kann 60 m von der Achse entfernt sein und trotzdem an der Straße
+          adressiert werden. Zu klein gewählt, löscht der Puffer es.</p>
+      </div>
+    </div>
+
+    <div class="re" style="--r:var(--sage)">
+      <div class="re-frage"><b>Ring-Toleranz ±35 %</b><span class="re-wahl">nur Reihenfolge</span></div>
+      <div class="re-text">
+        <p class="warum"><b>Warum:</b> Gemessene Abweichungen waren −12 % und +32 %. ±35 % fasst
+          beide. Da Ringe nur ordnen, kann der Wert keine falsche Antwort erzeugen.</p>
+        <p class="merkmal"><b>Falsch, wenn:</b> das richtige Flurstück regelmäßig weit unten in der
+          Liste steht. Merkt man erst mit gelösten Fällen.</p>
+      </div>
+    </div>
+
+    <div class="re" style="--r:var(--sage)">
+      <div class="re-frage"><b>Gewichte und Untergrenze 0,05</b><span class="re-wahl">nur Reihenfolge</span></div>
+      <div class="re-text">
+        <p class="warum"><b>Warum:</b> Sie entscheiden nichts mehr, seit „bestätigt“ an den harten
+          Filtern hängt. Ungeeicht dürfen sie sein.</p>
+        <p class="merkmal"><b>Falsch, wenn:</b> Nutzer in der Mehrdeutigkeitsliste regelmäßig nicht
+          den ersten Eintrag wählen. Das ist auch die einzige Eichmenge, die von selbst entsteht —
+          <b>jede Nutzerauswahl ist ein gelöster Fall.</b></p>
+      </div>
+    </div>
+
+    <div class="re" style="--r:var(--error)">
+      <div class="re-frage"><b>Raum-Obergrenze 60 000</b><span class="re-wahl">widerlegt · ersetzt</span></div>
+      <div class="re-text">
+        <p class="warum"><b>Was gedacht war:</b> ein Anker mit über 60 000 Flurstücken sei zu grob
+          zum Suchen. Die Zahl lag zwischen Stadt Grimma (32 544) und einem Landkreis.</p>
+        <p class="warum"><b>Die Messung sagt nein:</b> Stadt Leipzig hat <b>112 588</b> Flurstücke,
+          Dresden 108 558 — beide wären abgelehnt worden. Und mit der exakten Fläche bleiben von
+          Leipzig <b>78</b> übrig: völlig bewertbar.</p>
+        <p class="merkmal"><b>Ersetzt durch:</b> die Größe des <em>Kandidatenbestands</em> nach den
+          harten Filtern, Grenze ~500. Der Anker darf beliebig groß sein. Ein hübsches Beispiel
+          dafür, dass eine gegriffene Konstante eine Messung wert ist.</p>
+      </div>
+    </div>
+
+    <div class="re" style="--r:var(--primary)">
+      <div class="re-frage"><b>NDJSON statt SSE</b><span class="re-wahl">entschieden</span></div>
+      <div class="re-text">
+        <p class="warum"><b>Warum:</b> Kein Serverzustand, ein Endpunkt, und nginx ist mit
+          <code>proxy_buffering off</code> schon vorbereitet.</p>
+        <p class="merkmal"><b>Falsch, wenn:</b> ein Zwischenproxy doch puffert und die Karte erst am
+          Ende auf einen Schlag gefüllt wird. Fällt beim ersten Deployment hinter fremder
+          Infrastruktur auf.</p>
+      </div>
+    </div>
+
+    <div class="re" style="--r:var(--sage)">
+      <div class="re-frage"><b>Kamera: 120 m Mindestbreite, 2 s Standzeit</b><span class="re-wahl">gestaltet</span></div>
+      <div class="re-text">
+        <p class="warum"><b>Warum:</b> 120 m zeigt ein 30-m-Flurstück mit seinen Nachbarn; 2 s ist
+          die Untergrenze, bei der ein Kameraflug noch als Bewegung und nicht als Sprung liest.</p>
+        <p class="merkmal"><b>Falsch, wenn:</b> jemand die Suche zweimal ansieht und sie beim
+          zweiten Mal als zäh empfindet. Standzeit ist eine Erstnutzungshilfe und gehört
+          abschaltbar.</p>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<section>
+  <div class="col stack quellen">
+    <p class="eyebrow" style="color:var(--muted)">Was gemessen ist und was nicht</p>
+    <p><b>Gemessen am 01.09.2026:</b> die Toleranz-Treppe (sieben <code>resultType=hits</code>-Anfragen
+      gegen den ALKIS-WFS), der Nutzungsartfilter über <code>PropertyIsLike</code> auf
+      <code>ave:tntxt</code>, die Straßenzuordnung 25 → 5 über einen 80-m-Puffer um die
+      OSM-Wiesenstraße, die Ringe 25 → 8, und die komplette Texterkennungstabelle
+      (Tesseract 5.3.4, Pillow-Lanczos, Medianzeiten aus je drei Läufen inklusive Prozessstart).</p>
+    <p><b>Gesetzt, nicht gemessen:</b> die Obergrenze von ~500 für den Kandidatenbestand, die Vertrauenswerte
+      in Phase 1, die Ring-Toleranz und die Gewichte in Phase 4. Keine davon kann eine falsche
+      Antwort erzeugen — sie beeinflussen Kosten und Reihenfolge, nicht das Urteil. Eichen lohnt,
+      sobald gelöste Inserate vorliegen; warten muss man darauf nicht.</p>
+    <p><b>Offen:</b> ob der Kurzschluss in Phase 0 auch dann sicher ist, wenn das Bild eine
+      Gemarkung nennt, die nicht zum Standortfeld passt; ob <code>--dpi 300</code> die
+      Texterkennung verbessert (jeder Lauf meldete „Invalid resolution 0 dpi“, ungetestet); und ob
+      der Nutzungsartfilter über mehrere Inserate hinweg mehr nützt als schadet.</p>
+  </div>
+</section>
+
+</div>
+
+<script>
+const TREPPE = [
+  { pct: "0", band: "502–502 m²", n: 1, rolle: "halt" },
+  { pct: "0,5", band: "500–504 m²", n: 2, rolle: "pruef" },
+  { pct: "1", band: "497–507 m²", n: 5 },
+  { pct: "2", band: "492–512 m²", n: 12 },
+  { pct: "5", band: "477–527 m²", n: 25 },
+  { pct: "10", band: "452–552 m²", n: 46 },
+  { pct: "20", band: "402–602 m²", n: 83 }
+];
+const host = document.getElementById("treppe");
+const widest = Math.max(...TREPPE.map(step => step.n));
+for (const step of TREPPE) {
+  const row = document.createElement("div");
+  row.className = "tr-zeile" + (step.rolle ? " " + step.rolle : "");
+  row.innerHTML = '<span class="tr-pct"></span><span class="tr-bar"><i></i></span><span class="tr-n"></span>';
+  row.querySelector(".tr-pct").textContent = "±" + step.pct + " %";
+  row.querySelector(".tr-bar i").style.width = Math.max(step.n / widest * 100, 1.2).toFixed(1) + "%";
+  row.querySelector(".tr-n").textContent = step.n;
+  row.title = "±" + step.pct + " % · " + step.band + " · " + step.n +
+    (step.n === 1 ? " Kandidat" : " Kandidaten");
+  host.appendChild(row);
+}
+</script>

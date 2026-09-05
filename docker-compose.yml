@@ -103,7 +103,35 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  # Recurring jobs. Opt-in like the routing, so `docker compose up` stays the
+  # two services it has always been:
+  #     docker compose --profile scheduled-jobs up -d
+  #     docker compose exec scheduler python scripts/run_jobs.py list
+  #     docker compose exec scheduler python scripts/run_jobs.py run cache-sweep
+  # Same image as the backend, so there is nothing extra to build and the job
+  # scripts are the ones already shipped. No Docker socket: every job here runs
+  # in this container against the shared volumes, and mounting the socket would
+  # hand it root on the host for the sake of four timed commands.
+  scheduler:
+    profiles: ["scheduled-jobs"]
+    build:
+      context: ./backend
+    command: ["python", "scripts/run_jobs.py", "serve"]
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      - JOBS_FILE=/ops/jobs.json
+    volumes:
+      - backend-cache:/cache
+      # Writable, unlike the backend's mount: rebuilding an index is the job.
+      - ./backend/data:/app/data
+      - ./ops:/ops:ro
+      - scheduler-state:/state
+    restart: unless-stopped
+
 volumes:
   backend-cache:
+  scheduler-state:
   # The built routing graph. Only exists when the local-routing profile has run.
   motis-graph:

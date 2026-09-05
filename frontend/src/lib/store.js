@@ -32,8 +32,34 @@ const THEME_KEY = "where2build.theme";
 export const state = reactive({
   data: emptyState(),
   theme: "system",
+  /* What "system" currently resolves to. Kept in the state rather than read
+   * where it is needed, so anything that has to follow the palette — the map
+   * backdrop, above all — can watch it like any other reactive value. */
+  systemDark: false,
   plan: { backdrop: "map", northUp: true, showDimensions: true, showSetbacks: true, measuring: false }
 });
+
+const DARK_QUERY = "(prefers-color-scheme: dark)";
+
+/** Whether the interface is dark right now, choice and system setting folded
+ *  into one answer. Reactive: reading it inside a computed tracks both. */
+export function darkTheme() {
+  return state.theme === "dark" || (state.theme === "system" && state.systemDark);
+}
+
+/** Follow the system setting for as long as the page lives. Idempotent, and a
+ *  browser without `matchMedia` simply stays light. */
+export function watchSystemTheme() {
+  const query = window.matchMedia?.(DARK_QUERY);
+  if (!query) return;
+  state.systemDark = query.matches;
+  if (watchSystemTheme.attached) return;
+  watchSystemTheme.attached = true;
+  const update = event => { state.systemDark = event.matches; };
+  // Safari before 14 has only the deprecated spelling.
+  if (query.addEventListener) query.addEventListener("change", update);
+  else query.addListener(update);
+}
 
 /* ---------- Migration from the version-1 document ----------
  * Version 1 named its fields in German. Those names are gone from the code, but
@@ -289,6 +315,7 @@ export function load() {
     state.theme = "system";
   }
   applyTheme(state.theme);
+  watchSystemTheme();
 }
 
 export function save() {

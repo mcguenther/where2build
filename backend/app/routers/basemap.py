@@ -8,7 +8,9 @@ tiles, glyph ranges, sprite sheet and the raster hillshade.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Path, Request, Response
+from typing import Literal
+
+from fastapi import APIRouter, Depends, Path, Query, Request, Response
 from fastapi.responses import JSONResponse
 
 from ..deps import basemap_service
@@ -34,8 +36,17 @@ def _headers(service: BasemapService, from_cache: bool) -> dict[str, str]:
     response_class=JSONResponse,
     responses={200: {"content": {"application/json": {}}, "description": "MapLibre-Style"}},
 )
-async def style(basemap: BasemapService = Depends(basemap_service)) -> Response:
-    document, from_cache = await basemap.style()
+async def style(
+    variant: Literal["light", "dark"] = Query(
+        "light",
+        description="Palette des Kartenhintergrunds — hell oder dunkel.",
+    ),
+    basemap: BasemapService = Depends(basemap_service),
+) -> Response:
+    # The variant is part of the URL, so the long max-age above stays correct:
+    # a shared cache keys on the query string and cannot hand the light style
+    # to a dark page.
+    document, from_cache = await basemap.style(dark=variant == "dark")
     return JSONResponse(content=document, headers=_headers(basemap, from_cache))
 
 
