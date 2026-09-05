@@ -1,0 +1,505 @@
+<title>Kandidaten einkreisen</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --primary:#2F4A3A; --primary-light:#456B52; --primary-dark:#1C2E23; --primary-veil:rgba(47,74,58,.10);
+  --secondary:#B5813C; --secondary-text:#7C5620; --secondary-light:#E8D4B0; --secondary-veil:rgba(181,129,60,.16);
+  --sage:#9DB39A; --sage-light:#DCE4DA;
+  --ink:#1E1A16; --graphite:#4A443C; --muted:#6F675C; --line:#DCD3C6; --line-faint:#EBE4D9;
+  --surface:#FAF7F1; --sunken:#F3EFE6; --paper:#F1EBE1; --white:#FFFFFF;
+  --warning:#BE8524; --warning-text:#7C5620; --warning-surface:#F6E9CE;
+  --error:#A8402C; --error-surface:#F2DED8; --good:#2F4A3A; --good-surface:#DEE7DF;
+  --map-ground:#E6E3DC; --map-surface:#EFEDE7; --map-boundary:#1E1A16; --map-halo:#FFFFFF;
+  --map-neighbour:#9A9184; --map-street:#B5813C; --map-street-surface:#D6D2CA;
+  --shadow:0 1px 2px rgba(30,26,22,.05),0 10px 24px -18px rgba(30,26,22,.45);
+  --font-display:"Archivo",system-ui,-apple-system,sans-serif;
+  --font-body:"Public Sans",system-ui,-apple-system,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --primary:#7FA98A; --primary-light:#9BC0A4; --primary-dark:#24382C; --primary-veil:rgba(127,169,138,.14);
+  --secondary:#D9A55E; --secondary-text:#DBB273; --secondary-light:#3E3021; --secondary-veil:rgba(217,165,94,.18);
+  --sage:#6E8470; --sage-light:#26302A;
+  --ink:#F1EBE1; --graphite:#C4BCB0; --muted:#948B7E; --line:#3A342C; --line-faint:#2A2620;
+  --surface:#201C17; --sunken:#191510; --paper:#16130F;
+  --warning:#D8A340; --warning-text:#E3BC72; --warning-surface:#3A2E19;
+  --error:#E0705A; --error-surface:#3B211B; --good:#7FA98A; --good-surface:#1F2C24;
+  --map-ground:#1A1917; --map-surface:#23211D; --map-boundary:#F1EBE1; --map-halo:#16130F;
+  --map-neighbour:#5A544B; --map-street:#8A6A3A; --map-street-surface:#242220;
+  --shadow:0 1px 2px rgba(0,0,0,.5),0 12px 28px -20px rgba(0,0,0,.85);
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --primary:#7FA98A; --primary-light:#9BC0A4; --primary-dark:#24382C; --primary-veil:rgba(127,169,138,.14);
+  --secondary:#D9A55E; --secondary-text:#DBB273; --secondary-light:#3E3021; --secondary-veil:rgba(217,165,94,.18);
+  --sage:#6E8470; --sage-light:#26302A;
+  --ink:#F1EBE1; --graphite:#C4BCB0; --muted:#948B7E; --line:#3A342C; --line-faint:#2A2620;
+  --surface:#201C17; --sunken:#191510; --paper:#16130F;
+  --warning:#D8A340; --warning-text:#E3BC72; --warning-surface:#3A2E19;
+  --error:#E0705A; --error-surface:#3B211B; --good:#7FA98A; --good-surface:#1F2C24;
+  --map-ground:#1A1917; --map-surface:#23211D; --map-boundary:#F1EBE1; --map-halo:#16130F;
+  --map-neighbour:#5A544B; --map-street:#8A6A3A; --map-street-surface:#242220;
+  --shadow:0 1px 2px rgba(0,0,0,.5),0 12px 28px -20px rgba(0,0,0,.85);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--font-body);font-size:16px;line-height:1.6;
+  -webkit-font-smoothing:antialiased;padding:0 0 var(--pad,72px)}
+.wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+.col{max-width:70ch}
+h1,h2,h3{font-family:var(--font-display);text-wrap:balance;line-height:1.15;margin:0}
+h1{font-size:clamp(30px,5vw,46px);font-weight:700;letter-spacing:-.02em}
+h2{font-size:clamp(21px,3vw,27px);font-weight:600;letter-spacing:-.01em}
+h3{font-size:17px;font-weight:600}
+p{margin:0}
+.eyebrow{font-family:var(--font-mono);font-size:11.5px;font-weight:500;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--muted)}
+.lede{font-size:19px;line-height:1.55;color:var(--graphite)}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.stack{display:flex;flex-direction:column;gap:16px}
+section{padding:48px 0;border-top:1px solid var(--line-faint)}
+section:first-of-type{border-top:0}
+.tafel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px;box-shadow:var(--shadow)}
+a{color:var(--primary);text-underline-offset:3px}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:4px}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+<style>
+.hero{padding:64px 0 36px}
+.hero h1{margin:12px 0 18px;max-width:17ch}
+.zwei{display:flex;flex-wrap:wrap;gap:10px 36px;align-items:baseline;margin:4px 0}
+.zwei b{font-family:var(--font-display);font-size:clamp(30px,5vw,44px);font-weight:700;line-height:1;
+  letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.zwei b.gut{color:var(--primary)} .zwei b.mau{color:var(--secondary-text)}
+.zwei span{font-size:14px;color:var(--muted);max-width:22ch;display:block}
+
+/* --- Filterrangliste --- */
+.filter{display:flex;flex-direction:column;gap:8px;margin-top:26px}
+.f{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;background:var(--surface);border:1px solid var(--line);
+  border-radius:12px;padding:15px 17px;border-left:4px solid var(--s,var(--line))}
+@media(min-width:860px){.f{grid-template-columns:19ch minmax(0,1fr) 11ch 9ch;align-items:start;gap:20px}}
+.f-name{font-family:var(--font-display);font-weight:600;font-size:15px}
+.f-sub{font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px;letter-spacing:.03em}
+.f-text{font-size:13.5px;color:var(--graphite);display:flex;flex-direction:column;gap:6px}
+.f-wert{font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-size:16px;font-weight:500;color:var(--ink)}
+.f-wert small{display:block;font-size:10.5px;font-weight:400;letter-spacing:.11em;text-transform:uppercase;
+  color:var(--muted);margin-top:4px}
+.f-kosten{font-family:var(--font-mono);font-size:12px;color:var(--muted)}
+@media(min-width:860px){.f-wert,.f-kosten{text-align:right}}
+
+/* --- Werkbank --- */
+.werkbank{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;
+  margin-top:24px;box-shadow:var(--shadow)}
+.wb-kopf{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;
+  gap:10px 20px;align-items:baseline;justify-content:space-between}
+.wb-kopf h3{font-size:15.5px}
+.wb-stand{font-family:var(--font-mono);font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.wb-stand b{color:var(--primary);font-weight:500}
+.wb-stand b.weg{color:var(--error)}
+.regler{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:16px 22px;padding:18px 20px;
+  border-bottom:1px solid var(--line);background:var(--sunken)}
+.regler label{display:flex;flex-direction:column;gap:7px;font-size:13px}
+.regler .zeile{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.regler .zeile span:first-child{font-weight:500}
+.regler .zeile output{font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-size:12.5px;color:var(--muted)}
+.regler input[type=range]{width:100%;accent-color:var(--primary);cursor:pointer}
+.regler label.an{flex-direction:row;align-items:center;gap:9px;font-size:13px;cursor:pointer}
+.an input{accent-color:var(--primary);width:15px;height:15px;cursor:pointer}
+.wb-liste{max-height:430px;overflow-y:auto}
+.wb-zeile{display:grid;grid-template-columns:8ch 1fr 6ch;gap:12px;align-items:center;padding:8px 20px;
+  border-bottom:1px solid var(--line-faint);font-size:13px}
+.wb-zeile.raus{opacity:.32}
+.wb-zeile.wahr{background:var(--good-surface)}
+.wb-nr{font-family:var(--font-mono);font-weight:500;font-variant-numeric:tabular-nums}
+.wb-zeile.wahr .wb-nr{color:var(--primary)}
+.wb-bar{height:8px;border-radius:999px;background:var(--sunken);border:1px solid var(--line-faint);overflow:hidden}
+.wb-bar i{display:block;height:100%;background:var(--secondary);border-radius:999px;transition:width .18s ease}
+.wb-zeile.wahr .wb-bar i{background:var(--primary)}
+.wb-punkte{font-family:var(--font-mono);font-variant-numeric:tabular-nums;text-align:right;font-size:12.5px;color:var(--muted)}
+.wb-fuss{padding:13px 20px;font-size:12.5px;color:var(--muted);border-top:1px solid var(--line);background:var(--sunken)}
+
+.merk{border-left:3px solid var(--secondary);background:var(--secondary-veil);padding:14px 18px;border-radius:0 8px 8px 0}
+.merk p{font-size:14.5px}
+.merk--rot{border-left-color:var(--error);background:var(--error-surface)}
+.paare{display:grid;grid-template-columns:repeat(auto-fit,minmax(255px,1fr));gap:14px;margin-top:20px}
+.paar{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:15px 17px}
+.paar h3{font-size:14px;margin-bottom:7px}
+.paar p{font-size:13.5px;color:var(--graphite)}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line-faint);vertical-align:top}
+th{font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:500}
+td.n{font-family:var(--font-mono);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.scroll{overflow-x:auto}
+code{font-family:var(--font-mono);font-size:12.5px;background:var(--sunken);padding:1px 5px;border-radius:4px;
+  border:1px solid var(--line-faint)}
+pre{margin:0;font-family:var(--font-mono);font-size:12.5px;line-height:1.62;white-space:pre-wrap;color:var(--ink)}
+.kasten{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-top:18px}
+.kasten-kopf{padding:12px 16px;border-bottom:1px solid var(--line);background:var(--sunken);font-family:var(--font-display);
+  font-weight:600;font-size:14.5px}
+.kasten pre{padding:16px}
+</style>
+
+<div class="wrap">
+
+<header class="hero">
+  <p class="eyebrow">Suchstrategie · 25 echte Kandidaten aus Großbothen</p>
+  <h1>Weiches Einkreisen schlägt hartes Ausschließen</h1>
+  <div class="col stack">
+    <p class="lede">Die Angaben eines Maklers sind nicht falsch, sondern ungenau — und der
+      Unterschied entscheidet über den Suchalgorithmus. Wer sie als Gleichung behandelt, wirft das
+      richtige Flurstück weg. Wer sie als Zugehörigkeit mit Toleranz behandelt, behält es oben in
+      der Rangliste.</p>
+    <div class="zwei">
+      <div><b class="gut">1 131 → 1</b><span>Gemarkung und exakte Fläche. Zwei Anfragen.</span></div>
+      <div><b class="mau">25 → 8</b><span>Doppelring aus zwei Entfernungsangaben. Grenzt ein, entscheidet nicht.</span></div>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="col stack">
+    <p class="eyebrow">Rangfolge</p>
+    <h2>Filter nach Trennschärfe je Kosten, nicht nach Verfügbarkeit</h2>
+    <p>Der Kandidatenraum wird nie über ganz Sachsen aufgespannt. Er beginnt beim engsten
+      räumlichen Anker, den die Indizien hergeben, und wird dann in dieser Reihenfolge
+      verkleinert — jede Zeile nur, wenn die darüber nicht schon entschieden hat.</p>
+  </div>
+
+  <div class="filter">
+
+    <div class="f" style="--s:var(--primary)">
+      <div><div class="f-name">Flurstückskennung</div>
+        <div class="f-sub">ave:flstnrzae + flstnrnen</div></div>
+      <div class="f-text"><p>Aus dem Bild oder dem Text. Eine vollständige Nummer plus Gemarkung ist
+        keine Einschränkung, sondern die Antwort — sie wird nur noch bestätigt.</p></div>
+      <div class="f-wert">→ 1<small>Kandidaten</small></div>
+      <div class="f-kosten">1 Anfrage</div>
+    </div>
+
+    <div class="f" style="--s:var(--primary)">
+      <div><div class="f-name">Gemarkung × Fläche</div>
+        <div class="f-sub">ave:gemaschl + PropertyIsEqualTo flaeche</div></div>
+      <div class="f-text">
+        <p>Der stärkste Filter, der ohne Nummer auskommt. Beide Werte stehen in strukturierten
+          Feldern, und ALKIS filtert beide serverseitig — es kommt nur der Treffer zurück, keine
+          Liste zum Nachsieben.</p>
+        <p><b>Bedingung:</b> Die Fläche im Inserat muss die amtliche sein. Hier war sie es
+          (502 = 502). Bei „ca. 500 m²“ oder „ab 450 m²“ greift stattdessen das Band unten.</p>
+      </div>
+      <div class="f-wert">1 131 → 1<small>gemessen</small></div>
+      <div class="f-kosten">2 Anfragen</div>
+    </div>
+
+    <div class="f" style="--s:var(--secondary)">
+      <div><div class="f-name">Flächenband</div>
+        <div class="f-sub">PropertyIsBetween ±5 %</div></div>
+      <div class="f-text"><p>Wenn die Zahl gerundet ist. Das Band muss aus der <em>Schreibweise</em>
+        kommen, nicht aus einer festen Prozentzahl: „502 m²“ ist exakt, „ca. 500 m²“ ist ±3 %,
+        „ab 450 m²“ ist eine untere Schranke und kein Band.</p></div>
+      <div class="f-wert">1 131 → 25<small>gemessen</small></div>
+      <div class="f-kosten">2 Anfragen</div>
+    </div>
+
+    <div class="f" style="--s:var(--secondary)">
+      <div><div class="f-name">Straßenlage</div>
+        <div class="f-sub">geometrisch, nicht über ave:lagebeztxt</div></div>
+      <div class="f-text">
+        <p>Der Straßenname aus dem Kartenauszug grenzt stark ein — aber <b>nicht über das
+          Adressfeld von ALKIS</b>. Dieses Flurstück trägt dort <code>„ohne Lage“</code>.</p>
+        <p>Also: die Straße in OpenStreetMap holen, ihre Linie um 40 m puffern, und die
+          Kandidaten behalten, die den Puffer schneiden.</p>
+      </div>
+      <div class="f-wert">stark<small>nicht gemessen</small></div>
+      <div class="f-kosten">1 Anfrage</div>
+    </div>
+
+    <div class="f" style="--s:var(--secondary)">
+      <div><div class="f-name">Entfernungsringe</div>
+        <div class="f-sub">MOTIS one-to-many · Gehzeit</div></div>
+      <div class="f-text">
+        <p>„Fernbahnhof 1,6 km“, „Bus 0,3 km“, „Grundschule im Ort“. Weich, nie hart —
+          siehe die Werkbank unten.</p>
+        <p>Ein Aufruf reicht für bis zu 128 Kandidaten, gemessene 148 ms. Die Triangulation ist
+          also nicht teuer, sondern nur schwach.</p>
+      </div>
+      <div class="f-wert">25 → 8<small>gemessen</small></div>
+      <div class="f-kosten">1 Anfrage</div>
+    </div>
+
+    <div class="f" style="--s:var(--sage)">
+      <div><div class="f-name">Nutzungsart und Bebauung</div>
+        <div class="f-sub">ave:NutzungFlurstueck · Gebäudeumringe</div></div>
+      <div class="f-text"><p>Ein Baugrundstück ist Wohnbaufläche und meist unbebaut. Beides ist
+        prüfbar — und beides ist ein <em>Ausschluss</em>, kein Beleg: es entfernt Kandidaten,
+        es wählt keinen aus.</p></div>
+      <div class="f-wert">schwach<small>nicht gemessen</small></div>
+      <div class="f-kosten">1 Anfrage</div>
+    </div>
+
+  </div>
+</section>
+
+<section>
+  <div class="col stack">
+    <p class="eyebrow">Werkbank</p>
+    <h2>Was mit den 25 wirklich passiert</h2>
+    <p>Die 25 Flurstücke unten sind echt: Gemarkung Großbothen, Fläche zwischen 477 und 527 m²,
+      am 01.09.2026 aus dem ALKIS-WFS geholt. Die Entfernungen sind Luftlinien zum Bahnhof
+      Großbothen und zur jeweils nächsten Bushaltestelle aus dem DELFI-Fahrplan.</p>
+    <p>Stellen Sie die Toleranz auf null, und die Suche verliert das richtige Flurstück.</p>
+  </div>
+
+  <div class="werkbank">
+    <div class="wb-kopf">
+      <h3>Rangliste nach weichem Gesamtwert</h3>
+      <div class="wb-stand" id="stand"></div>
+    </div>
+    <div class="regler">
+      <label>
+        <span class="zeile"><span>Toleranz Entfernungen</span><output id="outTol"></output></span>
+        <input type="range" id="tol" min="0" max="60" step="5" value="35">
+      </label>
+      <label>
+        <span class="zeile"><span>Toleranz Fläche</span><output id="outFlaeche"></output></span>
+        <input type="range" id="flaeche" min="0" max="15" step="1" value="5">
+      </label>
+      <div style="display:flex;flex-direction:column;gap:9px;justify-content:center">
+        <label class="an"><input type="checkbox" id="hart"> Harte Grenze statt weicher Wertung</label>
+        <label class="an"><input type="checkbox" id="nurBus"> Nur die Busangabe verwenden</label>
+      </div>
+    </div>
+    <div class="wb-liste" id="liste"></div>
+    <div class="wb-fuss" id="fuss"></div>
+  </div>
+
+  <div class="col" style="margin-top:22px">
+    <div class="merk merk--rot"><p><b>Der Ausgangspunkt:</b> Mit harter Grenze und ±0 % Toleranz
+      bleibt kein einziges Flurstück übrig — auch das richtige nicht. „1,6 km“ meint hier 1.415 m
+      und „0,3 km“ meint 396 m. Jede Suche, die Maklerzahlen als Gleichung liest, findet
+      garantiert nichts oder garantiert das Falsche.</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="col stack">
+    <p class="eyebrow">Die Wertung</p>
+    <h2>Trapez statt Schalter</h2>
+    <p>Jedes Indiz liefert für jeden Kandidaten eine Zahl zwischen 0 und 1, keine Ja-Nein-Antwort.
+      Die Form ist ein Trapez: innerhalb der Toleranz voll, darüber linear abfallend, und
+      <em>nie</em> exakt null — damit ein einzelnes falsches Indiz den richtigen Kandidaten nach
+      unten schiebt, statt ihn zu löschen.</p>
+  </div>
+  <div class="kasten">
+    <div class="kasten-kopf">Zugehörigkeit eines Kandidaten zu einer Entfernungsangabe</div>
+<pre>abweichung = |gemessen − behauptet| / behauptet
+
+zugehoerigkeit = 1                                  wenn abweichung ≤ toleranz
+                 1 − (abweichung − toleranz) / toleranz   wenn ≤ 2 × toleranz
+                 UNTERGRENZE                        sonst
+
+UNTERGRENZE = 0.05   Nie null. Ein einzelnes Indiz darf ausschließen,
+                     wenn es amtlich ist — eine Maklerangabe darf das nie.
+
+gesamt = Σ (gewicht[quelle] × zugehoerigkeit) / Σ gewicht[quelle]
+
+gewicht   amtlicher Auszug   1.00     aus Bild oder Urkunde abgelesen
+          Attributliste      0.90     strukturiertes Feld der Plattform
+          Fließtext          0.60     Anbietertext, Beziehung geprüft
+          Entfernungsangabe  0.35     wirbt, rundet, misst Luftlinie
+          Plattform-Pin      0.10     abgeleitet, hier 6,24 km daneben</pre>
+  </div>
+  <div class="paare">
+    <div class="paar">
+      <h3>Warum nicht multiplizieren</h3>
+      <p>Ein Produkt von Wahrscheinlichkeiten setzt voraus, dass die Indizien unabhängig sind. Sind
+        sie nicht: Bahnhof, Bus und Schule liegen alle im Ortskern, ihre Fehler zeigen in dieselbe
+        Richtung. Ein Produkt zählt denselben Fehler dreimal.</p>
+    </div>
+    <div class="paar">
+      <h3>Warum keine harte Schranke</h3>
+      <p>Eine harte Grenze ist ein Produkt mit Faktor null: ein Ausreißer löscht den richtigen
+        Kandidaten unwiderruflich, und keine spätere Stufe kann ihn zurückholen. Die Untergrenze
+        von 0,05 hält ihn in der Liste, nur eben ganz unten.</p>
+    </div>
+    <div class="paar">
+      <h3>Wann doch hart</h3>
+      <p>Wenn die Quelle amtlich ist. Ein aus ALKIS gelesenes <code>flaeche</code>-Feld, das um den
+        Faktor vier abweicht, schließt aus — das ist bereits geltende Regel im Projekt
+        (<code>AREA_FACTOR_TOO_LARGE</code>). Nur Behauptungen bleiben weich.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="col stack">
+    <p class="eyebrow">Routing</p>
+    <h2>Was der vorhandene MOTIS beisteuert — und was nicht</h2>
+    <p>Das Projekt bringt bereits ein Routing mit: Transitous oder, über das Compose-Profil
+      <code>local-routing</code>, eine eigene Instanz. Für die Triangulation sind zwei Dinge daran
+      wichtig, und ein drittes ist eine Warnung.</p>
+  </div>
+  <div class="scroll" style="margin-top:20px">
+  <table>
+    <thead><tr><th>Fähigkeit</th><th>Wofür in der Suche</th><th class="n">Gemessen</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>one-to-many</b><br><span class="mono" style="font-size:12px;color:var(--muted)">POST, max. 128 Ziele</span></td>
+        <td>Alle Kandidaten in einem Aufruf gegen einen Anker rechnen. Der Kandidat ist das
+          <code>many</code>, der Bahnhof das <code>one</code>. 25 Kandidaten kosten dasselbe wie einer.</td>
+        <td class="n">148 ms</td>
+      </tr>
+      <tr>
+        <td><b>map/stops</b><br><span class="mono" style="font-size:12px;color:var(--muted)">aus dem Fahrplan</span></td>
+        <td>Welche Haltestellen es gibt und welche Verkehrsmittel dort wirklich halten. OSM kann
+          das in Sachsen nicht beantworten.</td>
+        <td class="n">1 Anfrage</td>
+      </tr>
+      <tr>
+        <td><b>geocode</b><br><span class="mono" style="font-size:12px;color:var(--muted)">type: PLACE / ADDRESS / STOP</span></td>
+        <td>Den genannten Bahnhof auf eine Koordinate bringen — und dabei mitlesen, ob es eine
+          Adresse oder nur ein Ort war.</td>
+        <td class="n">1 Anfrage</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="col" style="margin-top:20px">
+    <div class="merk"><p><b>Die Warnung:</b> Der Geocoder liefert auf „Großbothen Bahnhof“ als
+      sechsten Treffer <span class="mono">Großbeeren, Bahnhof</span> — 134 km entfernt. Jeder
+      Geocoder-Treffer, der außerhalb des schon eingegrenzten Gebiets liegt, wird verworfen, bevor
+      er ein Ring wird. Sonst trianguliert die Suche gegen Brandenburg.</p></div>
+  </div>
+  <div class="col stack" style="margin-top:24px">
+    <p>Und die Regel aus dem Projekt gilt auch hier: <b>nach Gehzeit ordnen, nie nach Luftlinie.</b>
+      Die Werkbank oben rechnet Luftlinie, weil sie im Browser laufen soll — die Suche im Backend
+      nimmt <code>one-to-many</code> mit <code>WALK</code>. Umwegfaktoren erreichen 2,88, und was
+      per Luftlinie am nächsten liegt, kann zu Fuß unerreichbar sein.</p>
+  </div>
+</section>
+
+<section>
+  <div class="col stack">
+    <p class="eyebrow">Abschluss</p>
+    <h2>Wann eine Suche fertig ist</h2>
+    <p>Die Suche endet nie damit, dass ein Kandidat vorn liegt. Sie endet mit einer Prüfung, die
+      auch scheitern darf.</p>
+  </div>
+  <div class="kasten">
+    <div class="kasten-kopf">Bestätigt heißt</div>
+<pre>1  Das Flurstück existiert in ALKIS und liegt in der erschlossenen Gemarkung.
+2  Die amtliche Fläche stimmt mit der Angabe im Inserat überein, oder die
+   Abweichung ist durch die Schreibweise erklärbar („ca.“, „rund“).
+3  Die Plausibilitätsprüfung des Projekts schlägt nicht an: kein Faktor 4
+   in der Fläche, kein Streifen von über 200 m Länge bei fünffacher
+   Länglichkeit.
+4  Der zweitbeste Kandidat liegt im Gesamtwert deutlich zurück.
+   Tut er das nicht, ist das Ergebnis „mehrdeutig“ und nicht „gefunden“.
+
+Trifft 1–3 zu und 4 nicht, zeigt die Oberfläche ALLE verbliebenen
+Kandidaten auf der Karte — und keinen davon als Ergebnis.</pre>
+  </div>
+  <div class="col" style="margin-top:20px">
+    <div class="merk"><p>Punkt 4 ist der wichtigste und der unbequemste. Bei diesem Inserat wäre er
+      über den Doppelring <b>nicht</b> erfüllt: 790/11 überlebt zusammen mit 792/3, 793/4 und 794/4 —
+      seinen direkten Nachbarn. Ohne die exakte Fläche oder das Bild hätte die Suche ehrlicherweise
+      „vier Kandidaten“ melden müssen, nicht „gefunden“.</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="col stack" style="font-size:12.5px;color:var(--muted)">
+    <p class="eyebrow" style="color:var(--muted)">Was hier gemessen wurde</p>
+    <p><b>Live am 01.09.2026:</b> 1 131 Flurstücke in Gemarkung 144241; davon 1 mit
+      <code>flaeche = 502</code> (es ist 790/11), 5 im Band 497–507 und 25 im Band 477–527. In der
+      Gemeinde Grimma insgesamt 32 544 Flurstücke, davon 15 mit exakt 502 m². Alle Zahlen aus
+      <code>resultType=hits</code> gegen
+      <code>geodienste.sachsen.de/aaa/public_alkis/vereinf/wfs</code>.</p>
+    <p><b>Entfernungen:</b> Luftlinien von den Flurstücksmittelpunkten zu Bahnhof Großbothen
+      (51,184165 / 12,759661) und zu den Bushaltestellen aus
+      <code>api.transitous.org/api/v1/map/stops</code>. Die 148 ms für <code>one-to-many</code>
+      stammen aus <code>docs/research/poi.md</code> und wurden hier nicht neu gemessen.</p>
+    <p><b>Nicht geprüft:</b> der Straßenfilter über OSM-Puffer, der Nutzungsartfilter, und die
+      Gewichte in der Formel. Die Gewichte sind eine begründete Setzung, keine Messung — sie
+      gehören an echten Inseraten kalibriert, sobald ein Dutzend Fälle mit bekannter Lösung
+      vorliegt.</p>
+  </div>
+</section>
+
+</div>
+
+<script>
+const SUCHE={"kandidaten":[{"nr":"115/19","m2":483,"xy":[882.9,-491.6],"bhf":421,"bus":75},{"nr":"120/5","m2":507,"xy":[932.6,-221.3],"bhf":501,"bus":139},{"nr":"120/7","m2":505,"xy":[937.8,-203.8],"bhf":509,"bus":158},{"nr":"154/3","m2":481,"xy":[771.4,-105.1],"bhf":698,"bus":206},{"nr":"165/8","m2":492,"xy":[685.2,-209.6],"bhf":708,"bus":264},{"nr":"169/g","m2":520,"xy":[595.2,52.6],"bhf":935,"bus":96},{"nr":"172/2","m2":513,"xy":[648.7,-60.0],"bhf":822,"bus":148},{"nr":"19/4","m2":483,"xy":[384.8,-270.6],"bhf":959,"bus":465},{"nr":"202","m2":510,"xy":[566.6,-283.8],"bhf":783,"bus":345},{"nr":"238/3","m2":500,"xy":[160.0,-1711.8],"bhf":1616,"bus":1487},{"nr":"266/1","m2":507,"xy":[-6.6,-1822.4],"bhf":1813,"bus":1668},{"nr":"364/a","m2":480,"xy":[-87.0,-307.7],"bhf":1408,"bus":705},{"nr":"419/6","m2":516,"xy":[-320.5,-339.6],"bhf":1634,"bus":859},{"nr":"51/4","m2":494,"xy":[370.9,-108.2],"bhf":1033,"bus":369},{"nr":"561/2","m2":516,"xy":[-592.3,224.7],"bhf":2048,"bus":821},{"nr":"61/a","m2":520,"xy":[445.0,-29.8],"bhf":1006,"bus":267},{"nr":"708/2","m2":495,"xy":[724.0,985.6],"bhf":1652,"bus":99},{"nr":"709/a","m2":480,"xy":[734.4,989.8],"bhf":1653,"bus":89},{"nr":"790/11","m2":502,"xy":[-0.0,0.0],"bhf":1415,"bus":394},{"nr":"792/3","m2":511,"xy":[18.0,-51.7],"bhf":1379,"bus":429},{"nr":"793/4","m2":522,"xy":[27.0,-11.0],"bhf":1386,"bus":389},{"nr":"794/4","m2":493,"xy":[40.9,-51.3],"bhf":1357,"bus":418},{"nr":"798/3","m2":521,"xy":[88.0,-49.1],"bhf":1315,"bus":398},{"nr":"823/2","m2":525,"xy":[293.1,79.9],"bhf":1193,"bus":256},{"nr":"853/5","m2":495,"xy":[-223.7,-484.0],"bhf":1524,"bus":924}],"wahr":"790/11","soll":{"m2":502,"bhf":1600,"bus":300},"bahnhof":[1297.9,-563.7],"bus":[[222.4,325.5],[684.8,86.8],[687.2,82.8],[903.5,-357.6],[891.5,-417.3],[791.7,1057.6],[777.4,1112.6]],"plot_ring":[[-8.14,-17.18],[9.7,-17.17],[9.28,10.15],[-2.72,11.74],[-8.12,12.46],[-8.14,-17.18]]};
+const list = document.getElementById("liste");
+const controls = {
+  tolerance: document.getElementById("tol"),
+  areaTolerance: document.getElementById("flaeche"),
+  hardCut: document.getElementById("hart"),
+  busOnly: document.getElementById("nurBus")
+};
+const FLOOR = 0.05;
+const KEEP = 0.75;      // soft mode keeps a candidate only above this
+const LEAD = 0.15;      // a lead smaller than this is not an answer
+
+/* Trapezoid membership: full inside the tolerance, linear to the floor at twice it. */
+function membership(measured, claimed, tolerance) {
+  if (tolerance <= 0) return measured === claimed ? 1 : FLOOR;
+  const deviation = Math.abs(measured - claimed) / claimed;
+  if (deviation <= tolerance) return 1;
+  if (deviation <= tolerance * 2) return 1 - (deviation - tolerance) / tolerance;
+  return FLOOR;
+}
+
+function render() {
+  const tolerance = Number(controls.tolerance.value) / 100;
+  const areaTolerance = Number(controls.areaTolerance.value) / 100;
+  const hard = controls.hardCut.checked;
+  const busOnly = controls.busOnly.checked;
+
+  const weights = busOnly ? { bus: 0.35, m2: 0.9 } : { bhf: 0.35, bus: 0.35, m2: 0.9 };
+  const scored = SUCHE.kandidaten.map(candidate => {
+    const parts = [];
+    if (weights.bhf) parts.push([weights.bhf, membership(candidate.bhf, SUCHE.soll.bhf, tolerance), Math.abs(candidate.bhf - SUCHE.soll.bhf) / SUCHE.soll.bhf <= tolerance]);
+    parts.push([weights.bus, membership(candidate.bus, SUCHE.soll.bus, tolerance), Math.abs(candidate.bus - SUCHE.soll.bus) / SUCHE.soll.bus <= tolerance]);
+    parts.push([weights.m2, membership(candidate.m2, SUCHE.soll.m2, areaTolerance), Math.abs(candidate.m2 - SUCHE.soll.m2) / SUCHE.soll.m2 <= areaTolerance]);
+    const weightSum = parts.reduce((total, part) => total + part[0], 0);
+    const score = parts.reduce((total, part) => total + part[0] * part[1], 0) / weightSum;
+    const survives = hard ? parts.every(part => part[2]) : score >= KEEP;
+    return { ...candidate, score, survives };
+  }).sort((a, b) => b.score - a.score);
+
+  const kept = scored.filter(candidate => candidate.survives);
+  const truth = scored.find(candidate => candidate.nr === SUCHE.wahr);
+  const rank = scored.indexOf(truth) + 1;
+
+  list.innerHTML = "";
+  for (const candidate of scored) {
+    const row = document.createElement("div");
+    row.className = "wb-zeile" + (candidate.survives ? "" : " raus") + (candidate.nr === SUCHE.wahr ? " wahr" : "");
+    row.innerHTML = '<span class="wb-nr"></span><span class="wb-bar"><i style="width:' +
+      (candidate.score * 100).toFixed(0) + '%"></i></span><span class="wb-punkte"></span>';
+    row.querySelector(".wb-nr").textContent = candidate.nr;
+    row.querySelector(".wb-punkte").textContent = candidate.score.toFixed(2);
+    row.title = candidate.m2 + " m² · Bahnhof " + candidate.bhf + " m · Bus " + candidate.bus + " m";
+    list.appendChild(row);
+  }
+
+  document.getElementById("outTol").textContent = "±" + controls.tolerance.value + " %";
+  document.getElementById("outFlaeche").textContent = "±" + controls.areaTolerance.value + " %";
+  document.getElementById("stand").innerHTML =
+    "<b" + (truth.survives ? "" : ' class="weg"') + ">" +
+    (truth.survives ? "790/11 auf Rang " + rank : "790/11 ausgeschieden") +
+    "</b> · " + kept.length + " von 25 im Rennen";
+  const lead = scored.length > 1 ? truth.score - scored[1].score : 1;
+  document.getElementById("fuss").textContent = !truth.survives
+    ? "Das richtige Flurstück ist aus der Liste gefallen. Keine spätere Stufe holt es zurück."
+    : rank > 1
+      ? "790/11 steht auf Rang " + rank + " von 25. Für ein Ergebnis zu wenig, für eine Vorauswahl genug."
+      : lead >= LEAD
+        ? "790/11 führt mit " + lead.toFixed(2) + " Vorsprung vor " + scored[1].nr + ". Das reicht als Vorauswahl — bestätigt ist es erst nach der Prüfung gegen ALKIS."
+        : "790/11 führt, aber " + scored[1].nr + " liegt bei " + scored[1].score.toFixed(2) + ". Gleichauf ist kein Ergebnis: die Oberfläche zeigt hier alle Kandidaten, keinen davon als Treffer.";
+}
+
+for (const control of Object.values(controls)) control.addEventListener("input", render);
+render();
+</script>
