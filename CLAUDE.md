@@ -722,14 +722,18 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 463 passed (8 of them skip without Tesseract)
-- `vitest`: 444 passed — plus the integration file, excluded by `npm run test`
+- `pytest`: 464 passed, 1 skipped (that one needs pyosmium, which only the
+  index builder wants). Three of the 464 need Tesseract and skip without it.
+- `vitest`: 453 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
-- `scripts/screenshots.mjs`: 47 images plus a print PDF. It fails on console
+- `scripts/screenshots.mjs`: 50 images plus a print PDF. It fails on console
   errors, on horizontal overflow, and if not a single vector tile arrived. It
   also drives the live geocoder, which is slow often enough to blow the 60 s
   wait on the destinations step — two runs failed there and the third passed
   with nothing changed. Re-run once before going looking for the bug.
   The two `suche-*` images run a **real** search against ALKIS, so they need a
   backend on :8000 like every other picture here; without one the step reports
-  "die Suche kam zu keinem Ergebnis" rather than passing quietly.
+  "die Suche kam zu keinem Ergebnis" rather than passing quietly. The three
+  `assistent-werte-*` images paste a saved advert
+  (`backend/tests/fixtures/inserat-kleinanzeigen.html`) through
+  `/api/listings/extract`, which needs the same backend and no LLM key.
