@@ -336,11 +336,22 @@ The measurements behind every threshold are in
 `docs/research/flurstueck-identifikation.md`; the six phases are drawn out in
 `docs/strategie/suchalgorithmus.html`.
 
-**Image text recognition is the one channel not built here.** The endpoint
-accepts `indizien` from the caller so it plugs in without a contract change,
-and `docs/research/flurstueck-identifikation.md` § 10 has the measured ladder
-(upscale, then `--psm 6`, then `--psm 1`) — but no Tesseract is wired up, so
-nothing in this repository reads an image today.
+**A seller who attaches a Geoportal print has already answered the question.**
+The images are read for „Flurstück“ and „Gemarkung“ — upscale to 1 500 px, then
+`--psm 6`, then `--psm 1` only if nothing matched — but only when the text
+names no parcel, and the loop stops at the first hit. Measured on a real
+advert: image four of seven yielded `Flurstück 790/11` in 862 ms and the whole
+search then took **two** cadastre requests; across 21 real listing images there
+was no false parcel number and no false Gemarkung, which is why every image is
+read and filtered by pattern rather than sorted first.
+
+Tesseract is optional, like the POI index. Without it `/api/health` says so and
+the search runs on the listing's text:
+
+```bash
+apt-get install -y tesseract-ocr tesseract-ocr-deu
+backend/.venv/bin/pip install -e "backend[ocr]"
+```
 
 ## Not done yet
 
@@ -358,11 +369,10 @@ nothing in this repository reads an image today.
   including why it is not being built yet.
 - **The dimension figures get small on a narrow screen.** Nothing overflows, but
   at 390 px they are hard to read.
-- **The search reads no images.** The OCR ladder is measured and written down
-  but not wired in, so a listing whose only cadastral evidence is an attached
-  extract falls back to its area and its place names. `POST
-  /api/parcels/search` already takes `indizien` from the caller, which is where
-  that channel will attach.
+- **immobilienscout24.de still answers 401** to every server-side request, so
+  its pictures cannot be fetched here either. The paste field is the way in:
+  image extraction falls back to ordinary `<img>` URLs for pages whose markup
+  is not known, and those CDNs generally do answer.
 - **The street filter uses the cadastre's own address field, not OSM.** That is
   free and needs no Overpass, but it only covers the parcels that carry an
   address — half of them in the district measured. The OSM buffer (25 → 5 on

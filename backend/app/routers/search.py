@@ -20,11 +20,12 @@ from typing import AsyncIterator
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
-from ..deps import alkis_service, gemarkung_directory
+from ..deps import alkis_service, gemarkung_directory, settings_dep
 from ..gemarkung_index import GemarkungDirectory
 from ..schemas import ParcelSearchRequest, ParcelSearchResponse, SuchEreignis
 from ..search import run_search
 from ..services.alkis import AlkisService
+from ..settings import Settings
 
 router = APIRouter(prefix="/api/parcels", tags=["Flurstücke"])
 
@@ -37,9 +38,10 @@ async def _stream(
     payload: ParcelSearchRequest,
     alkis: AlkisService,
     directory: GemarkungDirectory | None,
+    settings: Settings,
 ) -> AsyncIterator[bytes]:
     try:
-        async for event in run_search(payload, alkis, directory):
+        async for event in run_search(payload, alkis, directory, settings.app):
             yield _line(event)
     except Exception as exc:  # noqa: BLE001 - the stream has to carry its own failure
         # Headers are long gone by the time an upstream fails, so an error can
@@ -69,9 +71,10 @@ async def search(
     payload: ParcelSearchRequest,
     alkis: AlkisService = Depends(alkis_service),
     directory: GemarkungDirectory | None = Depends(gemarkung_directory),
+    settings: Settings = Depends(settings_dep),
 ) -> StreamingResponse:
     return StreamingResponse(
-        _stream(payload, alkis, directory),
+        _stream(payload, alkis, directory, settings),
         media_type="application/x-ndjson",
         # Nginx is configured for this already; the header says so to anything
         # else that might buffer the answer into uselessness.
@@ -88,6 +91,7 @@ async def search_complete(
     payload: ParcelSearchRequest,
     alkis: AlkisService = Depends(alkis_service),
     directory: GemarkungDirectory | None = Depends(gemarkung_directory),
+    settings: Settings = Depends(settings_dep),
 ) -> ParcelSearchResponse:
     """The whole run at once, for callers that cannot read a stream.
 
@@ -95,7 +99,7 @@ async def search_complete(
     """
 
     events: list[SuchEreignis] = []
-    async for event in run_search(payload, alkis, directory):
+    async for event in run_search(payload, alkis, directory, settings.app):
         events.append(event)
 
     final = events[-1] if events else None

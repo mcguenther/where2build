@@ -621,7 +621,146 @@ and the features fetched only once the count is small enough to draw.
   did not say whose candidates win. They are unioned, and the fact that more
   than one anchor survived *is itself* the thing to show the user.
 
-## 16. What is still unverified ⚠️
+---
+
+## 16. Third pass, 05.09.2026: four listings that did not work ✅
+
+Four adverts the author reported as failing. All four now resolve to a single
+confirmed parcel in six or seven cadastre requests. Each failure was a
+different bug, and three of them were mistakes in the *reading*, not in the
+search.
+
+| Advert | Reported | Now |
+|---|---|---|
+| 3423861748, "Ortsteil Lobstädt bei Neukieritzsch", 1 025 m² | 3 candidates, ambiguous | **51/3, Gemarkung Lobstädt**, Dora-Helene-Straße 5 |
+| 3375124391, "Ortsteil Plagwitz von Machern", 1 489 m² | 2 candidates, ambiguous | **309/6, Gemarkung Plagwitz** |
+| 3503721553, "in Bad Lausick", 1 076 m² | 9 candidates, ambiguous | **502/47, Gemarkung Etzoldshain**, "Am Kurpark" |
+| 3499632623 (the reference), parcel number on an attached print | text only | **790/11 in 2 requests**, read off the image |
+
+### 16.1 The municipality is the missing key, and it was already in the file ✅
+
+`gemarkungen-sachsen.json` carries `gemeinde` per district and nothing used it.
+
+    Plagwitz   140427 → Stadt Leipzig
+    Plagwitz   148642 → Machern
+
+Two districts of that name, and the listing says "Ortsteil Plagwitz **von
+Machern**". One line of directory lookup turns an ambiguity into an answer —
+and the same field removes the false candidates in the Lobstädt advert, where
+"gute Anbindung **an Leipzig**" had made Gemarkung Leipzig an anchor and Leipzig
+holds two parcels of exactly 1 025 m².
+
+**The location field's municipality is reliable even though its coordinate is
+not.** That looks like a contradiction of § 2 and is not: the pin is 6 km out
+*because* it is the municipality's geocode, so the name it was geocoded from is
+exactly the part that holds. True on all four adverts:
+
+| Location field | Parcel's district | Its municipality |
+|---|---|---|
+| 04668 Sachsen – Grimma | Großbothen | Stadt Grimma |
+| 04827 Sachsen - Machern | Plagwitz | Machern |
+| 04575 Sachsen - Neukieritzsch | Lobstädt | Neukieritzsch |
+| 04651 Sachsen - Bad Lausick | Etzoldshain | Stadt Bad Lausick |
+
+Used as a filter *with a fallback*: when nothing matches, the whole anchor set
+stands. It is a strong hint, not an official fact about this plot.
+
+### 16.2 Widen the *place* before the *number* ✅
+
+"1.076 m² in Bad Lausick" has **no** match in Gemarkung Bad Lausick. The
+drafted staircase would open the tolerance; that is the wrong thing to give up.
+
+| Constraint | Parcels |
+|---|---|
+| Gemarkung Bad Lausick + `flaeche = 1076` | **0** |
+| Gemarkung Bad Lausick + ±0,5 % | 5 |
+| **Gemeinde** Stadt Bad Lausick + `flaeche = 1076` | **1** |
+
+The one is Flurstück 502/47 in Gemarkung **Etzoldshain**, `lagebeztxt`
+"Am Kurpark" — and the advert is titled "Naturnah wohnen am Kurpark". The
+Gemarkung named in the prose was simply the wrong level.
+
+An exactly stated area is an official fact; a Gemarkung read out of prose is
+not. Widening the number to keep the guess throws away the better of the two.
+Stadt Bad Lausick has 14 Gemarkungen and 11 156 parcels, so this stays a hard
+filter — it is the *place* that got looser, not the test.
+
+### 16.3 German capitalises every noun ✅
+
+A bare directory match is not evidence. The Machern advert reads "geprägt von
+**Wiesen** und Feldern", and Wiesen is a real Gemarkung (148950, Stadt
+Wildenfels); "**Leipzig**" and "**Püchau**" arrive the same way. Each cost a
+count request and one produced false candidates.
+
+Only a place with a *positional* relation is searched now — `liegt_in` or
+`liegt_an`. A bare mention stays in the protocol as weak evidence, where it
+belongs. Same reason "Ihr Platz zum Träumen" and "einen befahrbaren Feldweg"
+were being read as streets.
+
+And the relation itself needs care: "Anbindung **an** Leipzig", "Nähe **zu**
+Leipzig" are connectivity, not location.
+
+### 16.4 „Ortsteil <A> von <B>" — the district comes first ✅
+
+The second pass handled "Großbothen, einem OT von Grimma" and missed the more
+common ordering:
+
+    Ortsteil Plagwitz von Machern
+    Ortsteil Lobstädt bei Neukieritzsch
+    Ortsteil Plagwitz der Gemeinde Machern
+
+All three name the district *and* the municipality, one level apart. Reading
+that pair is what makes § 16.1 possible.
+
+### 16.5 Tesseract, wired up and measured ✅
+
+Now built, not just designed. Against the reference advert's seven images:
+
+| | |
+|---|---|
+| Image 4 (Geoportal print, 678 x 960) | `Flurstück 790/11`, **862 ms**, first pass |
+| The other six (site photographs, orthophoto) | nothing, both passes |
+| Whole advert, text first then images | **2** cadastre requests, 15,6 s |
+
+Across 14 further images from the three other adverts: **no false parcel
+number and no false Gemarkung.** That is the property the design rests on, and
+it now has 21 real images behind it rather than four.
+
+**Two things the design got wrong, both found by running it:**
+
+* **Reading the images concurrently is slower, not faster.** Tesseract is
+  CPU-bound; seven at once pushed every process past a 30 s timeout on this
+  machine, where sequentially each takes 0,9–5 s. The drafted "stop at the
+  first hit" was right and the concurrency was an unmeasured optimisation.
+* **A timed-out reader looked exactly like a photograph of a lawn.** Both
+  produce no text, and the code reported both as "no cadastral extract
+  attached" — a claim about the listing that it had never checked. `read()`
+  now returns the failure alongside the text, and the search says "n of m
+  images could not be read" rather than answering for them.
+
+**What a portal serves is smaller than the reader wants.** Kleinanzeigen's
+largest variant is 678 x 960 for the print and 960 x 720 for a photograph, so
+the upscale is not the exception the earlier measurement implied — it runs on
+every image.
+
+### 16.6 Traps in getting the pages at all ✅
+
+* **Kleinanzeigen answers the first request with 403 and the second with the
+  page.** Reproduced on three adverts, exactly once each. Not a block, a
+  warm-up; one retry is the difference between "the portal refuses us" and a
+  working read.
+* **The whole page is not the listing.** `html_to_text` returns navigation,
+  cookie banner and category tree, and the search read all of it as evidence.
+  The description sits in one findable element (`#viewad-description-text`);
+  the structured attribute list next to it carries the *authoritative* area,
+  which may be exact where the title hedges ("ca. 1.025qm" against
+  "1.025 m²").
+* **immobilienscout24.de still answers 401**, re-confirmed. Its images
+  therefore have to come through the paste field, which is why image
+  extraction falls back to ordinary `<img>` URLs for pages whose markup is not
+  known here.
+
+## 17. What is still unverified ⚠️
 
 * The three prompts in `docs/strategie/extraktion-prompting.html` are drafted
   but have not been run against a model — this listing did not need them.

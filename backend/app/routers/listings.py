@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from fastapi import APIRouter, Depends
 from pydantic import ValidationError
 
@@ -40,6 +42,26 @@ _NO_LOCATOR = (
 )
 
 
+def _area_from(angaben: dict[str, str]) -> int | None:
+    """The plot area out of the portal's own attribute list.
+
+    Structured and therefore better than the same number read out of the prose:
+    a title may hedge („ca. 1.025qm") where the field states 1.025 m², and the
+    tolerance staircase starts where the *wording* says.
+    """
+
+    raw = angaben.get("Grundstücksfläche")
+    if not raw:
+        return None
+    match = re.search(r"\d[\d.\s]*", raw)
+    if not match:
+        return None
+    try:
+        return int(float(match.group(0).replace(".", "").replace(" ", "")))
+    except ValueError:
+        return None
+
+
 def _merge(deterministic: InseratFelder, extracted: InseratFelder | None) -> InseratFelder:
     """Deterministic values win; the model only fills the gaps."""
 
@@ -64,6 +86,7 @@ def _answer(
     hinweis: str | None = None,
     titel: str | None = None,
     beschreibung: str | None = None,
+    bilder: list[str] | None = None,
 ) -> ListingExtractResponse:
     try:
         inserat = Inserat(**felder.model_dump(), quelle_url=quelle_url)
@@ -76,6 +99,7 @@ def _answer(
         weg=weg,
         hinweis=hinweis or titel,
         beschreibung=text[:_DESCRIPTION_LIMIT] or None,
+        bilder=bilder or [],
     )
 
 
@@ -86,7 +110,10 @@ async def _from_url(url: str, llm: LLMClient, settings: Settings) -> ListingExtr
 
     if is_kleinanzeigen(url):
         seite = await fetch_page(url, settings.app)
-        deterministic = InseratFelder(adresse=seite.adresse, lat=seite.lat, lon=seite.lon)
+        deterministic = InseratFelder(
+            adresse=seite.adresse, lat=seite.lat, lon=seite.lon,
+            grundstuecksflaeche_m2=_area_from(seite.angaben),
+        )
         weg: Extraktionsweg = "meta-tags" if seite.has_coordinates else "llm"
         hinweis = None
         extracted: InseratFelder | None = None
@@ -105,7 +132,15 @@ async def _from_url(url: str, llm: LLMClient, settings: Settings) -> ListingExtr
                 "keine Koordinaten. Bitte den Seiteninhalt einfügen."
             )
         return _answer(
-            _merge(deterministic, extracted), url, weg, hinweis, seite.titel, seite.text
+            _merge(deterministic, extracted),
+            url,
+            weg,
+            hinweis,
+            seite.titel,
+            # The description, not the whole page: without this the search
+            # reads a portal's navigation and cookie banner as evidence.
+            seite.beschreibung or seite.text,
+            seite.bilder,
         )
 
     # Unknown domain: the spec's chain is web_fetch first, then meta tags and
@@ -127,7 +162,8 @@ async def _from_url(url: str, llm: LLMClient, settings: Settings) -> ListingExtr
                     url,
                     "meta-tags",
                     titel=seite.titel,
-                    beschreibung=seite.text,
+                    beschreibung=seite.beschreibung or seite.text,
+                    bilder=seite.bilder,
                 )
             raise NotConfiguredError(
                 "Das Auslesen von Seiten ist nicht konfiguriert. "
@@ -145,7 +181,8 @@ async def _from_url(url: str, llm: LLMClient, settings: Settings) -> ListingExtr
         url,
         "llm",
         titel=seite.titel if seite else None,
-        beschreibung=text,
+        beschreibung=(seite.beschreibung if seite and seite.beschreibung else text),
+        bilder=seite.bilder if seite else None,
     )
 
 
@@ -179,4 +216,10 @@ async def extract(
         if seite is not None
         else InseratFelder()
     )
-    return _answer(_merge(deterministic, extracted), None, "eingefuegter-text", beschreibung=text)
+    return _answer(
+        _merge(deterministic, extracted),
+        None,
+        "eingefuegter-text",
+        beschreibung=(seite.beschreibung if seite and seite.beschreibung else text),
+        bilder=seite.bilder if seite else None,
+    )

@@ -91,7 +91,18 @@ _RELATION_PATTERNS: tuple[tuple[Ortsbeziehung, re.Pattern[str]], ...] = (
             re.IGNORECASE,
         ),
     ),
-    ("liegt_an", re.compile(r"(?:direkt\s+)?(?:an|am)\s+(?:der\s+|dem\s+)?", re.IGNORECASE)),
+    (
+        "liegt_an",
+        # „Anbindung an Leipzig“ and „Nähe zu Leipzig“ are statements about how
+        # well connected the plot is, not about what it borders — and Leipzig
+        # holds parcels of every size, so reading them as location put two
+        # false candidates next to the right one.
+        re.compile(
+            r"(?<!anbindung )(?<!verbindung )(?<!anschluss )(?<!nähe )(?<!naehe )"
+            r"(?:direkt\s+)?(?:an|am)\s+(?:der\s+|dem\s+)?",
+            re.IGNORECASE,
+        ),
+    ),
     (
         "entfernt_von",
         re.compile(
@@ -109,15 +120,51 @@ _RELATION_PATTERNS: tuple[tuple[Ortsbeziehung, re.Pattern[str]], ...] = (
 # How much of the sentence before a name is searched for a relation trigger.
 _RELATION_WINDOW = 60
 
-# „Großbothen, einem OT von Grimma" says two different things about two
-# different places: Großbothen is where the plot is, and Grimma is the
-# municipality Großbothen belongs to. Reading both as candidate cadastral
-# districts is what made the reference listing look contested when it is not --
-# and it is why the same text scores Grimma as often as Großbothen.
-_MUNICIPALITY_RE = re.compile(
-    r"(?:einem?\s+|ein\s+)?(?:OT|Ortsteil|Stadtteil|Gemeindeteil)\s+(?:von|der|des)\s+"
-    r"([A-ZÄÖÜ][\wäöüßÄÖÜ\-]{2,}(?:[ -][A-ZÄÖÜ][\wäöüßÄÖÜ\-]+)?)",
+# A place name, as German writes one.
+_NAME = r"[A-ZÄÖÜ][\wäöüßÄÖÜ\-]{2,}(?:[ -][A-ZÄÖÜ][\wäöüßÄÖÜ\-]+)?"
+
+# „Ortsteil Plagwitz von Machern“ says two different things about two different
+# places, one level apart: Plagwitz is where the plot is, Machern is the
+# municipality it belongs to. Reading both as candidate cadastral districts is
+# what made the reference listing look contested when it is not.
+#
+# The two orderings both occur and neither is rare:
+#
+#     Ortsteil Plagwitz von Machern        district first
+#     Ortsteil Lobstädt bei Neukieritzsch  district first
+#     Ortsteil Plagwitz der Gemeinde Machern
+#     Großbothen, einem OT von Grimma      district before the word
+#
+# Getting the *level* right is what makes the municipality usable, and the
+# municipality is what separates the two Gemarkungen called Plagwitz — one in
+# Machern, one in Leipzig.
+_OT_NAMED_RE = re.compile(
+    rf"(?:OT|Ortsteil|Stadtteil|Gemeindeteil)\s+(?P<district>{_NAME})\s+"
+    rf"(?:von|bei|in|der\s+Gemeinde|der\s+Stadt|des\s+Marktes)\s+(?P<municipality>{_NAME})",
 )
+_OT_BEFORE_RE = re.compile(
+    rf"(?P<district>{_NAME})\s*,\s*(?:einem?\s+|ein\s+)?"
+    rf"(?:OT|Ortsteil|Stadtteil|Gemeindeteil)\s+(?:von|der|des)\s+(?P<municipality>{_NAME})",
+)
+_OT_PLAIN_RE = re.compile(
+    rf"(?:einem?\s+|ein\s+)?(?:OT|Ortsteil|Stadtteil|Gemeindeteil)\s+(?:von|der|des)\s+"
+    rf"(?P<municipality>{_NAME})",
+)
+
+# The platform's location field: „04827 Sachsen - Machern“, „04668 Sachsen –
+# Grimma“. The municipality is the tail, and it is the cheapest way there is to
+# tell two districts of the same name apart.
+_LOCALITY_RE = re.compile(rf"(?:^|[-–—])\s*(?P<municipality>{_NAME})\s*$")
+
+# A street name that begins with one of these is a sentence, not a street:
+# „Ihr Platz zum Träumen“ is a headline and „einen befahrbaren Feldweg“ is a
+# path through a field. German capitalises every noun, so the usual signal —
+# a capital letter — says nothing here.
+_NOT_A_STREET_PREFIX = (
+    "ihr", "ihre", "der", "die", "das", "den", "dem", "ein", "eine", "einen",
+    "einem", "mein", "unser", "unsere", "kein", "jeder", "dieser", "diese",
+)
+_NOT_A_STREET = ("feldweg", "wanderweg", "radweg", "waldweg", "fußweg", "gehweg", "kirchweg")
 
 # The GeoSN prints its own address on every sheet it issues. A street read out
 # of a map extract next to any of these is the authority signing its work, not
@@ -407,6 +454,24 @@ def collect_indicia(
                 beziehung="liegt_in",
             )
         )
+        # The municipality out of it. The pin derived from this field is
+        # useless — measured 6 235 m out — but the *name* it was geocoded from
+        # is not: it is what separates the Plagwitz in Machern from the one in
+        # Leipzig, and it costs nothing.
+        municipality = _LOCALITY_RE.search(adresse.strip())
+        if municipality:
+            name = municipality.group("municipality")
+            found.append(
+                _indiz(
+                    counter,
+                    art="gemeinde",
+                    wert=name,
+                    text=f"Gemeinde {name} laut Standortfeld — grenzt gleichnamige Gemarkungen ein",
+                    quelle="standortfeld",
+                    beleg=adresse.strip(),
+                    beziehung="liegt_in",
+                )
+            )
     if lat is not None and lon is not None:
         found.append(
             _indiz(
@@ -451,21 +516,32 @@ def _from_body(
         )
 
     # A place named as the municipality an Ortsteil belongs to is not a rival
-    # reading of where the plot is -- it is the level above. Collected first so
-    # the district scan below knows to weigh it down rather than treat it as a
-    # competing cadastral district.
+    # reading of where the plot is -- it is the level above, and it is what
+    # tells two districts of the same name apart. Collected first so the
+    # district scan below knows which names are already spoken for.
     municipalities: dict[str, tuple[int, int]] = {}
-    for match in _MUNICIPALITY_RE.finditer(body):
-        municipalities[fold(match.group(1))] = (match.start(1), match.end(1))
-    for name_key, (start, end) in municipalities.items():
+    stated_districts: dict[str, tuple[int, int]] = {}
+    for pattern in (_OT_NAMED_RE, _OT_BEFORE_RE, _OT_PLAIN_RE):
+        for match in pattern.finditer(body):
+            groups = match.groupdict()
+            name = groups["municipality"]
+            municipalities.setdefault(fold(name), match.span("municipality"))
+            if groups.get("district"):
+                stated_districts.setdefault(
+                    fold(groups["district"]), match.span("district")
+                )
+
+    for _, (start, end) in municipalities.items():
+        name = body[start:end]
         out.append(
             _indiz(
                 counter,
                 art="gemeinde",
-                wert=body[start:end],
+                wert=name,
                 text=(
-                    f"{body[start:end]} ist laut Text die Gemeinde, nicht der Ortsteil — "
-                    "eine Ebene über der gesuchten Gemarkung"
+                    f"{name} ist laut Text die Gemeinde, nicht der Ortsteil — eine Ebene "
+                    "über der gesuchten Gemarkung, und genau das, was gleichnamige "
+                    "Gemarkungen auseinanderhält"
                 ),
                 quelle="fliesstext",
                 beleg=_excerpt(body, start, end),
@@ -474,7 +550,25 @@ def _from_body(
             )
         )
 
-    named: set[str] = set()
+    # „Ortsteil Plagwitz von Machern“ names the district outright. That is a
+    # far stronger statement than a name the text merely contains, and it is
+    # the one the search should anchor on.
+    for _, (start, end) in stated_districts.items():
+        name = body[start:end]
+        out.append(
+            _indiz(
+                counter,
+                art="gemarkung",
+                wert=name,
+                text=f"Der Text nennt {name} ausdrücklich als Ortsteil",
+                quelle="fliesstext",
+                beleg=_excerpt(body, start, end),
+                beziehung="liegt_in",
+                sicherheit=0.68,
+            )
+        )
+
+    named: set[str] = set(stated_districts)
     for match in _DISTRICT_RE.finditer(body):
         name = match.group(1).strip(" .:-")
         entries = _district_matches(directory, name) if directory else []
@@ -531,7 +625,7 @@ def _from_body(
 
     for match in _STREET_RE.finditer(body):
         name = match.group(1).strip()
-        if _in_authority_block(body, match.start()):
+        if _in_authority_block(body, match.start()) or not _is_street_name(name):
             continue
         if any(indiz.art == "strasse" and indiz.wert == name for indiz in out):
             continue
@@ -566,6 +660,21 @@ def _named_as_distant(body: str, folded_name: str) -> bool:
         if any(m.end() >= len(window) - 2 for m in pattern.finditer(window)):
             return True
     return False
+
+
+def _is_street_name(name: str) -> bool:
+    """Whether a match ending in -weg or -platz is plausibly a street.
+
+    German capitalises every noun, so the capital letter that finds a street
+    also finds „Ihr Platz zum Träumen“ and „einen befahrbaren Feldweg“. Two
+    cheap rules remove both: a leading article or pronoun makes it a sentence,
+    and a handful of generic paths are never addresses.
+    """
+
+    words = name.split()
+    if words and words[0].lower() in _NOT_A_STREET_PREFIX:
+        return False
+    return name.lower() not in _NOT_A_STREET
 
 
 def _in_authority_block(body: str, position: int) -> bool:

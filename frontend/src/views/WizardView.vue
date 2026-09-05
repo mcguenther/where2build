@@ -311,6 +311,11 @@ export default {
        * plot; see lib/plots.js for what a plot actually carries. */
       description: "",
       searchQuery: null,
+      /* The listing's pictures. The search reads them only when the text names
+       * no Flurstück — a seller who attaches a Geoportal print has already
+       * answered the question, and one who has not costs three seconds an
+       * image to learn nothing. */
+      images: [],
       // Bumped to remount the search rather than reuse a finished one.
       searchRun: 0,
       draft: null,
@@ -423,6 +428,7 @@ export default {
           : await readPage(this.pastedText);
         this.readFields = fieldsFromResponse(response);
         this.description = response?.beschreibung || (this.source === "paste" ? this.pastedText : "");
+        this.images = response?.bilder || [];
         this.returnStage = "werte";
         this.goToStage("werte");
       } catch (error) {
@@ -445,6 +451,7 @@ export default {
       const read = name => this.readFields.find(f => f.key === name)?.value;
       this.searchQuery = queryFromFields(this.readFields, {
         ...(this.description ? { text: this.description } : {}),
+        ...(this.images.length ? { bilder: this.images } : {}),
         ...(this.gemarkungQuery ? { gemarkung: this.gemarkungQuery } : {})
       });
       this.listingExtras = {

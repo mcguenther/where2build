@@ -152,7 +152,7 @@ import { area } from "../lib/format.js";
 
 const SOURCE_LABELS = {
   nutzer: "von Hand",
-  bild: "aus einem Bild gelesen",
+  bild: "aus einem Bild der Anzeige gelesen",
   attribut: "Attributliste der Anzeige",
   fliesstext: "Anzeigentext",
   modell: "Modell",

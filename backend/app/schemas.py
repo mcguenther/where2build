@@ -195,6 +195,9 @@ class ListingExtractResponse(BaseModel):
     quelle_url: HttpUrl | None = None
     weg: Extraktionsweg
     hinweis: str | None = None
+    # The listing's images, largest variant each. The search reads them for a
+    # cadastral extract; nothing else in the app uses them.
+    bilder: list[str] = Field(default_factory=list)
     # The listing's own description, as the page carries it. Not an extracted
     # field and never part of a stored plot: it travels so the parcel search can
     # read the cadastral district, the street and the relation between the
@@ -1028,9 +1031,16 @@ class ParcelSearchRequest(BaseModel):
     flaeche_text: str | None = Field(default=None, max_length=120)
     gemarkung: str | None = Field(default=None, max_length=120)
     flurstuecksnummer: str | None = Field(default=None, max_length=20)
-    # Indicia the caller gathered elsewhere -- image text recognition above
-    # all. Accepted as input so that channel can be added without changing
-    # this contract.
+    # The listing's images. Read only when the text carries no parcel number:
+    # a seller who attaches a Geoportal print has already answered the question,
+    # and Tesseract reads that print's title block reliably. Measured on a real
+    # advert: one of seven images yielded „Flurstück 790/11", the other six
+    # yielded nothing at all -- which is what makes reading every image and
+    # filtering by pattern safer than classifying images first.
+    bilder: list[str] = Field(default_factory=list, max_length=24)
+    # Indicia the caller gathered elsewhere. Accepted as input so a channel
+    # this server cannot run -- an image the browser holds but the backend
+    # cannot fetch -- still has a way in.
     indizien: list[Indiz] = Field(default_factory=list)
     # Indiz ids the user switched off. The search runs again without them.
     verworfen: list[str] = Field(default_factory=list)

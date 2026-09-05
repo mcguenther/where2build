@@ -585,6 +585,58 @@ from the user directly. Reopen only if the user asks.
   Nothing else fails: the run simply stops after its first line, with the map
   still showing the whole of Saxony and one entry in the protocol. Wrap the
   timers (`(fn, ms) => setTimeout(fn, ms)`), do not reference them.
+- **The directory's `gemeinde` column is the key nothing was using.** There are
+  two Gemarkungen called Plagwitz — 140427 in Leipzig, 148642 in Machern — and
+  „Ortsteil Plagwitz von Machern“ picks one with a directory lookup and no
+  request. The same column removes Gemarkung Leipzig as an anchor when the
+  location field says Neukieritzsch, which is what stopped a listing's two
+  false 1 025 m² candidates. Used as a filter *with a fallback*: nothing
+  matching means the whole anchor set stands.
+- **The location field's *municipality* is reliable even though its coordinate
+  is not.** That reads like a contradiction of the 6 235 m pin and is not: the
+  pin is that far out *because* it is the municipality's geocode, so the name
+  it was geocoded from is exactly the part that holds. True on all four
+  adverts measured — Grimma/Großbothen, Machern/Plagwitz,
+  Neukieritzsch/Lobstädt, Bad Lausick/Etzoldshain.
+- **Widen the *place* before the *number*.** „1.076 m² in Bad Lausick“ has **0**
+  matches in Gemarkung Bad Lausick and exactly **1** in the Gemeinde — Flurstück
+  502/47 in Gemarkung *Etzoldshain*, `lagebeztxt` „Am Kurpark“, and the advert
+  is titled „Naturnah wohnen am Kurpark“. An exactly stated area is an official
+  fact; a Gemarkung read out of prose is not, so opening the tolerance to keep
+  the guess throws away the better of the two.
+- **German capitalises every noun, so a capital letter finds nothing.** „geprägt
+  von Wiesen und Feldern“ made Gemarkung Wiesen (148950) an anchor; „Ihr Platz
+  zum Träumen“ and „einen befahrbaren Feldweg“ were read as streets. Only a
+  place with a *positional* relation is searched — a bare mention stays in the
+  protocol as weak evidence and costs no request. And „Anbindung **an**
+  Leipzig“ is connectivity, not location.
+- **„Ortsteil <A> von <B>“ — the district comes first, and both matter.**
+  „Ortsteil Plagwitz von Machern“, „Ortsteil Lobstädt bei Neukieritzsch“,
+  „Ortsteil Plagwitz der Gemeinde Machern“: A is the Gemarkung, B the Gemeinde.
+  „Großbothen, einem OT von Grimma“ is the same statement with the name in
+  front. Reading the *level* is what makes the municipality usable.
+- **Reading a listing's images concurrently is slower, not faster.** Tesseract
+  is CPU-bound; seven at once pushed every process past a 30 s timeout on this
+  machine, where sequentially each takes 0,9–5 s. Read them one at a time and
+  stop at the first parcel number — the drafted algorithm said so and the
+  concurrency was an unmeasured optimisation that made it worse.
+- **A timed-out reader looks exactly like a photograph of a lawn.** Both
+  produce no text, and reporting both as „kein Katasterauszug dabei“ is a claim
+  about the listing that was never checked. `ocr.read()` returns the failure
+  next to the text, and the search says how many images it could not read.
+- **What a portal *serves* is smaller than the reader wants.** Kleinanzeigen's
+  largest variant is 678 x 960 for a cadastral print and 960 x 720 for a
+  photograph, whatever the camera produced — so the 1 500 px upscale runs on
+  every image in production, not on the odd small one.
+- **Kleinanzeigen answers the first request with 403 and the second with the
+  page.** Reproduced on three adverts, exactly once each. Not a block, a
+  warm-up: `fetch_page` retries once.
+- **The whole page is not the listing.** `html_to_text` returns navigation,
+  cookie banner and category tree, and the search read all of it as evidence.
+  The description sits in `#viewad-description-text`, and the attribute list
+  beside it carries the *authoritative* area — a title may hedge („ca.
+  1.025qm“) where the field states 1.025 m², and the tolerance staircase starts
+  from the wording.
 - **Verify a "not affected" against a control point.** A layer that answers
   zero features looks the same whether the plot is clear or the layer is
   empty. `luft/radonvorsorgegebiete` holds 107 municipalities and answers "no"
@@ -609,6 +661,11 @@ docker compose up --build      # http://localhost:8080
 # imports for ~3.5 min into the motis-graph volume, after that it is seconds.
 ./motis/fetch-data.sh
 MOTIS_BASE_URL=http://motis:8080 docker compose --profile local-routing up --build
+
+# reading a listing's attached cadastral extract -- optional, and the search
+# says so in /api/health when it is missing
+apt-get install -y tesseract-ocr tesseract-ocr-deu
+backend/.venv/bin/pip install -e "backend[ocr]"
 
 # frontend — needs Node >= 22.19: jsdom 30 pulls in undici 8, and on Node 20
 # vitest dies before loading a test with `markAsUncloneable is not a function`.
@@ -638,7 +695,7 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 447 passed
+- `pytest`: 463 passed (8 of them skip without Tesseract)
 - `vitest`: 444 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
 - `scripts/screenshots.mjs`: 47 images plus a print PDF. It fails on console

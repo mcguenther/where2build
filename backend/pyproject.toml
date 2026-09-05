@@ -18,11 +18,21 @@ dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
     "respx>=0.21",
+    # The image tests need it; they skip when Tesseract itself is missing.
+    "pillow>=10.0",
 ]
 # Only scripts/build_poi_index.py needs this, and only where an OSM extract is
 # reachable. The API itself reads the built index with the standard library.
 poi = [
     "osmium>=4.0",
+]
+# Reading a listing's attached cadastral extract. The binary is the real
+# dependency (apt install tesseract-ocr tesseract-ocr-deu); Pillow is what
+# enlarges an image before it is read, which is the single step the
+# measurements say buys the most -- see app/services/ocr.py. Without either,
+# /api/parcels/search runs on the listing's text and says so.
+ocr = [
+    "pillow>=10.0",
 ]
 
 [build-system]

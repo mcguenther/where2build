@@ -35,6 +35,7 @@ from .routers import (
     tiles,
 )
 from .deps import address_index, gemarkung_directory, nearby_service
+from .services import ocr
 from .schemas import DienstStatus, HealthResponse
 from .settings import get_settings
 from .validation import readable_validation_error
@@ -94,6 +95,35 @@ def _poi_hinweis(status: dict[str, Any]) -> str:
     datenstand = status.get("datenstand")
     stand = f", Stand {datenstand}" if datenstand else ""
     return f"{status['anzahl']} Orte aus OpenStreetMap{stand} für {kategorien}. {fahrplan}"
+
+
+def _ocr_hinweis(status: dict[str, Any]) -> str:
+    """What /api/health says about reading a listing's images.
+
+    Same distinction as the POI sentence: absent is "not set up here", never
+    "the listing had nothing". The search falls back to the text, which is
+    where most listings say it anyway.
+    """
+
+    if not status["konfiguriert"]:
+        missing = (
+            "Tesseract ist nicht installiert"
+            if not status["pfad"]
+            else "die deutschen Sprachdaten fehlen"
+        )
+        return (
+            f"Bilder von Inseraten werden nicht gelesen — {missing}. Ein beigelegter "
+            "Katasterauszug nennt Gemarkung und Flurstück oft im Klartext; ohne "
+            "Texterkennung sucht /api/parcels/search allein über den Anzeigentext. "
+            "Nachrüsten mit: apt-get install tesseract-ocr tesseract-ocr-deu"
+        )
+    return (
+        "Bilder eines Inserats werden auf „Flurstück“ und „Gemarkung“ gelesen "
+        f"(Tesseract, Sprachen: {', '.join(status['sprachen'])}). Gemessen: von sieben "
+        "Bildern eines echten Inserats trug eines den Katasterauszug, die übrigen "
+        "sechs lieferten nichts — deshalb wird jedes Bild gelesen und nach Muster "
+        "gefiltert, statt Bilder vorher zu sortieren."
+    )
 
 
 def _adressen_hinweis(index: AddressIndex | None) -> str:
@@ -169,6 +199,7 @@ def create_app() -> FastAPI:
     async def health() -> HealthResponse:
         current = get_settings()
         poi = nearby_service().index_status()
+        ocr_status = ocr.status()
         verzeichnis = gemarkung_directory()
         adressen = address_index()
         return HealthResponse(
@@ -242,6 +273,12 @@ def create_app() -> FastAPI:
                         "Vektor-Hintergrundkarte über /api/basemap/style.json; der Browser "
                         "spricht nur mit diesem Backend."
                     ),
+                ),
+                DienstStatus(
+                    name="texterkennung",
+                    konfiguriert=ocr_status["konfiguriert"],
+                    endpunkt=ocr_status["pfad"],
+                    hinweis=_ocr_hinweis(ocr_status),
                 ),
                 DienstStatus(
                     name="llm",

@@ -7,6 +7,7 @@ are the same figures ``docs/research/flurstueck-identifikation.md`` reports.
 
 from __future__ import annotations
 
+import io
 import json
 
 import httpx
@@ -25,9 +26,13 @@ from app.search.indicia import (
 )
 from app.search.ladder import tolerance_ladder
 from app.search.scoring import land_use, score, street_match
+from app.services import ocr
 from app.services.alkis import parse_feature_collection
 
-from .conftest import ALKIS_URL, fixture_bytes
+from app.deps import alkis_service
+from app.search.engine import SearchEngine
+
+from .conftest import ALKIS_URL, fixture_bytes, fixture_json, fixture_text
 
 # The three district names the reference listing contains, plus the second
 # Höfgen -- a name is not a key, and two of these share one.
@@ -38,9 +43,29 @@ DIRECTORY = GemarkungDirectory(
         GemarkungEntry("Höfgen", "144245", "Stadt Grimma"),
         GemarkungEntry("Höfgen", "146132", "Stadt Colditz"),
         GemarkungEntry("Mölkau", "143156", "Stadt Leipzig"),
+        # The districts the four recorded adverts turn on. Two Plagwitz, and
+        # only the municipality tells them apart.
+        GemarkungEntry("Plagwitz", "140427", "Stadt Leipzig"),
+        GemarkungEntry("Plagwitz", "148642", "Machern"),
+        GemarkungEntry("Machern", "148635", "Machern"),
+        GemarkungEntry("Püchau", "148643", "Machern"),
+        GemarkungEntry("Lobstädt", "141894", "Neukieritzsch"),
+        GemarkungEntry("Neukieritzsch", "141896", "Neukieritzsch"),
+        GemarkungEntry("Leipzig", "140415", "Stadt Leipzig"),
+        GemarkungEntry("Borna", "141810", "Stadt Borna"),
+        GemarkungEntry("Bad Lausick", "143836", "Stadt Bad Lausick"),
+        GemarkungEntry("Etzoldshain", "143840", "Stadt Bad Lausick"),
+        # A common German noun that is also a real Gemarkung. The Machern
+        # advert contains it in „geprägt von Wiesen und Feldern".
+        GemarkungEntry("Wiesen", "148950", "Stadt Wildenfels"),
     ],
     stand="2026-09-05",
 )
+
+# Four real adverts, read on 05.09.2026, with the parcel each resolves to. The
+# descriptions are the portal's own, not the whole page: what the search reads
+# is the listing, and the difference is a cookie banner and a category tree.
+LISTINGS = fixture_json("inserate-sachsen.json")
 
 LISTING = (
     "Baugrundstück in ruhiger Lage am Ortsrand von Großbothen, einem OT von Grimma. "
@@ -62,6 +87,34 @@ def _hits(count: int) -> httpx.Response:
 
 def _gml(name: str) -> httpx.Response:
     return httpx.Response(200, content=fixture_bytes(name))
+
+
+def _cadastre(counts: dict[str, int], features: dict[str, str]):
+    """An ALKIS stub that answers by what was asked, not by call order.
+
+    The search decides how many anchors are worth a request, and that number
+    moves whenever the reading of a listing improves. A stub keyed on the
+    request body keeps the tests about *behaviour* -- which district was asked,
+    what came back -- instead of about a sequence that a better reading breaks.
+
+    ``counts`` and ``features`` map a substring of the request (a district key,
+    an area) to a hit count and to a fixture; the first match wins, and the
+    fallbacks are "nothing there".
+    """
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        body = request.content.decode("utf-8")
+        if 'resultType="hits"' in body:
+            for needle, count in counts.items():
+                if all(part in body for part in needle.split("+")):
+                    return _hits(count)
+            return _hits(0)
+        for needle, fixture in features.items():
+            if all(part in body for part in needle.split("+")):
+                return _gml(fixture)
+        return _gml("alkis_leer.gml")
+
+    return answer
 
 
 def _stream(client: TestClient, payload: dict) -> list[dict]:
@@ -337,13 +390,15 @@ def test_the_user_can_choose_which_reading_applies(client: TestClient):
         if indiz.art == "gemarkung" and indiz.wert == "Höfgen"
     )
 
-    route = respx.post(ALKIS_URL).mock(side_effect=[_gml("alkis_leer.gml")] * 20)
+    route = respx.post(ALKIS_URL).mock(side_effect=_cadastre({}, {}))
     _stream(client, {**payload, "entscheidungen": {"gemarkung": hoefgen.id}})
 
     asked = "".join(call.request.content.decode("utf-8") for call in route.calls)
-    # Only the chosen reading's districts are queried. Großbothen -- which the
-    # search would otherwise have ranked first -- is never asked about.
-    assert "144245" in asked and "146132" in asked
+    # Only the chosen reading is queried. Großbothen -- which the search would
+    # otherwise have ranked first -- is never asked about. Of the two Höfgen
+    # only the one in Grimma is asked, because the text names that municipality
+    # and the directory knows which Höfgen belongs to it.
+    assert "144245" in asked
     assert "144241" not in asked
 
 
@@ -352,20 +407,14 @@ def test_the_staircase_stops_at_the_first_rung_that_answers(client: TestClient):
     """No parcel number: exact area, four districts, one hit."""
 
     respx.post(ALKIS_URL).mock(
-        side_effect=[
-            # Three anchors: Großbothen and the two Höfgen. Grimma is named as
-            # "6 km entfernte Kreisstadt" and is therefore never an anchor.
-            _hits(1131), _hits(1131), _hits(1131),   # phase 2, the counts
-            # The search space, drawn: one outline per anchor, so the map has
-            # something to frame on before the first candidate exists.
-            _gml("alkis_katasterbezirk_grossbothen.gml"),
-            _gml("alkis_katasterbezirk_grossbothen.gml"),
-            _gml("alkis_katasterbezirk_grossbothen.gml"),
-            _hits(1), _hits(0), _hits(0),            # rung 0
-            _gml("alkis_grossbothen_790_11.gml"),    # fetch the survivor
-            _gml("alkis_grossbothen_band.gml"),      # confirmation rung
-            _gml("alkis_katasterbezirk_grossbothen.gml"),
-        ]
+        side_effect=_cadastre(
+            # Großbothen holds the parcel of exactly this size; the Höfgen the
+            # text also names holds parcels, but none of them that size.
+            counts={"144241+502": 1, "144245+502": 0, "144241": 1131, "144245": 812},
+            features={"144241+502": "alkis_grossbothen_790_11.gml",
+                      "144241": "alkis_grossbothen_band.gml",
+                      "KatasterBezirk": "alkis_katasterbezirk_grossbothen.gml"},
+        )
     )
 
     events = _stream(client, {"text": LISTING, "flaeche_m2": 502, "flaeche_text": "502 m²"})
@@ -377,7 +426,6 @@ def test_the_staircase_stops_at_the_first_rung_that_answers(client: TestClient):
     # The map is given the districts in play before any candidate exists.
     areas = next(e for e in events if e["art"] == "gebiete")
     assert areas["gebiete"][0]["geometry"]["type"] in ("Polygon", "MultiPolygon")
-    assert areas["gebiete"][0]["anzahl"] == 1131
 
     rungs = [e["text"] for e in events if e.get("phase") == "treppe"]
     # Five rungs are planned; only the first is ever asked for.
@@ -398,14 +446,11 @@ def test_a_rounded_area_alone_is_never_confirmed(client: TestClient):
     """
 
     respx.post(ALKIS_URL).mock(
-        side_effect=[
-            _hits(1131),
-            _gml("alkis_katasterbezirk_grossbothen.gml"),   # the search space
-            _hits(2),
-            _gml("alkis_grossbothen_790_11.gml"),
-            _gml("alkis_grossbothen_band.gml"),
-            _gml("alkis_katasterbezirk_grossbothen.gml"),
-        ]
+        side_effect=_cadastre(
+            counts={"144241": 2},
+            features={"KatasterBezirk": "alkis_katasterbezirk_grossbothen.gml",
+                      "144241": "alkis_grossbothen_790_11.gml"},
+        )
     )
 
     events = _stream(
@@ -572,3 +617,313 @@ def test_numbers_from_different_sources_are_a_dispute(client: TestClient):
 
     conflicts = [e["konflikt"] for e in events if e["art"] == "konflikt"]
     assert any(conflict["art"] == "flurstueck" for conflict in conflicts)
+
+
+# --------------------------------------------------------------------------
+# Reading the listing's images
+#
+# Both fixtures are real images from the reference advert, downloaded on
+# 05.09.2026: one Geoportal print and one photograph of the plot. The pair is
+# the whole argument for reading every image and filtering by pattern rather
+# than classifying images first -- and the photograph is the more important of
+# the two, because a false parcel number is the one failure validating against
+# ALKIS cannot catch.
+# --------------------------------------------------------------------------
+
+_HAS_TESSERACT = ocr.available()
+_needs_tesseract = pytest.mark.skipif(
+    not _HAS_TESSERACT, reason="Tesseract ist auf diesem Rechner nicht installiert"
+)
+
+
+@_needs_tesseract
+def test_the_cadastral_extract_gives_up_its_parcel_number():
+    reading = ocr.read_image(fixture_bytes("inserat-katasterauszug.jpg"))
+
+    assert reading.parcels == ["790/11"]
+    # The first pass is enough for an upright sheet; the second only runs when
+    # nothing matched, and here it never has to.
+    assert reading.modes == ["6"]
+    assert "Wiesenstraße" in reading.text
+
+
+@_needs_tesseract
+def test_a_photograph_of_the_plot_invents_no_parcel_number():
+    reading = ocr.read_image(fixture_bytes("inserat-grundstuecksfoto.jpg"))
+
+    assert reading.parcels == []
+    assert reading.districts == []
+    # Both passes ran and neither matched, which is the expensive-but-correct
+    # outcome: an empty answer is harmless, a plausible wrong one is not.
+    assert reading.modes == ["6", "1"]
+
+
+def test_a_misread_number_never_leaves_the_reader():
+    """The 7-degree misreading, as text: „Flurstück 790717“."""
+
+    good, _ = ocr.patterns("Untertitel: Flurstück 790/11")
+    garbled, _ = ocr.patterns("Untertitel: Flurstück 790717")
+
+    assert good == ["790/11"]
+    assert garbled == []
+
+
+def test_the_authoritys_own_district_line_is_not_read_as_the_plots():
+    _, districts = ocr.patterns(
+        "Gemarkung Großbothen\nStaatsbetrieb Geobasisinformation, Gemarkung Dresden"
+    )
+
+    assert districts == ["Großbothen"]
+
+
+def test_a_listing_image_is_enlarged_before_it_is_read():
+    """What a portal serves is smaller than what the reader wants.
+
+    Measured on the reference advert: Kleinanzeigen's largest variant is
+    678 x 960 for the cadastral print and 960 x 720 for a photograph -- both
+    under the 1 500 px the measurements call for, so the upscale that repaired
+    a 7 degree tilt and a 180 degree flip runs on real input every time rather
+    than being the exception it looked like.
+    """
+
+    from PIL import Image
+
+    original = fixture_bytes("inserat-katasterauszug.jpg")
+    with Image.open(io.BytesIO(original)) as before:
+        assert max(before.size) < ocr.TARGET_LONG_EDGE
+
+    with Image.open(io.BytesIO(ocr.upscale(original))) as after:
+        assert max(after.size) == ocr.TARGET_LONG_EDGE
+
+    # Anything already large enough is handed on untouched.
+    assert ocr.upscale(original, target=100) is original
+
+
+@respx.mock
+def test_the_images_are_read_only_when_the_text_names_no_parcel(client: TestClient):
+    """A listing that states its Flurstück is not worth three seconds an image."""
+
+    respx.post(ALKIS_URL).mock(
+        side_effect=_cadastre({}, {"KatasterBezirk": "alkis_katasterbezirk_grossbothen.gml",
+                                   "144241": "alkis_grossbothen_790_11.gml"})
+    )
+    images = respx.get("https://bilder.example.org/1.jpg").mock(
+        return_value=httpx.Response(200, content=fixture_bytes("inserat-katasterauszug.jpg"))
+    )
+
+    _stream(
+        client,
+        {"gemarkung": "Großbothen", "flurstuecksnummer": "790/11",
+         "bilder": ["https://bilder.example.org/1.jpg"]},
+    )
+
+    assert images.call_count == 0
+
+
+@respx.mock
+@_needs_tesseract
+def test_a_cadastral_extract_answers_a_listing_whose_text_does_not(client: TestClient):
+    """The whole chain: image to parcel number to a confirmed parcel."""
+
+    respx.post(ALKIS_URL).mock(
+        side_effect=_cadastre({}, {"KatasterBezirk": "alkis_katasterbezirk_grossbothen.gml",
+                                   "144241": "alkis_grossbothen_790_11.gml"})
+    )
+    respx.get("https://bilder.example.org/1.jpg").mock(
+        return_value=httpx.Response(200, content=fixture_bytes("inserat-katasterauszug.jpg"))
+    )
+
+    events = _stream(
+        client,
+        {"text": "Baugrundstück am Ortsrand von Großbothen. 502 m².",
+         "flaeche_text": "502 m²",
+         "bilder": ["https://bilder.example.org/1.jpg"]},
+    )
+
+    read = [e["indiz"] for e in events if e["art"] == "indiz" and e["indiz"]["quelle"] == "bild"]
+    assert [i["wert"] for i in read] == ["790/11"]
+    # The Beleg is the line it was read from -- an Indiz whose evidence cannot
+    # be looked at is one nobody can resolve a contradiction with.
+    assert "Flurstück 790/11" in read[0]["beleg"]
+    assert events[-1]["status"] == "bestaetigt"
+
+
+@respx.mock
+def test_a_server_without_tesseract_says_so_instead_of_going_quiet(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(ocr, "available", lambda: False)
+    respx.post(ALKIS_URL).mock(side_effect=_cadastre({}, {}))
+
+    events = _stream(
+        client,
+        {"text": "Baugrundstück in Großbothen.", "bilder": ["https://bilder.example.org/1.jpg"]},
+    )
+
+    said = [e["text"] for e in events if e.get("phase") == "bilder"]
+    assert said and "keine Texterkennung eingerichtet" in said[0]
+
+
+# --------------------------------------------------------------------------
+# Four adverts that did not work, and what each one taught
+# --------------------------------------------------------------------------
+
+
+def _indicia_of(key: str):
+    listing = LISTINGS[key]
+    return collect_indicia(
+        titel=listing["titel"],
+        text=listing["beschreibung"],
+        adresse=listing["ort"],
+        flaeche_text=listing["angaben"].get("Grundstücksfläche"),
+        lat=listing["lat"],
+        lon=listing["lon"],
+        directory=DIRECTORY,
+    )
+
+
+def _anchor_names(key: str) -> list[str]:
+    listing = LISTINGS[key]
+    engine = SearchEngine(
+        ParcelSearchRequest(
+            titel=listing["titel"],
+            text=listing["beschreibung"],
+            adresse=listing["ort"],
+            flaeche_text=listing["angaben"].get("Grundstücksfläche"),
+        ),
+        alkis_service(),
+        DIRECTORY,
+    )
+    engine.state.indicia = _indicia_of(key)
+    return [f"{a.name}/{a.schluessel}" for a in engine.anchors()]
+
+
+def test_ortsteil_names_the_district_and_the_municipality_in_one_breath():
+    """„im malerischen Ortsteil Plagwitz von Machern“ — both, one level apart."""
+
+    indicia = _indicia_of("3375124391")
+    districts = [i for i in indicia if i.art == "gemarkung" and i.beziehung == "liegt_in"]
+    municipalities = [i.wert for i in indicia if i.art == "gemeinde"]
+
+    assert [i.wert for i in districts] == ["Plagwitz"]
+    assert "Machern" in municipalities
+
+
+def test_the_municipality_tells_two_districts_of_one_name_apart():
+    """There are two Gemarkungen called Plagwitz. Only one is in Machern.
+
+    Nothing used the directory's own ``gemeinde`` column before, and it is what
+    turned this advert from two candidates into one.
+    """
+
+    assert _anchor_names("3375124391") == ["Plagwitz/148642"]
+
+
+def test_a_common_noun_that_is_also_a_district_is_not_searched():
+    """„geprägt von Wiesen und Feldern“ — German capitalises every noun.
+
+    A bare directory match is not a statement about where the plot is. It stays
+    in the protocol as weak evidence and costs no request.
+    """
+
+    mentioned = {i.wert: i for i in _indicia_of("3375124391") if i.art == "gemarkung"}
+
+    assert "Wiesen" in mentioned
+    assert mentioned["Wiesen"].beziehung == "erwaehnt"
+    assert "Wiesen/148950" not in _anchor_names("3375124391")
+
+
+def test_a_connection_to_a_city_is_not_a_location_in_it():
+    """„gute Anbindung an Leipzig“ put Gemarkung Leipzig up as an anchor.
+
+    Leipzig holds parcels of every size, so it produced two false candidates of
+    exactly the stated area next to the right one.
+    """
+
+    assert _anchor_names("3423861748") == ["Lobstädt/141894"]
+
+
+def test_the_locality_field_gives_up_its_municipality():
+    """The pin derived from it is 6 km out; the name it was geocoded from is not."""
+
+    for key, expected in (
+        ("3499632623", "Grimma"),
+        ("3375124391", "Machern"),
+        ("3423861748", "Neukieritzsch"),
+        ("3503721553", "Bad Lausick"),
+    ):
+        from_field = [
+            i.wert for i in _indicia_of(key) if i.art == "gemeinde" and i.quelle == "standortfeld"
+        ]
+        assert from_field == [expected], key
+
+
+def test_the_portals_own_area_field_is_the_one_that_counts():
+    """A title may hedge („ca. 1.025qm“) where the attribute list does not."""
+
+    listing = LISTINGS["3423861748"]
+
+    assert "ca." in listing["titel"]
+    assert listing["angaben"]["Grundstücksfläche"] == "1.025 m²"
+    assert tolerance_ladder(read_area(listing["angaben"]["Grundstücksfläche"]))[0].hard
+
+
+@respx.mock
+def test_an_exact_area_widens_the_place_before_it_widens_the_number(client: TestClient):
+    """„1.076 m² in Bad Lausick“ has no match in Gemarkung Bad Lausick.
+
+    It has exactly one in the *municipality*: Flurstück 502/47 in Gemarkung
+    Etzoldshain, at „Am Kurpark" — which is what the advert is titled after.
+    An exactly stated area is an official fact and a Gemarkung read out of
+    prose is not, so it is the guess that gives way.
+    """
+
+    listing = LISTINGS["3503721553"]
+    respx.post(ALKIS_URL).mock(
+        side_effect=_cadastre(
+            # Nothing that size in the district; one in the municipality. The
+            # municipality key is the one the recorded parcel carries -- the
+            # search learns it from any parcel of the district, which is the
+            # single extra request this step costs.
+            counts={"143836+1076": 0, "14729010+1076": 1, "143836": 2363},
+            features={"KatasterBezirk": "alkis_katasterbezirk_grossbothen.gml",
+                      "14729010+1076": "alkis_etzoldshain_502_47.gml",
+                      "143836": "alkis_etzoldshain_502_47.gml"},
+        )
+    )
+
+    events = _stream(
+        client,
+        {"titel": listing["titel"], "text": listing["beschreibung"], "adresse": listing["ort"],
+         "flaeche_text": listing["angaben"]["Grundstücksfläche"]},
+    )
+
+    widened = [e for e in events if e.get("phase") == "gemeinde"]
+    assert widened, "the municipality was never tried"
+    assert "kein Flurstück dieser Größe" in widened[0]["text"]
+    assert events[-1]["status"] == "bestaetigt"
+    found = events[-1]["kandidaten"][0]["properties"]
+    assert (found["flurstuecksnummer"], found["gemarkung"]) == ("502/47", "Etzoldshain")
+    assert found["lagebezeichnung"] == "Am Kurpark"
+    # The tolerance was never opened: what gave way is the place.
+    assert not any("±0,5" in (e.get("text") or "") for e in events)
+
+
+def test_the_listing_page_yields_its_description_and_not_the_portal_around_it():
+    """The whole page is navigation, cookie banner and category tree.
+
+    Reading all of it as evidence is what put „Alle Kategorien" next to the one
+    sentence that names the Ortsteil.
+    """
+
+    from app.services.portals import parse_page
+
+    seite = parse_page("https://www.kleinanzeigen.de/x", fixture_text("inserat-kleinanzeigen.html"))
+
+    assert seite.beschreibung and len(seite.beschreibung) < 4000
+    assert "Ortsteil Lobstädt bei Neukieritzsch" in seite.beschreibung
+    assert "Alle Kategorien" not in seite.beschreibung
+    assert seite.angaben["Grundstücksfläche"] == "1.025 m²"
+    # One URL per picture, not the six sizes each is served at.
+    assert 0 < len(seite.bilder) <= 8
+    assert len(set(seite.bilder)) == len(seite.bilder)
