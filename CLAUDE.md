@@ -70,6 +70,21 @@ from the user directly. Reopen only if the user asks.
   so only the 3 m floor is computable.
   See `docs/research/abstandsflaechen-nachbargebaeude.md`.
 - Region is Saxony only; ALKIS and BORIS are state-specific.
+- **The sentence under a check is composed, not written.** Every finding comes
+  from a template in `frontend/src/lib/findings.js`: structured input from one
+  service, fixed German text out. No model writes UI copy. That keeps the
+  wording reviewable, keeps the same plot reading the same way twice, and makes
+  it impossible for a missing input to turn into a sentence that sounds
+  confident. The templates take the data's shape seriously — noise is a band so
+  the text says a range, a designation is a yes or no so the text is a yes or a
+  no.
+- **The search field reads what was typed before it looks anything up**
+  (`frontend/src/lib/queryInput.js`). Three signals settle almost everything: a
+  German address never begins with a digit, so a leading digit rules the address
+  index out; a coordinate is two numbers that land inside Germany; a parcel
+  denominator (`85/1`) cannot occur in an address. Where two readings stay
+  plausible — "Lessingweg 44" and "Mölkau 204" are the same shape — the answer
+  says so and both local indexes are asked, rather than one being guessed.
 - **Never show example data.** There is no sample state and no fallback: when a
   service fails, the German `detail` from the backend is shown instead. Tests
   run on recorded real responses in `frontend/tests/fixtures/`, not on invented
@@ -430,6 +445,67 @@ from the user directly. Reopen only if the user asks.
   `addPlot` puts every new plot into `state.data.selection`, so opening the
   overview's comparison mode when the selection is non-empty means opening it
   always — the state that button exists to get out of.
+- **`luis.sachsen.de` and `geodienste.sachsen.de` are two different worlds.**
+  Cadastre and base maps (ALKIS-WFS, DOP, WebAtlas) sit on the second; every
+  environmental layer — noise, flood, water protection, soil, boreholes, radon
+  — sits on the first, as an open ArcGIS REST server. A guessed `wms_smul_*`
+  name on `geodienste` answers 403, which reads like a block and is a wrong
+  path: the documented ALKIS-WFS on that same host answers 200. And the
+  service inventory is worth enumerating in full before concluding something
+  is missing — `luft/radonvorsorgegebiete` sits in the `luft` folder, not
+  under any name containing "strahl", and was missed twice by a partial listing.
+  See `docs/research/grundradar-datenquellen.md`.
+- **ArcGIS `identify` measures its tolerance in *pixels*, so it is the wrong
+  tool for a factual answer.** It also demands `mapExtent` and `imageDisplay`,
+  which the query is not geometrically about, and returns zero hits rather
+  than an error when either is missing. Worse: at `tolerance=3` and a plausible
+  extent, 3 px was about 7 m, and the service reported a neighbouring polygon
+  as a hit — which put a wrong noise band in the first draft of the research.
+  Use `/<layer>/query` with `esriSpatialRelIntersects`; it intersects the real
+  geometry and knows no scale.
+- **Ask the noise map with the parcel outline, never with a point.** A plot
+  straddles isophones: Mölkau 204 is `Lden5054` at the building point and
+  `Lden5054` + `Lden5559` across its 650 m². The ALKIS ring we already fetch
+  goes straight in as `esriGeometryPolygon`. And the levels are 5 dB **bands**
+  (`Lden5559` → "55–59 dB(A)"), never a single figure — "57 dB" would be
+  invented.
+- **"No noise value" is not "quiet".** Umgebungslärm mapping is limited to
+  agglomerations and major routes: road-noise polygons within 300 m number 109
+  in Leipzig and 94 in Dresden, but **0 in Geithain** (6 000 inhabitants) and 0
+  in a village. So three outcomes, not two — a hit gives the range; no hit but
+  polygons within 2 km means below the lowest mapped band (< 45 dB(A)); nothing
+  within 2 km means "not mapped here", with no value and no colour. The
+  `Kartierungsgebiet` layer cannot serve as that mask: it is a polyline of
+  4 637 mapped road segments carrying traffic counts, so a point query never
+  hits it.
+- **A `minScale` layer returns an empty image, not an error** — and the scale
+  is computed, so it can be steered. The noise layer carries `minScale: 50000`
+  and draws nothing above 1:50 000. ArcGIS derives the scale as
+  `(bbox_width_m / image_width_px) * dpi / 0.0254`, verified exactly: at a
+  10 km box and 512 px, `dpi=65` gives 1:49 982 and draws, `dpi=66` gives
+  1:50 750 and returns a blank 2 231-byte PNG. So clamp `dpi` to
+  `minScale * 0.0254 * width_px / bbox_width_m` and the layer never silently
+  disappears.
+- **The noise WMS cannot do Web Mercator.** It offers EPSG:4326 and 25833 but
+  not 3857, so MapLibre's `{bbox-epsg-3857}` raster source gets nothing. The
+  ArcGIS `export` endpoint with `bboxSR=3857&imageSR=3857` reprojects
+  server-side and sends CORS headers — that is the path for the overlay.
+- **The BfN protected-areas WMS filters on User-Agent.** No UA: 403. Any UA:
+  200 with full capabilities. An empty User-Agent is a rule here, not a
+  network problem.
+- **The UBA air-quality API is not on `umweltbundesamt.de`,** and its nearest
+  station is not the one to use. The documented path is a 301 to
+  `luftdaten.umweltbundesamt.de`, where it spells `air-data`, not `air_data`.
+  And the station list mixes in historic and research sites whose "active to"
+  field is empty anyway: the three nearest to Mölkau (1,9–3,0 km, prefixed
+  `z_GUAN` and `zDDR_`) return no measurements at all, while Leipzig-Mitte at
+  4,6 km returns all four pollutants. Pick the nearest station that actually
+  answers with values, not the nearest on the map.
+- **Verify a "not affected" against a control point.** A layer that answers
+  zero features looks the same whether the plot is clear or the layer is
+  empty. `luft/radonvorsorgegebiete` holds 107 municipalities and answers "no"
+  for Leipzig but "yes" for Johanngeorgenstadt and Schneeberg — only that
+  second query turns silence into a statement.
 
 ## Commands
 
