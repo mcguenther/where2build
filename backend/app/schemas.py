@@ -344,6 +344,26 @@ class ParcelResolveRequest(BaseModel):
         return self
 
 
+class ParcelsAroundRequest(BaseModel):
+    """The parcels near a coordinate, for choosing between them.
+
+    Deliberately separate from `/resolve`: that answers with *the* plot, as one
+    union, while this answers with the candidates so the user can say which one
+    is theirs. The distinction matters because an address coordinate is not a
+    parcel — the register places it on the building, and a metre either way puts
+    it in the neighbour's.
+    """
+
+    lat: float = Field(ge=-90, le=90)
+    lon: float = Field(ge=-180, le=180)
+    umkreis_m: int = Field(
+        default=60,
+        ge=10,
+        le=300,
+        description="Halbe Kantenlänge des Suchfensters um die Koordinate.",
+    )
+
+
 class Geometry(BaseModel):
     type: Literal["Polygon", "MultiPolygon", "LineString", "Point"]
     coordinates: Any

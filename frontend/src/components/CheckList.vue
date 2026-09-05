@@ -9,6 +9,7 @@
       </button>
     </div>
 
+    <div class="checks__body">
     <p v-if="!ring" class="checks__empty">
       Ohne Flurstücksumriss gibt es nichts zu fragen — die Prüfungen werden mit der
       Grundstücksfläche gestellt, nicht mit einem Punkt.
@@ -37,8 +38,8 @@
 
       <ol class="checks__list">
         <li v-for="check in checks" :key="check.id" class="check" :data-status="check.finding.status">
-          <span class="check__dot" aria-hidden="true"></span>
           <div class="check__head">
+            <span class="check__dot" aria-hidden="true"></span>
             <span class="check__name">{{ check.name }}</span>
             <span class="check__value">{{ check.finding.value }}</span>
           </div>
@@ -70,6 +71,7 @@
 
       <p class="checks__foot">{{ result.hinweis }}</p>
     </template>
+    </div>
   </section>
 </template>
 
@@ -142,40 +144,46 @@ export default {
 </script>
 
 <style scoped>
+/* One left edge for everything in this panel — the heading above it, the
+   counters, every check's name, its sentence and its source. The dot sits in
+   the heading row rather than in a gutter of its own, because a gutter gives
+   the rows a second edge that lines up with nothing. */
+.checks__body{ padding: var(--w2b-space-3) var(--w2b-space-4) var(--w2b-space-4); }
+
 .checks__empty{ color: var(--w2b-muted); font-size: var(--w2b-text-s); margin: 0; }
 .checks__tally{ display: flex; flex-wrap: wrap; gap: 6px; }
 .checks__no-score{
-  margin: 6px 0 0; font-size: var(--w2b-text-xs); color: var(--w2b-muted); max-width: 52ch;
+  margin: var(--w2b-space-2) 0 0; font-size: var(--w2b-text-xs);
+  color: var(--w2b-muted); max-width: 52ch;
 }
 
 .checks__list{ list-style: none; margin: var(--w2b-space-3) 0 0; padding: 0; }
 
-.check{
-  position: relative; padding: var(--w2b-space-3) 0 var(--w2b-space-3) var(--w2b-space-4);
-  border-top: 1px solid var(--w2b-line-faint);
-}
-.check:first-child{ border-top: 0; }
+.check{ padding: var(--w2b-space-3) 0; border-top: 1px solid var(--w2b-line-faint); }
+.check:first-child{ border-top: 0; padding-top: 0; }
+.check:last-child{ padding-bottom: 0; }
+
+.check__head{ display: flex; align-items: baseline; gap: 7px; }
 .check__dot{
-  position: absolute; left: 0; top: calc(var(--w2b-space-3) + 6px);
-  width: 9px; height: 9px; border-radius: var(--w2b-radius-full);
-  background: var(--w2b-line);
+  flex: none; width: 8px; height: 8px; border-radius: var(--w2b-radius-full);
+  background: var(--w2b-line); transform: translateY(-1px);
 }
 .check[data-status="good"] .check__dot{ background: var(--w2b-good); }
 .check[data-status="note"] .check__dot{ background: var(--w2b-warning); }
 
-.check__head{ display: flex; align-items: baseline; gap: var(--w2b-space-2); }
 .check__name{ font-family: var(--w2b-font-display); font-weight: 600; font-size: 14.5px; }
 .check__value{
-  margin-left: auto; font-family: var(--w2b-font-mono); font-size: var(--w2b-text-xs);
+  margin-left: auto; padding-left: var(--w2b-space-2);
+  font-family: var(--w2b-font-mono); font-size: var(--w2b-text-xs);
   font-variant-numeric: tabular-nums; text-align: right; color: var(--w2b-muted);
 }
 .check[data-status="good"] .check__value{ color: var(--w2b-good); }
 .check[data-status="note"] .check__value{ color: var(--w2b-warning-text); }
 
-.check__text{ margin: 4px 0 0; font-size: var(--w2b-text-s); line-height: 1.5; }
+.check__text{ margin: 5px 0 0; font-size: var(--w2b-text-s); line-height: 1.5; }
 .check__source{
   margin: 6px 0 0; font-family: var(--w2b-font-mono); font-size: 10.5px;
-  color: var(--w2b-muted); letter-spacing: .01em;
+  color: var(--w2b-muted); letter-spacing: .01em; overflow-wrap: anywhere;
 }
 
 .reading{
@@ -196,8 +204,8 @@ export default {
 .check__detail p{ margin: 5px 0 0; color: var(--w2b-graphite); line-height: 1.5; }
 
 .checks__foot{
-  margin: var(--w2b-space-3) 0 0; padding-top: var(--w2b-space-3);
-  border-top: 1px solid var(--w2b-line-faint);
+  margin: var(--w2b-space-4) 0 0; padding-top: var(--w2b-space-3);
+  border-top: 1px solid var(--w2b-line);
   font-size: var(--w2b-text-xs); color: var(--w2b-muted); max-width: 58ch;
 }
 </style>

@@ -102,6 +102,26 @@ export function plotFromCadastre(response, extra = {}) {
   };
 }
 
+/**
+ * Which of these parcels the cadastre says carries this address.
+ *
+ * `ave:lagebeztxt` holds what the register calls the parcel's location, often
+ * several spellings joined by a semicolon ("Lessingweg; Lessingweg 42"). A
+ * house number matches only as a whole token: "Lessingweg 4" must not answer
+ * for "Lessingweg 46". Returns null when nothing matches — a guess here would
+ * be worse than the point-in-polygon answer it would override.
+ */
+export function parcelForAddress(features, address) {
+  const wanted = String(address ?? "").trim().toLowerCase();
+  if (!wanted) return null;
+  const matches = (features ?? []).filter(feature => {
+    const location = String(feature.properties?.lagebezeichnung ?? "").toLowerCase();
+    return location.split(";").some(part => part.trim() === wanted);
+  });
+  // Two parcels claiming the same address is not a tie to break here.
+  return matches.length === 1 ? matches[0] : null;
+}
+
 function centrePlacement(ring) {
   const n = ring.length;
   return {

@@ -306,7 +306,18 @@ class TilesSettings(BaseSettings):
     webatlas_url: str = "https://geodienste.sachsen.de/wms_geosn_webatlas-sn/guest"
     webatlas_layers: str = "Vegetation,Siedlung,Gewaesser,Verkehr,Administrative_Einheiten,Beschriftung"
     alkis_url: str = "https://geodienste.sachsen.de/wms_geosn_alkis-adv/guest"
-    alkis_layers: str = "adv_alkis_tatsaechliche_nutzung,adv_alkis_verkehr,adv_alkis_siedlung"
+    # The parcels themselves, with the buildings for orientation. The land-use
+    # layers (`tatsaechliche_nutzung`, `verkehr`, `siedlung`) draw areas that
+    # cut straight across parcel boundaries, which is the opposite of what a
+    # ground called "Kataster" is for.
+    alkis_layers: str = "adv_alkis_flurstuecke,adv_alkis_gebaeude"
+    # And the parcels stop being drawn at 1:2000 -- an empty image, no error.
+    # A WMS derives the scale of a request from the standard 0,28 mm pixel, and
+    # MAP_RESOLUTION is how a caller says the pixel is a different size, so the
+    # threshold can be steered. Measured on a z18 tile over Liebertwolkwitz on
+    # 05.09.2026: without it the tile is blank, MAP_RESOLUTION=85 draws, 86 is
+    # blank again -- exactly where the scale reaches 1:2000.
+    alkis_min_scale: float = 2000.0
     # The noise survey is not a WMS tile source: its service offers EPSG:4326
     # and 25833 but not 3857, so MapLibre's {bbox-epsg-3857} raster source gets
     # nothing at all. The ArcGIS ``export`` endpoint reprojects server-side.

@@ -136,8 +136,8 @@
     <section v-else-if="stageIndex === 2" class="stack">
       <p class="subtitle">
         So liegt das Flurstück im Kataster. Stimmt der Zuschnitt, geht es weiter;
-        sonst zurück und die Angaben korrigieren. Den Ausschnitt bewegt die
-        gedrückte Maustaste, das Mausrad zoomt, ein Doppelklick setzt ihn zurück.
+        sonst ein anderes Flurstück anklicken. Den Ausschnitt bewegt die gedrückte
+        Maustaste, das Mausrad zoomt, ein Doppelklick setzt ihn zurück.
       </p>
 
       <!-- The service found something implausible for this listing. Not an
@@ -148,22 +148,34 @@
         {{ doubt }}
       </div>
 
-      <!-- The house is placed before the plot exists, so this is the first and
-           only moment the user can be told it did not fit. -->
-      <p v-if="!houseSeated" class="notice notice--error" role="status">
-        <b>Für den Baukörper ist zwischen den Abstandsflächen kein Platz.</b>
-        {{ num(draftBuilding.width, 1) }} × {{ num(draftBuilding.depth, 1) }} m finden auf diesem
-        Zuschnitt in keiner Lage und in keinem Winkel Platz. Übernehmen lässt sich das Flurstück
-        trotzdem; auf der Grundstücksseite liegt der Umriss dann mittig und ragt sichtbar über das
-        Bebauungsfenster hinaus, und dort lassen sich Maße, Wandhöhe und Abstandstiefen ändern.
+      <!-- An address coordinate is not a parcel boundary: the register puts it
+           on the building, and a few metres either way is the neighbour's. So
+           the neighbours are on the map and the choice is the user's. -->
+      <p v-if="corrected" class="notice" role="status">
+        <b>Zur gesuchten Adresse gehört ein anderes Flurstück als das unter der Koordinate.</b>
+        Gewählt ist {{ corrected }} — die Lagebezeichnung im Kataster nennt genau diese
+        Adresse. Ein Klick auf ein anderes Flurstück ändert das.
       </p>
 
       <div class="check-grid">
         <div class="panel">
           <!-- No house here: this step is about the parcel's outline, and a
                body nobody has planned yet only distracts from it. -->
-          <SitePlan :plot="draft" :width="640" :height="440" backdrop="map" north-up
-                    :show-building="false" navigable />
+          <!-- No dimension chains: the question here is which parcel, not how
+               long each of its edges is, and the chains sat on the numbers of
+               the neighbours they were meant to help pick between. The measures
+               are in the table beside it. -->
+          <SitePlan :plot="draft" :width="640" :height="440" backdrop="cadastre" north-up
+                    :show-building="false" :show-dimensions="false" navigable
+                    :parcels="choices" :chosen-parcel="draft.kennzeichen"
+                    @choose="chooseParcel" />
+          <p class="panel__footnote">
+            <template v-if="choices.length > 1">
+              {{ choices.length }} Flurstücke im Umkreis — die Katasterkarte beschriftet
+              jedes mit seiner Nummer, ein Klick darauf wählt es aus.
+            </template>
+            Kataster: © GeoSN, dl-de/by-2-0
+          </p>
         </div>
         <div class="panel">
           <div class="panel__head"><h3>Was übernommen wird</h3><div class="spacer"></div><span class="chip">ALKIS</span></div>
@@ -224,10 +236,10 @@
 import SitePlan from "../components/SitePlan.vue";
 import CadastralDistrictPicker from "../components/CadastralDistrictPicker.vue";
 import PlotSearch from "../components/PlotSearch.vue";
-import { state, addPlot, placement, autoSeatHouse } from "../lib/store.js";
+import { state, addPlot, autoSeatHouse } from "../lib/store.js";
 import { WIZARD_STAGES, wizardStage } from "../router/stages.js";
-import { readListing, readPage, resolveParcel, landValue } from "../lib/api.js";
-import { plotFromCadastre } from "../lib/plots.js";
+import { readListing, readPage, resolveParcel, landValue, nearbyParcels } from "../lib/api.js";
+import { plotFromCadastre, parcelForAddress } from "../lib/plots.js";
 import { polygonArea } from "../lib/geometry.js";
 import { area, euroPerSqm, num } from "../lib/format.js";
 
@@ -282,8 +294,14 @@ export default {
       readFields: [],
       draft: null,
       doubt: null,
-      // Whether the footprint found room inside the setbacks; see `seatHouse`.
-      houseSeated: true,
+      /** The parcels around the resolved point, for the user to choose from. */
+      choices: [],
+      /** The address the search picked, so the cadastre's own Lagebezeichnung
+       *  can be checked against it rather than the coordinate being trusted. */
+      searchedAddress: null,
+      /** The parcel number a Lagebezeichnung match put in place of the one the
+       *  coordinate landed in. Null unless it actually differed. */
+      corrected: null,
       // The labels for the stages in `WIZARD_STAGES`, in that order.
       steps: [
         { id: "source", name: "Quelle" },
@@ -320,11 +338,6 @@ export default {
       return this.pastedText.trim().length > 20;
     },
     computedArea() { return this.draft ? polygonArea(this.draft.polygon) : 0; },
-    /** The footprint this draft carries, for the sentence that says it found
-     *  no room. Read by the template since this step existed, and defined
-     *  nowhere — so the one plot that needed the message crashed the step
-     *  instead of showing it, and the wizard rendered an empty page. */
-    draftBuilding() { return this.draft ? placement(this.draft) : null; },
     /** What the cadastre is asked for: the key of the chosen entry, which is
      *  unambiguous where two districts share a name, else the plain text. */
     gemarkungQuery() { return this.gemarkungEntry?.schluessel || this.gemarkung.trim(); }
@@ -361,11 +374,12 @@ export default {
     },
 
     /** A suggestion was picked: it already carries the cadastral query. */
-    async searchPicked({ query, label }) {
+    async searchPicked({ query, label, address }) {
       this.busy = true;
       this.error = "";
       try {
         this.returnStage = 0;
+        this.searchedAddress = address ?? null;
         await this.queryCadastre(query, { note: `Gesucht: ${label}` });
       } catch (error) {
         this.error = error.message;
@@ -435,6 +449,53 @@ export default {
       }
     },
 
+    /** The parcels around this draft, and the one the address actually names.
+     *
+     * Two different things can put the wrong parcel in front of the user: an
+     * address coordinate that lands next door, and a plot that is simply not
+     * the one they meant. The first is corrected here against the cadastre's
+     * own Lagebezeichnung; the second is theirs to fix with a click. Neither
+     * is worth failing the step over, so a refusal only costs the choice. */
+    async loadChoices(plot, extra) {
+      if (!plot.anchor) return;
+      try {
+        const answer = await nearbyParcels(plot.anchor.lat, plot.anchor.lon);
+        this.choices = answer?.features ?? [];
+      } catch {
+        this.choices = [];
+        return;
+      }
+      const named = parcelForAddress(this.choices, this.searchedAddress);
+      if (!named || named.properties?.kennzeichen === plot.kennzeichen) return;
+      const corrected = plotFromCadastre(
+        { features: [named], grundstueck: named, quelle: plot.source }, extra
+      );
+      this.corrected = `Flurstück ${corrected.flurstuecke.join(" · ")}`;
+      this.draft = { ...corrected, bodenrichtwert: plot.bodenrichtwert, brwZone: plot.brwZone,
+                     brwReferenceDate: plot.brwReferenceDate,
+                     brwReferencePlotArea: plot.brwReferencePlotArea,
+                     brwConversionUrl: plot.brwConversionUrl,
+                     houseTypeId: plot.houseTypeId, ratio: plot.ratio };
+    },
+
+    /** Another parcel from the map: it replaces the draft, keeping what the
+     *  cadastre cannot know — the land value and the chosen house type. */
+    chooseParcel(kennzeichen) {
+      const feature = this.choices.find(f => f.properties?.kennzeichen === kennzeichen);
+      if (!feature || kennzeichen === this.draft?.kennzeichen) return;
+      const chosen = plotFromCadastre(
+        { features: [feature], grundstueck: feature, quelle: this.draft.source },
+        { note: this.draft.note }
+      );
+      this.corrected = null;
+      this.doubt = null;
+      this.draft = { ...chosen, bodenrichtwert: this.draft.bodenrichtwert,
+                     brwZone: this.draft.brwZone, brwReferenceDate: this.draft.brwReferenceDate,
+                     brwReferencePlotArea: this.draft.brwReferencePlotArea,
+                     brwConversionUrl: this.draft.brwConversionUrl,
+                     houseTypeId: this.draft.houseTypeId, ratio: this.draft.ratio };
+    },
+
     async queryCadastre(query, extra = {}) {
       const answer = await resolveParcel(query);
       const plot = plotFromCadastre(answer, extra);
@@ -463,12 +524,19 @@ export default {
         plot.houseTypeId = first.id;
         if (first.ratio) plot.ratio = first.ratio;
       }
-      this.houseSeated = autoSeatHouse(plot);
       this.draft = plot;
+      this.choices = [];
+      this.corrected = null;
       this.goToStage(2);
+      // After the step is on screen: the choice is an aid, not a precondition.
+      await this.loadChoices(plot, extra);
     },
 
     create() {
+      // Seated here, not at the Flurstück step: until the plot exists nobody
+      // has chosen a house type, so a footprint there is a placeholder the
+      // user never asked for — and "no room for it" a finding about nothing.
+      autoSeatHouse(this.draft);
       const plot = addPlot(this.draft);
       // Replace: the last stage of a finished wizard is not a place to return to.
       this.$router.replace({ name: "plot", params: { id: plot.id } });

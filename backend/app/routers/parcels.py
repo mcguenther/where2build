@@ -7,7 +7,12 @@ from fastapi import APIRouter, Depends
 from ..deps import alkis_service, motis_service
 from ..errors import NotFoundError
 from ..plausibility import assess
-from ..schemas import GeocodeTreffer, ParcelCollection, ParcelResolveRequest
+from ..schemas import (
+    GeocodeTreffer,
+    ParcelCollection,
+    ParcelResolveRequest,
+    ParcelsAroundRequest,
+)
 from ..services.alkis import AlkisService, Flurstueck, expand_gemarkung_key, to_collection
 from ..services.motis import MotisService
 
@@ -117,3 +122,26 @@ async def resolve(
         hinweis=" ".join(hints) or None,
         plausibility=assess(parcels, payload.expected_area_m2, address_match),
     )
+
+
+NEARBY_HINT = (
+    "Zur Auswahl: Das erste Flurstück ist das, in dem die Koordinate liegt. Eine "
+    "Adresskoordinate ist keine Flurstücksgrenze — sie sitzt auf dem Gebäude, und "
+    "ein paar Meter daneben liegt das Nachbarflurstück."
+)
+
+
+@router.post("/nearby", response_model=ParcelCollection, summary="Flurstücke in der Nähe")
+async def nearby(
+    payload: ParcelsAroundRequest,
+    alkis: AlkisService = Depends(alkis_service),
+) -> ParcelCollection:
+    """The parcels around a coordinate, for the user to choose between.
+
+    `/resolve` answers with one plot; this answers with the candidates. The
+    union in `grundstueck` is meaningless here and the caller ignores it — what
+    matters is `features`, in order of how near each parcel is to the point.
+    """
+
+    parcels = await alkis.around(payload.lat, payload.lon, payload.umkreis_m)
+    return to_collection(parcels, hinweis=NEARBY_HINT)

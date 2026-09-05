@@ -135,6 +135,10 @@ export default {
         kind: hit.art === "adresse" ? "Adresse" : "Ort",
         name: hit.name,
         note: hit.beschreibung || "",
+        // The address as the register spells it, so the step that follows can
+        // check it against the cadastre's own `lagebeztxt` instead of trusting
+        // the coordinate to land in the right parcel.
+        address: hit.name,
         query: { lat: hit.lat, lon: hit.lon }
       }));
 
@@ -256,7 +260,9 @@ export default {
         return;
       }
       this.open = false;
-      this.$emit("select", { query: hit.query, label: `${hit.kind}: ${hit.name}` });
+      this.$emit("select", {
+        query: hit.query, label: `${hit.kind}: ${hit.name}`, address: hit.address ?? null
+      });
     }
   }
 };

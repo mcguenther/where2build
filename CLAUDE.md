@@ -364,6 +364,14 @@ from the user directly. Reopen only if the user asks.
   one in the listing. `/api/parcels/resolve` takes `expected_area_m2` and
   answers with a `plausibility` block; MOTIS's `type: PLACE` versus `ADDRESS`
   is the sharpest of the three signals, and works even with no listing area.
+- **A geocoded house number is not the parcel that carries it.** "Lessingweg 44
+  Leipzig" geocodes to a point that lies *inside* Flurstück 205, whose
+  Lagebezeichnung is "Lessingweg 46" — 0,3 m on the wrong side of the boundary
+  of 204, which is the one actually named "Lessingweg 44". No radius and no
+  nearest-neighbour rule fixes that; the parcel's own `lagebeztxt` does, when it
+  matches exactly one candidate, and the user's click does when it does not.
+  `/api/parcels/nearby` therefore answers with all 37 parcels within 60 m and
+  the wizard draws them on the cadastral ground, each with its number.
 - **Real parcels are frequently concave.** Half-plane clipping is only a correct
   inward offset for convex rings; on an L-shaped plot it returns an empty
   envelope. `buildableArea` falls back to a grid contour, biased inward so an
@@ -381,6 +389,32 @@ from the user directly. Reopen only if the user asks.
   vector tile keeps `areTilesLoaded()` false indefinitely, so anything that
   waits for `idle` before photographing a map needs a bounded fallback that
   reports the incomplete render instead of hanging the whole run.
+- **A prevented `pointerdown` produces no `click` at all.** `SitePlan` captures
+  the pointer and calls `preventDefault` so panning follows the hand, which
+  silently kills every click handler under it — the parcels the picker offers
+  looked inert. The press is remembered and the *release* decides: same spot
+  within 4 px picks, further than that panned.
+- **The picker frames the plot and a band, not every candidate.** 33 parcels
+  come back within 60 m of an address; framing all of them made each one a
+  speck and floated the labels over paper. `CHOICE_BAND_M = 18` — about one
+  plot's width — keeps the neighbour either side clickable and the drawing
+  legible.
+- **Two parcel numbers in the same spot read as a third.** "292/2" over "293/5"
+  came out as "29293/5". The labels are culled against each other — the chosen
+  parcel first, then the larger ones — so what gets dropped is the sliver at
+  the edge, not the plot in the middle.
+- **The ground's camera hangs off the drawing's *rendered* width.** The SVG is
+  640 units wide and renders at 776 CSS px inside the panel; `setCamera` divides
+  by that ratio, so a measurement taken before the layout settles — or a window
+  resize afterwards — leaves the backdrop at a different scale than the drawing,
+  and the outline stops sitting on its own parcel with nothing in the console.
+  A `ResizeObserver` on the svg re-sets the camera; measured after a resize, the
+  drawing's metres per pixel and the map's agree to nine decimal places.
+- **A MapLibre map that never finished starting cannot always be removed.**
+  Without WebGL the constructor succeeds and the first frame does not, and
+  `remove()` then throws on internals it never created — which took a component
+  down on unmount. Teardown swallows that, and `setCamera` catches too: it runs
+  on every pan, where a throw would freeze the drawing rather than the backdrop.
 - **`node scripts/screenshots.mjs` serves `frontend/dist`, not the dev server.**
   Run `npm run build` first or the pictures show the previous code.
   Its Playwright import is an absolute sandbox path (`/opt/node22/...`), so the
@@ -529,6 +563,25 @@ from the user directly. Reopen only if the user asks.
   1:48 149, 59 kB) as well as at z18. Floor, not round — the threshold
   excludes: at 10 km over 512 px, dpi 65 draws and 66 returns the blank
   2 231-byte image.
+- **The ALKIS WMS has twelve layers, and its groups are not the
+  Liegenschaftskarte.** `adv_alkis_tatsaechliche_nutzung`, `…_siedlung`,
+  `…_verkehr` draw *land use* — blocks of Wohnbaufläche and Grünfläche that run
+  straight across parcel boundaries, which is what a ground called "Kataster"
+  showed until the layer list was read properly. The cadastral ground is
+  `adv_alkis_flurstuecke` (boundaries and their numbers) plus
+  `adv_alkis_gebaeude`. The capabilities list twelve layers, not the six in the
+  old note.
+- **The cadastral layers have a scale limit of their own, and it is the same
+  trap as the noise layer's `minScale`:** Flurstücke draw *below* 1:2000 and
+  answer a 2 646-byte empty PNG from 1:2000 on, buildings from 1:5000 — no
+  error, nothing in a log. A WMS derives the scale from the standard 0,28 mm
+  pixel, and `MAP_RESOLUTION` says the pixel is a different size, so the same
+  clamp works: on a z18 tile (1:2133) `MAP_RESOLUTION=85` draws and 86 comes
+  back blank, exactly where `bbox · res / (px · 0,0254)` reaches 2000. `DPI=85`
+  answers byte for byte the same; a nonsense parameter changes nothing, which
+  is how you know it is the parameter and not the extra argument.
+  `services/tiles.py` sends it only when the standard pixel would cross the
+  line, so z19 is untouched and z16 still shows the parcel fabric.
 - **ArcGIS `query` answers "is anything within r?", never "how far".** So a
   distance to the nearest protected area is a *band*, and it comes from a
   binary search over a ladder of radii — three requests, not seven. Mölkau 204
@@ -614,8 +667,8 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 446 passed, 1 skipped
-- `vitest`: 452 passed — plus the integration file, excluded by `npm run test`
+- `pytest`: 451 passed, 1 skipped
+- `vitest`: 464 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
 - `scripts/screenshots.mjs`: 47 images plus two print PDFs. It fails on console
   errors, on horizontal overflow, and if not a single vector tile arrived. It

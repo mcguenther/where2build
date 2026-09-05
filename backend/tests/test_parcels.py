@@ -516,3 +516,43 @@ def test_an_expected_area_of_zero_is_refused(client: TestClient):
 
     assert answer.status_code == 422
     assert answer.json()["felder"][0]["pfad"] == ["body", "expected_area_m2"]
+
+
+# --------------------------------------------------------------------------
+# POST /api/parcels/nearby -- the candidates, for the user to choose between
+# --------------------------------------------------------------------------
+
+
+@respx.mock
+def test_nearby_lists_the_parcels_around_a_coordinate(client: TestClient):
+    """`/resolve` answers with one plot; this answers with the candidates.
+
+    An address coordinate is not a parcel boundary — the register puts it on the
+    building. Measured on Lessingweg 44 in Mölkau, where the routing geocoder's
+    point sits 7 m away, inside number 46.
+    """
+
+    route = respx.get(ALKIS_URL).mock(
+        return_value=httpx.Response(200, content=fixture_bytes("alkis_flurstueck_zwei.gml"))
+    )
+
+    answer = client.post(
+        "/api/parcels/nearby", json={"lat": 51.336612, "lon": 12.441776, "umkreis_m": 60}
+    )
+
+    assert answer.status_code == 200
+    body = answer.json()
+    assert len(body["features"]) == 2
+    assert "Adresskoordinate ist keine Flurstücksgrenze" in body["hinweis"] \
+        or "Nachbarflurstück" in body["hinweis"]
+    # The window is the one that was asked for, not the 1 m the point query uses.
+    bbox = route.calls[0].request.url.params["BBOX"].split(",")
+    assert float(bbox[2]) - float(bbox[0]) == pytest.approx(120, abs=1)
+
+
+def test_nearby_refuses_a_window_that_is_not_a_neighbourhood(client: TestClient):
+    answer = client.post(
+        "/api/parcels/nearby", json={"lat": 51.33, "lon": 12.44, "umkreis_m": 5000}
+    )
+
+    assert answer.status_code == 422

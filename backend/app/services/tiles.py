@@ -29,8 +29,9 @@ class LayerConfig:
     # "wms" is a WMS 1.3.0 GetMap; "arcgis" is an ArcGIS ``export`` request,
     # which is a different set of parameter names for the same picture.
     kind: str = "wms"
-    # Scale above which an ArcGIS layer draws nothing. ``None`` means it draws
-    # at every scale.
+    # Scale from which the layer draws nothing. ``None`` means it draws at
+    # every scale. Both kinds have one, and both answer an empty image rather
+    # than an error -- see ``_dpi_for`` and ``_map_resolution_for``.
     min_scale: float | None = None
 
 
@@ -60,6 +61,40 @@ def _dpi_for(bbox_width_m: float, image_width_px: int, min_scale: float | None) 
     return max(1, min(_MAX_DPI, allowed))
 
 
+# The OGC standard pixel: 0,28 mm. A WMS derives the scale a request asks for
+# from it, and ``MAP_RESOLUTION`` is how a caller says the pixel is a different
+# size.
+_STANDARD_PIXEL_M = 0.00028
+_STANDARD_RESOLUTION = round(_METRES_PER_INCH / _STANDARD_PIXEL_M)
+
+
+def _map_resolution_for(
+    bbox_width_m: float, image_width_px: int, min_scale: float | None
+) -> int | None:
+    """The resolution that keeps a tile inside a WMS layer's own scale range.
+
+    ``None`` when the standard pixel is already inside it, and the parameter is
+    then left off the request altogether.
+
+    The service computes the scale as ``bbox_width_m * resolution /
+    (image_width_px * 0.0254)``. The ALKIS layers stop drawing at 1:2000 and
+    answer with an empty image -- no error, nothing in the log -- so the
+    resolution is what keeps the cadastral ground from silently disappearing
+    two zoom steps out. Measured on a z18 tile over Liebertwolkwitz on
+    05.09.2026: 85 draws, 86 is blank, and the threshold itself is excluded
+    (1:1990 draws, 1:2000 does not), which is why this is one below the exact
+    solution rather than its floor.
+    """
+
+    if min_scale is None or bbox_width_m <= 0:
+        return None
+    at_standard = bbox_width_m / (image_width_px * _STANDARD_PIXEL_M)
+    if at_standard < min_scale:
+        return None
+    exact = min_scale * _METRES_PER_INCH * image_width_px / bbox_width_m
+    return max(1, min(_STANDARD_RESOLUTION, math.ceil(exact) - 1))
+
+
 class TileService:
     def __init__(self, settings: TilesSettings, app_settings: AppSettings) -> None:
         self.settings = settings
@@ -71,7 +106,11 @@ class TileService:
         return {
             "dop": LayerConfig(self.settings.dop_url, self.settings.dop_layers),
             "webatlas": LayerConfig(self.settings.webatlas_url, self.settings.webatlas_layers),
-            "alkis": LayerConfig(self.settings.alkis_url, self.settings.alkis_layers),
+            "alkis": LayerConfig(
+                self.settings.alkis_url,
+                self.settings.alkis_layers,
+                min_scale=self.settings.alkis_min_scale,
+            ),
             "laerm": LayerConfig(
                 self.settings.noise_url,
                 self.settings.noise_layers,
@@ -103,7 +142,7 @@ class TileService:
     def _params(self, config: LayerConfig, z: int, x: int, y: int) -> dict[str, str]:
         if config.kind == "arcgis":
             return self._arcgis_params(config, z, x, y)
-        return {
+        params = {
             "SERVICE": "WMS",
             "VERSION": "1.3.0",
             "REQUEST": "GetMap",
@@ -116,6 +155,22 @@ class TileService:
             "FORMAT": self.settings.image_format,
             "TRANSPARENT": "TRUE" if self.settings.transparent else "FALSE",
         }
+        resolution = self._map_resolution(config, z, x, y)
+        if resolution is not None:
+            params["MAP_RESOLUTION"] = str(resolution)
+        return params
+
+    def _map_resolution(self, config: LayerConfig, z: int, x: int, y: int) -> int | None:
+        """The pixel size for this tile, or ``None`` to leave it to the service.
+
+        Only for a metric CRS: in EPSG:4326 the BBOX is degrees, and the scale
+        the service derives from it is not the arithmetic above.
+        """
+
+        if self.settings.crs.upper() not in (geo.WEB_MERCATOR, "EPSG:900913"):
+            return None
+        minx, _, maxx, _ = geo.tile_bounds_3857(z, x, y)
+        return _map_resolution_for(maxx - minx, self.settings.tile_size, config.min_scale)
 
     def _arcgis_params(self, config: LayerConfig, z: int, x: int, y: int) -> dict[str, str]:
         """An ArcGIS ``export`` request for one XYZ tile.

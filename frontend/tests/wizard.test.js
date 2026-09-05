@@ -220,11 +220,11 @@ describe("Aufnahme — Schritt Quelle", () => {
 });
 
 describe("Der Schritt „Flurstück“", () => {
-  /* The template has read `draftBuilding` since this step existed and nothing
-     ever defined it, so the one plot that needed the message — a footprint that
-     fits nowhere — crashed the render instead of showing it, and the wizard
-     came out as an empty page under the header. */
-  it("sagt, dass der Baukörper nirgends passt, statt leer zu bleiben", async () => {
+  /* This step seats no house: nobody has chosen one yet, so a body drawn here
+     is a body the user did not put there — and its "fits nowhere" message read
+     a computed nothing defined, which crashed the render and left the wizard an
+     empty page under the header for exactly the plots that triggered it. */
+  it("zeigt auch ein winziges Flurstück, statt von einem Baukörper zu reden", async () => {
     const wizard = mountWithRouter(WizardView, {
       path: "/aufnahme/flurstueck", props: { stage: "flurstueck" }
     });
@@ -234,11 +234,13 @@ describe("Der Schritt „Flurstück“", () => {
       { x: 0, y: 0 }, { x: 6, y: 0 }, { x: 6, y: 4 }, { x: 0, y: 4 }
     ];
     wizard.vm.draft.setbacks = wizard.vm.draft.polygon.map(() => 3);
-    wizard.vm.houseSeated = false;
     await nextTick();
 
-    expect(wizard.text()).toContain("kein Platz");
-    expect(wizard.text()).toMatch(/\d+,\d+ × \d+,\d+ m/);
+    const plan = wizard.findComponent({ name: "SitePlan" });
+    expect(plan.exists()).toBe(true);
+    expect(plan.props("showBuilding")).toBe(false);
+    expect(wizard.text()).toContain("Passt");
+    expect(wizard.text()).not.toContain("Baukörper");
     wizard.unmount();
   });
 });

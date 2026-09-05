@@ -391,6 +391,37 @@ class AlkisService:
         hit = [parcel for parcel in parcels if parcel.geometry.covers(point)]
         return hit or parcels
 
+    async def around(self, lat: float, lon: float, radius_m: float) -> list[Flurstueck]:
+        """Every parcel whose outline meets a box of that half-edge.
+
+        For choosing: a house coordinate lands where the address register put
+        it, which is not always inside the parcel being sold -- measured on
+        Lessingweg 44 in Mölkau, where the routing geocoder's point sits 7 m
+        away, inside number 46. So the neighbours are offered and the user
+        says which one is theirs, rather than the point deciding silently.
+
+        The parcel the point sits in comes first, so a caller can preselect it.
+        """
+
+        easting, northing = geo.wgs84_to_utm33(lon, lat)
+        params = {
+            "SERVICE": "WFS",
+            "VERSION": self.settings.version,
+            "REQUEST": "GetFeature",
+            "TYPENAMES": "ave:Flurstueck",
+            "SRSNAME": self._crs_urn,
+            "BBOX": (
+                f"{easting - radius_m},{northing - radius_m},"
+                f"{easting + radius_m},{northing + radius_m},{self._crs_urn}"
+            ),
+            "COUNT": str(self.settings.max_features),
+        }
+        parcels = parse_feature_collection(await self._get(params))
+        point = Point(easting, northing)
+        parcels.sort(key=lambda parcel: (not parcel.geometry.covers(point),
+                                         parcel.geometry.distance(point)))
+        return parcels
+
     async def by_kennzeichen(self, kennzeichen: str) -> list[Flurstueck]:
         """Parcels by the 20-character AdV parcel key (stored query)."""
 

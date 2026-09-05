@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from app import geo
 from app.deps import tile_service
 
-from .conftest import DOP_URL, NOISE_EXPORT_URL
+from .conftest import ALKIS_WMS_URL, DOP_URL, NOISE_EXPORT_URL
 
 # Smallest valid PNG, enough to prove the bytes travel through unchanged.
 PNG = bytes.fromhex(
@@ -167,6 +167,51 @@ def test_the_dpi_keeps_the_layer_under_its_own_minscale(client: TestClient):
         scale = (maxx - minx) / 256 * int(params["dpi"]) / 0.0254
         assert scale <= 50000, f"1:{scale:.0f} would draw nothing"
         assert 1 <= int(params["dpi"]) <= 96
+
+
+@respx.mock
+def test_the_cadastral_layer_keeps_its_parcels_at_every_zoom(client: TestClient):
+    """The ALKIS layers stop drawing at 1:2000 and answer with an empty image,
+    so a ground called "Kataster" loses its parcel boundaries two zoom steps out
+    and says nothing about it. A WMS derives the scale from the standard 0,28 mm
+    pixel, and MAP_RESOLUTION is what a caller can change: measured on a z18
+    tile, 85 draws and 86 comes back blank."""
+
+    route = respx.get(ALKIS_WMS_URL).mock(return_value=_wms_answer())
+
+    # z20 is inside the layer's own range; z18 and z16 are not.
+    for zoom, x, y in ((20, 561296, 351568), (18, 140324, 87892), (16, 35081, 21973)):
+        client.get(f"/api/tiles/alkis/{zoom}/{x}/{y}.png")
+
+    for call in route.calls:
+        params = call.request.url.params
+        minx, _, maxx, _ = (float(value) for value in params["BBOX"].split(","))
+        # Without the parameter the service measures in its own standard pixel.
+        resolution = float(params.get("MAP_RESOLUTION", 0.0254 / 0.00028))
+        scale = (maxx - minx) * resolution / (256 * 0.0254)
+        assert scale < 2000, f"1:{scale:.0f} would draw nothing"
+        assert 1 <= resolution <= 91
+
+
+@respx.mock
+def test_a_layer_inside_its_scale_range_is_asked_without_a_resolution(client: TestClient):
+    """The parameter is a correction, not a habit: where the standard pixel
+    already draws, the request carries the service's own default."""
+
+    route = respx.get(ALKIS_WMS_URL).mock(return_value=_wms_answer())
+
+    client.get("/api/tiles/alkis/20/561296/351568.png")
+
+    assert "MAP_RESOLUTION" not in route.calls[0].request.url.params
+
+
+@respx.mock
+def test_the_photo_layer_has_no_scale_limit_and_is_asked_plainly(client: TestClient):
+    route = respx.get(DOP_URL).mock(return_value=_wms_answer())
+
+    client.get("/api/tiles/dop/16/35081/21973.png")
+
+    assert "MAP_RESOLUTION" not in route.calls[0].request.url.params
 
 
 @respx.mock

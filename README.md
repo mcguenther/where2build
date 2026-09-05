@@ -242,12 +242,13 @@ nothing else.
 | Method | Path | |
 |---|---|---|
 | `POST` | `/api/parcels/resolve` | address, coordinate (WGS84 or ETRS89/UTM33N as the Geoportal prints it) or *Gemarkung* + numerator/denominator → GeoJSON in EPSG:4326 with the official area |
+| `POST` | `/api/parcels/nearby` | one coordinate → the parcels around it, the one covering it first, then by distance — an address coordinate sits on the building the register recorded, and a few metres either way is the neighbour's parcel |
 | `POST` | `/api/listings/extract` | `{url}` or `{text}` → listing fields, each with its source |
 | `POST` | `/api/housetypes/extract` | `{url}` → house type, fetch restricted to the manufacturer's domain |
 | `GET` | `/api/landvalue` | `?lat=&lon=` → €/m², zone, reference date, and the size of the notional plot the value is quoted for |
 | `POST` | `/api/site-checks` | one parcel outline → noise bands, flood, radon, water protection, protected areas, slope, ground and air quality; each check carries either data or its own German `fehler` |
 | `POST` | `/api/reachability` | origin + destinations + modes → durations and route geometry |
-| `GET` | `/api/tiles/{layer}/{z}/{x}/{y}.png` | cached proxy for the GeoSN WMS layers (`dop`, `webatlas`, `alkis`) and, through the ArcGIS `export` endpoint, the noise survey (`laerm`, `laerm-nacht`) |
+| `GET` | `/api/tiles/{layer}/{z}/{x}/{y}.png` | cached proxy for the GeoSN WMS layers (`dop`, `webatlas`, `alkis` — parcel boundaries with their numbers, and the buildings) and, through the ArcGIS `export` endpoint, the noise survey (`laerm`, `laerm-nacht`) |
 | `POST` | `/api/nearby` | one coordinate → the nearest school, park, tram stop and so on, ranked by walking time; `linien: true` also names the lines calling at each stop |
 | `GET` | `/api/gemarkungen` | `?q=` → the Saxon cadastral districts, served from a committed index; the WFS is never touched |
 | `POST` | `/api/geocode` | `{text, lat?, lon?}` → candidates, never one answer: the same street name matches in three states |
