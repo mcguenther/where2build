@@ -32,7 +32,7 @@
 
     <!-- 1 · Quelle. Also what a stage without its data falls back to, so the
          redirect in `checkStage` never renders a step that has nothing. -->
-    <section v-if="stageIndex === 0 || !reachable" class="stack">
+    <section v-if="stage === 'quelle' || !reachable" class="stack">
       <p class="subtitle">Drei Wege hinein. Welcher passt zu dem, was vorliegt?</p>
       <div class="sources">
         <label v-for="s in sources" :key="s.id" class="source" :class="{ 'source--selected': source === s.id }">
@@ -76,6 +76,21 @@
             </p>
           </template>
 
+          <template v-else-if="source === 'text'">
+            <div class="field">
+              <label for="q-text">Beschreibung aus der Anzeige</label>
+              <textarea id="q-text" v-model="listingText"
+                        placeholder="Den Beschreibungstext der Anzeige einfügen — mit Ortsteil, Fläche und Straße"></textarea>
+            </div>
+            <p class="hint">
+              Dieser Weg braucht kein Modell. Gesucht wird über Muster und das
+              Gemarkungsverzeichnis: eine Flurstücksnummer im Text, ein Ortsteil mit
+              seiner Beziehung („OT von“, „am Ortsrand von“, „6 km entfernt“), die
+              Fläche so, wie sie dasteht, und die Straße. Was daraus folgt, steht
+              anschließend Zeile für Zeile im Protokoll.
+            </p>
+          </template>
+
           <template v-else>
             <div class="field">
               <label for="q-paste">Anzeige hier einfügen</label>
@@ -86,7 +101,7 @@
 
           <div class="row">
             <button type="button" class="btn" :disabled="busy || !ready" @click="read">
-              {{ busy ? "Wird gelesen …" : source === "parcel" ? "Nachschlagen" : "Lesen" }}
+              {{ busy ? "Wird gelesen …" : readLabel }}
             </button>
             <span v-if="busy" class="hint">Der Abruf kann eine Minute dauern.</span>
           </div>
@@ -95,7 +110,7 @@
     </section>
 
     <!-- 2 · Gelesene Werte -->
-    <section v-else-if="stageIndex === 1" class="stack">
+    <section v-else-if="stage === 'werte'" class="stack">
       <p class="subtitle">
         Jedes Feld führt die Quelle mit, aus der es stammt. Erst nach Bestätigung wandern die
         Werte in die Planung — das Modell antwortet auch dann, wenn die Seite die Zahl gar nicht hergibt.
@@ -115,14 +130,30 @@
 
       <div class="row">
         <button type="button" class="btn" :disabled="busy" @click="lookUpParcel">
-          {{ busy ? "Kataster wird abgefragt …" : "Flurstück nachschlagen" }}
+          {{ busy ? "Kataster wird abgefragt …" : "Flurstück suchen" }}
         </button>
-        <button type="button" class="btn btn--quiet" @click="stepBack(0)">Zurück</button>
+        <button type="button" class="btn btn--quiet" @click="stepBack('quelle')">Zurück</button>
       </div>
     </section>
 
-    <!-- 3 · Flurstück -->
-    <section v-else-if="stageIndex === 2" class="stack">
+    <!-- 3 · Flurstück suchen. The listing named a place, not a parcel; this
+         step turns the one into the other and shows what it stood on. -->
+    <section v-else-if="stage === 'suche'" class="stack">
+      <p class="subtitle">
+        Ein Inserat nennt fast nie sein Flurstück. Gesucht wird deshalb über das, was
+        dasteht — Ortsteil, Fläche, Straße —, und die Karte zeigt dabei durchgehend, was
+        noch möglich ist. Reicht es nicht für ein einzelnes Flurstück, sagt die Antwort,
+        worauf sich die Lage eingrenzen lässt.
+      </p>
+      <ParcelSearch v-if="searchQuery" :query="searchQuery" :key="searchRun"
+                    @confirm="takeCandidate" @manual="stepBack('quelle')" />
+      <div class="row">
+        <button type="button" class="btn btn--quiet" @click="stepBack('werte')">Zurück</button>
+      </div>
+    </section>
+
+    <!-- 4 · Flurstück -->
+    <section v-else-if="stage === 'flurstueck'" class="stack">
       <p class="subtitle">
         So liegt das Flurstück im Kataster. Stimmt der Zuschnitt, geht es weiter;
         sonst zurück und die Angaben korrigieren. Den Ausschnitt bewegt die
@@ -169,14 +200,14 @@
         </div>
       </div>
       <div class="row">
-        <button type="button" :class="doubt ? 'btn btn--secondary' : 'btn'" @click="goToStage(3)">
+        <button type="button" :class="doubt ? 'btn btn--secondary' : 'btn'" @click="goToStage('angaben')">
           {{ doubt ? "Trotzdem übernehmen" : "Passt" }}
         </button>
         <button type="button" class="btn btn--quiet" @click="stepBack(returnStage)">Zurück</button>
       </div>
     </section>
 
-    <!-- 4 · Angaben -->
+    <!-- 5 · Angaben -->
     <section v-else class="stack">
       <div class="panel">
         <div class="panel__body stack">
@@ -201,7 +232,7 @@
           </p>
           <div class="row">
             <button type="button" class="btn" @click="create">Anlegen und öffnen</button>
-            <button type="button" class="btn btn--quiet" @click="stepBack(2)">Zurück</button>
+            <button type="button" class="btn btn--quiet" @click="stepBack('flurstueck')">Zurück</button>
           </div>
         </div>
       </div>
@@ -212,9 +243,11 @@
 <script>
 import SitePlan from "../components/SitePlan.vue";
 import CadastralDistrictPicker from "../components/CadastralDistrictPicker.vue";
+import ParcelSearch from "../components/ParcelSearch.vue";
 import { state, addPlot, placement, autoSeatHouse } from "../lib/store.js";
 import { WIZARD_STAGES, wizardStage } from "../router/stages.js";
 import { readListing, readPage, resolveParcel, landValue } from "../lib/api.js";
+import { queryFromFields } from "../lib/search.js";
 import { plotFromCadastre } from "../lib/plots.js";
 import { polygonArea } from "../lib/geometry.js";
 import { area, euroPerSqm, num } from "../lib/format.js";
@@ -246,14 +279,17 @@ function fieldsFromResponse(response) {
 
 export default {
   name: "WizardView",
-  components: { SitePlan, CadastralDistrictPicker },
+  components: { SitePlan, CadastralDistrictPicker, ParcelSearch },
   props: {
     /** The stage's URL segment; the route only matches the four known ones. */
     stage: { type: String, required: true }
   },
   data() {
     return {
-      returnStage: 0,
+      returnStage: "quelle",
+      // What the listing said about price and address, held until a candidate
+      // is chosen and the draft is built.
+      listingExtras: null,
       lost: false,
       // How many history entries this wizard pushed; see `stepBack`.
       ownEntries: 0,
@@ -265,25 +301,37 @@ export default {
       gemarkungEntry: null,
       flurstuecksnummer: "",
       pastedText: "",
+      listingText: "",
       busy: false,
       error: "",
       readFields: [],
+      /* The listing's own prose. It is what the search reads the cadastral
+       * district, the street and the relation between the named places out of
+       * — none of which is an attribute anywhere. It never reaches the stored
+       * plot; see lib/plots.js for what a plot actually carries. */
+      description: "",
+      searchQuery: null,
+      // Bumped to remount the search rather than reuse a finished one.
+      searchRun: 0,
       draft: null,
       doubt: null,
       // Whether the footprint found room inside the setbacks; see `seatHouse`.
       houseSeated: true,
       // The labels for the stages in `WIZARD_STAGES`, in that order.
       steps: [
-        { id: "source", name: "Quelle" },
-        { id: "fields", name: "Gelesene Werte" },
-        { id: "parcel", name: "Flurstück" },
-        { id: "details", name: "Angaben" }
+        { id: "quelle", name: "Quelle" },
+        { id: "werte", name: "Gelesene Werte" },
+        { id: "suche", name: "Flurstück suchen" },
+        { id: "flurstueck", name: "Flurstück" },
+        { id: "angaben", name: "Angaben" }
       ],
       sources: [
         { id: "url", name: "Link einwerfen",
           text: "Adresse einer Anzeige. Der Server holt die Seite und liest Adresse, Flurstück, Kaufpreis und Fläche heraus." },
         { id: "parcel", name: "Flurstück direkt",
           text: "Gemarkung und Flurstücksnummer, so wie sie im Geoportal stehen." },
+        { id: "text", name: "Text durchsuchen",
+          text: "Nur der Beschreibungstext. Daraus wird das Flurstück gesucht — ohne Modell, allein über Muster und das Gemarkungsverzeichnis." },
         { id: "paste", name: "Seite einfügen",
           text: "Für Portale, die keinen Serverabruf zulassen. Die kopierte Anzeigenseite einfügen." }
       ]
@@ -292,16 +340,22 @@ export default {
   computed: {
     stageIndex() { return WIZARD_STAGES.indexOf(this.stage); },
     /* What each stage needs in order to have anything to show. Only the first
-     * one stands on its own: the read fields and the draft live in this
-     * component and are gone after a reload. */
+     * one stands on its own: the read fields, the query and the draft live in
+     * this component and are gone after a reload. */
     reachable() {
       if (this.stageIndex <= 0) return true;
-      return this.stageIndex === 1 ? this.readFields.length > 0 : Boolean(this.draft);
+      if (this.stage === "werte") return this.readFields.length > 0;
+      if (this.stage === "suche") return Boolean(this.searchQuery);
+      return Boolean(this.draft);
     },
     ready() {
       if (this.source === "url") return /^https?:\/\/\S{6,}/.test(this.url.trim());
       if (this.source === "parcel") return this.gemarkung.trim() && this.flurstuecksnummer.trim();
+      if (this.source === "text") return this.listingText.trim().length > 20;
       return this.pastedText.trim().length > 20;
+    },
+    readLabel() {
+      return { parcel: "Nachschlagen", text: "Flurstück suchen" }[this.source] ?? "Lesen";
     },
     computedArea() { return this.draft ? polygonArea(this.draft.polygon) : 0; },
     /** What the cadastre is asked for: the key of the chosen entry, which is
@@ -343,8 +397,21 @@ export default {
       this.busy = true;
       this.error = "";
       try {
+        if (this.source === "text") {
+          // Straight into the search: no page to fetch and no model to ask.
+          // The text is the evidence, and reading it is what the search does.
+          this.searchQuery = {
+            text: this.listingText.trim(),
+          };
+          this.listingExtras = {};
+          this.searchRun++;
+          this.returnStage = "quelle";
+          this.goToStage("suche");
+          return;
+        }
         if (this.source === "parcel") {
-          this.returnStage = 0;
+          // Nothing to search for: the district and the number are the answer.
+          this.returnStage = "quelle";
           await this.queryCadastre({
             gemarkung: this.gemarkungQuery,
             flurstuecksnummer: this.flurstuecksnummer.trim()
@@ -355,8 +422,9 @@ export default {
           ? await readListing(this.url.trim())
           : await readPage(this.pastedText);
         this.readFields = fieldsFromResponse(response);
-        this.returnStage = 1;
-        this.goToStage(1);
+        this.description = response?.beschreibung || (this.source === "paste" ? this.pastedText : "");
+        this.returnStage = "werte";
+        this.goToStage("werte");
       } catch (error) {
         this.error = error.message;
       } finally {
@@ -364,35 +432,49 @@ export default {
       }
     },
 
-    /** Turn what was read into a cadastral query: coordinate first, else the parcel number. */
-    async lookUpParcel() {
+    /** Hand what was read to the search.
+     *
+     *  Deliberately not a lookup any more. A coordinate resolves to whatever
+     *  parcel it lands on — measured 6 235 m from the plot actually being sold,
+     *  because the platform geocodes its own location field — and a single
+     *  parcel number without its district is a guess. The search asks the
+     *  cadastre a series of narrow questions instead, and shows what each one
+     *  settled.
+     */
+    lookUpParcel() {
       const read = name => this.readFields.find(f => f.key === name)?.value;
-      const lat = numberFrom(read("lat")), lon = numberFrom(read("lon"));
-      const numbers = String(read("flurstuecke") ?? "").split(/[,;]/).map(s => s.trim()).filter(Boolean);
+      this.searchQuery = queryFromFields(this.readFields, {
+        ...(this.description ? { text: this.description } : {}),
+        ...(this.gemarkungQuery ? { gemarkung: this.gemarkungQuery } : {})
+      });
+      this.listingExtras = {
+        askingPrice: numberFrom(read("kaufpreis_eur")),
+        note: read("adresse") ? `Aus der Anzeige: ${read("adresse")}` : ""
+      };
+      this.searchRun++;
+      this.returnStage = "suche";
+      this.goToStage("suche");
+    },
 
-      let query = null;
-      if (Number.isFinite(lat) && Number.isFinite(lon)) query = { lat, lon };
-      else if (numbers.length) query = { gemarkung: this.gemarkungQuery || undefined, flurstuecksnummer: numbers[0] };
-      else if (read("adresse")) query = { address: read("adresse") };
-
-      // The listing's own plot area lets the service judge whether the parcel
-      // it found can plausibly be the one being sold. A district address lands
-      // in the field next door, and nothing else would say so.
-      const statedArea = numberFrom(read("grundstuecksflaeche_m2"));
-      if (query && Number.isFinite(statedArea)) query.expected_area_m2 = statedArea;
-
-      if (!query) {
-        this.error = "Aus der Seite ließ sich weder eine Koordinate noch ein Flurstück lesen. "
-          + "Bitte den Weg „Flurstück direkt“ nehmen.";
-        return;
-      }
+    /** One candidate from the search becomes the draft plot.
+     *
+     *  Resolved again through /api/parcels/resolve rather than assembled from
+     *  the search answer: that endpoint is what the rest of the app already
+     *  speaks, and it re-checks the parcel on the way through.
+     */
+    async takeCandidate(candidate) {
+      if (!candidate) return;
       this.busy = true;
       this.error = "";
       try {
-        await this.queryCadastre(query, {
-          askingPrice: numberFrom(read("kaufpreis_eur")),
-          note: read("adresse") ? `Aus der Anzeige: ${read("adresse")}` : ""
-        });
+        await this.queryCadastre(
+          {
+            gemarkung: candidate.properties.gemarkungsnummer || candidate.properties.gemarkung,
+            flurstuecksnummer: candidate.properties.flurstuecksnummer,
+            ...(this.searchQuery?.flaeche_m2 ? { expected_area_m2: Math.round(this.searchQuery.flaeche_m2) } : {})
+          },
+          this.listingExtras || {}
+        );
       } catch (error) {
         this.error = error.message;
       } finally {
@@ -425,7 +507,7 @@ export default {
       }
       this.houseSeated = autoSeatHouse(plot);
       this.draft = plot;
-      this.goToStage(2);
+      this.goToStage("flurstueck");
     },
 
     create() {

@@ -31,6 +31,7 @@ from .routers import (
     neighbours,
     parcels,
     reachability,
+    search,
     tiles,
 )
 from .deps import address_index, gemarkung_directory, nearby_service
@@ -257,6 +258,7 @@ def create_app() -> FastAPI:
 
     for module in (
         parcels,
+        search,
         gemarkungen,
         listings,
         housetypes,

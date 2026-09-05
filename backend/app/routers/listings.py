@@ -52,22 +52,30 @@ def _merge(deterministic: InseratFelder, extracted: InseratFelder | None) -> Ins
     return InseratFelder.model_validate(merged)
 
 
+# How much of a page's prose travels back. Enough for a description with its
+# location sentences; not a whole portal page with its navigation.
+_DESCRIPTION_LIMIT = 20_000
+
+
 def _answer(
     felder: InseratFelder,
     quelle_url: str | None,
     weg: Extraktionsweg,
     hinweis: str | None = None,
     titel: str | None = None,
+    beschreibung: str | None = None,
 ) -> ListingExtractResponse:
     try:
         inserat = Inserat(**felder.model_dump(), quelle_url=quelle_url)
     except ValidationError as exc:
         raise BadRequestError(_NO_LOCATOR) from exc
+    text = " ".join(part for part in (titel, beschreibung) if part).strip()
     return ListingExtractResponse(
         felder=as_vorschlaege(inserat, InseratVorschlaege, quelle_url),
         quelle_url=quelle_url,
         weg=weg,
         hinweis=hinweis or titel,
+        beschreibung=text[:_DESCRIPTION_LIMIT] or None,
     )
 
 
@@ -96,7 +104,9 @@ async def _from_url(url: str, llm: LLMClient, settings: Settings) -> ListingExtr
                 "Das Auslesen von Seiten ist nicht konfiguriert und die Seite trägt "
                 "keine Koordinaten. Bitte den Seiteninhalt einfügen."
             )
-        return _answer(_merge(deterministic, extracted), url, weg, hinweis, seite.titel)
+        return _answer(
+            _merge(deterministic, extracted), url, weg, hinweis, seite.titel, seite.text
+        )
 
     # Unknown domain: the spec's chain is web_fetch first, then meta tags and
     # JSON-LD from a direct request, then the full text to the model.
@@ -117,6 +127,7 @@ async def _from_url(url: str, llm: LLMClient, settings: Settings) -> ListingExtr
                     url,
                     "meta-tags",
                     titel=seite.titel,
+                    beschreibung=seite.text,
                 )
             raise NotConfiguredError(
                 "Das Auslesen von Seiten ist nicht konfiguriert. "
@@ -129,7 +140,13 @@ async def _from_url(url: str, llm: LLMClient, settings: Settings) -> ListingExtr
         if seite is not None
         else InseratFelder()
     )
-    return _answer(_merge(deterministic, extracted), url, "llm", titel=seite.titel if seite else None)
+    return _answer(
+        _merge(deterministic, extracted),
+        url,
+        "llm",
+        titel=seite.titel if seite else None,
+        beschreibung=text,
+    )
 
 
 @router.post("/extract", response_model=ListingExtractResponse, summary="Inserat auslesen")
@@ -162,4 +179,4 @@ async def extract(
         if seite is not None
         else InseratFelder()
     )
-    return _answer(_merge(deterministic, extracted), None, "eingefuegter-text")
+    return _answer(_merge(deterministic, extracted), None, "eingefuegter-text", beschreibung=text)

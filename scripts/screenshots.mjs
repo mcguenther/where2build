@@ -103,6 +103,15 @@ async function addPlot(page) {
 const taken = [];
 const problems = [];
 
+/* A real listing's description, from the case in
+   docs/research/flurstueck-identifikation.md. It names three places, an area
+   and a street, and resolves to Flurstück 790/11 in Gemarkung Großbothen. */
+const LISTING =
+  "Baugrundstück in ruhiger Lage am Ortsrand von Großbothen, einem OT von Grimma. "
+  + "Das Grundstück ist 502 m² groß und liegt an der Wiesenstraße. "
+  + "Über die B107 erreichen Sie die ca. 6 km entfernte Kreisstadt Grimma. "
+  + "Sehenswert sind das Kloster Nimbschen und die Schiffsmühle in Höfgen.";
+
 /* The map reports when every tile for the current view has arrived. A tile
  * that 502s never lets it, and a whole screenshot run must not hang on one --
  * so the wait is bounded and says what it settled for. */
@@ -144,6 +153,26 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
 
   await page.click(".page-head .btn");                      // Grundstück hinzufügen
   await shot(page, "assistent-1", mode, narrow ? "-schmal" : "");
+
+  /* The search, on the way past: this is the step between a listing and a
+     parcel, and the only one whose whole point is showing its working. It
+     needs no model — the text is read with patterns and the Gemarkung
+     register — so it runs here even without an LLM key. */
+  await page.getByText("Text durchsuchen").click();
+  await page.fill("#q-text", LISTING);
+  await page.getByRole("button", { name: "Flurstück suchen" }).click();
+  await page.waitForTimeout(1500);
+  await shot(page, "suche-laeuft", mode, narrow ? "-schmal" : "");
+  try {
+    await page.waitForSelector(".suche__urteil--bestaetigt, .suche__urteil--mehrdeutig, .suche__urteil--erfolglos", { timeout: 90000 });
+    // Let the queue play the run out; it spends a fixed budget over the backlog.
+    await page.waitForTimeout(8000);
+  } catch {
+    problems.push(`${mode}/${width}: die Suche kam zu keinem Ergebnis`);
+  }
+  await shot(page, "suche-ergebnis", mode, narrow ? "-schmal" : "");
+  await page.click(".breadcrumb a");
+  await page.click(".page-head .btn");
   await page.getByText("Flurstück direkt").click();
   await pickDistrict(page, "Liebertwolkwitz");
   await page.fill("#q-parcel-number", "85/1");

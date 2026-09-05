@@ -120,6 +120,7 @@ describe("Aufnahme", () => {
     const { app, router } = await openApp("/aufnahme/quelle");
     const wizard = app.findComponent({ name: "WizardView" });
     wizard.vm.readFields = [{ key: "adresse", label: "Adresse", value: "Muldentalstraße 4", source: "Test" }];
+    wizard.vm.searchQuery = { adresse: "Muldentalstraße 4" };
     wizard.vm.draft = { ...state.data.plots[0] };
     return { app, router, wizard };
   };
@@ -135,9 +136,9 @@ describe("Aufnahme", () => {
 
   it("geht mit dem Zurück-Knopf des Browsers einen Schritt zurück, nicht hinaus", async () => {
     const { app, router, wizard } = await wizardWithDraft();
-    wizard.vm.goToStage(1);
+    wizard.vm.goToStage("werte");
     await flushPromises();
-    wizard.vm.goToStage(2);
+    wizard.vm.goToStage("flurstueck");
     await flushPromises();
     expect(router.currentRoute.value.fullPath).toBe("/aufnahme/flurstueck");
 
@@ -154,12 +155,12 @@ describe("Aufnahme", () => {
 
   it("nimmt der Zurück-Schaltfläche denselben Weg wie dem Browser", async () => {
     const { router, wizard } = await wizardWithDraft();
-    wizard.vm.goToStage(1);
+    wizard.vm.goToStage("werte");
     await flushPromises();
-    wizard.vm.goToStage(2);
+    wizard.vm.goToStage("flurstueck");
     await flushPromises();
 
-    wizard.vm.stepBack(1);
+    wizard.vm.stepBack("werte");
     await flushPromises();
     expect(router.currentRoute.value.fullPath).toBe("/aufnahme/werte");
 

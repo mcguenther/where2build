@@ -241,6 +241,7 @@ nothing else.
 | Method | Path | |
 |---|---|---|
 | `POST` | `/api/parcels/resolve` | address, coordinate or *Gemarkung* + numerator/denominator → GeoJSON in EPSG:4326 with the official area |
+| `POST` | `/api/parcels/search` | everything a listing says → the parcel it is selling, as **NDJSON**: one object per line while the search runs, so the map grows with it. `…/search/complete` is the same run as one answer |
 | `POST` | `/api/listings/extract` | `{url}` or `{text}` → listing fields, each with its source |
 | `POST` | `/api/housetypes/extract` | `{url}` → house type, fetch restricted to the manufacturer's domain |
 | `GET` | `/api/landvalue` | `?lat=&lon=` → €/m², zone, reference date |
@@ -310,6 +311,37 @@ Each of these is verified, not assumed — the details are in
   derived figure whose input is missing stays a dash; computing it anyway is
   where "0,00 €" and "−100 % under the land value" came from.
 
+### Finding the parcel a listing is selling
+
+A listing almost never names its Flurstück, and its map pin is not the plot —
+measured 6 235 m away on a real advert, because the platform geocodes its own
+location field. `POST /api/parcels/search` therefore asks the cadastre a series
+of narrow questions instead of one broad one, and reports every step.
+
+* **The cheap case is cheap.** A Gemarkung and a parcel number resolve in
+  **two requests** and stop — but not before the parcel that came back is
+  checked against the other things the listing says, because a misread digit
+  resolves to a real but foreign parcel and validating against ALKIS is exactly
+  what does not catch that.
+* **Contradictions are shown, not resolved quietly.** Several districts named
+  in one text become a `Konflikt` with the sentence each was read from; the
+  user can pick a different one, or switch a clue off, and the search runs
+  again. Often it never has to be asked: the parcel number exists in only one
+  of the contested districts, and four count requests settle it.
+* **When no single parcel can be named, the answer says what is settled** —
+  the street, the district, the municipality. For the land value and for travel
+  times that is often enough.
+
+The measurements behind every threshold are in
+`docs/research/flurstueck-identifikation.md`; the six phases are drawn out in
+`docs/strategie/suchalgorithmus.html`.
+
+**Image text recognition is the one channel not built here.** The endpoint
+accepts `indizien` from the caller so it plugs in without a contract change,
+and `docs/research/flurstueck-identifikation.md` § 10 has the measured ladder
+(upscale, then `--psm 6`, then `--psm 1`) — but no Tesseract is wired up, so
+nothing in this repository reads an image today.
+
 ## Not done yet
 
 - **No persistence on the server.** Plots live in the browser, and PostGIS is
@@ -326,6 +358,16 @@ Each of these is verified, not assumed — the details are in
   including why it is not being built yet.
 - **The dimension figures get small on a narrow screen.** Nothing overflows, but
   at 390 px they are hard to read.
+- **The search reads no images.** The OCR ladder is measured and written down
+  but not wired in, so a listing whose only cadastral evidence is an attached
+  extract falls back to its area and its place names. `POST
+  /api/parcels/search` already takes `indizien` from the caller, which is where
+  that channel will attach.
+- **The street filter uses the cadastre's own address field, not OSM.** That is
+  free and needs no Overpass, but it only covers the parcels that carry an
+  address — half of them in the district measured. The OSM buffer (25 → 5 on
+  the reference case) needs a street index built from the Saxony extract, the
+  same way `scripts/build_poi_index.py` builds the POI one.
 
 ## Attribution
 

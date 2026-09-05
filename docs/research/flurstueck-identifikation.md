@@ -1,11 +1,12 @@
 # From a listing to the parcel — what the evidence actually supports
 
-**Research date: 2026-09-01.** Written in English: this is developer
-documentation, only the user interface is German.
+**Research date: 2026-09-01, re-verified and extended 2026-09-05.** Written in
+English: this is developer documentation, only the user interface is German.
 
 > **Legend**
-> ✅ **VERIFIED LIVE (2026-09-01)** — a request was made from this shell, or a
-> command run here, and its answer read.
+> ✅ **VERIFIED LIVE** — a request was made from this shell, or a command run
+> here, and its answer read. §§ 2-14 on 2026-09-01, all of them re-run on
+> 2026-09-05 before the algorithm was built; § 15 is new on that date.
 > ⚠️ **NOT VERIFIED** — stated as a design decision or an open question, not as
 > a fact.
 
@@ -487,7 +488,140 @@ the same place needs no configuration change.
 
 ---
 
-## 15. What is still unverified ⚠️
+---
+
+## 15. Second pass, 05.09.2026: what the review changed ✅
+
+Everything in §§ 2-15 was re-run against the live WFS before the algorithm was
+built. The tolerance staircase, the land-use filter and the wrong-anchor table
+all reproduce **exactly**. Five things did not survive the second look, and
+four of them make the search cheaper.
+
+### 15.1 A parcel number settles a contested district by itself ✅
+
+The drafted algorithm chose *one* anchor and filtered inside it, which made a
+misread relation the single route to a confidently wrong answer. It does not
+have to choose. Testing the number against every district the text names:
+
+| Anchor | + Flurstück 790/11 |
+|---|---|
+| Gemarkung Großbothen (144241) | **1** |
+| Gemarkung Grimma (144236) | 0 |
+| Gemarkung Höfgen (144245) | 0 |
+| Gemarkung Höfgen (146132) | 0 |
+
+Four count requests, and the contest is over — no relation extraction, no
+model call, and no question to the user. The same shape as the exact-area
+result in § 12, one signal further along: **a hard filter run against a *set*
+of anchors is a disambiguator, not just a filter.**
+
+A district name that is not unique contributes *all* of its districts. Two
+Höfgen are two cheap questions; dropping the name because it is ambiguous
+throws away exactly the case this search exists for.
+
+### 15.2 How far a number goes with no district at all ✅
+
+| Query, whole of Saxony | Parcels |
+|---|---|
+| `flstnrzae=790` and `flstnrnen=11` | **5** |
+| `flstnrzae=85` and `flstnrnen=1` | 672 |
+
+So a distinctive number is nearly an anchor on its own and a low one is
+nothing — and one `resultType=hits` request is enough to tell which. Worth
+spending as a last resort; not worth guessing about.
+
+### 15.3 `gmdschl` is a working anchor ✅
+
+| Constraint | Parcels |
+|---|---|
+| `gmdschl = 14729160` (Stadt Grimma) | 32 544 |
+| … + `flstnrzae=790`, `flstnrnen=11` | **1** |
+| … + `flstnrzae=790` (no denominator) | 13 |
+
+A municipality is a legitimate container when no Gemarkung is known — and the
+denominator is what makes it decisive.
+
+### 15.4 `ave:lagebeztxt` is filterable after all — and must never filter ✅
+
+§ 6 concluded that a street "cannot be matched against ALKIS as an attribute"
+because 790/11 carries `"ohne Lage"`. That is too strong: the field *is*
+matchable server-side with `PropertyIsLike`, and in Großbothen it covers a
+sixth of the district.
+
+| Filter in Gemarkung 144241 | Parcels |
+|---|---|
+| `lagebeztxt` like `*Wiesenstr*` | **71** |
+| `lagebeztxt` like `*ohne Lage*` | 577 |
+| Gemarkung Mölkau (143156), total | 250 |
+| … `"ohne Lage"` | 227 |
+
+Two conclusions, and the second is the important one. It is free — the field
+rides along with every feature, so no Overpass request is needed for the
+common case. And it may only ever **promote**: 790/11 is one of the 577, so a
+hard street filter would have deleted the right answer. A missing address is
+missing data, not a contradiction.
+
+### 15.5 „OT von X“ names the municipality, not the cadastral district ✅
+
+§ 5 showed that counting mentions picks Grimma, and § 12 showed that one rung
+out Grimma manufactures 26 false candidates against Großbothen's 2. Both are
+consequences of reading one sentence wrongly:
+
+> „am Ortsrand von **Großbothen**, einem OT von **Grimma**“
+
+Großbothen is where the plot is; Grimma is the *municipality Großbothen
+belongs to*. Read that way the two names stop competing, and the second
+mention — „die ca. 6 km entfernte Kreisstadt Grimma“ — turns Grimma into
+evidence against itself rather than for itself. The frequency trap disappears
+without a model, a parser or a weight. What the extractor needs is not
+"which place" but "which *level*".
+
+### 15.6 The costs, measured ✅
+
+| | |
+|---|---|
+| `ave:KatasterBezirk` for one district | **16.5 kB**, 637 boundary points, one request |
+| 25 parcels with geometry | 35.6 kB, ~1.4 kB each, 1.5 s |
+| `fes:BBOX` 2 × 2 km on `ave:geometrie` | 785 parcels |
+
+The first is what makes the search map possible: the committed directory drops
+the geometry on purpose, so the district wash is one request, on demand, and
+not 28 MB in the repository.
+
+The second sets the cap. ALKIS cannot be asked for attributes without
+geometry, so the split is: `resultType=hits` for every rung and every probe,
+and the features fetched only once the count is small enough to draw.
+
+### 15.7 What the drafted algorithm got wrong
+
+* **The short circuit did not check.** It jumped from "district and number
+  present" straight to the verdict. But § 10 records a misreading that
+  produced `Flurstück 790717` — a plausible wrong number resolves to a real
+  but foreign parcel, and that is exactly the error validating against ALKIS
+  does *not* catch. The check costs nothing: the official area and the
+  municipality arrive **with** the parcel, so comparing them to what the
+  listing says is a rule, not a request. This also answers the open question
+  the strategy page left ("is the short circuit safe when the image names a
+  district the location field contradicts?" — no, and now it says so).
+* **A five-digit numerator is the only string test worth having.** The AdV
+  parcel key gives the numerator five characters and the denominator four, so
+  `790717` is not a parcel number at all and can be rejected before a request
+  is spent. Nothing beyond that width is detectable from the string; the rest
+  is the cross-check above.
+* **„bestätigt“ was defined twice.** The outcomes section still said "and the
+  runner-up is far enough behind" after the lead threshold had been abolished
+  in favour of the hard filters. The hard-filter definition is the one that
+  holds — and it needs one addition the draft did not have: a single survivor
+  reached only through a *chosen tolerance* is `mehrdeutig`, not
+  `bestätigt`, because nothing official picked it.
+* **The model call sat in phase 0.** The detail text gates it correctly
+  ("only when the area is not exact"), the pseudo-code did not. It belongs
+  after the staircase, which is measurably where it stops being needed.
+* **The anchor tie was undefined.** When several anchors survive, the draft
+  did not say whose candidates win. They are unioned, and the fact that more
+  than one anchor survived *is itself* the thing to show the user.
+
+## 16. What is still unverified ⚠️
 
 * The three prompts in `docs/strategie/extraktion-prompting.html` are drafted
   but have not been run against a model — this listing did not need them.

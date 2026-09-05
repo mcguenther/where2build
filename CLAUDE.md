@@ -34,6 +34,9 @@ Keep comments sparse and about *why*, not *what*.
 backend/     FastAPI. Proxy and disk cache in front of ALKIS, BORIS, GeoSN
              WMS, MOTIS and the LLM. Owns no geometry maths and no database —
              PostGIS is in the plan, not in the code.
+             `app/search/` is the exception in one direction only: it asks the
+             cadastre a series of narrow questions and answers NDJSON, so the
+             map can grow while it runs. Still no geometry maths.
 frontend/    Vite + Vue 3, Options API. Owns ALL geometry.
 docs/        Spec, service research, screenshots. `strategie/` holds the four
              interactive strategy pages for parcel identification.
@@ -70,6 +73,12 @@ from the user directly. Reopen only if the user asks.
   so only the 3 m floor is computable.
   See `docs/research/abstandsflaechen-nachbargebaeude.md`.
 - Region is Saxony only; ALKIS and BORIS are state-specific.
+- **A contradiction is shown, never resolved quietly.** Two Gemarkungen in one
+  listing, or a number on an image that the location field disagrees with, are
+  a `Konflikt`: the search follows the most trustworthy reading, says which and
+  why, carries the *Beleg* for each option, and lets the user pick another —
+  which re-runs the search. A contradiction nobody can look up is one nobody
+  can resolve.
 - **The sentence under a check is composed, not written.** Every finding comes
   from a template in `frontend/src/lib/findings.js`: structured input from one
   service, fixed German text out. No model writes UI copy. That keeps the
@@ -85,6 +94,15 @@ from the user directly. Reopen only if the user asks.
   denominator (`85/1`) cannot occur in an address. Where two readings stay
   plausible — "Lessingweg 44" and "Mölkau 204" are the same shape — the answer
   says so and both local indexes are asked, rather than one being guessed.
+- **The search decides with hard filters and orders with weights.**
+  „Bestätigt“ means an *official* statement left exactly one parcel standing —
+  a parcel number resolved against ALKIS, the Gemarkung, `ave:flaeche` when the
+  listing's figure is exact — and nothing contradicted it. A single survivor
+  reached only through a chosen tolerance is `mehrdeutig`. Everything
+  inferential (a rounded area, a street, land use, a broker's distance) may
+  only order the list, which is why the weights can ship uncalibrated: they
+  can produce an unhelpful ordering, never a wrong answer. See
+  `backend/app/search/`.
 - **Never show example data.** There is no sample state and no fallback: when a
   service fails, the German `detail` from the backend is shown instead. Tests
   run on recorded real responses in `frontend/tests/fixtures/`, not on invented
@@ -501,6 +519,69 @@ from the user directly. Reopen only if the user asks.
   `z_GUAN` and `zDDR_`) return no measurements at all, while Leipzig-Mitte at
   4,6 km returns all four pollutants. Pick the nearest station that actually
   answers with values, not the nearest on the map.
+- **A parcel number is a hard filter that can be run against a *set* of
+  anchors, and that is what dissolves a contested Gemarkung.** Measured
+  05.09.2026 on the Grimma ad: 790/11 exists in Großbothen and in **none** of
+  Grimma, Höfgen (144245) or Höfgen (146132). Four `resultType=hits` requests
+  and the contest is over — no relation extraction, no model call, no question
+  to the user. So never *choose* one anchor: ask them all, and let the cadastre
+  answer. An ambiguous name contributes **all** its districts; dropping it for
+  being ambiguous throws away the case the search exists for.
+- **The short circuit has to check, not just resolve.** Gemarkung plus
+  Flurstück is not a verdict on its own: a misread number resolves to a real
+  but foreign parcel, and validating against ALKIS is exactly what does *not*
+  catch that. The cross-check is free — `flaeche` and `gemeinde` arrive **with**
+  the parcel — so the official area is compared against the listing's, and the
+  municipality against the location field, before anything says „bestätigt“.
+  The one string test worth having is the AdV key's own widths: five digits of
+  numerator, four of denominator, so `790717` is not a parcel number at all.
+- **`ave:lagebeztxt` *is* filterable with `PropertyIsLike` — and must never
+  filter.** The earlier note ("a street cannot be matched as an attribute") is
+  too strong: in Gemarkung Großbothen 71 of 1 131 parcels carry `Wiesenstr*`.
+  But 577 carry `"ohne Lage"` and **790/11 is one of them**, so a hard street
+  filter deletes the right answer. Use it to promote, never to demote: a
+  missing address is missing data, not a contradiction. Costs nothing — the
+  field rides along with every feature, so no Overpass request for the common
+  case.
+- **„OT von X“ names the Gemeinde, not the Gemarkung.** „am Ortsrand von
+  Großbothen, einem OT von Grimma“ places the plot in Großbothen and says
+  Grimma is the municipality above it. Read that way the two names stop
+  competing and the frequency trap disappears without a parser or a weight —
+  and the second mention („die ca. 6 km entfernte Kreisstadt Grimma“) turns
+  Grimma into evidence *against* itself. Extract the **level**, not just the
+  place.
+- **`resultType=hits` is what makes the staircase affordable, and ALKIS cannot
+  be asked for attributes without geometry.** A count is a few hundred bytes
+  whatever the number; features are ~1,4 kB each (25 parcels = 35,6 kB in
+  1,5 s, measured). So: count every rung, every anchor and every number probe,
+  and fetch features only once the count is small enough to draw. The abort
+  belongs on the **candidate set after the hard filters** (~500), never on the
+  anchor — Stadt Leipzig has 112 588 Flurstücke and an exact area still leaves
+  78.
+- **`ave:KatasterBezirk` by `schluessel` is one request and 16,5 kB** (637
+  boundary points for Großbothen). That is where the search map's district wash
+  comes from: the committed `gemarkungen-sachsen.json` drops the geometry on
+  purpose, so the outline is fetched on demand rather than added to the file.
+- **`ave:tntxt` splits on the semicolon, not the comma.** The kind and its area
+  share are separated by `;`, but the *name* can contain a comma —
+  „Sport-, Freizeit- und Erholungsfläche;500“. Splitting on both puts „Sport-“
+  in the table as if that were a land use.
+- **A search map must show its candidates at the scale it is standing at.**
+  Twenty-two parcels spread over two Gemarkungen are a few pixels each; the
+  outlines are drawn and nothing is visible. `EvidenceMap` therefore gives
+  every candidate a dot that fades in below zoom 17 and out again once the real
+  outline can be seen.
+- **Two seconds per Indiz is the pace for evidence arriving live, and the wrong
+  pace for a finished run.** Most runs complete in a few seconds while sixteen
+  events at two seconds is half a minute of watching. `StepQueue` therefore
+  spends a fixed budget over whatever is queued (≥ 240 ms per step), and the
+  camera flight follows that pace — a 900 ms flight started every 240 ms is the
+  twitch the queue exists to prevent. `prefers-reduced-motion` skips it all.
+- **`this.timer = setTimeout` and then `this.timer(…)` throws „Illegal
+  invocation“.** The native function ends up with the queue as its receiver.
+  Nothing else fails: the run simply stops after its first line, with the map
+  still showing the whole of Saxony and one entry in the protocol. Wrap the
+  timers (`(fn, ms) => setTimeout(fn, ms)`), do not reference them.
 - **Verify a "not affected" against a control point.** A layer that answers
   zero features looks the same whether the plot is clear or the layer is
   empty. `luft/radonvorsorgegebiete` holds 107 municipalities and answers "no"
