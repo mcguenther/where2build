@@ -493,3 +493,82 @@ def test_the_request_carries_no_contact_details():
     fields = set(ParcelSearchRequest.model_fields)
 
     assert not fields & {"name", "telefon", "anbieter", "makler", "email"}
+
+
+@respx.mock
+def test_a_number_without_a_denominator_is_narrowed_by_the_area(client: TestClient):
+    """„238“ alone also finds 238/3. The area settles it, and costs nothing.
+
+    Both parcels arrive in one answer with their official areas, so this is a
+    rule applied to what is already in hand rather than another request.
+    """
+
+    respx.post(ALKIS_URL).mock(
+        side_effect=[
+            _gml("alkis_grossbothen_band.gml"),   # 238/3 at 500 m² and 790/11 at 502
+            _gml("alkis_katasterbezirk_grossbothen.gml"),
+        ]
+    )
+
+    events = _stream(
+        client,
+        {"gemarkung": "Großbothen", "flurstuecksnummer": "790", "flaeche_m2": 502,
+         "flaeche_text": "502 m²"},
+    )
+
+    final = events[-1]
+    assert final["status"] == "bestaetigt"
+    assert [c["properties"]["flurstuecksnummer"] for c in final["kandidaten"]] == ["790/11"]
+    assert any("exakten Fläche" in (e.get("text") or "") for e in events)
+
+
+@respx.mock
+def test_several_numbers_from_one_source_are_a_plot_and_not_a_dispute(client: TestClient):
+    """„Flurstück 790/11 sowie 238/3“ is one plot made of two.
+
+    A plot is a set of parcels -- the normal case in this project, not the
+    exception -- so asking which of the two is meant would be asking a question
+    that is not there.
+    """
+
+    respx.post(ALKIS_URL).mock(
+        side_effect=[
+            _gml("alkis_grossbothen_band.gml"),   # both, in one answer
+            _gml("alkis_leer.gml"),
+            _gml("alkis_katasterbezirk_grossbothen.gml"),
+        ]
+    )
+
+    events = _stream(
+        client,
+        {"gemarkung": "Großbothen",
+         "text": "Verkauft werden Flurstück 790/11 sowie Flurstück 238/3 in Großbothen."},
+    )
+
+    assert not [e for e in events if e["art"] == "konflikt" and e["konflikt"]["art"] == "flurstueck"]
+    assert "besteht oft aus mehreren" in events[-1]["text"]
+
+
+@respx.mock
+def test_numbers_from_different_sources_are_a_dispute(client: TestClient):
+    """An image naming one parcel and the text another is a real contradiction."""
+
+    respx.post(ALKIS_URL).mock(side_effect=[_gml("alkis_grossbothen_band.gml")] * 6)
+
+    events = _stream(
+        client,
+        {
+            "gemarkung": "Großbothen",
+            "text": "Baugrundstück, Flurstück 238/3 in Großbothen.",
+            "indizien": [
+                Indiz(
+                    id="ocr1", art="flurstueck", wert="790/11",
+                    text="Flurstück 790/11 auf dem Katasterauszug",
+                    beleg="Titelzeile des Auszugs", quelle="bild", sicherheit=0.95,
+                ).model_dump(mode="json")
+            ],
+        },
+    )
+
+    conflicts = [e["konflikt"] for e in events if e["art"] == "konflikt"]
+    assert any(conflict["art"] == "flurstueck" for conflict in conflicts)

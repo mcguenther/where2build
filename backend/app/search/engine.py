@@ -239,6 +239,12 @@ class SearchEngine:
             values = {self._conflict_key(indiz) for indiz in usable}
             if len(values) < 2:
                 continue
+            if art == "flurstueck" and self.named_as_a_set():
+                # „Flurstück 790 sowie 706“ is not two readings of one parcel,
+                # it is one plot made of two -- which this project treats as the
+                # normal case, not the exception. Asking which one is meant
+                # would be asking a question that is not there.
+                continue
             chosen = self.payload.entscheidungen.get(art) or usable[0].id
             out.append(
                 Konflikt(
@@ -249,6 +255,18 @@ class SearchEngine:
                 )
             )
         return out
+
+    def named_as_a_set(self) -> bool:
+        """Whether the parcel numbers were listed together rather than in dispute.
+
+        A plot is a set of parcels -- the normal case. Numbers that all come
+        from *one* source are that set; numbers from different sources (an
+        image against the body text) are rival readings, and only those are a
+        contradiction worth putting to the user.
+        """
+
+        numbers = self.active("flurstueck")
+        return len(numbers) > 1 and len({indiz.quelle for indiz in numbers}) == 1
 
     @staticmethod
     def _conflict_key(indiz: Indiz) -> str:
@@ -411,11 +429,44 @@ class SearchEngine:
                 yield SuchEreignis(art="konflikt", konflikt=conflict)
 
         self.state.candidates = [parcel for _, _, parcel in hits]
+
+        # „604" without a denominator also finds 604/1 to 604/c. The exact area
+        # settles that without a request -- ``flaeche`` came back with each
+        # parcel -- and it is a hard filter, so it may decide.
+        narrowed = self._narrow_by_area(self.state.candidates)
+        if narrowed is not None:
+            yield SuchEreignis(
+                art="phase",
+                phase="kurzschluss",
+                text=(
+                    f"Die Nummer trifft {len(self.state.candidates)} Flurstücke; mit der "
+                    f"exakten Fläche bleibt {'davon eines' if len(narrowed) == 1 else f'{len(narrowed)} davon'} übrig"
+                ),
+                anzahl=len(narrowed),
+            )
+            self.state.candidates = narrowed
+
         yield SuchEreignis(
             art="kandidaten",
             anzahl=len(self.state.candidates),
             kandidaten=self.to_candidates(self.state.candidates),
         )
+
+    def _narrow_by_area(self, parcels: list[Flurstueck]) -> list[Flurstueck] | None:
+        """Keep only the parcels whose official area is the one the listing gives.
+
+        ``None`` when there is nothing to narrow with, or when narrowing would
+        empty the set -- a filter that deletes everything has refuted itself,
+        not the candidates.
+        """
+
+        if len(parcels) < 2 or self._area is None or not self._area.exact:
+            return None
+        if self.named_as_a_set():
+            # Their areas are meant to add up, not to match one by one.
+            return None
+        kept = [p for p in parcels if p.flaeche_amtlich_m2 == self._area.value]
+        return kept or None
 
     def cross_check(self) -> str | None:
         """What contradicts the parcel the short circuit found, if anything.
@@ -783,6 +834,32 @@ class SearchEngine:
         hard = bool(self.active("flurstueck")) or bool(self._area and self._area.exact)
         return "bestaetigt" if hard else "mehrdeutig"
 
+    def _set_note(self) -> str | None:
+        """What to say when the listing named several parcels at once."""
+
+        if not self.named_as_a_set() or len(self.state.candidates) < 2:
+            return None
+        total = sum(p.flaeche_amtlich_m2 or 0.0 for p in self.state.candidates)
+        numbers = ", ".join(parcel_number(p) for p in self.state.candidates)
+        matches = (
+            self._area is not None
+            and abs(total - self._area.value) <= max(2.0, self._area.value * 0.01)
+        )
+        return (
+            f"Das Inserat nennt mehrere Flurstücke ({numbers}) — ein Grundstück besteht oft "
+            f"aus mehreren. Zusammen messen sie {total:g} m²"
+            + (
+                f", und das passt zu den {self._area.value:g} m² aus dem Inserat."
+                if matches
+                else (
+                    f"; das Inserat nennt {self._area.value:g} m². Bitte prüfen, ob wirklich "
+                    "alle dazugehören."
+                    if self._area is not None
+                    else "."
+                )
+            )
+        )
+
     async def fetch_outline(self) -> None:
         """The district wash under the candidates, when one district is settled.
 
@@ -827,7 +904,7 @@ class SearchEngine:
             await self.fetch_outline()
 
         self.state.status = self.verdict()
-        objection = self.cross_check()
+        objection = self.cross_check() or self._set_note()
         huelle = common_envelope(self.state.candidates, district_outline=self.state.outline)
         question = next_question(self.state.candidates, huelle)
         hint = " ".join(p for p in (objection, self.state.hint, question) if p) or None

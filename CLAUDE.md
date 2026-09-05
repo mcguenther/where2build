@@ -57,7 +57,10 @@ from the user directly. Reopen only if the user asks.
   price-related. The area computed from the polygon differs by a few square
   metres and is for shape analysis only. Both are shown side by side.
 - **A plot is a *set* of parcels.** Not the exception — the normal case.
-  Union the polygons, sum the official areas.
+  Union the polygons, sum the official areas. The search follows the same rule:
+  several parcel numbers from *one* source („790/11 sowie 238/3“) are that set
+  and are never put to the user as a question, while numbers from *different*
+  sources — an image against the body text — are rival readings and are.
 - **No contact details are stored.** The extraction schema does not carry
   agent names or phone numbers, so no personal data reaches the database.
 - **Fonts come from npm (Fontsource)**, never from a CDN.
@@ -635,11 +638,14 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 422 passed
-- `vitest`: 367 passed — plus the integration file, excluded by `npm run test`
+- `pytest`: 447 passed
+- `vitest`: 444 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
-- `scripts/screenshots.mjs`: 41 images plus a print PDF. It fails on console
+- `scripts/screenshots.mjs`: 47 images plus a print PDF. It fails on console
   errors, on horizontal overflow, and if not a single vector tile arrived. It
   also drives the live geocoder, which is slow often enough to blow the 60 s
   wait on the destinations step — two runs failed there and the third passed
   with nothing changed. Re-run once before going looking for the bug.
+  The two `suche-*` images run a **real** search against ALKIS, so they need a
+  backend on :8000 like every other picture here; without one the step reports
+  "die Suche kam zu keinem Ergebnis" rather than passing quietly.
