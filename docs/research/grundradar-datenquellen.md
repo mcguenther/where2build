@@ -529,3 +529,111 @@ Maßstabsbalkens und die ganze Straßennamen-Logik.
 Der Mockup wird jetzt aus `mockup/build/` mit `python3 mockup/build/bauen.py`
 erzeugt, und die 832-kB-Ausgabe wird nicht mehr von Hand angefasst. Bei einer
 Datei mit einem base64-Luftbild darin ist das keine Stilfrage.
+
+---
+
+# Nachtrag 05.09.2026 — beim Einbau gemessen
+
+Die Prüfungen aus dem Vergleichsblatt sind gebaut (`POST /api/site-checks`,
+`frontend/src/views/LocationView.vue`). Was dabei an Abrufen dazugekommen ist,
+steht hier. Alle Werte per **GET/POST** an diesem Tag geholt, mit dem echten
+Umring von Flurstück 204 aus dem ALKIS-WFS.
+
+## 18. Die Ebenen, die tatsächlich abgefragt werden
+
+| Prüfung | Dienst · Layer | Antwort für Mölkau 204 |
+| --- | --- | --- |
+| Lärm | `laerm/laermkartierung` 4 · 5 (Straße), 55 · 56 (Straßenbahn), 37 · 36 (Flughafen) | `Lden5559` + `Lden5054`, `Lnight4549`, Bahn und Flug je 0 |
+| Trinkwasserschutz | `wasser/wasserschutzgebiete` 0–3 | 0 |
+| Schutzgebiet | `natur/schutzgebiete` 0–5 | 0 am Flurstück, LSG „Östliche Rietzschke - Stünz" im Band 300–400 m, ein weiteres ≤ 1 km |
+| Hochwasser | `wasser/hochwassergefaehrdung` 6–10 (HQ20/25 bis Extremhochwasser) | 0 |
+| Radon | `luft/radonvorsorgegebiete` 0 | 0 |
+| Hangneigung | `landwirtschaft/hangneigung_ausbringung` 0 | 0 |
+| Baugrund | `boden/bk50` 0, `boden/bodenkennwerte` 5, `geologie/bohrungen` 0 | BK50-Text wie in § 15, `LK_STUFE = LK_IV`, 96 Bohrungen in 500 m, 16 in 300 m |
+
+**`wasser/hochwasserrisikokarte` ist nicht der richtige Dienst.** Seine Layer
+sind Risikokarten-Objekte (betroffene Einwohner je Gemeinde, Kulturgüter,
+Wirtschaftstätigkeiten), und `wasser/hochwasserrisikogebiete` Layer 0 ist eine
+**Polylinie** von 4 637 Gewässern — dieselbe Falle wie `Kartierungsgebiet` beim
+Lärm: eine Flächenabfrage trifft sie nie. Die Überschwemmungsflächen liegen in
+`wasser/hochwassergefaehrdung` 6–10. `wasser/hochwassergefahrenkarte` (ohne
+„-gefaehrdung") antwortet `Token Required`.
+
+## 19. Kontrollpunkte — ohne die ist „0 Treffer" keine Aussage
+
+Für jede Ja/Nein-Ebene ein Ort, an dem sie **ja** sagt. Sonst ist eine leere
+Antwort nicht von einer leeren Ebene zu unterscheiden.
+
+| Ebene | Mölkau 204 | Kontrollpunkt |
+| --- | --- | --- |
+| Hochwasser HQ100 | 0 | Grimma an der Mulde: **1** — `NAME: Vereinigte Mulde` |
+| Extremhochwasser | 0 | Grimma: **1** |
+| Radonvorsorgegebiet | 0 | Johanngeorgenstadt: **1** — `Stadt Johanngeorgenstadt` |
+| Trinkwasserschutz | 0 | Dresden Elbwiese: **1** — `WSG WW Albertstadt/Saloppe` |
+
+## 20. Die Bänderskala und ihre Legende widersprechen sich
+
+`returnDistinctValues=true` auf Layer 4 gibt **sieben** Kategorien, `Lden4549`
+darunter. Der Renderer desselben Layers (`MapServer/4?f=json` →
+`drawingInfo.renderer.uniqueValueInfos`) führt aber nur **sechs**, ab
+`Lden5054`. Die Karte zeichnet also nichts zwischen 45 und 49 dB(A), obwohl der
+Dienst dort gemessen hat.
+
+Daraus folgt für die Oberfläche: der Prüftext liest die **Daten** (unterste
+Stufe 45 dB(A), also heißt „im kartierten Gebiet und in keinem Band" belegbar
+*unter 45*), die Legende zeigt die **gezeichneten** Bänder ab 50 — und sagt
+dazu, dass 45–49 keine Farbe hat. Die sechs Farben stehen im Renderer und sind
+von dort übernommen, nicht gewählt:
+`Lden5054 rgb(184,214,209)`, `5559 rgb(226,242,191)`, `6064 rgb(243,198,131)`,
+`6569 rgb(205,70,62)`, `7074 rgb(117,8,92)`, `Ab75 rgb(67,10,74)`.
+
+## 21. Der dpi-Deckel funktioniert bis hinunter zu Zoom 10
+
+§ 11 rechnet die Schwelle aus; hier ist sie an echten XYZ-Kacheln (256 px)
+über Mölkau geprüft. `dpi = min(96, floor(minScale · 0,0254 · px / bbox_m))`:
+
+| Zoom | Kachelbreite | dpi | Maßstab | Antwort |
+| --- | --- | --- | --- | --- |
+| 10 | 39 136 m | 8 | 1:48 149 | 59 347 B — zeichnet |
+| 12 | 9 784 m | 33 | 1:49 654 | 60 947 B |
+| 13 | 4 892 m | 66 | 1:49 654 | 32 816 B |
+| 14 | 2 446 m | 96 | 1:36 112 | 17 264 B |
+| 16 | 611 m | 96 | 1:9 028 | 4 013 B |
+| 18 | 153 m | 96 | 1:2 257 | 1 945 B |
+
+Der Layer verschwindet damit **auf keiner Zoomstufe** stumm — die im
+Entscheidungsblatt erwogene Mindestzoomstufe für die Umschaltfläche ist nicht
+nötig. Abgerundet, nicht gerundet: die Schwelle ist ausschließend (dpi 65
+zeichnet, 66 nicht, bei 10 km über 512 px).
+
+## 22. Die UBA-Stationsfalle, noch einmal bestätigt
+
+Stundenwerte über zwei Tage, Komponente NO₂ (`component=5`, `scope=2`):
+
+| Station | Entfernung | Antwort |
+| --- | --- | --- |
+| `z_GUAN Leipzig Eisenbahnstraße` (1690) | 2,6 km | **keine Daten** (`data` fehlt) |
+| `zDDR_Leipzig-Stadt` (10427) | 3,2 km | **keine Daten** |
+| `Leipzig-Mitte` (1613) | 4,6 km | **89 Stundenwerte** |
+
+Das Feld „active to" ist bei allen dreien leer. Die Auswahl muss also über die
+tatsächliche Antwort laufen, nicht über die Karte — und die Ausgabe sagt, wie
+viele nähere Stationen übersprungen wurden, sonst sieht „4,6 km" nach
+Nachlässigkeit aus.
+
+## 23. Der Bodenrichtwert trägt das Richtwertgrundstück mit
+
+Die GetFeatureInfo-Antwort für Mölkau 204 führt neben `BODENRICHTWERT_TEXT =
+'280'` auch `FLAECHE_TEXT = 'f800'` und `UMRECHNUNGSTABELLEN` (ohne Schema,
+also `https://` davor). Beides ist jetzt in `LandValue` und steht in der
+Oberfläche: der Wert gilt für ein gedachtes Grundstück von 800 m², und das
+Produkt aus Wert und tatsächlicher Fläche ist deshalb nicht der Bodenwert.
+
+## 24. Der Abstand ist ein Band, kein Wert
+
+Der ArcGIS-`query` beantwortet „liegt etwas innerhalb von r?", nicht „wie weit
+ist es?". Die Entfernung zum nächsten Schutzgebiet entsteht deshalb aus einer
+Leitersuche (100 · 200 · 300 · 400 · 500 · 750 · 1 000 m), binär durchsucht —
+drei Abfragen statt sieben — und wird als Spanne ausgegeben. Für Mölkau 204:
+bei 300 m null Treffer, bei 400 m einer, also **300–400 m**. Eine Einzelzahl
+daraus wäre erfunden.

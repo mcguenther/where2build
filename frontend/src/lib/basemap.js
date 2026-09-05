@@ -72,6 +72,77 @@ export const rasterStyle = (layer, attribution) => ({
 });
 
 export const GEOSN = "© GeoSN, dl-de/by-2-0";
+export const LFULG = "Umgebungslärmkartierung © LfULG";
+
+/**
+ * Raster layers that go *on top of* a backdrop rather than instead of one.
+ *
+ * The noise survey is not a WMS tile source — its own service speaks EPSG:4326
+ * and 25833 but not 3857, so MapLibre's `{bbox-epsg-3857}` raster source would
+ * get nothing at all and say nothing about it. `/api/tiles/laerm/…` goes
+ * through the ArcGIS `export` endpoint instead, which reprojects server-side
+ * and, with the dpi the proxy computes, never falls silently under the layer's
+ * own scale threshold.
+ *
+ * Over the aerial photograph the veil is thinner: at full strength the bands
+ * hide exactly the thing somebody switched the photo on to see.
+ */
+export const OVERLAYS = {
+  laerm: { name: "Lärm (Straße, 24 h)", attribution: LFULG },
+  "laerm-nacht": { name: "Lärm (Straße, nachts)", attribution: LFULG }
+};
+
+const OVERLAY_OPACITY = { aerial: 0.45, other: 0.62 };
+
+/**
+ * The bands the noise layer actually draws, in the service's own colours.
+ *
+ * Read off the layer's renderer (`MapServer/4?f=json`), not chosen here, so the
+ * key beside the map is the map. Note what is missing from it: the data holds a
+ * `Lden4549` band that the renderer has no entry for — the survey has measured
+ * 45 to 49 dB(A) and draws nothing for it. So the check text can say "below
+ * 45 dB(A)" while the key starts at 50, and both are correct.
+ */
+export const NOISE_BANDS = {
+  laerm: [
+    { label: "50–54", colour: "rgb(184,214,209)" },
+    { label: "55–59", colour: "rgb(226,242,191)" },
+    { label: "60–64", colour: "rgb(243,198,131)" },
+    { label: "65–69", colour: "rgb(205,70,62)" },
+    { label: "70–74", colour: "rgb(117,8,92)" },
+    { label: "ab 75", colour: "rgb(67,10,74)" }
+  ]
+};
+
+/** Put an overlay's source and layer on top of a style document. */
+export function withOverlay(style, id, backdrop = "map") {
+  const overlay = OVERLAYS[id];
+  if (!overlay || !style?.sources) return style;
+  return {
+    ...style,
+    sources: {
+      ...style.sources,
+      [id]: {
+        type: "raster",
+        tiles: [`${window.location.origin}/api/tiles/${id}/{z}/{x}/{y}.png`],
+        tileSize: 256,
+        maxzoom: 20,
+        attribution: overlay.attribution
+      }
+    },
+    layers: [
+      ...style.layers,
+      {
+        id,
+        type: "raster",
+        source: id,
+        paint: {
+          "raster-opacity": backdrop === "aerial" ? OVERLAY_OPACITY.aerial : OVERLAY_OPACITY.other
+        }
+      }
+    ]
+  };
+}
 
 /** What each backdrop offers. `none` keeps the drawing on plain paper. */
 export const BACKDROPS = {

@@ -1,0 +1,21 @@
+{
+ "displayFieldName": "LEG_NR",
+ "fieldAliases": {
+  "LK_STUFE": "LK_STUFE"
+ },
+ "fields": [
+  {
+   "name": "LK_STUFE",
+   "type": "esriFieldTypeString",
+   "alias": "LK_STUFE",
+   "length": 10
+  }
+ ],
+ "features": [
+  {
+   "attributes": {
+    "LK_STUFE": "LK_IV"
+   }
+  }
+ ]
+}

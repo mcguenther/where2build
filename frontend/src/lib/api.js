@@ -95,6 +95,21 @@ export const neighbourBuildings = (lat, lon, umkreis_m = 80) =>
     body: JSON.stringify({ origin: { lat, lon }, umkreis_m })
   });
 
+/**
+ * The environmental record of one parcel: noise, water protection, protected
+ * areas, flood, radon, slope, ground and air.
+ *
+ * Takes the outline, not a point, because that is the question — a plot
+ * straddles isophones and zone boundaries, and its centre answers for one
+ * square metre of it. `ring` is `[lon, lat]` pairs in WGS84; `toWgs84` in
+ * `projection.js` turns a stored plot into one.
+ *
+ * Each check in the answer carries either data or its own `fehler`: a service
+ * that is down costs one row, not the page.
+ */
+export const siteChecks = ring =>
+  request("/site-checks", { method: "POST", body: JSON.stringify({ ring }) });
+
 export const landValue = (lat, lon) =>
   request(`/landvalue?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`);
 

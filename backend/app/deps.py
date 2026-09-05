@@ -10,10 +10,12 @@ from functools import lru_cache
 
 from .address_index import AddressIndex, load_index as load_address_index
 from .gemarkung_index import GemarkungDirectory, load_directory
+from .services.airquality import AirQualityService
 from .services.alkis import AlkisService
 from .services.basemap import BasemapService
 from .services.boris import BorisService
 from .services.llm import LLMClient
+from .services.luis import LuisService
 from .services.motis import MotisService
 from .services.nearby import NearbyService
 from .services.overpass import OverpassService
@@ -54,6 +56,18 @@ def address_index() -> AddressIndex | None:
 def boris_service() -> BorisService:
     settings = get_settings()
     return BorisService(settings.boris, settings.app)
+
+
+@lru_cache(maxsize=1)
+def luis_service() -> LuisService:
+    settings = get_settings()
+    return LuisService(settings.luis, settings.app)
+
+
+@lru_cache(maxsize=1)
+def air_quality_service() -> AirQualityService:
+    settings = get_settings()
+    return AirQualityService(settings.air_quality, settings.app)
 
 
 @lru_cache(maxsize=1)
@@ -105,6 +119,8 @@ def reset_services() -> None:
         gemarkung_directory,
         address_index,
         boris_service,
+        luis_service,
+        air_quality_service,
         motis_service,
         overpass_service,
         nearby_service,

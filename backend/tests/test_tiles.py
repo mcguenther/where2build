@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from app import geo
 from app.deps import tile_service
 
-from .conftest import DOP_URL
+from .conftest import DOP_URL, NOISE_EXPORT_URL
 
 # Smallest valid PNG, enough to prove the bytes travel through unchanged.
 PNG = bytes.fromhex(
@@ -109,5 +109,75 @@ def test_geographic_crs_uses_latitude_first():
     assert 12.0 < second < 15.0
 
 
-def test_layer_configuration_covers_the_three_switchable_layers():
-    assert set(tile_service().layers) == {"dop", "webatlas", "alkis"}
+def test_layer_configuration_covers_every_switchable_layer():
+    assert set(tile_service().layers) == {
+        "dop", "webatlas", "alkis", "laerm", "laerm-nacht"
+    }
+
+
+# --------------------------------------------------------------------------
+# The noise layer, which is not a WMS
+# --------------------------------------------------------------------------
+
+
+@respx.mock
+def test_the_noise_layer_goes_through_the_arcgis_export_endpoint(client: TestClient):
+    """Its own service offers EPSG:4326 and 25833 but not 3857, so a WMS raster
+    source gets nothing at all. `export` reprojects server-side."""
+
+    route = respx.get(NOISE_EXPORT_URL).mock(return_value=_wms_answer())
+
+    answer = client.get("/api/tiles/laerm/16/35081/21973.png")
+
+    assert answer.status_code == 200
+    params = route.calls[0].request.url.params
+    assert params["bboxSR"] == params["imageSR"] == "3857"
+    assert params["layers"] == "show:4"
+    assert params["format"] == "png32"
+    assert params["f"] == "image"
+    assert "SERVICE" not in params  # not a WMS request
+
+
+@respx.mock
+def test_the_night_layer_asks_for_the_other_one(client: TestClient):
+    route = respx.get(NOISE_EXPORT_URL).mock(return_value=_wms_answer())
+
+    client.get("/api/tiles/laerm-nacht/16/35081/21973.png")
+
+    assert route.calls[0].request.url.params["layers"] == "show:5"
+
+
+@respx.mock
+def test_the_dpi_keeps_the_layer_under_its_own_minscale(client: TestClient):
+    """`minScale: 50000` makes the service answer with an empty image and no
+    error above that scale. ArcGIS derives the scale as
+    (bbox_width_m / image_width_px) * dpi / 0.0254, so the dpi is what keeps
+    the layer visible -- measured: at 10 km over 512 px, dpi 65 draws and 66
+    comes back blank."""
+
+    route = respx.get(NOISE_EXPORT_URL).mock(return_value=_wms_answer())
+
+    # Zoom 10 covers 39 km across one tile; zoom 16 covers 611 m.
+    for zoom, x, y in ((10, 548, 343), (16, 35081, 21973)):
+        client.get(f"/api/tiles/laerm/{zoom}/{x}/{y}.png")
+
+    for call in route.calls:
+        params = call.request.url.params
+        minx, _, maxx, _ = (float(value) for value in params["bbox"].split(","))
+        scale = (maxx - minx) / 256 * int(params["dpi"]) / 0.0254
+        assert scale <= 50000, f"1:{scale:.0f} would draw nothing"
+        assert 1 <= int(params["dpi"]) <= 96
+
+
+@respx.mock
+def test_a_wms_layer_keeps_its_own_request_shape(client: TestClient):
+    """The two kinds live in one table; adding the second must not have turned
+    the first into an ArcGIS request."""
+
+    route = respx.get(DOP_URL).mock(return_value=_wms_answer())
+
+    client.get("/api/tiles/dop/16/35081/21973.png")
+
+    params = route.calls[0].request.url.params
+    assert params["REQUEST"] == "GetMap"
+    assert "bboxSR" not in params

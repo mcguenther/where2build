@@ -1,0 +1,26 @@
+{
+ "displayFieldName": "OBJECTID",
+ "fieldAliases": {
+  "CATEGORY": "CATEGORY"
+ },
+ "fields": [
+  {
+   "name": "CATEGORY",
+   "type": "esriFieldTypeString",
+   "alias": "CATEGORY",
+   "length": 8
+  }
+ ],
+ "features": [
+  {
+   "attributes": {
+    "CATEGORY": "Lden5559"
+   }
+  },
+  {
+   "attributes": {
+    "CATEGORY": "Lden5054"
+   }
+  }
+ ]
+}

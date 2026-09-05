@@ -178,6 +178,24 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
     await page.waitForTimeout(2000);
   }
 
+  /* The location record: eleven checks against the authority services, asked
+   * with the parcel outline. Waited on either outcome — with no backend on
+   * :8000 the list shows the German failure sentence, and that is a state
+   * worth photographing too. */
+  await page.getByRole("link", { name: "Standort prüfen" }).click();
+  await page.waitForSelector(".checks__list, .checks .notice--error", { timeout: 90000 });
+  await page.waitForTimeout(3000);
+  await shot(page, "standort", mode, narrow ? "-schmal" : "");
+  if (!narrow) {
+    // The noise layer over the ground: the one raster in this app that does
+    // not come from a WMS, because that service speaks no Web Mercator.
+    await page.getByRole("button", { name: "Lärm" }).click();
+    await mapSettled(page, `${mode}/${width} Lärmschleier`);
+    await shot(page, "standort-laerm", mode);
+  }
+  await page.click(".breadcrumb a:nth-child(3)");
+  await page.waitForSelector(".plot-page", { timeout: 20000 });
+
   /* The point of the addresses: the plot has one of its own, and reloading it
    * comes back to the same page instead of the overview. This is also what
    * exercises the server's history-mode fallback above. */
@@ -277,6 +295,20 @@ taken.push("grundstueck-druck.png");
 /* A flat screenshot cannot show where the page actually breaks; the PDF can. */
 await page.pdf({ path: resolve(outDir, "grundstueck-druck.pdf"), format: "A4", preferCSSPageSize: true });
 taken.push("grundstueck-druck.pdf");
+
+/* And the location sheet, which prints the other way round — the record leads,
+   the map follows it. Eleven checks are taller than one page, so the PDF is
+   the part that shows whether the breaks land between rows. */
+await page.emulateMedia({ media: null });
+await page.getByRole("link", { name: "Standort prüfen" }).click();
+await page.waitForSelector(".checks__list, .checks .notice--error", { timeout: 90000 });
+await page.waitForTimeout(2000);
+await page.emulateMedia({ media: "print" });
+await page.waitForTimeout(300);
+await page.screenshot({ path: resolve(outDir, "standort-druck.png"), fullPage: true });
+taken.push("standort-druck.png");
+await page.pdf({ path: resolve(outDir, "standort-druck.pdf"), format: "A4", preferCSSPageSize: true });
+taken.push("standort-druck.pdf");
 await ctx.close();
 
 await browser.close();

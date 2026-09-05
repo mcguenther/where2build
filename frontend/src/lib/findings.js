@@ -196,11 +196,13 @@ export function noiseFinding(data) {
  * water protection zone, flood extent, radon precaution area.
  *
  * @param {{name: string, hit: boolean, distanceFrom: number, distanceTo: number,
- *          alsoNearby: number, subject: string, absent: string}} data
+ *          alsoNearby: number, nearbyRadius: string, subject: string,
+ *          absent: string}} data
  */
 export function designationFinding(data) {
   const { hit = false, name = null, distanceFrom = null, distanceTo = null,
-          alsoNearby = 0, subject = "Gebiet", absent = null, absentValue = null } = data ?? {};
+          alsoNearby = 0, nearbyRadius = "eines Kilometers", subject = "Gebiet",
+          absent = null, absentValue = null } = data ?? {};
 
   // `subject` is a bare noun. Every one of these is a "…gebiet" compound and
   // therefore neuter, so one set of articles serves them all.
@@ -216,8 +218,11 @@ export function designationFinding(data) {
     const distance = distanceFrom !== null
       ? `${num(distanceFrom, 0)}–${num(distanceTo, 0)} m`
       : `unter ${num(distanceTo, 0)} m`;
+    // Plural-correct: the service answers with however many are in the ring,
+    // and "Ein weiteres" beside three of them would be wrong.
     const more = alsoNearby > 0
-      ? ` Ein weiteres liegt innerhalb eines Kilometers.`
+      ? ` ${alsoNearby === 1 ? "Ein weiteres liegt" : `${alsoNearby} weitere liegen`}`
+        + ` innerhalb ${nearbyRadius === "eines Kilometers" ? nearbyRadius : `von ${nearbyRadius}`}.`
       : "";
     return {
       status: GOOD,
@@ -236,10 +241,12 @@ export function designationFinding(data) {
  * Air quality. The station is chosen by whether it answers, not by distance —
  * so the text says how far away the answering one is.
  *
- * @param {{station: string, distanceKm: number, values: Object<string,number>, hours: number}} data
+ * @param {{station: string, distanceKm: number, values: Object<string,number>,
+ *          hours: number, skipped: number}} data
  */
 export function airQualityFinding(data) {
-  const { station = null, distanceKm = null, values = {}, hours = null } = data ?? {};
+  const { station = null, distanceKm = null, values = {}, hours = null,
+          skipped = 0 } = data ?? {};
   const entries = Object.entries(values).filter(([, v]) => Number.isFinite(v));
   if (!station || !entries.length) {
     return {
@@ -250,10 +257,17 @@ export function airQualityFinding(data) {
   const LABELS = { no2: "NO₂", pm10: "PM10", pm25: "PM2,5", o3: "O₃" };
   const listed = entries.map(([key, v]) => `${LABELS[key] ?? key} ${num(v, 1)}`).join(" · ");
   const window = hours ? `, Mittel aus ${hours} Stundenwerten` : "";
+  /* Why not the nearest one on the map: the station list mixes in research and
+     historic sites that carry no measurements at all. Saying so turns a
+     distance that looks careless into the reason it is what it is. */
+  const nearer = skipped > 0
+    ? ` ${skipped === 1 ? "Eine nähere Station liefert" : `${skipped} nähere Stationen liefern`}`
+      + " keine Messwerte."
+    : "";
   return {
     status: GOOD,
     value: `${LABELS[entries[0][0]] ?? entries[0][0]} ${num(entries[0][1], 1)} µg/m³`,
-    text: `Station ${station}, ${num(distanceKm, 1)} km entfernt: ${listed} µg/m³${window}.`
+    text: `Station ${station}, ${num(distanceKm, 1)} km entfernt: ${listed} µg/m³${window}.${nearer}`
   };
 }
 

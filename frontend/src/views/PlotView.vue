@@ -20,6 +20,8 @@
       <div class="row no-print">
         <button type="button" class="btn btn--quiet" :disabled="!hasPrevious" @click="step(-1)">‹ Voriges</button>
         <button type="button" class="btn btn--quiet" :disabled="!hasNext" @click="step(1)">Nächstes ›</button>
+        <RouterLink v-if="hasAnchor" class="btn btn--secondary"
+                    :to="{ name: 'location', params: { id: plot.id } }">Standort prüfen</RouterLink>
         <button type="button" class="btn btn--secondary" @click="print">Drucken</button>
       </div>
     </div>
@@ -351,6 +353,9 @@
       <p v-if="hasAnchor" class="row no-print">
         <RouterLink class="btn btn--quiet" :to="{ name: 'surroundings', params: { id: plot.id } }">
           Auf der Umgebungskarte ansehen
+        </RouterLink>
+        <RouterLink class="btn btn--quiet" :to="{ name: 'location', params: { id: plot.id } }">
+          Lärm, Hochwasser, Baugrund und Luft prüfen
         </RouterLink>
       </p>
     </section>
@@ -775,15 +780,6 @@ export default {
 }
 
 .facts{ display: flex; flex-direction: column; gap: var(--w2b-space-4); }
-.value-list{ margin: 0; display: grid; grid-template-columns: auto 1fr; }
-.value-list dt, .value-list dd{
-  padding: 8px var(--w2b-space-4); border-bottom: 1px solid var(--w2b-line-faint); margin: 0;
-  display: flex; align-items: center;
-}
-.value-list dt{ font-size: var(--w2b-text-s); color: var(--w2b-graphite); }
-.value-list dd{ justify-content: flex-end; gap: 6px; font-family: var(--w2b-font-mono); font-size: var(--w2b-text-s); font-variant-numeric: tabular-nums; }
-.value-list dt:last-of-type, .value-list dd:last-of-type{ border-bottom: 0; }
-.faint{ color: var(--w2b-muted); font-size: var(--w2b-text-xs); }
 .panel__footnote{ padding: var(--w2b-space-3) var(--w2b-space-4); border-top: 1px solid var(--w2b-line-faint); font-size: var(--w2b-text-xs); color: var(--w2b-muted); }
 
 .price-band{ padding: var(--w2b-space-4); }

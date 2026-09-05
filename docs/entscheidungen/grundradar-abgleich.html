@@ -167,6 +167,36 @@ pre .schl{color:var(--akzent)}
 
 <section>
   <div class="abschnitt-kopf">
+    <h2>Stand der Umsetzung</h2>
+    <span class="zahl">05.09.2026 · gebaut</span>
+  </div>
+  <div class="einwurf" style="border-left-color:var(--geprueft);background:var(--geprueft-feld)">
+    <h3>Die Bahn „Jetzt“ steht — und ein Teil der Bahn „Danach“ gleich mit</h3>
+    <p>
+      Gebaut als <code>POST /api/site-checks</code> (Backend:
+      <code>services/luis.py</code>, <code>services/airquality.py</code>) und als eigene
+      Ansicht <code>/grundstueck/:id/standort</code>: Karte groß, der Befund als Spalte
+      daneben, elf Prüfungen, Zähler statt Score. Gefragt wird durchweg mit dem
+      <b>Flurstücksumring</b>. Der Lärmlayer liegt als Raster über der Karte, über den
+      ArcGIS-<code>export</code>-Endpunkt mit gerechnetem <code>dpi</code> — er verschwindet
+      damit auf keiner Zoomstufe stumm. Der Sucheinstieg mit Tippvorschlägen aus den
+      amtlichen Hauskoordinaten ist der erste der vier Wege in die Aufnahme.
+    </p>
+    <p>
+      <b>Radon steht dagegen doch drin.</b> Die Bahn „Nicht übernehmen“ unten nennt es neben
+      Altlasten und Mobilfunk — das war der Stand des ersten Durchgangs. Nachtrag 7 der
+      Recherche hat <code>luft/radonvorsorgegebiete</code> gefunden: 107 Gemeinden,
+      rechtsverbindlich nach § 121 StrlSchG und damit belastbarer als grundradars
+      modellierte Potenzialklasse. Altlasten und Mobilfunk bleiben ohne Quelle und stehen
+      als „offen“ mit ihrem Grund in der Liste, zusammen mit Starkregen — nicht
+      weggelassen, weil eine Liste, die verschweigt, was sie nicht beantworten kann, wie
+      eine vollständige aussieht.
+    </p>
+  </div>
+</section>
+
+<section>
+  <div class="abschnitt-kopf">
     <h2>Die Empfehlung</h2>
     <span class="zahl">3 Bahnen</span>
   </div>

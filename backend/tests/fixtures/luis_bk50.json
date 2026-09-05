@@ -1,0 +1,21 @@
+{
+ "displayFieldName": "OBJECTID",
+ "fieldAliases": {
+  "LEG_TXT": "LEG_TXT"
+ },
+ "fields": [
+  {
+   "name": "LEG_TXT",
+   "type": "esriFieldTypeString",
+   "alias": "LEG_TXT",
+   "length": 254
+  }
+ ],
+ "features": [
+  {
+   "attributes": {
+    "LEG_TXT": "Hortisol ueber erodierter Parabraunerde aus gemischtem Schluff ueber tiefem periglaziaerem Kies fuehrendem Lehm"
+   }
+  }
+ ]
+}

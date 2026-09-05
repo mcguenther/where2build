@@ -33,7 +33,7 @@
     <!-- 1 · Quelle. Also what a stage without its data falls back to, so the
          redirect in `checkStage` never renders a step that has nothing. -->
     <section v-if="stageIndex === 0 || !reachable" class="stack">
-      <p class="subtitle">Drei Wege hinein. Welcher passt zu dem, was vorliegt?</p>
+      <p class="subtitle">Vier Wege hinein. Welcher passt zu dem, was vorliegt?</p>
       <div class="sources">
         <label v-for="s in sources" :key="s.id" class="source" :class="{ 'source--selected': source === s.id }">
           <input type="radio" name="source" :value="s.id" v-model="source">
@@ -44,7 +44,17 @@
 
       <div class="panel">
         <div class="panel__body stack">
-          <template v-if="source === 'url'">
+          <template v-if="source === 'search'">
+            <PlotSearch @select="searchPicked" />
+            <p class="hint">
+              Was getippt wurde, wird zuerst gelesen und dann nachgeschlagen: eine deutsche
+              Adresse beginnt nie mit einer Ziffer, eine Koordinate sind zwei Zahlen, und ein
+              Nenner (<span class="mono">85/1</span>) kommt in keiner Adresse vor. Bleiben zwei
+              Lesarten möglich, werden beide Verzeichnisse gefragt statt eine geraten.
+            </p>
+          </template>
+
+          <template v-else-if="source === 'url'">
             <div class="field">
               <label for="q-url">Adresse der Anzeige</label>
               <input id="q-url" type="text" v-model="url" placeholder="https://…">
@@ -84,12 +94,13 @@
             </div>
           </template>
 
-          <div class="row">
+          <div v-if="source !== 'search'" class="row">
             <button type="button" class="btn" :disabled="busy || !ready" @click="read">
               {{ busy ? "Wird gelesen …" : source === "parcel" ? "Nachschlagen" : "Lesen" }}
             </button>
             <span v-if="busy" class="hint">Der Abruf kann eine Minute dauern.</span>
           </div>
+          <p v-else-if="busy" class="hint">Das Kataster wird gefragt …</p>
         </div>
       </div>
     </section>
@@ -212,6 +223,7 @@
 <script>
 import SitePlan from "../components/SitePlan.vue";
 import CadastralDistrictPicker from "../components/CadastralDistrictPicker.vue";
+import PlotSearch from "../components/PlotSearch.vue";
 import { state, addPlot, placement, autoSeatHouse } from "../lib/store.js";
 import { WIZARD_STAGES, wizardStage } from "../router/stages.js";
 import { readListing, readPage, resolveParcel, landValue } from "../lib/api.js";
@@ -246,7 +258,7 @@ function fieldsFromResponse(response) {
 
 export default {
   name: "WizardView",
-  components: { SitePlan, CadastralDistrictPicker },
+  components: { SitePlan, CadastralDistrictPicker, PlotSearch },
   props: {
     /** The stage's URL segment; the route only matches the four known ones. */
     stage: { type: String, required: true }
@@ -257,7 +269,7 @@ export default {
       lost: false,
       // How many history entries this wizard pushed; see `stepBack`.
       ownEntries: 0,
-      source: "url",
+      source: "search",
       url: "",
       gemarkung: "",
       // The directory entry the text stands for, once one does. Null while
@@ -280,6 +292,8 @@ export default {
         { id: "details", name: "Angaben" }
       ],
       sources: [
+        { id: "search", name: "Suchen",
+          text: "Adresse, Flurstück oder Koordinate. Vorschläge kommen aus den amtlichen Hauskoordinaten und dem Gemarkungsverzeichnis." },
         { id: "url", name: "Link einwerfen",
           text: "Adresse einer Anzeige. Der Server holt die Seite und liest Adresse, Flurstück, Kaufpreis und Fläche heraus." },
         { id: "parcel", name: "Flurstück direkt",
@@ -299,6 +313,8 @@ export default {
       return this.stageIndex === 1 ? this.readFields.length > 0 : Boolean(this.draft);
     },
     ready() {
+      // The search has no button: picking a suggestion is the action.
+      if (this.source === "search") return false;
       if (this.source === "url") return /^https?:\/\/\S{6,}/.test(this.url.trim());
       if (this.source === "parcel") return this.gemarkung.trim() && this.flurstuecksnummer.trim();
       return this.pastedText.trim().length > 20;
@@ -337,6 +353,20 @@ export default {
       if (!this.ownEntries) return this.goToStage(stage);
       this.ownEntries--;
       this.$router.back();
+    },
+
+    /** A suggestion was picked: it already carries the cadastral query. */
+    async searchPicked({ query, label }) {
+      this.busy = true;
+      this.error = "";
+      try {
+        this.returnStage = 0;
+        await this.queryCadastre(query, { note: `Gesucht: ${label}` });
+      } catch (error) {
+        this.error = error.message;
+      } finally {
+        this.busy = false;
+      }
     },
 
     async read() {
@@ -414,6 +444,11 @@ export default {
         plot.bodenrichtwert = value?.euro_per_sqm ?? null;
         plot.brwZone = value?.zone ?? null;
         plot.brwReferenceDate = value?.reference_date ?? null;
+        // The notional plot the zone value is quoted for. Without it a reader
+        // multiplies the value by their own area, which is exactly the step
+        // the Gutachterausschuss publishes a conversion table for.
+        plot.brwReferencePlotArea = value?.richtwertgrundstueck_m2 ?? null;
+        plot.brwConversionUrl = value?.umrechnungstabelle_url ?? null;
       } catch { /* leave it empty and say so on the next step */ }
       /* A catalogue entry when the user has one, and otherwise the plot's own
        * dimensions — anything rather than a "Baukörper" box with nothing chosen

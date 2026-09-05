@@ -79,6 +79,8 @@ export function plotFromCadastre(response, extra = {}) {
     bodenrichtwert: extra.bodenrichtwert ?? null,
     brwZone: extra.brwZone ?? null,
     brwReferenceDate: extra.brwReferenceDate ?? null,
+    brwReferencePlotArea: extra.brwReferencePlotArea ?? null,
+    brwConversionUrl: extra.brwConversionUrl ?? null,
     polygon,
     divisionLine: null,
     streetEdge: guessStreetEdge(polygon),

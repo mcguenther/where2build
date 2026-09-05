@@ -7,6 +7,7 @@ an orthophoto does not change between two page views.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 from .. import geo
@@ -25,6 +26,38 @@ ADVICE = (
 class LayerConfig:
     url: str
     layers: str
+    # "wms" is a WMS 1.3.0 GetMap; "arcgis" is an ArcGIS ``export`` request,
+    # which is a different set of parameter names for the same picture.
+    kind: str = "wms"
+    # Scale above which an ArcGIS layer draws nothing. ``None`` means it draws
+    # at every scale.
+    min_scale: float | None = None
+
+
+# ArcGIS' own maximum; asking for more only enlarges the symbology.
+_MAX_DPI = 96
+# The inch, in metres. ArcGIS derives the map scale with it.
+_METRES_PER_INCH = 0.0254
+
+
+def _dpi_for(bbox_width_m: float, image_width_px: int, min_scale: float | None) -> int:
+    """The highest dpi at which a ``minScale`` layer still draws.
+
+    ArcGIS computes the scale as ``(bbox_width_m / image_width_px) * dpi /
+    0.0254``, so the dpi is the one term the caller controls. Above the layer's
+    ``minScale`` the service answers with an empty image and no error -- the
+    failure mode this exists to prevent. Floored rather than rounded, because
+    the threshold is exclusive: measured at 10 km over 512 px, dpi 65 draws and
+    dpi 66 comes back blank.
+    """
+
+    if min_scale is None or bbox_width_m <= 0:
+        return _MAX_DPI
+    allowed = math.floor(min_scale * _METRES_PER_INCH * image_width_px / bbox_width_m)
+    # A dpi below 1 is not a request ArcGIS accepts. It cannot arise for a tile
+    # of any real zoom -- at zoom 0 the whole world is one tile -- but the
+    # clamp keeps the arithmetic from ever producing one.
+    return max(1, min(_MAX_DPI, allowed))
 
 
 class TileService:
@@ -39,6 +72,18 @@ class TileService:
             "dop": LayerConfig(self.settings.dop_url, self.settings.dop_layers),
             "webatlas": LayerConfig(self.settings.webatlas_url, self.settings.webatlas_layers),
             "alkis": LayerConfig(self.settings.alkis_url, self.settings.alkis_layers),
+            "laerm": LayerConfig(
+                self.settings.noise_url,
+                self.settings.noise_layers,
+                kind="arcgis",
+                min_scale=self.settings.noise_min_scale,
+            ),
+            "laerm-nacht": LayerConfig(
+                self.settings.noise_url,
+                self.settings.noise_night_layers,
+                kind="arcgis",
+                min_scale=self.settings.noise_min_scale,
+            ),
         }
 
     def _config(self, layer: str) -> LayerConfig:
@@ -56,6 +101,8 @@ class TileService:
             raise BadRequestError(f"Kachel {x}/{y} liegt außerhalb der Zoomstufe {z}.")
 
     def _params(self, config: LayerConfig, z: int, x: int, y: int) -> dict[str, str]:
+        if config.kind == "arcgis":
+            return self._arcgis_params(config, z, x, y)
         return {
             "SERVICE": "WMS",
             "VERSION": "1.3.0",
@@ -70,12 +117,33 @@ class TileService:
             "TRANSPARENT": "TRUE" if self.settings.transparent else "FALSE",
         }
 
+    def _arcgis_params(self, config: LayerConfig, z: int, x: int, y: int) -> dict[str, str]:
+        """An ArcGIS ``export`` request for one XYZ tile.
+
+        Always in Web Mercator: the service reprojects server-side, which is
+        the whole reason this path exists next to the WMS one.
+        """
+
+        minx, miny, maxx, maxy = geo.tile_bounds_3857(z, x, y)
+        return {
+            "bbox": f"{minx},{miny},{maxx},{maxy}",
+            "bboxSR": "3857",
+            "imageSR": "3857",
+            "size": f"{self.settings.tile_size},{self.settings.tile_size}",
+            "layers": config.layers,
+            "format": "png32",
+            "transparent": "true" if self.settings.transparent else "false",
+            "dpi": str(_dpi_for(maxx - minx, self.settings.tile_size, config.min_scale)),
+            "f": "image",
+        }
+
     async def tile(self, layer: str, z: int, x: int, y: int) -> tuple[bytes, bool]:
         """Return the tile image and whether it came from the cache."""
 
         config = self._config(layer)
         self._check_tile(z, x, y)
-        cache_key = f"{layer}/{self.settings.crs}/{z}/{x}/{y}"
+        crs = "EPSG:3857" if config.kind == "arcgis" else self.settings.crs
+        cache_key = f"{layer}/{crs}/{z}/{x}/{y}"
         cached = self.cache.get_bytes(cache_key)
         if cached is not None:
             return cached, True

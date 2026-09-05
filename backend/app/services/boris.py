@@ -51,6 +51,26 @@ def _as_float(value: str | None) -> float | None:
         return None
 
 
+def _reference_plot_area(value: str | None) -> float | None:
+    """``'f800'`` -> 800.0 -- the notional plot the zone value is quoted for."""
+
+    if not value:
+        return None
+    digits = value.strip().lstrip("fF")
+    return _as_float(digits) if digits.replace(",", "").replace(".", "").isdigit() else None
+
+
+def _absolute(url: str | None) -> str | None:
+    """BORIS links its conversion tables without a scheme."""
+
+    if not url:
+        return None
+    url = url.strip()
+    if not url:
+        return None
+    return url if url.startswith(("http://", "https://")) else f"https://{url}"
+
+
 def _as_date(value: str | None) -> date | None:
     if not value:
         return None
@@ -135,6 +155,8 @@ class BorisService:
                 nutzung=feature.get("NUTZUNG_TEXT") or feature.get("NUTZUNG") or None,
                 entwicklungszustand=feature.get("ENTWICKLUNGSZUSTAND_TEXT") or None,
                 gutachterausschuss=feature.get("GA_POST_NAME") or None,
+                richtwertgrundstueck_m2=_reference_plot_area(feature.get("FLAECHE_TEXT")),
+                umrechnungstabelle_url=_absolute(feature.get("UMRECHNUNGSTABELLEN")),
             )
 
         raise NotFoundError(

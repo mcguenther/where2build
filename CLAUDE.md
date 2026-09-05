@@ -505,7 +505,40 @@ from the user directly. Reopen only if the user asks.
   zero features looks the same whether the plot is clear or the layer is
   empty. `luft/radonvorsorgegebiete` holds 107 municipalities and answers "no"
   for Leipzig but "yes" for Johanngeorgenstadt and Schneeberg — only that
-  second query turns silence into a statement.
+  second query turns silence into a statement. The same check on the other
+  designations: flood HQ100 is empty at Mölkau and names "Vereinigte Mulde" at
+  Grimma, drinking-water protection is empty at Mölkau and names a zone on the
+  Dresden Elbwiese. Every layer in `services/luis.py` has one.
+- **The flood *risk* map is not the flood *extent*.** `wasser/hochwasserrisikokarte`
+  carries affected inhabitants per municipality and cultural sites, and
+  `wasser/hochwasserrisikogebiete` layer 0 is a **polyline** of 4 637
+  watercourses — the same trap as `Kartierungsgebiet` in the noise service, and
+  an area query never hits it. The extents are `wasser/hochwassergefaehrdung`
+  layers 6 to 10, HQ20/25 through Extremhochwasser. `hochwassergefahrenkarte`,
+  without the "-gefaehrdung", answers `Token Required`.
+- **The noise layer's data and its own legend disagree at the bottom band.**
+  `returnDistinctValues` on layer 4 gives seven categories including
+  `Lden4549`; the renderer of that same layer has six, starting at
+  `Lden5054`. So the survey has measured 45 to 49 dB(A) and draws nothing for
+  it. The check text therefore reads the *data* ("below 45 dB(A)" is provable
+  inside a mapped area) and the map key shows the *drawn* bands from 50, saying
+  so. The six colours come from the renderer, not from taste.
+- **The `minScale` dpi clamp holds at every zoom, so the noise layer needs no
+  minimum zoom.** Measured on real 256 px tiles over Mölkau:
+  `dpi = min(96, floor(minScale · 0,0254 · px / bbox_m))` draws at z10 (dpi 8,
+  1:48 149, 59 kB) as well as at z18. Floor, not round — the threshold
+  excludes: at 10 km over 512 px, dpi 65 draws and 66 returns the blank
+  2 231-byte image.
+- **ArcGIS `query` answers "is anything within r?", never "how far".** So a
+  distance to the nearest protected area is a *band*, and it comes from a
+  binary search over a ladder of radii — three requests, not seven. Mölkau 204
+  has nothing at 300 m and one at 400 m, so the answer is "300–400 m". A single
+  figure out of that would be a measurement nobody made.
+- **A shared class in a scoped `<style>` is styled in exactly one view.**
+  `.value-list` lived in `PlotView.vue`, so the same markup on the location
+  page rendered as an unstyled `<dl>` with every label above its value. Vue's
+  `[data-v-…]` attribute is per component: anything more than one view uses
+  belongs in `base.css`.
 
 ## Commands
 
@@ -554,10 +587,10 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 422 passed
-- `vitest`: 367 passed — plus the integration file, excluded by `npm run test`
+- `pytest`: 443 passed, 1 skipped
+- `vitest`: 450 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
-- `scripts/screenshots.mjs`: 41 images plus a print PDF. It fails on console
+- `scripts/screenshots.mjs`: 47 images plus two print PDFs. It fails on console
   errors, on horizontal overflow, and if not a single vector tile arrived. It
   also drives the live geocoder, which is slow often enough to blow the 60 s
   wait on the destinations step — two runs failed there and the third passed

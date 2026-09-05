@@ -1,6 +1,7 @@
 <template>
   <div class="site-plan-shell">
-    <div v-if="hasBackdrop" ref="mapContainer" class="site-plan__map" aria-hidden="true"></div>
+    <div v-if="hasBackdrop" ref="mapContainer" class="site-plan__map" aria-hidden="true"
+         :data-map-ready="String(mapReady)"></div>
     <svg
     ref="svg"
     class="site-plan"
@@ -170,7 +171,7 @@ import {
 } from "../lib/geometry.js";
 import { cameraFor } from "../lib/projection.js";
 import { num } from "../lib/format.js";
-import { BACKDROPS } from "../lib/basemap.js";
+import { BACKDROPS, withOverlay } from "../lib/basemap.js";
 import { darkTheme } from "../lib/store.js";
 // MapLibre 6 ships named exports only — there is no default.
 // Its worker URL is set once in main.js; see the note there.
@@ -226,6 +227,9 @@ export default {
     // "none" by default: a backdrop is a MapLibre instance, and the small
     // plans on cards and in the comparison must not each start one.
     backdrop: { type: String, default: "none" },
+    /** A raster layer laid over the backdrop — today the noise survey. Needs a
+     *  backdrop under it: the bands are translucent and mean nothing on paper. */
+    overlay: { type: String, default: null },
     northUp: { type: Boolean, default: false },
     showDimensions: { type: Boolean, default: true },
     showSetbacks: { type: Boolean, default: true },
@@ -245,6 +249,11 @@ export default {
   data() {
     return {
       uid: ++instanceCount, dragging: null, mapUnavailable: false,
+      /* Whether every tile of the current view has arrived. Only anything that
+       * photographs the plan reads it — a picture taken before this is a
+       * picture of a half-drawn backdrop. Kept apart from `mapUnavailable`,
+       * which is the failure flag and must never drive a rebuild. */
+      mapReady: false,
       measurePoints: [], measurePointer: null,
       // Navigation, relative to the fitted framing: a factor on its scale and
       // an offset of its centre, in metres. Both feed `view`, so the backdrop
@@ -486,6 +495,9 @@ export default {
     // underneath itself, so the map is torn down and rebuilt.
     wantsBackdrop() { this.rebuildMap(); },
     backdrop() { this.rebuildMap(); },
+    // MapLibre cannot add a source to a running style either, so switching the
+    // overlay is the same rebuild as switching the ground.
+    overlay() { this.rebuildMap(); },
     // Only the vector backdrop has a palette; the aerial photo and the
     // cadastral map are the authority's own raster and look the same either way.
     darkBackdrop() { if (this.backdrop === "map") this.rebuildMap(); },
@@ -505,6 +517,7 @@ export default {
     rebuildMap() {
       this.destroyMap();
       this.mapUnavailable = false;
+      this.mapReady = false;
       // The container only exists once `hasBackdrop` has re-rendered it.
       this.$nextTick(() => this.buildMap());
     },
@@ -512,7 +525,9 @@ export default {
       if (!this.hasBackdrop || !this.plot.anchor || this._map) return;
       const run = ++this._mapRun;
       try {
-        const style = await BACKDROPS[this.backdrop]();
+        const style = withOverlay(
+          await BACKDROPS[this.backdrop](), this.overlay, this.backdrop
+        );
         // The backdrop may have changed again while the style was in flight.
         if (run !== this._mapRun || !this.$refs.mapContainer || this._map) return;
         this._map = new MapLibreMap({
@@ -526,6 +541,8 @@ export default {
           preserveDrawingBuffer: true
         });
         this._map.on("load", () => this.setCamera());
+        // "idle" means every tile for this view has arrived and been drawn.
+        this._map.on("idle", () => { this.mapReady = true; });
         // A single missing icon or tile is not a broken map. Tearing the
         // backdrop down for one of those is what made it look permanently
         // unavailable; only a style that never loads counts as a failure.

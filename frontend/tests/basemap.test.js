@@ -6,7 +6,7 @@
  * in the browser, because only the browser knows what "system" resolved to.
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { vectorStyle } from "../src/lib/basemap.js";
+import { vectorStyle, withOverlay, NOISE_BANDS } from "../src/lib/basemap.js";
 import { state, darkTheme, watchSystemTheme } from "../src/lib/store.js";
 
 /** Just enough of a style document for `vectorStyle` to hand back. */
@@ -89,5 +89,46 @@ describe("Die Palette des Kartenhintergrunds", () => {
   it("meldet einen Stil, der nicht kommt, statt ewig zu warten", async () => {
     globalThis.fetch = () => Promise.resolve({ ok: false, status: 502 });
     await expect(vectorStyle()).rejects.toThrow(/502/);
+  });
+});
+
+describe("Der Lärmschleier über dem Hintergrund", () => {
+  /** A style with one source and one layer, as a backdrop hands one over. */
+  const backdrop = () => ({
+    version: 8,
+    sources: { grund: { type: "raster", tiles: ["/api/tiles/dop/{z}/{x}/{y}.png"] } },
+    layers: [{ id: "grund", type: "raster", source: "grund" }]
+  });
+
+  it("legt die Ebene über den Grund, nicht an seine Stelle", () => {
+    const style = withOverlay(backdrop(), "laerm");
+
+    expect(style.layers.map(l => l.id)).toEqual(["grund", "laerm"]);
+    expect(style.sources.grund).toBeTruthy();
+    // Through our own proxy: the noise service speaks no Web Mercator, so the
+    // browser could not fetch these tiles itself.
+    expect(style.sources.laerm.tiles[0]).toContain("/api/tiles/laerm/{z}/{x}/{y}.png");
+  });
+
+  it("nimmt über dem Luftbild die Deckkraft zurück", () => {
+    const overMap = withOverlay(backdrop(), "laerm", "map");
+    const overAerial = withOverlay(backdrop(), "laerm", "aerial");
+
+    const opacity = style => style.layers.at(-1).paint["raster-opacity"];
+    expect(opacity(overAerial)).toBeLessThan(opacity(overMap));
+  });
+
+  it("lässt einen unbekannten Namen den Stil unverändert", () => {
+    const style = backdrop();
+    expect(withOverlay(style, "gibtsnicht")).toBe(style);
+    expect(withOverlay(style, null)).toBe(style);
+  });
+
+  it("nennt in der Legende nur die Bänder, die auch gezeichnet werden", () => {
+    // The data carries Lden4549; the service's own renderer has no entry for
+    // it, so the key must not claim a colour the map never draws.
+    expect(NOISE_BANDS.laerm[0].label).toBe("50–54");
+    expect(NOISE_BANDS.laerm.map(b => b.label)).not.toContain("45–49");
+    expect(NOISE_BANDS.laerm.every(band => /^rgb\(/.test(band.colour))).toBe(true);
   });
 });

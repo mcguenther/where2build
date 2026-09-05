@@ -249,11 +249,24 @@ class ParcelResolveRequest(BaseModel):
     The cadastral way in accepts both spellings: the two ALKIS attributes
     (``zaehler`` plus optional ``nenner``) and the single ``flurstuecksnummer``
     the official geoportal prints.
+
+    A coordinate may be given the way the cadastre itself writes it. The Saxon
+    geoportal shows ETRS89/UTM33N, so a user copying a position out of it has
+    ``easting``/``northing`` in front of them and no way to turn those into
+    degrees in a browser -- the projection lives here.
     """
 
     address: str | None = Field(default=None, max_length=300)
     lat: float | None = Field(default=None, ge=-90, le=90)
     lon: float | None = Field(default=None, ge=-180, le=180)
+    easting: float | None = Field(
+        default=None, ge=180_000, le=900_000,
+        description="Rechtswert in ETRS89/UTM33N (EPSG:25833), wie im Geoportal.",
+    )
+    northing: float | None = Field(
+        default=None, ge=5_200_000, le=6_100_000,
+        description="Hochwert in ETRS89/UTM33N (EPSG:25833).",
+    )
     gemarkung: str | None = Field(default=None, max_length=120)
     zaehler: int | None = Field(default=None, ge=0)
     # A denominator may be a letter (41/e), so it travels as text; an integer
@@ -293,6 +306,20 @@ class ParcelResolveRequest(BaseModel):
                     "Erlaubt sind bis zu sechs Ziffern oder Buchstaben, etwa „1“ oder „e“."
                 )
             self.nenner = nenner
+
+        if (self.easting is None) != (self.northing is None):
+            raise ValueError("Rechtswert und Hochwert müssen gemeinsam angegeben werden.")
+        if self.easting is not None:
+            if self.lat is not None:
+                raise ValueError(
+                    "Bitte entweder lat/lon oder Rechts- und Hochwert angeben, nicht beides."
+                )
+            # Imported here: schemas.py is otherwise free of the projection
+            # stack, and importing pyproj at module scope would drag it into
+            # every process that only wants the models.
+            from . import geo
+
+            self.lon, self.lat = geo.utm33_to_wgs84(self.easting, self.northing)
 
         by_address = bool(self.address and self.address.strip())
         by_point = self.lat is not None and self.lon is not None
@@ -416,6 +443,12 @@ class LandValue(BaseModel):
     nutzung: str | None = None
     entwicklungszustand: str | None = None
     gutachterausschuss: str | None = None
+    # The size of the notional plot the value is quoted for. BORIS carries it
+    # as `FLAECHE_TEXT = 'f800'` and links the Gutachterausschuss' own
+    # conversion table beside it -- so a 650 m² parcel is not simply 650 × the
+    # zone value, and the interface can say so instead of implying it.
+    richtwertgrundstueck_m2: float | None = None
+    umrechnungstabelle_url: str | None = None
     hinweis: str = (
         "Zonenwert nach § 196 BauGB. Nach § 15 Abs. 2 ImmoWertV kann ein einzelnes "
         "Grundstück innerhalb der Zone abweichend genutzt werden — dann gilt der "
@@ -785,6 +818,153 @@ class NachbarnResponse(BaseModel):
     quelle: str | None = None
     datenstand: str | None = None
     hinweis: str = NACHBARN_HINWEIS
+
+
+# --------------------------------------------------------------------------
+# Standortprüfungen
+#
+# The field names are German because they are the wire format and they mirror
+# the authorities' own vocabulary -- a `Wasserschutzgebiet` has no English name
+# in the register it comes from. What the services answer travels untranslated:
+# `Lden5559`, `LK_IV`, the area's own name. Turning a class key into a sentence
+# is the browser's job (`frontend/src/lib/findings.js`), and turning it into a
+# sentence *here* would put German UI copy in a Python module and make it
+# unreviewable in one place.
+# --------------------------------------------------------------------------
+
+STANDORT_HINWEIS = (
+    "Die Prüfungen sind eine Recherche, keine behördliche Auskunft. Sie ersetzen "
+    "weder eine Bauvoranfrage noch ein Baugrundgutachten; maßgeblich sind die "
+    "Auskünfte der zuständigen Behörden."
+)
+
+
+class StandortRequest(BaseModel):
+    """One parcel outline, in WGS84, as `[lon, lat]` pairs.
+
+    A ring rather than a point, and deliberately no point alternative: a plot
+    straddles isophones and zone boundaries, and asking with its centre would
+    answer for one square metre of it. Measured on Flurstück 204 in Mölkau --
+    50-54 dB(A) at the building point, 50-59 dB(A) across the 650 m².
+    """
+
+    ring: list[tuple[float, float]] = Field(
+        min_length=3,
+        max_length=2000,
+        description="Umring des Grundstücks als [lon, lat]-Paare in WGS84.",
+    )
+
+    @field_validator("ring")
+    @classmethod
+    def _inside_saxony(cls, ring: list[tuple[float, float]]) -> list[tuple[float, float]]:
+        # Generous bounds around Germany: the services are Saxon, and a ring
+        # somewhere else is a mistake worth naming rather than a slow 0-hit.
+        for lon, lat in ring:
+            if not (5.6 <= lon <= 15.3 and 47.0 <= lat <= 55.2):
+                raise ValueError(
+                    "Der Umring liegt außerhalb Deutschlands — bitte [lon, lat] in WGS84 senden."
+                )
+        return ring
+
+
+class Laerm(BaseModel):
+    """Noise bands per source, as 5 dB categories.
+
+    `tag` is L_DEN over 24 hours, `nacht` is L_night. A source that answers with
+    an empty list is mapped and quiet there; a source that is absent from the
+    dict was not asked.
+    """
+
+    tag: dict[str, list[str]] = Field(default_factory=dict)
+    nacht: dict[str, list[str]] = Field(default_factory=dict)
+    kartiert_umkreis: bool = False
+    umkreis_m: int
+    unterste_stufe_db: int
+    quelle: str
+    fehler: str | None = None
+
+
+class Gebiet(BaseModel):
+    """One designated area, with the category it was designated under."""
+
+    name: str | None = None
+    kategorie: str | None = None
+
+
+class Ausweisung(BaseModel):
+    """A designation the plot either sits in or does not.
+
+    `abstand_von_m`/`abstand_bis_m` are a bracket, not a measurement: the
+    service answers whether something lies within a radius, so the distance is
+    only known to the width of the rung it was found on.
+    """
+
+    betroffen: bool = False
+    gebiete: list[Gebiet] = Field(default_factory=list)
+    naechstes: Gebiet | None = None
+    abstand_von_m: float | None = None
+    abstand_bis_m: float | None = None
+    weitere_im_umkreis: int = 0
+    umkreis_m: int | None = None
+    quelle: str
+    fehler: str | None = None
+
+
+class Bohrung(BaseModel):
+    entfernung_m: float
+    endteufe_m: float | None = None
+    jahr: int | None = None
+    url: str | None = None
+
+
+class Baugrund(BaseModel):
+    """The soil map's own wording, the air capacity class, and what was drilled.
+
+    Nothing in here says anything about bearing capacity: a soil map at
+    1:50 000 is not a ground investigation, and the finding says so.
+    """
+
+    bodenart_text: str | None = None
+    luftkapazitaet_stufe: str | None = None
+    bohrungen_umkreis: int = 0
+    bohrungen_naher_umkreis: int = 0
+    umkreis_m: int
+    naher_umkreis_m: int
+    naechste: Bohrung | None = None
+    tiefste: Bohrung | None = None
+    quelle: str
+    fehler: str | None = None
+
+
+class Luftqualitaet(BaseModel):
+    """Measured pollutants, and how far away the station that answered is.
+
+    `uebersprungen` counts the nearer stations that carried no values at all --
+    without it, "4,6 km" looks like carelessness rather than the only station
+    that answers.
+    """
+
+    station: str | None = None
+    entfernung_km: float | None = None
+    werte: dict[str, float] = Field(default_factory=dict)
+    stunden: int | None = None
+    stand: str | None = None
+    uebersprungen: int = 0
+    quelle: str
+    fehler: str | None = None
+
+
+class StandortPruefungen(BaseModel):
+    laerm: Laerm
+    trinkwasserschutz: Ausweisung
+    schutzgebiet: Ausweisung
+    hochwasser: Ausweisung
+    radon: Ausweisung
+    hangneigung: Ausweisung
+    baugrund: Baugrund
+    luftqualitaet: Luftqualitaet
+    abgerufen_am: datetime
+    hinweis: str = STANDORT_HINWEIS
 
 
 # --------------------------------------------------------------------------

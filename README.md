@@ -26,12 +26,13 @@ takes to get to work, school and the station.
 
 | | |
 |---|---|
-| **Take a plot in** | From a listing URL, from a pasted page, or straight from *Gemarkung* + parcel numbers. A four-step wizard shows what the model read, where each value came from, and what it could not find. |
+| **Take a plot in** | From the search field, from a listing URL, from a pasted page, or straight from *Gemarkung* + parcel numbers. The search reads what was typed before it looks anything up — an address never begins with a digit, a coordinate is two numbers, a parcel denominator cannot occur in an address — and where two readings stay plausible it asks both local indexes rather than guessing. A four-step wizard shows what the model read, where each value came from, and what it could not find. |
 | **Resolve the parcels** | ALKIS gives the outline, the official area and the parcel identifier. A plot is a *set* of parcels — the normal case, not the exception — so geometries are unioned and official areas summed. |
 | **Judge the shape** | Rectangularity as polygon area over the area of its smallest rotated bounding rectangle, plus street frontage and vertex count. |
 | **Judge the price** | €/m² against the BORIS land value for the zone, as a percentage rather than a hunch. |
 | **Draw the setbacks** | The strip that may *not* be built on is the part that gets colour. Depth is adjustable **per boundary segment**, because § 6 SächsBO measures from wall height and treats 3 m as a floor. |
 | **Place a house** | From the catalogue or from dimensions you type yourself. Drag it, rotate it, or align it to the street front in one click; corners leaving the envelope are flagged. |
+| **Check the location** | Noise, flood, radon, drinking-water protection, protected areas, slope, ground and air quality — asked with the *parcel outline*, never with a point, because a plot straddles isophones and zone boundaries. Eleven checks, each a sentence composed from a template, and a counter instead of a score. |
 | **Check reachability** | Car, bike, transit and the best combination to each saved destination, via MOTIS. |
 | **Compare and print** | Several candidates side by side at one scale. There is no separate print view — the page on screen is the page that prints. |
 
@@ -240,12 +241,13 @@ nothing else.
 
 | Method | Path | |
 |---|---|---|
-| `POST` | `/api/parcels/resolve` | address, coordinate or *Gemarkung* + numerator/denominator → GeoJSON in EPSG:4326 with the official area |
+| `POST` | `/api/parcels/resolve` | address, coordinate (WGS84 or ETRS89/UTM33N as the Geoportal prints it) or *Gemarkung* + numerator/denominator → GeoJSON in EPSG:4326 with the official area |
 | `POST` | `/api/listings/extract` | `{url}` or `{text}` → listing fields, each with its source |
 | `POST` | `/api/housetypes/extract` | `{url}` → house type, fetch restricted to the manufacturer's domain |
-| `GET` | `/api/landvalue` | `?lat=&lon=` → €/m², zone, reference date |
+| `GET` | `/api/landvalue` | `?lat=&lon=` → €/m², zone, reference date, and the size of the notional plot the value is quoted for |
+| `POST` | `/api/site-checks` | one parcel outline → noise bands, flood, radon, water protection, protected areas, slope, ground and air quality; each check carries either data or its own German `fehler` |
 | `POST` | `/api/reachability` | origin + destinations + modes → durations and route geometry |
-| `GET` | `/api/tiles/{layer}/{z}/{x}/{y}.png` | cached proxy for the GeoSN WMS layers |
+| `GET` | `/api/tiles/{layer}/{z}/{x}/{y}.png` | cached proxy for the GeoSN WMS layers (`dop`, `webatlas`, `alkis`) and, through the ArcGIS `export` endpoint, the noise survey (`laerm`, `laerm-nacht`) |
 | `POST` | `/api/nearby` | one coordinate → the nearest school, park, tram stop and so on, ranked by walking time; `linien: true` also names the lines calling at each stop |
 | `GET` | `/api/gemarkungen` | `?q=` → the Saxon cadastral districts, served from a committed index; the WFS is never touched |
 | `POST` | `/api/geocode` | `{text, lat?, lon?}` → candidates, never one answer: the same street name matches in three states |
@@ -326,6 +328,12 @@ Each of these is verified, not assumed — the details are in
   including why it is not being built yet.
 - **The dimension figures get small on a narrow screen.** Nothing overflows, but
   at 390 px they are hard to read.
+- **Three location checks have no source.** Heavy rain (KOSTRA-2020) exists as a
+  DWD raster to download rather than a service and needs an import; Saxony
+  publishes no state-wide contaminated-sites data at all; and the federal mobile
+  and broadband portals have no open interface. All three are shown as open
+  with the reason rather than left out, because a list that silently omits what
+  it cannot answer reads as a complete one.
 
 ## Attribution
 
