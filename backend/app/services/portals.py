@@ -94,6 +94,21 @@ _GENERIC_IMAGE = re.compile(
 _NOT_A_PHOTO = ("logo", "icon", "sprite", "avatar", "placeholder", "pixel", "badge", "banner")
 _IMAGE_LIMIT = 24
 
+# The asking price. On the wire twice on every advert measured -- as a
+# machine-readable ``itemprop`` and as the displayed „60.000 €" -- so it never
+# needed a model to find it, and the model is exactly what was not configured
+# when it went missing.
+_PRICE_PATTERNS = (
+    re.compile(r'itemprop="price"[^>]*content="([^"]*)"', re.IGNORECASE),
+    re.compile(r'<meta[^>]+property="product:price:amount"[^>]+content="([^"]*)"', re.IGNORECASE),
+    re.compile(r'id="viewad-price"[^>]*>(.*?)<', re.IGNORECASE | re.DOTALL),
+    re.compile(r'"price"\s*:\s*"?([\d.,]+)"?', re.IGNORECASE),
+)
+
+# What separates „1.489" (one thousand) from „51.189265" (a coordinate): a dot
+# is a thousands separator only where it groups exactly three digits.
+_THOUSANDS = re.compile(r"^-?\d{1,3}(\.\d{3})+$")
+
 
 def is_blocked(url: str) -> bool:
     domain = domain_of(url)
@@ -180,6 +195,44 @@ def parse_details(html: str) -> dict[str, str]:
     return found
 
 
+def german_number(raw: str) -> float | None:
+    """A number out of what a German page wrote.
+
+    The dot is a thousands separator only where it groups threes; anywhere else
+    it is a decimal point. Stripping every dot turns „1.489" into 1489 correctly
+    and „51.189265" into 51 189 265, which is how a coordinate became a
+    validation error with no hint as to why.
+    """
+
+    match = re.search(r"-?\d[\d.,]*", raw.replace(" ", "").replace("\u00a0", ""))
+    if not match:
+        return None
+    digits = match.group(0)
+    if "," in digits:
+        digits = digits.replace(".", "").replace(",", ".")
+    elif _THOUSANDS.match(digits):
+        digits = digits.replace(".", "")
+    try:
+        return float(digits)
+    except ValueError:
+        return None
+
+
+def parse_price(html: str) -> int | None:
+    """The asking price in euro, from whichever of the four spellings is there."""
+
+    for pattern in _PRICE_PATTERNS:
+        match = pattern.search(html)
+        if not match:
+            continue
+        text = html_module.unescape(_TAG_PATTERN.sub(" ", match.group(1)))
+        # „VB", „Zu verschenken", „auf Anfrage" are not prices.
+        value = german_number(text)
+        if value is not None and 0 < value < 100_000_000:
+            return int(round(value))
+    return None
+
+
 def parse_images(html: str) -> list[str]:
     """The listing's pictures, largest variant of each, in page order."""
 
@@ -246,6 +299,7 @@ class Seite:
     # The portal's structured fields, „Grundstücksfläche" above all.
     angaben: dict[str, str] = field(default_factory=dict)
     bilder: list[str] = field(default_factory=list)
+    kaufpreis_eur: int | None = None
 
     @property
     def has_coordinates(self) -> bool:
@@ -280,6 +334,7 @@ def parse_page(url: str, html: str) -> Seite:
         beschreibung=parse_description(html) or meta.get("og:description") or None,
         angaben=parse_details(html),
         bilder=parse_images(html),
+        kaufpreis_eur=parse_price(html),
     )
 
 

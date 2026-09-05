@@ -642,6 +642,33 @@ from the user directly. Reopen only if the user asks.
   empty. `luft/radonvorsorgegebiete` holds 107 municipalities and answers "no"
   for Leipzig but "yes" for Johanngeorgenstadt and Schneeberg — only that
   second query turns silence into a statement.
+- **A German thousands stripper eats a coordinate.** Removing every `.` turned
+  `51.189265` into `51189265`, and every Kleinanzeigen listing answered 422
+  („Der Wert darf höchstens 90.0 betragen") before the search asked the
+  cadastre anything. A dot separates thousands **only in groups of three**, and
+  a comma settles it outright: `1.025` is 1025, `51.189265` is a coordinate,
+  `1.025,50` is 1025,5. One reader for both — `parseGermanNumber` in
+  `frontend/src/lib/format.js`; the helper that broke this was a local copy in
+  the wizard, which is how it survived.
+- **The price is in the markup three times and never needs a model.**
+  `<meta itemprop="price">`, the JSON-LD `offers.price` and `#viewad-price` —
+  the first hit answered all four measured adverts (60 000 / 165 000 / 80 000 /
+  195 000 €). It had been left to the LLM, so the field stayed empty on exactly
+  the pages that have a known adapter.
+- **The clipboard carries `text/html` next to `text/plain`, and a `<textarea>`
+  shows only the second.** `Strg+A, Strg+C` on a portal page therefore has
+  everything the extraction wants — meta tags, JSON-LD, price, pictures — and
+  the paste field keeps it (`@paste`, capped at 400 000 characters) and sends
+  that instead. So the paste path needs no `LLM_API_KEY`: a model is asked only
+  when no address, no coordinate and no parcel number could be read at all.
+  Emptying the field has to clear the kept HTML, or the next read silently
+  ships the page pasted before.
+- **jsdom does not submit a form from a dispatched click.** Wrapping the
+  wizard's first step in a `<form>` (so Enter submits, as it does everywhere
+  else) broke two tests that click the button, with no change to the component's
+  logic. The button's click carries `.prevent` so a real browser does not submit
+  twice, and the two paths — `trigger("click")` on the button, `trigger("submit")`
+  on the form — are tested separately.
 
 ## Commands
 

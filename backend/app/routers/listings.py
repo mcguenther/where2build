@@ -42,6 +42,16 @@ _NO_LOCATOR = (
 )
 
 
+def _has_locator(felder: InseratFelder) -> bool:
+    """Whether the deterministic pass found enough to place the plot at all."""
+
+    return bool(
+        felder.adresse
+        or felder.flurstuecke
+        or (felder.lat is not None and felder.lon is not None)
+    )
+
+
 def _area_from(angaben: dict[str, str]) -> int | None:
     """The plot area out of the portal's own attribute list.
 
@@ -113,6 +123,7 @@ async def _from_url(url: str, llm: LLMClient, settings: Settings) -> ListingExtr
         deterministic = InseratFelder(
             adresse=seite.adresse, lat=seite.lat, lon=seite.lon,
             grundstuecksflaeche_m2=_area_from(seite.angaben),
+            kaufpreis_eur=seite.kaufpreis_eur,
         )
         weg: Extraktionsweg = "meta-tags" if seite.has_coordinates else "llm"
         hinweis = None
@@ -203,23 +214,48 @@ async def extract(
         return answer
 
     assert payload.text is not None
-    if not llm.settings.configured:
-        raise NotConfiguredError(
-            "Das Auswerten eingefügter Texte ist nicht konfiguriert (LLM_API_KEY fehlt)."
-        )
-    # Pasted HTML still carries meta tags and JSON-LD; use them before the model.
+    # Pasted content is parsed deterministically first, and that is usually the
+    # whole job: a page copied out of a browser carries its meta tags, its
+    # JSON-LD, its price and its attribute list, and the parcel search reads the
+    # prose itself. Requiring a model here was what turned a portal that refuses
+    # a server-side fetch -- the very case this field exists for -- into
+    # „nicht konfiguriert“.
     seite = parse_page("", payload.text) if "<" in payload.text else None
     text = seite.text if seite and seite.text else payload.text
-    extracted = await llm.structure(text, InseratFelder, "inserat", _STRUCTURE_TASK)
     deterministic = (
-        InseratFelder(adresse=seite.adresse, lat=seite.lat, lon=seite.lon)
+        InseratFelder(
+            adresse=seite.adresse,
+            lat=seite.lat,
+            lon=seite.lon,
+            grundstuecksflaeche_m2=_area_from(seite.angaben),
+            kaufpreis_eur=seite.kaufpreis_eur,
+        )
         if seite is not None
         else InseratFelder()
     )
+    beschreibung = (seite.beschreibung if seite and seite.beschreibung else text)
+
+    extracted: InseratFelder | None = None
+    hinweis: str | None = None
+    if llm.settings.configured:
+        try:
+            extracted = await llm.structure(text, InseratFelder, "inserat", _STRUCTURE_TASK)
+        except UpstreamError as exc:
+            hinweis = f"Nur die Angaben der Seite konnten gelesen werden: {exc.message}"
+    elif not _has_locator(deterministic):
+        raise NotConfiguredError(
+            "Aus dem eingefügten Text ließ sich weder eine Adresse noch eine Koordinate "
+            "noch ein Flurstück lesen, und das Auswerten durch ein Modell ist auf diesem "
+            "Server nicht eingerichtet (LLM_API_KEY fehlt). Am zuverlässigsten ist die "
+            "kopierte Seite selbst: im Browser Strg+A, Strg+C — dann kommt das HTML mit "
+            "Meta-Angaben, Preis und Bildern mit, und es braucht kein Modell."
+        )
+
     return _answer(
         _merge(deterministic, extracted),
         None,
         "eingefuegter-text",
-        beschreibung=(seite.beschreibung if seite and seite.beschreibung else text),
+        hinweis=hinweis,
+        beschreibung=beschreibung,
         bilder=seite.bilder if seite else None,
     )

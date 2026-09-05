@@ -760,7 +760,94 @@ every image.
   extraction falls back to ordinary `<img>` URLs for pages whose markup is not
   known here.
 
-## 17. What is still unverified ⚠️
+## 17. Fourth pass, 05.09.2026: three failures on the way in ✅
+
+Reported from a running `docker compose`, all three before the search had asked
+the cadastre anything at all. None is about parcels; all three are about the
+step in front of it.
+
+### 17.1 A German thousands stripper eats a coordinate ✅
+
+Every Kleinanzeigen listing answered:
+
+```
+POST /api/parcels/search HTTP/1.0 422 Unprocessable Entity
+„lat": Der Wert darf höchstens 90.0 betragen.
+„lon": Der Wert darf höchstens 180.0 betragen.
+```
+
+The wizard read its fields with a helper that removed every `.` as a German
+thousands separator. `51.189265` became `51189265`; the endpoint's `le=90` was
+right to refuse it. The listing was never wrong — the number was destroyed one
+step before the request.
+
+A dot is a thousands separator **only in groups of three**, and a comma settles
+the question outright:
+
+| Input | Read as | Why |
+| --- | --- | --- |
+| `51.189265` | 51.189265 | six digits after the dot — not a group of three |
+| `1.025` | 1025 | exactly three, no comma |
+| `1.025,50` | 1025.5 | a comma is present, so the dot is a separator |
+| `80.000 €` | 80000 | three digits, no comma |
+| `auf Anfrage` | `null` | no digits, and no `NaN` either |
+
+`parseGermanNumber` in `frontend/src/lib/format.js` is the single reader, and
+`queryFromFields` is covered by a test that asserts the coordinate arrives
+unchanged. The old helper was local to the wizard, which is how it survived.
+
+### 17.2 The price was never found, and did not need a model ✅
+
+The "Gelesene Werte" step showed *Kaufpreis* empty on all four adverts, because
+the price only ever came from the model, and the model was only asked for pages
+without a known adapter.
+
+Measured on the four saved pages: the price is in the markup three times over —
+`<meta itemprop="price">`, the JSON-LD `offers.price`, and the boxed figure in
+the page body. Parsing them in that order:
+
+| Advert | Price found | Source |
+| --- | --- | --- |
+| 3423861748 Lobstädt | 80 000 € | meta |
+| 3375124391 Plagwitz | 165 000 € | meta |
+| 3503721553 Etzoldshain | 195 000 € | meta |
+| 3499632623 Großbothen | 60 000 € | meta |
+
+Four out of four, no model call, and the same reader works on a pasted page
+because the meta tags travel with it.
+
+### 17.3 The paste field required a model it did not need ✅
+
+Pasting an ImmoScout24 page answered „Das Auswerten eingefügter Texte ist nicht
+konfiguriert (LLM_API_KEY fehlt)" — the one portal the paste field exists for.
+
+Two things fix it and neither needs a provider:
+
+* **Read the pasted text with the same deterministic parsers as a fetched
+  page.** A copied page carries its meta tags, its JSON-LD, its price and its
+  attribute list. The model is only asked when *no locator at all* — no
+  address, no coordinate, no parcel number — could be read, and the refusal
+  then says what to paste instead rather than only naming the missing key.
+* **Take the clipboard's HTML flavour.** `Strg+A, Strg+C` in a browser puts
+  **both** `text/plain` and `text/html` on the clipboard; a `<textarea>` shows
+  only the first. The paste handler keeps the second (capped at 400 000
+  characters — the head of the document is where every locator sits) and sends
+  it instead. Emptying the field clears it, or the next read silently ships the
+  page pasted before.
+
+### 17.4 Enter has to submit ✅
+
+The URL field swallowed the Enter key: there was no `<form>`, so there was no
+implicit submission. Wrapping the step in one fixes it — and then the submit
+button submits **twice** in a real browser, once through its own activation and
+once through the handler. The click carries `.prevent`, so there is one way in.
+
+Worth knowing for the tests: **jsdom does not run a form's submission from a
+dispatched click**, so a test that clicks the button never exercises the form,
+and a test that only triggers `submit` never exercises the button. Both paths
+are tested separately.
+
+## 18. What is still unverified ⚠️
 
 * The three prompts in `docs/strategie/extraktion-prompting.html` are drafted
   but have not been run against a model — this listing did not need them.

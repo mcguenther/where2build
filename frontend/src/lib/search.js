@@ -16,6 +16,7 @@
  */
 
 import { ServiceError } from "./api.js";
+import { parseGermanNumber } from "./format.js";
 
 const ENDPOINT = "/api/parcels/search";
 
@@ -112,10 +113,7 @@ export async function runSearch(query, onEvent, { signal } = {}) {
  */
 export function queryFromFields(fields, extra = {}) {
   const read = name => fields.find(field => field.key === name)?.value ?? "";
-  const number = value => {
-    const match = String(value).replace(/\./g, "").replace(",", ".").match(/-?\d+(\.\d+)?/);
-    return match ? parseFloat(match[0]) : null;
-  };
+  const number = parseGermanNumber;
   const lat = number(read("lat"));
   const lon = number(read("lon"));
   const area = number(read("grundstuecksflaeche_m2"));

@@ -33,7 +33,7 @@
     <!-- 1 · Quelle. Also what a stage without its data falls back to, so the
          redirect in `checkStage` never renders a step that has nothing. -->
     <section v-if="stage === 'quelle' || !reachable" class="stack">
-      <p class="subtitle">Drei Wege hinein. Welcher passt zu dem, was vorliegt?</p>
+      <p class="subtitle">Vier Wege hinein. Welcher passt zu dem, was vorliegt?</p>
       <div class="sources">
         <label v-for="s in sources" :key="s.id" class="source" :class="{ 'source--selected': source === s.id }">
           <input type="radio" name="source" :value="s.id" v-model="source">
@@ -42,12 +42,14 @@
         </label>
       </div>
 
-      <div class="panel">
+      <!-- A form, so the Enter key does what it does everywhere else. Without
+           one the address field swallowed it and nothing happened. -->
+      <form class="panel" @submit.prevent="submit">
         <div class="panel__body stack">
           <template v-if="source === 'url'">
             <div class="field">
               <label for="q-url">Adresse der Anzeige</label>
-              <input id="q-url" type="text" v-model="url" placeholder="https://…">
+              <input id="q-url" type="url" inputmode="url" v-model="url" placeholder="https://…">
             </div>
             <p class="hint">
               Die Seite wird auf dem Server geholt und ausgelesen. ImmoScout24 lässt das
@@ -94,26 +96,35 @@
           <template v-else>
             <div class="field">
               <label for="q-paste">Anzeige hier einfügen</label>
-              <textarea id="q-paste" v-model="pastedText"
+              <textarea id="q-paste" v-model="pastedText" @paste="takePaste"
                         placeholder="Strg+V — die kopierte Anzeigenseite"></textarea>
             </div>
+            <p class="hint">
+              Im Browser <span class="mono">Strg+A</span>, <span class="mono">Strg+C</span>,
+              hier <span class="mono">Strg+V</span>. Die Zwischenablage führt neben dem Text
+              auch das HTML mit — daraus kommen Preis, Fläche, Koordinate und die Bilder
+              ohne Modell.
+              <span v-if="pastedHtml"><b>Das HTML wurde übernommen</b> ({{ Math.round(pastedHtml.length / 1024) }} kB).</span>
+            </p>
           </template>
 
           <div class="row">
-            <button type="button" class="btn" :disabled="busy || !ready" @click="read">
+            <!-- The click carries `.prevent`, so the button's own activation
+                 does not submit the form a second time. -->
+            <button type="submit" class="btn" :disabled="busy || !ready" @click.prevent="submit">
               {{ busy ? "Wird gelesen …" : readLabel }}
             </button>
             <span v-if="busy" class="hint">Der Abruf kann eine Minute dauern.</span>
           </div>
         </div>
-      </div>
+      </form>
     </section>
 
     <!-- 2 · Gelesene Werte -->
     <section v-else-if="stage === 'werte'" class="stack">
       <p class="subtitle">
         Jedes Feld führt die Quelle mit, aus der es stammt. Erst nach Bestätigung wandern die
-        Werte in die Planung — das Modell antwortet auch dann, wenn die Seite die Zahl gar nicht hergibt.
+        Werte in die Planung — was die Seite nicht hergibt, bleibt leer und wird nicht erfunden.
       </p>
 
       <div class="suggestions">
@@ -250,14 +261,7 @@ import { readListing, readPage, resolveParcel, landValue } from "../lib/api.js";
 import { queryFromFields } from "../lib/search.js";
 import { plotFromCadastre } from "../lib/plots.js";
 import { polygonArea } from "../lib/geometry.js";
-import { area, euroPerSqm, num } from "../lib/format.js";
-
-/** "212.000 €" and "1.104 m²" as a German listing writes them. */
-function numberFrom(text) {
-  if (text === null || text === undefined || text === "") return null;
-  const match = String(text).replace(/\./g, "").replace(",", ".").match(/-?\d+(\.\d+)?/);
-  return match ? parseFloat(match[0]) : null;
-}
+import { area, euroPerSqm, num, parseGermanNumber as numberFrom } from "../lib/format.js";
 
 /** The backend answers with {feld: {wert, quelle_url, bestaetigt}}. */
 function fieldsFromResponse(response) {
@@ -276,6 +280,9 @@ function fieldsFromResponse(response) {
     source: entry?.quelle_url || response?.hinweis || "aus der gelesenen Seite"
   }));
 }
+
+/** What POST /api/listings/extract accepts in `text`. */
+const PASTE_LIMIT = 400000;
 
 export default {
   name: "WizardView",
@@ -301,6 +308,13 @@ export default {
       gemarkungEntry: null,
       flurstuecksnummer: "",
       pastedText: "",
+      /* What the clipboard carried as `text/html`. A Ctrl+A copy out of a
+       * browser puts both flavours on the clipboard, and a textarea only ever
+       * receives the plain one — which loses the meta tags, the price, the
+       * coordinate and every image URL. Those are exactly what makes the paste
+       * path work without a model, and they are the whole point of this field:
+       * it exists for the portals that refuse a server-side fetch. */
+      pastedHtml: "",
       listingText: "",
       busy: false,
       error: "",
@@ -368,7 +382,12 @@ export default {
     gemarkungQuery() { return this.gemarkungEntry?.schluessel || this.gemarkung.trim(); }
   },
   created() { this.checkStage(); },
-  watch: { stage() { this.checkStage(); } },
+  watch: {
+    stage() { this.checkStage(); },
+    // Emptying the field has to empty the clipboard HTML with it, or the next
+    // read silently sends the page that was pasted before.
+    pastedText(value) { if (!value.trim()) this.pastedHtml = ""; }
+  },
   methods: {
     area, euroPerSqm, num,
 
@@ -398,6 +417,23 @@ export default {
       this.$router.back();
     },
 
+    /** Keep the clipboard's HTML flavour alongside the text the textarea shows.
+     *
+     *  Capped at what the endpoint accepts: a whole portal page with its inline
+     *  scripts runs past 400 000 characters, and everything the extraction
+     *  wants — meta tags, JSON-LD, the price, the attribute list — sits in the
+     *  first part of the document. */
+    takePaste(event) {
+      const html = event.clipboardData?.getData("text/html");
+      if (html && html.length > this.pastedHtml.length) this.pastedHtml = html.slice(0, PASTE_LIMIT);
+    },
+
+    /** The one way in, for the Enter key and for the button alike. */
+    submit() {
+      if (this.busy || !this.ready) return;
+      this.read();
+    },
+
     async read() {
       this.busy = true;
       this.error = "";
@@ -425,7 +461,7 @@ export default {
         }
         const response = this.source === "url"
           ? await readListing(this.url.trim())
-          : await readPage(this.pastedText);
+          : await readPage(this.pastedHtml || this.pastedText);
         this.readFields = fieldsFromResponse(response);
         this.description = response?.beschreibung || (this.source === "paste" ? this.pastedText : "");
         this.images = response?.bilder || [];

@@ -26,7 +26,7 @@ takes to get to work, school and the station.
 
 | | |
 |---|---|
-| **Take a plot in** | From a listing URL, from a pasted page, or straight from *Gemarkung* + parcel numbers. A four-step wizard shows what the model read, where each value came from, and what it could not find. |
+| **Take a plot in** | From a listing URL, from a pasted page, from a description alone, or straight from *Gemarkung* + parcel numbers. The wizard shows what was read, where each value came from, and what it could not find. Only the last of those ever asks a model, and only when nothing locatable could be parsed. |
 | **Resolve the parcels** | ALKIS gives the outline, the official area and the parcel identifier. A plot is a *set* of parcels — the normal case, not the exception — so geometries are unioned and official areas summed. |
 | **Judge the shape** | Rectangularity as polygon area over the area of its smallest rotated bounding rectangle, plus street frontage and vertex count. |
 | **Judge the price** | €/m² against the BORIS land value for the zone, as a percentage rather than a hunch. |
@@ -290,7 +290,16 @@ Each of these is verified, not assumed — the details are in
 - **immobilienscout24.de answers server-side fetches with 401** on every route
   tested, so its adapter goes straight to the paste field.
 - **kleinanzeigen.de carries `og:latitude`/`og:longitude`** in its meta tags —
-  parse those and skip both the geocoder and the model call.
+  parse those and skip both the geocoder and the model call. The asking price
+  is there too (`<meta itemprop="price">`, JSON-LD, `#viewad-price`), which is
+  why no listing needs a model to give up its price.
+- **The clipboard carries `text/html` alongside `text/plain`**, and a textarea
+  shows only the second. The paste field keeps the first, so a copied page
+  arrives with its meta tags and is read the same way a fetched one is — no
+  provider key involved.
+- **A dot is a German thousands separator only in groups of three.** Stripping
+  every dot turned the coordinate `51.189265` into `51189265` and made the
+  search endpoint answer 422 for every listing that carried one.
 - **ALKIS stored queries need the `CRS` parameter**; without it the service
   answers HTTP 400 with a generic HTML page rather than an OGC error. Ad-hoc
   `fes:Filter` expressions need the `ave:` namespace prefix.

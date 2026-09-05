@@ -2,7 +2,7 @@
  * print rendering. Runs against the built app on a static server — no manual
  * steps, so the images always match the current code. */
 import { chromium } from "/opt/node22/lib/node_modules/playwright/index.mjs";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer } from "node:http";
@@ -112,6 +112,14 @@ const LISTING =
   + "Über die B107 erreichen Sie die ca. 6 km entfernte Kreisstadt Grimma. "
   + "Sehenswert sind das Kloster Nimbschen und die Schiffsmühle in Höfgen.";
 
+/* A saved advert, exactly as the portal served it — the same file the backend
+   tests read. Pasting it is what a person does with Strg+A, Strg+C on a portal
+   that refuses a server-side fetch, and everything the next step shows is read
+   out of this markup without a model. */
+const PASTED_PAGE = readFileSync(
+  new URL("../backend/tests/fixtures/inserat-kleinanzeigen.html", import.meta.url), "utf8"
+);
+
 /* The map reports when every tile for the current view has arrived. A tile
  * that 502s never lets it, and a whole screenshot run must not hang on one --
  * so the wait is bounded and says what it settled for. */
@@ -171,6 +179,22 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
     problems.push(`${mode}/${width}: die Suche kam zu keinem Ergebnis`);
   }
   await shot(page, "suche-ergebnis", mode, narrow ? "-schmal" : "");
+
+  /* The pasted page, and the step that shows what was read off it. This is the
+     way in for a portal that refuses a server-side fetch, and it needs no model
+     either: price, area, coordinate and pictures come out of the markup. */
+  await page.click(".breadcrumb a");
+  await page.click(".page-head .btn");
+  await page.getByText("Seite einfügen", { exact: true }).click();
+  await page.fill("#q-paste", PASTED_PAGE);
+  await page.getByRole("button", { name: "Lesen" }).click();
+  try {
+    await page.waitForSelector(".suggestions", { timeout: 30000 });
+  } catch {
+    problems.push(`${mode}/${width}: die eingefügte Seite wurde nicht gelesen`);
+  }
+  await shot(page, "assistent-werte", mode, narrow ? "-schmal" : "");
+
   await page.click(".breadcrumb a");
   await page.click(".page-head .btn");
   await page.getByText("Flurstück direkt").click();

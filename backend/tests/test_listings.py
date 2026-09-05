@@ -195,11 +195,40 @@ def test_page_without_any_locator_is_a_400(client: TestClient):
 
 
 @respx.mock
-def test_pasting_without_a_configured_provider_is_a_503(without_llm, client: TestClient):
+def test_bare_text_without_a_provider_says_what_to_paste_instead(without_llm, client: TestClient):
+    """A sentence with no address and no coordinate needs a model. HTML does not.
+
+    So the refusal names the way round it — copy the page itself — rather than
+    only reporting a missing key.
+    """
+
     answer = client.post("/api/listings/extract", json={"text": "Baugrundstück 688 m²"})
 
     assert answer.status_code == 503
-    assert "nicht konfiguriert" in answer.json()["detail"]
+    detail = answer.json()["detail"]
+    assert "nicht eingerichtet" in detail
+    assert "Strg+A" in detail
+
+
+def test_a_pasted_page_is_read_without_a_model_at_all(without_llm, client: TestClient):
+    """The paste field exists for portals that refuse a server-side fetch.
+
+    Requiring a model here made it useless in exactly that case. A page copied
+    out of a browser carries its meta tags, its price and its attribute list,
+    and the parcel search reads the prose itself.
+    """
+
+    answer = client.post(
+        "/api/listings/extract", json={"text": fixture_text("inserat-kleinanzeigen.html")}
+    )
+
+    assert answer.status_code == 200
+    body = answer.json()
+    assert body["weg"] == "eingefuegter-text"
+    assert body["felder"]["kaufpreis_eur"]["wert"] == 80000
+    assert body["felder"]["grundstuecksflaeche_m2"]["wert"] == 1025
+    assert "Ortsteil Lobstädt bei Neukieritzsch" in body["beschreibung"]
+    assert body["bilder"]
 
 
 @respx.mock

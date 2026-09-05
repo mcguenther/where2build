@@ -27,7 +27,7 @@ vi.mock("../src/lib/api.js", () => ({
   geocode: vi.fn(),
   nearby: vi.fn()
 }));
-const { cadastralDistricts, resolveParcel, landValue } = await import("../src/lib/api.js");
+const { cadastralDistricts, resolveParcel, landValue, readPage } = await import("../src/lib/api.js");
 
 beforeEach(() => {
   localStorage.clear();
@@ -215,5 +215,99 @@ describe("Aufnahme — Schritt Quelle", () => {
     await flushPromises();
 
     expect(resolveParcel).toHaveBeenCalledWith({ gemarkung: "Moritzburg", flurstuecksnummer: "85/1" });
+  });
+});
+
+describe("Aufnahme — Absenden", () => {
+  const atSource = () =>
+    mountWithRouter(WizardView, { path: "/aufnahme/quelle", props: { stage: "quelle" } });
+
+  it("liest die Anzeige auch, wenn im Feld nur Enter gedrückt wurde", async () => {
+    resolveParcel.mockResolvedValue(moelkau);
+    landValue.mockRejectedValue(new Error("Kein Bodenrichtwert."));
+
+    const w = atSource();
+    await w.find('input[value="parcel"]').setValue();
+    await flushPromises();
+
+    await typeInto(w.findComponent(CadastralDistrictPicker).find("input"), "Moritzburg");
+    await typeInto(w.find("#q-parcel-number"), "85/1");
+    // Was das Drücken von Enter in einem Textfeld auslöst.
+    await w.find("form").trigger("submit");
+    await flushPromises();
+
+    expect(resolveParcel).toHaveBeenCalledWith({ gemarkung: "Moritzburg", flurstuecksnummer: "85/1" });
+  });
+
+  it("liest genau einmal, wenn der Knopf geklickt wird", async () => {
+    resolveParcel.mockResolvedValue(moelkau);
+    landValue.mockRejectedValue(new Error("Kein Bodenrichtwert."));
+
+    const w = atSource();
+    await w.find('input[value="parcel"]').setValue();
+    await flushPromises();
+
+    await typeInto(w.findComponent(CadastralDistrictPicker).find("input"), "Moritzburg");
+    await typeInto(w.find("#q-parcel-number"), "85/1");
+    await w.findAll("button").find(b => b.text() === "Nachschlagen").trigger("click");
+    await flushPromises();
+
+    expect(resolveParcel).toHaveBeenCalledTimes(1);
+  });
+
+  it("schickt bei leerem Feld gar nichts los", async () => {
+    const w = atSource();
+    await w.find('input[value="parcel"]').setValue();
+    await flushPromises();
+
+    await w.find("form").trigger("submit");
+    await flushPromises();
+
+    expect(resolveParcel).not.toHaveBeenCalled();
+  });
+
+  it("nimmt das HTML aus der Zwischenablage mit, nicht nur den Text", async () => {
+    readPage.mockResolvedValue({ felder: {}, beschreibung: "", bilder: [] });
+
+    const w = atSource();
+    await w.find('input[value="paste"]').setValue();
+    await flushPromises();
+
+    const field = w.find("#q-paste");
+    const html = "<html><meta property=\"og:latitude\" content=\"51.19\"><body>Baugrundstück in Lobstädt, 1.025 m²</body></html>";
+    await field.trigger("paste", {
+      clipboardData: { getData: kind => (kind === "text/html" ? html : "Baugrundstück in Lobstädt, 1.025 m²") }
+    });
+    await typeInto(field, "Baugrundstück in Lobstädt, 1.025 m²");
+    await flushPromises();
+
+    expect(w.text()).toContain("Das HTML wurde übernommen");
+
+    await w.find("form").trigger("submit");
+    await flushPromises();
+
+    expect(readPage).toHaveBeenCalledWith(html);
+  });
+
+  it("vergisst das HTML, sobald das Feld geleert wird", async () => {
+    readPage.mockResolvedValue({ felder: {}, beschreibung: "", bilder: [] });
+
+    const w = atSource();
+    await w.find('input[value="paste"]').setValue();
+    await flushPromises();
+
+    const field = w.find("#q-paste");
+    await field.trigger("paste", {
+      clipboardData: { getData: () => "<html>die vorige Seite</html>" }
+    });
+    await typeInto(field, "die vorige Seite");
+    await typeInto(field, "");
+    await typeInto(field, "Ein ganz anderer Text, von Hand getippt und lang genug.");
+    await flushPromises();
+
+    await w.find("form").trigger("submit");
+    await flushPromises();
+
+    expect(readPage).toHaveBeenCalledWith("Ein ganz anderer Text, von Hand getippt und lang genug.");
   });
 });

@@ -15,7 +15,8 @@ import {
   MIN_HALF_WIDTH_M, StepQueue, boundsOf, contains, contextOpacity,
   evidenceOpacity, frameFor, halfExtentsM, padBounds, unionBounds
 } from "../src/lib/evidence.js";
-import { runSearch, splitLines, verdictSentence } from "../src/lib/search.js";
+import { queryFromFields, runSearch, splitLines, verdictSentence } from "../src/lib/search.js";
+import { parseGermanNumber } from "../src/lib/format.js";
 import ParcelSearch from "../src/components/ParcelSearch.vue";
 
 const EVENTS = STREAM.split("\n").filter(Boolean).map(line => JSON.parse(line));
@@ -234,6 +235,48 @@ describe("Der Ergebnissatz", () => {
 
     expect(sentence).toContain("Kein Flurstück gefunden");
     expect(sentence).not.toContain("x");
+  });
+});
+
+describe("Gelesene Werte als Suchanfrage", () => {
+  /** The bug this covers made every Kleinanzeigen listing answer 422: the
+   *  coordinate 51.189265 had its dot stripped as a thousands separator and
+   *  went out as 51189265, which the endpoint rejects at `le=90`. */
+  it("liest den Punkt einer Koordinate als Komma, nicht als Tausendertrennung", () => {
+    expect(parseGermanNumber("51.189265")).toBe(51.189265);
+    expect(parseGermanNumber("12.4076")).toBe(12.4076);
+    expect(parseGermanNumber(51.189265)).toBe(51.189265);
+  });
+
+  it("liest den Punkt einer Fläche als Tausendertrennung", () => {
+    expect(parseGermanNumber("1.025")).toBe(1025);
+    expect(parseGermanNumber("1.025 m²")).toBe(1025);
+    expect(parseGermanNumber("80.000 €")).toBe(80000);
+    // Ein Komma entscheidet die Frage von selbst.
+    expect(parseGermanNumber("1.025,50")).toBe(1025.5);
+  });
+
+  it("gibt null zurück, wo keine Zahl steht", () => {
+    expect(parseGermanNumber("")).toBeNull();
+    expect(parseGermanNumber(null)).toBeNull();
+    expect(parseGermanNumber("auf Anfrage")).toBeNull();
+  });
+
+  it("schickt die Koordinate unverändert in die Anfrage", () => {
+    const fields = [
+      { key: "adresse", value: "Ortsteil Lobstädt bei Neukieritzsch" },
+      { key: "lat", value: "51.189265" },
+      { key: "lon", value: "12.4076" },
+      { key: "grundstuecksflaeche_m2", value: "1.025" }
+    ];
+
+    const query = queryFromFields(fields);
+
+    expect(query.lat).toBe(51.189265);
+    expect(query.lon).toBe(12.4076);
+    expect(query.flaeche_m2).toBe(1025);
+    // Die Schreibweise bleibt erhalten: aus ihr leitet die Suche die Toleranz ab.
+    expect(query.flaeche_text).toBe("1.025");
   });
 });
 
