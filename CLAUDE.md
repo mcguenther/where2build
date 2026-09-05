@@ -535,10 +535,37 @@ from the user directly. Reopen only if the user asks.
   has nothing at 300 m and one at 400 m, so the answer is "300–400 m". A single
   figure out of that would be a measurement nobody made.
 - **A shared class in a scoped `<style>` is styled in exactly one view.**
-  `.value-list` lived in `PlotView.vue`, so the same markup on the location
-  page rendered as an unstyled `<dl>` with every label above its value. Vue's
-  `[data-v-…]` attribute is per component: anything more than one view uses
-  belongs in `base.css`.
+  Vue's `[data-v-…]` attribute is per component, so the app's page furniture —
+  `.breadcrumb`, `.page-head`, `.page-head__sub`, `.plan-bar`, `.button-group`,
+  `.toggle`, `.plan-foot`, `.value-list`, `.missing` — was declared in
+  `PlotView.vue` and *copied* into six other views. The views that never copied
+  it rendered the same markup unstyled: the surroundings map and the location
+  record had a breadcrumb without separators, a page head whose buttons dropped
+  under the text, and raw browser buttons in the map toolbar. They now live in
+  `base.css` once; a view that wants another measure overrides the one
+  declaration it cares about. Anything a second view uses belongs there.
+- **ALKIS delivers counter-clockwise rings, and ArcGIS reads one as a *hole*.**
+  A polygon that is nothing but a hole has no area to buffer, so every
+  `distance` query on it answers `{"code": 400, "message": ""}` — an empty
+  message that says nothing about why. Measured 05.09.2026: Flurstück 263/7
+  (86 m², 5 points) failed that way on the borehole and protected-area layers at
+  *every* radius from 50 m up, and the same ring reversed returned 114
+  boreholes; Flurstück 204 (650 m²) answered either way, which is what kept it
+  hidden. `services/luis.py` orients every ring clockwise before it goes out.
+- **A template reference to a computed that does not exist crashes the view,
+  and Vue then renders nothing at all.** `WizardView` read `draftBuilding.width`
+  in the branch that says the footprint fits nowhere, and nothing ever defined
+  `draftBuilding` — so the one plot that needed the message got an empty page
+  under the header instead. A `v-if` around the branch is what let it survive:
+  it only ever ran for a parcel too small for the default footprint.
+- **An absolutely positioned dropdown inside a `.panel` is clipped.** `.panel`
+  carries `overflow: hidden` to keep map canvases off its rounded corners, so
+  the search suggestions were cut after the first row. The list is in the flow
+  instead — it pushes the hint down, and no ancestor can cut it.
+- **Chromium hides a closed `<details>` through `::details-content`.** Forcing
+  `display: block` on the children is not enough for print; the pseudo-element
+  needs `content-visibility: visible`. Both spellings are in `print.css`, since
+  older builds hide the children directly.
 
 ## Commands
 
@@ -587,8 +614,8 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 443 passed, 1 skipped
-- `vitest`: 450 passed — plus the integration file, excluded by `npm run test`
+- `pytest`: 446 passed, 1 skipped
+- `vitest`: 452 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
 - `scripts/screenshots.mjs`: 47 images plus two print PDFs. It fails on console
   errors, on horizontal overflow, and if not a single vector tile arrived. It

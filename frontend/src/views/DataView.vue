@@ -141,7 +141,7 @@ export default {
 </script>
 
 <style scoped>
-.page-head__sub{ margin-top: var(--w2b-space-2); color: var(--w2b-graphite); font-size: var(--w2b-text-s); max-width: 68ch; }
+.page-head__sub{ max-width: 68ch; }
 .hint{ font-size: var(--w2b-text-s); color: var(--w2b-graphite); }
 .two-columns{ display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--w2b-space-4); align-items: start; }
 .data-field{ min-height: 210px; font-size: 11.5px; line-height: 1.5; }

@@ -928,6 +928,9 @@ class Baugrund(BaseModel):
     luftkapazitaet_stufe: str | None = None
     bohrungen_umkreis: int = 0
     bohrungen_naher_umkreis: int = 0
+    # Whether the borehole layer answered at all. Without it, a refused query
+    # and a genuinely undrilled neighbourhood both arrive as zero.
+    bohrungen_gefragt: bool = True
     umkreis_m: int
     naher_umkreis_m: int
     naechste: Bohrung | None = None

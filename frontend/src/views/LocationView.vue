@@ -80,14 +80,15 @@
       </aside>
 
       <section class="panel location-grid__map">
-        <div class="layer-bar no-print">
-          <span class="layer-bar__label">Grund</span>
+        <div class="plan-bar no-print">
+          <span class="plan-bar__label">Grund</span>
           <div class="button-group" role="group" aria-label="Kartenhintergrund">
             <button v-for="b in backdrops" :key="b.id" type="button"
                     :aria-pressed="String(backdrop === b.id)"
                     @click="backdrop = b.id">{{ b.name }}</button>
           </div>
           <div class="spacer"></div>
+          <span class="plan-bar__label">Ebene</span>
           <button type="button" class="toggle" :aria-pressed="String(Boolean(overlay))"
                   @click="toggleNoise">Lärm</button>
         </div>
@@ -212,7 +213,10 @@ export default {
 }
 
 .location-grid__facts{ display: grid; gap: var(--w2b-space-4); align-content: start; }
-.location-grid__map{ padding: var(--w2b-space-3); overflow: hidden; }
+/* No padding: the bar and the source line sit flush against the panel's edges
+   and are separated by rules, like the plan frame on the plot page. */
+.location-grid__map{ overflow: hidden; }
+.location-grid__map :deep(.site-plan){ display: block; }
 /* The column of checks is several times taller than the map. Sticky keeps the
    plot in view while its record is read — which is the whole point of giving
    the map the larger half. */
@@ -220,29 +224,25 @@ export default {
   .location-grid__map{ position: sticky; top: var(--w2b-space-3); }
 }
 
-.layer-bar{
-  display: flex; align-items: center; gap: var(--w2b-space-2);
-  flex-wrap: wrap; margin-bottom: var(--w2b-space-3);
+.location-page__empty{
+  margin: 0; padding: 0 var(--w2b-space-4) var(--w2b-space-4);
+  color: var(--w2b-muted); font-size: var(--w2b-text-s);
 }
-.layer-bar__label{
-  font-family: var(--w2b-font-display); font-weight: 600;
-  font-size: var(--w2b-text-xs); color: var(--w2b-muted);
-}
-
-.location-page__empty{ margin: 0; color: var(--w2b-muted); font-size: var(--w2b-text-s); }
 .location-page__value{
-  margin: 0 0 var(--w2b-space-2); font-family: var(--w2b-font-display);
+  margin: 0; padding: var(--w2b-space-3) var(--w2b-space-4) var(--w2b-space-2);
+  font-family: var(--w2b-font-display);
   font-weight: 700; font-size: 30px; letter-spacing: -.02em; line-height: 1;
 }
 .location-page__value small{ font-size: 15px; font-weight: 600; color: var(--w2b-muted); }
 .location-page__note{
-  margin: var(--w2b-space-2) 0 0; font-size: var(--w2b-text-xs);
-  color: var(--w2b-graphite); line-height: 1.5;
+  margin: 0; padding: var(--w2b-space-3) var(--w2b-space-4);
+  border-top: 1px solid var(--w2b-line-faint);
+  font-size: var(--w2b-text-xs); color: var(--w2b-graphite); line-height: 1.5;
 }
 
 .key{
-  margin-top: var(--w2b-space-3); padding-top: var(--w2b-space-3);
-  border-top: 1px solid var(--w2b-line-faint);
+  padding: var(--w2b-space-3);
+  border-top: 1px solid var(--w2b-line);
 }
 .key__head{ margin: 0 0 6px; font-size: var(--w2b-text-xs); color: var(--w2b-muted); }
 .key__bands{
@@ -256,12 +256,5 @@ export default {
 .key__note{
   margin: 8px 0 0; font-size: var(--w2b-text-xs); color: var(--w2b-muted);
   max-width: 68ch; line-height: 1.5;
-}
-
-.plan-foot{
-  display: flex; justify-content: space-between; gap: var(--w2b-space-3); flex-wrap: wrap;
-  margin-top: var(--w2b-space-3); padding-top: var(--w2b-space-2);
-  border-top: 1px solid var(--w2b-line-faint);
-  font-family: var(--w2b-font-mono); font-size: 10.5px; color: var(--w2b-muted);
 }
 </style>

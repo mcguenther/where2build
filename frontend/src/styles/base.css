@@ -90,20 +90,6 @@ a{ color: var(--w2b-primary); text-underline-offset: 2px; text-decoration-thickn
 .panel__body{ padding: var(--w2b-space-4); }
 
 /* ---------- Chips ---------- */
-/* A label-and-value list inside a panel. Shared: the plot page, the location
-   record and the comparison all state figures this way, and a scoped copy in
-   one view left the same markup unstyled in the others. */
-.value-list{ margin: 0; display: grid; grid-template-columns: auto 1fr; }
-.value-list dt, .value-list dd{
-  padding: 8px var(--w2b-space-4); border-bottom: 1px solid var(--w2b-line-faint); margin: 0;
-  display: flex; align-items: center;
-}
-.value-list dt{ font-size: var(--w2b-text-s); color: var(--w2b-graphite); }
-.value-list dd{ justify-content: flex-end; gap: 6px; font-family: var(--w2b-font-mono); font-size: var(--w2b-text-s); font-variant-numeric: tabular-nums; }
-.value-list dt:last-of-type, .value-list dd:last-of-type{ border-bottom: 0; }
-
-.faint{ color: var(--w2b-muted); font-size: var(--w2b-text-xs); }
-
 .chip{
   display: inline-block;
   padding: 2px 9px;
@@ -122,6 +108,76 @@ a{ color: var(--w2b-primary); text-underline-offset: 2px; text-decoration-thickn
 .chip--brass{ background: var(--w2b-secondary-light); color: var(--w2b-secondary-text); }
 /* A missing figure is not a verdict: no traffic-light colour for it. */
 .chip--unknown{ background: var(--w2b-surface-sunken); color: var(--w2b-muted); }
+
+/* ---------- Page furniture ----------
+   Breadcrumb, page head, the map toolbar and the "nothing here" panel. Shared
+   on purpose: a scoped `<style>` puts a `[data-v-…]` attribute on every
+   selector, so a class defined in one view styles that view alone. These were
+   declared in `PlotView.vue` and copied into six others, and the views that
+   never copied them — the surroundings map, the data page, the location record
+   — rendered the same markup unstyled: a breadcrumb without its separators, a
+   page head whose buttons dropped below the text, and raw browser buttons in
+   the map toolbar. One definition, here. A view that wants a different measure
+   overrides the one declaration it cares about. */
+
+.breadcrumb{ display: flex; align-items: center; gap: var(--w2b-space-2); font-size: var(--w2b-text-xs); color: var(--w2b-muted); }
+.breadcrumb a{ color: var(--w2b-primary); text-decoration: none; }
+.breadcrumb a:hover{ text-decoration: underline; }
+
+.page-head{ display: flex; align-items: flex-end; gap: var(--w2b-space-4); flex-wrap: wrap; }
+.page-head__sub{ margin-top: var(--w2b-space-2); color: var(--w2b-graphite); font-size: var(--w2b-text-s); max-width: 66ch; }
+.page-head__note{ margin-top: var(--w2b-space-1); color: var(--w2b-muted); font-size: var(--w2b-text-s); font-style: italic; }
+
+.panel__footnote{ padding: var(--w2b-space-3) var(--w2b-space-4); border-top: 1px solid var(--w2b-line-faint); font-size: var(--w2b-text-xs); color: var(--w2b-muted); }
+
+/* The bar above a map, its buttons, and the source line under it. */
+.plan-bar{
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: var(--w2b-space-2) var(--w2b-space-3); border-bottom: 1px solid var(--w2b-line);
+}
+.plan-bar__label{
+  font-family: var(--w2b-font-display); font-weight: 600; font-size: 10.5px;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--w2b-muted); margin-left: 4px;
+}
+.button-group{ display: flex; border: 1px solid var(--w2b-line); border-radius: var(--w2b-radius-s); overflow: hidden; }
+.button-group button, .toggle{
+  background: var(--w2b-surface); border: 0; cursor: pointer; padding: 5px 11px;
+  font-family: var(--w2b-font-display); font-weight: 600; font-size: var(--w2b-text-xs);
+  color: var(--w2b-muted);
+}
+.button-group button + button{ border-left: 1px solid var(--w2b-line); }
+.toggle{ border: 1px solid var(--w2b-line); border-radius: var(--w2b-radius-s); }
+.button-group button[aria-pressed="true"], .toggle[aria-pressed="true"]{
+  background: var(--w2b-primary); color: var(--w2b-primary-on);
+}
+.button-group button:disabled, .toggle:disabled{ opacity: .45; cursor: not-allowed; }
+.plan-foot{
+  display: flex; justify-content: space-between; gap: var(--w2b-space-3); flex-wrap: wrap;
+  padding: var(--w2b-space-2) var(--w2b-space-3); border-top: 1px solid var(--w2b-line);
+  font-family: var(--w2b-font-mono); font-size: 10.5px; color: var(--w2b-muted);
+}
+
+.missing{
+  border: 1px dashed var(--w2b-line); border-radius: var(--w2b-radius-m);
+  display: flex; flex-direction: column; align-items: center; gap: var(--w2b-space-3);
+  padding: var(--w2b-space-6) var(--w2b-space-5); text-align: center;
+}
+.missing p{ color: var(--w2b-muted); font-size: var(--w2b-text-s); }
+.missing .btn{ text-decoration: none; }
+
+/* A label-and-value list inside a panel. Shared: the plot page, the location
+   record and the comparison all state figures this way, and a scoped copy in
+   one view left the same markup unstyled in the others. */
+.value-list{ margin: 0; display: grid; grid-template-columns: auto 1fr; }
+.value-list dt, .value-list dd{
+  padding: 8px var(--w2b-space-4); border-bottom: 1px solid var(--w2b-line-faint); margin: 0;
+  display: flex; align-items: center;
+}
+.value-list dt{ font-size: var(--w2b-text-s); color: var(--w2b-graphite); }
+.value-list dd{ justify-content: flex-end; gap: 6px; font-family: var(--w2b-font-mono); font-size: var(--w2b-text-s); font-variant-numeric: tabular-nums; }
+.value-list dt:last-of-type, .value-list dd:last-of-type{ border-bottom: 0; }
+
+.faint{ color: var(--w2b-muted); font-size: var(--w2b-text-xs); }
 
 /* ---------- Form fields ---------- */
 .field{ display: flex; flex-direction: column; gap: var(--w2b-space-1); }

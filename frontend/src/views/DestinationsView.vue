@@ -295,8 +295,6 @@ export default {
 </script>
 
 <style scoped>
-.page-head{ display: flex; align-items: flex-end; gap: var(--w2b-space-4); flex-wrap: wrap; }
-.page-head__sub{ margin-top: var(--w2b-space-2); color: var(--w2b-graphite); font-size: var(--w2b-text-s); max-width: 66ch; }
 .destination-list{ display: flex; flex-direction: column; }
 .destination-row{ padding: var(--w2b-space-3) var(--w2b-space-4); border-bottom: 1px solid var(--w2b-line-faint); }
 .destination-row:last-child{ border-bottom: 0; }

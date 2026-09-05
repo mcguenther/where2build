@@ -404,3 +404,58 @@ def test_an_unreachable_uba_costs_the_air_row_and_no_more(client: TestClient):
     assert "Umweltbundesamt" in answer["luftqualitaet"]["fehler"]
     assert answer["luftqualitaet"]["station"] is None
     assert answer["laerm"]["tag"]["strasse"] == ["Lden5559", "Lden5054"]
+
+
+# --------------------------------------------------------------------------
+# The ring, as ArcGIS reads it
+# --------------------------------------------------------------------------
+
+
+@respx.mock
+def test_the_ring_goes_out_clockwise(client: TestClient):
+    """ALKIS delivers counter-clockwise rings and ArcGIS reads one of those as a
+    *hole*. Measured on 05.09.2026: an 86 m² parcel sent that way made every
+    `distance` query answer `{"code": 400, "message": ""}`, while the same ring
+    reversed returned 114 boreholes — and a 650 m² parcel survived either way,
+    which is what kept it hidden."""
+
+    route = luis_answers(moelkau_answers())
+    uba_answers()
+
+    check(client)
+
+    sent = json.loads(
+        httpx.QueryParams(route.calls[0].request.content.decode())["geometry"]
+    )["rings"][0]
+    twice_area = sum(
+        sent[i][0] * sent[i + 1][1] - sent[i + 1][0] * sent[i][1]
+        for i in range(len(sent) - 1)
+    )
+    assert twice_area < 0, "counter-clockwise: ArcGIS would take this for a hole"
+    # Same points, same count — only the direction is ours to choose.
+    assert len(sent) == len(MOELKAU_RING)
+
+
+@respx.mock
+def test_a_refused_borehole_query_leaves_the_soil_answer_standing(client: TestClient):
+    def dispatch(request: httpx.Request) -> httpx.Response:
+        service, layer = _layer_of(request)
+        if service == L.BOREHOLE_SERVICE:
+            # How this service refuses: HTTP 200, an error with no message.
+            return httpx.Response(200, json={"error": {"code": 400, "message": "", "details": []}})
+        body = moelkau_answers().get((service, layer), EMPTY)
+        if b"returnCountOnly=true" in request.content:
+            body = {"count": len(body.get("features", []))}
+        return httpx.Response(200, json=body)
+
+    respx.post(url__startswith=LUIS_URL).mock(side_effect=dispatch)
+    uba_answers()
+
+    baugrund = check(client)["baugrund"]
+
+    assert baugrund["bodenart_text"].startswith("Hortisol")
+    assert baugrund["luftkapazitaet_stufe"] == "LK_IV"
+    # Zero boreholes and an unanswered layer are different statements.
+    assert baugrund["bohrungen_gefragt"] is False
+    assert baugrund["bohrungen_umkreis"] == 0
+    assert baugrund["fehler"] is None

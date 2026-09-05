@@ -23,8 +23,7 @@ export default { name: "NotFoundView" };
 </script>
 
 <style scoped>
-.page-head{ display: flex; align-items: flex-end; gap: var(--w2b-space-4); flex-wrap: wrap; }
-.page-head__sub{ margin-top: var(--w2b-space-2); color: var(--w2b-graphite); max-width: 62ch; font-size: var(--w2b-text-s); }
+.page-head__sub{ max-width: 62ch; }
 .page-head__sub .mono{ overflow-wrap: anywhere; }
 .empty-card{
   border: 1px dashed var(--w2b-line); border-radius: var(--w2b-radius-m);

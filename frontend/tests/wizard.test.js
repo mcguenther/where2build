@@ -8,10 +8,11 @@
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
+import { nextTick } from "vue";
 import CadastralDistrictPicker from "../src/components/CadastralDistrictPicker.vue";
 import WizardView from "../src/views/WizardView.vue";
 import { state } from "../src/lib/store.js";
-import { realState, mountWithRouter } from "./helpers.js";
+import { realState, realPlot, mountWithRouter } from "./helpers.js";
 import directory from "./fixtures/gemarkungen.json";
 import moelkau from "./fixtures/parcel-moelkau.json";
 
@@ -215,5 +216,29 @@ describe("Aufnahme — Schritt Quelle", () => {
     await flushPromises();
 
     expect(resolveParcel).toHaveBeenCalledWith({ gemarkung: "Moritzburg", flurstuecksnummer: "85/1" });
+  });
+});
+
+describe("Der Schritt „Flurstück“", () => {
+  /* The template has read `draftBuilding` since this step existed and nothing
+     ever defined it, so the one plot that needed the message — a footprint that
+     fits nowhere — crashed the render instead of showing it, and the wizard
+     came out as an empty page under the header. */
+  it("sagt, dass der Baukörper nirgends passt, statt leer zu bleiben", async () => {
+    const wizard = mountWithRouter(WizardView, {
+      path: "/aufnahme/flurstueck", props: { stage: "flurstueck" }
+    });
+    // A parcel too small for any footprint: 86 m² is what Lilienweg 25 measures.
+    wizard.vm.draft = realPlot("moelkau");
+    wizard.vm.draft.polygon = [
+      { x: 0, y: 0 }, { x: 6, y: 0 }, { x: 6, y: 4 }, { x: 0, y: 4 }
+    ];
+    wizard.vm.draft.setbacks = wizard.vm.draft.polygon.map(() => 3);
+    wizard.vm.houseSeated = false;
+    await nextTick();
+
+    expect(wizard.text()).toContain("kein Platz");
+    expect(wizard.text()).toMatch(/\d+,\d+ × \d+,\d+ m/);
+    wizard.unmount();
   });
 });

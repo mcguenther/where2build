@@ -140,6 +140,28 @@ _BOREHOLE_LABEL = "AKBEZ"
 _BOREHOLE_URL = "URL"
 
 
+def _clockwise(ring: Sequence[tuple[float, float]]) -> list[tuple[float, float]]:
+    """The ring the way ArcGIS reads an outer boundary: clockwise.
+
+    ALKIS delivers counter-clockwise rings, and ArcGIS takes one of those for a
+    *hole* -- a polygon that is nothing but a hole has no area to work with.
+    Measured on 05.09.2026: Flurstück 263/7 in Mölkau (86 m², 5 points) makes
+    every ``distance`` query on the borehole and protected-area layers answer
+    ``{"code": 400, "message": ""}``; the same ring reversed answers with 114
+    boreholes. Flurstück 204 (650 m²) survives either way, which is exactly what
+    makes this worth doing centrally -- the fault shows on some parcels and not
+    on others, and the empty error message says nothing about why.
+    """
+
+    points = list(ring)
+    # Shoelace, in a right-handed frame: positive means counter-clockwise.
+    twice_area = sum(
+        points[i][0] * points[i + 1][1] - points[i + 1][0] * points[i][1]
+        for i in range(len(points) - 1)
+    )
+    return points[::-1] if twice_area > 0 else points
+
+
 def _name_of(attributes: dict[str, Any]) -> str | None:
     """The area's own name, whichever field this service keeps it in."""
 
@@ -191,7 +213,7 @@ class LuisService:
         """
 
         geometry = {
-            "rings": [[[x, y] for x, y in ring]],
+            "rings": [[[x, y] for x, y in _clockwise(ring)]],
             "spatialReference": {"wkid": self.settings.srid},
         }
         params = {
@@ -395,15 +417,30 @@ class LuisService:
         is not a ground investigation.
         """
 
-        soil, capacity, boreholes = await asyncio.gather(
+        # Three separate facts, so three separate failures: a borehole query the
+        # service refuses must not take the soil classification with it. Only an
+        # upstream failure counts as a missing part -- a bug in here keeps
+        # travelling rather than reading as "the authority did not answer".
+        answers = await asyncio.gather(
             self._features(SOIL_SERVICE, SOIL_LAYER, ring, out_fields=_SOIL_TEXT_FIELD),
             self._features(
-                SOIL_PARAMETER_SERVICE, SOIL_PARAMETER_LAYER, ring, out_fields=_AIR_CAPACITY_FIELD
+                SOIL_PARAMETER_SERVICE, SOIL_PARAMETER_LAYER, ring,
+                out_fields=_AIR_CAPACITY_FIELD,
             ),
             self._features(
-                BOREHOLE_SERVICE, BOREHOLE_LAYER, ring, distance_m=self.settings.borehole_radius_m
+                BOREHOLE_SERVICE, BOREHOLE_LAYER, ring,
+                distance_m=self.settings.borehole_radius_m,
             ),
+            return_exceptions=True,
         )
+        for answer in answers:
+            if isinstance(answer, BaseException) and not isinstance(answer, AppError):
+                raise answer
+        soil, capacity, boreholes = [
+            [] if isinstance(answer, BaseException) else answer for answer in answers
+        ]
+        # "0 boreholes" and "nobody answered" are different sentences.
+        boreholes_answered = not isinstance(answers[2], BaseException)
         outline = Polygon(ring)
         near_radius = self.settings.borehole_near_radius_m
 
@@ -435,6 +472,7 @@ class LuisService:
             bohrungen_naher_umkreis=sum(1 for distance, _ in measured if distance <= near_radius),
             umkreis_m=self.settings.borehole_radius_m,
             naher_umkreis_m=near_radius,
+            bohrungen_gefragt=boreholes_answered,
             naechste=measured[0][1] if measured else None,
             tiefste=(
                 max(with_depth, key=lambda entry: entry[1].endteufe_m or 0)[1]

@@ -320,6 +320,11 @@ export default {
       return this.pastedText.trim().length > 20;
     },
     computedArea() { return this.draft ? polygonArea(this.draft.polygon) : 0; },
+    /** The footprint this draft carries, for the sentence that says it found
+     *  no room. Read by the template since this step existed, and defined
+     *  nowhere — so the one plot that needed the message crashed the step
+     *  instead of showing it, and the wizard rendered an empty page. */
+    draftBuilding() { return this.draft ? placement(this.draft) : null; },
     /** What the cadastre is asked for: the key of the chosen entry, which is
      *  unambiguous where two districts share a name, else the plain text. */
     gemarkungQuery() { return this.gemarkungEntry?.schluessel || this.gemarkung.trim(); }
@@ -475,10 +480,6 @@ export default {
 <style scoped>
 .doubt-note{ display: block; line-height: 1.5; }
 .doubt-note b{ display: block; margin-bottom: 2px; }
-.breadcrumb{ display: flex; align-items: center; gap: var(--w2b-space-2); font-size: var(--w2b-text-xs); color: var(--w2b-muted); }
-.breadcrumb a{ color: var(--w2b-primary); text-decoration: none; }
-.breadcrumb a:hover{ text-decoration: underline; }
-.page-head{ display: flex; align-items: flex-end; gap: var(--w2b-space-4); flex-wrap: wrap; }
 .subtitle{ color: var(--w2b-graphite); font-size: var(--w2b-text-s); max-width: 70ch; }
 .hint{ color: var(--w2b-muted); font-size: var(--w2b-text-s); }
 
@@ -536,5 +537,6 @@ export default {
 .value-list dt, .value-list dd{ padding: 8px var(--w2b-space-4); border-bottom: 1px solid var(--w2b-line-faint); margin: 0; display: flex; align-items: center; }
 .value-list dt{ font-size: var(--w2b-text-s); color: var(--w2b-graphite); }
 .value-list dd{ justify-content: flex-end; font-family: var(--w2b-font-mono); font-size: var(--w2b-text-s); font-variant-numeric: tabular-nums; text-align: right; }
-.panel__footnote{ padding: var(--w2b-space-3) var(--w2b-space-4); font-size: var(--w2b-text-xs); color: var(--w2b-muted); }
+/* No rule above it here: the value list it follows is the panel's whole body. */
+.panel__footnote{ border-top: 0; }
 </style>

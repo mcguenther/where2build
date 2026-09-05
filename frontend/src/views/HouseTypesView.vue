@@ -236,8 +236,7 @@ export default {
 </script>
 
 <style scoped>
-.page-head{ display: flex; align-items: flex-end; gap: var(--w2b-space-4); flex-wrap: wrap; }
-.page-head__sub{ margin-top: var(--w2b-space-2); color: var(--w2b-graphite); font-size: var(--w2b-text-s); max-width: 70ch; }
+.page-head__sub{ max-width: 70ch; }
 .hint{ font-size: var(--w2b-text-s); color: var(--w2b-graphite); }
 .faint{ color: var(--w2b-muted); }
 .intake{ display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--w2b-space-4); align-items: start; }

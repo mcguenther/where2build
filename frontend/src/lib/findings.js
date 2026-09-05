@@ -336,11 +336,12 @@ export function classifySoil(soilText, airCapacityClass = null) {
  *
  * @param {{soilText: string, airCapacityClass: string, boreholes: number,
  *          radiusM: number, nearestM: number, nearestDepthM: number,
- *          deepest: Object}} data
+ *          deepest: Object, boreholesAsked: boolean}} data
  */
 export function groundFinding(data) {
   const { soilText = null, airCapacityClass = null, boreholes = 0, radiusM = 300,
-          nearestM = null, nearestDepthM = null, deepest = null } = data ?? {};
+          nearestM = null, nearestDepthM = null, deepest = null,
+          boreholesAsked = true } = data ?? {};
   if (!soilText && !boreholes) {
     return { status: OPEN, value: "—", text: "Keine Bodenkarte und keine Aufschlussdaten am Ort." };
   }
@@ -356,6 +357,11 @@ export function groundFinding(data) {
     if (deepest?.depthM) {
       parts.push(`Tiefste in der Nähe ${num(deepest.depthM, 0)} m${deepest.year ? ` (${deepest.year})` : ""}.`);
     }
+  }
+  // A query the service refused and a neighbourhood nobody has drilled both
+  // arrive as zero; only one of them is a statement about this plot.
+  if (!boreholesAsked) {
+    parts.push("Zu den Bohrungen in der Umgebung hat die Aufschlussdatenbank nicht geantwortet.");
   }
   parts.push("Die Bodenkarte 1:50.000 ersetzt keine Baugrunduntersuchung.");
   return {

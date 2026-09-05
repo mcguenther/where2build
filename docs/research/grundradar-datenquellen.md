@@ -637,3 +637,32 @@ Leitersuche (100 · 200 · 300 · 400 · 500 · 750 · 1 000 m), binär durchsuc
 drei Abfragen statt sieben — und wird als Spanne ausgegeben. Für Mölkau 204:
 bei 300 m null Treffer, bei 400 m einer, also **300–400 m**. Eine Einzelzahl
 daraus wäre erfunden.
+
+## 25. Die Ringorientierung entscheidet, ob eine Umkreisabfrage antwortet
+
+Beim Einbau aufgefallen und am 05.09.2026 nachgemessen. ALKIS liefert die
+Flurstücksringe **gegen den Uhrzeigersinn**; ArcGIS liest so einen Ring als
+**Loch**. Ein Polygon, das nur aus einem Loch besteht, hat keine Fläche, um die
+herum gepuffert werden könnte — die Antwort ist `{"code": 400, "message": ""}`,
+also ein Fehler ohne Begründung.
+
+| Flurstück | Fläche | Ring wie geliefert | Ring umgedreht |
+| --- | --- | --- | --- |
+| Mölkau **204** | 650 m² | 96 Bohrungen | 96 Bohrungen |
+| Mölkau **263/7** (Lilienweg 25) | 86 m² | **400, leere Meldung** | **114 Bohrungen** |
+
+Bei 263/7 scheitert **jede** `distance`-Abfrage, von 50 m an, und zwar auf
+`geologie/bohrungen` wie auf allen sechs Ebenen von `natur/schutzgebiete`.
+Ohne `distance` antwortet dieselbe Geometrie normal, und `distance` ohne
+`units` wird stillschweigend ignoriert (Mölkau 204 gibt dann 0 statt 96).
+
+Das ist die unangenehmste Sorte Fehler: er hängt an der Geometrie, nicht am
+Aufruf, tritt bei einem großen Flurstück nicht auf und sagt nicht, woran er
+liegt. `services/luis.py` dreht deshalb jeden Ring vor dem Absenden in den
+Uhrzeigersinn.
+
+**Folge für die Anzeige:** eine abgewiesene Bohrungsabfrage darf nicht als
+„0 Bohrungen" erscheinen. Der Block trägt jetzt `bohrungen_gefragt`, und der
+Prüftext sagt „Zu den Bohrungen in der Umgebung hat die Aufschlussdatenbank
+nicht geantwortet" statt zu schweigen — die Bodenkarte, die sehr wohl
+geantwortet hat, bleibt daneben stehen.

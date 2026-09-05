@@ -123,6 +123,7 @@ export function siteFindings(answer) {
         soilText: answer.baugrund?.bodenart_text ?? null,
         airCapacityClass: answer.baugrund?.luftkapazitaet_stufe ?? null,
         boreholes: answer.baugrund?.bohrungen_naher_umkreis ?? 0,
+        boreholesAsked: answer.baugrund?.bohrungen_gefragt !== false,
         radiusM: answer.baugrund?.naher_umkreis_m ?? 300,
         nearestM: answer.baugrund?.naechste?.entfernung_m ?? null,
         nearestDepthM: answer.baugrund?.naechste?.endteufe_m ?? null,

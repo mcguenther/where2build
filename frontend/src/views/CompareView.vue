@@ -129,11 +129,6 @@ export default {
 </script>
 
 <style scoped>
-.breadcrumb{ display: flex; align-items: center; gap: var(--w2b-space-2); font-size: var(--w2b-text-xs); color: var(--w2b-muted); }
-.breadcrumb a{ color: var(--w2b-primary); text-decoration: none; }
-.breadcrumb a:hover{ text-decoration: underline; }
-.page-head{ display: flex; align-items: flex-end; gap: var(--w2b-space-4); flex-wrap: wrap; }
-.page-head__sub{ margin-top: var(--w2b-space-2); color: var(--w2b-graphite); font-size: var(--w2b-text-s); max-width: 66ch; }
 .faint{ color: var(--w2b-muted); font-size: var(--w2b-text-xs); }
 .plan-figures{ display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: var(--w2b-space-4); }
 .plan-figure{ margin: 0; display: flex; flex-direction: column; gap: var(--w2b-space-2); }

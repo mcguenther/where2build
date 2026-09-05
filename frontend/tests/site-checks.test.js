@@ -84,6 +84,17 @@ describe("siteFindings", () => {
     expect(ground.detail).toContain("Hortisol");
   });
 
+  it("says when the drilling record did not answer, rather than showing a zero", () => {
+    const silent = siteFindings(withBlock("baugrund", {
+      bohrungen_gefragt: false, bohrungen_umkreis: 0, bohrungen_naher_umkreis: 0
+    }));
+    const ground = find(silent, "baugrund").finding;
+    expect(ground.text).toContain("Gemischter Boden");
+    expect(ground.text).toContain("nicht geantwortet");
+    // Never "0 Bohrungen": that would be a statement about the neighbourhood.
+    expect(ground.text).not.toMatch(/0 Bohrungen/);
+  });
+
   it("says why the station that answered is not the nearest one", () => {
     const air = find(checks, "luftqualitaet").finding;
     expect(air.text).toContain("Leipzig-Mitte");

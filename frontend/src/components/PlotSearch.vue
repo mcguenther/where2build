@@ -167,9 +167,13 @@ export default {
         return "Die Adressen kommen aus den amtlichen Hauskoordinaten des GeoSN, nicht von "
           + "einem fremden Dienst.";
       }
-      if (this.reading.kind === "ambiguous" && this.hits.length) {
-        return "„Lessingweg 44“ und „Mölkau 204“ haben dieselbe Form — beide Verzeichnisse "
-          + "wurden gefragt.";
+      // Only where both readings actually produced a row: "Lilienweg 25 Leipzig"
+      // is ambiguous by shape too, but nothing offered it as a parcel, and
+      // saying so there explains a choice nobody was given.
+      const kinds = new Set(this.hits.map(hit => hit.kind));
+      if (kinds.has("Flurstück") && (kinds.has("Adresse") || kinds.has("Ort"))) {
+        return "„Lessingweg 44“ und „Mölkau 204“ haben dieselbe Form — deshalb stehen hier "
+          + "beide Lesarten, statt dass eine geraten wird.";
       }
       return this.hits.length ? "" : "Nichts gefunden. Postleitzahl oder Ort ergänzen hilft oft.";
     }
@@ -259,7 +263,7 @@ export default {
 </script>
 
 <style scoped>
-.search{ display: flex; flex-direction: column; gap: 6px; position: relative; }
+.search{ display: flex; flex-direction: column; gap: 6px; }
 .search label{
   font-family: var(--w2b-font-display); font-weight: 600;
   font-size: var(--w2b-text-xs); color: var(--w2b-muted);
@@ -283,23 +287,34 @@ export default {
 }
 .search__badge[data-certain="true"]{ background: var(--w2b-primary-veil); color: var(--w2b-primary-dark); }
 
+/* In the flow, not floating over it. A dropdown positioned absolutely is at
+   the mercy of every ancestor: `.panel` sets `overflow: hidden` to clip its
+   own rounded corners, which cut the list off after the first row. Pushing the
+   hint below it costs nothing here and cannot be clipped by anything. */
 .search__hits{
-  position: absolute; top: 100%; left: 0; right: 0; z-index: 20;
   margin: 4px 0 0; padding: 4px; list-style: none; max-height: 19rem; overflow-y: auto;
   background: var(--w2b-surface); border: 1px solid var(--w2b-line);
-  border-radius: var(--w2b-radius-s); box-shadow: var(--w2b-shadow-high);
+  border-radius: var(--w2b-radius-s);
 }
 .hit{
-  display: grid; grid-template-columns: 6.5rem 1fr; gap: 2px 10px;
-  padding: 7px 9px; border-radius: var(--w2b-radius-xs); cursor: pointer;
+  display: grid; grid-template-columns: 1fr auto; gap: 1px var(--w2b-space-3);
+  padding: 6px 9px; border-radius: var(--w2b-radius-xs); cursor: pointer;
+  align-items: baseline;
 }
+.hit + .hit{ border-top: 1px solid var(--w2b-line-faint); }
 .hit.is-active, .hit:hover{ background: var(--w2b-primary-veil); }
+.hit__name{ font-size: var(--w2b-text-s); font-weight: 600; line-height: 1.35; }
 .hit__kind{
-  grid-row: span 2; align-self: center;
-  font-family: var(--w2b-font-mono); font-size: 10.5px; color: var(--w2b-muted);
+  font-family: var(--w2b-font-mono); font-size: 10px; color: var(--w2b-muted);
+  text-align: right; white-space: nowrap;
 }
-.hit__name{ font-size: var(--w2b-text-s); font-weight: 600; }
-.hit__note{ font-size: var(--w2b-text-xs); color: var(--w2b-muted); }
+/* Under both, because a postcode and a district are the second line of an
+   address, not a column of their own. */
+.hit__note{
+  grid-column: 1 / -1; font-size: var(--w2b-text-xs); color: var(--w2b-muted);
+  line-height: 1.35;
+}
+.hit__note:empty{ display: none; }
 
 .search__hint{ margin: 0; font-size: var(--w2b-text-xs); color: var(--w2b-muted); max-width: 62ch; }
 .search__hint--warn{ color: var(--w2b-warning-text); }
