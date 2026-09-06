@@ -870,12 +870,12 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
   index builder wants). Six of the 493 need Tesseract and skip without it.
 - `vitest`: 469 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
-- `scripts/screenshots.mjs`: 51 images plus a print PDF. It fails on console
+- `scripts/screenshots.mjs`: 54 images plus a print PDF. It fails on console
   errors, on horizontal overflow, and if not a single vector tile arrived. It
   also drives the live geocoder, which is slow often enough to blow the 60 s
   wait on the destinations step — two runs failed there and the third passed
   with nothing changed. Re-run once before going looking for the bug.
-  The three `suche-*` images run a **real** search against ALKIS, so they need a
+  The `suche-*` images run a **real** search against ALKIS, so they need a
   backend on :8000 like every other picture here; without one the step reports
   "die Suche kam zu keinem Ergebnis" rather than passing quietly. The three
   `assistent-werte-*` images paste a saved advert

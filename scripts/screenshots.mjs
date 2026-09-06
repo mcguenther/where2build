@@ -112,6 +112,19 @@ const LISTING =
   + "Über die B107 erreichen Sie die ca. 6 km entfernte Kreisstadt Grimma. "
   + "Sehenswert sind das Kloster Nimbschen und die Schiffsmühle in Höfgen.";
 
+/* An advert this tool cannot serve, and the picture of it saying so. Advert
+ * 3381469778, shortened: the location field names Sachsen-Anhalt, „Brehna" is
+ * in no Saxon Gemarkung, and „Schulen in Roitzsch" names one that is — 100 km
+ * away, holding a parcel of exactly the stated 600 m². The run used to find
+ * it. */
+const FOREIGN_LISTING =
+  "Ihr Traum vom Eigenheim: 600 m² Baugrundstück in Brehna. "
+  + "Sachsen-Anhalt - Brehna. "
+  + "Das Grundstück liegt im Geltungsbereich des Bebauungsplans „Wiesewitz/Goethestraße“ "
+  + "OT Brehna der Gemeinde Sandersdorf-Brehna. "
+  + "Kindergarten und Grundschule finden sich im Ort, weiterführende Schulen in "
+  + "Roitzsch oder Bitterfeld sind in 10 bis 15 Autominuten erreichbar.";
+
 /* A saved advert, exactly as the portal served it — the same file the backend
    tests read. Pasting it is what a person does with Strg+A, Strg+C on a portal
    that refuses a server-side fetch, and everything the next step shows is read
@@ -209,6 +222,22 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
     problems.push(`${mode}/${width}: die Suche kam zu keinem Ergebnis`);
   }
   await shot(page, "suche-ergebnis", mode, narrow ? "-schmal" : "");
+
+  /* And a listing this tool cannot serve. It costs no cadastre request at all:
+     the location field names the state, and every Saxon answer would be
+     somebody else's parcel. */
+  await page.click(".breadcrumb a");
+  await page.click(".page-head .btn");
+  await page.getByText("Text durchsuchen").click();
+  await page.fill("#q-text", FOREIGN_LISTING);
+  await page.getByRole("button", { name: "Lesen" }).click();
+  try {
+    await page.waitForSelector(".suche__urteil--erfolglos", { timeout: 60000 });
+    await page.waitForTimeout(4000);
+  } catch {
+    problems.push(`${mode}/${width}: das Inserat außerhalb Sachsens wurde nicht als solches erkannt`);
+  }
+  await shot(page, "suche-ausserhalb", mode, narrow ? "-schmal" : "");
 
   /* The pasted page, and what was read off it. This is the way in for a portal
      that refuses a server-side fetch, and it needs no model either: price,
