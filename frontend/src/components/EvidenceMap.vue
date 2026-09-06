@@ -44,7 +44,7 @@
  * in `lib/evidence.js`, where it can be tested without a canvas.
  */
 import { Map as MapLibreMap, Marker, NavigationControl } from "maplibre-gl";
-import { vectorStyle } from "../lib/basemap.js";
+import { aerialCadastreStyle, canRenderMap, vectorStyle } from "../lib/basemap.js";
 import { darkTheme } from "../lib/store.js";
 import {
   FLIGHT_MS, boundsOf, contextOpacity, frameFor, isEmptyBounds, prefersReducedMotion
@@ -91,7 +91,12 @@ export default {
     /** The platform's pin, which is drawn struck through once refuted. */
     refutedPin: { type: Object, default: null },
     status: { type: String, default: null },
-    height: { type: Number, default: 460 }
+    height: { type: Number, default: 460 },
+    /** What lies under the drawing. `site` is the orthophoto with the roads
+     *  and the cadastral outlines over it — a listing's own photographs are
+     *  recognisable against that, which a street map cannot offer. `map` is
+     *  the vector basemap. */
+    ground: { type: String, default: "site" }
   },
   emits: ["select"],
   data() {
@@ -120,6 +125,9 @@ export default {
   beforeUnmount() { this.destroy(); },
   watch: {
     darkGround() { this.rebuild(); },
+    // MapLibre cannot swap a style under its own layers, so a different ground
+    // is a rebuild -- which keeps the camera, because `rebuild` saves it.
+    ground() { this.rebuild(); },
     candidates() { this.draw(); this.moveCamera(); },
     districtOutline() { this.draw(); },
     areas() { this.draw(); this.moveCamera(); },
@@ -129,8 +137,12 @@ export default {
   methods: {
     async build() {
       if (this._map) return;
+      if (!canRenderMap()) {
+        this.unavailable = "Diese Ansicht braucht WebGL, und der Browser bietet es nicht an.";
+        return;
+      }
       try {
-        const style = await vectorStyle();
+        const style = this.ground === "site" ? aerialCadastreStyle() : await vectorStyle();
         if (!this.$refs.mapContainer || this._map) return;
         this._map = new MapLibreMap({
           container: this.$refs.mapContainer,

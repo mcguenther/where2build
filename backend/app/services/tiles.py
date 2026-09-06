@@ -25,6 +25,18 @@ ADVICE = (
 class LayerConfig:
     url: str
     layers: str
+    # WMS `STYLES`. Empty means the service's own default, which is what every
+    # layer here wanted until the parcel outlines: those are meant to sit over
+    # an orthophoto, and the service offers a style for exactly that
+    # („In der Gelb-Darstellung werden keine Flaechen sondern nur Konturen
+    # dargestellt“).
+    styles: str = ""
+    # Below this zoom the service draws nothing. Not a rendering preference:
+    # `adv_alkis_flurstuecke` carries `MaxScaleDenominator: 2000` and answers
+    # HTTP 200 with a fully transparent PNG outside it -- measured at this
+    # parcel, z18 is 1:2133 and empty, z19 is 1:1066 and draws. Asking anyway
+    # spends a request and a cache entry on 854 bytes of nothing.
+    min_zoom: int = 0
 
 
 class TileService:
@@ -39,6 +51,15 @@ class TileService:
             "dop": LayerConfig(self.settings.dop_url, self.settings.dop_layers),
             "webatlas": LayerConfig(self.settings.webatlas_url, self.settings.webatlas_layers),
             "alkis": LayerConfig(self.settings.alkis_url, self.settings.alkis_layers),
+            # The two that make an orthophoto readable as a cadastral map:
+            # parcel outlines, and the roads with their names.
+            "flurstuecke": LayerConfig(
+                self.settings.alkis_url,
+                self.settings.parcel_layers,
+                styles=self.settings.parcel_styles,
+                min_zoom=self.settings.parcel_min_zoom,
+            ),
+            "strassen": LayerConfig(self.settings.webatlas_url, self.settings.street_layers),
         }
 
     def _config(self, layer: str) -> LayerConfig:
@@ -61,7 +82,7 @@ class TileService:
             "VERSION": "1.3.0",
             "REQUEST": "GetMap",
             "LAYERS": config.layers,
-            "STYLES": "",
+            "STYLES": config.styles,
             "CRS": self.settings.crs,
             "BBOX": geo.wms_bbox(self.settings.crs, z, x, y),
             "WIDTH": str(self.settings.tile_size),
@@ -75,6 +96,11 @@ class TileService:
 
         config = self._config(layer)
         self._check_tile(z, x, y)
+        if z < config.min_zoom:
+            raise BadRequestError(
+                f"Die Ebene „{layer}“ zeichnet erst ab Zoomstufe {config.min_zoom}; "
+                f"darunter liefert der Dienst ein leeres Bild."
+            )
         cache_key = f"{layer}/{self.settings.crs}/{z}/{x}/{y}"
         cached = self.cache.get_bytes(cache_key)
         if cached is not None:

@@ -250,11 +250,17 @@ from the user directly. Reopen only if the user asks.
   outside the OSM extract from being dropped. Costs, measured: 6 min of import
   at 5,6 GiB peak RSS, a 3,4 GB graph, 1,7 GiB to serve.
   See `docs/research/routing-motis.md` § 5.
-- **The backend's disk cache does not know which MOTIS answered.** Its key is
-  the request parameters alone, so changing `MOTIS_BASE_URL` keeps serving the
-  other instance's answers until `/cache/motis*` is deleted. Comparing the two
-  instances without clearing it reports a difference that is not there — and,
-  worse, an agreement that is not there either.
+- **A cache key that does not name what produced the answer outlives the fix.**
+  Twice now. The MOTIS cache was keyed on the request parameters alone, so
+  changing `MOTIS_BASE_URL` kept serving the other instance's answers until
+  `/cache/motis*` was deleted — reporting a difference between the two that was
+  not there and, worse, an agreement that was not there either. The extracted
+  listing was keyed on the URL alone *and* never expires (`ttl_s=None`), so an
+  answer written before the price parser existed was still being served after
+  it shipped, and the field stayed empty on exactly the listings the fix was
+  written for. Both now carry it in the key: `MotisService.instance` is a hash
+  of the base URL, `EXTRACTION_VERSION` is a number to bump whenever the
+  reader's *output* changes.
 - **The listing pin is the municipality, not the plot.** Measured on a real
   Kleinanzeigen ad (3499632623, 01.09.2026): `og:latitude/longitude` sat
   **6 235 m** from the parcel actually offered, because the platform geocodes
@@ -663,6 +669,40 @@ from the user directly. Reopen only if the user asks.
   when no address, no coordinate and no parcel number could be read at all.
   Emptying the field has to clear the kept HTML, or the next read silently
   ships the page pasted before.
+- **An optional dependency has to be optional in one place only.** The backend
+  image installed `.[poi]` and never `tesseract-ocr`, so every Compose
+  deployment reported „keine Bilderkennung eingerichtet“ while the code, the
+  tests and the README all said it was wired up. `apt-get install tesseract-ocr
+  tesseract-ocr-deu` plus `.[poi,ocr]`; the German data is not optional either,
+  because the patterns key on the words around the number.
+- **`adv_alkis_flurstuecke` carries `MaxScaleDenominator: 2000` and answers 200
+  with a transparent PNG above it.** Same shape as the ArcGIS `minScale` trap,
+  different service. Measured at Flurstück 790/11: z17 is 1:4265 and empty, z18
+  is 1:2133 and empty, **z19 is 1:1066 and draws**. Every style behaves the same
+  — it is the scale, not `STYLES` — and `STYLES=default` is rejected outright
+  while `STYLES=` (empty) is accepted. Its sibling layers are not affected:
+  `tatsaechliche_nutzung` and `gebaeude` draw at z18 in the same request. The
+  service's own overlay style is **`Gelb`**, which its abstract describes as
+  „keine Flaechen sondern nur Konturen“ — that is the one to put over an
+  orthophoto. Streets and their names come from the WebAtlas as
+  `Verkehr,Beschriftung`, transparent at every zoom from 13 to 19.
+- **A raster style needs no network, and that is what starts a MapLibre
+  instance where none can run.** The vector style is a `fetch`, so in jsdom it
+  failed and the map was never built; the orthophoto ground is assembled
+  locally, so `new MapLibreMap` ran, half-initialised without WebGL, and only
+  said so on the way out — `remove()` throwing inside the library, reported as
+  an unhandled rejection against whichever test file happened to be running.
+  `canRenderMap()` is asked first now. It is not only a test concern: a browser
+  with WebGL switched off did the same thing.
+- **Sorting the clues by confidence destroys the one thing the list is for.**
+  `ParcelSearch` re-sorted `indicia` on every event and kept the phase lines in
+  a separate `<ol>` underneath, so afterwards nobody could tell what came
+  first — which is what makes a run checkable at all. There is one numbered
+  `Verlauf` now, in arrival order, and every row that stands for something on
+  the map flies to it. The geometry is resolved when a row is *clicked*, not
+  when it was recorded: a clue arrives several steps before the outline it
+  names is fetched, so anything captured at the time is null for exactly the
+  rows worth clicking.
 - **jsdom does not submit a form from a dispatched click.** Wrapping the
   wizard's first step in a `<form>` (so Enter submits, as it does everywhere
   else) broke two tests that click the button, with no change to the component's
@@ -687,7 +727,7 @@ docker compose up --build      # http://localhost:8080
 # fetch-data.sh pulls the OSM extract and the DELFI GTFS; the first start
 # imports for ~3.5 min into the motis-graph volume, after that it is seconds.
 ./motis/fetch-data.sh
-MOTIS_BASE_URL=http://motis:8080 docker compose --profile local-routing up --build
+docker compose -f docker-compose.yml -f docker-compose.local-routing.yml up --build
 
 # reading a listing's attached cadastral extract -- optional, and the search
 # says so in /api/health when it is missing
@@ -722,11 +762,11 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 464 passed, 1 skipped (that one needs pyosmium, which only the
-  index builder wants). Three of the 464 need Tesseract and skip without it.
-- `vitest`: 453 passed — plus the integration file, excluded by `npm run test`
+- `pytest`: 472 passed, 1 skipped (that one needs pyosmium, which only the
+  index builder wants). Three of the 472 need Tesseract and skip without it.
+- `vitest`: 465 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
-- `scripts/screenshots.mjs`: 50 images plus a print PDF. It fails on console
+- `scripts/screenshots.mjs`: 47 images plus a print PDF. It fails on console
   errors, on horizontal overflow, and if not a single vector tile arrived. It
   also drives the live geocoder, which is slow often enough to blow the 60 s
   wait on the destinations step — two runs failed there and the third passed

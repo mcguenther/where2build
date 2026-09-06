@@ -516,3 +516,77 @@ def test_an_expected_area_of_zero_is_refused(client: TestClient):
 
     assert answer.status_code == 422
     assert answer.json()["felder"][0]["pfad"] == ["body", "expected_area_m2"]
+
+
+# --------------------------------------------------------------------------
+# A plot is a set of parcels -- the normal case, not the exception
+# --------------------------------------------------------------------------
+
+
+@respx.mock
+def test_several_numbers_of_one_gemarkung_become_one_plot(client: TestClient):
+    """The two halves of the reference plot, asked for together.
+
+    Each number is one request; the union and the summed official area are
+    what the caller gets back, because that is what a plot is.
+    """
+
+    route = respx.post(ALKIS_URL).mock(
+        side_effect=[
+            httpx.Response(200, content=fixture_bytes("alkis_flurstueck_790.gml")),
+            httpx.Response(200, content=fixture_bytes("alkis_flurstueck_706.gml")),
+        ]
+    )
+
+    answer = client.post(
+        "/api/parcels/resolve",
+        json={"gemarkung": "Liebertwolkwitz", "flurstuecksnummern": ["790", "706"]},
+    )
+
+    assert answer.status_code == 200
+    assert route.call_count == 2
+    body = answer.json()
+    assert len(body["features"]) == 2
+    grundstueck = body["grundstueck"]["properties"]
+    assert grundstueck["anzahl_flurstuecke"] == 2
+    # 520 + 282, straight from the two recorded answers.
+    assert grundstueck["flaeche_amtlich_m2"] == 802.0
+
+
+@respx.mock
+def test_a_number_that_does_not_exist_is_named_rather_than_skipped(client: TestClient):
+    """Silently dropping one would understate the plot by its area."""
+
+    respx.post(ALKIS_URL).mock(
+        side_effect=[
+            httpx.Response(200, content=fixture_bytes("alkis_flurstueck_790.gml")),
+            httpx.Response(200, content=fixture_bytes("alkis_leer.gml")),
+        ]
+    )
+
+    answer = client.post(
+        "/api/parcels/resolve",
+        json={"gemarkung": "Liebertwolkwitz", "flurstuecksnummern": ["790", "999/9"]},
+    )
+
+    assert answer.status_code == 404
+    assert "999/9" in answer.json()["detail"]
+
+
+def test_the_same_number_twice_is_not_counted_twice(client: TestClient):
+    """A duplicate would double the area every price comparison rests on."""
+
+    from app.schemas import ParcelResolveRequest
+
+    request = ParcelResolveRequest(
+        gemarkung="Liebertwolkwitz", flurstuecksnummern=["790", "790", "706"]
+    )
+
+    assert request.flurstuecksnummern == ["790", "706"]
+
+
+def test_a_list_of_numbers_needs_its_gemarkung(client: TestClient):
+    answer = client.post("/api/parcels/resolve", json={"flurstuecksnummern": ["790", "706"]})
+
+    assert answer.status_code == 422
+    assert "Gemarkung" in answer.json()["detail"]

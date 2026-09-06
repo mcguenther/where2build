@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import httpx
+import pytest
 import respx
 from fastapi.testclient import TestClient
 
 from app import geo
 from app.deps import tile_service
+from app.errors import BadRequestError
 
 from .conftest import DOP_URL
 
@@ -109,5 +111,31 @@ def test_geographic_crs_uses_latitude_first():
     assert 12.0 < second < 15.0
 
 
-def test_layer_configuration_covers_the_three_switchable_layers():
-    assert set(tile_service().layers) == {"dop", "webatlas", "alkis"}
+def test_layer_configuration_covers_every_switchable_layer():
+    assert set(tile_service().layers) == {
+        "dop", "webatlas", "alkis", "flurstuecke", "strassen"
+    }
+
+
+def test_the_parcel_outlines_are_asked_for_in_the_overlay_style():
+    """„Gelb“ draws contours and no fills, which is the point over a photo."""
+
+    config = tile_service().layers["flurstuecke"]
+
+    assert config.layers == "adv_alkis_flurstuecke"
+    assert config.styles == "Gelb"
+
+
+@pytest.mark.asyncio
+async def test_the_parcel_layer_is_not_asked_for_where_it_draws_nothing():
+    """MaxScaleDenominator 2000: the service answers 200 with an empty PNG.
+
+    Measured at Flurstück 790/11 -- z18 is 1:2133 and blank, z19 is 1:1066 and
+    draws. A request below the floor would spend a round trip and a cache entry
+    on 854 bytes of nothing, and look like a broken layer rather than a scale.
+    """
+
+    with pytest.raises(BadRequestError) as raised:
+        await tile_service().tile("flurstuecke", 18, 140349, 87540)
+
+    assert "Zoomstufe 19" in raised.value.message

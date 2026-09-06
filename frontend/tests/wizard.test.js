@@ -11,7 +11,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import CadastralDistrictPicker from "../src/components/CadastralDistrictPicker.vue";
 import WizardView from "../src/views/WizardView.vue";
 import { state } from "../src/lib/store.js";
-import { realState, mountWithRouter } from "./helpers.js";
+import { realPlot, realState, mountWithRouter } from "./helpers.js";
 import directory from "./fixtures/gemarkungen.json";
 import moelkau from "./fixtures/parcel-moelkau.json";
 
@@ -309,5 +309,101 @@ describe("Aufnahme — Absenden", () => {
     await flushPromises();
 
     expect(readPage).toHaveBeenCalledWith("Ein ganz anderer Text, von Hand getippt und lang genug.");
+  });
+});
+
+
+describe("Aufnahme — Flurstück und Angaben in einem Schritt", () => {
+  /** The last stage, with a draft in hand. */
+  const atParcelStage = async () => {
+    const view = mountWithRouter(WizardView, { path: "/aufnahme/quelle", props: { stage: "quelle" } });
+    view.vm.draft = {
+      ...realPlot(),
+      gemarkung: "Liebertwolkwitz",
+      gemarkungsnummer: "145592",
+      flurstuecke: ["85/1"]
+    };
+    await view.setProps({ stage: "flurstueck" });
+    return view;
+  };
+
+  it("fragt beim Klick auf die Zeichnung, was dort liegt, und legt es dazu", async () => {
+    const w = await atParcelStage();
+    const before = [...w.vm.draft.flurstuecke];
+
+    resolveParcel.mockReset();
+    resolveParcel
+      .mockResolvedValueOnce({
+        features: [{ properties: {
+          zaehler: "86", nenner: "2",
+          gemarkung: "Liebertwolkwitz", gemarkungsnummer: "145592"
+        } }]
+      })
+      .mockResolvedValueOnce(moelkau);
+    landValue.mockRejectedValue(new Error("Kein Bodenrichtwert."));
+
+    await w.findAll("button").find(b => /Flurstück hinzufügen/.test(b.text())).trigger("click");
+    expect(w.findComponent({ name: "SitePlan" }).props("picking")).toBe(true);
+
+    await w.vm.addParcelAt({ lat: 51.31, lon: 12.47 });
+    await flushPromises();
+
+    // Erst die Frage nach dem Punkt, dann das Grundstück aus allen Nummern:
+    // die Vereinigung und die Summe der amtlichen Flächen kommen von dort,
+    // wo sie immer herkamen.
+    expect(resolveParcel).toHaveBeenCalledTimes(2);
+    expect(resolveParcel.mock.calls[0][0]).toEqual({ lat: 51.31, lon: 12.47 });
+    expect(resolveParcel.mock.calls[1][0].flurstuecksnummern).toEqual([...before, "86/2"]);
+    expect(resolveParcel.mock.calls[1][0].gemarkung).toBe("145592");
+  });
+
+  it("nimmt dasselbe Flurstück nicht zweimal", async () => {
+    const w = await atParcelStage();
+
+    resolveParcel.mockReset();
+    resolveParcel.mockResolvedValueOnce({
+      features: [{ properties: {
+        zaehler: "85", nenner: "1",
+        gemarkung: "Liebertwolkwitz", gemarkungsnummer: "145592"
+      } }]
+    });
+
+    await w.vm.addParcelAt({ lat: 51.31, lon: 12.47 });
+    await flushPromises();
+
+    // Kein zweiter Aufruf: die summierte Fläche würde sich sonst verdoppeln,
+    // und auf ihr steht jeder Preisvergleich.
+    expect(resolveParcel).toHaveBeenCalledTimes(1);
+    expect(w.text()).toContain("gehört bereits dazu");
+  });
+
+  it("legt kein Flurstück aus einer anderen Gemarkung dazu", async () => {
+    const w = await atParcelStage();
+
+    resolveParcel.mockReset();
+    resolveParcel.mockResolvedValueOnce({
+      features: [{ properties: {
+        zaehler: "12", nenner: null,
+        gemarkung: "Mölkau", gemarkungsnummer: "140427"
+      } }]
+    });
+
+    await w.vm.addParcelAt({ lat: 51.34, lon: 12.47 });
+    await flushPromises();
+
+    expect(resolveParcel).toHaveBeenCalledTimes(1);
+    expect(w.text()).toContain("Mölkau");
+  });
+
+  it("nimmt Name, Kaufpreis und Notiz im selben Schritt auf", async () => {
+    const w = await atParcelStage();
+
+    // Drei Felder waren eine eigene Seite, und der Umriss, den sie beschreiben,
+    // war dabei nicht zu sehen.
+    expect(w.find("#q-name").exists()).toBe(true);
+    expect(w.find("#q-price").exists()).toBe(true);
+    expect(w.find("#q-note").exists()).toBe(true);
+    expect(w.findComponent({ name: "SitePlan" }).exists()).toBe(true);
+    expect(w.text()).toContain("Anlegen und öffnen");
   });
 });

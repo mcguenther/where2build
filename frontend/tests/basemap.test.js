@@ -6,7 +6,7 @@
  * in the browser, because only the browser knows what "system" resolved to.
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { vectorStyle } from "../src/lib/basemap.js";
+import { PARCEL_OUTLINE_MIN_ZOOM, aerialCadastreStyle, vectorStyle } from "../src/lib/basemap.js";
 import { state, darkTheme, watchSystemTheme } from "../src/lib/store.js";
 
 /** Just enough of a style document for `vectorStyle` to hand back. */
@@ -89,5 +89,39 @@ describe("Die Palette des Kartenhintergrunds", () => {
   it("meldet einen Stil, der nicht kommt, statt ewig zu warten", async () => {
     globalThis.fetch = () => Promise.resolve({ ok: false, status: 502 });
     await expect(vectorStyle()).rejects.toThrow(/502/);
+  });
+});
+
+describe("Luftbild mit Kataster", () => {
+  it("legt Foto, Straßen und Flurstücksgrenzen in dieser Reihenfolge übereinander", () => {
+    const style = aerialCadastreStyle();
+
+    // Die Reihenfolge ist der ganze Trick: das Foto unten, die Straßen
+    // darüber, die Grenzen zuoberst.
+    expect(style.layers.map(l => l.id)).toEqual(["dop", "strassen", "flurstuecke"]);
+    style.layers.forEach(layer => expect(layer.type).toBe("raster"));
+  });
+
+  it("holt jede Ebene durch das eigene Backend", () => {
+    const style = aerialCadastreStyle();
+
+    Object.entries(style.sources).forEach(([name, source]) => {
+      expect(source.tiles[0]).toContain(`/api/tiles/${name}/`);
+      expect(source.attribution).toContain("GeoSN");
+    });
+  });
+
+  it("fragt die Flurstücksgrenzen erst da, wo der Dienst sie zeichnet", () => {
+    const style = aerialCadastreStyle();
+
+    // adv_alkis_flurstuecke trägt MaxScaleDenominator 2000 und antwortet
+    // darüber mit einer leeren PNG statt mit einem Fehler: z18 ist 1:2133 und
+    // leer, z19 ist 1:1066 und zeichnet. Gemessen an Flurstück 790/11.
+    expect(PARCEL_OUTLINE_MIN_ZOOM).toBe(19);
+    expect(style.sources.flurstuecke.minzoom).toBe(PARCEL_OUTLINE_MIN_ZOOM);
+    expect(style.layers.find(l => l.id === "flurstuecke").minzoom).toBe(PARCEL_OUTLINE_MIN_ZOOM);
+    // Das Foto und die Straßen dagegen zeichnen auf jeder Stufe.
+    expect(style.sources.dop.minzoom).toBeUndefined();
+    expect(style.sources.strassen.minzoom).toBeUndefined();
   });
 });

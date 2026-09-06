@@ -44,46 +44,97 @@
 
     <div class="suche__buehne">
       <div class="panel suche__karte">
-        <EvidenceMap ref="karte" :candidates="candidates" :district-outline="districtOutline"
-                     :areas="areas" :huelle="huelle" :refuted-pin="refutedPin"
-                     :status="status" :flight="flight" :height="mapHeight" @select="pick" />
-      </div>
-
-      <!-- The protocol. Every entry can be looked up and switched off: a
-           contradiction nobody can check is one nobody can resolve. -->
-      <div class="panel suche__protokoll">
-        <div class="panel__head">
-          <h3>Indizien</h3>
+        <!-- Zooming away from the answer and not finding the way back was the
+             one thing the map could not do. Both buttons are always in reach. -->
+        <div class="panel__head suche__kartenkopf">
+          <!-- The photograph is the default: an advert shows pictures of the
+               plot, and those are recognisable against an orthophoto in a way
+               they never are against a street map. -->
+          <div class="grundwahl" role="group" aria-label="Kartenhintergrund">
+            <button type="button" :class="['grundwahl__knopf', { 'grundwahl__knopf--an': ground === 'site' }]"
+                    :aria-pressed="String(ground === 'site')" @click="ground = 'site'">
+              Luftbild
+            </button>
+            <button type="button" :class="['grundwahl__knopf', { 'grundwahl__knopf--an': ground === 'map' }]"
+                    :aria-pressed="String(ground === 'map')" @click="ground = 'map'">
+              Karte
+            </button>
+          </div>
           <div class="spacer"></div>
-          <span v-if="queued" class="chip">{{ queued }} wartet</span>
-          <button v-if="queued" type="button" class="btn btn--quiet btn--small" @click="skip">
+          <button type="button" class="btn btn--quiet btn--small"
+                  :disabled="!resultGeometry" @click="focusResult">
+            Zum Ergebnis
+          </button>
+          <button type="button" class="btn btn--quiet btn--small"
+                  :disabled="!everything.length" @click="focusEverything">
             Alles zeigen
           </button>
         </div>
-        <ul class="indizien">
-          <li v-for="indiz in shownIndicia" :key="indiz.id"
-              :class="{ 'indizien--verworfen': indiz.verworfen }">
-            <button type="button" class="indizien__zeile" @click="focusIndiz(indiz)">
-              <span class="indizien__staerke" :style="{ opacity: 0.25 + 0.75 * indiz.sicherheit }"></span>
-              <span class="indizien__text">
-                <b>{{ indiz.text }}</b>
-                <span class="indizien__meta">
-                  {{ sourceLabel(indiz.quelle) }} · Sicherheit {{ percent(indiz.sicherheit) }}
+        <EvidenceMap ref="karte" :candidates="candidates" :district-outline="districtOutline"
+                     :areas="areas" :huelle="huelle" :refuted-pin="refutedPin"
+                     :status="status" :flight="flight" :height="mapHeight"
+                     :ground="ground" @select="pick" />
+        <p v-if="ground === 'site'" class="panel__footnote">
+          Luftbild und Straßen vom GeoSN. Die amtlichen Flurstücksgrenzen zeichnet der
+          Dienst erst ab Zoomstufe {{ parcelOutlineZoom }} — darüber liefert er ein leeres Bild.
+        </p>
+      </div>
+
+      <!-- The course of the search, in the order it happened. One list, not
+           two: the clues used to be sorted by confidence and the steps kept
+           separately, so afterwards nobody could tell what came first. Every
+           row that stands for something on the map jumps to it, and a clue can
+           still be switched off — a contradiction nobody can check is one
+           nobody can resolve. -->
+      <div class="panel suche__protokoll">
+        <div class="panel__head">
+          <h3>Verlauf</h3>
+          <div class="spacer"></div>
+          <span v-if="queued" class="chip">{{ queued }} wartet</span>
+          <button v-if="queued" type="button" class="btn btn--quiet btn--small" @click="skip">
+            Rest zeigen
+          </button>
+        </div>
+        <ol class="verlauf">
+          <li v-for="step in steps" :key="step.n"
+              class="verlauf__schritt" :class="[
+                `verlauf__schritt--${step.kind}`,
+                { 'verlauf--verworfen': step.indiz && indizOf(step).verworfen }
+              ]">
+            <span class="verlauf__nr" aria-hidden="true">{{ step.n }}</span>
+
+            <button v-if="step.kind === 'indiz'" type="button" class="verlauf__zeile"
+                    @click="focusStep(step)">
+              <span class="verlauf__staerke"
+                    :style="{ opacity: 0.25 + 0.75 * indizOf(step).sicherheit }"></span>
+              <span class="verlauf__text">
+                <b>{{ indizOf(step).text }}</b>
+                <span class="verlauf__meta">
+                  {{ sourceLabel(indizOf(step).quelle) }} ·
+                  Sicherheit {{ percent(indizOf(step).sicherheit) }}
                 </span>
-                <span v-if="indiz.beleg" class="indizien__beleg">„{{ indiz.beleg }}“</span>
-                <span v-if="indiz.verworfen_grund" class="indizien__grund">{{ indiz.verworfen_grund }}</span>
+                <span v-if="indizOf(step).beleg" class="verlauf__beleg">„{{ indizOf(step).beleg }}“</span>
+                <span v-if="indizOf(step).verworfen_grund" class="verlauf__grund">
+                  {{ indizOf(step).verworfen_grund }}
+                </span>
               </span>
             </button>
-            <button type="button" class="indizien__schalter"
-                    :aria-pressed="String(!indiz.verworfen)"
-                    :title="indiz.verworfen ? 'Wieder berücksichtigen' : 'Ohne dieses Indiz suchen'"
-                    @click="toggle(indiz)">
-              {{ indiz.verworfen ? "+" : "×" }}
+
+            <button v-else type="button" class="verlauf__zeile verlauf__zeile--schritt"
+                    :disabled="!hasFocus(step)" @click="focusStep(step)">
+              <span class="verlauf__text">
+                <span class="verlauf__marke">{{ stepLabel(step) }}</span>
+                {{ step.text }}
+              </span>
+            </button>
+
+            <button v-if="step.kind === 'indiz'" type="button" class="verlauf__schalter"
+                    :aria-pressed="String(!indizOf(step).verworfen)"
+                    :title="indizOf(step).verworfen ? 'Wieder berücksichtigen' : 'Ohne dieses Indiz suchen'"
+                    @click="toggle(indizOf(step))">
+              {{ indizOf(step).verworfen ? "+" : "×" }}
             </button>
           </li>
-        </ul>
-        <ol v-if="protocol.length" class="protokoll">
-          <li v-for="(step, i) in protocol" :key="i">{{ step }}</li>
         </ol>
       </div>
     </div>
@@ -148,7 +199,20 @@
 import EvidenceMap from "./EvidenceMap.vue";
 import { DWELL_MS, FLIGHT_MS, StepQueue, prefersReducedMotion } from "../lib/evidence.js";
 import { runSearch, STATUS_LABEL, verdictSentence } from "../lib/search.js";
+import { PARCEL_OUTLINE_MIN_ZOOM } from "../lib/basemap.js";
 import { area } from "../lib/format.js";
+
+/** What each phase of the run is called in the course list. The backend names
+ *  them; this is the German the reader sees next to the step. */
+const PHASE_LABELS = {
+  ernten: "Gelesen",
+  raum: "Raum",
+  treppe: "Toleranz",
+  gegenprobe: "Gegenprobe",
+  bilder: "Bilder",
+  nummer: "Nummer",
+  strasse: "Straße"
+};
 
 const SOURCE_LABELS = {
   nutzer: "von Hand",
@@ -189,10 +253,18 @@ export default {
       hint: "",
       requests: 0,
       phaseText: "Angaben werden gelesen …",
-      protocol: [],
+      // The run in the order it happened. Every event that reaches `apply`
+      // becomes one entry, so the sequence is a fact rather than a
+      // reconstruction — the clues themselves are still re-sorted by
+      // confidence for the conflict options, and that used to be the only
+      // list there was.
+      steps: [],
       queued: 0,
       queueStep: DWELL_MS,
       chosen: null,
+      // The ground under the drawing. Remembered per visit only: which
+      // backdrop helps depends on the plot in front of you.
+      ground: "site",
       discarded: [],
       decisions: {}
     };
@@ -202,9 +274,25 @@ export default {
      *  „Ergebnis“ over a half-drawn map is worse than one that waits. */
     running() { return this.streaming || this.queued > 0; },
     statusLabel() { return STATUS_LABEL[this.status] ?? "Suche"; },
+    parcelOutlineZoom() { return PARCEL_OUTLINE_MIN_ZOOM; },
     sentence() { return this.status ? verdictSentence(this.status, this.candidates.length, this.huelle) : ""; },
-    shownIndicia() { return this.indicia; },
     chosenCandidate() { return this.candidates.find(c => c.id === this.chosen) ?? null; },
+    /** Where „Zum Ergebnis“ goes: the parcel if there is one, else whatever
+     *  the answer could still name. */
+    resultGeometry() {
+      if (this.chosenCandidate?.geometry) return this.chosenCandidate.geometry;
+      if (this.candidates.length === 1) return this.candidates[0].geometry;
+      return this.huelle?.geometry ?? null;
+    },
+    /** Everything the run put on the map, for the way back out. */
+    everything() {
+      return [
+        ...this.candidates.map(candidate => candidate.geometry),
+        this.huelle?.geometry,
+        ...this.areas.map(area => area.geometry),
+        this.districtOutline
+      ].filter(Boolean);
+    },
     /** How long the camera may take, matched to how fast the clues are playing.
      *
      *  A 900 ms flight started every 240 ms spends the whole run interrupting
@@ -249,7 +337,7 @@ export default {
       Object.assign(this, {
         streaming: true, error: "", status: null, indicia: [], conflicts: [],
         candidates: [], huelle: null, districtOutline: null, areas: [],
-        hint: "", requests: 0, protocol: [], chosen: null,
+        hint: "", requests: 0, steps: [], chosen: null,
         phaseText: "Angaben werden gelesen …"
       });
 
@@ -285,10 +373,14 @@ export default {
       this.queueStep = this._queue?.step ?? DWELL_MS;
       if (event.art === "phase") {
         this.phaseText = event.text || this.phaseText;
-        if (event.text) this.protocol = [...this.protocol, event.text];
+        if (event.text) this.record({ kind: "phase", phase: event.phase, text: event.text });
       } else if (event.art === "indiz") {
         const rest = this.indicia.filter(indiz => indiz.id !== event.indiz.id);
         this.indicia = [...rest, event.indiz].sort((a, b) => b.sicherheit - a.sicherheit);
+        // Recorded by id, not by value: the same clue arrives again when a
+        // conflict is settled, and the entry has to follow it rather than
+        // freeze the first wording.
+        this.record({ kind: "indiz", indiz: event.indiz.id });
       } else if (event.art === "konflikt") {
         const rest = this.conflicts.filter(conflict => conflict.art !== event.konflikt.art);
         this.conflicts = [...rest, event.konflikt];
@@ -296,6 +388,11 @@ export default {
         this.areas = event.gebiete || [];
       } else if (event.art === "kandidaten") {
         this.candidates = event.kandidaten || [];
+        this.record({
+          kind: "kandidaten",
+          text: this.candidateLine(event.anzahl ?? this.candidates.length),
+          geometries: this.candidates.map(candidate => candidate.geometry).filter(Boolean)
+        });
       } else if (event.art === "ergebnis") {
         this.status = event.status;
         this.candidates = event.kandidaten || [];
@@ -304,7 +401,28 @@ export default {
         if (event.gebiete) this.areas = event.gebiete;
         this.hint = event.text || "";
         this.requests = event.anfragen || 0;
+        this.record({ kind: "ergebnis", text: this.huelle?.text || this.statusLabel });
       }
+    },
+
+    /** One entry in the course of the run. */
+    record(step) {
+      this.steps = [...this.steps, { ...step, n: this.steps.length + 1 }];
+    },
+
+    indizOf(step) {
+      return this.indicia.find(indiz => indiz.id === step.indiz) ?? {};
+    },
+
+    candidateLine(count) {
+      if (count === 1) return "1 Flurstück bleibt stehen";
+      return `${count} Flurstücke bleiben stehen`;
+    },
+
+    stepLabel(step) {
+      if (step.kind === "kandidaten") return "Kandidaten";
+      if (step.kind === "ergebnis") return "Ergebnis";
+      return PHASE_LABELS[step.phase] ?? "Schritt";
     },
 
     skip() {
@@ -327,12 +445,67 @@ export default {
 
     rerun() { this.start(); },
 
-    /** Clicking a clue jumps to it. Nobody waits for the animation. */
-    focusIndiz(indiz) {
+    /**
+     * What one entry stands for on the map.
+     *
+     * Resolved when it is clicked rather than when it was recorded: a clue
+     * arrives before the outline it names is fetched — the districts turn up
+     * in the „raum“ step, several clues later — so anything captured at the
+     * time would have been null for exactly the rows worth clicking.
+     */
+    focusOf(step) {
+      if (step.kind === "ergebnis") return this.resultGeometry;
+      if (step.kind === "kandidaten") {
+        return step.geometries?.length ? step.geometries : null;
+      }
+      if (step.kind !== "indiz") return null;
+
+      const indiz = this.indizOf(step);
+      if (indiz.art === "flurstueck") {
+        const named = this.candidates.find(
+          candidate => candidate.properties.flurstuecksnummer === indiz.wert
+        );
+        if (named?.geometry) return named.geometry;
+      }
+      if (indiz.art === "gemarkung") {
+        const area = this.areas.find(entry => entry.name === indiz.wert);
+        if (area?.geometry) return area.geometry;
+        return this.districtOutline;
+      }
+      if (indiz.art === "pin") {
+        const [lat, lon] = String(indiz.wert).split(",").map(Number);
+        if (Number.isFinite(lat) && Number.isFinite(lon)) {
+          return { type: "Point", coordinates: [lon, lat] };
+        }
+        return null;
+      }
+      // Area, street, municipality, place: constraints over the whole set
+      // rather than one thing on the map, so they frame what survived them.
+      const candidates = this.candidates.map(candidate => candidate.geometry).filter(Boolean);
+      if (candidates.length) return candidates;
+      return this.huelle?.geometry || this.districtOutline;
+    },
+
+    hasFocus(step) {
+      const geometry = this.focusOf(step);
+      return Array.isArray(geometry) ? geometry.length > 0 : Boolean(geometry);
+    },
+
+    /** Clicking an entry jumps to it. Nobody waits for the animation. */
+    focusStep(step) {
       this.skip();
-      const candidate = this.candidates.find(c => c.properties.flurstuecksnummer === indiz.wert);
-      const geometry = candidate?.geometry || this.districtOutline || this.huelle?.geometry;
-      this.$refs.karte?.focusOn?.(geometry);
+      const geometry = this.focusOf(step);
+      if (geometry) this.$refs.karte?.focusOn?.(geometry);
+    },
+
+    focusResult() {
+      this.skip();
+      if (this.resultGeometry) this.$refs.karte?.focusOn?.(this.resultGeometry);
+    },
+
+    focusEverything() {
+      this.skip();
+      if (this.everything.length) this.$refs.karte?.focusOn?.(this.everything);
     },
 
     pick(id) {
@@ -387,37 +560,73 @@ export default {
 .suche__karte{ padding: var(--w2b-space-3); }
 .suche__protokoll{ max-height: 560px; overflow-y: auto; }
 
-.indizien{ list-style: none; margin: 0; padding: 0; }
-.indizien li{ display: flex; align-items: flex-start; border-bottom: 1px solid var(--w2b-line-faint); }
-.indizien__zeile{
-  flex: 1; display: flex; gap: var(--w2b-space-3); align-items: flex-start; text-align: left;
-  background: none; border: 0; cursor: pointer; padding: 10px var(--w2b-space-3) 10px var(--w2b-space-4);
+.verlauf{ list-style: none; margin: 0; padding: 0; counter-reset: none; }
+.verlauf__schritt{
+  display: flex; align-items: flex-start; gap: var(--w2b-space-2);
+  border-bottom: 1px solid var(--w2b-line-faint);
 }
-.indizien__zeile:hover{ background: var(--w2b-primary-veil); }
-.indizien__staerke{
+/* The number is the point of this list: the order is what was missing. */
+.verlauf__nr{
+  flex: none; width: 26px; padding-top: 11px; text-align: right;
+  font-family: var(--w2b-font-mono); font-size: 10px; font-variant-numeric: tabular-nums;
+  color: var(--w2b-muted);
+}
+.verlauf__zeile{
+  flex: 1; display: flex; gap: var(--w2b-space-3); align-items: flex-start; text-align: left;
+  background: none; border: 0; cursor: pointer; padding: 10px var(--w2b-space-3) 10px 6px;
+  min-width: 0;
+}
+.verlauf__zeile:hover:not(:disabled){ background: var(--w2b-primary-veil); }
+.verlauf__zeile:disabled{ cursor: default; }
+.verlauf__staerke{
   flex: none; width: 5px; align-self: stretch; min-height: 26px; border-radius: 3px;
   background: var(--w2b-map-selection);
 }
-.indizien__text{ display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.indizien__text b{ font-size: var(--w2b-text-s); font-weight: 600; }
-.indizien__meta{ font-size: var(--w2b-text-xs); color: var(--w2b-muted); }
-.indizien__beleg{ font-family: var(--w2b-font-mono); font-size: 10px; color: var(--w2b-muted); line-height: 1.5; overflow-wrap: anywhere; }
-.indizien__grund{ font-size: var(--w2b-text-xs); color: var(--w2b-error); }
-.indizien--verworfen .indizien__text b{ text-decoration: line-through; color: var(--w2b-muted); }
-.indizien--verworfen .indizien__staerke{ background: var(--w2b-line); }
-.indizien__schalter{
+.verlauf__text{ display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.verlauf__text b{ font-size: var(--w2b-text-s); font-weight: 600; }
+.verlauf__meta{ font-size: var(--w2b-text-xs); color: var(--w2b-muted); }
+.verlauf__beleg{
+  font-family: var(--w2b-font-mono); font-size: 10px; color: var(--w2b-muted);
+  line-height: 1.5; overflow-wrap: anywhere;
+}
+.verlauf__grund{ font-size: var(--w2b-text-xs); color: var(--w2b-error); }
+
+/* A step of the search reads quieter than a clue: it is what the search did,
+   not what it was told. */
+.verlauf__zeile--schritt .verlauf__text{ font-size: var(--w2b-text-xs); color: var(--w2b-muted); line-height: 1.6; }
+.verlauf__marke{
+  display: inline-block; margin-right: 6px; padding: 1px 6px; border-radius: 999px;
+  background: var(--w2b-surface-sunken); border: 1px solid var(--w2b-line-faint);
+  font-size: 9.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--w2b-muted);
+}
+.verlauf__schritt--ergebnis .verlauf__text{ color: var(--w2b-text); font-weight: 600; }
+.verlauf__schritt--ergebnis .verlauf__marke{
+  border-color: var(--w2b-primary); color: var(--w2b-primary);
+}
+
+.verlauf--verworfen .verlauf__text b{ text-decoration: line-through; color: var(--w2b-muted); }
+.verlauf--verworfen .verlauf__staerke{ background: var(--w2b-line); }
+.verlauf__schalter{
   flex: none; align-self: center; margin-right: var(--w2b-space-3);
   width: 26px; height: 26px; border-radius: 50%; cursor: pointer;
   border: 1px solid var(--w2b-line); background: var(--w2b-surface);
   color: var(--w2b-muted); font-size: 14px; line-height: 1;
 }
-.indizien__schalter:hover{ border-color: var(--w2b-error); color: var(--w2b-error); }
+.verlauf__schalter:hover{ border-color: var(--w2b-error); color: var(--w2b-error); }
 
-.protokoll{
-  margin: var(--w2b-space-3) 0 0; padding: var(--w2b-space-3) var(--w2b-space-4) var(--w2b-space-4) 30px;
-  border-top: 1px solid var(--w2b-line-faint);
-  color: var(--w2b-muted); font-size: var(--w2b-text-xs); line-height: 1.7;
+/* Three controls in one row do not fit a 390 px panel: without the wrap the
+   ground toggle lost its second half to `overflow: hidden`. */
+.suche__kartenkopf{ padding-bottom: var(--w2b-space-3); flex-wrap: wrap; gap: var(--w2b-space-2); }
+.grundwahl{
+  flex: none; display: inline-flex; border: 1px solid var(--w2b-line);
+  border-radius: 999px; overflow: hidden;
 }
+.grundwahl__knopf{ flex: none; white-space: nowrap; }
+.grundwahl__knopf{
+  border: 0; background: none; cursor: pointer; padding: 4px 12px;
+  font-size: var(--w2b-text-xs); color: var(--w2b-muted);
+}
+.grundwahl__knopf--an{ background: var(--w2b-primary); color: var(--w2b-on-primary); }
 
 .kandidaten{ width: 100%; border-collapse: collapse; font-size: var(--w2b-text-s); }
 .kandidaten th, .kandidaten td{

@@ -583,7 +583,7 @@ behalten also das letzte Wort, solange niemand etwas anderes verlangt.
 
 ```bash
 ./motis/fetch-data.sh
-MOTIS_BASE_URL=http://motis:8080 docker compose --profile local-routing up --build
+docker compose -f docker-compose.yml -f docker-compose.local-routing.yml up --build
 ```
 
 `docker compose up` ohne Profil bleibt unverändert bei zwei Containern.

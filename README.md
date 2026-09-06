@@ -26,7 +26,7 @@ takes to get to work, school and the station.
 
 | | |
 |---|---|
-| **Take a plot in** | From a listing URL, from a pasted page, from a description alone, or straight from *Gemarkung* + parcel numbers. The wizard shows what was read, where each value came from, and what it could not find. Only the last of those ever asks a model, and only when nothing locatable could be parsed. |
+| **Take a plot in** | From a listing URL, from a pasted page, from a description alone, or straight from *Gemarkung* + parcel numbers. The wizard shows what was read, where each value came from, and what it could not find. Only the last of those ever asks a model, and only when nothing locatable could be parsed. A plot is a *set* of parcels: the last step takes further ones by pointing at them on the drawing. |
 | **Resolve the parcels** | ALKIS gives the outline, the official area and the parcel identifier. A plot is a *set* of parcels — the normal case, not the exception — so geometries are unioned and official areas summed. |
 | **Judge the shape** | Rectangularity as polygon area over the area of its smallest rotated bounding rectangle, plus street frontage and vertex count. |
 | **Judge the price** | €/m² against the BORIS land value for the zone, as a percentage rather than a hunch. |
@@ -100,7 +100,7 @@ if you want it separately.
 | **POI directory** | `backend/data` is mounted read-only. Build the index with `python backend/scripts/build_poi_index.py --download` and `/api/nearby` will use it; without it that endpoint says so for the OpenStreetMap categories instead of answering with an empty list. The default extract is all of Saxony; `--url` and `--out` take any other region — see [Reach of the POI index](#reach-of-the-poi-index). |
 | **Extraction** | Without `LLM_API_KEY` in `backend/.env`, reading a listing page stays switched off. Everything else works. |
 | **Contact address** | Set `APP_CONTACT` before any real use: the Transitous usage policy requires one. |
-| **Own router** | `docker compose --profile local-routing up` runs MOTIS here instead of asking Transitous. See below. |
+| **Own router** | `docker compose -f docker-compose.yml -f docker-compose.local-routing.yml up` runs MOTIS here instead of asking Transitous. See below. |
 
 `backend/.env` is read if it exists and skipped if it does not, so the stack
 comes up either way.
@@ -130,7 +130,7 @@ and replaces a volume, which is a host-side operation, so it stays a host cron
 entry:
 
 ```cron
-40 2 * * 1  cd /srv/where2build && ./motis/fetch-data.sh && docker compose --profile local-routing up -d --force-recreate motis-import motis
+40 2 * * 1  cd /srv/where2build && ./motis/fetch-data.sh && docker compose -f docker-compose.yml -f docker-compose.local-routing.yml up -d --force-recreate motis-import motis
 ```
 
 ### Routing on your own machine
@@ -139,16 +139,20 @@ Routing goes to [Transitous](https://api.transitous.org) by default. That is a
 volunteer service: its policy asks to be contacted before "many requests",
 counts routing itself as resource-intensive, and rules out commercial use
 (`docs/research/routing-motis.md` § 6). Anything past a prototype should bring
-its own router, and the `local-routing` profile is that router.
+its own router, and `docker-compose.local-routing.yml` is that router.
 
 ```bash
 ./motis/fetch-data.sh                                   # ~420 MB of input data
-MOTIS_BASE_URL=http://motis:8080 \
-  docker compose --profile local-routing up --build     # first start imports
+docker compose -f docker-compose.yml -f docker-compose.local-routing.yml \
+  up --build                                           # first start imports
 ```
 
-Without the profile nothing changes: `docker compose up` is still two
-containers and still talks to Transitous.
+Without that second file nothing changes: `docker compose up` is still two
+containers and still talks to Transitous. Naming the file is the whole opt-in —
+it brings the router up *and* points the backend at it, so there is no
+`MOTIS_BASE_URL` to remember. Forgetting it used to start the local router and
+then route against Transitous anyway, with nothing to see: the two agree to the
+last decimal, so the only sign was whose bandwidth was being spent.
 
 | | |
 |---|---|
@@ -289,6 +293,10 @@ Each of these is verified, not assumed — the details are in
   fails outright on the combined layer. Use `text/plain` or GML.
 - **immobilienscout24.de answers server-side fetches with 401** on every route
   tested, so its adapter goes straight to the paste field.
+- **`adv_alkis_flurstuecke` carries `MaxScaleDenominator: 2000`** and answers
+  HTTP 200 with a transparent PNG above it. Measured at one parcel: z18 is
+  1:2133 and blank, z19 is 1:1066 and draws. Its `Gelb` style is the one meant
+  for overlaying — contours, no fills.
 - **kleinanzeigen.de carries `og:latitude`/`og:longitude`** in its meta tags —
   parse those and skip both the geocoder and the model call. The asking price
   is there too (`<meta itemprop="price">`, JSON-LD, `#viewad-price`), which is

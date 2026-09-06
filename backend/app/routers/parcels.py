@@ -7,7 +7,12 @@ from fastapi import APIRouter, Depends
 from ..deps import alkis_service, motis_service
 from ..errors import NotFoundError
 from ..plausibility import assess
-from ..schemas import GeocodeTreffer, ParcelCollection, ParcelResolveRequest
+from ..schemas import (
+    GeocodeTreffer,
+    ParcelCollection,
+    ParcelResolveRequest,
+    parse_flurstuecksnummer,
+)
 from ..services.alkis import AlkisService, Flurstueck, expand_gemarkung_key, to_collection
 from ..services.motis import MotisService
 
@@ -71,7 +76,23 @@ async def resolve(
     hints: list[str] = []
     address_match: GeocodeTreffer | None = None
 
-    if payload.gemarkung and payload.zaehler is not None:
+    if payload.gemarkung and payload.flurstuecksnummern:
+        # A plot is a set of parcels. Each number is resolved on its own and
+        # the union is left to `to_collection`, which has always built it.
+        parcels = []
+        for number in payload.flurstuecksnummern:
+            zaehler, nenner = parse_flurstuecksnummer(number)
+            found = await alkis.by_gemarkung(payload.gemarkung, zaehler, nenner)
+            if not found:
+                raise NotFoundError(
+                    NOT_FOUND_BY_IDENTIFIER.format(
+                        district=payload.gemarkung.strip(),
+                        number=number,
+                        explanation="",
+                    )
+                )
+            parcels.extend(found)
+    elif payload.gemarkung and payload.zaehler is not None:
         expanded = expand_gemarkung_key(payload.gemarkung)
         if expanded != payload.gemarkung.strip():
             hints.append(

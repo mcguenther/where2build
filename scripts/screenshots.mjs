@@ -203,17 +203,17 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
   await shot(page, "assistent-2", mode, narrow ? "-schmal" : "");
   await page.getByRole("button", { name: "Nachschlagen" }).click();
   await page.waitForSelector(".site-plan", { timeout: 60000 });
+  /* The last step: the outline, what is being taken over, and the three fields
+     that used to be a page of their own. */
   await shot(page, "assistent-3", mode, narrow ? "-schmal" : "");
-  await page.getByRole("button", { name: "Passt" }).click();
-  await shot(page, "assistent-4", mode, narrow ? "-schmal" : "");
 
   /* Every step of the wizard has an address of its own, so the browser's back
    * button steps back one step instead of leaving the wizard. */
   await page.goBack();
   await page.waitForTimeout(200);
   const steppedBackTo = new URL(page.url()).pathname;
-  if (steppedBackTo !== "/aufnahme/flurstueck") {
-    problems.push(`${mode}/${width}: Zurück führte von „Angaben“ nach ${steppedBackTo}`);
+  if (steppedBackTo !== "/aufnahme/quelle") {
+    problems.push(`${mode}/${width}: Zurück führte von „Flurstück“ nach ${steppedBackTo}`);
   }
   await page.goForward();
   await page.waitForSelector("#q-name", { timeout: 10000 });
@@ -320,7 +320,6 @@ countTiles(page);
 await page.goto(address, { waitUntil: "load" });
 await page.evaluate(() => document.fonts.ready);
 await addPlot(page);
-await page.getByRole("button", { name: "Passt" }).click();
 await page.getByRole("button", { name: "Anlegen und öffnen" }).click();
 await page.waitForTimeout(6000);
 await page.emulateMedia({ media: "print" });

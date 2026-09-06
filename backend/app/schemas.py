@@ -273,6 +273,18 @@ class ParcelResolveRequest(BaseModel):
         max_length=20,
         description="Flurstücksnummer wie im Geoportal, etwa „85/1“, „476“ oder „41/e“.",
     )
+    # A plot is a *set* of parcels -- the normal case, not the exception. One
+    # Gemarkung, several numbers: the polygons are unioned and the official
+    # areas summed, which is what `to_collection` has always done.
+    flurstuecksnummern: list[str] | None = Field(
+        default=None,
+        max_length=20,
+        description=(
+            "Mehrere Flurstücksnummern derselben Gemarkung, die zusammen ein "
+            "Grundstück bilden. Die Umringe werden vereinigt, die amtlichen "
+            "Flächen summiert."
+        ),
+    )
     # What the listing says the plot measures. Only ever used to judge the
     # answer, never to filter it -- see app/plausibility.py.
     expected_area_m2: int | None = Field(
@@ -287,6 +299,33 @@ class ParcelResolveRequest(BaseModel):
 
     @model_validator(mode="after")
     def _exactly_one_way_in(self) -> "ParcelResolveRequest":
+        if self.flurstuecksnummern:
+            cleaned = [number.strip() for number in self.flurstuecksnummern if number.strip()]
+            if not cleaned:
+                raise ValueError("Die Liste der Flurstücksnummern ist leer.")
+            if self.flurstuecksnummer or self.zaehler is not None:
+                raise ValueError(
+                    "Bitte entweder eine einzelne Flurstücksnummer angeben oder die Liste, "
+                    "nicht beides."
+                )
+            if not self.gemarkung:
+                raise ValueError(
+                    "Zu Flurstücksnummern wird die Gemarkung benötigt — "
+                    "dieselbe Nummer gibt es in jeder Gemarkung."
+                )
+            # Validated here so a typo is a 422 with the number in it rather
+            # than a request that finds nothing and says the parcel is unknown.
+            for number in cleaned:
+                parse_flurstuecksnummer(number)
+            # Duplicates would double the summed area, which is the one figure
+            # every price comparison rests on.
+            seen: list[str] = []
+            for number in cleaned:
+                if number not in seen:
+                    seen.append(number)
+            self.flurstuecksnummern = seen
+            return self
+
         if self.flurstuecksnummer is not None and self.flurstuecksnummer.strip():
             if self.zaehler is not None or self.nenner is not None:
                 raise ValueError(

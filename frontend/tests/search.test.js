@@ -330,11 +330,70 @@ describe("Die Suchansicht", () => {
     expect(wrapper.findAll(".konflikt__option").length).toBe(conflict.optionen.length);
   });
 
+  it("führt den Verlauf in der Reihenfolge, in der er passiert ist", async () => {
+    const wrapper = await openSearch();
+
+    // Die Liste war nach Sicherheit sortiert, und die Schritte standen
+    // getrennt darunter — hinterher war nicht mehr zu sehen, was zuerst kam.
+    const rows = wrapper.findAll(".verlauf__schritt");
+    const numbers = wrapper.findAll(".verlauf__nr").map(n => Number(n.text()));
+    expect(numbers).toEqual(numbers.map((_, i) => i + 1));
+
+    const text = rows.map(row => row.text());
+    const firstPhase = EVENTS.find(e => e.art === "phase").text;
+    const firstIndiz = EVENTS.find(e => e.art === "indiz").indiz.text;
+    expect(text[0]).toContain(firstPhase);
+    expect(text[1]).toContain(firstIndiz);
+
+    // Und das Ergebnis steht am Ende, nicht irgendwo dazwischen.
+    expect(text.at(-1)).toContain("Ergebnis");
+  });
+
+  it("führt vom letzten Eintrag zurück zum gefundenen Flurstück", async () => {
+    const wrapper = await openSearch();
+    const map = wrapper.findComponent({ name: "EvidenceMap" });
+    const focusOn = vi.fn();
+    map.vm.focusOn = focusOn;
+
+    await wrapper.findAll(".verlauf__zeile").at(-1).trigger("click");
+
+    expect(focusOn).toHaveBeenCalledTimes(1);
+    // Die Hülle des bestätigten Flurstücks, nicht die Gemarkung darum.
+    expect(focusOn.mock.calls[0][0]).toEqual(RESULT.huelle.geometry);
+  });
+
+  it("hat einen Weg zurück zum Ergebnis, auch ohne den Verlauf", async () => {
+    const wrapper = await openSearch();
+    const map = wrapper.findComponent({ name: "EvidenceMap" });
+    const focusOn = vi.fn();
+    map.vm.focusOn = focusOn;
+
+    const back = wrapper.findAll("button").find(b => b.text() === "Zum Ergebnis");
+    expect(back.attributes("disabled")).toBeUndefined();
+    await back.trigger("click");
+
+    expect(focusOn).toHaveBeenCalledTimes(1);
+  });
+
+  it("zeigt auf Wunsch wieder alles, was der Lauf gefunden hat", async () => {
+    const wrapper = await openSearch();
+    const map = wrapper.findComponent({ name: "EvidenceMap" });
+    const focusOn = vi.fn();
+    map.vm.focusOn = focusOn;
+
+    await wrapper.findAll("button").find(b => b.text() === "Alles zeigen").trigger("click");
+
+    const shown = focusOn.mock.calls[0][0];
+    expect(Array.isArray(shown)).toBe(true);
+    // Das Flurstück und die Gemarkung darum sind beide dabei.
+    expect(shown.length).toBeGreaterThan(1);
+  });
+
   it("sucht erneut, wenn ein Indiz abgewählt wird", async () => {
     const wrapper = await openSearch();
     const calls = global.fetch.mock.calls.length;
 
-    await wrapper.findAll(".indizien__schalter")[0].trigger("click");
+    await wrapper.findAll(".verlauf__schalter")[0].trigger("click");
     await flushPromises();
 
     expect(global.fetch.mock.calls.length).toBe(calls + 1);

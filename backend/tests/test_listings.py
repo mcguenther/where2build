@@ -238,3 +238,41 @@ def test_provider_timeout_becomes_a_504(client: TestClient):
     answer = client.post("/api/listings/extract", json={"text": "Baugrundstück"})
 
     assert answer.status_code == 504
+
+
+@respx.mock
+def test_an_answer_cached_by_an_older_reader_is_not_served(client: TestClient):
+    """The cache that holds an extracted listing never expires.
+
+    So an answer written before the price parser existed would be served for
+    ever, and the field stayed empty on exactly the listings the fix was
+    written for. The version in the key is what retires it.
+    """
+
+    from app.deps import llm_client
+    from app.routers.listings import EXTRACTION_VERSION
+    from app.services.llm import normalize_url
+
+    respx.get(KLEINANZEIGEN_URL).mock(return_value=_kleinanzeigen_page())
+    respx.post(CHAT_URL).mock(
+        return_value=httpx.Response(200, json=completion(json.dumps(INSERAT_JSON)))
+    )
+
+    llm = client.app.dependency_overrides.get(llm_client, llm_client)()
+    stale = {
+        "quelle_url": KLEINANZEIGEN_URL,
+        "weg": "meta-tags",
+        "felder": {},
+        "beschreibung": None,
+        "bilder": [],
+    }
+    # Exactly the key the deployed build wrote: the URL and nothing else. That
+    # entry is what is sitting in the cache volume right now.
+    llm.cache.set_json(f"inserat:{normalize_url(KLEINANZEIGEN_URL)}", stale)
+    assert EXTRACTION_VERSION >= 2
+
+    answer = client.post("/api/listings/extract", json={"url": KLEINANZEIGEN_URL})
+
+    assert answer.status_code == 200
+    # The page is read again rather than the empty answer being handed back.
+    assert answer.json()["felder"]["kaufpreis_eur"]["wert"] == 89000

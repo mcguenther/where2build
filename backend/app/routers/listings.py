@@ -36,6 +36,18 @@ _STRUCTURE_TASK = (
     "werden nicht erfasst."
 )
 
+# What the reader produces, as a number. It rides in the cache key, because the
+# cache that holds an extracted listing has no expiry (`ttl_s=None`) and is
+# keyed on the URL alone -- so an answer produced before the price parser
+# existed outlived the parser, and the field stayed empty on the very listings
+# the fix was written for. Bump this whenever the extraction's *output* changes:
+# a new field, a new source for one, a corrected parse. Old entries are then
+# simply never asked for again, and the sweeper clears them.
+#
+#   1  the original reader
+#   2  asking price, plot area from the attribute list, description and images
+EXTRACTION_VERSION = 2
+
 _NO_LOCATOR = (
     "Aus dieser Seite ließ sich weder eine Adresse noch eine Koordinate noch ein "
     "Flurstück lesen. Bitte den Seiteninhalt einfügen oder die Angaben von Hand eintragen."
@@ -205,7 +217,7 @@ async def extract(
 ) -> ListingExtractResponse:
     if payload.url is not None:
         url = str(payload.url)
-        cache_key = f"inserat:{normalize_url(url)}"
+        cache_key = f"inserat:v{EXTRACTION_VERSION}:{normalize_url(url)}"
         cached = llm.cache.get_json(cache_key)
         if cached is not None:
             return ListingExtractResponse.model_validate(cached)

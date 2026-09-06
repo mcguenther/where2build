@@ -7,7 +7,8 @@
     :class="{
       'site-plan--dragging': dragging,
       'site-plan--measuring': measuring,
-      'site-plan--navigable': navigable && !measuring,
+      'site-plan--navigable': navigable && !measuring && !picking,
+      'site-plan--picking': picking,
       'site-plan--panning': panning
     }"
     :viewBox="`0 0 ${width} ${height}`"
@@ -168,9 +169,9 @@ import {
   closestBoundaryPoint, boundingBox, alignmentToEdge, asCounterClockwise,
   minimumRotatedRectangleCorners, constrainToEnvelope, hasNeighbourHint
 } from "../lib/geometry.js";
-import { cameraFor } from "../lib/projection.js";
+import { cameraFor, toWgs84 } from "../lib/projection.js";
 import { num } from "../lib/format.js";
-import { BACKDROPS } from "../lib/basemap.js";
+import { BACKDROPS, canRenderMap } from "../lib/basemap.js";
 import { darkTheme } from "../lib/store.js";
 // MapLibre 6 ships named exports only — there is no default.
 // Its worker URL is set once in main.js; see the note there.
@@ -238,10 +239,16 @@ export default {
     neighbourDepths: { type: Array, default: null },
     /** Fixed pixels per metre. Without it each plan fits its own frame. */
     scale: { type: Number, default: null },
+    /** Picking mode: one click reports where it landed, in WGS84.
+     *
+     *  A plot is a set of parcels, and the neighbour to add is on the drawing
+     *  already — the cadastre knows what is under a coordinate, so pointing at
+     *  it is the whole interaction. */
+    picking: { type: Boolean, default: false },
     /** Measuring mode: clicks add points, the run is measured segment by segment. */
     measuring: { type: Boolean, default: false }
   },
-  emits: ["move", "measured"],
+  emits: ["move", "measured", "pick"],
   data() {
     return {
       uid: ++instanceCount, dragging: null, mapUnavailable: false,
@@ -510,6 +517,13 @@ export default {
     },
     async buildMap() {
       if (!this.hasBackdrop || !this.plot.anchor || this._map) return;
+      // A raster backdrop needs no network, so without this the map would be
+      // constructed wherever there is no WebGL and only fail on the way out,
+      // inside the library. The flag is a boolean here, not a message.
+      if (!canRenderMap()) {
+        this.mapUnavailable = true;
+        return;
+      }
       const run = ++this._mapRun;
       try {
         const style = await BACKDROPS[this.backdrop]();
@@ -637,6 +651,14 @@ export default {
         event.preventDefault();
         return;
       }
+      if (this.picking) {
+        // Local metres back to a coordinate the cadastre can be asked with.
+        const point = this.toMetres(event);
+        const [[lon, lat]] = toWgs84([point], this.plot.anchor);
+        this.$emit("pick", { lat, lon });
+        event.preventDefault();
+        return;
+      }
       if (!this.navigable) return;
       // The metre the pointer grabbed. It is held under the cursor for as long
       // as the button is down, so the drawing follows the hand exactly.
@@ -708,6 +730,7 @@ export default {
 .site-plan{ display: block; width: 100%; height: auto; touch-action: none; position: relative; }
 .site-plan--dragging{ cursor: grabbing; }
 .site-plan--navigable{ cursor: grab; }
+.site-plan--picking{ cursor: crosshair; }
 .site-plan--panning{ cursor: grabbing; }
 .site-plan--measuring{ cursor: crosshair; }
 .site-plan__dimension--measuring{ fill: var(--w2b-map-violation); }

@@ -847,7 +847,93 @@ dispatched click**, so a test that clicks the button never exercises the form,
 and a test that only triggers `submit` never exercises the button. Both paths
 are tested separately.
 
-## 18. What is still unverified ⚠️
+## 18. Fifth pass, 06.09.2026: what a deployment reported ✅
+
+Three of these came back from a running `docker compose`, and none of them was
+visible from the tests.
+
+### 18.1 The image had no reader in it ✅
+
+The search said „keine Bilderkennung eingerichtet“ on every Compose
+deployment, while the code, the suite and the README all said Tesseract was
+wired up. The image installed `.[poi]` and no system packages beyond
+`libexpat1`: `ocr.available()` is `shutil.which("tesseract")`, and there was
+none. Both packages are needed — `tesseract-ocr` for the binary and
+`tesseract-ocr-deu` for the language data, because the patterns key on the
+words around the number.
+
+### 18.2 A cache with no expiry outlives the code that filled it ✅
+
+Reported as „bei den Kleinanzeigen-Links wird immer noch nicht zuverlässig
+Preis sowie Flurstückgröße gefunden“, with one advert named. Fetched live on
+06.09.2026, that page parses cleanly:
+
+| | |
+| --- | --- |
+| `itemprop="price"` | `165000.00` |
+| `#viewad-price` | `165.000 €` |
+| Attribute list | `Grundstücksfläche: 1.489 m²`, `Grundstücksart: Baugrundstück` |
+| `og:latitude` / `og:longitude` | 51.3677848 / 12.6086485 |
+
+So the reader was right and the *cache* was wrong: `POST /api/listings/extract`
+keys on `inserat:<normalised url>` and the LLM cache has `ttl_s=None`. An
+answer written before the price parser existed is therefore served for ever —
+and only for the listings someone had already opened, which is exactly what
+„nicht zuverlässig“ looks like from outside. The key now carries
+`EXTRACTION_VERSION`.
+
+The same fault was already documented for MOTIS and had never been fixed: its
+cache key was the request parameters alone, so pointing `MOTIS_BASE_URL` at a
+local router kept serving Transitous's answers. That key now carries a hash of
+the base URL.
+
+### 18.3 Local routing was one forgettable variable away from silence ✅
+
+`docker compose --profile local-routing up` brought the router up and left the
+backend talking to Transitous, because `MOTIS_BASE_URL=http://motis:8080` had
+to be typed alongside it. Nothing showed: the two instances agree to the last
+decimal (§ 5 of `routing-motis.md`), so the only sign was whose bandwidth was
+being spent. The services moved into `docker-compose.local-routing.yml`, which
+also sets the variable — naming the file is now the whole opt-in.
+
+`profiles: []` in an override file does **not** clear a profile inherited from
+the base file; `docker compose config` then refuses with „service backend
+depends on undefined service motis“. Moving the services is the way to do it,
+not overriding them.
+
+## 19. The orthophoto with the cadastre on it ✅
+
+A listing shows photographs of the plot, so the ground under the search map
+should be something those can be compared against. Measured against the GeoSN
+services at Flurstück 790/11, all through one 256 px tile at the parcel:
+
+| Layer | z17 | z18 | z19 |
+| --- | --- | --- | --- |
+| `sn_dop_020` (orthophoto) | draws | draws | draws |
+| `adv_alkis_tatsaechliche_nutzung` | — | draws | — |
+| `adv_alkis_gebaeude` | — | draws | — |
+| **`adv_alkis_flurstuecke`** | **empty** | **empty** | **draws** |
+| WebAtlas `Verkehr,Beschriftung` | draws | draws | draws |
+
+**`adv_alkis_flurstuecke` carries `MaxScaleDenominator: 2000`** and answers
+HTTP 200 with a fully transparent 854-byte PNG above it — the same shape as the
+ArcGIS `minScale` trap, on a different service and a different protocol. The
+computed denominators: z17 1:4265, z18 1:2133, z19 1:1066. It is the scale and
+not the style — `Farbe`, `SW`, `Gelb` and the empty string all come back empty
+at z18 — and `STYLES=default` is rejected outright with a
+`ServiceExceptionReport`, so the empty string is the only way to ask for the
+default.
+
+The style to use over a photo is **`Gelb`**, which the layer's own abstract
+describes: „In der Gelb-Darstellung werden keine Flaechen sondern nur Konturen
+dargestellt.“
+
+So the search map's ground is three raster layers in this order — photo,
+streets with their names, parcel outlines from zoom 19 — and the outline layer
+carries that floor as `minzoom`, or the map asks for hundreds of blank tiles on
+the way in and looks like a broken layer rather than a scale.
+
+## 20. What is still unverified ⚠️
 
 * The three prompts in `docs/strategie/extraktion-prompting.html` are drafted
   but have not been run against a model — this listing did not need them.
