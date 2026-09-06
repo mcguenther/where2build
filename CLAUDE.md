@@ -373,14 +373,37 @@ from the user directly. Reopen only if the user asks.
   `/api/parcels/nearby` therefore answers with all 37 parcels within 60 m and
   the wizard draws them on the cadastral ground, each with its number.
 - **The set of parcels is the user's to assemble, and the register does the
-  arithmetic.** The picker toggles membership and asks `/api/parcels/resolve`
-  with the `kennzeichen` of the whole set, so the union and the summed official
-  areas come from the same code every other way in uses — no polygon union in
-  the browser. Two clicks on Lessingweg 44 and 46 give one plot of 1 299 m² with
-  8 boundary points, and the plot page, the checks and the print sheet take it
-  unchanged. Two rules the picker keeps: at least one parcel stays (a plot with
-  none is not a plot), and parcels that do not touch are refused with the reason
-  — their union is a MultiPolygon, and `outerRing` would silently draw one half.
+  arithmetic.** The picker asks `/api/parcels/resolve` with the `kennzeichen` of
+  the whole set, so the union and the summed official areas come from the same
+  code every other way in uses — no polygon union in the browser. Two clicks on
+  Lessingweg 44 and 46 give one plot of 1 299 m² with 8 boundary points, and the
+  plot page, the checks and the print sheet take it unchanged. At least one
+  parcel always stays: a plot with none is not a plot.
+- **A click has two meanings, and the common one is replacing.** Correcting the
+  parcel the coordinate landed on is what nearly every user does; assembling a
+  plot out of several is the rarer case and would otherwise happen by accident.
+  So the default click switches the plot to the parcel clicked, and a switch in
+  the map's toolbar turns on composing, where the same click adds and removes.
+- **A chosen parcel is drawn with no fill, and the drawing above it swallowed
+  the click.** The picker's polygons sat *under* the plot's own fill, so taking a
+  parcel back out never worked: the press landed on the plot, not on the parcel.
+  The group is drawn above the plot now (visually identical — the chosen ones
+  are transparent, the others do not overlap it) and carries
+  `pointer-events: all`, which hit-tests an unpainted area.
+- **A split selection is marked, not refused.** Parcels that do not touch union
+  into a MultiPolygon, which one outline cannot hold — but refusing the click
+  closes the only way back: to drop the middle parcel of three you have to pass
+  through a split plot. So the drawn outline is the piece around the parcel the
+  selection started from (`outerRing` takes `near`, else the largest part), the
+  ones outside it are drawn in red, and "Anlegen und öffnen" is disabled with the
+  reason until they are gone.
+- **The 3 m line's arc at an inward corner is the rule, not decoration.** Where
+  two parcels of unequal depth meet, the plot has a reflex vertex, and "at least
+  3 m from every boundary" means "at least 3 m from that point" — the envelope's
+  own vertices sit at r = 3,00 m from it, measured. Squaring the corner would
+  *remove* buildable land: 1,44 m² on the app's own L-shaped test case (9 − 9π/4
+  = 1,93 m² in theory), and it would pull the corner 1,24 m further in along the
+  diagonal.
 - **`metrics.streetFrontage` measured edge 0, not the street edge.** Harmless
   on a single parcel whose ring starts at a corner, wrong the moment a plot is
   a union: the ring then starts where the two outlines meet, and Mölkau 204+205
@@ -643,6 +666,11 @@ from the user directly. Reopen only if the user asks.
   `draftBuilding` — so the one plot that needed the message got an empty page
   under the header instead. A `v-if` around the branch is what let it survive:
   it only ever ran for a parcel too small for the default footprint.
+- **A suggestion row is read left to right, so the address goes first.** The
+  category sat in the left-hand column and the hit in the right one, which made
+  every row read "Adresse … Lessingweg 44": the useful half last, and furthest
+  from where the caret is. Name first, category small and grey on the right,
+  context underneath.
 - **An absolutely positioned dropdown inside a `.panel` is clipped.** `.panel`
   carries `overflow: hidden` to keep map canvases off its rounded corners, so
   the search suggestions were cut after the first row. The list is in the flow
@@ -700,7 +728,7 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 ## Test and screenshot counts at last check
 
 - `pytest`: 457 passed, 1 skipped
-- `vitest`: 473 passed — plus the integration file, excluded by `npm run test`
+- `vitest`: 477 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
 - `scripts/screenshots.mjs`: 44 images plus two print PDFs. It fails on console
   errors, on horizontal overflow, and if not a single vector tile arrived. It

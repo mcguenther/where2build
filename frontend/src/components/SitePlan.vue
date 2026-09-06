@@ -37,20 +37,6 @@
     <rect v-if="!hasBackdrop" x="0" y="0" :width="width" :height="height" :fill="backgroundFill" />
 
     <g :transform="`rotate(${rotation}, ${width / 2}, ${height / 2})`">
-      <!-- The parcels to choose between, under the chosen one. Each is its own
-           target, so picking the right neighbour is a click rather than a
-           second search — an address coordinate sits on the building, and a few
-           metres either way is the parcel next door. -->
-      <g v-if="choosableParcels.length" class="site-plan__choices">
-        <polygon v-for="parcel in choosableParcels" :key="parcel.key"
-                 class="site-plan__choice" :class="{ 'is-chosen': parcel.chosen }"
-                 :points="path(parcel.ring)" :data-number="parcel.number"
-                 tabindex="0" role="button"
-                 :aria-label="`Flurstück ${parcel.number}, ${parcel.area}`"
-                 :aria-pressed="String(parcel.chosen)"
-                 @keydown.enter.prevent="$emit('choose', parcel.id)"
-                 @keydown.space.prevent="$emit('choose', parcel.id)" />
-      </g>
 
       <polygon :points="path(plot.polygon)" fill="var(--w2b-map-surface)"
                :fill-opacity="hasBackdrop ? 0.42 : 1" />
@@ -154,6 +140,22 @@
         </template>
       </g>
 
+      <!-- The parcels to choose between, above the drawing rather than under
+           it: a chosen parcel is drawn with no fill, and the plot's own fill
+           sat on top of it — so the click that should have taken it back out
+           of the plot never reached it. Nothing changes visually; the chosen
+           ones are transparent and the others do not overlap the plot. -->
+      <g v-if="choosableParcels.length" class="site-plan__choices">
+        <polygon v-for="parcel in choosableParcels" :key="parcel.key"
+                 class="site-plan__choice"
+                 :class="{ 'is-chosen': parcel.chosen, 'is-problem': parcel.problem }"
+                 :points="path(parcel.ring)" :data-number="parcel.number"
+                 tabindex="0" role="button"
+                 :aria-label="`Flurstück ${parcel.number}, ${parcel.area}`"
+                 :aria-pressed="String(parcel.chosen)"
+                 @keydown.enter.prevent="$emit('choose', parcel.id)"
+                 @keydown.space.prevent="$emit('choose', parcel.id)" />
+      </g>
       <!-- The numbers last, so nothing draws over them. Counter-rotated: a
            parcel number read sideways is not a label. -->
       <g v-if="choosableParcels.length" class="site-plan__choice-labels">
@@ -292,6 +294,10 @@ export default {
      *  set of parcels, so this is a set — the drawing marks every one of them
      *  as taken and leaves the rest on offer. */
     chosenParcels: { type: Array, default: () => [] },
+    /** Chosen parcels that are part of a problem — today: they hang off the
+     *  rest of the plot. Marked rather than refused, so the user can click
+     *  their way back to a shape that holds together. */
+    problemParcels: { type: Array, default: () => [] },
     northUp: { type: Boolean, default: false },
     showDimensions: { type: Boolean, default: true },
     showSetbacks: { type: Boolean, default: true },
@@ -379,6 +385,7 @@ export default {
           area: area(properties.flaeche_amtlich_m2),
           size: Number(properties.flaeche_amtlich_m2) || 0,
           chosen: this.chosenParcels.includes(properties.kennzeichen),
+          problem: this.problemParcels.includes(properties.kennzeichen),
           ring: local,
           at: this.p(centre)
         }];
@@ -951,10 +958,21 @@ export default {
   fill: var(--w2b-map-surface); fill-opacity: .12;
   stroke: var(--w2b-map-boundary); stroke-width: 1; stroke-opacity: .45;
   cursor: pointer;
+  /* A chosen parcel is drawn with no fill at all, and an untouchable parcel
+     cannot be deselected — which is exactly what "taking one out again does
+     not work" was. `all` hit-tests the area whether or not it is painted. */
+  pointer-events: all;
 }
 .site-plan__choice:hover{ fill-opacity: .3; stroke-opacity: .9; }
 .site-plan__choice:focus-visible{ outline: none; stroke: var(--w2b-primary); stroke-width: 2.5; }
 .site-plan__choice.is-chosen{ fill-opacity: 0; stroke-opacity: 0; }
+/* After `is-chosen`, because a marked parcel is a chosen one: it is in the
+   plot and that is the problem. */
+.site-plan__choice.is-problem{
+  fill: var(--w2b-map-violation); fill-opacity: .22;
+  stroke: var(--w2b-map-violation); stroke-width: 2; stroke-opacity: 1;
+  stroke-dasharray: 7 4;
+}
 
 .site-plan__choice-label{
   font-family: var(--w2b-font-mono); font-size: 11px; font-weight: 500;

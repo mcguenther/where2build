@@ -28,8 +28,8 @@
           class="hit" :class="{ 'is-active': i === activeIndex }"
           role="option" :aria-selected="i === activeIndex ? 'true' : 'false'"
           @mousedown.prevent="choose(hit)">
-        <span class="hit__kind">{{ hit.kind }}</span>
         <span class="hit__name">{{ hit.name }}</span>
+        <span class="hit__kind">{{ hit.kind }}</span>
         <span class="hit__note">{{ hit.note }}</span>
       </li>
     </ul>
@@ -309,7 +309,15 @@ export default {
 }
 .hit + .hit{ border-top: 1px solid var(--w2b-line-faint); }
 .hit.is-active, .hit:hover{ background: var(--w2b-primary-veil); }
-.hit__name{ font-size: var(--w2b-text-s); font-weight: 600; line-height: 1.35; }
+/* The address first, where the eye and the caret already are. It used to be in
+   the right-hand column with the category on the left, so the row read
+   "Adresse … Lessingweg 44" — the useful half last and furthest from the
+   typing. The category is what is now on the right: it says which index
+   answered, which matters only once the name has been read. */
+.hit__name{
+  font-size: var(--w2b-text-s); font-weight: 600; line-height: 1.35;
+  overflow-wrap: anywhere;
+}
 .hit__kind{
   font-family: var(--w2b-font-mono); font-size: 10px; color: var(--w2b-muted);
   text-align: right; white-space: nowrap;

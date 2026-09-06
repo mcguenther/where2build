@@ -124,6 +124,22 @@ describe("Suchfeld", () => {
     field.unmount();
   });
 
+  it("stellt in einer Zeile die Adresse vor die Kategorie", async () => {
+    // Vorher stand die Kategorie links und der Treffer rechts: die Zeile las
+    // sich „Adresse … Lessingweg 44“ — die nützliche Hälfte zuletzt und am
+    // weitesten weg vom Tippen.
+    const field = mount(PlotSearch);
+    await type(field, "Lessingweg 44");
+
+    const row = field.findAll(".hit")
+      .find(hit => hit.find(".hit__kind").text() === "Adresse");
+    const parts = [...row.element.children].map(node => node.className);
+    expect(parts[0]).toBe("hit__name");
+    expect(parts[1]).toBe("hit__kind");
+    expect(row.find(".hit__name").text()).toContain("Lessingweg 44");
+    field.unmount();
+  });
+
   it("übernimmt eine Gemarkung ins Feld, statt sie aufzulösen", async () => {
     const field = mount(PlotSearch);
     await type(field, "Mölkau");

@@ -67,6 +67,25 @@ describe("Bebauungsfenster", () => {
     expect(buildableArea(SQUARE, [6, 6, 6, 6])).toEqual([]);
   });
 
+  it("rundet am einspringenden Eck — mit genau dem Radius der Abstandstiefe", () => {
+    /* Wo zwei unterschiedlich tiefe Flurstücke aneinanderstoßen, hat das
+       Grundstück ein einspringendes Eck. „Mindestens 3 m von jeder Grenze“
+       heißt dort: mindestens 3 m von diesem *Punkt* — die Grenze der
+       Abstandsfläche ist der Kreis um ihn. Eckig gezeichnet nähme das dem
+       Grundstück Fläche weg, die es nach der Regel hat. */
+    const L = [
+      { x: 0, y: 0 }, { x: 40, y: 0 }, { x: 40, y: 20 },
+      { x: 20, y: 20 }, { x: 20, y: 30 }, { x: 0, y: 30 }
+    ];
+    const envelope = buildableArea(L, L.map(() => 3), { step: 0.15, safety: 0 });
+    const atCorner = envelope.filter(v => Math.hypot(v.x - 20, v.y - 20) < 4.2);
+
+    expect(atCorner.length).toBeGreaterThan(3);
+    for (const v of atCorner) expect(Math.hypot(v.x - 20, v.y - 20)).toBeCloseTo(3, 2);
+    // Und die runde Ecke ist die großzügigere: das eckige Pendant misst 616 m².
+    expect(polygonArea(envelope)).toBeGreaterThan(616);
+  });
+
   it("hält überall den geforderten Abstand ein", () => {
     for (const p of buildableArea(LIEBERTWOLKWITZ, [3, 3, 3, 3])) {
       expect(distanceToBoundary(p, LIEBERTWOLKWITZ)).toBeGreaterThan(2.99);

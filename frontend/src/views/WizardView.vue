@@ -135,9 +135,9 @@
     <!-- 3 · Grundstück: die Flurstücke und die Angaben dazu -->
     <section v-else class="stack">
       <p class="subtitle">
-        So liegen die Flurstücke im Kataster. Ein Klick nimmt eines dazu oder wieder
-        heraus — ein Grundstück kann aus mehreren bestehen. Den Ausschnitt bewegt die
-        gedrückte Maustaste, das Mausrad zoomt, ein Doppelklick setzt ihn zurück.
+        So liegen die Flurstücke im Kataster. Ein Klick wählt ein anderes — zum
+        Zusammensetzen mehrerer umschalten. Den Ausschnitt bewegt die gedrückte
+        Maustaste, das Mausrad zoomt, ein Doppelklick setzt ihn zurück.
       </p>
 
       <!-- The service found something implausible for this listing. Not an
@@ -159,6 +159,20 @@
 
       <div class="check-grid">
         <div class="panel">
+          <!-- Two ways to click, because they are two different intentions:
+               correcting the parcel is the common one, assembling a plot out of
+               several is the rarer one and would otherwise happen by accident. -->
+          <div class="plan-bar">
+            <span class="plan-bar__label">Klick</span>
+            <div class="button-group" role="group" aria-label="Was ein Klick tut">
+              <button type="button" :aria-pressed="String(!composing)"
+                      @click="composing = false">Wechseln</button>
+              <button type="button" :aria-pressed="String(composing)"
+                      @click="composing = true">Zusammensetzen</button>
+            </div>
+            <div class="spacer"></div>
+            <span class="plan-bar__label">{{ selection.length }} gewählt</span>
+          </div>
           <!-- No house here: this step is about the parcel's outline, and a
                body nobody has planned yet only distracts from it. -->
           <!-- No dimension chains: the question here is which parcel, not how
@@ -173,12 +187,15 @@
                     overlay="flurstuecke" north-up hold-frame
                     :show-building="false" :show-dimensions="false" navigable
                     :parcels="choices" :chosen-parcels="selection"
-                    @choose="toggleParcel" />
-          <p v-if="selectionNote" class="notice" role="status">{{ selectionNote }}</p>
+                    :problem-parcels="detached"
+                    @choose="chooseParcel" />
+          <p v-if="selectionNote" class="notice" :class="{ 'notice--error': detached.length }"
+             role="status">{{ selectionNote }}</p>
           <p class="panel__footnote">
             <template v-if="choices.length > 1">
               {{ choices.length }} Flurstücke im Umkreis — die Katasterlinien beschriften
-              jedes mit seiner Nummer, ein Klick nimmt es dazu oder heraus.
+              jedes mit seiner Nummer.
+              {{ composing ? "Ein Klick nimmt eines dazu oder heraus." : "Ein Klick wählt ein anderes." }}
             </template>
             Luftbild und Kataster: © GeoSN, dl-de/by-2-0
           </p>
@@ -223,8 +240,13 @@
             bleibt dann leer; nachtragen lässt sie sich später.
           </p>
           <div class="row">
+            <!-- A split plot may be assembled on the way to a whole one, but it
+                 cannot be created: the drawing holds one outline, and half a
+                 plot would be a plot nobody chose. -->
             <button type="button" :class="doubt ? 'btn btn--secondary' : 'btn'"
-                    :disabled="busy" @click="create">
+                    :disabled="busy || detached.length > 0"
+                    :title="detached.length ? 'Die rot markierten Flurstücke hängen nicht mit dem übrigen Grundstück zusammen.' : null"
+                    @click="create">
               {{ doubt ? "Trotzdem anlegen" : "Anlegen und öffnen" }}
             </button>
             <button type="button" class="btn btn--quiet" @click="stepBack(returnStage)">Zurück</button>
@@ -242,8 +264,9 @@ import PlotSearch from "../components/PlotSearch.vue";
 import { state, addPlot, autoSeatHouse } from "../lib/store.js";
 import { WIZARD_STAGES, wizardStage } from "../router/stages.js";
 import { readListing, readPage, resolveParcel, landValue, nearbyParcels } from "../lib/api.js";
-import { plotFromCadastre, parcelForAddress } from "../lib/plots.js";
-import { polygonArea } from "../lib/geometry.js";
+import { plotFromCadastre, parcelForAddress, outerRing } from "../lib/plots.js";
+import { polygonArea, polygonCentroid, pointInPolygon } from "../lib/geometry.js";
+import { toLocal } from "../lib/projection.js";
 import { area, euroPerSqm, num } from "../lib/format.js";
 
 /** "212.000 €" and "1.104 m²" as a German listing writes them. */
@@ -304,6 +327,12 @@ export default {
       selection: [],
       /** Why the last click did not do what it looked like it would. */
       selectionNote: null,
+      /** What a click does: replace the plot's parcel, or add to it. Replacing
+       *  is the default because correcting the parcel is the common case. */
+      composing: false,
+      /** Chosen parcels the drawn outline does not reach — the plot is in two
+       *  pieces. Allowed on the way through, marked in red, and not a plot. */
+      detached: [],
       /** The address the search picked, so the cadastre's own Lagebezeichnung
        *  can be checked against it rather than the coordinate being trusted. */
       searchedAddress: null,
@@ -488,15 +517,19 @@ export default {
                      houseTypeId: plot.houseTypeId, ratio: plot.ratio };
     },
 
-    /** A click on the map: the parcel joins the plot or leaves it.
+    /** A click on the map, in whichever of the two meanings is switched on.
      *
-     * A plot is a set of parcels — that is the normal case, not the exception —
-     * so this toggles membership and asks the cadastre for the new set. The
-     * union and the summed official areas come from there, the same way every
-     * other route into this wizard gets them. */
-    async toggleParcel(kennzeichen) {
+     * Replacing is the default: the common case is that the coordinate landed
+     * on the wrong parcel and one click puts that right. Composing is the other
+     * one — a plot is a set of parcels, and then a click adds or removes. */
+    async chooseParcel(kennzeichen) {
       if (this.busy || !this.choices.length) return;
       const taken = this.selection.includes(kennzeichen);
+      if (!this.composing) {
+        if (taken && this.selection.length === 1) return;
+        await this.applySelection([kennzeichen]);
+        return;
+      }
       if (taken && this.selection.length === 1) {
         this.selectionNote = "Ein Grundstück besteht aus mindestens einem Flurstück. "
           + "Erst ein anderes dazunehmen, dann lässt sich dieses abwählen.";
@@ -507,6 +540,33 @@ export default {
         : [...this.selection, kennzeichen]);
     },
 
+    /** Which chosen parcels the drawn outline does not contain.
+     *
+     * Parcels that do not touch are a real set in the register and a shape one
+     * outline cannot hold. Refusing the click was worse than allowing it: the
+     * way back to a whole plot often leads through a split one — take the
+     * middle parcel out, then the far one. So they are marked instead, and the
+     * step will not create a plot while any of them stands. */
+    /** A feature's centre as `[lon, lat]`, or null when it carries no ring. */
+    centreOf(feature) {
+      const ring = outerRing(feature?.geometry);
+      if (ring.length < 4) return null;
+      const n = ring.length;
+      return [ring.reduce((s, c) => s + c[0], 0) / n, ring.reduce((s, c) => s + c[1], 0) / n];
+    },
+
+    detachedParcels(plot, features) {
+      if (!plot?.anchor || !plot.polygon?.length) return [];
+      return features
+        .filter(feature => {
+          const ring = outerRing(feature.geometry);
+          if (ring.length < 4) return false;
+          return !pointInPolygon(polygonCentroid(toLocal(ring, plot.anchor)), plot.polygon);
+        })
+        .map(feature => feature.properties?.kennzeichen)
+        .filter(Boolean);
+    },
+
     /** Resolve a set of parcel keys into the draft, keeping what the cadastre
      *  cannot know: the name and price the user typed, and the note. */
     async applySelection(keys) {
@@ -514,21 +574,22 @@ export default {
       this.selectionNote = null;
       try {
         const answer = await resolveParcel({ kennzeichen: keys });
-        /* Two parcels that do not touch are a real plot in the register and a
-           shape this drawing cannot hold: the outline would be one of the two
-           parts, silently. So the click is refused with the reason. */
-        if (answer?.grundstueck?.geometry?.type === "MultiPolygon") {
-          this.selectionNote = "Diese Flurstücke grenzen nicht aneinander. Der Lageplan "
-            + "zeichnet einen zusammenhängenden Umriss — bitte nur benachbarte Flurstücke "
-            + "zusammenfassen.";
-          return;
-        }
         const kept = {
-          name: this.draft.name, askingPrice: this.draft.askingPrice, note: this.draft.note
+          name: this.draft.name, askingPrice: this.draft.askingPrice, note: this.draft.note,
+          /* Which piece is the plot when the set falls apart: the one around the
+             parcel this selection started from, not whichever the register
+             listed first. */
+          near: this.centreOf(answer.features?.[0])
         };
         const plot = await this.withLandValue(plotFromCadastre(answer, kept));
         this.draft = { ...plot, houseTypeId: this.draft.houseTypeId, ratio: this.draft.ratio };
         this.selection = keys;
+        this.detached = this.detachedParcels(plot, answer.features ?? []);
+        this.selectionNote = this.detached.length
+          ? "Die rot markierten Flurstücke hängen nicht mit dem übrigen Grundstück "
+            + "zusammen. Gezeichnet ist nur der zusammenhängende Teil — entweder die "
+            + "markierten wieder abwählen oder das Flurstück dazwischen dazunehmen."
+          : null;
         this.corrected = null;
         this.doubt = null;
       } catch (error) {
@@ -575,6 +636,7 @@ export default {
       this.choices = [];
       this.corrected = null;
       this.selectionNote = null;
+      this.detached = [];
       this.selection = (answer.features ?? [])
         .map(feature => feature.properties?.kennzeichen)
         .filter(Boolean);

@@ -259,9 +259,10 @@ describe("Der Schritt „Flurstück“", () => {
 describe("Ein Grundstück aus mehreren Flurstücken", () => {
   const KEY_44 = "145592___00204____02";
   const KEY_46 = "145592___00205____02";
+  const KEY_84 = "145592___00084000y02";
 
   /** The wizard at the parcel step, one parcel chosen, its neighbours offered. */
-  const atParcelStep = async () => {
+  const atParcelStep = async (composing = true) => {
     resolveParcel.mockResolvedValue(moelkau);
     landValue.mockRejectedValue(new Error("Kein Bodenrichtwert."));
     nearbyParcels.mockResolvedValue({ features: moelkauZwei.features });
@@ -274,15 +275,31 @@ describe("Ein Grundstück aus mehreren Flurstücken", () => {
     await flushPromises();
     await w.setProps({ stage: "flurstueck" });
     await flushPromises();
+    w.vm.composing = composing;
+    await nextTick();
     return w;
   };
 
-  it("nimmt ein angeklicktes Flurstück dazu und rechnet beide zusammen", async () => {
+  it("wechselt per Klick das Flurstück, statt es dazuzunehmen", async () => {
+    // Der häufige Fall: die Koordinate lag auf dem Nachbarn, ein Klick rückt das
+    // gerade. Zusammensetzen ist die Ausnahme und muss angeschaltet werden.
+    const w = await atParcelStep(false);
+    expect(w.vm.selection).toEqual([KEY_44]);
+
+    resolveParcel.mockResolvedValue(moelkau);
+    await w.vm.chooseParcel(KEY_46);
+    await flushPromises();
+
+    expect(resolveParcel).toHaveBeenLastCalledWith({ kennzeichen: [KEY_46] });
+    w.unmount();
+  });
+
+  it("nimmt im Zusammensetzen-Modus ein Flurstück dazu und rechnet beide zusammen", async () => {
     const w = await atParcelStep();
     expect(w.vm.selection).toEqual([KEY_44]);
 
     resolveParcel.mockResolvedValue(moelkauZwei);
-    await w.vm.toggleParcel(KEY_46);
+    await w.vm.chooseParcel(KEY_46);
     await flushPromises();
 
     expect(resolveParcel).toHaveBeenLastCalledWith({ kennzeichen: [KEY_44, KEY_46] });
@@ -297,11 +314,11 @@ describe("Ein Grundstück aus mehreren Flurstücken", () => {
   it("nimmt ein zweites Flurstück auf Klick wieder heraus", async () => {
     const w = await atParcelStep();
     resolveParcel.mockResolvedValue(moelkauZwei);
-    await w.vm.toggleParcel(KEY_46);
+    await w.vm.chooseParcel(KEY_46);
     await flushPromises();
 
     resolveParcel.mockResolvedValue(moelkau);
-    await w.vm.toggleParcel(KEY_46);
+    await w.vm.chooseParcel(KEY_46);
     await flushPromises();
 
     expect(resolveParcel).toHaveBeenLastCalledWith({ kennzeichen: [KEY_44] });
@@ -314,7 +331,7 @@ describe("Ein Grundstück aus mehreren Flurstücken", () => {
     const w = await atParcelStep();
     const calls = resolveParcel.mock.calls.length;
 
-    await w.vm.toggleParcel(KEY_44);
+    await w.vm.chooseParcel(KEY_44);
     await flushPromises();
 
     expect(resolveParcel.mock.calls.length).toBe(calls);
@@ -323,18 +340,39 @@ describe("Ein Grundstück aus mehreren Flurstücken", () => {
     w.unmount();
   });
 
-  it("weist Flurstücke ab, die nicht aneinandergrenzen", async () => {
-    // Der Lageplan zeichnet einen Umriss; von zwei getrennten Teilen wäre einer
-    // davon stillschweigend verschwunden.
+  it("markiert getrennte Flurstücke rot, statt den Klick abzulehnen", async () => {
+    // Der Weg zurück zu einem ganzen Grundstück führt oft durch ein geteiltes:
+    // erst das mittlere heraus, dann das ferne. Wer den Klick verweigert,
+    // verschließt genau diesen Weg.
     const w = await atParcelStep();
     resolveParcel.mockResolvedValue(moelkauGetrennt);
 
-    await w.vm.toggleParcel("145592___00084000y02");
+    await w.vm.chooseParcel(KEY_84);
     await flushPromises();
 
-    expect(w.vm.selection).toEqual([KEY_44]);
-    expect(w.vm.draft.officialArea).toBe(650);
-    expect(w.text()).toContain("grenzen nicht aneinander");
+    expect(w.vm.selection).toEqual([KEY_44, KEY_84]);
+    expect(w.vm.detached).toEqual([KEY_84]);
+    expect(w.findComponent({ name: "SitePlan" }).props("problemParcels")).toEqual([KEY_84]);
+    expect(w.text()).toContain("hängen nicht mit dem übrigen Grundstück zusammen");
+    // Und angelegt wird so nichts: der Lageplan hält einen Umriss.
+    const create = w.findAll("button").find(b => b.text().includes("Anlegen und öffnen"));
+    expect(create.attributes("disabled")).toBeDefined();
+    w.unmount();
+  });
+
+  it("gibt den Weg wieder frei, sobald das getrennte Flurstück draußen ist", async () => {
+    const w = await atParcelStep();
+    resolveParcel.mockResolvedValue(moelkauGetrennt);
+    await w.vm.chooseParcel(KEY_84);
+    await flushPromises();
+
+    resolveParcel.mockResolvedValue(moelkau);
+    await w.vm.chooseParcel(KEY_84);
+    await flushPromises();
+
+    expect(w.vm.detached).toEqual([]);
+    const create = w.findAll("button").find(b => b.text().includes("Anlegen und öffnen"));
+    expect(create.attributes("disabled")).toBeUndefined();
     w.unmount();
   });
 });
