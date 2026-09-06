@@ -241,7 +241,7 @@ nothing else.
 
 | Method | Path | |
 |---|---|---|
-| `POST` | `/api/parcels/resolve` | address, coordinate (WGS84 or ETRS89/UTM33N as the Geoportal prints it) or *Gemarkung* + numerator/denominator → GeoJSON in EPSG:4326 with the official area |
+| `POST` | `/api/parcels/resolve` | address, coordinate (WGS84 or ETRS89/UTM33N as the Geoportal prints it), *Gemarkung* + numerator/denominator, or a set of `kennzeichen` → GeoJSON in EPSG:4326 with the official area. A plot is a set of parcels: the geometries are unioned and the official areas summed |
 | `POST` | `/api/parcels/nearby` | one coordinate → the parcels around it, the one covering it first, then by distance — an address coordinate sits on the building the register recorded, and a few metres either way is the neighbour's parcel |
 | `POST` | `/api/listings/extract` | `{url}` or `{text}` → listing fields, each with its source |
 | `POST` | `/api/housetypes/extract` | `{url}` → house type, fetch restricted to the manufacturer's domain |

@@ -15,6 +15,8 @@ import { state } from "../src/lib/store.js";
 import { realState, realPlot, mountWithRouter } from "./helpers.js";
 import directory from "./fixtures/gemarkungen.json";
 import moelkau from "./fixtures/parcel-moelkau.json";
+import moelkauZwei from "./fixtures/parcel-moelkau-zwei.json";
+import moelkauGetrennt from "./fixtures/parcel-moelkau-getrennt.json";
 
 vi.mock("../src/lib/api.js", () => ({
   cadastralDistricts: vi.fn(),
@@ -26,9 +28,11 @@ vi.mock("../src/lib/api.js", () => ({
   backendHealth: vi.fn(() => Promise.resolve(null)),
   reachability: vi.fn(),
   geocode: vi.fn(),
-  nearby: vi.fn()
+  nearby: vi.fn(),
+  nearbyParcels: vi.fn()
 }));
-const { cadastralDistricts, resolveParcel, landValue } = await import("../src/lib/api.js");
+const { cadastralDistricts, resolveParcel, landValue, nearbyParcels } =
+  await import("../src/lib/api.js");
 
 beforeEach(() => {
   localStorage.clear();
@@ -239,8 +243,98 @@ describe("Der Schritt „Flurstück“", () => {
     const plan = wizard.findComponent({ name: "SitePlan" });
     expect(plan.exists()).toBe(true);
     expect(plan.props("showBuilding")).toBe(false);
-    expect(wizard.text()).toContain("Passt");
+    expect(wizard.text()).toContain("Anlegen und öffnen");
     expect(wizard.text()).not.toContain("Baukörper");
     wizard.unmount();
+  });
+});
+
+
+/**
+ * A plot is a set of parcels, and this is where the user assembles it: the
+ * fixtures are the backend's real answers for Lessingweg 44 alone, together
+ * with 46 next door, and together with 84 two streets away — which the register
+ * unions into two separate pieces.
+ */
+describe("Ein Grundstück aus mehreren Flurstücken", () => {
+  const KEY_44 = "145592___00204____02";
+  const KEY_46 = "145592___00205____02";
+
+  /** The wizard at the parcel step, one parcel chosen, its neighbours offered. */
+  const atParcelStep = async () => {
+    resolveParcel.mockResolvedValue(moelkau);
+    landValue.mockRejectedValue(new Error("Kein Bodenrichtwert."));
+    nearbyParcels.mockResolvedValue({ features: moelkauZwei.features });
+
+    const w = mountWithRouter(WizardView, { path: "/aufnahme/quelle", props: { stage: "quelle" } });
+    await w.find('input[value="parcel"]').setValue();
+    await typeInto(w.findComponent(CadastralDistrictPicker).find("input"), "Mölkau");
+    await typeInto(w.find("#q-parcel-number"), "204");
+    await w.findAll("button").find(b => b.text() === "Nachschlagen").trigger("click");
+    await flushPromises();
+    await w.setProps({ stage: "flurstueck" });
+    await flushPromises();
+    return w;
+  };
+
+  it("nimmt ein angeklicktes Flurstück dazu und rechnet beide zusammen", async () => {
+    const w = await atParcelStep();
+    expect(w.vm.selection).toEqual([KEY_44]);
+
+    resolveParcel.mockResolvedValue(moelkauZwei);
+    await w.vm.toggleParcel(KEY_46);
+    await flushPromises();
+
+    expect(resolveParcel).toHaveBeenLastCalledWith({ kennzeichen: [KEY_44, KEY_46] });
+    expect(w.vm.selection).toEqual([KEY_44, KEY_46]);
+    // Amtliche Flächen summiert, nicht die gerechnete Fläche des Umrisses.
+    expect(w.vm.draft.officialArea).toBe(1299);
+    expect(w.vm.draft.flurstuecke).toEqual(["204", "205"]);
+    expect(w.text()).toContain("204 · 205");
+    w.unmount();
+  });
+
+  it("nimmt ein zweites Flurstück auf Klick wieder heraus", async () => {
+    const w = await atParcelStep();
+    resolveParcel.mockResolvedValue(moelkauZwei);
+    await w.vm.toggleParcel(KEY_46);
+    await flushPromises();
+
+    resolveParcel.mockResolvedValue(moelkau);
+    await w.vm.toggleParcel(KEY_46);
+    await flushPromises();
+
+    expect(resolveParcel).toHaveBeenLastCalledWith({ kennzeichen: [KEY_44] });
+    expect(w.vm.selection).toEqual([KEY_44]);
+    expect(w.vm.draft.officialArea).toBe(650);
+    w.unmount();
+  });
+
+  it("lässt das letzte Flurstück nicht abwählen und sagt warum", async () => {
+    const w = await atParcelStep();
+    const calls = resolveParcel.mock.calls.length;
+
+    await w.vm.toggleParcel(KEY_44);
+    await flushPromises();
+
+    expect(resolveParcel.mock.calls.length).toBe(calls);
+    expect(w.vm.selection).toEqual([KEY_44]);
+    expect(w.text()).toContain("mindestens einem Flurstück");
+    w.unmount();
+  });
+
+  it("weist Flurstücke ab, die nicht aneinandergrenzen", async () => {
+    // Der Lageplan zeichnet einen Umriss; von zwei getrennten Teilen wäre einer
+    // davon stillschweigend verschwunden.
+    const w = await atParcelStep();
+    resolveParcel.mockResolvedValue(moelkauGetrennt);
+
+    await w.vm.toggleParcel("145592___00084000y02");
+    await flushPromises();
+
+    expect(w.vm.selection).toEqual([KEY_44]);
+    expect(w.vm.draft.officialArea).toBe(650);
+    expect(w.text()).toContain("grenzen nicht aneinander");
+    w.unmount();
   });
 });

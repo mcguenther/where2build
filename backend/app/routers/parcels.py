@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from fastapi import APIRouter, Depends
 
 from ..deps import alkis_service, motis_service
@@ -27,6 +29,16 @@ SHORT_KEY_HINT = (
     "Der Gemarkungsschlüssel „{entered}“ wurde als „{full_key}“ gesucht: in "
     "Sachsen ist er sechsstellig und beginnt mit der Landesnummer 14. Die Kartenebene "
     "„Flurstück“ im Geoportal zeigt nur die letzten vier Stellen."
+)
+
+NOT_FOUND_BY_KEY = (
+    "Zu dem Flurstückskennzeichen {keys} wurde nichts gefunden. Es stammt aus der "
+    "Nachbarschaftsabfrage; bitte die Auswahl auf der Karte noch einmal treffen."
+)
+
+COMPOSED_HINT = (
+    "Das Grundstück besteht aus {count} Flurstücken. Fläche und Umriss sind ihre "
+    "Summe beziehungsweise Vereinigung — so führt das Kataster sie einzeln."
 )
 
 NOT_FOUND_BY_IDENTIFIER = (
@@ -76,7 +88,17 @@ async def resolve(
     hints: list[str] = []
     address_match: GeocodeTreffer | None = None
 
-    if payload.gemarkung and payload.zaehler is not None:
+    if payload.kennzeichen:
+        found = await asyncio.gather(
+            *(alkis.by_kennzeichen(key) for key in payload.kennzeichen)
+        )
+        parcels = [parcel for group in found for parcel in group]
+        missing = [key for key, group in zip(payload.kennzeichen, found) if not group]
+        if missing:
+            raise NotFoundError(NOT_FOUND_BY_KEY.format(keys=", ".join(missing)))
+        if len(payload.kennzeichen) > 1:
+            hints.append(COMPOSED_HINT.format(count=len(payload.kennzeichen)))
+    elif payload.gemarkung and payload.zaehler is not None:
         expanded = expand_gemarkung_key(payload.gemarkung)
         if expanded != payload.gemarkung.strip():
             hints.append(

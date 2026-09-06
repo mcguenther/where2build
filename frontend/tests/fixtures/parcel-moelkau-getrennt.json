@@ -1,0 +1,198 @@
+{
+ "type": "FeatureCollection",
+ "crs_hinweis": "EPSG:4326 (WGS84); Längen und Flächen wurden in EPSG:25833 gerechnet.",
+ "features": [
+  {
+   "type": "Feature",
+   "id": "DESNALK0v90009BRFL",
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       12.44208139204319,
+       51.336394069671584
+      ],
+      [
+       12.442093879016328,
+       51.33641065752354
+      ],
+      [
+       12.442161513146377,
+       51.33650414333532
+      ],
+      [
+       12.441529940640779,
+       51.33667614800694
+      ],
+      [
+       12.441452528570872,
+       51.336564891946715
+      ],
+      [
+       12.44208139204319,
+       51.336394069671584
+      ]
+     ]
+    ]
+   },
+   "properties": {
+    "kennzeichen": "145592___00204____02",
+    "gemarkung": "Mölkau",
+    "gemarkungsnummer": "145592",
+    "flur": null,
+    "zaehler": "204",
+    "nenner": null,
+    "flaeche_amtlich_m2": 650.0,
+    "flaeche_berechnet_m2": 645.57,
+    "lagebezeichnung": "Lessingweg 44",
+    "gemeinde": "Stadt Leipzig",
+    "aktualitaet": "2019-07-09"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "DESNALK0v9000678FL",
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       12.43986296765469,
+       51.33542052145425
+      ],
+      [
+       12.440062550288372,
+       51.3353701848252
+      ],
+      [
+       12.440215008698248,
+       51.335433742082415
+      ],
+      [
+       12.440339833402087,
+       51.3356590176583
+      ],
+      [
+       12.440053872361176,
+       51.33571912206591
+      ],
+      [
+       12.439963808564137,
+       51.335548228255476
+      ],
+      [
+       12.43986296765469,
+       51.33542052145425
+      ]
+     ]
+    ]
+   },
+   "properties": {
+    "kennzeichen": "145592___00084000y02",
+    "gemarkung": "Mölkau",
+    "gemarkungsnummer": "145592",
+    "flur": null,
+    "zaehler": "84",
+    "nenner": "y",
+    "flaeche_amtlich_m2": 730.0,
+    "flaeche_berechnet_m2": 733.24,
+    "lagebezeichnung": "Körnerweg 7, 7a",
+    "gemeinde": "Stadt Leipzig",
+    "aktualitaet": "2024-02-07"
+   }
+  }
+ ],
+ "grundstueck": {
+  "type": "Feature",
+  "geometry": {
+   "type": "MultiPolygon",
+   "coordinates": [
+    [
+     [
+      [
+       12.439963808564137,
+       51.335548228255476
+      ],
+      [
+       12.440053872361176,
+       51.33571912206591
+      ],
+      [
+       12.440339833402087,
+       51.3356590176583
+      ],
+      [
+       12.440215008698248,
+       51.335433742082415
+      ],
+      [
+       12.440062550288372,
+       51.3353701848252
+      ],
+      [
+       12.43986296765469,
+       51.33542052145425
+      ],
+      [
+       12.439963808564137,
+       51.335548228255476
+      ]
+     ]
+    ],
+    [
+     [
+      [
+       12.441452528570872,
+       51.336564891946715
+      ],
+      [
+       12.441529940640779,
+       51.33667614800694
+      ],
+      [
+       12.442161513146377,
+       51.33650414333532
+      ],
+      [
+       12.442093879016328,
+       51.33641065752354
+      ],
+      [
+       12.44208139204319,
+       51.336394069671584
+      ],
+      [
+       12.441452528570872,
+       51.336564891946715
+      ]
+     ]
+    ]
+   ]
+  },
+  "properties": {
+   "anzahl_flurstuecke": 2,
+   "kennzeichen": [
+    "145592___00204____02",
+    "145592___00084000y02"
+   ],
+   "flaeche_amtlich_m2": 1380.0,
+   "flaeche_berechnet_m2": 1378.82,
+   "gemarkung": "Mölkau",
+   "gemeinde": "Stadt Leipzig"
+  }
+ },
+ "quelle": "Landesamt für Geobasisinformation Sachsen (GeoSN), dl-de/by-2-0",
+ "hinweis": "Das Grundstück besteht aus 2 Flurstücken. Fläche und Umriss sind ihre Summe beziehungsweise Vereinigung — so führt das Kataster sie einzeln.",
+ "plausibility": {
+  "plausible": true,
+  "issues": [],
+  "expected_area_m2": null,
+  "flaeche_amtlich_m2": 1380.0,
+  "area_factor": null,
+  "longest_extent_m": 37.0,
+  "shortest_extent_m": 22.2,
+  "elongation": 1.67,
+  "warning": null
+ }
+}

@@ -244,7 +244,7 @@ def parse_flurstuecksnummer(value: str) -> tuple[int, str | None]:
 
 
 class ParcelResolveRequest(BaseModel):
-    """One of three ways in: address, coordinate, or cadastral identifier.
+    """One of four ways in: address, coordinate, cadastral identifier, or keys.
 
     The cadastral way in accepts both spellings: the two ALKIS attributes
     (``zaehler`` plus optional ``nenner``) and the single ``flurstuecksnummer``
@@ -276,6 +276,15 @@ class ParcelResolveRequest(BaseModel):
         default=None,
         max_length=20,
         description="Flurstücksnummer wie im Geoportal, etwa „85/1“, „476“ oder „41/e“.",
+    )
+    # A plot is a set of parcels, and the user assembles that set by clicking:
+    # this is that set, as the parcel keys `/nearby` answered with. The union
+    # and the summed official areas are the same code every other way in uses.
+    kennzeichen: list[str] | None = Field(
+        default=None,
+        min_length=1,
+        max_length=20,
+        description="Flurstückskennzeichen, die zusammen ein Grundstück bilden.",
     )
     # What the listing says the plot measures. Only ever used to judge the
     # answer, never to filter it -- see app/plausibility.py.
@@ -331,15 +340,24 @@ class ParcelResolveRequest(BaseModel):
                 "Zu einer Flurstücksnummer wird die Gemarkung benötigt — "
                 "dieselbe Nummer gibt es in jeder Gemarkung."
             )
-        chosen = [by_address, by_point, by_parcel]
+        by_keys = bool(self.kennzeichen)
+        if by_keys:
+            keys = [key.strip() for key in self.kennzeichen if key and key.strip()]
+            if not keys:
+                raise ValueError("Ein Flurstückskennzeichen darf nicht leer sein.")
+            # A set of parcels, not a list: the same key twice would be counted
+            # twice in the official area.
+            self.kennzeichen = list(dict.fromkeys(keys))
+        chosen = [by_address, by_point, by_parcel, by_keys]
         if sum(chosen) == 0:
             raise ValueError(
-                "Bitte Adresse, Koordinate (lat/lon) oder Gemarkung mit Flurstücksnummer angeben."
+                "Bitte Adresse, Koordinate (lat/lon), Gemarkung mit Flurstücksnummer "
+                "oder Flurstückskennzeichen angeben."
             )
         if sum(chosen) > 1:
             raise ValueError(
-                "Bitte nur einen Weg angeben: Adresse, Koordinate oder Gemarkung "
-                "mit Flurstücksnummer."
+                "Bitte nur einen Weg angeben: Adresse, Koordinate, Gemarkung mit "
+                "Flurstücksnummer oder Flurstückskennzeichen."
             )
         return self
 

@@ -372,6 +372,20 @@ from the user directly. Reopen only if the user asks.
   matches exactly one candidate, and the user's click does when it does not.
   `/api/parcels/nearby` therefore answers with all 37 parcels within 60 m and
   the wizard draws them on the cadastral ground, each with its number.
+- **The set of parcels is the user's to assemble, and the register does the
+  arithmetic.** The picker toggles membership and asks `/api/parcels/resolve`
+  with the `kennzeichen` of the whole set, so the union and the summed official
+  areas come from the same code every other way in uses — no polygon union in
+  the browser. Two clicks on Lessingweg 44 and 46 give one plot of 1 299 m² with
+  8 boundary points, and the plot page, the checks and the print sheet take it
+  unchanged. Two rules the picker keeps: at least one parcel stays (a plot with
+  none is not a plot), and parcels that do not touch are refused with the reason
+  — their union is a MultiPolygon, and `outerRing` would silently draw one half.
+- **`metrics.streetFrontage` measured edge 0, not the street edge.** Harmless
+  on a single parcel whose ring starts at a corner, wrong the moment a plot is
+  a union: the ring then starts where the two outlines meet, and Mölkau 204+205
+  reported a 2,04 m stub as the frontage. It reads `plot.streetEdge` now — the
+  edge the rest of the app already calls the street side.
 - **Real parcels are frequently concave.** Half-plane clipping is only a correct
   inward offset for convex rings; on an L-shaped plot it returns an empty
   envelope. `buildableArea` falls back to a grid contour, biased inward so an
@@ -685,10 +699,10 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 453 passed, 1 skipped
-- `vitest`: 468 passed — plus the integration file, excluded by `npm run test`
+- `pytest`: 457 passed, 1 skipped
+- `vitest`: 473 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
-- `scripts/screenshots.mjs`: 47 images plus two print PDFs. It fails on console
+- `scripts/screenshots.mjs`: 44 images plus two print PDFs. It fails on console
   errors, on horizontal overflow, and if not a single vector tile arrived. It
   also drives the live geocoder, which is slow often enough to blow the 60 s
   wait on the destinations step — two runs failed there and the third passed

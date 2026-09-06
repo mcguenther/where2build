@@ -15,7 +15,7 @@ import CompareView from "../src/views/CompareView.vue";
 import WizardView from "../src/views/WizardView.vue";
 import { state, placement, plotById } from "../src/lib/store.js";
 import { realState, realPlot, mountWithRouter, testRouter } from "./helpers.js";
-import { buildableArea, cornersOutside, alignmentToEdge, polygonArea, findPlacement } from "../src/lib/geometry.js";
+import { buildableArea, cornersOutside, alignmentToEdge, polygonArea, findPlacement, polygonEdges } from "../src/lib/geometry.js";
 import { area } from "../src/lib/format.js";
 import { plotMetrics } from "../src/lib/metrics.js";
 import { boundingBox } from "../src/lib/geometry.js";
@@ -397,6 +397,21 @@ describe("Kartenhintergrund", () => {
   });
 });
 
+describe("Straßenfront", () => {
+  it("misst die Kante, die das Grundstück selbst als Straßenkante führt", () => {
+    // Nicht die erste Kante des Rings: die Vereinigung zweier Flurstücke
+    // beginnt dort, wo ihre Umrisse sich treffen — bei 204 und 205 in Mölkau
+    // ein 2,04-m-Stummel, der als Straßenfront ausgewiesen wurde.
+    const p = { ...plot(), streetEdge: 2 };
+    const edges = polygonEdges(p.polygon);
+
+    expect(plotMetrics(p).streetFrontage).toBeCloseTo(edges[2].length, 6);
+    expect(plotMetrics({ ...p, streetEdge: 0 }).streetFrontage).toBeCloseTo(edges[0].length, 6);
+    // Eine Kante, die es nicht gibt, fällt auf die erste zurück statt zu werfen.
+    expect(plotMetrics({ ...p, streetEdge: 99 }).streetFrontage).toBeCloseTo(edges[0].length, 6);
+  });
+});
+
 describe("Preis ohne Kaufpreis", () => {
   it("rechnet nichts aus, was es nicht gibt", () => {
     // ALKIS knows the parcel; only the listing knows the asking price. Without
@@ -683,7 +698,10 @@ describe("Aufnahme — Schritt Flurstück", () => {
       expect(plan.props("building")).toBeNull();
       expect(plan.props("showBuilding")).toBe(false);
       expect(w.find("[data-house]").exists()).toBe(false);
-      expect(w.text()).toContain("Passt");
+      // Der Schritt trägt jetzt auch die Angaben: ein „Passt“ dazwischen
+      // entschied nichts.
+      expect(w.text()).toContain("Anlegen und öffnen");
+      expect(w.find("#q-name").exists()).toBe(true);
     } finally {
       globalThis.fetch = original;
     }

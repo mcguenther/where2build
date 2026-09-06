@@ -74,7 +74,7 @@ describe("Flurstücksauswahl im Lageplan", () => {
   const build = () => mount(SitePlan, {
     props: {
       plot: realPlot("moelkau"), building: null, showBuilding: false, navigable: true,
-      parcels: NEIGHBOURS, chosenParcel: NEIGHBOURS[1].properties.kennzeichen
+      parcels: NEIGHBOURS, chosenParcels: [NEIGHBOURS[1].properties.kennzeichen]
     }
   });
 
@@ -159,7 +159,7 @@ describe("Flurstücksauswahl im Lageplan", () => {
     const plan = mount(SitePlan, {
       props: {
         plot: realPlot("moelkau"), building: null, showBuilding: false,
-        parcels: [twin, chosen], chosenParcel: chosen.properties.kennzeichen
+        parcels: [twin, chosen], chosenParcels: [chosen.properties.kennzeichen]
       }
     });
 
@@ -176,7 +176,7 @@ describe("Flurstücksauswahl im Lageplan", () => {
     const plan = mount(SitePlan, {
       props: {
         plot: realPlot("moelkau"), building: null, showBuilding: false, holdFrame: true,
-        parcels: NEIGHBOURS, chosenParcel: NEIGHBOURS[1].properties.kennzeichen
+        parcels: NEIGHBOURS, chosenParcels: [NEIGHBOURS[1].properties.kennzeichen]
       }
     });
     await nextTick();

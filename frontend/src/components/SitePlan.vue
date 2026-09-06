@@ -288,8 +288,10 @@ export default {
      *  Given, the drawing frames all of them, draws each with its number and
      *  emits `choose` with the parcel key that was clicked. */
     parcels: { type: Array, default: null },
-    /** Which of `parcels` is the plot right now, by `kennzeichen`. */
-    chosenParcel: { type: String, default: null },
+    /** Which of `parcels` the plot is made of, by `kennzeichen`. A plot is a
+     *  set of parcels, so this is a set — the drawing marks every one of them
+     *  as taken and leaves the rest on offer. */
+    chosenParcels: { type: Array, default: () => [] },
     northUp: { type: Boolean, default: false },
     showDimensions: { type: Boolean, default: true },
     showSetbacks: { type: Boolean, default: true },
@@ -376,7 +378,7 @@ export default {
           number: properties.nenner ? `${properties.zaehler}/${properties.nenner}` : `${properties.zaehler}`,
           area: area(properties.flaeche_amtlich_m2),
           size: Number(properties.flaeche_amtlich_m2) || 0,
-          chosen: properties.kennzeichen === this.chosenParcel,
+          chosen: this.chosenParcels.includes(properties.kennzeichen),
           ring: local,
           at: this.p(centre)
         }];
