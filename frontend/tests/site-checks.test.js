@@ -184,6 +184,20 @@ describe("Prüfliste", () => {
     list.unmount();
   });
 
+  it("zeigt beim Warten die Zeilen, die kommen, statt nur eines Satzes", async () => {
+    // Acht Dienste brauchen Sekunden; ein kleiner Hinweistext sieht in der
+    // Zeit aus wie eine Seite, die fertig ist und nichts gefunden hat.
+    const list = mountList(realPlot("moelkau"), () => new Promise(() => {}));
+    await nextTick();
+
+    expect(list.findAll(".skeleton__row").length).toBeGreaterThan(2);
+    expect(list.text()).toContain("Das dauert einen Moment.");
+    // Die Platzhalter sind für das Auge, nicht für den Screenreader.
+    expect(list.find(".skeleton").attributes("aria-hidden")).toBe("true");
+    expect(list.find(".checks__waiting").attributes("role")).toBe("status");
+    list.unmount();
+  });
+
   it("zeigt den deutschen Satz des Dienstes, wenn der Abruf scheitert", async () => {
     const list = mountList(realPlot("moelkau"), () =>
       Promise.resolve({

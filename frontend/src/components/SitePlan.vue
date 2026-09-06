@@ -195,7 +195,7 @@ import {
   minimumRotatedRectangleCorners, constrainToEnvelope, hasNeighbourHint,
   polygonCentroid
 } from "../lib/geometry.js";
-import { cameraFor, toLocal } from "../lib/projection.js";
+import { cameraFor, toLocal, toWgs84 } from "../lib/projection.js";
 import { outerRing } from "../lib/plots.js";
 import { num, area } from "../lib/format.js";
 import { BACKDROPS, withOverlay } from "../lib/basemap.js";
@@ -279,6 +279,11 @@ export default {
     /** A raster layer laid over the backdrop — today the noise survey. Needs a
      *  backdrop under it: the bands are translucent and mean nothing on paper. */
     overlay: { type: String, default: null },
+    /** Keep the camera where it is when the plot changes. Picking another
+     *  parcel is a change the user has to *see*: a drawing that re-centres on
+     *  the new outline looks the same before and after, and the neighbours
+     *  they were comparing are suddenly somewhere else. */
+    holdFrame: { type: Boolean, default: false },
     /** Parcels the user may pick from, as `/api/parcels/nearby` returns them.
      *  Given, the drawing frames all of them, draws each with its number and
      *  emits `choose` with the parcel key that was clicked. */
@@ -303,7 +308,7 @@ export default {
   emits: ["move", "measured", "choose"],
   data() {
     return {
-      uid: ++instanceCount, dragging: null, mapUnavailable: false,
+      uid: ++instanceCount, dragging: null, mapUnavailable: false, heldFrame: null,
       /* Whether every tile of the current view has arrived. Only anything that
        * photographs the plan reads it — a picture taken before this is a
        * picture of a half-drawn backdrop. Kept apart from `mapUnavailable`,
@@ -379,7 +384,9 @@ export default {
     },
 
     /** Whether the ground under the drawing already names the parcels. */
-    groundNamesParcels() { return this.hasBackdrop && this.backdrop === "cadastre"; },
+    groundNamesParcels() {
+      return this.hasBackdrop && (this.backdrop === "cadastre" || this.overlay === "flurstuecke");
+    },
 
     /** Those whose number lands inside the drawing and clear of one already
      *  placed. A label over empty paper names a parcel the user cannot see, let
@@ -459,6 +466,13 @@ export default {
     /* Frame the plot with a margin, then stretch the box to the frame's aspect
        so the drawing fills the panel instead of floating in it. */
     fit() {
+      /* A frame held across a change of plot. It is kept in WGS84, because the
+         local metres are measured from the plot's own anchor and the new plot
+         has a different one — the same numbers would be a different place. */
+      if (this.heldFrame && this.plot.anchor) {
+        const [centre] = toLocal([this.heldFrame.centre], this.plot.anchor);
+        return { scale: this.heldFrame.scale, mx: centre.x, my: centre.y };
+      }
       /* With a choice on the table the frame grows by a fixed band of metres so
          the parcels either side are in it and big enough to hit. Framing *all*
          of them instead put 33 parcels across 200 m: the neighbours became
@@ -609,6 +623,9 @@ export default {
   mounted() {
     this.buildMap();
     this.watchSize();
+    // The first framing is never a change, so the watcher below would not see
+    // it — and the first pick would then be the one that moves the map.
+    this.rememberFrame();
   },
   beforeUnmount() {
     this._sizeWatcher?.disconnect();
@@ -627,14 +644,28 @@ export default {
     // cadastral map are the authority's own raster and look the same either way.
     darkBackdrop() { if (this.backdrop === "map") this.rebuildMap(); },
     measuring(on) { if (!on) this.clearMeasurement(); },
-    "plot.id"() {
+    "plot.id"(_, previous) {
       this.clearMeasurement();
+      /* Another parcel from the picker: the ground is the same ground, so
+         neither the camera nor the map is touched. `_shownFrame` is what the
+         last camera actually showed — this watcher runs before the one that
+         records the next one. */
+      if (this.holdFrame && previous && this._shownFrame) {
+        this.heldFrame = this._shownFrame;
+        // The held frame already carries the zoom and pan that produced it.
+        this.zoomFactor = 1;
+        this.panMetres = { x: 0, y: 0 };
+        return;
+      }
       this.resetView();
       this.rebuildMap();
     },
     navigable(on) { if (!on) this.resetView(); },
     rotation() { this.setCamera(); },
-    view() { this.setCamera(); }
+    view() {
+      this.setCamera();
+      this.rememberFrame();
+    }
   },
   methods: {
     /** MapLibre needs WebGL and a network; neither is guaranteed. Any failure
@@ -697,6 +728,16 @@ export default {
       // MapLibre's teardown reaches for internals it never got round to
       // creating. Unmounting a component must not fail over that.
       try { map?.remove(); } catch { /* there is nothing left to keep */ }
+    },
+    /** Where the drawing stands, in a frame that survives a change of anchor:
+     *  the local metres are measured from the plot's own anchor, and the next
+     *  plot has a different one. */
+    rememberFrame() {
+      if (!this.plot.anchor) return;
+      this._shownFrame = {
+        centre: toWgs84([{ x: this.view.mx, y: this.view.my }], this.plot.anchor)[0],
+        scale: this.view.scale
+      };
     },
     /** No backdrop, and the drawing carries on without one. */
     mapFailed(error, run) {
@@ -800,6 +841,8 @@ export default {
       this.zoomFactor = 1;
       this.panMetres = { x: 0, y: 0 };
       this.panning = null;
+      // A double click asks for this plot's own framing, held frame or not.
+      this.heldFrame = null;
     },
     /* Measuring and moving the house are what the pointer is for wherever they
        are switched on; panning only gets what is left over. */

@@ -311,6 +311,11 @@ class TilesSettings(BaseSettings):
     # cut straight across parcel boundaries, which is the opposite of what a
     # ground called "Kataster" is for.
     alkis_layers: str = "adv_alkis_flurstuecke,adv_alkis_gebaeude"
+    # The same cadastre without the building fills, for laying over the aerial
+    # photograph: boundaries, parcel numbers, boundary points and street names,
+    # all as line work on transparent ground. Measured over Liebertwolkwitz --
+    # the street names ride along with the parcels, no second layer needed.
+    alkis_parcel_layers: str = "adv_alkis_flurstuecke"
     # And the parcels stop being drawn at 1:2000 -- an empty image, no error.
     # A WMS derives the scale of a request from the standard 0,28 mm pixel, and
     # MAP_RESOLUTION is how a caller says the pixel is a different size, so the

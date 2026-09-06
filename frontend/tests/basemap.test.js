@@ -118,6 +118,18 @@ describe("Der Lärmschleier über dem Hintergrund", () => {
     expect(opacity(overAerial)).toBeLessThan(opacity(overMap));
   });
 
+  it("zeichnet die Katasterlinien über dem Luftbild fast deckend", () => {
+    // A boundary at the noise veil's 45 % is a smudge on a photograph; the
+    // bands are areas and must stay translucent, the lines must not.
+    const lines = withOverlay(backdrop(), "flurstuecke", "aerial");
+    const bands = withOverlay(backdrop(), "laerm", "aerial");
+
+    const opacity = style => style.layers.at(-1).paint["raster-opacity"];
+    expect(opacity(lines)).toBeGreaterThan(0.9);
+    expect(opacity(lines)).toBeGreaterThan(opacity(bands));
+    expect(lines.sources.flurstuecke.tiles[0]).toContain("/api/tiles/flurstuecke/{z}/{x}/{y}.png");
+  });
+
   it("lässt einen unbekannten Namen den Stil unverändert", () => {
     const style = backdrop();
     expect(withOverlay(style, "gibtsnicht")).toBe(style);

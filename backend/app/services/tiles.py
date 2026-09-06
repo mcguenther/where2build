@@ -7,6 +7,7 @@ an orthophoto does not change between two page views.
 
 from __future__ import annotations
 
+import hashlib
 import math
 from dataclasses import dataclass
 
@@ -95,6 +96,13 @@ def _map_resolution_for(
     return max(1, min(_STANDARD_RESOLUTION, math.ceil(exact) - 1))
 
 
+def _fingerprint(config: LayerConfig) -> str:
+    """A short digest of what this layer actually asks the service for."""
+
+    seed = f"{config.url}|{config.layers}|{config.kind}|{config.min_scale}"
+    return hashlib.sha1(seed.encode("utf-8")).hexdigest()[:8]
+
+
 class TileService:
     def __init__(self, settings: TilesSettings, app_settings: AppSettings) -> None:
         self.settings = settings
@@ -109,6 +117,11 @@ class TileService:
             "alkis": LayerConfig(
                 self.settings.alkis_url,
                 self.settings.alkis_layers,
+                min_scale=self.settings.alkis_min_scale,
+            ),
+            "flurstuecke": LayerConfig(
+                self.settings.alkis_url,
+                self.settings.alkis_parcel_layers,
                 min_scale=self.settings.alkis_min_scale,
             ),
             "laerm": LayerConfig(
@@ -198,7 +211,11 @@ class TileService:
         config = self._config(layer)
         self._check_tile(z, x, y)
         crs = "EPSG:3857" if config.kind == "arcgis" else self.settings.crs
-        cache_key = f"{layer}/{crs}/{z}/{x}/{y}"
+        # The layer list is part of the key, not just the name: changing which
+        # ALKIS layers "alkis" stands for kept serving the old picture until
+        # someone deleted the cache by hand -- and a stale tile of the *previous*
+        # configuration looks exactly like a change that did not work.
+        cache_key = f"{layer}/{_fingerprint(config)}/{crs}/{z}/{x}/{y}"
         cached = self.cache.get_bytes(cache_key)
         if cached is not None:
             return cached, True

@@ -89,7 +89,12 @@ export const LFULG = "Umgebungslärmkartierung © LfULG";
  */
 export const OVERLAYS = {
   laerm: { name: "Lärm (Straße, 24 h)", attribution: LFULG },
-  "laerm-nacht": { name: "Lärm (Straße, nachts)", attribution: LFULG }
+  "laerm-nacht": { name: "Lärm (Straße, nachts)", attribution: LFULG },
+  /* The cadastre as line work: boundaries, parcel numbers, boundary points and
+     street names on transparent ground. It is drawn nearly opaque, because a
+     line at 45 % over a photograph is a smudge — the veil setting below is for
+     the noise bands, which are areas and must not hide what is under them. */
+  flurstuecke: { name: "Flurstücke", attribution: GEOSN, opacity: 0.95 }
 };
 
 const OVERLAY_OPACITY = { aerial: 0.45, other: 0.62 };
@@ -137,7 +142,8 @@ export function withOverlay(style, id, backdrop = "map") {
         type: "raster",
         source: id,
         paint: {
-          "raster-opacity": backdrop === "aerial" ? OVERLAY_OPACITY.aerial : OVERLAY_OPACITY.other
+          "raster-opacity": overlay.opacity
+            ?? (backdrop === "aerial" ? OVERLAY_OPACITY.aerial : OVERLAY_OPACITY.other)
         }
       }
     ]

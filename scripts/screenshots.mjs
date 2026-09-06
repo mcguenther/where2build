@@ -150,6 +150,9 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
   await shot(page, "assistent-2", mode, narrow ? "-schmal" : "");
   await page.getByRole("button", { name: "Nachschlagen" }).click();
   await page.waitForSelector(".site-plan", { timeout: 60000 });
+  // The step is a picture of the ground: without waiting for the tiles, a cold
+  // cache photographs the drawing on empty paper and calls it a clean run.
+  await mapSettled(page, `${mode}/${width} Flurstückswahl`);
   await shot(page, "assistent-3", mode, narrow ? "-schmal" : "");
   await page.getByRole("button", { name: "Passt" }).click();
   await shot(page, "assistent-4", mode, narrow ? "-schmal" : "");

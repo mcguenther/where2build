@@ -13,6 +13,7 @@ import { mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import SitePlan from "../src/components/SitePlan.vue";
 import { parcelForAddress } from "../src/lib/plots.js";
+import { toWgs84 } from "../src/lib/projection.js";
 import { state } from "../src/lib/store.js";
 import { realState, realPlot } from "./helpers.js";
 
@@ -165,6 +166,53 @@ describe("Flurstücksauswahl im Lageplan", () => {
     expect(plan.findAll(".site-plan__choice")).toHaveLength(2);
     const labels = plan.findAll(".site-plan__choice-label").map(n => n.text());
     expect(labels).toEqual(["204"]);
+    plan.unmount();
+  });
+
+  it("lässt die Karte stehen, wenn ein anderes Flurstück gewählt wird", async () => {
+    // Sonst sieht der Schritt vor und nach dem Klick gleich aus: die Karte
+    // zentriert auf den neuen Umriss, und die Nachbarn, mit denen gerade
+    // verglichen wurde, sind woanders.
+    const plan = mount(SitePlan, {
+      props: {
+        plot: realPlot("moelkau"), building: null, showBuilding: false, holdFrame: true,
+        parcels: NEIGHBOURS, chosenParcel: NEIGHBOURS[1].properties.kennzeichen
+      }
+    });
+    await nextTick();
+    const before = { ...plan.vm.view };
+
+    // Ein anderes Flurstück: eigener Umriss, eigener Anker, dieselbe Stelle.
+    const other = realPlot("moelkau");
+    other.id = "andere";
+    other.anchor = { lat: other.anchor.lat + 0.0004, lon: other.anchor.lon + 0.0004 };
+    other.polygon = other.polygon.map(p => ({ x: p.x + 12, y: p.y - 9 }));
+    await plan.setProps({ plot: other });
+    await nextTick();
+
+    // Gleicher Maßstab, und die Mitte ist geografisch dieselbe geblieben.
+    expect(plan.vm.view.scale).toBeCloseTo(before.scale, 6);
+    const centre = toWgs84([{ x: plan.vm.view.mx, y: plan.vm.view.my }], other.anchor)[0];
+    const was = toWgs84([{ x: before.mx, y: before.my }], realPlot("moelkau").anchor)[0];
+    expect(centre[0]).toBeCloseTo(was[0], 9);
+    expect(centre[1]).toBeCloseTo(was[1], 9);
+    plan.unmount();
+  });
+
+  it("rahmt ohne hold-frame wieder auf das neue Flurstück", async () => {
+    const plan = mount(SitePlan, {
+      props: { plot: realPlot("moelkau"), building: null, showBuilding: false }
+    });
+    await nextTick();
+    const before = { ...plan.vm.view };
+
+    const other = realPlot("moelkau");
+    other.id = "andere";
+    other.polygon = other.polygon.map(p => ({ x: p.x + 40, y: p.y - 40 }));
+    await plan.setProps({ plot: other });
+    await nextTick();
+
+    expect(plan.vm.view.mx).not.toBeCloseTo(before.mx, 3);
     plan.unmount();
   });
 

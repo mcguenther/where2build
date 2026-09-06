@@ -111,8 +111,37 @@ def test_geographic_crs_uses_latitude_first():
 
 def test_layer_configuration_covers_every_switchable_layer():
     assert set(tile_service().layers) == {
-        "dop", "webatlas", "alkis", "laerm", "laerm-nacht"
+        "dop", "webatlas", "alkis", "flurstuecke", "laerm", "laerm-nacht"
     }
+
+
+def test_the_parcel_layer_is_the_cadastre_without_the_building_fills():
+    """It lies over the aerial photograph, where a grey building fill would
+    hide the roof somebody switched the photo on to see."""
+
+    layers = tile_service().layers
+    assert layers["flurstuecke"].layers == "adv_alkis_flurstuecke"
+    assert "gebaeude" in layers["alkis"].layers
+    assert layers["flurstuecke"].min_scale == layers["alkis"].min_scale
+
+
+@respx.mock
+def test_changing_which_layers_a_ground_stands_for_invalidates_its_tiles(client: TestClient):
+    """The cache key carried the layer's *name* only, so a tile drawn from the
+    land-use layers was still served after the ground became the parcels --
+    which looks exactly like a change that did not work."""
+
+    route = respx.get(ALKIS_WMS_URL).mock(return_value=_wms_answer())
+    service = tile_service()
+    alkis, parcels = service.layers["alkis"], service.layers["flurstuecke"]
+
+    client.get("/api/tiles/alkis/20/561296/351568.png")
+    second = client.get("/api/tiles/flurstuecke/20/561296/351568.png")
+
+    # Same service, same tile, different layers: the second is fetched again.
+    assert second.headers["x-cache"] == "MISS"
+    assert len(route.calls) == 2
+    assert route.calls[1].request.url.params["LAYERS"] == parcels.layers != alkis.layers
 
 
 # --------------------------------------------------------------------------

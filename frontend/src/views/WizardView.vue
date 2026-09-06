@@ -165,16 +165,21 @@
                long each of its edges is, and the chains sat on the numbers of
                the neighbours they were meant to help pick between. The measures
                are in the table beside it. -->
-          <SitePlan :plot="draft" :width="640" :height="440" backdrop="cadastre" north-up
+          <!-- The photograph with the cadastre's line work over it: what is
+               actually on the ground, and where the boundaries run. `hold-frame`
+               keeps the camera still when another parcel is picked — the point
+               of the click is to see which outline moved. -->
+          <SitePlan :plot="draft" :width="640" :height="440" backdrop="aerial"
+                    overlay="flurstuecke" north-up hold-frame
                     :show-building="false" :show-dimensions="false" navigable
                     :parcels="choices" :chosen-parcel="draft.kennzeichen"
                     @choose="chooseParcel" />
           <p class="panel__footnote">
             <template v-if="choices.length > 1">
-              {{ choices.length }} Flurstücke im Umkreis — die Katasterkarte beschriftet
+              {{ choices.length }} Flurstücke im Umkreis — die Katasterlinien beschriften
               jedes mit seiner Nummer, ein Klick darauf wählt es aus.
             </template>
-            Kataster: © GeoSN, dl-de/by-2-0
+            Luftbild und Kataster: © GeoSN, dl-de/by-2-0
           </p>
         </div>
         <div class="panel">

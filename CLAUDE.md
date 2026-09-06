@@ -582,6 +582,24 @@ from the user directly. Reopen only if the user asks.
   is how you know it is the parameter and not the extra argument.
   `services/tiles.py` sends it only when the standard pixel would cross the
   line, so z19 is untouched and z16 still shows the parcel fabric.
+- **A tile cache keyed by the layer's *name* serves the previous
+  configuration.** `alkis` stood for the land-use layers and then for the
+  parcels, and every cached tile kept the old picture — which looks exactly like
+  a change that did not work, on the reviewer's machine as much as here. The key
+  now carries a digest of what the layer actually asks for (url, layer list,
+  kind, minimum scale), so a changed configuration simply misses.
+- **The picker's ground is the photograph with the cadastre's line work over
+  it.** `adv_alkis_flurstuecke` alone draws boundaries, parcel numbers, boundary
+  points *and street names* on transparent ground — measured over
+  Liebertwolkwitz, no second layer needed — while `adv_alkis_gebaeude` would
+  cover the roofs the photo is there to show. The overlay is drawn at 0,95: the
+  noise veil's 45 % is for areas, and a boundary at that strength is a smudge.
+- **Picking another parcel must not move the camera.** Re-centring on the new
+  outline makes the step look identical before and after the click, and puts the
+  neighbours the user was comparing somewhere else. `SitePlan.holdFrame` keeps
+  the frame across the change — in WGS84, because the local metres are measured
+  from each plot's own anchor, so the same numbers would be a different place.
+  A double click still resets to the plot's own framing.
 - **ArcGIS `query` answers "is anything within r?", never "how far".** So a
   distance to the nearest protected area is a *band*, and it comes from a
   binary search over a ladder of radii — three requests, not seven. Mölkau 204
@@ -667,8 +685,8 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 451 passed, 1 skipped
-- `vitest`: 464 passed — plus the integration file, excluded by `npm run test`
+- `pytest`: 453 passed, 1 skipped
+- `vitest`: 468 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
 - `scripts/screenshots.mjs`: 47 images plus two print PDFs. It fails on console
   errors, on horizontal overflow, and if not a single vector tile arrived. It
