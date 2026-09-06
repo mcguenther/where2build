@@ -278,3 +278,49 @@ table.data-table tbody tr:last-child td{ border-bottom: 0; }
 .maplibregl-ctrl-attrib-inner{ color: var(--w2b-muted); }
 .maplibregl-ctrl-attrib a{ color: var(--w2b-graphite); }
 .maplibregl-ctrl-attrib-button{ filter: var(--w2b-map-control-icons); }
+
+
+/* ---------------------------------------------------------------------------
+   Waiting, drawn as the rows that are coming.
+
+   Used by the check list and by the surroundings table: a skeleton is page
+   furniture, and furniture in a scoped block is styled in exactly one view.
+   The pulse is what says the wait is still alive — a static grey block reads
+   as a layout that failed.
+   --------------------------------------------------------------------------- */
+.skeleton{ list-style: none; margin: var(--w2b-space-3) 0 0; padding: 0; }
+.skeleton__row{
+  display: grid; gap: 7px;
+  grid-template-columns: 8px minmax(0, 1fr) 78px;
+  padding: var(--w2b-space-3) 0; border-top: 1px solid var(--w2b-line-faint);
+}
+.skeleton__row:first-child{ border-top: 0; padding-top: 0; }
+.skeleton__bar{
+  height: 9px; border-radius: var(--w2b-radius-s); background: var(--w2b-line-faint);
+  animation: w2b-pulse 1.5s ease-in-out infinite;
+}
+.skeleton__row:nth-child(2) .skeleton__bar{ animation-delay: .12s; }
+.skeleton__row:nth-child(3) .skeleton__bar{ animation-delay: .24s; }
+.skeleton__row:nth-child(4) .skeleton__bar{ animation-delay: .36s; }
+.skeleton__bar--dot{ width: 8px; height: 8px; border-radius: var(--w2b-radius-full); }
+.skeleton__bar--name{ height: 11px; max-width: 8.5em; }
+.skeleton__bar--value{ height: 9px; }
+.skeleton__bar--text{ grid-column: 2 / -1; height: 8px; }
+.skeleton__bar--short{ max-width: 62%; }
+
+/* One cell of a table that is still being filled: same pulse, no grid. */
+.skeleton-cell{
+  display: inline-block; width: 3.2em; height: 9px; border-radius: var(--w2b-radius-s);
+  background: var(--w2b-line-faint); animation: w2b-pulse 1.5s ease-in-out infinite;
+  vertical-align: middle;
+}
+
+@keyframes w2b-pulse{
+  0%, 100%{ opacity: 1; }
+  50%{ opacity: .38; }
+}
+
+/* Movement is a preference, and the placeholders still have to be visible. */
+@media (prefers-reduced-motion: reduce){
+  .skeleton__bar, .skeleton-cell{ animation: none; opacity: .7; }
+}

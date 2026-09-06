@@ -184,7 +184,7 @@
                keeps the camera still when another parcel is picked — the point
                of the click is to see which outline moved. -->
           <SitePlan :plot="draft" :width="640" :height="440" backdrop="aerial"
-                    overlay="flurstuecke" north-up hold-frame
+                    overlay="flurstuecke" north-up :hold-frame="holdFrame"
                     :show-building="false" :show-dimensions="false" navigable
                     :parcels="choices" :chosen-parcels="selection"
                     :problem-parcels="detached"
@@ -333,6 +333,12 @@ export default {
       /** Chosen parcels the drawn outline does not reach — the plot is in two
        *  pieces. Allowed on the way through, marked in red, and not a plot. */
       detached: [],
+      /** Whether the camera stays where it is when the draft changes. True for
+       *  a click on the map — the user has to see *which* outline moved — and
+       *  false when the correction moves the plot by itself: the map would
+       *  otherwise keep showing the parcel the coordinate landed in, which is
+       *  the parcel the correction just rejected. */
+      holdFrame: false,
       /** The address the search picked, so the cadastre's own Lagebezeichnung
        *  can be checked against it rather than the coordinate being trusted. */
       searchedAddress: null,
@@ -508,6 +514,8 @@ export default {
       const corrected = plotFromCadastre(
         { features: [named], grundstueck: named, quelle: plot.source }, extra
       );
+      // Nobody clicked: the address moved the plot, so the map follows it.
+      this.holdFrame = false;
       this.corrected = `Flurstück ${corrected.flurstuecke.join(" · ")}`;
       this.selection = [named.properties.kennzeichen];
       this.draft = { ...corrected, bodenrichtwert: plot.bodenrichtwert, brwZone: plot.brwZone,
@@ -527,6 +535,7 @@ export default {
       const taken = this.selection.includes(kennzeichen);
       if (!this.composing) {
         if (taken && this.selection.length === 1) return;
+        this.holdFrame = true;
         await this.applySelection([kennzeichen]);
         return;
       }
@@ -535,6 +544,7 @@ export default {
           + "Erst ein anderes dazunehmen, dann lässt sich dieses abwählen.";
         return;
       }
+      this.holdFrame = true;
       await this.applySelection(taken
         ? this.selection.filter(key => key !== kennzeichen)
         : [...this.selection, kennzeichen]);

@@ -331,7 +331,7 @@
         <div class="spacer"></div>
         <button type="button" class="btn no-print"
                 :disabled="!routesPossible || routesBusy" @click="computeRoutes">
-          {{ routesBusy ? "Rechnet…" : "Wege berechnen" }}
+          {{ routesBusy ? "Rechnet…" : "Neu berechnen" }}
         </button>
         <button type="button" class="btn btn--quiet no-print" @click="$router.push({ name: 'destinations' })">
           Ziele bearbeiten
@@ -346,7 +346,10 @@
         Keines der Ziele ist verortet. Unter „Ziele bearbeiten“ die Adressen nachschlagen lassen.
       </p>
 
-      <RouteCards :plot="plot" />
+      <!-- Routing several destinations takes seconds, and a page that shows
+           nothing in that time reads as one that found nothing. The cards draw
+           themselves as placeholders while they wait. -->
+      <RouteCards :plot="plot" :busy="routesBusy && !hasRoutes" />
 
       <NearbyPanel :plot="plot" auto />
 
@@ -432,6 +435,10 @@ export default {
       neighboursError: null,
       routesBusy: false,
       routesError: null,
+      /** Which plot this browser session has already routed. Asking again on
+       *  every visit would put the routing service through the whole set for a
+       *  page the user only opened to read the area. */
+      routedFor: null,
       backdrops: [
         { id: "none", name: "Ohne" },
         { id: "map", name: "Karte" },
@@ -445,7 +452,10 @@ export default {
     locatedDestinations() {
       return state.data.destinations.filter(d => Number.isFinite(d.lat) && Number.isFinite(d.lon));
     },
-    routesPossible() { return Boolean(this.plot.anchor) && this.locatedDestinations.length > 0; },
+    routesPossible() { return Boolean(this.plot?.anchor) && this.locatedDestinations.length > 0; },
+    /** Whether this plot already carries routes, from this session or an
+     *  earlier one — the document keeps them. */
+    hasRoutes() { return Object.keys(this.plot?.routes ?? {}).length > 0; },
     plot() { return plotById(this.id); },
     hasAnchor() { return Boolean(this.plot?.anchor); },
     building() { return placement(this.plot); },
@@ -521,8 +531,12 @@ export default {
   },
   /* A plot that was left with the neighbour hint on comes back with it on, so
      the outlines have to be fetched again — they are not in the document. */
-  created() { if (this.showNeighbours) this.loadNeighbours(); },
+  created() {
+    if (this.showNeighbours) this.loadNeighbours();
+    this.routeAutomatically();
+  },
   watch: {
+    "plot.id"() { this.routeAutomatically(); },
     /** A default nobody has touched follows the fields above it. */
     dimensionLabel(next, previous) {
       if (this.naming && this.typeName === previous) this.typeName = next;
@@ -541,6 +555,23 @@ export default {
     houseShape() { this.reseatHouse(); }
   },
   methods: {
+    /** The ways are computed on arrival, not on a button press.
+     *
+     * Waiting for a click made the page look like it had nothing to say about
+     * getting anywhere. Once per plot per session: the routes live in the
+     * document, so a plot that already carries them is not asked again, and
+     * neither is one whose routing just failed — that would hammer a service
+     * that is already down. */
+    routeAutomatically() {
+      // The view also renders for an id that names no plot here — that page is
+      // the whole reason `plot` may be null, and a hook that reads through it
+      // would empty exactly the page meant to explain the id.
+      if (!this.plot || !this.routesPossible || this.routesBusy) return;
+      if (this.hasRoutes || this.routedFor === this.plot.id) return;
+      this.routedFor = this.plot.id;
+      this.computeRoutes();
+    },
+
     /** Ask the routing service for every located destination at once and keep
      *  what it answers. Nothing is filled in when a mode has no connection —
      *  the card then says so instead of showing a plausible number. */

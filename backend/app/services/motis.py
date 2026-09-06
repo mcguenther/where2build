@@ -13,7 +13,7 @@ from datetime import datetime
 from typing import Any
 
 from ..cache import DiskCache
-from ..errors import UpstreamError
+from ..errors import AppError, UpstreamError
 from ..schemas import (
     ZUBRINGER_MODI,
     Geocodeart,
@@ -553,14 +553,36 @@ class MotisService:
         modes: list[Modus],
         time: datetime | None = None,
     ) -> ReachabilityResponse:
+        wanted = [(destination, mode) for destination in destinations for mode in modes]
         tasks = [
             self.transit_auto(origin, destination, time)
             if mode == "transit_auto"
             else self.route(origin, destination, mode, time)
-            for destination in destinations
-            for mode in modes
+            for destination, mode in wanted
         ]
-        return ReachabilityResponse(ergebnisse=list(await asyncio.gather(*tasks)))
+        answers = await asyncio.gather(*tasks, return_exceptions=True)
+
+        results: list[RouteErgebnis] = []
+        for (destination, mode), answer in zip(wanted, answers):
+            if isinstance(answer, BaseException):
+                if not isinstance(answer, AppError):
+                    raise answer
+                # One route the service could not answer costs one row. Before
+                # this, a single 500 on one destination emptied the whole table
+                # -- and the reason it gave was about the service, not about
+                # which of the ways it applied to.
+                results.append(
+                    RouteErgebnis(
+                        destination_id=destination.id,
+                        mode="transit" if mode == "transit_auto" else mode,
+                        angefragter_modus=mode,
+                        erreichbar=False,
+                        hinweis=answer.message,
+                    )
+                )
+            else:
+                results.append(answer)
+        return ReachabilityResponse(ergebnisse=results)
 
     async def _get_json(
         self, path: str, params: dict[str, Any], cache_key: str, cache: DiskCache

@@ -241,8 +241,9 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
     await page.getByRole("button", { name: "Fertig" }).click();
 
     // And the routes that follow from it, drawn from the geometry MOTIS sends.
+    // The page asks for them itself now -- there is no button to press, and a
+    // wait for one sat there until it timed out.
     await page.click(".plot-card .btn");
-    await page.getByRole("button", { name: "Wege berechnen" }).click();
     await page.waitForSelector(".route-card polyline", { timeout: 60000 });
     await page.waitForTimeout(600);
     // The cards themselves: this is the only picture that carries them, and
@@ -255,6 +256,13 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
     // that is there reads "Neu suchen", which is what a wait for "Nachsehen"
     // sat out until it timed out.
     await page.waitForSelector(".nearby__list tbody tr", { timeout: 60000 });
+    // Bike and car arrive after the walk does, so the table is photographed
+    // once its cells have stopped being placeholders. Bounded: a router that
+    // cannot answer leaves the skeletons standing, and that is a picture worth
+    // having rather than a run that never ends.
+    await page
+      .waitForFunction(() => !document.querySelector(".skeleton-cell"), null, { timeout: 60000 })
+      .catch(() => {});
     await shot(page, "grundstueck-umgebung", mode);
 
     // The map of the same thing: house, ground around it, and every place that

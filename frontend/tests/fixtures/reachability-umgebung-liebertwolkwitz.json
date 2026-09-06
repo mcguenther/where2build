@@ -1,0 +1,233 @@
+{
+  "ergebnisse": [
+    {
+      "destination_id": "tram-0",
+      "mode": "bike",
+      "angefragter_modus": "bike",
+      "erreichbar": true,
+      "duration_s": 1326,
+      "umstiege": 0,
+      "startzeit": "2026-09-06T18:50:00Z",
+      "ankunftszeit": "2026-09-06T19:12:00Z",
+      "teilstrecken": [
+        {
+          "mode": "BIKE",
+          "duration_s": 1326,
+          "von": "START",
+          "nach": "END"
+        }
+      ],
+      "hinweis": null
+    },
+    {
+      "destination_id": "tram-0",
+      "mode": "car",
+      "angefragter_modus": "car",
+      "erreichbar": true,
+      "duration_s": 422,
+      "umstiege": 0,
+      "startzeit": "2026-09-06T18:50:00Z",
+      "ankunftszeit": "2026-09-06T18:57:00Z",
+      "teilstrecken": [
+        {
+          "mode": "CAR",
+          "duration_s": 422,
+          "von": "START",
+          "nach": "END"
+        }
+      ],
+      "hinweis": null
+    },
+    {
+      "destination_id": "tram-1",
+      "mode": "bike",
+      "angefragter_modus": "bike",
+      "erreichbar": true,
+      "duration_s": 1189,
+      "umstiege": 0,
+      "startzeit": "2026-09-06T18:50:00Z",
+      "ankunftszeit": "2026-09-06T19:09:00Z",
+      "teilstrecken": [
+        {
+          "mode": "BIKE",
+          "duration_s": 1189,
+          "von": "START",
+          "nach": "END"
+        }
+      ],
+      "hinweis": null
+    },
+    {
+      "destination_id": "tram-1",
+      "mode": "car",
+      "angefragter_modus": "car",
+      "erreichbar": true,
+      "duration_s": 385,
+      "umstiege": 0,
+      "startzeit": "2026-09-06T18:50:00Z",
+      "ankunftszeit": "2026-09-06T18:56:00Z",
+      "teilstrecken": [
+        {
+          "mode": "CAR",
+          "duration_s": 385,
+          "von": "START",
+          "nach": "END"
+        }
+      ],
+      "hinweis": null
+    },
+    {
+      "destination_id": "bus-2",
+      "mode": "bike",
+      "angefragter_modus": "bike",
+      "erreichbar": true,
+      "duration_s": 1817,
+      "umstiege": 0,
+      "startzeit": "2026-09-06T18:50:00Z",
+      "ankunftszeit": "2026-09-06T19:20:00Z",
+      "teilstrecken": [
+        {
+          "mode": "BIKE",
+          "duration_s": 1817,
+          "von": "START",
+          "nach": "END"
+        }
+      ],
+      "hinweis": null
+    },
+    {
+      "destination_id": "bus-2",
+      "mode": "car",
+      "angefragter_modus": "car",
+      "erreichbar": true,
+      "duration_s": 532,
+      "umstiege": 0,
+      "startzeit": "2026-09-06T18:50:00Z",
+      "ankunftszeit": "2026-09-06T18:58:00Z",
+      "teilstrecken": [
+        {
+          "mode": "CAR",
+          "duration_s": 532,
+          "von": "START",
+          "nach": "END"
+        }
+      ],
+      "hinweis": null
+    },
+    {
+      "destination_id": "bus-3",
+      "mode": "bike",
+      "angefragter_modus": "bike",
+      "erreichbar": true,
+      "duration_s": 1752,
+      "umstiege": 0,
+      "startzeit": "2026-09-06T18:50:00Z",
+      "ankunftszeit": "2026-09-06T19:19:00Z",
+      "teilstrecken": [
+        {
+          "mode": "BIKE",
+          "duration_s": 1752,
+          "von": "START",
+          "nach": "END"
+        }
+      ],
+      "hinweis": null
+    },
+    {
+      "destination_id": "bus-3",
+      "mode": "car",
+      "angefragter_modus": "car",
+      "erreichbar": true,
+      "duration_s": 553,
+      "umstiege": 0,
+      "startzeit": "2026-09-06T18:50:00Z",
+      "ankunftszeit": "2026-09-06T18:59:00Z",
+      "teilstrecken": [
+        {
+          "mode": "CAR",
+          "duration_s": 553,
+          "von": "START",
+          "nach": "END"
+        }
+      ],
+      "hinweis": null
+    },
+    {
+      "destination_id": "bahnhof-4",
+      "mode": "bike",
+      "angefragter_modus": "bike",
+      "erreichbar": true,
+      "duration_s": 1772,
+      "umstiege": 0,
+      "startzeit": "2026-09-06T18:50:00Z",
+      "ankunftszeit": "2026-09-06T19:19:00Z",
+      "teilstrecken": [
+        {
+          "mode": "BIKE",
+          "duration_s": 1772,
+          "von": "START",
+          "nach": "END"
+        }
+      ],
+      "hinweis": null
+    },
+    {
+      "destination_id": "bahnhof-4",
+      "mode": "car",
+      "angefragter_modus": "car",
+      "erreichbar": true,
+      "duration_s": 538,
+      "umstiege": 0,
+      "startzeit": "2026-09-06T18:50:00Z",
+      "ankunftszeit": "2026-09-06T18:58:00Z",
+      "teilstrecken": [
+        {
+          "mode": "CAR",
+          "duration_s": 538,
+          "von": "START",
+          "nach": "END"
+        }
+      ],
+      "hinweis": null
+    },
+    {
+      "destination_id": "bahnhof-5",
+      "mode": "bike",
+      "angefragter_modus": "bike",
+      "erreichbar": true,
+      "duration_s": 2526,
+      "umstiege": 0,
+      "startzeit": "2026-09-06T18:50:00Z",
+      "ankunftszeit": "2026-09-06T19:32:00Z",
+      "teilstrecken": [
+        {
+          "mode": "BIKE",
+          "duration_s": 2526,
+          "von": "START",
+          "nach": "END"
+        }
+      ],
+      "hinweis": null
+    },
+    {
+      "destination_id": "bahnhof-5",
+      "mode": "car",
+      "angefragter_modus": "car",
+      "erreichbar": true,
+      "duration_s": 780,
+      "umstiege": 0,
+      "startzeit": "2026-09-06T18:50:00Z",
+      "ankunftszeit": "2026-09-06T19:03:00Z",
+      "teilstrecken": [
+        {
+          "mode": "CAR",
+          "duration_s": 780,
+          "von": "START",
+          "nach": "END"
+        }
+      ],
+      "hinweis": null
+    }
+  ],
+  "quelle": "MOTIS / Transitous (DELFI-GTFS, OpenStreetMap)"
+}

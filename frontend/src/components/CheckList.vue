@@ -166,38 +166,6 @@ export default {
 
 .checks__empty{ color: var(--w2b-muted); font-size: var(--w2b-text-s); margin: 0; }
 
-/* What is on its way, drawn as the rows it will become. The pulse is the only
-   thing on the page that says the wait is still alive — a static grey block
-   reads as a layout that failed. */
-.skeleton{ list-style: none; margin: var(--w2b-space-3) 0 0; padding: 0; }
-.skeleton__row{
-  display: grid; gap: 7px;
-  grid-template-columns: 8px minmax(0, 1fr) 78px;
-  padding: var(--w2b-space-3) 0; border-top: 1px solid var(--w2b-line-faint);
-}
-.skeleton__row:first-child{ border-top: 0; padding-top: 0; }
-.skeleton__bar{
-  height: 9px; border-radius: var(--w2b-radius-s); background: var(--w2b-line-faint);
-  animation: checks-pulse 1.5s ease-in-out infinite;
-}
-.skeleton__row:nth-child(2) .skeleton__bar{ animation-delay: .12s; }
-.skeleton__row:nth-child(3) .skeleton__bar{ animation-delay: .24s; }
-.skeleton__row:nth-child(4) .skeleton__bar{ animation-delay: .36s; }
-.skeleton__bar--dot{ width: 8px; height: 8px; border-radius: var(--w2b-radius-full); }
-.skeleton__bar--name{ height: 11px; max-width: 8.5em; }
-.skeleton__bar--value{ height: 9px; }
-.skeleton__bar--text{ grid-column: 2 / -1; height: 8px; }
-.skeleton__bar--short{ max-width: 62%; }
-
-@keyframes checks-pulse{
-  0%, 100%{ opacity: 1; }
-  50%{ opacity: .38; }
-}
-
-/* Movement is a preference, and the rows still have to be visible without it. */
-@media (prefers-reduced-motion: reduce){
-  .skeleton__bar{ animation: none; opacity: .7; }
-}
 .checks__tally{ display: flex; flex-wrap: wrap; gap: 6px; }
 .checks__no-score{
   margin: var(--w2b-space-2) 0 0; font-size: var(--w2b-text-xs);

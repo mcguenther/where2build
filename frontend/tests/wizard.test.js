@@ -17,6 +17,7 @@ import directory from "./fixtures/gemarkungen.json";
 import moelkau from "./fixtures/parcel-moelkau.json";
 import moelkauZwei from "./fixtures/parcel-moelkau-zwei.json";
 import moelkauGetrennt from "./fixtures/parcel-moelkau-getrennt.json";
+import moelkauNachbar from "./fixtures/parcel-moelkau-205.json";
 
 vi.mock("../src/lib/api.js", () => ({
   cadastralDistricts: vi.fn(),
@@ -279,6 +280,30 @@ describe("Ein Grundstück aus mehreren Flurstücken", () => {
     await nextTick();
     return w;
   };
+
+  it("zentriert die Karte auf das korrigierte Flurstück, nicht auf die Koordinate", async () => {
+    // „Lessingweg 44“ landet unter der Koordinate auf 205; die Lagebezeichnung
+    // korrigiert auf 204. Den Ausschnitt festzuhalten wäre hier falsch — er
+    // zeigte weiter genau das Flurstück, das gerade verworfen wurde.
+    resolveParcel.mockResolvedValue(moelkauNachbar);
+    landValue.mockRejectedValue(new Error("Kein Bodenrichtwert."));
+    nearbyParcels.mockResolvedValue({ features: moelkauZwei.features });
+
+    const w = mountWithRouter(WizardView, { path: "/aufnahme/quelle", props: { stage: "quelle" } });
+    w.vm.searchedAddress = "Lessingweg 44";
+    await w.find('input[value="parcel"]').setValue();
+    await typeInto(w.findComponent(CadastralDistrictPicker).find("input"), "Mölkau");
+    await typeInto(w.find("#q-parcel-number"), "205");
+    await w.findAll("button").find(b => b.text() === "Nachschlagen").trigger("click");
+    await flushPromises();
+    await w.setProps({ stage: "flurstueck" });
+    await flushPromises();
+
+    expect(w.vm.corrected).toContain("204");
+    expect(w.vm.holdFrame).toBe(false);
+    expect(w.findComponent({ name: "SitePlan" }).props("holdFrame")).toBe(false);
+    w.unmount();
+  });
 
   it("wechselt per Klick das Flurstück, statt es dazuzunehmen", async () => {
     // Der häufige Fall: die Koordinate lag auf dem Nachbarn, ein Klick rückt das

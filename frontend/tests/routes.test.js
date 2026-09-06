@@ -173,6 +173,24 @@ describe("Wegekarten mit echten Daten", () => {
     expect(t).not.toMatch(/\d+ min/);
   });
 
+  it("zeigt beim Rechnen Platzhalter in Kartenform statt einer leeren Fläche", () => {
+    // Not a row of thin bars: what arrives is a card as tall as its map, and a
+    // placeholder of another shape makes the page jump by the difference.
+    const w = mount(RouteCards, { props: { plot: plot(), busy: true } });
+    expect(w.findAll(".route-skeleton__card").length).toBeGreaterThan(0);
+    expect(w.findAll(".route-skeleton__map").length).toBe(w.findAll(".route-skeleton__card").length);
+    // Nothing measured is shown while it is still being measured.
+    expect(w.text()).not.toMatch(/\d+ min/);
+    expect(w.findAll("polyline")).toHaveLength(0);
+  });
+
+  it("ersetzt die Platzhalter durch die Karten, sobald es etwas zu zeigen gibt", async () => {
+    const w = mount(RouteCards, { props: { plot: plot(), busy: true } });
+    await w.setProps({ busy: false });
+    expect(w.findAll(".route-skeleton__card")).toHaveLength(0);
+    expect(w.text()).toContain("13 min");
+  });
+
   it("vergisst Wege zu einem Ziel, das es nicht mehr gibt", () => {
     const restored = validate({
       version: 2,

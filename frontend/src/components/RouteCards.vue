@@ -1,5 +1,20 @@
 <template>
-  <div v-if="destinations.length" class="route-grid" :style="gridStyle">
+  <!-- What is on its way, in the shape it will arrive in. A row of thin bars
+       would be replaced by cards a map tall, and the page would jump by that
+       much; the pulse is what says the wait is still alive. -->
+  <div v-if="busy" class="route-grid route-skeleton" :style="gridStyle" aria-hidden="true">
+    <article v-for="row in skeletonCards" :key="row" class="panel route-skeleton__card"
+             :class="{ 'route-card--wide': layout.wide }">
+      <div class="route-card__head"><span class="skeleton__bar skeleton__bar--name"></span></div>
+      <div class="route-card__figure"><span class="skeleton__bar route-skeleton__map"></span></div>
+      <div class="route-card__detail route-skeleton__lines">
+        <span class="skeleton__bar"></span>
+        <span class="skeleton__bar skeleton__bar--short"></span>
+        <span class="skeleton__bar"></span>
+      </div>
+    </article>
+  </div>
+  <div v-else-if="destinations.length" class="route-grid" :style="gridStyle">
     <article v-for="destination in cards" :key="destination.id" class="route-card panel"
              :class="{ 'route-card--wide': layout.wide }">
       <div class="route-card__head">
@@ -153,13 +168,19 @@ export default {
     /** The raster ground under each sketch. Off leaves the flat paper colour —
      *  and one fewer request per tile, which matters when printing a page of
      *  twenty cards. */
-    backdrop: { type: Boolean, default: true }
+    backdrop: { type: Boolean, default: true },
+    /** Routes are being computed and there is nothing to show yet: the cards
+     *  are drawn as placeholders instead. */
+    busy: { type: Boolean, default: false }
   },
   data() { return { MODE_COLOURS }; },
   computed: {
     destinations() { return state.data.destinations; },
     /** How the row is divided, and therefore what shape a drawing gets. */
     layout() { return rowLayout(this.destinations.length); },
+    /** As many placeholders as there are destinations, capped at one row —
+     *  a screen of grey cards is not more informative than three. */
+    skeletonCards() { return Math.min(Math.max(this.destinations.length, 1), this.layout.columns); },
     gridStyle() {
       return {
         "--route-columns": this.layout.columns,
@@ -342,7 +363,12 @@ export default {
 @media (max-width: 680px){
   .route-grid{ grid-template-columns: minmax(0, 1fr); }
 }
-.route-card{ display: flex; flex-direction: column; }
+.route-card, .route-skeleton__card{ display: flex; flex-direction: column; }
+.route-skeleton__card .route-card__head{ min-height: 0; }
+.route-skeleton__card .skeleton__bar--name{ width: 9em; max-width: 60%; }
+.route-skeleton__map{ flex: none; height: 168px; border-radius: 0; }
+.route-skeleton__lines{ display: flex; flex-direction: column; gap: 11px; padding: var(--w2b-space-4); }
+.route-card--wide .route-skeleton__map{ height: 232px; }
 .route-card__figure, .route-card__detail{ display: flex; flex-direction: column; min-width: 0; }
 /* A card with the row to itself: drawing left, everything read on the right.
    The second column is capped, not shared — a table of five times does not get

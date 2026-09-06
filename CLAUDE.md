@@ -334,6 +334,10 @@ from the user directly. Reopen only if the user asks.
   it becomes a search constraint.
 - **Rank by walking time, never air distance.** Detour ratios reach 2.88x, and
   the nearest thing by air can be unwalkable altogether.
+- **The surroundings service ranks *within* a category, not across them.** Its
+  answer is category by category, so the panel's own order was the category
+  list's — a bus stop one minute away sat below a tram stop half an hour away.
+  `NearbyPanel.found` sorts by walking time and puts what has no walk last.
 - **Let the hard filters decide and the weights only order.** "Bestätigt" means
   plausibility raised no objection *and* exactly one candidate survives the
   filters that are official facts — a parcel key resolved against ALKIS, the
@@ -473,6 +477,26 @@ from the user directly. Reopen only if the user asks.
   park-and-ride is `CAR_PARKING`, which also returns bare-car itineraries, so
   the answer has to be checked for CAR-then-WALK. Both verified against
   Transitous; see § 9 of `docs/research/routing-motis.md`.
+- **One destination the router cannot answer must not cost the page.**
+  `reachability()` asked for every destination and mode in one `asyncio.gather`,
+  so a single upstream failure raised out of the whole endpoint and every other
+  row was lost with it — which is the 500 an outage produces. It gathers with
+  `return_exceptions=True` now and turns an `AppError` into a row that is not
+  reachable and carries the German sentence in `hinweis`; anything else still
+  raises, because a bug is not a routing result. The way-out sentence therefore
+  travels *in the row*, and the endpoint answers 200.
+- **A single 5xx from an upstream is worth one retry, and only one.**
+  Transitous answers 500/502 now and then under load, and the request that
+  follows 600 ms later succeeds. `upstream.py` retries once on 500, 502, 503,
+  504 and on a transport error; a second failure is believed. More attempts
+  would turn a real outage into a minute of waiting per row.
+- **A placeholder has to have the shape of what is coming.** The route
+  placeholder was a row of thin bars and what arrived was a card as tall as its
+  map, so the page jumped by that height when the answer landed. It lives in
+  `RouteCards` now, behind a `busy` prop, next to the layout it imitates — and
+  the same pulse (`.skeleton*` in `base.css`, since a scoped style reaches
+  exactly one component) serves the check list, the route cards and the two
+  routed columns of the surroundings table.
 - **A dimension chain hangs a fixed number of *pixels* outside the outline, so
   the frame it needs is a pixel margin.** Reserving it in metres needs a scale,
   which the reservation then changes, and the two chase each other — a 35 m plot
@@ -685,6 +709,12 @@ from the user directly. Reopen only if the user asks.
   carries `overflow: hidden` to keep map canvases off its rounded corners, so
   the search suggestions were cut after the first row. The list is in the flow
   instead — it pushes the hint down, and no ancestor can cut it.
+  The same `overflow: hidden` eats a table that grew a column: at 390 px the
+  surroundings table was 438 px wide inside a 340 px panel, so „Strecke“ was
+  simply gone — with no scrollbar, and with the page's own `scrollWidth`
+  reporting no overflow at all. A wide table goes in the `.table-scroll`
+  wrapper `base.css` already has, and gives up its cell padding below 620 px so
+  it fits without needing one.
 - **Chromium hides a closed `<details>` through `::details-content`.** Forcing
   `display: block` on the children is not enough for print; the pseudo-element
   needs `content-visibility: visible`. Both spellings are in `print.css`, since
@@ -737,8 +767,8 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 458 passed, 1 skipped
-- `vitest`: 478 passed — plus the integration file, excluded by `npm run test`
+- `pytest`: 460 passed, 1 skipped
+- `vitest`: 485 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
 - `scripts/screenshots.mjs`: 44 images plus two print PDFs. It fails on console
   errors, on horizontal overflow, and if not a single vector tile arrived. It

@@ -3,11 +3,19 @@ failures into HTTP answers a user can understand."""
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import httpx
 
 from .errors import UpstreamError, UpstreamTimeout
+
+# A public routing or authority service answers 5xx now and then, and the
+# request that follows a second later usually succeeds. One retry turns that
+# into a hiccup rather than a failed page; more than one would only make a real
+# outage take longer to report.
+_RETRY_ON = (500, 502, 503, 504)
+_RETRY_AFTER_S = 0.6
 
 
 def _sentence(*parts: str | None) -> str:
@@ -44,16 +52,28 @@ async def request(
     """
 
     headers = {"User-Agent": user_agent, **(kwargs.pop("headers", None) or {})}
-    try:
-        async with httpx.AsyncClient(timeout=timeout_s, follow_redirects=True) as client:
-            response = await client.request(method, url, headers=headers, **kwargs)
-    except httpx.TimeoutException as exc:
-        raise UpstreamTimeout(
-            _sentence(f"{service} hat nicht rechtzeitig geantwortet.", advice)
-        ) from exc
-    except httpx.HTTPError as exc:
-        raise UpstreamError(_sentence(f"{service} ist derzeit nicht erreichbar.", advice)) from exc
+    response: httpx.Response | None = None
+    for attempt in range(2):
+        last = attempt == 1
+        try:
+            async with httpx.AsyncClient(timeout=timeout_s, follow_redirects=True) as client:
+                response = await client.request(method, url, headers=headers, **kwargs)
+        except httpx.TimeoutException as exc:
+            if last:
+                raise UpstreamTimeout(
+                    _sentence(f"{service} hat nicht rechtzeitig geantwortet.", advice)
+                ) from exc
+        except httpx.HTTPError as exc:
+            if last:
+                raise UpstreamError(
+                    _sentence(f"{service} ist derzeit nicht erreichbar.", advice)
+                ) from exc
+        else:
+            if response.status_code not in _RETRY_ON or last:
+                break
+        await asyncio.sleep(_RETRY_AFTER_S)
 
+    assert response is not None
     if response.status_code >= 400:
         raise UpstreamError(
             _sentence(

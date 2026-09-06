@@ -93,14 +93,19 @@ def test_a_coordinate_without_a_land_value_explains_the_usual_reason(client: Tes
 
 @respx.mock
 def test_routing_outage_says_the_rest_of_the_appraisal_still_holds(client: TestClient):
+    """The sentence now travels in the row it applies to: one way that cannot be
+    computed costs that way, not the page — but it still has to say what a user
+    can do and that the appraisal itself is unaffected."""
+
     respx.get(f"{MOTIS_URL}/api/v6/plan").mock(side_effect=httpx.ConnectError("kein Netz"))
 
     answer = client.post("/api/reachability", json=REACHABILITY_BODY)
 
-    assert answer.status_code == 502
-    detail = answer.json()["detail"]
-    assert_offers_a_way_out(detail)
-    assert "Bodenrichtwert" in detail
+    assert answer.status_code == 200
+    row = answer.json()["ergebnisse"][0]
+    assert row["erreichbar"] is False
+    assert_offers_a_way_out(row["hinweis"])
+    assert "Bodenrichtwert" in row["hinweis"]
 
 
 @respx.mock
