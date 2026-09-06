@@ -20,6 +20,8 @@
       <div class="row no-print">
         <button type="button" class="btn btn--quiet" :disabled="!hasPrevious" @click="step(-1)">‹ Voriges</button>
         <button type="button" class="btn btn--quiet" :disabled="!hasNext" @click="step(1)">Nächstes ›</button>
+        <RouterLink v-if="hasAnchor" class="btn btn--secondary"
+                    :to="{ name: 'location', params: { id: plot.id } }">Standort prüfen</RouterLink>
         <button type="button" class="btn btn--secondary" @click="print">Drucken</button>
       </div>
     </div>
@@ -73,14 +75,14 @@
             <b>Schraffiert: hier reicht die Abstandsfläche des Nachbargebäudes herüber.</b>
             § 6 SächsBO verlangt das nicht von uns — jedes Gebäude hält seine Abstandsfläche
             auf dem eigenen Grundstück. Wo beide sich überdecken würden, ist das eine Frage
-            an die Bauaufsicht, keine Prüfung. Umrisse aus OpenStreetMap, ohne Wandhöhen,
-            gerechnet mit dem Mindestmaß von 3 m.
+            an die Bauaufsicht, keine Prüfung. Umrisse aus {{ neighbourSource }}, ohne
+            Wandhöhen, gerechnet mit dem Mindestmaß von 3 m.
           </span>
           <span v-else-if="neighbourBuildings.length">
             <b>Kein Nachbargebäude steht näher als 3 m an der Grenze.</b>
-            {{ neighbourBuildings.length }} Umrisse aus OpenStreetMap geprüft.
+            {{ neighbourBuildings.length }} Umrisse aus {{ neighbourSource }} geprüft.
           </span>
-          <span v-else>In der Umgebung ist in OpenStreetMap kein Gebäude erfasst.</span>
+          <span v-else>In der Umgebung ist dort kein Gebäude erfasst.</span>
         </p>
 
         <p v-if="state.plan.measuring" class="notice measure-bar">
@@ -329,7 +331,7 @@
         <div class="spacer"></div>
         <button type="button" class="btn no-print"
                 :disabled="!routesPossible || routesBusy" @click="computeRoutes">
-          {{ routesBusy ? "Rechnet…" : "Wege berechnen" }}
+          {{ routesBusy ? "Rechnet…" : "Neu berechnen" }}
         </button>
         <button type="button" class="btn btn--quiet no-print" @click="$router.push({ name: 'destinations' })">
           Ziele bearbeiten
@@ -344,13 +346,19 @@
         Keines der Ziele ist verortet. Unter „Ziele bearbeiten“ die Adressen nachschlagen lassen.
       </p>
 
-      <RouteCards :plot="plot" />
+      <!-- Routing several destinations takes seconds, and a page that shows
+           nothing in that time reads as one that found nothing. The cards draw
+           themselves as placeholders while they wait. -->
+      <RouteCards :plot="plot" :busy="routesBusy && !hasRoutes" />
 
       <NearbyPanel :plot="plot" auto />
 
       <p v-if="hasAnchor" class="row no-print">
         <RouterLink class="btn btn--quiet" :to="{ name: 'surroundings', params: { id: plot.id } }">
           Auf der Umgebungskarte ansehen
+        </RouterLink>
+        <RouterLink class="btn btn--quiet" :to="{ name: 'location', params: { id: plot.id } }">
+          Lärm, Hochwasser, Baugrund und Luft prüfen
         </RouterLink>
       </p>
     </section>
@@ -420,10 +428,17 @@ export default {
        *  they are large, and the backend keeps them for a month anyway. Only
        *  the preference lives in the document. */
       neighbourBuildings: [],
+      /** Which register the outlines came from — the answer says so, and the
+       *  sentence beside the drawing must not claim a different one. */
+      neighbourSource: "dem Liegenschaftskataster",
       neighboursBusy: false,
       neighboursError: null,
       routesBusy: false,
       routesError: null,
+      /** Which plot this browser session has already routed. Asking again on
+       *  every visit would put the routing service through the whole set for a
+       *  page the user only opened to read the area. */
+      routedFor: null,
       backdrops: [
         { id: "none", name: "Ohne" },
         { id: "map", name: "Karte" },
@@ -437,7 +452,10 @@ export default {
     locatedDestinations() {
       return state.data.destinations.filter(d => Number.isFinite(d.lat) && Number.isFinite(d.lon));
     },
-    routesPossible() { return Boolean(this.plot.anchor) && this.locatedDestinations.length > 0; },
+    routesPossible() { return Boolean(this.plot?.anchor) && this.locatedDestinations.length > 0; },
+    /** Whether this plot already carries routes, from this session or an
+     *  earlier one — the document keeps them. */
+    hasRoutes() { return Object.keys(this.plot?.routes ?? {}).length > 0; },
     plot() { return plotById(this.id); },
     hasAnchor() { return Boolean(this.plot?.anchor); },
     building() { return placement(this.plot); },
@@ -513,8 +531,12 @@ export default {
   },
   /* A plot that was left with the neighbour hint on comes back with it on, so
      the outlines have to be fetched again — they are not in the document. */
-  created() { if (this.showNeighbours) this.loadNeighbours(); },
+  created() {
+    if (this.showNeighbours) this.loadNeighbours();
+    this.routeAutomatically();
+  },
   watch: {
+    "plot.id"() { this.routeAutomatically(); },
     /** A default nobody has touched follows the fields above it. */
     dimensionLabel(next, previous) {
       if (this.naming && this.typeName === previous) this.typeName = next;
@@ -533,6 +555,23 @@ export default {
     houseShape() { this.reseatHouse(); }
   },
   methods: {
+    /** The ways are computed on arrival, not on a button press.
+     *
+     * Waiting for a click made the page look like it had nothing to say about
+     * getting anywhere. Once per plot per session: the routes live in the
+     * document, so a plot that already carries them is not asked again, and
+     * neither is one whose routing just failed — that would hammer a service
+     * that is already down. */
+    routeAutomatically() {
+      // The view also renders for an id that names no plot here — that page is
+      // the whole reason `plot` may be null, and a hook that reads through it
+      // would empty exactly the page meant to explain the id.
+      if (!this.plot || !this.routesPossible || this.routesBusy) return;
+      if (this.hasRoutes || this.routedFor === this.plot.id) return;
+      this.routedFor = this.plot.id;
+      this.computeRoutes();
+    },
+
     /** Ask the routing service for every located destination at once and keep
      *  what it answers. Nothing is filled in when a mode has no connection —
      *  the card then says so instead of showing a plausible number. */
@@ -694,6 +733,9 @@ export default {
       try {
         const answer = await fetchNeighbourBuildings(this.plot.anchor.lat, this.plot.anchor.lon);
         this.neighbourBuildings = answer?.gebaeude ?? [];
+        this.neighbourSource = /OpenStreetMap|overpass/i.test(answer?.quelle ?? "")
+          ? "OpenStreetMap"
+          : "dem Liegenschaftskataster";
       } catch (error) {
         this.neighboursError = error.message;
       } finally {
@@ -727,64 +769,18 @@ export default {
 </script>
 
 <style scoped>
-.breadcrumb{ display: flex; align-items: center; gap: var(--w2b-space-2); font-size: var(--w2b-text-xs); color: var(--w2b-muted); }
-.breadcrumb a{ color: var(--w2b-primary); text-decoration: none; }
-.breadcrumb a:hover{ text-decoration: underline; }
-.missing{
-  border: 1px dashed var(--w2b-line); border-radius: var(--w2b-radius-m);
-  display: flex; flex-direction: column; align-items: center; gap: var(--w2b-space-3);
-  padding: var(--w2b-space-6) var(--w2b-space-5); text-align: center;
-}
-.missing p{ color: var(--w2b-muted); font-size: var(--w2b-text-s); }
-.missing .btn{ text-decoration: none; }
 
-.page-head{ display: flex; align-items: flex-end; gap: var(--w2b-space-4); flex-wrap: wrap; }
-.page-head__sub{ margin-top: var(--w2b-space-2); color: var(--w2b-graphite); font-size: var(--w2b-text-s); max-width: 64ch; }
-.page-head__note{ margin-top: var(--w2b-space-1); color: var(--w2b-muted); font-size: var(--w2b-text-s); font-style: italic; }
+.page-head__sub{ max-width: 64ch; }
 
 .plan-grid{ display: grid; grid-template-columns: minmax(0, 1fr) 336px; gap: var(--w2b-space-4); align-items: start; }
 @media (max-width: 1140px){ .plan-grid{ grid-template-columns: 1fr; } }
 .plan-frame{ position: sticky; top: var(--w2b-space-3); }
 @media (max-width: 1140px){ .plan-frame{ position: static; } }
 
-.plan-bar{
-  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-  padding: var(--w2b-space-2) var(--w2b-space-3); border-bottom: 1px solid var(--w2b-line);
-}
-.plan-bar__label{
-  font-family: var(--w2b-font-display); font-weight: 600; font-size: 10.5px;
-  letter-spacing: .1em; text-transform: uppercase; color: var(--w2b-muted); margin-left: 4px;
-}
-.button-group{ display: flex; border: 1px solid var(--w2b-line); border-radius: var(--w2b-radius-s); overflow: hidden; }
-.button-group button, .toggle{
-  background: var(--w2b-surface); border: 0; cursor: pointer; padding: 5px 11px;
-  font-family: var(--w2b-font-display); font-weight: 600; font-size: var(--w2b-text-xs);
-  color: var(--w2b-muted);
-}
-.button-group button + button{ border-left: 1px solid var(--w2b-line); }
-.toggle{ border: 1px solid var(--w2b-line); border-radius: var(--w2b-radius-s); }
-.button-group button[aria-pressed="true"], .toggle[aria-pressed="true"]{
-  background: var(--w2b-primary); color: var(--w2b-primary-on);
-}
 .notice{ border-radius: 0; }
 .measure-bar{ display: flex; align-items: center; gap: var(--w2b-space-3); border-bottom: 1px solid var(--w2b-line); }
-.plan-foot{
-  display: flex; justify-content: space-between; gap: var(--w2b-space-3); flex-wrap: wrap;
-  padding: var(--w2b-space-2) var(--w2b-space-3); border-top: 1px solid var(--w2b-line);
-  font-family: var(--w2b-font-mono); font-size: 10.5px; color: var(--w2b-muted);
-}
 
 .facts{ display: flex; flex-direction: column; gap: var(--w2b-space-4); }
-.value-list{ margin: 0; display: grid; grid-template-columns: auto 1fr; }
-.value-list dt, .value-list dd{
-  padding: 8px var(--w2b-space-4); border-bottom: 1px solid var(--w2b-line-faint); margin: 0;
-  display: flex; align-items: center;
-}
-.value-list dt{ font-size: var(--w2b-text-s); color: var(--w2b-graphite); }
-.value-list dd{ justify-content: flex-end; gap: 6px; font-family: var(--w2b-font-mono); font-size: var(--w2b-text-s); font-variant-numeric: tabular-nums; }
-.value-list dt:last-of-type, .value-list dd:last-of-type{ border-bottom: 0; }
-.faint{ color: var(--w2b-muted); font-size: var(--w2b-text-xs); }
-.panel__footnote{ padding: var(--w2b-space-3) var(--w2b-space-4); border-top: 1px solid var(--w2b-line-faint); font-size: var(--w2b-text-xs); color: var(--w2b-muted); }
 
 .price-band{ padding: var(--w2b-space-4); }
 .price-band__scale{ position: relative; height: 34px; margin-bottom: var(--w2b-space-2); }

@@ -28,6 +28,10 @@ export function plotMetrics(plot) {
     deviationClass: deviation === null
       ? "unknown"
       : Math.abs(deviation) <= 5 ? "good" : deviation > 15 ? "error" : "warn",
-    streetFrontage: polygonEdges(plot.polygon)[0].length
+    /* The edge the plot itself calls its street front, not the one the ring
+       happens to start with: a union of two parcels starts wherever the two
+       outlines meet, and that was a 2,04 m stub reported as the frontage. */
+    streetFrontage: (polygonEdges(plot.polygon)[plot.streetEdge ?? 0]
+      ?? polygonEdges(plot.polygon)[0]).length
   };
 }

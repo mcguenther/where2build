@@ -51,6 +51,30 @@ Namespace-Präfix: `ave:` → `http://repository.gdi-de.org/schemas/adv/produkt/
 
 Default-SRS: `EPSG:25833`, weitere unterstützte SRS: `EPSG:25832`, `EPSG:4258` (alle drei ✅ live in Capabilities bestätigt).
 
+### 1.1.1 `ave:GebaeudeBauwerk` — die Nachbargebäude, amtlich (✅ live gemessen 06.09.2026)
+
+Der Layer stand von Anfang an in dieser Liste und wurde nie benutzt: die
+Nachbargebäude kamen aus OpenStreetMap über Overpass, mit `OVERPASS_ENABLED` als
+Voraussetzung. Nötig ist das nicht — es ist derselbe WFS, den die Flurstücke
+ohnehin nutzen, mit demselben Proxy und Plattencache.
+
+Gemessen über Mölkau 204 (BBOX in EPSG:25833):
+
+| Anfrage | Antwort |
+|---|---|
+| 240 × 240 m | `numberReturned="146"` Gebäude |
+| 90 × 90 m | 25 Gebäude, 11 davon mit Lagebezeichnung |
+
+Attribute je Objekt: `oid` (z. B. `DESNALK0v9001cc9BL`), `geometrie`
+(`gml:MultiSurface`, EPSG:25833), `gebnutzbez` („Gebäude"), `funktion`
+(„Wohngebäude", „Gebäude für Wirtschaft oder Gewerbe"), `gfkzshh` (ALKIS-Kennzahl,
+z. B. `31001_2000`), `gmdschl`, `lagebeztxt` (wo vorhanden), `aktualit`
+(Fortführungsdatum, hier durchweg `2015-03-28Z`).
+
+⚠️ **Keine Wandhöhe, keine Geschosse** — dieselbe Lücke wie in OSM, nur amtlich.
+Für § 6 Abs. 5 SächsBO bleibt damit ausschließlich das Mindestmaß von 3 m
+rechenbar, nie 0,4 H.
+
 ### 1.2 DescribeFeatureType — Attribute (✅ live abgerufen)
 
 **`ave:Flurstueck`** (das für den Grundstücks-Check zentrale Objekt):
@@ -438,15 +462,80 @@ https://geodienste.sachsen.de/wms_geosn_dop-rgb/guest?SERVICE=WMS&VERSION=1.3.0&
 
 **Endpunkt:** `https://geodienste.sachsen.de/wms_geosn_alkis-adv/guest`
 
+**Vollständige Layerliste** (✅ live aus den Capabilities gelesen, 05.09.2026 —
+zwölf Layer, nicht sechs):
+
 | Layer | Bedeutung |
 |---|---|
+| `adv_alkis_flurstuecke` | **Flurstücke** — Grenzen und Flurstücksnummern |
+| `adv_alkis_gebaeude` | **Gebäude** |
+| `adv_alkis_fgp` | Festgestellte Grenzpunkte |
 | `adv_alkis_tatsaechliche_nutzung` | Tatsächliche Nutzung |
 | `adv_alkis_gewaesser` | Gewässer |
 | `adv_alkis_vegetation` | Vegetation |
 | `adv_alkis_verkehr` | Verkehr |
 | `adv_alkis_siedlung` | Siedlung |
 | `adv_alkis_gesetzl_festlegungen` | Gesetzliche Festlegungen |
-| (weitere: Gruppe "Weiteres" mit Bauwerken/Relief laut ⚠️ Websuche, nicht im Detail live durchgeprüft) |
+| `adv_alkis_oeff_rechtl_sonst_festl` | Öffentlich-rechtliche und sonstige Festlegungen |
+| `adv_alkis_bauw_einricht` | Bauwerke und Einrichtungen |
+| `adv_alkis_weiteres` | Weiteres |
+
+#### 3.3.1 Nutzungsgruppen sind keine Liegenschaftskarte (✅ live geprüft)
+
+`adv_alkis_tatsaechliche_nutzung` zeichnet **Nutzungsflächen**, keine
+Flurstücke: eine GetMap über Liebertwolkwitz (700 × 525 px, ~445 m) liefert
+zusammenhängende Blöcke — Wohnbaufläche rosa, Sport-/Grünfläche grün, Gewässer
+blau —, die quer über mehrere Flurstücke laufen. Wer eine Kataster­darstellung
+will, braucht `adv_alkis_flurstuecke` (+ `adv_alkis_gebaeude` zur Orientierung).
+Genau das war der Grund, warum der Kartenhintergrund "Kataster" zunächst Flächen
+zeigte, die mehrere Flurstücke überspannten.
+
+#### 3.3.2 Maßstabsgrenze 1:2000 — leeres Bild, kein Fehler (✅ live gemessen)
+
+`adv_alkis_flurstuecke` zeichnet **unterhalb** von 1:2000 und liefert ab 1:2000
+ein leeres PNG (2 646 Byte bei 700 × 525) — ohne `ServiceException`, ohne
+Hinweis. Gemessen über Liebertwolkwitz, EPSG:3857, 700 × 525 px:
+
+| Maßstab | Antwort |
+|---|---|
+| 1:1531 | 85 211 B — gezeichnet |
+| 1:1900 | 104 554 B — gezeichnet |
+| 1:1990 | 108 262 B — gezeichnet |
+| **1:2000** | **2 646 B — leer** |
+| 1:2270 | 2 646 B — leer |
+| 1:4541 | 2 646 B — leer |
+
+Der Dienst rechnet den Maßstab aus der Anfrage, mit dem Norm-Pixel von 0,28 mm:
+
+```
+Maßstab = BBOX-Breite_m · Auflösung / (Breite_px · 0,0254)
+```
+
+Die Auflösung ist steuerbar — der Parameter heißt `MAP_RESOLUTION`, `DPI`
+antwortet byte-identisch. Auf einer z18-Kachel (152,87 m über 256 px, also
+1:2133 im Norm-Pixel):
+
+| Anfrage | Antwort |
+|---|---|
+| ohne Parameter | 854 B — leer |
+| `FOO=36` (Unsinnsparameter) | 854 B — leer |
+| `MAP_RESOLUTION=85` | 20 081 B — gezeichnet |
+| `MAP_RESOLUTION=86` | 854 B — leer |
+| `DPI=85` | 20 081 B — byte-identisch zu `MAP_RESOLUTION=85` |
+
+85 statt 86 ist exakt die Stelle, an der die Formel 1:2000 erreicht — die
+Grenze ist ausgeschlossen. Der Unsinnsparameter zeigt, dass es der Parameter
+ist und nicht irgendein zusätzliches Argument.
+
+`backend/app/services/tiles.py` klemmt die Auflösung deshalb wie beim
+Lärm-Layer den `dpi`: `MAP_RESOLUTION` wird nur mitgeschickt, wenn das
+Norm-Pixel die Grenze reißen würde. Wirkung: z19 unverändert, z18 mit 85, z17
+mit 42, z16 mit 21 — dort sind die Nummern zwar unlesbar klein, aber das
+Flurstücksgefüge bleibt sichtbar, statt spurlos zu verschwinden.
+
+Die Gebäude haben dieselbe Mechanik mit einer weiteren Grenze: 1:4990
+gezeichnet, **1:5000 leer**. Die Klemmung auf 1:2000 hält sie damit
+automatisch mit im Bild.
 
 - Formate: `image/png`, `image/jpeg`, `image/gif`
 - CRS: `EPSG:25833`, `EPSG:4258`, `EPSG:4326`, `EPSG:25832`, `EPSG:31469`, `EPSG:31468`, `EPSG:31467`, `EPSG:31466`

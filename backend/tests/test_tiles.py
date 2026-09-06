@@ -13,7 +13,7 @@ from app import geo
 from app.deps import tile_service
 from app.errors import BadRequestError
 
-from .conftest import DOP_URL
+from .conftest import ALKIS_WMS_URL, DOP_URL, NOISE_EXPORT_URL
 
 # Smallest valid PNG, enough to prove the bytes travel through unchanged.
 PNG = bytes.fromhex(
@@ -115,17 +115,45 @@ def test_geographic_crs_uses_latitude_first():
 
 def test_layer_configuration_covers_every_switchable_layer():
     assert set(tile_service().layers) == {
-        "dop", "webatlas", "alkis", "flurstuecke", "strassen"
+        "dop", "webatlas", "alkis", "liegenschaftskarte", "flurstuecke", "strassen",
+        "laerm", "laerm-nacht"
     }
 
 
 def test_the_parcel_outlines_are_asked_for_in_the_overlay_style():
-    """„Gelb“ draws contours and no fills, which is the point over a photo."""
+    """„Gelb“ draws contours and no fills, which is the point over a photo.
 
-    config = tile_service().layers["flurstuecke"]
+    The cadastral *ground* is the other one: there the buildings are wanted,
+    because nothing underneath is being hidden by them.
+    """
 
-    assert config.layers == "adv_alkis_flurstuecke"
-    assert config.styles == "Gelb"
+    layers = tile_service().layers
+
+    assert layers["flurstuecke"].layers == "adv_alkis_flurstuecke"
+    assert layers["flurstuecke"].styles == "Gelb"
+    assert "gebaeude" in layers["alkis"].layers
+
+
+def test_the_two_cadastral_overlays_solve_the_same_limit_differently():
+    """One picture across a district, one picture of a plot.
+
+    `adv_alkis_flurstuecke` stops drawing at 1:2000 either way. The search map
+    needs its outlines five zoom steps above that, so its tile is rendered
+    oversized and scaled back — which scales the labels down with it. The
+    picker needs the *numbers*, so its tile stays 256 px and the limit is moved
+    with `MAP_RESOLUTION` instead. Measured at z18 over Liebertwolkwitz: the
+    plain tile carries 101/2, 85/1 and „Wiesengasse“, the oversampled one
+    carries neither.
+    """
+
+    layers = tile_service().layers
+    outlines, map_ = layers["flurstuecke"], layers["liegenschaftskarte"]
+
+    assert outlines.layers == map_.layers  # the same layer of the same service
+    assert outlines.max_scale_denominator and not outlines.min_scale
+    assert map_.min_scale and not map_.max_scale_denominator
+    assert map_.styles == ""  # the service's own symbology, labels and all
+    assert map_.min_zoom == 0  # nothing to run out of: the tile stays one tile
 
 
 def test_the_parcel_layer_is_rendered_large_enough_to_draw():
@@ -194,3 +222,125 @@ def test_an_oversized_render_reaches_the_browser_as_one_tile():
     assert small.size == (256, 256)
     # The lines survive the reduction rather than falling between samples.
     assert any(pixel[3] > 0 for pixel in small.convert("RGBA").get_flattened_data())
+
+
+@respx.mock
+def test_changing_which_layers_a_ground_stands_for_invalidates_its_tiles(client: TestClient):
+    """The cache key carried the layer's *name* only, so a tile drawn from the
+    land-use layers was still served after the ground became the parcels --
+    which looks exactly like a change that did not work."""
+
+    route = respx.get(ALKIS_WMS_URL).mock(return_value=_wms_answer())
+    service = tile_service()
+    alkis, parcels = service.layers["alkis"], service.layers["flurstuecke"]
+
+    client.get("/api/tiles/alkis/20/561296/351568.png")
+    second = client.get("/api/tiles/flurstuecke/20/561296/351568.png")
+
+    # Same service, same tile, different layers: the second is fetched again.
+    assert second.headers["x-cache"] == "MISS"
+    assert len(route.calls) == 2
+    assert route.calls[1].request.url.params["STYLES"] == parcels.styles != alkis.styles
+
+
+# --------------------------------------------------------------------------
+# The noise layer, which is not a WMS
+# --------------------------------------------------------------------------
+
+
+@respx.mock
+def test_the_noise_layer_goes_through_the_arcgis_export_endpoint(client: TestClient):
+    """Its own service offers EPSG:4326 and 25833 but not 3857, so a WMS raster
+    source gets nothing at all. `export` reprojects server-side."""
+
+    route = respx.get(NOISE_EXPORT_URL).mock(return_value=_wms_answer())
+
+    answer = client.get("/api/tiles/laerm/16/35081/21973.png")
+
+    assert answer.status_code == 200
+    params = route.calls[0].request.url.params
+    assert params["bboxSR"] == params["imageSR"] == "3857"
+    assert params["layers"] == "show:4"
+    assert params["format"] == "png32"
+    assert params["f"] == "image"
+    assert "SERVICE" not in params  # not a WMS request
+
+
+@respx.mock
+def test_the_night_layer_asks_for_the_other_one(client: TestClient):
+    route = respx.get(NOISE_EXPORT_URL).mock(return_value=_wms_answer())
+
+    client.get("/api/tiles/laerm-nacht/16/35081/21973.png")
+
+    assert route.calls[0].request.url.params["layers"] == "show:5"
+
+
+@respx.mock
+def test_the_dpi_keeps_the_layer_under_its_own_minscale(client: TestClient):
+    """`minScale: 50000` makes the service answer with an empty image and no
+    error above that scale. ArcGIS derives the scale as
+    (bbox_width_m / image_width_px) * dpi / 0.0254, so the dpi is what keeps
+    the layer visible -- measured: at 10 km over 512 px, dpi 65 draws and 66
+    comes back blank."""
+
+    route = respx.get(NOISE_EXPORT_URL).mock(return_value=_wms_answer())
+
+    # Zoom 10 covers 39 km across one tile; zoom 16 covers 611 m.
+    for zoom, x, y in ((10, 548, 343), (16, 35081, 21973)):
+        client.get(f"/api/tiles/laerm/{zoom}/{x}/{y}.png")
+
+    for call in route.calls:
+        params = call.request.url.params
+        minx, _, maxx, _ = (float(value) for value in params["bbox"].split(","))
+        scale = (maxx - minx) / 256 * int(params["dpi"]) / 0.0254
+        assert scale <= 50000, f"1:{scale:.0f} would draw nothing"
+        assert 1 <= int(params["dpi"]) <= 96
+
+
+@respx.mock
+def test_the_cadastral_layer_keeps_its_parcels_at_every_zoom(client: TestClient):
+    """The ALKIS layers stop drawing at 1:2000 and answer with an empty image,
+    so a ground called "Kataster" loses its parcel boundaries two zoom steps out
+    and says nothing about it. A WMS derives the scale from the standard 0,28 mm
+    pixel, and MAP_RESOLUTION is what a caller can change: measured on a z18
+    tile, 85 draws and 86 comes back blank.
+
+    The other way round the same limit is `render_size`, which the overlay uses:
+    a larger image over the same box. Both are measured; this one keeps the
+    request to a single tile, which is what a full-screen ground wants."""
+
+    route = respx.get(ALKIS_WMS_URL).mock(return_value=_wms_answer())
+
+    # z20 is inside the layer's own range; z18 and z16 are not.
+    for zoom, x, y in ((20, 561296, 351568), (18, 140324, 87892), (16, 35081, 21973)):
+        client.get(f"/api/tiles/alkis/{zoom}/{x}/{y}.png")
+
+    for call in route.calls:
+        params = call.request.url.params
+        minx, _, maxx, _ = (float(value) for value in params["BBOX"].split(","))
+        # Without the parameter the service measures in its own standard pixel.
+        resolution = float(params.get("MAP_RESOLUTION", 0.0254 / 0.00028))
+        scale = (maxx - minx) * resolution / (256 * 0.0254)
+        assert scale < 2000, f"1:{scale:.0f} would draw nothing"
+        assert 1 <= resolution <= 91
+
+
+@respx.mock
+def test_a_layer_inside_its_scale_range_is_asked_without_a_resolution(client: TestClient):
+    """The parameter is a correction, not a habit: where the standard pixel
+    already draws, the request carries the service's own default."""
+
+    route = respx.get(ALKIS_WMS_URL).mock(return_value=_wms_answer())
+
+    client.get("/api/tiles/alkis/20/561296/351568.png")
+
+    assert "MAP_RESOLUTION" not in route.calls[0].request.url.params
+
+
+@respx.mock
+def test_the_photo_layer_has_no_scale_limit_and_is_asked_plainly(client: TestClient):
+    route = respx.get(DOP_URL).mock(return_value=_wms_answer())
+
+    client.get("/api/tiles/dop/16/35081/21973.png")
+
+    assert "MAP_RESOLUTION" not in route.calls[0].request.url.params

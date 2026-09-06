@@ -8,13 +8,42 @@ import { toLocal, anchorOf } from "./projection.js";
 import { polygonArea, polygonEdges } from "./geometry.js";
 import { newId, CUSTOM_SIZE, DEFAULT_FOOTPRINT } from "./store.js";
 
-/** Outer ring of a GeoJSON Polygon or the first ring of a MultiPolygon. */
-export function outerRing(geometry) {
+/**
+ * Outer ring of a GeoJSON Polygon, or the one part of a MultiPolygon that is
+ * meant: the piece around `near` when a caller names a point, else the biggest.
+ *
+ * A plot of parcels that do not touch comes back as a MultiPolygon, and taking
+ * whichever part the register listed first drew the outline around the parcel
+ * that had just been added rather than around the one the user started from.
+ */
+export function outerRing(geometry, near = null) {
   if (!geometry) return [];
   if (geometry.type === "Polygon") return geometry.coordinates[0] ?? [];
-  if (geometry.type === "MultiPolygon") return geometry.coordinates[0]?.[0] ?? [];
-  return [];
+  if (geometry.type !== "MultiPolygon") return [];
+  const rings = (geometry.coordinates ?? []).map(part => part?.[0] ?? []).filter(r => r.length >= 3);
+  if (!rings.length) return [];
+  if (near) {
+    const hit = rings.find(ring => pointInRing(near, ring));
+    if (hit) return hit;
+  }
+  return rings.reduce((a, b) => (Math.abs(ringArea(b)) > Math.abs(ringArea(a)) ? b : a));
 }
+
+/** Twice the signed area of a `[lon, lat]` ring — for comparing parts only. */
+const ringArea = ring => ring.reduce((sum, [x, y], i) => {
+  const [nx, ny] = ring[(i + 1) % ring.length];
+  return sum + (x * ny - nx * y);
+}, 0);
+
+/** Even-odd test in degrees; the parts are far enough apart for that to hold. */
+const pointInRing = ([x, y], ring) => {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i], [xj, yj] = ring[j];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+};
 
 /** GeoJSON rings repeat the first vertex and often carry near-duplicates. */
 export function tidyRing(ring, minimumGap = 0.1) {
@@ -48,7 +77,7 @@ export function guessStreetEdge(ring) {
 export function plotFromCadastre(response, extra = {}) {
   const features = response?.features ?? [];
   const merged = response?.grundstueck ?? features[0];
-  const wgs = outerRing(merged?.geometry);
+  const wgs = outerRing(merged?.geometry, extra.near ?? null);
   if (wgs.length < 4) throw new Error("Die Antwort des Katasterdienstes enthält keine brauchbare Geometrie.");
 
   const anchor = anchorOf(wgs);
@@ -82,6 +111,8 @@ export function plotFromCadastre(response, extra = {}) {
     bodenrichtwert: extra.bodenrichtwert ?? null,
     brwZone: extra.brwZone ?? null,
     brwReferenceDate: extra.brwReferenceDate ?? null,
+    brwReferencePlotArea: extra.brwReferencePlotArea ?? null,
+    brwConversionUrl: extra.brwConversionUrl ?? null,
     polygon,
     divisionLine: null,
     streetEdge: guessStreetEdge(polygon),
@@ -101,6 +132,26 @@ export function plotFromCadastre(response, extra = {}) {
     note: extra.note ?? "",
     routes: {}
   };
+}
+
+/**
+ * Which of these parcels the cadastre says carries this address.
+ *
+ * `ave:lagebeztxt` holds what the register calls the parcel's location, often
+ * several spellings joined by a semicolon ("Lessingweg; Lessingweg 42"). A
+ * house number matches only as a whole token: "Lessingweg 4" must not answer
+ * for "Lessingweg 46". Returns null when nothing matches — a guess here would
+ * be worse than the point-in-polygon answer it would override.
+ */
+export function parcelForAddress(features, address) {
+  const wanted = String(address ?? "").trim().toLowerCase();
+  if (!wanted) return null;
+  const matches = (features ?? []).filter(feature => {
+    const location = String(feature.properties?.lagebezeichnung ?? "").toLowerCase();
+    return location.split(";").some(part => part.trim() === wanted);
+  });
+  // Two parcels claiming the same address is not a tie to break here.
+  return matches.length === 1 ? matches[0] : null;
 }
 
 function centrePlacement(ring) {

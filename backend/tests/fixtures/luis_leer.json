@@ -1,0 +1,15 @@
+{
+ "displayFieldName": "CATEGORY",
+ "fieldAliases": {
+  "CATEGORY": "CATEGORY"
+ },
+ "fields": [
+  {
+   "name": "CATEGORY",
+   "type": "esriFieldTypeString",
+   "alias": "CATEGORY",
+   "length": 8
+  }
+ ],
+ "features": []
+}

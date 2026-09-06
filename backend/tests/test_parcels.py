@@ -519,7 +519,123 @@ def test_an_expected_area_of_zero_is_refused(client: TestClient):
 
 
 # --------------------------------------------------------------------------
-# A plot is a set of parcels -- the normal case, not the exception
+# POST /api/parcels/nearby -- the candidates, for the user to choose between
+# --------------------------------------------------------------------------
+
+
+@respx.mock
+def test_nearby_lists_the_parcels_around_a_coordinate(client: TestClient):
+    """`/resolve` answers with one plot; this answers with the candidates.
+
+    An address coordinate is not a parcel boundary — the register puts it on the
+    building. Measured on Lessingweg 44 in Mölkau, where the routing geocoder's
+    point sits 7 m away, inside number 46.
+    """
+
+    route = respx.get(ALKIS_URL).mock(
+        return_value=httpx.Response(200, content=fixture_bytes("alkis_flurstueck_zwei.gml"))
+    )
+
+    answer = client.post(
+        "/api/parcels/nearby", json={"lat": 51.336612, "lon": 12.441776, "umkreis_m": 60}
+    )
+
+    assert answer.status_code == 200
+    body = answer.json()
+    assert len(body["features"]) == 2
+    assert "Adresskoordinate ist keine Flurstücksgrenze" in body["hinweis"] \
+        or "Nachbarflurstück" in body["hinweis"]
+    # The window is the one that was asked for, not the 1 m the point query uses.
+    bbox = route.calls[0].request.url.params["BBOX"].split(",")
+    assert float(bbox[2]) - float(bbox[0]) == pytest.approx(120, abs=1)
+
+
+def test_nearby_refuses_a_window_that_is_not_a_neighbourhood(client: TestClient):
+    answer = client.post(
+        "/api/parcels/nearby", json={"lat": 51.33, "lon": 12.44, "umkreis_m": 5000}
+    )
+
+    assert answer.status_code == 422
+
+
+# --------------------------------------------------------------------------
+# The fourth way in: a set of parcel keys, as the picker assembles it
+# --------------------------------------------------------------------------
+
+SINGLE_KEY = "140415___00604000202"
+MORITZBURG_KEY = "143044___00001____01"
+
+
+def _by_key(request: httpx.Request) -> httpx.Response:
+    """The stored query, answering per key like the WFS does."""
+
+    wanted = request.url.params.get("kennzeichen")
+    fixtures = {
+        SINGLE_KEY: "alkis_flurstueck_single.gml",
+        MORITZBURG_KEY: "alkis_flurstueck_moritzburg.gml",
+    }
+    return httpx.Response(200, content=fixture_bytes(fixtures.get(wanted, "alkis_leer.gml")))
+
+
+@respx.mock
+def test_resolve_by_keys_makes_one_plot_of_several_parcels(client: TestClient):
+    """A plot is a set of parcels, and this is the set a user clicked together:
+    the union is the outline, the official areas are summed."""
+
+    respx.get(ALKIS_URL).mock(side_effect=_by_key)
+
+    answer = client.post(
+        "/api/parcels/resolve", json={"kennzeichen": [SINGLE_KEY, MORITZBURG_KEY]}
+    )
+
+    assert answer.status_code == 200
+    body = answer.json()
+    assert [f["properties"]["kennzeichen"] for f in body["features"]] == [
+        SINGLE_KEY, MORITZBURG_KEY
+    ]
+    grundstueck = body["grundstueck"]["properties"]
+    assert grundstueck["anzahl_flurstuecke"] == 2
+    assert grundstueck["flaeche_amtlich_m2"] == 34838.0   # 39 + 34 799
+    assert "2 Flurstücken" in body["hinweis"]
+
+
+@respx.mock
+def test_the_same_key_twice_is_one_parcel(client: TestClient):
+    """Otherwise a double click would double the plot's official area."""
+
+    respx.get(ALKIS_URL).mock(side_effect=_by_key)
+
+    body = client.post(
+        "/api/parcels/resolve", json={"kennzeichen": [SINGLE_KEY, SINGLE_KEY]}
+    ).json()
+
+    assert body["grundstueck"]["properties"]["anzahl_flurstuecke"] == 1
+    assert body["grundstueck"]["properties"]["flaeche_amtlich_m2"] == 39.0
+
+
+@respx.mock
+def test_a_key_nobody_knows_is_a_404_that_names_it(client: TestClient):
+    respx.get(ALKIS_URL).mock(side_effect=_by_key)
+
+    answer = client.post(
+        "/api/parcels/resolve", json={"kennzeichen": [SINGLE_KEY, "140415___09999000000"]}
+    )
+
+    assert answer.status_code == 404
+    assert "140415___09999000000" in answer.json()["detail"]
+
+
+def test_keys_do_not_mix_with_the_other_ways_in(client: TestClient):
+    answer = client.post(
+        "/api/parcels/resolve", json={"kennzeichen": [SINGLE_KEY], "lat": 51.3, "lon": 12.4}
+    )
+
+    assert answer.status_code == 422
+
+
+# --------------------------------------------------------------------------
+# And the same set named the way a listing names it: several numbers, one
+# Gemarkung
 # --------------------------------------------------------------------------
 
 

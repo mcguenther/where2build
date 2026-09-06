@@ -266,11 +266,16 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
   await page.getByRole("button", { name: "Nachschlagen" }).click();
   await page.waitForSelector(".site-plan", { timeout: 60000 });
   /* The last step: the outline, what is being taken over, and the three fields
-     that used to be a page of their own. */
+     that used to be a page of their own. It is a picture of the ground, so
+     without waiting for the tiles a cold cache photographs the drawing on empty
+     paper and calls it a clean run. */
+  await mapSettled(page, `${mode}/${width} Flurstückswahl`);
   await shot(page, "assistent-3", mode, narrow ? "-schmal" : "");
 
   /* Every step of the wizard has an address of its own, so the browser's back
-   * button steps back one step instead of leaving the wizard. */
+   * button steps back one step instead of leaving the wizard. The parcel step
+   * is the last one — it carries the fields the cadastre cannot supply — so
+   * back from it is the source step. */
   await page.goBack();
   await page.waitForTimeout(200);
   const steppedBackTo = new URL(page.url()).pathname;
@@ -292,6 +297,24 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
     await page.getByRole("button", { name: "Karte" }).click();
     await page.waitForTimeout(2000);
   }
+
+  /* The location record: eleven checks against the authority services, asked
+   * with the parcel outline. Waited on either outcome — with no backend on
+   * :8000 the list shows the German failure sentence, and that is a state
+   * worth photographing too. */
+  await page.getByRole("link", { name: "Standort prüfen" }).click();
+  await page.waitForSelector(".checks__list, .checks .notice--error", { timeout: 90000 });
+  await page.waitForTimeout(3000);
+  await shot(page, "standort", mode, narrow ? "-schmal" : "");
+  if (!narrow) {
+    // The noise layer over the ground: the one raster in this app that does
+    // not come from a WMS, because that service speaks no Web Mercator.
+    await page.getByRole("button", { name: "Lärm" }).click();
+    await mapSettled(page, `${mode}/${width} Lärmschleier`);
+    await shot(page, "standort-laerm", mode);
+  }
+  await page.click(".breadcrumb a:nth-child(3)");
+  await page.waitForSelector(".plot-page", { timeout: 20000 });
 
   /* The point of the addresses: the plot has one of its own, and reloading it
    * comes back to the same page instead of the overview. This is also what
@@ -335,8 +358,9 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
     await page.getByRole("button", { name: "Fertig" }).click();
 
     // And the routes that follow from it, drawn from the geometry MOTIS sends.
+    // The page asks for them itself now -- there is no button to press, and a
+    // wait for one sat there until it timed out.
     await page.click(".plot-card .btn");
-    await page.getByRole("button", { name: "Wege berechnen" }).click();
     await page.waitForSelector(".route-card polyline", { timeout: 60000 });
     await page.waitForTimeout(600);
     // The cards themselves: this is the only picture that carries them, and
@@ -349,6 +373,13 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
     // that is there reads "Neu suchen", which is what a wait for "Nachsehen"
     // sat out until it timed out.
     await page.waitForSelector(".nearby__list tbody tr", { timeout: 60000 });
+    // Bike and car arrive after the walk does, so the table is photographed
+    // once its cells have stopped being placeholders. Bounded: a router that
+    // cannot answer leaves the skeletons standing, and that is a picture worth
+    // having rather than a run that never ends.
+    await page
+      .waitForFunction(() => !document.querySelector(".skeleton-cell"), null, { timeout: 60000 })
+      .catch(() => {});
     await shot(page, "grundstueck-umgebung", mode);
 
     // The map of the same thing: house, ground around it, and every place that
@@ -391,6 +422,20 @@ taken.push("grundstueck-druck.png");
 /* A flat screenshot cannot show where the page actually breaks; the PDF can. */
 await page.pdf({ path: resolve(outDir, "grundstueck-druck.pdf"), format: "A4", preferCSSPageSize: true });
 taken.push("grundstueck-druck.pdf");
+
+/* And the location sheet, which prints the other way round — the record leads,
+   the map follows it. Eleven checks are taller than one page, so the PDF is
+   the part that shows whether the breaks land between rows. */
+await page.emulateMedia({ media: null });
+await page.getByRole("link", { name: "Standort prüfen" }).click();
+await page.waitForSelector(".checks__list, .checks .notice--error", { timeout: 90000 });
+await page.waitForTimeout(2000);
+await page.emulateMedia({ media: "print" });
+await page.waitForTimeout(300);
+await page.screenshot({ path: resolve(outDir, "standort-druck.png"), fullPage: true });
+taken.push("standort-druck.png");
+await page.pdf({ path: resolve(outDir, "standort-druck.pdf"), format: "A4", preferCSSPageSize: true });
+taken.push("standort-druck.pdf");
 await ctx.close();
 
 await browser.close();

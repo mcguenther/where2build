@@ -19,6 +19,7 @@ import PlotView from "../src/views/PlotView.vue";
 import { state, plotById, save } from "../src/lib/store.js";
 import { realState, realPlot, mountWithRouter } from "./helpers.js";
 import answer from "./fixtures/neighbours-moelkau.json";
+import fromCadastre from "./fixtures/neighbours-moelkau-alkis.json";
 
 const { neighbourBuildings } = await import("../src/lib/api.js");
 
@@ -71,6 +72,19 @@ describe("Nachbargebäude als Hinweis", () => {
     expect(text).toContain("OpenStreetMap");
     // The premise the statute does not carry must not be stated as one.
     expect(text).not.toContain("müssen Sie");
+    expect(text).toContain("§ 6 SächsBO verlangt das nicht von uns");
+  });
+
+  it("nennt das Kataster, wenn die Umrisse von dort kommen", async () => {
+    // Dieselbe Stelle, amtlich beantwortet: 71 Umrisse aus ave:GebaeudeBauwerk,
+    // ohne dass irgendetwas eingerichtet werden musste.
+    neighbourBuildings.mockResolvedValue(fromCadastre);
+
+    const w = await turnOn(mountWithRouter(PlotView, { props: { id: ID } }));
+
+    const text = w.text();
+    expect(text).toContain("Liegenschaftskataster");
+    expect(text).not.toContain("OpenStreetMap");
     expect(text).toContain("§ 6 SächsBO verlangt das nicht von uns");
   });
 

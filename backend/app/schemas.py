@@ -253,16 +253,29 @@ def parse_flurstuecksnummer(value: str) -> tuple[int, str | None]:
 
 
 class ParcelResolveRequest(BaseModel):
-    """One of three ways in: address, coordinate, or cadastral identifier.
+    """One of four ways in: address, coordinate, cadastral identifier, or keys.
 
     The cadastral way in accepts both spellings: the two ALKIS attributes
     (``zaehler`` plus optional ``nenner``) and the single ``flurstuecksnummer``
     the official geoportal prints.
+
+    A coordinate may be given the way the cadastre itself writes it. The Saxon
+    geoportal shows ETRS89/UTM33N, so a user copying a position out of it has
+    ``easting``/``northing`` in front of them and no way to turn those into
+    degrees in a browser -- the projection lives here.
     """
 
     address: str | None = Field(default=None, max_length=300)
     lat: float | None = Field(default=None, ge=-90, le=90)
     lon: float | None = Field(default=None, ge=-180, le=180)
+    easting: float | None = Field(
+        default=None, ge=180_000, le=900_000,
+        description="Rechtswert in ETRS89/UTM33N (EPSG:25833), wie im Geoportal.",
+    )
+    northing: float | None = Field(
+        default=None, ge=5_200_000, le=6_100_000,
+        description="Hochwert in ETRS89/UTM33N (EPSG:25833).",
+    )
     gemarkung: str | None = Field(default=None, max_length=120)
     zaehler: int | None = Field(default=None, ge=0)
     # A denominator may be a letter (41/e), so it travels as text; an integer
@@ -273,9 +286,17 @@ class ParcelResolveRequest(BaseModel):
         max_length=20,
         description="Flurstücksnummer wie im Geoportal, etwa „85/1“, „476“ oder „41/e“.",
     )
-    # A plot is a *set* of parcels -- the normal case, not the exception. One
-    # Gemarkung, several numbers: the polygons are unioned and the official
-    # areas summed, which is what `to_collection` has always done.
+    # A plot is a set of parcels, and the user assembles that set by clicking:
+    # this is that set, as the parcel keys `/nearby` answered with. The union
+    # and the summed official areas are the same code every other way in uses.
+    kennzeichen: list[str] | None = Field(
+        default=None,
+        min_length=1,
+        max_length=20,
+        description="Flurstückskennzeichen, die zusammen ein Grundstück bilden.",
+    )
+    # The same set named the way a listing names it: one Gemarkung, several
+    # numbers. The keys above come from `/nearby`, these from what was read.
     flurstuecksnummern: list[str] | None = Field(
         default=None,
         max_length=20,
@@ -342,6 +363,20 @@ class ParcelResolveRequest(BaseModel):
                 )
             self.nenner = nenner
 
+        if (self.easting is None) != (self.northing is None):
+            raise ValueError("Rechtswert und Hochwert müssen gemeinsam angegeben werden.")
+        if self.easting is not None:
+            if self.lat is not None:
+                raise ValueError(
+                    "Bitte entweder lat/lon oder Rechts- und Hochwert angeben, nicht beides."
+                )
+            # Imported here: schemas.py is otherwise free of the projection
+            # stack, and importing pyproj at module scope would drag it into
+            # every process that only wants the models.
+            from . import geo
+
+            self.lon, self.lat = geo.utm33_to_wgs84(self.easting, self.northing)
+
         by_address = bool(self.address and self.address.strip())
         by_point = self.lat is not None and self.lon is not None
         by_parcel = bool(self.gemarkung and self.zaehler is not None)
@@ -352,17 +387,46 @@ class ParcelResolveRequest(BaseModel):
                 "Zu einer Flurstücksnummer wird die Gemarkung benötigt — "
                 "dieselbe Nummer gibt es in jeder Gemarkung."
             )
-        chosen = [by_address, by_point, by_parcel]
+        by_keys = bool(self.kennzeichen)
+        if by_keys:
+            keys = [key.strip() for key in self.kennzeichen if key and key.strip()]
+            if not keys:
+                raise ValueError("Ein Flurstückskennzeichen darf nicht leer sein.")
+            # A set of parcels, not a list: the same key twice would be counted
+            # twice in the official area.
+            self.kennzeichen = list(dict.fromkeys(keys))
+        chosen = [by_address, by_point, by_parcel, by_keys]
         if sum(chosen) == 0:
             raise ValueError(
-                "Bitte Adresse, Koordinate (lat/lon) oder Gemarkung mit Flurstücksnummer angeben."
+                "Bitte Adresse, Koordinate (lat/lon), Gemarkung mit Flurstücksnummer "
+                "oder Flurstückskennzeichen angeben."
             )
         if sum(chosen) > 1:
             raise ValueError(
-                "Bitte nur einen Weg angeben: Adresse, Koordinate oder Gemarkung "
-                "mit Flurstücksnummer."
+                "Bitte nur einen Weg angeben: Adresse, Koordinate, Gemarkung mit "
+                "Flurstücksnummer oder Flurstückskennzeichen."
             )
         return self
+
+
+class ParcelsAroundRequest(BaseModel):
+    """The parcels near a coordinate, for choosing between them.
+
+    Deliberately separate from `/resolve`: that answers with *the* plot, as one
+    union, while this answers with the candidates so the user can say which one
+    is theirs. The distinction matters because an address coordinate is not a
+    parcel — the register places it on the building, and a metre either way puts
+    it in the neighbour's.
+    """
+
+    lat: float = Field(ge=-90, le=90)
+    lon: float = Field(ge=-180, le=180)
+    umkreis_m: int = Field(
+        default=60,
+        ge=10,
+        le=300,
+        description="Halbe Kantenlänge des Suchfensters um die Koordinate.",
+    )
 
 
 class Geometry(BaseModel):
@@ -464,6 +528,12 @@ class LandValue(BaseModel):
     nutzung: str | None = None
     entwicklungszustand: str | None = None
     gutachterausschuss: str | None = None
+    # The size of the notional plot the value is quoted for. BORIS carries it
+    # as `FLAECHE_TEXT = 'f800'` and links the Gutachterausschuss' own
+    # conversion table beside it -- so a 650 m² parcel is not simply 650 × the
+    # zone value, and the interface can say so instead of implying it.
+    richtwertgrundstueck_m2: float | None = None
+    umrechnungstabelle_url: str | None = None
     hinweis: str = (
         "Zonenwert nach § 196 BauGB. Nach § 15 Abs. 2 ImmoWertV kann ein einzelnes "
         "Grundstück innerhalb der Zone abweichend genutzt werden — dann gilt der "
@@ -797,6 +867,16 @@ class NearbyResponse(BaseModel):
 # --------------------------------------------------------------------------
 
 
+# The wall height is what § 6 Abs. 5 SächsBO measures from, and neither source
+# carries one: the simplified ALKIS has no storeys at all, and OSM had them for
+# 11 of 59 buildings around Mölkau 204. So both sentences say the same thing
+# about what is computable and differ only in where the outlines came from.
+NACHBARN_HINWEIS_KATASTER = (
+    "Umrisse aus dem Liegenschaftskataster (ALKIS), ohne Wandhöhen — daraus "
+    "lässt sich nur das Mindestmaß von 3 m nach § 6 Abs. 5 SächsBO rechnen, nie "
+    "0,4 H. Ein Hinweis, keine bauordnungsrechtliche Prüfung."
+)
+
 NACHBARN_HINWEIS = (
     "Umrisse aus OpenStreetMap, ohne Wandhöhen — daraus lässt sich nur das "
     "Mindestmaß von 3 m nach § 6 Abs. 5 SächsBO rechnen, nie 0,4 H. Ein "
@@ -805,16 +885,23 @@ NACHBARN_HINWEIS = (
 
 
 class Nachbargebaeude(BaseModel):
-    """One mapped building outline, as OpenStreetMap has it."""
+    """One building outline, from the cadastre or from OpenStreetMap."""
 
-    osm_id: str
+    id: str = Field(description="Objekt-ID der Quelle — ALKIS-OID oder OSM-Weg.")
     umriss: list[list[float]] = Field(
         description="Geschlossener Ring in [lon, lat], WGS84.", min_length=4
     )
     adresse: str | None = None
+    funktion: str | None = Field(
+        default=None, description="Gebäudefunktion, wie ALKIS sie führt."
+    )
+    aktualitaet: str | None = Field(
+        default=None, description="Fortführungsdatum des Objekts im Kataster."
+    )
     geschosse: int | None = Field(
         default=None,
-        description="Nur wenn OSM es führt; in sächsischen Wohnlagen fast nie.",
+        description="Nur wenn die Quelle es führt; ALKIS-vereinfacht führt es nie "
+        "und OSM in sächsischen Wohnlagen fast nie.",
     )
 
 
@@ -833,6 +920,156 @@ class NachbarnResponse(BaseModel):
     quelle: str | None = None
     datenstand: str | None = None
     hinweis: str = NACHBARN_HINWEIS
+
+
+# --------------------------------------------------------------------------
+# Standortprüfungen
+#
+# The field names are German because they are the wire format and they mirror
+# the authorities' own vocabulary -- a `Wasserschutzgebiet` has no English name
+# in the register it comes from. What the services answer travels untranslated:
+# `Lden5559`, `LK_IV`, the area's own name. Turning a class key into a sentence
+# is the browser's job (`frontend/src/lib/findings.js`), and turning it into a
+# sentence *here* would put German UI copy in a Python module and make it
+# unreviewable in one place.
+# --------------------------------------------------------------------------
+
+STANDORT_HINWEIS = (
+    "Die Prüfungen sind eine Recherche, keine behördliche Auskunft. Sie ersetzen "
+    "weder eine Bauvoranfrage noch ein Baugrundgutachten; maßgeblich sind die "
+    "Auskünfte der zuständigen Behörden."
+)
+
+
+class StandortRequest(BaseModel):
+    """One parcel outline, in WGS84, as `[lon, lat]` pairs.
+
+    A ring rather than a point, and deliberately no point alternative: a plot
+    straddles isophones and zone boundaries, and asking with its centre would
+    answer for one square metre of it. Measured on Flurstück 204 in Mölkau --
+    50-54 dB(A) at the building point, 50-59 dB(A) across the 650 m².
+    """
+
+    ring: list[tuple[float, float]] = Field(
+        min_length=3,
+        max_length=2000,
+        description="Umring des Grundstücks als [lon, lat]-Paare in WGS84.",
+    )
+
+    @field_validator("ring")
+    @classmethod
+    def _inside_saxony(cls, ring: list[tuple[float, float]]) -> list[tuple[float, float]]:
+        # Generous bounds around Germany: the services are Saxon, and a ring
+        # somewhere else is a mistake worth naming rather than a slow 0-hit.
+        for lon, lat in ring:
+            if not (5.6 <= lon <= 15.3 and 47.0 <= lat <= 55.2):
+                raise ValueError(
+                    "Der Umring liegt außerhalb Deutschlands — bitte [lon, lat] in WGS84 senden."
+                )
+        return ring
+
+
+class Laerm(BaseModel):
+    """Noise bands per source, as 5 dB categories.
+
+    `tag` is L_DEN over 24 hours, `nacht` is L_night. A source that answers with
+    an empty list is mapped and quiet there; a source that is absent from the
+    dict was not asked.
+    """
+
+    tag: dict[str, list[str]] = Field(default_factory=dict)
+    nacht: dict[str, list[str]] = Field(default_factory=dict)
+    kartiert_umkreis: bool = False
+    umkreis_m: int
+    unterste_stufe_db: int
+    quelle: str
+    fehler: str | None = None
+
+
+class Gebiet(BaseModel):
+    """One designated area, with the category it was designated under."""
+
+    name: str | None = None
+    kategorie: str | None = None
+
+
+class Ausweisung(BaseModel):
+    """A designation the plot either sits in or does not.
+
+    `abstand_von_m`/`abstand_bis_m` are a bracket, not a measurement: the
+    service answers whether something lies within a radius, so the distance is
+    only known to the width of the rung it was found on.
+    """
+
+    betroffen: bool = False
+    gebiete: list[Gebiet] = Field(default_factory=list)
+    naechstes: Gebiet | None = None
+    abstand_von_m: float | None = None
+    abstand_bis_m: float | None = None
+    weitere_im_umkreis: int = 0
+    umkreis_m: int | None = None
+    quelle: str
+    fehler: str | None = None
+
+
+class Bohrung(BaseModel):
+    entfernung_m: float
+    endteufe_m: float | None = None
+    jahr: int | None = None
+    url: str | None = None
+
+
+class Baugrund(BaseModel):
+    """The soil map's own wording, the air capacity class, and what was drilled.
+
+    Nothing in here says anything about bearing capacity: a soil map at
+    1:50 000 is not a ground investigation, and the finding says so.
+    """
+
+    bodenart_text: str | None = None
+    luftkapazitaet_stufe: str | None = None
+    bohrungen_umkreis: int = 0
+    bohrungen_naher_umkreis: int = 0
+    # Whether the borehole layer answered at all. Without it, a refused query
+    # and a genuinely undrilled neighbourhood both arrive as zero.
+    bohrungen_gefragt: bool = True
+    umkreis_m: int
+    naher_umkreis_m: int
+    naechste: Bohrung | None = None
+    tiefste: Bohrung | None = None
+    quelle: str
+    fehler: str | None = None
+
+
+class Luftqualitaet(BaseModel):
+    """Measured pollutants, and how far away the station that answered is.
+
+    `uebersprungen` counts the nearer stations that carried no values at all --
+    without it, "4,6 km" looks like carelessness rather than the only station
+    that answers.
+    """
+
+    station: str | None = None
+    entfernung_km: float | None = None
+    werte: dict[str, float] = Field(default_factory=dict)
+    stunden: int | None = None
+    stand: str | None = None
+    uebersprungen: int = 0
+    quelle: str
+    fehler: str | None = None
+
+
+class StandortPruefungen(BaseModel):
+    laerm: Laerm
+    trinkwasserschutz: Ausweisung
+    schutzgebiet: Ausweisung
+    hochwasser: Ausweisung
+    radon: Ausweisung
+    hangneigung: Ausweisung
+    baugrund: Baugrund
+    luftqualitaet: Luftqualitaet
+    abgerufen_am: datetime
+    hinweis: str = STANDORT_HINWEIS
 
 
 # --------------------------------------------------------------------------

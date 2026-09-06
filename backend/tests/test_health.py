@@ -17,6 +17,8 @@ def test_health_lists_every_service(client: TestClient):
         "gemarkungen",
         "hauskoordinaten",
         "boris",
+        "luis",
+        "luftqualitaet",
         "motis",
         "poi",
         "tiles",

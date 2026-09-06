@@ -1,0 +1,155 @@
+{
+ "displayFieldName": "NAME",
+ "fieldAliases": {
+  "OBJECTID": "OBJECTID",
+  "KATEGORIE": "KATEGORIE",
+  "STATUS": "STATUS",
+  "SG_NR": "SG_NR",
+  "NAME": "NAME",
+  "FLAECHE": "FLAECHE",
+  "UMFANG": "UMFANG",
+  "RVO_DATUM": "RVO_DATUM",
+  "RVO_1": "RVO_1",
+  "RVO_2": "RVO_2",
+  "PRAEZI": "PRAEZI",
+  "ERFDAT": "ERFDAT",
+  "UEBDAT": "UEBDAT",
+  "SHAPE.AREA": "SHAPE.AREA",
+  "SHAPE.LEN": "SHAPE.LEN",
+  "SE_ANNO_CAD_DATA": "SE_ANNO_CAD_DATA"
+ },
+ "fields": [
+  {
+   "name": "OBJECTID",
+   "type": "esriFieldTypeOID",
+   "alias": "OBJECTID"
+  },
+  {
+   "name": "KATEGORIE",
+   "type": "esriFieldTypeString",
+   "alias": "KATEGORIE",
+   "length": 3
+  },
+  {
+   "name": "STATUS",
+   "type": "esriFieldTypeString",
+   "alias": "STATUS",
+   "length": 2
+  },
+  {
+   "name": "SG_NR",
+   "type": "esriFieldTypeString",
+   "alias": "SG_NR",
+   "length": 30
+  },
+  {
+   "name": "NAME",
+   "type": "esriFieldTypeString",
+   "alias": "NAME",
+   "length": 110
+  },
+  {
+   "name": "FLAECHE",
+   "type": "esriFieldTypeDouble",
+   "alias": "FLAECHE"
+  },
+  {
+   "name": "UMFANG",
+   "type": "esriFieldTypeDouble",
+   "alias": "UMFANG"
+  },
+  {
+   "name": "RVO_DATUM",
+   "type": "esriFieldTypeString",
+   "alias": "RVO_DATUM",
+   "length": 10
+  },
+  {
+   "name": "RVO_1",
+   "type": "esriFieldTypeString",
+   "alias": "RVO_1",
+   "length": 254
+  },
+  {
+   "name": "RVO_2",
+   "type": "esriFieldTypeString",
+   "alias": "RVO_2",
+   "length": 254
+  },
+  {
+   "name": "PRAEZI",
+   "type": "esriFieldTypeString",
+   "alias": "PRAEZI",
+   "length": 50
+  },
+  {
+   "name": "ERFDAT",
+   "type": "esriFieldTypeString",
+   "alias": "ERFDAT",
+   "length": 50
+  },
+  {
+   "name": "UEBDAT",
+   "type": "esriFieldTypeString",
+   "alias": "UEBDAT",
+   "length": 50
+  },
+  {
+   "name": "SHAPE.AREA",
+   "type": "esriFieldTypeDouble",
+   "alias": "SHAPE.AREA"
+  },
+  {
+   "name": "SHAPE.LEN",
+   "type": "esriFieldTypeDouble",
+   "alias": "SHAPE.LEN"
+  },
+  {
+   "name": "SE_ANNO_CAD_DATA",
+   "type": "esriFieldTypeBlob",
+   "alias": "SE_ANNO_CAD_DATA"
+  }
+ ],
+ "features": [
+  {
+   "attributes": {
+    "OBJECTID": 250,
+    "KATEGORIE": "LSG",
+    "STATUS": "F",
+    "SG_NR": "l 25",
+    "NAME": "Östliche Rietzschke - Stünz",
+    "FLAECHE": 296252.655,
+    "UMFANG": 3466.852,
+    "RVO_DATUM": "15.02.1963",
+    "RVO_1": "Beschluss Nr. 13-3/63 des Rates des Bezirkes Leipzig vom 15.02.1963 (MittBl. Bezirkstages und Rates des Bezirkes Leipzig Nr. 2)",
+    "RVO_2": null,
+    "PRAEZI": null,
+    "ERFDAT": null,
+    "UEBDAT": null,
+    "SHAPE.AREA": 0,
+    "SHAPE.LEN": 0,
+    "SE_ANNO_CAD_DATA": null
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 252,
+    "KATEGORIE": "LSG",
+    "STATUS": "F",
+    "SG_NR": "l 27",
+    "NAME": "Etzoldsche Sandgrube und Rietzschketal Zweinaundorf",
+    "FLAECHE": 2252251.009,
+    "UMFANG": 21148.674,
+    "RVO_DATUM": "03.12.2010",
+    "RVO_1": "Verordnung der Kreisfreien Stadt Leipzig zur Festsetzung des Landschaftsschutzgebietes \"Etzoldsche Sandgrube und Rietzschketal Zweinaundorf\" vom 03.12.2010 (SächsGVBl. 2011 S. 40)",
+    "RVO_2": null,
+    "PRAEZI": null,
+    "ERFDAT": null,
+    "UEBDAT": null,
+    "SHAPE.AREA": 0,
+    "SHAPE.LEN": 0,
+    "SE_ANNO_CAD_DATA": null
+   }
+  }
+ ]
+}

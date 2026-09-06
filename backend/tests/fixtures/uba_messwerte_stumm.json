@@ -1,0 +1,30 @@
+{
+ "request": {
+  "component": "5",
+  "scope": "2",
+  "station": "1690",
+  "date_from": "2026-09-04",
+  "date_to": "2026-09-05",
+  "time_from": "01:00:00",
+  "time_to": "24:00:00",
+  "recent": false,
+  "index": "id",
+  "lang": "en",
+  "datetime_from": "2026-09-04 00:00:00",
+  "datetime_to": "2026-09-05 23:00:00"
+ },
+ "indices": {
+  "data": {
+   "station id": {
+    "date start": [
+     "component id",
+     "scope id",
+     "value",
+     "date end",
+     "index"
+    ]
+   }
+  }
+ },
+ "data": {}
+}

@@ -49,6 +49,11 @@ STORED_QUERY_BY_KENNZEICHEN = (
     "http://repository.gdi-de.org/query/adv/produkt/alkis-vereinfacht/2.0/flst-by-kennzeichen"
 )
 
+# Attributes carried over from ave:GebaeudeBauwerk. No height and no storeys:
+# the simplified ALKIS carries neither, which is why only § 6's 3 m floor is
+# computable -- the same limit OSM has, from an official register.
+_BUILDING_FIELDS = ("lagebeztxt", "funktion", "gebnutzbez", "aktualit")
+
 # Attributes carried over from ave:Flurstueck.
 _TEXT_FIELDS = (
     "flstkennz",
@@ -255,6 +260,56 @@ def parse_feature_collection(xml: bytes | str) -> list[Flurstueck]:
             )
         )
     return parcels
+
+
+def parse_buildings(xml: bytes | str) -> list[dict[str, object]]:
+    """A GetFeature answer for ``ave:GebaeudeBauwerk`` -> outlines in WGS84.
+
+    The rings are closed here so no caller has to wonder whether they are, and
+    the geometry travels as `[lon, lat]` because that is what the drawing wants.
+    """
+
+    try:
+        root = ElementTree.fromstring(xml if isinstance(xml, bytes) else xml.encode("utf-8"))
+    except ElementTree.ParseError as exc:
+        raise UpstreamError(f"{SERVICE_NAME} hat kein gültiges GML geliefert. {ADVICE}") from exc
+    if _local(root.tag) in ("ServiceExceptionReport", "ExceptionReport", "html"):
+        raise UpstreamError(f"{SERVICE_NAME} hat die Anfrage abgelehnt. {ADVICE}")
+
+    default_srs = root.get("srsName")
+    buildings: list[dict[str, object]] = []
+    for element in root.iter():
+        if _local(element.tag) != "GebaeudeBauwerk":
+            continue
+        attributes = {
+            _local(child.tag): (child.text or "").strip()
+            for child in element
+            if _local(child.tag) in _BUILDING_FIELDS and child.text
+        }
+        try:
+            geometry = _parse_geometry(element, default_srs)
+        except UpstreamError:
+            # One outline without geometry is not a reason to lose the street.
+            continue
+        wgs84 = geo.reproject_geometry(geometry, geo.UTM33, geo.WGS84)
+        # A building in two parts is rare and this is a hint: the larger part
+        # is the outline worth drawing.
+        outline = wgs84 if wgs84.geom_type == "Polygon" else max(wgs84.geoms, key=lambda g: g.area)
+        ring = [[round(x, 7), round(y, 7)] for x, y in outline.exterior.coords]
+        if len(ring) < 4:
+            continue
+        if ring[0] != ring[-1]:
+            ring.append(ring[0])
+        buildings.append({
+            "id": next((v for k, v in element.attrib.items() if _local(k) == "id"), None)
+            or attributes.get("lagebeztxt", "")
+            or "unbekannt",
+            "umriss": ring,
+            "adresse": attributes.get("lagebeztxt"),
+            "funktion": attributes.get("funktion"),
+            "aktualitaet": attributes.get("aktualit"),
+        })
+    return buildings
 
 
 def to_collection(
@@ -485,6 +540,62 @@ class AlkisService:
         point = Point(easting, northing)
         hit = [parcel for parcel in parcels if parcel.geometry.covers(point)]
         return hit or parcels
+
+    async def around(self, lat: float, lon: float, radius_m: float) -> list[Flurstueck]:
+        """Every parcel whose outline meets a box of that half-edge.
+
+        For choosing: a house coordinate lands where the address register put
+        it, which is not always inside the parcel being sold -- measured on
+        Lessingweg 44 in Mölkau, where the routing geocoder's point sits 7 m
+        away, inside number 46. So the neighbours are offered and the user
+        says which one is theirs, rather than the point deciding silently.
+
+        The parcel the point sits in comes first, so a caller can preselect it.
+        """
+
+        easting, northing = geo.wgs84_to_utm33(lon, lat)
+        params = {
+            "SERVICE": "WFS",
+            "VERSION": self.settings.version,
+            "REQUEST": "GetFeature",
+            "TYPENAMES": "ave:Flurstueck",
+            "SRSNAME": self._crs_urn,
+            "BBOX": (
+                f"{easting - radius_m},{northing - radius_m},"
+                f"{easting + radius_m},{northing + radius_m},{self._crs_urn}"
+            ),
+            "COUNT": str(self.settings.max_features),
+        }
+        parcels = parse_feature_collection(await self._get(params))
+        point = Point(easting, northing)
+        parcels.sort(key=lambda parcel: (not parcel.geometry.covers(point),
+                                         parcel.geometry.distance(point)))
+        return parcels
+
+    async def buildings_around(self, lat: float, lon: float, radius_m: float) -> list[dict[str, object]]:
+        """The building outlines around a point, from the cadastre itself.
+
+        The same WFS the parcels come from carries ``ave:GebaeudeBauwerk`` --
+        146 buildings in a 240 m box over Mölkau, with the register's own
+        ``funktion`` and Lagebezeichnung. So the neighbour hint needs no
+        OpenStreetMap source, no Overpass instance and no key: it is one more
+        BBOX query on a service this app already proxies and caches.
+        """
+
+        easting, northing = geo.wgs84_to_utm33(lon, lat)
+        params = {
+            "SERVICE": "WFS",
+            "VERSION": self.settings.version,
+            "REQUEST": "GetFeature",
+            "TYPENAMES": "ave:GebaeudeBauwerk",
+            "SRSNAME": self._crs_urn,
+            "BBOX": (
+                f"{easting - radius_m},{northing - radius_m},"
+                f"{easting + radius_m},{northing + radius_m},{self._crs_urn}"
+            ),
+            "COUNT": str(self.settings.max_features),
+        }
+        return parse_buildings(await self._get(params))
 
     async def by_kennzeichen(self, kennzeichen: str) -> list[Flurstueck]:
         """Parcels by the 20-character AdV parcel key (stored query)."""

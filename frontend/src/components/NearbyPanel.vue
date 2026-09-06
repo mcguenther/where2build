@@ -19,9 +19,24 @@
     </p>
 
     <template v-else>
-      <table v-if="found.length" class="data-table nearby__list">
+      <!-- Five columns where there were three: on a phone the last of them was
+           cut off by the panel's own `overflow: hidden`, without a scrollbar to
+           say so. Below the breakpoint the cells give up their side padding and
+           the walk may wrap; the scroll container is what catches whatever is
+           left over. -->
+      <div v-if="found.length" class="table-scroll">
+      <table class="data-table nearby__list">
+        <thead>
+          <tr>
+            <th>Ziel</th>
+            <th class="num">zu Fuß</th>
+            <th class="num">Rad</th>
+            <th class="num">Auto</th>
+            <th class="num nearby__walk">Strecke</th>
+          </tr>
+        </thead>
         <tbody>
-          <tr v-for="(hit, i) in found" :key="i">
+          <tr v-for="(hit, i) in found" :key="hit.key">
             <td class="nearby__what">
               <b>{{ label(hit.kategorie) }}</b>
               <span v-if="hit.art && hit.art !== label(hit.kategorie)" class="nearby__kind">{{ hit.art }}</span>
@@ -43,15 +58,30 @@
               <span v-else-if="lineNote(hit)" class="nearby__kind">{{ lineNote(hit) }}</span>
             </td>
             <td class="num">{{ hit.erreichbar ? duration(hit.duration_s) : "—" }}</td>
+            <!-- Rad und Auto kommen aus einer zweiten, langsameren Anfrage. Bis
+                 sie da ist, steht hier ein Platzhalter statt eines Strichs, der
+                 wie „gibt es nicht“ aussähe. -->
+            <td class="num" :title="modeNote(hit, 'bike')">
+              <span v-if="extraBusy" class="skeleton-cell" aria-label="wird berechnet"></span>
+              <template v-else>{{ modeTime(hit, "bike") }}</template>
+            </td>
+            <td class="num" :title="modeNote(hit, 'car')">
+              <span v-if="extraBusy" class="skeleton-cell" aria-label="wird berechnet"></span>
+              <template v-else>{{ modeTime(hit, "car") }}</template>
+            </td>
             <td class="num nearby__walk">
               <span v-if="hit.erreichbar" :title="`Luftlinie ${metres(hit.luftlinie_m, 0)}`">
                 {{ metres(hit.distance_m, 0) }} Fußweg
+              </span>
+              <span v-else-if="Number.isFinite(hit.luftlinie_m)">
+                {{ metres(hit.luftlinie_m, 0) }} Luftlinie
               </span>
               <span v-else>kein Fußweg gefunden</span>
             </td>
           </tr>
         </tbody>
       </table>
+      </div>
 
       <!-- Two different silences, and confusing them would be a lie: a
            category this server has no data for, and one that was searched.
@@ -64,13 +94,17 @@
       <p v-if="empty.length" class="nearby__hint">
         Nichts gefunden für {{ empty.map(c => label(c.kategorie)).join(", ") }}.
       </p>
+      <p v-if="extraError" class="nearby__hint">
+        <b>Rad und Auto:</b> {{ extraError }} Die Fußwege oben stehen, die Strecke
+        daneben ist gemessen.
+      </p>
       <p class="panel__footnote">{{ result.quelle }}</p>
     </template>
   </section>
 </template>
 
 <script>
-import { nearby } from "../lib/api.js";
+import { nearby, reachability } from "../lib/api.js";
 import { duration, metres } from "../lib/format.js";
 import { openStreetMapRoute } from "../lib/mapLinks.js";
 
@@ -100,9 +134,29 @@ export default {
     auto: { type: Boolean, default: false }
   },
   emits: ["loaded"],
-  data() { return { result: null, busy: false, error: null }; },
+  data() {
+    return {
+      result: null, busy: false, error: null,
+      /** Travel times per hit and mode, from the second request. */
+      extra: {}, extraBusy: false, extraError: null
+    };
+  },
   computed: {
-    found() { return this.result?.treffer ?? []; },
+    /** The hits, nearest on foot first.
+     *
+     * The service ranks within a category; across categories the order was the
+     * category list's, so a supermarket four minutes away sat below a school
+     * twenty minutes away. Walking time is the measure this panel is about —
+     * air distance would reorder them wrongly, detours reach 2,88x. */
+    found() {
+      const hits = (this.result?.treffer ?? []).map((hit, i) => ({
+        ...hit, key: `${hit.kategorie}-${i}`
+      }));
+      return hits.sort((a, b) => {
+        if (a.erreichbar !== b.erreichbar) return a.erreichbar ? -1 : 1;
+        return (a.duration_s ?? Infinity) - (b.duration_s ?? Infinity);
+      });
+    },
     /** Unavailable categories, grouped by the reason the service gave, so six
      *  categories failing the same way read as one line rather than six. */
     unavailable() {
@@ -125,6 +179,8 @@ export default {
     "plot.id"() {
       this.result = null;
       this.error = null;
+      this.extra = {};
+      this.extraError = null;
       this.$emit("loaded", null);
       if (this.auto && this.plot.anchor) this.autoLoad();
     }
@@ -133,6 +189,48 @@ export default {
     duration,
     metres,
     located(hit) { return Number.isFinite(hit.lat) && Number.isFinite(hit.lon); },
+
+    /** What the second request found for this row, or a dash. */
+    modeTime(hit, mode) {
+      const route = this.extra[hit.key]?.[mode];
+      return route?.erreichbar ? duration(route.duration_s) : "—";
+    },
+    /** Why a dash is a dash: the row says nothing on its own. */
+    modeNote(hit, mode) {
+      const route = this.extra[hit.key]?.[mode];
+      if (route?.erreichbar) return null;
+      return route?.hinweis || this.extraError || "Noch nicht berechnet.";
+    },
+
+    /** Bike and car for the places just found.
+     *
+     * A second request, because the first one is a walking matrix and these are
+     * routes. It is allowed to fail: the walking times and the measured
+     * distances stand on their own, and the two columns then say so rather
+     * than the panel losing its rows. */
+    async loadModes() {
+      const targets = this.found.filter(hit => this.located(hit));
+      if (!targets.length || !this.plot.anchor) return;
+      this.extraBusy = true;
+      this.extraError = null;
+      try {
+        const answer = await reachability(
+          { lat: this.plot.anchor.lat, lon: this.plot.anchor.lon },
+          targets.map(hit => ({ id: hit.key, name: hit.name, lat: hit.lat, lon: hit.lon })),
+          ["bike", "car"]
+        );
+        const rows = {};
+        (answer?.ergebnisse ?? []).forEach(row => {
+          (rows[row.destination_id] ||= {})[row.mode] = row;
+        });
+        this.extra = rows;
+      } catch (error) {
+        this.extraError = error.message;
+      } finally {
+        this.extraBusy = false;
+      }
+    },
+
     /** The walk the row measured, openable. No anchor, no rows: the panel
      *  refuses to search at all without one, so there is no second case. */
     link(hit) { return openStreetMapRoute(this.plot.anchor, hit, "walk"); },
@@ -155,7 +253,9 @@ export default {
       this.result = seen.result;
       this.error = seen.error;
       this.$emit("loaded", this.result);
-      return Promise.resolve();
+      // The walking answer is remembered for this session; the two routed
+      // columns are not, and a returning visitor should still see them.
+      return this.result ? this.loadModes() : Promise.resolve();
     },
     async load() {
       this.busy = true;
@@ -170,6 +270,7 @@ export default {
         );
         answered.set(key, { result: this.result, error: null });
         this.$emit("loaded", this.result);
+        await this.loadModes();
       } catch (error) {
         this.error = error.message;
         answered.set(key, { result: null, error: this.error });
@@ -197,5 +298,11 @@ export default {
 a.nearby__name{ text-decoration: underline; text-underline-offset: 2px; }
 a.nearby__name:hover{ color: var(--w2b-primary); }
 .nearby__walk{ color: var(--w2b-muted); font-size: var(--w2b-text-xs); white-space: nowrap; }
+@media (max-width: 620px){
+  .nearby__list th, .nearby__list td{ padding-left: 8px; padding-right: 8px; }
+  .nearby__list th:first-child, .nearby__list td:first-child{ padding-left: var(--w2b-space-4); }
+  .nearby__list th:last-child, .nearby__list td:last-child{ padding-right: var(--w2b-space-4); }
+  .nearby__walk{ white-space: normal; }
+}
 .nearby__hint{ padding: 0 var(--w2b-space-4) var(--w2b-space-2); color: var(--w2b-muted); font-size: var(--w2b-text-xs); }
 </style>

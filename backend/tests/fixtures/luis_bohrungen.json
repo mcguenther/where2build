@@ -1,0 +1,242 @@
+{
+ "displayFieldName": "AKBEZ",
+ "fieldAliases": {
+  "IDENT": "IDENT",
+  "AKBEZ": "AKBEZ",
+  "RECHTSWERT": "RECHTSWERT",
+  "HOCHWERT": "HOCHWERT",
+  "RECHTSWERT_4": "RECHTSWERT_4",
+  "HOCHWERT_4": "HOCHWERT_4",
+  "RECHTSWERT_5": "RECHTSWERT_5",
+  "HOCHWERT_5": "HOCHWERT_5",
+  "ENDTEUFE": "ENDTEUFE",
+  "HAT_FACHDATEN": "HAT_FACHDATEN",
+  "GEODIN_ID": "GEODIN_ID",
+  "URL": "URL",
+  "DATUM": "DATUM",
+  "LEGEND_SYMBOL": "LEGEND_SYMBOL",
+  "OBJECTID": "Object ID",
+  "RECHTSWERT_UTM": "RECHTSWERT_UTM",
+  "HOCHWERT_UTM": "HOCHWERT_UTM"
+ },
+ "fields": [
+  {
+   "name": "IDENT",
+   "type": "esriFieldTypeInteger",
+   "alias": "IDENT"
+  },
+  {
+   "name": "AKBEZ",
+   "type": "esriFieldTypeString",
+   "alias": "AKBEZ",
+   "length": 14
+  },
+  {
+   "name": "RECHTSWERT",
+   "type": "esriFieldTypeDouble",
+   "alias": "RECHTSWERT"
+  },
+  {
+   "name": "HOCHWERT",
+   "type": "esriFieldTypeDouble",
+   "alias": "HOCHWERT"
+  },
+  {
+   "name": "RECHTSWERT_4",
+   "type": "esriFieldTypeDouble",
+   "alias": "RECHTSWERT_4"
+  },
+  {
+   "name": "HOCHWERT_4",
+   "type": "esriFieldTypeDouble",
+   "alias": "HOCHWERT_4"
+  },
+  {
+   "name": "RECHTSWERT_5",
+   "type": "esriFieldTypeDouble",
+   "alias": "RECHTSWERT_5"
+  },
+  {
+   "name": "HOCHWERT_5",
+   "type": "esriFieldTypeDouble",
+   "alias": "HOCHWERT_5"
+  },
+  {
+   "name": "ENDTEUFE",
+   "type": "esriFieldTypeDouble",
+   "alias": "ENDTEUFE"
+  },
+  {
+   "name": "HAT_FACHDATEN",
+   "type": "esriFieldTypeDouble",
+   "alias": "HAT_FACHDATEN"
+  },
+  {
+   "name": "GEODIN_ID",
+   "type": "esriFieldTypeString",
+   "alias": "GEODIN_ID",
+   "length": 16
+  },
+  {
+   "name": "URL",
+   "type": "esriFieldTypeString",
+   "alias": "URL",
+   "length": 163
+  },
+  {
+   "name": "DATUM",
+   "type": "esriFieldTypeString",
+   "alias": "DATUM",
+   "length": 19
+  },
+  {
+   "name": "LEGEND_SYMBOL",
+   "type": "esriFieldTypeString",
+   "alias": "LEGEND_SYMBOL",
+   "length": 2
+  },
+  {
+   "name": "OBJECTID",
+   "type": "esriFieldTypeOID",
+   "alias": "Object ID"
+  },
+  {
+   "name": "RECHTSWERT_UTM",
+   "type": "esriFieldTypeDouble",
+   "alias": "RECHTSWERT_UTM"
+  },
+  {
+   "name": "HOCHWERT_UTM",
+   "type": "esriFieldTypeDouble",
+   "alias": "HOCHWERT_UTM"
+  }
+ ],
+ "features": [
+  {
+   "attributes": {
+    "IDENT": 117423,
+    "AKBEZ": "B...21....1972",
+    "RECHTSWERT": 321915.23,
+    "HOCHWERT": 5690405.93,
+    "RECHTSWERT_4": 4531000.0,
+    "HOCHWERT_4": 5689230.0,
+    "RECHTSWERT_5": 5740000.85,
+    "HOCHWERT_5": 5694772.89,
+    "ENDTEUFE": 5.0,
+    "HAT_FACHDATEN": 1.0,
+    "GEODIN_ID": null,
+    "URL": "https://www.umwelt.sachsen.de/umwelt/infosysteme/geodin/getportalpage?WEBSITE=BOGE&OBJECTID1=0000117423BRG000&LAYOUT=Grunddaten",
+    "DATUM": "17.08.2026 14:06:06",
+    "LEGEND_SYMBOL": "11",
+    "OBJECTID": 104203,
+    "RECHTSWERT_UTM": 321915.23,
+    "HOCHWERT_UTM": 5690405.93
+   }
+  },
+  {
+   "attributes": {
+    "IDENT": 115991,
+    "AKBEZ": "B...40....1972",
+    "RECHTSWERT": 321850.37,
+    "HOCHWERT": 5690288.49,
+    "RECHTSWERT_4": 4530940.0,
+    "HOCHWERT_4": 5689110.0,
+    "RECHTSWERT_5": 5739945.76,
+    "HOCHWERT_5": 5694650.46,
+    "ENDTEUFE": 5.0,
+    "HAT_FACHDATEN": 1.0,
+    "GEODIN_ID": null,
+    "URL": "https://www.umwelt.sachsen.de/umwelt/infosysteme/geodin/getportalpage?WEBSITE=BOGE&OBJECTID1=0000115991BRG000&LAYOUT=Grunddaten",
+    "DATUM": "17.08.2026 14:06:06",
+    "LEGEND_SYMBOL": "11",
+    "OBJECTID": 104823,
+    "RECHTSWERT_UTM": 321850.37,
+    "HOCHWERT_UTM": 5690288.49
+   }
+  },
+  {
+   "attributes": {
+    "IDENT": 415531,
+    "AKBEZ": "B....1....2000",
+    "RECHTSWERT": 321985.42,
+    "HOCHWERT": 5690458.1,
+    "RECHTSWERT_4": 4531068.0,
+    "HOCHWERT_4": 5689285.0,
+    "RECHTSWERT_5": 5740066.59,
+    "HOCHWERT_5": 5694830.66,
+    "ENDTEUFE": 19.0,
+    "HAT_FACHDATEN": 1.0,
+    "GEODIN_ID": null,
+    "URL": "https://www.umwelt.sachsen.de/umwelt/infosysteme/geodin/getportalpage?WEBSITE=BOGE&OBJECTID1=0000415531BRG000&LAYOUT=Grunddaten",
+    "DATUM": "17.08.2026 14:06:06",
+    "LEGEND_SYMBOL": "11",
+    "OBJECTID": 363496,
+    "RECHTSWERT_UTM": 321985.42,
+    "HOCHWERT_UTM": 5690458.1
+   }
+  },
+  {
+   "attributes": {
+    "IDENT": 110398,
+    "AKBEZ": "B...41....1972",
+    "RECHTSWERT": 321968.86,
+    "HOCHWERT": 5690493.81,
+    "RECHTSWERT_4": 4531050.0,
+    "HOCHWERT_4": 5689320.0,
+    "RECHTSWERT_5": 5740047.15,
+    "HOCHWERT_5": 5694864.92,
+    "ENDTEUFE": 5.0,
+    "HAT_FACHDATEN": 1.0,
+    "GEODIN_ID": null,
+    "URL": "https://www.umwelt.sachsen.de/umwelt/infosysteme/geodin/getportalpage?WEBSITE=BOGE&OBJECTID1=0000110398BRG000&LAYOUT=Grunddaten",
+    "DATUM": "17.08.2026 14:06:06",
+    "LEGEND_SYMBOL": "11",
+    "OBJECTID": 98788,
+    "RECHTSWERT_UTM": 321968.86,
+    "HOCHWERT_UTM": 5690493.81
+   }
+  },
+  {
+   "attributes": {
+    "IDENT": 117021,
+    "AKBEZ": "B...20....1972",
+    "RECHTSWERT": 321821.1,
+    "HOCHWERT": 5690184.6,
+    "RECHTSWERT_4": 4530915.0,
+    "HOCHWERT_4": 5689005.0,
+    "RECHTSWERT_5": 5739925.06,
+    "HOCHWERT_5": 5694544.44,
+    "ENDTEUFE": 5.0,
+    "HAT_FACHDATEN": 1.0,
+    "GEODIN_ID": null,
+    "URL": "https://www.umwelt.sachsen.de/umwelt/infosysteme/geodin/getportalpage?WEBSITE=BOGE&OBJECTID1=0000117021BRG000&LAYOUT=Grunddaten",
+    "DATUM": "17.08.2026 14:06:06",
+    "LEGEND_SYMBOL": "11",
+    "OBJECTID": 106764,
+    "RECHTSWERT_UTM": 321821.1,
+    "HOCHWERT_UTM": 5690184.6
+   }
+  },
+  {
+   "attributes": {
+    "IDENT": 656920,
+    "AKBEZ": "B....1....2019",
+    "RECHTSWERT": 321761.0,
+    "HOCHWERT": 5690215.0,
+    "RECHTSWERT_4": 4530853.71,
+    "HOCHWERT_4": 5689032.92,
+    "RECHTSWERT_5": 5739862.63,
+    "HOCHWERT_5": 5694569.85,
+    "ENDTEUFE": 21.0,
+    "HAT_FACHDATEN": 0.0,
+    "GEODIN_ID": null,
+    "URL": "https://www.umwelt.sachsen.de/umwelt/infosysteme/geodin/getportalpage?WEBSITE=BOGE&OBJECTID1=0000656920BRG000&LAYOUT=Grunddaten",
+    "DATUM": "17.08.2026 14:06:06",
+    "LEGEND_SYMBOL": "10",
+    "OBJECTID": 511849,
+    "RECHTSWERT_UTM": 321761.0,
+    "HOCHWERT_UTM": 5690215.0
+   }
+  }
+ ]
+}

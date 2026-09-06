@@ -154,7 +154,7 @@ def rings_from_elements(elements: Iterable[Any]) -> list[dict[str, Any]]:
         number = str(tags.get("addr:housenumber") or "").strip()
         buildings.append(
             {
-                "osm_id": f"W{element.get('id')}",
+                "id": f"W{element.get('id')}",
                 "umriss": ring,
                 "adresse": " ".join(part for part in (street, number) if part) or None,
                 # Almost never tagged in Saxon residential areas -- see

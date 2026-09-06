@@ -196,6 +196,42 @@
      itself and only carries a cursor; hiding it prints an empty envelope. */
   .plan-hint{ display: none !important; }
 
+  /* ---------- The location sheet ----------
+     Not two columns. The plot sheet puts the plan beside its figures because
+     both are short; here the record runs to eleven checks and the map is one
+     picture, so side by side leaves half a page of white under the map. The
+     map goes across the top, the record flows beneath it. */
+  .location-grid{
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    break-inside: auto;
+  }
+  /* The map first, as on the plot sheet: it is what says where this is. */
+  .location-grid__map{
+    order: -1 !important;
+    position: static !important;
+    border: .6pt solid #000 !important;
+    border-radius: 0;
+    margin-bottom: 4mm;
+    break-inside: avoid;
+  }
+  /* Without a cap the map takes 130 mm of the first sheet on its own. */
+  .location-grid__map svg{ max-height: 85mm; width: auto; margin: 0 auto; display: block; }
+
+  /* Two columns for the checks: at full width each row is one short line above
+     a lot of empty paper, and the sheet grows by a page for nothing. */
+  .checks__list{ column-count: 2; column-gap: 6mm; }
+  .location-grid__facts, .checks{ break-inside: auto; }
+  .check{ break-inside: avoid; }
+
+  /* The disclosure holds the soil map's own wording — evidence for the
+     sentence above it, and paper has nothing to click. Chromium wraps the
+     content of a closed <details> in `::details-content` and hides that; older
+     versions hide the children directly, so both are opened here. */
+  .check__detail::details-content{ content-visibility: visible !important; }
+  .check__detail > *{ display: block !important; content-visibility: visible !important; }
+  .check__detail summary{ list-style: none; }
+
   /* ---------- Setbacks, building body, disclaimer ----------
      The setback table runs to one row per boundary and is by far the tallest
      of the three, so it takes the left column on its own and the other two

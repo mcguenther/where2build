@@ -72,6 +72,103 @@ export const rasterStyle = (layer, attribution) => ({
 });
 
 export const GEOSN = "© GeoSN, dl-de/by-2-0";
+export const LFULG = "Umgebungslärmkartierung © LfULG";
+
+/**
+ * The zoom the cadastral outlines stop being drawable at, measured.
+ *
+ * `adv_alkis_flurstuecke` carries `MaxScaleDenominator: 2000` and answers
+ * HTTP 200 with a fully transparent PNG above it, which at a 256 px tile would
+ * mean nothing below zoom 19. The proxy gets round that by rendering each tile
+ * larger — the denominator is (bbox / image width) / 0,00028, so a bigger image
+ * over the same box falls under the limit — and scaling it back to a tile. That
+ * works down to zoom 15; zoom 14 would need 4368 px for one tile and the
+ * service refuses anything over 4000. Below the floor the layer is left out,
+ * because a transparent tile looks like a broken overlay rather than a scale.
+ */
+export const PARCEL_OUTLINE_MIN_ZOOM = 15;
+
+/**
+ * Raster layers that go *on top of* a backdrop rather than instead of one.
+ *
+ * The noise survey is not a WMS tile source — its own service speaks EPSG:4326
+ * and 25833 but not 3857, so MapLibre's `{bbox-epsg-3857}` raster source would
+ * get nothing at all and say nothing about it. `/api/tiles/laerm/…` goes
+ * through the ArcGIS `export` endpoint instead, which reprojects server-side
+ * and, with the dpi the proxy computes, never falls silently under the layer's
+ * own scale threshold.
+ *
+ * Over the aerial photograph the veil is thinner: at full strength the bands
+ * hide exactly the thing somebody switched the photo on to see.
+ */
+export const OVERLAYS = {
+  laerm: { name: "Lärm (Straße, 24 h)", attribution: LFULG },
+  "laerm-nacht": { name: "Lärm (Straße, nachts)", attribution: LFULG },
+  /* The cadastre as line work: boundaries, parcel numbers, boundary points and
+     street names on transparent ground. It is drawn nearly opaque, because a
+     line at 45 % over a photograph is a smudge — the veil setting below is for
+     the noise bands, which are areas and must not hide what is under them.
+
+     Not the `flurstuecke` layer the search map's ground uses: that one is
+     rendered oversized so its outlines still draw across a district, and its
+     labels come back scaled down with it. Over one plot the numbers are the
+     whole point, so this asks for a plain tile and moves the scale limit
+     instead. */
+  liegenschaftskarte: { name: "Flurstücke", attribution: GEOSN, opacity: 0.95 }
+};
+
+const OVERLAY_OPACITY = { aerial: 0.45, other: 0.62 };
+
+/**
+ * The bands the noise layer actually draws, in the service's own colours.
+ *
+ * Read off the layer's renderer (`MapServer/4?f=json`), not chosen here, so the
+ * key beside the map is the map. Note what is missing from it: the data holds a
+ * `Lden4549` band that the renderer has no entry for — the survey has measured
+ * 45 to 49 dB(A) and draws nothing for it. So the check text can say "below
+ * 45 dB(A)" while the key starts at 50, and both are correct.
+ */
+export const NOISE_BANDS = {
+  laerm: [
+    { label: "50–54", colour: "rgb(184,214,209)" },
+    { label: "55–59", colour: "rgb(226,242,191)" },
+    { label: "60–64", colour: "rgb(243,198,131)" },
+    { label: "65–69", colour: "rgb(205,70,62)" },
+    { label: "70–74", colour: "rgb(117,8,92)" },
+    { label: "ab 75", colour: "rgb(67,10,74)" }
+  ]
+};
+
+/** Put an overlay's source and layer on top of a style document. */
+export function withOverlay(style, id, backdrop = "map") {
+  const overlay = OVERLAYS[id];
+  if (!overlay || !style?.sources) return style;
+  return {
+    ...style,
+    sources: {
+      ...style.sources,
+      [id]: {
+        type: "raster",
+        tiles: [`${window.location.origin}/api/tiles/${id}/{z}/{x}/{y}.png`],
+        tileSize: 256,
+        maxzoom: 20,
+        attribution: overlay.attribution
+      }
+    },
+    layers: [
+      ...style.layers,
+      {
+        id,
+        type: "raster",
+        source: id,
+        paint: {
+          "raster-opacity": overlay.opacity
+            ?? (backdrop === "aerial" ? OVERLAY_OPACITY.aerial : OVERLAY_OPACITY.other)
+        }
+      }
+    ]
+  };
+}
 
 /**
  * Whether this browser can draw a MapLibre map at all.
@@ -99,18 +196,8 @@ export function canRenderMap() {
  * roads and their names over it, the parcel outlines on top. Both overlays are
  * the authority's own transparent renderings, so nothing is drawn by hand.
  *
- * `minzoom` on the outlines is measured, not chosen. `adv_alkis_flurstuecke`
- * carries `MaxScaleDenominator: 2000` and answers HTTP 200 with a fully
- * transparent PNG above it, which at a 256 px tile would mean nothing below
- * zoom 19. The proxy gets round that by rendering each tile larger — the
- * denominator is (bbox / image width) / 0,00028, so a bigger image over the
- * same box falls under the limit — and scaling it back to a tile. That works
- * down to zoom 15; zoom 14 would need 4368 px for one tile and the service
- * refuses anything over 4000. Below the floor the layer is left out, because a
- * transparent tile looks like a broken overlay rather than a scale.
+ * The outlines carry a floor; see `PARCEL_OUTLINE_MIN_ZOOM`.
  */
-export const PARCEL_OUTLINE_MIN_ZOOM = 15;
-
 export const aerialCadastreStyle = () => {
   const origin = window.location.origin;
   const source = layer => ({

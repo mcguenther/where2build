@@ -109,6 +109,76 @@ a{ color: var(--w2b-primary); text-underline-offset: 2px; text-decoration-thickn
 /* A missing figure is not a verdict: no traffic-light colour for it. */
 .chip--unknown{ background: var(--w2b-surface-sunken); color: var(--w2b-muted); }
 
+/* ---------- Page furniture ----------
+   Breadcrumb, page head, the map toolbar and the "nothing here" panel. Shared
+   on purpose: a scoped `<style>` puts a `[data-v-…]` attribute on every
+   selector, so a class defined in one view styles that view alone. These were
+   declared in `PlotView.vue` and copied into six others, and the views that
+   never copied them — the surroundings map, the data page, the location record
+   — rendered the same markup unstyled: a breadcrumb without its separators, a
+   page head whose buttons dropped below the text, and raw browser buttons in
+   the map toolbar. One definition, here. A view that wants a different measure
+   overrides the one declaration it cares about. */
+
+.breadcrumb{ display: flex; align-items: center; gap: var(--w2b-space-2); font-size: var(--w2b-text-xs); color: var(--w2b-muted); }
+.breadcrumb a{ color: var(--w2b-primary); text-decoration: none; }
+.breadcrumb a:hover{ text-decoration: underline; }
+
+.page-head{ display: flex; align-items: flex-end; gap: var(--w2b-space-4); flex-wrap: wrap; }
+.page-head__sub{ margin-top: var(--w2b-space-2); color: var(--w2b-graphite); font-size: var(--w2b-text-s); max-width: 66ch; }
+.page-head__note{ margin-top: var(--w2b-space-1); color: var(--w2b-muted); font-size: var(--w2b-text-s); font-style: italic; }
+
+.panel__footnote{ padding: var(--w2b-space-3) var(--w2b-space-4); border-top: 1px solid var(--w2b-line-faint); font-size: var(--w2b-text-xs); color: var(--w2b-muted); }
+
+/* The bar above a map, its buttons, and the source line under it. */
+.plan-bar{
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: var(--w2b-space-2) var(--w2b-space-3); border-bottom: 1px solid var(--w2b-line);
+}
+.plan-bar__label{
+  font-family: var(--w2b-font-display); font-weight: 600; font-size: 10.5px;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--w2b-muted); margin-left: 4px;
+}
+.button-group{ display: flex; border: 1px solid var(--w2b-line); border-radius: var(--w2b-radius-s); overflow: hidden; }
+.button-group button, .toggle{
+  background: var(--w2b-surface); border: 0; cursor: pointer; padding: 5px 11px;
+  font-family: var(--w2b-font-display); font-weight: 600; font-size: var(--w2b-text-xs);
+  color: var(--w2b-muted);
+}
+.button-group button + button{ border-left: 1px solid var(--w2b-line); }
+.toggle{ border: 1px solid var(--w2b-line); border-radius: var(--w2b-radius-s); }
+.button-group button[aria-pressed="true"], .toggle[aria-pressed="true"]{
+  background: var(--w2b-primary); color: var(--w2b-primary-on);
+}
+.button-group button:disabled, .toggle:disabled{ opacity: .45; cursor: not-allowed; }
+.plan-foot{
+  display: flex; justify-content: space-between; gap: var(--w2b-space-3); flex-wrap: wrap;
+  padding: var(--w2b-space-2) var(--w2b-space-3); border-top: 1px solid var(--w2b-line);
+  font-family: var(--w2b-font-mono); font-size: 10.5px; color: var(--w2b-muted);
+}
+
+.missing{
+  border: 1px dashed var(--w2b-line); border-radius: var(--w2b-radius-m);
+  display: flex; flex-direction: column; align-items: center; gap: var(--w2b-space-3);
+  padding: var(--w2b-space-6) var(--w2b-space-5); text-align: center;
+}
+.missing p{ color: var(--w2b-muted); font-size: var(--w2b-text-s); }
+.missing .btn{ text-decoration: none; }
+
+/* A label-and-value list inside a panel. Shared: the plot page, the location
+   record and the comparison all state figures this way, and a scoped copy in
+   one view left the same markup unstyled in the others. */
+.value-list{ margin: 0; display: grid; grid-template-columns: auto 1fr; }
+.value-list dt, .value-list dd{
+  padding: 8px var(--w2b-space-4); border-bottom: 1px solid var(--w2b-line-faint); margin: 0;
+  display: flex; align-items: center;
+}
+.value-list dt{ font-size: var(--w2b-text-s); color: var(--w2b-graphite); }
+.value-list dd{ justify-content: flex-end; gap: 6px; font-family: var(--w2b-font-mono); font-size: var(--w2b-text-s); font-variant-numeric: tabular-nums; }
+.value-list dt:last-of-type, .value-list dd:last-of-type{ border-bottom: 0; }
+
+.faint{ color: var(--w2b-muted); font-size: var(--w2b-text-xs); }
+
 /* ---------- Form fields ---------- */
 .field{ display: flex; flex-direction: column; gap: var(--w2b-space-1); }
 .field > label, .field-label{
@@ -208,3 +278,49 @@ table.data-table tbody tr:last-child td{ border-bottom: 0; }
 .maplibregl-ctrl-attrib-inner{ color: var(--w2b-muted); }
 .maplibregl-ctrl-attrib a{ color: var(--w2b-graphite); }
 .maplibregl-ctrl-attrib-button{ filter: var(--w2b-map-control-icons); }
+
+
+/* ---------------------------------------------------------------------------
+   Waiting, drawn as the rows that are coming.
+
+   Used by the check list and by the surroundings table: a skeleton is page
+   furniture, and furniture in a scoped block is styled in exactly one view.
+   The pulse is what says the wait is still alive — a static grey block reads
+   as a layout that failed.
+   --------------------------------------------------------------------------- */
+.skeleton{ list-style: none; margin: var(--w2b-space-3) 0 0; padding: 0; }
+.skeleton__row{
+  display: grid; gap: 7px;
+  grid-template-columns: 8px minmax(0, 1fr) 78px;
+  padding: var(--w2b-space-3) 0; border-top: 1px solid var(--w2b-line-faint);
+}
+.skeleton__row:first-child{ border-top: 0; padding-top: 0; }
+.skeleton__bar{
+  height: 9px; border-radius: var(--w2b-radius-s); background: var(--w2b-line-faint);
+  animation: w2b-pulse 1.5s ease-in-out infinite;
+}
+.skeleton__row:nth-child(2) .skeleton__bar{ animation-delay: .12s; }
+.skeleton__row:nth-child(3) .skeleton__bar{ animation-delay: .24s; }
+.skeleton__row:nth-child(4) .skeleton__bar{ animation-delay: .36s; }
+.skeleton__bar--dot{ width: 8px; height: 8px; border-radius: var(--w2b-radius-full); }
+.skeleton__bar--name{ height: 11px; max-width: 8.5em; }
+.skeleton__bar--value{ height: 9px; }
+.skeleton__bar--text{ grid-column: 2 / -1; height: 8px; }
+.skeleton__bar--short{ max-width: 62%; }
+
+/* One cell of a table that is still being filled: same pulse, no grid. */
+.skeleton-cell{
+  display: inline-block; width: 3.2em; height: 9px; border-radius: var(--w2b-radius-s);
+  background: var(--w2b-line-faint); animation: w2b-pulse 1.5s ease-in-out infinite;
+  vertical-align: middle;
+}
+
+@keyframes w2b-pulse{
+  0%, 100%{ opacity: 1; }
+  50%{ opacity: .38; }
+}
+
+/* Movement is a preference, and the placeholders still have to be visible. */
+@media (prefers-reduced-motion: reduce){
+  .skeleton__bar, .skeleton-cell{ animation: none; opacity: .7; }
+}

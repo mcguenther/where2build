@@ -32,6 +32,7 @@ from .routers import (
     parcels,
     reachability,
     search,
+    sitechecks,
     tiles,
 )
 from .deps import address_index, gemarkung_directory, nearby_service
@@ -236,6 +237,25 @@ def create_app() -> FastAPI:
                     hinweis="Bodenrichtwerte über GetFeatureInfo; Endpunkt trägt das Stichtagsjahr.",
                 ),
                 DienstStatus(
+                    name="luis",
+                    konfiguriert=bool(current.luis.base_url),
+                    endpunkt=current.luis.base_url,
+                    hinweis=(
+                        "Lärm, Trinkwasserschutz, Schutzgebiete, Hochwasser, Radon, "
+                        "Hangneigung und Baugrund über /api/site-checks — gefragt wird "
+                        "mit dem Flurstücksumring, nicht mit einem Punkt."
+                    ),
+                ),
+                DienstStatus(
+                    name="luftqualitaet",
+                    konfiguriert=bool(current.air_quality.base_url),
+                    endpunkt=f"{current.air_quality.base_url}/stations/json",
+                    hinweis=(
+                        "Messwerte der nächstgelegenen Station, die tatsächlich "
+                        f"antwortet, im Umkreis von {current.air_quality.max_distance_km:.0f} km."
+                    ),
+                ),
+                DienstStatus(
                     name="motis",
                     konfiguriert=bool(current.motis.base_url),
                     endpunkt=f"{current.motis.base_url.rstrip('/')}/api/v6/plan",
@@ -260,7 +280,11 @@ def create_app() -> FastAPI:
                     name="tiles",
                     konfiguriert=bool(current.tiles.dop_url),
                     endpunkt=current.tiles.dop_url,
-                    hinweis="Ebenen: dop, webatlas, alkis.",
+                    hinweis=(
+                        "Ebenen: dop, webatlas, alkis (GeoSN-WMS) sowie laerm und "
+                        "laerm-nacht (Lärmkartierung über den ArcGIS-export-Endpunkt, "
+                        "der selbst nach Web Mercator rechnet)."
+                    ),
                 ),
                 DienstStatus(
                     name="basemap",
@@ -302,6 +326,7 @@ def create_app() -> FastAPI:
         landvalue,
         geocode,
         reachability,
+        sitechecks,
         nearby,
         neighbours,
         tiles,

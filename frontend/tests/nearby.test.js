@@ -11,15 +11,25 @@ import { mount, flushPromises } from "@vue/test-utils";
 import NearbyPanel from "../src/components/NearbyPanel.vue";
 import { realPlot } from "./helpers.js";
 import recorded from "./fixtures/nearby-liebertwolkwitz.json";
+/* The real `/api/reachability` answer for those same six places, asked from
+ * this plot's own anchor on 06.09.2026 with `modes: ["bike", "car"]`. The
+ * `geometry` of each row is dropped — the panel shows minutes, and the
+ * polylines were 213 kB of fixture nobody reads. */
+import routed from "./fixtures/reachability-umgebung-liebertwolkwitz.json";
 
 vi.mock("../src/lib/api.js", () => ({
-  nearby: vi.fn(() => Promise.resolve(recorded))
+  nearby: vi.fn(() => Promise.resolve(recorded)),
+  reachability: vi.fn(() => Promise.resolve(routed))
 }));
-const { nearby } = await import("../src/lib/api.js");
+const { nearby, reachability } = await import("../src/lib/api.js");
 
 const plot = () => realPlot("convex");
 
-beforeEach(() => { nearby.mockClear(); });
+beforeEach(() => {
+  nearby.mockClear();
+  reachability.mockClear();
+  reachability.mockResolvedValue(routed);
+});
 
 describe("Umgebung", () => {
   it("fragt nichts ab, bevor jemand danach fragt", () => {
@@ -115,10 +125,85 @@ describe("Umgebung", () => {
     await w.find("button").trigger("click");
     await flushPromises();
 
-    const rows = w.findAll("tbody tr");
-    expect(rows[0].findAll(".nearby__line").length).toBeGreaterThan(0);
-    expect(rows[1].text()).toContain("Linien nicht abgefragt");
-    expect(rows[1].findAll(".nearby__line")).toHaveLength(0);
+    // Nach Fußweg sortiert, also über den Namen gesucht statt über die Reihe.
+    const rowFor = name => w.findAll("tbody tr").find(r => r.text().includes(name));
+    const withLines = rowFor(capped.treffer[0].name);
+    const capped1 = capped.treffer.find((hit, i) => i && hit.name !== capped.treffer[0].name);
+
+    expect(withLines.findAll(".nearby__line").length).toBeGreaterThan(0);
+    expect(rowFor(capped1.name).text()).toContain("Linien nicht abgefragt");
+    expect(rowFor(capped1.name).findAll(".nearby__line")).toHaveLength(0);
+  });
+
+  it("sortiert die Zeilen nach Fußweg, nicht nach Kategorie", async () => {
+    // Der Dienst ordnet innerhalb einer Kategorie; über die Kategorien hinweg
+    // stand vorher die Reihenfolge der Kategorienliste — ein Supermarkt vier
+    // Minuten entfernt landete unter einer Schule zwanzig Minuten entfernt.
+    const w = mount(NearbyPanel, { props: { plot: plot() } });
+    await w.find("button").trigger("click");
+    await flushPromises();
+
+    const byName = Object.fromEntries(recorded.treffer.map(t => [t.name, t]));
+    const shown = w.findAll("tbody tr")
+      .map(row => Object.keys(byName).find(name => row.text().includes(name)))
+      .filter(Boolean)
+      .map(name => byName[name].duration_s ?? Infinity);
+
+    expect(shown.length).toBeGreaterThan(1);
+    expect([...shown].sort((a, b) => a - b)).toEqual(shown);
+  });
+
+  it("stellt neben den Fußweg die Zeit mit Rad und Auto", async () => {
+    const w = mount(NearbyPanel, { props: { plot: plot() } });
+    await w.find("button").trigger("click");
+    await flushPromises();
+    await flushPromises();
+
+    // Eine zweite Anfrage, für genau die Orte, die die erste gefunden hat.
+    expect(reachability).toHaveBeenCalledTimes(1);
+    expect(reachability.mock.calls[0][2]).toEqual(["bike", "car"]);
+    expect(reachability.mock.calls[0][1]).toHaveLength(recorded.treffer.length);
+
+    const head = w.findAll("thead th").map(th => th.text());
+    expect(head).toEqual(["Ziel", "zu Fuß", "Rad", "Auto", "Strecke"]);
+
+    // Aufgezeichnete Werte: Meusdorf ist 1326 s mit dem Rad und 422 s mit dem Auto.
+    const row = w.findAll("tbody tr").find(r => r.text().includes("Leipzig, Meusdorf"));
+    const cells = row.findAll("td").map(td => td.text());
+    expect(cells[2]).toBe("22 min");
+    expect(cells[3]).toBe("7 min");
+    expect(w.findAll(".skeleton-cell")).toHaveLength(0);
+  });
+
+  it("zeigt in den beiden Spalten Platzhalter, solange gerechnet wird", async () => {
+    let answer;
+    reachability.mockReturnValueOnce(new Promise(done => { answer = done; }));
+    const w = mount(NearbyPanel, { props: { plot: plot() } });
+    await w.find("button").trigger("click");
+    await flushPromises();
+
+    // Zwei Zellen je Zeile, und nichts, was wie ein Ergebnis aussieht.
+    expect(w.findAll(".skeleton-cell")).toHaveLength(recorded.treffer.length * 2);
+    answer(routed);
+    await flushPromises();
+    expect(w.findAll(".skeleton-cell")).toHaveLength(0);
+  });
+
+  it("lässt die Fußwege stehen, wenn Rad und Auto nicht zu berechnen sind", async () => {
+    // Der Ausweg, den der Nutzer verlangt hat: eine gescheiterte Routenberechnung
+    // darf die gemessenen Fußwege und Strecken nicht mitnehmen.
+    reachability.mockRejectedValueOnce(new Error("Der Routing-Dienst ist nicht erreichbar."));
+    const w = mount(NearbyPanel, { props: { plot: plot() } });
+    await w.find("button").trigger("click");
+    await flushPromises();
+    await flushPromises();
+
+    expect(w.findAll("tbody tr")).toHaveLength(recorded.treffer.length);
+    expect(w.text()).toContain("Fußweg");
+    expect(w.text()).toContain("Der Routing-Dienst ist nicht erreichbar.");
+    const row = w.findAll("tbody tr").find(r => r.text().includes("Leipzig, Meusdorf"));
+    expect(row.findAll("td")[2].text()).toBe("—");
+    expect(row.findAll("td")[2].attributes("title")).toContain("nicht erreichbar");
   });
 
   it("zeigt bei einem Halt, welche Verkehrsmittel dort fahren", async () => {
@@ -182,8 +267,12 @@ describe("Nachprüfbarkeit der Umgebung", () => {
 
     const links = w.findAll("a.nearby__name");
     expect(links.length).toBe(recorded.treffer.length);
-    links.forEach((a, i) => {
+    links.forEach(a => {
       const href = a.attributes("href");
+      // Die Zeilen stehen nach Fußweg sortiert, also wird der Treffer über
+      // seinen Namen gesucht statt über die Position.
+      const i = recorded.treffer.findIndex(t => t.name === a.text());
+      expect(i).toBeGreaterThanOrEqual(0);
       // A marker on the destination answers "where is it", but the row claims a
       // walking distance -- and that claim is only checkable as a route.
       expect(href).toContain("openstreetmap.org/directions");

@@ -46,7 +46,17 @@
            one the address field swallowed it and nothing happened. -->
       <form class="panel" @submit.prevent="submit">
         <div class="panel__body stack">
-          <template v-if="source === 'url'">
+          <template v-if="source === 'search'">
+            <PlotSearch @select="searchPicked" />
+            <p class="hint">
+              Was getippt wurde, wird zuerst gelesen und dann nachgeschlagen: eine deutsche
+              Adresse beginnt nie mit einer Ziffer, eine Koordinate sind zwei Zahlen, und ein
+              Nenner (<span class="mono">85/1</span>) kommt in keiner Adresse vor. Bleiben zwei
+              Lesarten möglich, werden beide Verzeichnisse gefragt statt eine geraten.
+            </p>
+          </template>
+
+          <template v-else-if="source === 'url'">
             <div class="field">
               <label for="q-url">Adresse der Anzeige</label>
               <input id="q-url" type="url" inputmode="url" v-model="url" placeholder="https://…">
@@ -108,7 +118,7 @@
             </p>
           </template>
 
-          <div class="row">
+          <div v-if="source !== 'search'" class="row">
             <!-- The click carries `.prevent`, so the button's own activation
                  does not submit the form a second time. -->
             <button type="submit" class="btn" :disabled="busy || !ready" @click.prevent="submit">
@@ -116,6 +126,7 @@
             </button>
             <span v-if="busy" class="hint">Der Abruf kann eine Minute dauern.</span>
           </div>
+          <p v-else-if="busy" class="hint">Das Kataster wird gefragt …</p>
         </div>
       </form>
     </section>
@@ -171,14 +182,12 @@
       </div>
     </section>
 
-    <!-- 4 · Flurstück -->
+    <!-- 3 · Grundstück: die Flurstücke und die Angaben dazu -->
     <section v-else-if="stage === 'flurstueck'" class="stack">
       <p class="subtitle">
-        So liegt das Grundstück im Kataster — und hier bekommt es seinen Namen.
-        Ein Grundstück ist oft <b>mehr als ein Flurstück</b>: „Flurstück hinzufügen“
-        einschalten und auf der Zeichnung auf das nächste klicken. Sonst bewegt die
-        gedrückte Maustaste den Ausschnitt, das Mausrad zoomt, ein Doppelklick
-        setzt ihn zurück.
+        So liegen die Flurstücke im Kataster. Ein Klick wählt ein anderes — zum
+        Zusammensetzen mehrerer umschalten. Den Ausschnitt bewegt die gedrückte
+        Maustaste, das Mausrad zoomt, ein Doppelklick setzt ihn zurück.
       </p>
 
       <!-- The service found something implausible for this listing. Not an
@@ -189,37 +198,59 @@
         {{ doubt }}
       </div>
 
-      <!-- The house is placed before the plot exists, so this is the first and
-           only moment the user can be told it did not fit. -->
-      <p v-if="!houseSeated && draftBuilding" class="notice notice--error" role="status">
-        <b>Für den Baukörper ist zwischen den Abstandsflächen kein Platz.</b>
-        {{ num(draftBuilding.width, 1) }} × {{ num(draftBuilding.depth, 1) }} m finden auf diesem
-        Zuschnitt in keiner Lage und in keinem Winkel Platz. Übernehmen lässt sich das Flurstück
-        trotzdem; auf der Grundstücksseite liegt der Umriss dann mittig und ragt sichtbar über das
-        Bebauungsfenster hinaus, und dort lassen sich Maße, Wandhöhe und Abstandstiefen ändern.
+      <!-- An address coordinate is not a parcel boundary: the register puts it
+           on the building, and a few metres either way is the neighbour's. So
+           the neighbours are on the map and the choice is the user's. -->
+      <p v-if="corrected" class="notice" role="status">
+        <b>Zur gesuchten Adresse gehört ein anderes Flurstück als das unter der Koordinate.</b>
+        Gewählt ist {{ corrected }} — die Lagebezeichnung im Kataster nennt genau diese
+        Adresse. Ein Klick auf ein anderes Flurstück ändert das.
       </p>
 
       <p v-if="addError" class="notice notice--error" role="alert">{{ addError }}</p>
 
       <div class="check-grid">
         <div class="panel">
-          <div class="panel__head">
-            <h3>Zuschnitt</h3>
+          <!-- Two ways to click, because they are two different intentions:
+               correcting the parcel is the common one, assembling a plot out of
+               several is the rarer one and would otherwise happen by accident. -->
+          <div class="plan-bar">
+            <span class="plan-bar__label">Klick</span>
+            <div class="button-group" role="group" aria-label="Was ein Klick tut">
+              <button type="button" :aria-pressed="String(!composing)"
+                      @click="composing = false">Wechseln</button>
+              <button type="button" :aria-pressed="String(composing)"
+                      @click="composing = true">Zusammensetzen</button>
+            </div>
             <div class="spacer"></div>
-            <button type="button" class="btn btn--quiet btn--small" :disabled="adding"
-                    :aria-pressed="String(picking)" @click="picking = !picking">
-              {{ adding ? "Wird geholt …" : picking ? "Fertig" : "Flurstück hinzufügen" }}
-            </button>
+            <span class="plan-bar__label">{{ selection.length }} gewählt</span>
           </div>
-          <p v-if="picking" class="hint">
-            Auf das Flurstück klicken, das dazugehört. Das Kataster wird gefragt, was
-            an der Stelle liegt; die Umringe werden vereinigt und die amtlichen Flächen summiert.
-          </p>
           <!-- No house here: this step is about the parcel's outline, and a
                body nobody has planned yet only distracts from it. -->
-          <SitePlan :plot="draft" :width="640" :height="440" backdrop="map" north-up
-                    :show-building="false" :navigable="!picking" :picking="picking"
-                    @pick="addParcelAt" />
+          <!-- No dimension chains: the question here is which parcel, not how
+               long each of its edges is, and the chains sat on the numbers of
+               the neighbours they were meant to help pick between. The measures
+               are in the table beside it. -->
+          <!-- The photograph with the cadastre's line work over it: what is
+               actually on the ground, and where the boundaries run. `hold-frame`
+               keeps the camera still when another parcel is picked — the point
+               of the click is to see which outline moved. -->
+          <SitePlan :plot="draft" :width="640" :height="440" backdrop="aerial"
+                    overlay="liegenschaftskarte" north-up :hold-frame="holdFrame"
+                    :show-building="false" :show-dimensions="false" navigable
+                    :parcels="choices" :chosen-parcels="selection"
+                    :problem-parcels="detached"
+                    @choose="chooseParcel" />
+          <p v-if="selectionNote" class="notice" :class="{ 'notice--error': detached.length }"
+             role="status">{{ selectionNote }}</p>
+          <p class="panel__footnote">
+            <template v-if="choices.length > 1">
+              {{ choices.length }} Flurstücke im Umkreis — die Katasterlinien beschriften
+              jedes mit seiner Nummer.
+              {{ composing ? "Ein Klick nimmt eines dazu oder heraus." : "Ein Klick wählt ein anderes." }}
+            </template>
+            Luftbild und Kataster: © GeoSN, dl-de/by-2-0
+          </p>
         </div>
         <div class="panel">
           <div class="panel__head"><h3>Was übernommen wird</h3><div class="spacer"></div><span class="chip">ALKIS</span></div>
@@ -235,9 +266,10 @@
           <p class="panel__footnote">{{ draft.source }}</p>
         </div>
       </div>
-      <!-- The two steps this used to be. Nothing here needs the outline out of
-           sight, and the name and the price were a page of their own for three
-           fields. -->
+
+      <!-- The fields that the cadastre cannot supply. They used to be a step of
+           their own, which meant a second page for three inputs and a "Passt"
+           in between that decided nothing. -->
       <div class="panel">
         <div class="panel__body stack">
           <div class="field-pair">
@@ -259,14 +291,19 @@
             Für dieses Grundstück ließ sich kein Bodenrichtwert abrufen. Die Preiseinordnung
             bleibt dann leer; nachtragen lässt sie sich später.
           </p>
+          <div class="row">
+            <!-- A split plot may be assembled on the way to a whole one, but it
+                 cannot be created: the drawing holds one outline, and half a
+                 plot would be a plot nobody chose. -->
+            <button type="button" :class="doubt ? 'btn btn--secondary' : 'btn'"
+                    :disabled="busy || detached.length > 0"
+                    :title="detached.length ? 'Die rot markierten Flurstücke hängen nicht mit dem übrigen Grundstück zusammen.' : null"
+                    @click="create">
+              {{ doubt ? "Trotzdem anlegen" : "Anlegen und öffnen" }}
+            </button>
+            <button type="button" class="btn btn--quiet" @click="stepBack(returnStage)">Zurück</button>
+          </div>
         </div>
-      </div>
-
-      <div class="row">
-        <button type="button" :class="doubt ? 'btn btn--secondary' : 'btn'" @click="create">
-          {{ doubt ? "Trotzdem anlegen und öffnen" : "Anlegen und öffnen" }}
-        </button>
-        <button type="button" class="btn btn--quiet" @click="stepBack(returnStage)">Zurück</button>
       </div>
     </section>
   </div>
@@ -275,13 +312,15 @@
 <script>
 import SitePlan from "../components/SitePlan.vue";
 import CadastralDistrictPicker from "../components/CadastralDistrictPicker.vue";
+import PlotSearch from "../components/PlotSearch.vue";
 import ParcelSearch from "../components/ParcelSearch.vue";
-import { state, addPlot, houseFootprint, placement, autoSeatHouse } from "../lib/store.js";
+import { state, addPlot, autoSeatHouse } from "../lib/store.js";
 import { WIZARD_STAGES, wizardStage } from "../router/stages.js";
-import { readListing, readPage, resolveParcel, landValue } from "../lib/api.js";
+import { readListing, readPage, resolveParcel, landValue, nearbyParcels } from "../lib/api.js";
 import { queryFromFields } from "../lib/search.js";
-import { plotFromCadastre } from "../lib/plots.js";
-import { polygonArea } from "../lib/geometry.js";
+import { plotFromCadastre, parcelForAddress, outerRing } from "../lib/plots.js";
+import { polygonArea, polygonCentroid, pointInPolygon } from "../lib/geometry.js";
+import { toLocal } from "../lib/projection.js";
 import { area, euroPerSqm, num, parseGermanNumber as numberFrom } from "../lib/format.js";
 
 /** The backend answers with {feld: {wert, quelle_url, bestaetigt}}. */
@@ -312,7 +351,7 @@ const PASTE_LIMIT = 400000;
 
 export default {
   name: "WizardView",
-  components: { SitePlan, CadastralDistrictPicker, ParcelSearch },
+  components: { SitePlan, CadastralDistrictPicker, PlotSearch, ParcelSearch },
   props: {
     /** The stage's URL segment; the route only matches the four known ones. */
     stage: { type: String, required: true }
@@ -326,7 +365,7 @@ export default {
       lost: false,
       // How many history entries this wizard pushed; see `stepBack`.
       ownEntries: 0,
-      source: "url",
+      source: "search",
       url: "",
       gemarkung: "",
       // The directory entry the text stands for, once one does. Null while
@@ -360,19 +399,44 @@ export default {
       searchRun: 0,
       draft: null,
       doubt: null,
-      // Adding a further parcel to the plot: the mode, and what went wrong.
-      picking: false,
-      adding: false,
+      /** The parcels around the resolved point, for the user to choose from. */
+      choices: [],
+      /** The keys of the parcels the plot is made of. A plot is a set of
+       *  parcels, so this is what the map's clicks add to and take from. */
+      selection: [],
+      /** Why the last click did not do what it looked like it would. */
+      selectionNote: null,
+      /** What a click does: replace the plot's parcel, or add to it. Replacing
+       *  is the default because correcting the parcel is the common case. */
+      composing: false,
+      /** Chosen parcels the drawn outline does not reach — the plot is in two
+       *  pieces. Allowed on the way through, marked in red, and not a plot. */
+      detached: [],
+      /** Whether the camera stays where it is when the draft changes. True for
+       *  a click on the map — the user has to see *which* outline moved — and
+       *  false when the correction moves the plot by itself: the map would
+       *  otherwise keep showing the parcel the coordinate landed in, which is
+       *  the parcel the correction just rejected. */
+      holdFrame: false,
+      /** The address the search picked, so the cadastre's own Lagebezeichnung
+       *  can be checked against it rather than the coordinate being trusted. */
+      searchedAddress: null,
+      /** The parcel number a Lagebezeichnung match put in place of the one the
+       *  coordinate landed in. Null unless it actually differed. */
+      corrected: null,
+      /** What went wrong while the plot was being reassembled. */
       addError: "",
-      // Whether the footprint found room inside the setbacks; see `seatHouse`.
-      houseSeated: true,
-      // The labels for the stages in `WIZARD_STAGES`, in that order.
+      // The labels for the stages in `WIZARD_STAGES`, in that order. The
+      // parcel and the fields are one step: the fields are three inputs, and
+      // the "Passt" between them decided nothing.
       steps: [
         { id: "quelle", name: "Quelle" },
         { id: "suche", name: "Flurstück suchen" },
         { id: "flurstueck", name: "Flurstück und Angaben" }
       ],
       sources: [
+        { id: "search", name: "Suchen",
+          text: "Adresse, Flurstück oder Koordinate. Vorschläge kommen aus den amtlichen Hauskoordinaten und dem Gemarkungsverzeichnis." },
         { id: "url", name: "Link einwerfen",
           text: "Adresse einer Anzeige. Der Server holt die Seite und liest Adresse, Flurstück, Kaufpreis und Fläche heraus." },
         { id: "parcel", name: "Flurstück direkt",
@@ -405,6 +469,8 @@ export default {
       return filled ? `${filled} von ${this.readFields.length} Feldern belegt` : "";
     },
     ready() {
+      // The search has no button: picking a suggestion is the action.
+      if (this.source === "search") return false;
       if (this.source === "url") return /^https?:\/\/\S{6,}/.test(this.url.trim());
       if (this.source === "parcel") return this.gemarkung.trim() && this.flurstuecksnummer.trim();
       if (this.source === "text") return this.listingText.trim().length > 20;
@@ -418,7 +484,6 @@ export default {
      *  found no room. The template has always named this and nothing ever
      *  defined it: the branch only runs for a parcel too small for the default
      *  body, so the page it crashed was one nobody had reached. */
-    draftBuilding() { return this.draft ? houseFootprint(this.draft) : null; },
     /** What the cadastre is asked for: the key of the chosen entry, which is
      *  unambiguous where two districts share a name, else the plain text. */
     gemarkungQuery() { return this.gemarkungEntry?.schluessel || this.gemarkung.trim(); }
@@ -457,6 +522,21 @@ export default {
       if (!this.ownEntries) return this.goToStage(stage);
       this.ownEntries--;
       this.$router.back();
+    },
+
+    /** A suggestion was picked: it already carries the cadastral query. */
+    async searchPicked({ query, label, address }) {
+      this.busy = true;
+      this.error = "";
+      try {
+        this.returnStage = "quelle";
+        this.searchedAddress = address ?? null;
+        await this.queryCadastre(query, { note: `Gesucht: ${label}` });
+      } catch (error) {
+        this.error = error.message;
+      } finally {
+        this.busy = false;
+      }
     },
 
     /** Keep the clipboard's HTML flavour alongside the text the textarea shows.
@@ -563,21 +643,147 @@ export default {
       }
     },
 
-    async queryCadastre(query, extra = {}) {
-      const answer = await resolveParcel(query);
-      const plot = plotFromCadastre(answer, extra);
-      // Not an error: the parcel is real and the user may still want it. It is
-      // a judgement they have to make, so it is put in front of them.
-      this.doubt = answer.plausibility?.plausible === false
-        ? answer.plausibility.warning
-        : null;
-      // The land value is a separate register; a plot without one is still usable.
+    /** The parcels around this draft, and the one the address actually names.
+     *
+     * Two different things can put the wrong parcel in front of the user: an
+     * address coordinate that lands next door, and a plot that is simply not
+     * the one they meant. The first is corrected here against the cadastre's
+     * own Lagebezeichnung; the second is theirs to fix with a click. Neither
+     * is worth failing the step over, so a refusal only costs the choice. */
+    async loadChoices(plot, extra) {
+      if (!plot.anchor) return;
+      try {
+        const answer = await nearbyParcels(plot.anchor.lat, plot.anchor.lon);
+        this.choices = answer?.features ?? [];
+      } catch {
+        this.choices = [];
+        return;
+      }
+      const named = parcelForAddress(this.choices, this.searchedAddress);
+      if (!named || named.properties?.kennzeichen === plot.kennzeichen) return;
+      const corrected = plotFromCadastre(
+        { features: [named], grundstueck: named, quelle: plot.source }, extra
+      );
+      // Nobody clicked: the address moved the plot, so the map follows it.
+      this.holdFrame = false;
+      this.corrected = `Flurstück ${corrected.flurstuecke.join(" · ")}`;
+      this.selection = [named.properties.kennzeichen];
+      this.draft = { ...corrected, bodenrichtwert: plot.bodenrichtwert, brwZone: plot.brwZone,
+                     brwReferenceDate: plot.brwReferenceDate,
+                     brwReferencePlotArea: plot.brwReferencePlotArea,
+                     brwConversionUrl: plot.brwConversionUrl,
+                     houseTypeId: plot.houseTypeId, ratio: plot.ratio };
+    },
+
+    /** A click on the map, in whichever of the two meanings is switched on.
+     *
+     * Replacing is the default: the common case is that the coordinate landed
+     * on the wrong parcel and one click puts that right. Composing is the other
+     * one — a plot is a set of parcels, and then a click adds or removes. */
+    async chooseParcel(kennzeichen) {
+      if (this.busy || !this.choices.length) return;
+      const taken = this.selection.includes(kennzeichen);
+      if (!this.composing) {
+        if (taken && this.selection.length === 1) return;
+        this.holdFrame = true;
+        await this.applySelection([kennzeichen]);
+        return;
+      }
+      if (taken && this.selection.length === 1) {
+        this.selectionNote = "Ein Grundstück besteht aus mindestens einem Flurstück. "
+          + "Erst ein anderes dazunehmen, dann lässt sich dieses abwählen.";
+        return;
+      }
+      this.holdFrame = true;
+      await this.applySelection(taken
+        ? this.selection.filter(key => key !== kennzeichen)
+        : [...this.selection, kennzeichen]);
+    },
+
+    /** Which chosen parcels the drawn outline does not contain.
+     *
+     * Parcels that do not touch are a real set in the register and a shape one
+     * outline cannot hold. Refusing the click was worse than allowing it: the
+     * way back to a whole plot often leads through a split one — take the
+     * middle parcel out, then the far one. So they are marked instead, and the
+     * step will not create a plot while any of them stands. */
+    /** A feature's centre as `[lon, lat]`, or null when it carries no ring. */
+    centreOf(feature) {
+      const ring = outerRing(feature?.geometry);
+      if (ring.length < 4) return null;
+      const n = ring.length;
+      return [ring.reduce((s, c) => s + c[0], 0) / n, ring.reduce((s, c) => s + c[1], 0) / n];
+    },
+
+    detachedParcels(plot, features) {
+      if (!plot?.anchor || !plot.polygon?.length) return [];
+      return features
+        .filter(feature => {
+          const ring = outerRing(feature.geometry);
+          if (ring.length < 4) return false;
+          return !pointInPolygon(polygonCentroid(toLocal(ring, plot.anchor)), plot.polygon);
+        })
+        .map(feature => feature.properties?.kennzeichen)
+        .filter(Boolean);
+    },
+
+    /** Resolve a set of parcel keys into the draft, keeping what the cadastre
+     *  cannot know: the name and price the user typed, and the note. */
+    async applySelection(keys) {
+      this.busy = true;
+      this.selectionNote = null;
+      try {
+        const answer = await resolveParcel({ kennzeichen: keys });
+        const kept = {
+          name: this.draft.name, askingPrice: this.draft.askingPrice, note: this.draft.note,
+          /* Which piece is the plot when the set falls apart: the one around the
+             parcel this selection started from, not whichever the register
+             listed first. */
+          near: this.centreOf(answer.features?.[0])
+        };
+        const plot = await this.withLandValue(plotFromCadastre(answer, kept));
+        this.draft = { ...plot, houseTypeId: this.draft.houseTypeId, ratio: this.draft.ratio };
+        this.selection = keys;
+        this.detached = this.detachedParcels(plot, answer.features ?? []);
+        this.selectionNote = this.detached.length
+          ? "Die rot markierten Flurstücke hängen nicht mit dem übrigen Grundstück "
+            + "zusammen. Gezeichnet ist nur der zusammenhängende Teil — entweder die "
+            + "markierten wieder abwählen oder das Flurstück dazwischen dazunehmen."
+          : null;
+        this.corrected = null;
+        this.doubt = null;
+      } catch (error) {
+        this.selectionNote = error.message;
+      } finally {
+        this.busy = false;
+      }
+    },
+
+    /** The land value for a plot's own centre. A separate register, and a plot
+     *  without one is still usable — so a failure only empties the fields. */
+    async withLandValue(plot) {
       try {
         const value = await landValue(plot.anchor.lat, plot.anchor.lon);
         plot.bodenrichtwert = value?.euro_per_sqm ?? null;
         plot.brwZone = value?.zone ?? null;
         plot.brwReferenceDate = value?.reference_date ?? null;
-      } catch { /* leave it empty and say so on the next step */ }
+        // The notional plot the zone value is quoted for. Without it a reader
+        // multiplies the value by their own area, which is exactly the step
+        // the Gutachterausschuss publishes a conversion table for.
+        plot.brwReferencePlotArea = value?.richtwertgrundstueck_m2 ?? null;
+        plot.brwConversionUrl = value?.umrechnungstabelle_url ?? null;
+      } catch { /* leave it empty and say so on the same step */ }
+      return plot;
+    },
+
+    async queryCadastre(query, extra = {}) {
+      const answer = await resolveParcel(query);
+      const plot = await this.withLandValue(plotFromCadastre(answer, extra));
+      // Not an error: the parcel is real and the user may still want it. It is
+      // a judgement they have to make, so it is put in front of them.
+      this.doubt = answer.plausibility?.plausible === false
+        ? answer.plausibility.warning
+        : null;
       /* A catalogue entry when the user has one, and otherwise the plot's own
        * dimensions — anything rather than a "Baukörper" box with nothing chosen
        * in it while the plan already draws a house. */
@@ -586,61 +792,24 @@ export default {
         plot.houseTypeId = first.id;
         if (first.ratio) plot.ratio = first.ratio;
       }
-      this.houseSeated = autoSeatHouse(plot);
       this.draft = plot;
+      this.choices = [];
+      this.corrected = null;
+      this.selectionNote = null;
+      this.detached = [];
+      this.selection = (answer.features ?? [])
+        .map(feature => feature.properties?.kennzeichen)
+        .filter(Boolean);
       this.goToStage("flurstueck");
-    },
-
-    /**
-     * One more parcel, pointed at on the drawing.
-     *
-     * The click gives a coordinate; the cadastre says which parcel is under it;
-     * the plot is then re-resolved from *all* its numbers at once, so the union
-     * and the summed official area come from the same place they always have
-     * rather than being stitched together here. Two requests, and the second
-     * one is the plot.
-     */
-    async addParcelAt({ lat, lon }) {
-      if (this.adding) return;
-      this.adding = true;
-      this.addError = "";
-      try {
-        const hit = await resolveParcel({ lat, lon });
-        const properties = hit?.features?.[0]?.properties;
-        const number = properties?.nenner
-          ? `${properties.zaehler}/${properties.nenner}`
-          : String(properties?.zaehler ?? "");
-        if (!number) throw new Error("An dieser Stelle liegt kein Flurstück.");
-        if (this.draft.flurstuecke.includes(number)) {
-          this.addError = `Flurstück ${number} gehört bereits dazu.`;
-          return;
-        }
-        // Same district only: the endpoint resolves a set within one Gemarkung,
-        // and two districts in one plot is a different thing entirely.
-        const district = properties.gemarkungsnummer || properties.gemarkung;
-        const own = this.draft.gemarkungsnummer || this.draft.gemarkung;
-        if (district && own && String(district) !== String(own) && properties.gemarkung !== this.draft.gemarkung) {
-          this.addError =
-            `Flurstück ${number} liegt in der Gemarkung ${properties.gemarkung}, ` +
-            `das Grundstück in ${this.draft.gemarkung}. Zusammenlegen lässt sich das hier nicht.`;
-          return;
-        }
-        await this.queryCadastre(
-          {
-            gemarkung: this.draft.gemarkungsnummer || this.draft.gemarkung,
-            flurstuecksnummern: [...this.draft.flurstuecke, number]
-          },
-          // What the user already typed survives the re-resolve.
-          { name: this.draft.name, askingPrice: this.draft.askingPrice, note: this.draft.note }
-        );
-      } catch (error) {
-        this.addError = error.message;
-      } finally {
-        this.adding = false;
-      }
+      // After the step is on screen: the choice is an aid, not a precondition.
+      await this.loadChoices(plot, extra);
     },
 
     create() {
+      // Seated here, not at the Flurstück step: until the plot exists nobody
+      // has chosen a house type, so a footprint there is a placeholder the
+      // user never asked for — and "no room for it" a finding about nothing.
+      autoSeatHouse(this.draft);
       const plot = addPlot(this.draft);
       // Replace: the last stage of a finished wizard is not a place to return to.
       this.$router.replace({ name: "plot", params: { id: plot.id } });
@@ -652,10 +821,6 @@ export default {
 <style scoped>
 .doubt-note{ display: block; line-height: 1.5; }
 .doubt-note b{ display: block; margin-bottom: 2px; }
-.breadcrumb{ display: flex; align-items: center; gap: var(--w2b-space-2); font-size: var(--w2b-text-xs); color: var(--w2b-muted); }
-.breadcrumb a{ color: var(--w2b-primary); text-decoration: none; }
-.breadcrumb a:hover{ text-decoration: underline; }
-.page-head{ display: flex; align-items: flex-end; gap: var(--w2b-space-4); flex-wrap: wrap; }
 .subtitle{ color: var(--w2b-graphite); font-size: var(--w2b-text-s); max-width: 70ch; }
 .hint{ color: var(--w2b-muted); font-size: var(--w2b-text-s); }
 
@@ -737,5 +902,6 @@ export default {
 .value-list dt, .value-list dd{ padding: 8px var(--w2b-space-4); border-bottom: 1px solid var(--w2b-line-faint); margin: 0; display: flex; align-items: center; }
 .value-list dt{ font-size: var(--w2b-text-s); color: var(--w2b-graphite); }
 .value-list dd{ justify-content: flex-end; font-family: var(--w2b-font-mono); font-size: var(--w2b-text-s); font-variant-numeric: tabular-nums; text-align: right; }
-.panel__footnote{ padding: var(--w2b-space-3) var(--w2b-space-4); font-size: var(--w2b-text-xs); color: var(--w2b-muted); }
+/* No rule above it here: the value list it follows is the panel's whole body. */
+.panel__footnote{ border-top: 0; }
 </style>

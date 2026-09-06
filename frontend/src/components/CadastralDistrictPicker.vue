@@ -57,42 +57,15 @@
 
 <script>
 import { cadastralDistricts } from "../lib/api.js";
+import { searchDistricts, exactDistricts } from "../lib/districts.js";
 
 /** Rendered rows. The directory holds about 5 300 entries; a list that long
  *  is neither readable nor cheap to draw, and a search that wide is not a
  *  search. What is left over is counted, not hidden silently. */
 const VISIBLE_LIMIT = 50;
 
-/** Every Saxon key is six digits and starts with 14 — see CLAUDE.md. */
-const LAND_PREFIX = "14";
-const DISTRICT_NUMBER_LENGTH = 4;
-
 /** Unique ids for the ARIA wiring, one set per instance. */
 let instances = 0;
-
-/** Lower case, without diacritics, so "Molkau" finds "Mölkau". */
-function fold(text) {
-  return String(text ?? "")
-    .toLowerCase()
-    .replace(/ß/g, "ss")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-}
-
-/**
- * The forms of one key a user may have in front of them. The Geoportal prints
- * the six-digit key on its Gemarkung layer and the four-digit district number
- * on its Flurstueck layer, and a number that has been through a spreadsheet
- * has lost its leading zero.
- */
-function keyForms(key) {
-  const forms = [key];
-  if (key.length === LAND_PREFIX.length + DISTRICT_NUMBER_LENGTH && key.startsWith(LAND_PREFIX)) {
-    const short = key.slice(LAND_PREFIX.length);
-    forms.push(short, short.replace(/^0+/, ""));
-  }
-  return forms;
-}
 
 export default {
   name: "CadastralDistrictPicker",
@@ -118,35 +91,19 @@ export default {
   computed: {
     fieldId() { return `gemarkung-${this.uid}`; },
     listId() { return `gemarkung-${this.uid}-liste`; },
-    needle() { return fold(this.query).trim(); },
-
     /** Everything the query matches, best first: a name that starts with it
      *  before one that merely contains it. Ties keep the directory's own
      *  order, which the service sorts by name. */
-    matches() {
-      if (!this.needle) return [];
-      const scored = [];
-      this.directory.forEach(entry => {
-        const rank = this.rank(entry);
-        if (rank !== null) scored.push({ entry, rank });
-      });
-      scored.sort((a, b) => a.rank - b.rank);
-      return scored.map(s => s.entry);
-    },
-    hits() { return this.matches.slice(0, VISIBLE_LIMIT); },
-    omitted() { return Math.max(0, this.matches.length - this.hits.length); },
+    found() { return searchDistricts(this.directory, this.query, VISIBLE_LIMIT); },
+    hits() { return this.found.hits; },
+    omitted() { return Math.max(0, this.found.total - this.hits.length); },
 
     /** The entries the text names outright, rather than merely resembles. */
-    exact() {
-      if (!this.needle) return [];
-      return this.directory.filter(
-        entry => fold(entry.name) === this.needle || keyForms(entry.schluessel).includes(this.query.trim())
-      );
-    },
+    exact() { return exactDistricts(this.directory, this.query); },
     selected() { return this.exact.length === 1 ? this.exact[0] : null; },
     ambiguous() { return this.exact.length > 1; },
     unknown() {
-      return Boolean(this.query.trim()) && this.directory.length > 0 && this.matches.length === 0;
+      return Boolean(this.query.trim()) && this.directory.length > 0 && this.found.total === 0;
     }
   },
   watch: {
@@ -169,16 +126,6 @@ export default {
       } finally {
         this.loading = false;
       }
-    },
-
-    /** How well an entry answers the query, or null if it does not. */
-    rank(entry) {
-      const name = fold(entry.name);
-      if (name.startsWith(this.needle)) return 0;
-      const typed = this.query.trim();
-      if (/^\d+$/.test(typed) && keyForms(entry.schluessel).some(form => form.startsWith(typed))) return 1;
-      if (name.includes(this.needle)) return 2;
-      return null;
     },
 
     optionId(index) { return `gemarkung-${this.uid}-treffer-${index}`; },

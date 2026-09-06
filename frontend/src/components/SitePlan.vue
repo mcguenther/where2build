@@ -1,14 +1,14 @@
 <template>
   <div class="site-plan-shell">
-    <div v-if="hasBackdrop" ref="mapContainer" class="site-plan__map" aria-hidden="true"></div>
+    <div v-if="hasBackdrop" ref="mapContainer" class="site-plan__map" aria-hidden="true"
+         :data-map-ready="String(mapReady)"></div>
     <svg
     ref="svg"
     class="site-plan"
     :class="{
       'site-plan--dragging': dragging,
       'site-plan--measuring': measuring,
-      'site-plan--navigable': navigable && !measuring && !picking,
-      'site-plan--picking': picking,
+      'site-plan--navigable': navigable && !measuring,
       'site-plan--panning': panning
     }"
     :viewBox="`0 0 ${width} ${height}`"
@@ -37,6 +37,7 @@
     <rect v-if="!hasBackdrop" x="0" y="0" :width="width" :height="height" :fill="backgroundFill" />
 
     <g :transform="`rotate(${rotation}, ${width / 2}, ${height / 2})`">
+
       <polygon :points="path(plot.polygon)" fill="var(--w2b-map-surface)"
                :fill-opacity="hasBackdrop ? 0.42 : 1" />
 
@@ -138,6 +139,32 @@
           </text>
         </template>
       </g>
+
+      <!-- The parcels to choose between, above the drawing rather than under
+           it: a chosen parcel is drawn with no fill, and the plot's own fill
+           sat on top of it — so the click that should have taken it back out
+           of the plot never reached it. Nothing changes visually; the chosen
+           ones are transparent and the others do not overlap the plot. -->
+      <g v-if="choosableParcels.length" class="site-plan__choices">
+        <polygon v-for="parcel in choosableParcels" :key="parcel.key"
+                 class="site-plan__choice"
+                 :class="{ 'is-chosen': parcel.chosen, 'is-problem': parcel.problem }"
+                 :points="path(parcel.ring)" :data-number="parcel.number"
+                 tabindex="0" role="button"
+                 :aria-label="`Flurstück ${parcel.number}, ${parcel.area}`"
+                 :aria-pressed="String(parcel.chosen)"
+                 @keydown.enter.prevent="$emit('choose', parcel.id)"
+                 @keydown.space.prevent="$emit('choose', parcel.id)" />
+      </g>
+      <!-- The numbers last, so nothing draws over them. Counter-rotated: a
+           parcel number read sideways is not a label. -->
+      <g v-if="choosableParcels.length" class="site-plan__choice-labels">
+        <text v-for="parcel in labelledParcels" :key="`n${parcel.key}`"
+              :x="parcel.at.x" :y="parcel.at.y"
+              :transform="`rotate(${-rotation}, ${parcel.at.x}, ${parcel.at.y})`"
+              class="site-plan__choice-label" :class="{ 'is-chosen': parcel.chosen }"
+              text-anchor="middle">{{ parcel.number }}</text>
+      </g>
     </g>
 
     <!-- North arrow and scale bar stay upright and stay in print: with the map
@@ -167,11 +194,13 @@
 import {
   buildableArea, polygonEdges, rectangleCorners, pointInPolygon,
   closestBoundaryPoint, boundingBox, alignmentToEdge, asCounterClockwise,
-  minimumRotatedRectangleCorners, constrainToEnvelope, hasNeighbourHint
+  minimumRotatedRectangleCorners, constrainToEnvelope, hasNeighbourHint,
+  polygonCentroid
 } from "../lib/geometry.js";
-import { cameraFor, toWgs84 } from "../lib/projection.js";
-import { num } from "../lib/format.js";
-import { BACKDROPS, canRenderMap } from "../lib/basemap.js";
+import { cameraFor, toLocal, toWgs84 } from "../lib/projection.js";
+import { outerRing } from "../lib/plots.js";
+import { num, area } from "../lib/format.js";
+import { BACKDROPS, canRenderMap, withOverlay } from "../lib/basemap.js";
 import { darkTheme } from "../lib/store.js";
 // MapLibre 6 ships named exports only — there is no default.
 // Its worker URL is set once in main.js; see the note there.
@@ -204,6 +233,28 @@ const MAX_LABELLED_EDGES = 16;
 const SCALE_BAR_STEPS = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000];
 const SCALE_BAR_SEGMENT_PX = 56;
 
+/** How far a pointer may travel between press and release and still count as
+ *  a click rather than a pan. */
+const CLICK_SLOP_PX = 4;
+
+/** Metres of neighbouring ground the parcel picker keeps in frame. About one
+ *  plot's width in a terraced street, which is what makes the neighbour either
+ *  side visible and clickable. */
+const CHOICE_BAND_M = 18;
+
+/* Roughly what a parcel number occupies at the label's own size — 11px in the
+   mono face — and the line it sits on. Enough to tell whether two of them would
+   touch; not a text metric. */
+const LABEL_CHAR_WIDTH = 6.6;
+const LABEL_LINE_HEIGHT = 13;
+
+/** A bounding box with a band of metres added on every side. */
+const grow = (box, band) => ({
+  minX: box.minX - band, maxX: box.maxX + band,
+  minY: box.minY - band, maxY: box.maxY + band,
+  width: box.width + 2 * band, height: box.height + 2 * band
+});
+
 /** How far the navigable view may depart from the fitted framing. */
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 8;
@@ -227,6 +278,26 @@ export default {
     // "none" by default: a backdrop is a MapLibre instance, and the small
     // plans on cards and in the comparison must not each start one.
     backdrop: { type: String, default: "none" },
+    /** A raster layer laid over the backdrop — today the noise survey. Needs a
+     *  backdrop under it: the bands are translucent and mean nothing on paper. */
+    overlay: { type: String, default: null },
+    /** Keep the camera where it is when the plot changes. Picking another
+     *  parcel is a change the user has to *see*: a drawing that re-centres on
+     *  the new outline looks the same before and after, and the neighbours
+     *  they were comparing are suddenly somewhere else. */
+    holdFrame: { type: Boolean, default: false },
+    /** Parcels the user may pick from, as `/api/parcels/nearby` returns them.
+     *  Given, the drawing frames all of them, draws each with its number and
+     *  emits `choose` with the parcel key that was clicked. */
+    parcels: { type: Array, default: null },
+    /** Which of `parcels` the plot is made of, by `kennzeichen`. A plot is a
+     *  set of parcels, so this is a set — the drawing marks every one of them
+     *  as taken and leaves the rest on offer. */
+    chosenParcels: { type: Array, default: () => [] },
+    /** Chosen parcels that are part of a problem — today: they hang off the
+     *  rest of the plot. Marked rather than refused, so the user can click
+     *  their way back to a shape that holds together. */
+    problemParcels: { type: Array, default: () => [] },
     northUp: { type: Boolean, default: false },
     showDimensions: { type: Boolean, default: true },
     showSetbacks: { type: Boolean, default: true },
@@ -239,19 +310,18 @@ export default {
     neighbourDepths: { type: Array, default: null },
     /** Fixed pixels per metre. Without it each plan fits its own frame. */
     scale: { type: Number, default: null },
-    /** Picking mode: one click reports where it landed, in WGS84.
-     *
-     *  A plot is a set of parcels, and the neighbour to add is on the drawing
-     *  already — the cadastre knows what is under a coordinate, so pointing at
-     *  it is the whole interaction. */
-    picking: { type: Boolean, default: false },
     /** Measuring mode: clicks add points, the run is measured segment by segment. */
     measuring: { type: Boolean, default: false }
   },
-  emits: ["move", "measured", "pick"],
+  emits: ["move", "measured", "choose"],
   data() {
     return {
-      uid: ++instanceCount, dragging: null, mapUnavailable: false,
+      uid: ++instanceCount, dragging: null, mapUnavailable: false, heldFrame: null,
+      /* Whether every tile of the current view has arrived. Only anything that
+       * photographs the plan reads it — a picture taken before this is a
+       * picture of a half-drawn backdrop. Kept apart from `mapUnavailable`,
+       * which is the failure flag and must never drive a rebuild. */
+      mapReady: false,
       measurePoints: [], measurePointer: null,
       // Navigation, relative to the fitted framing: a factor on its scale and
       // an offset of its centre, in metres. Both feed `view`, so the backdrop
@@ -296,6 +366,66 @@ export default {
     /** Which palette the vector backdrop should be drawn in. Deliberately not
      *  a function of whether the last build succeeded — see `rebuildMap`. */
     darkBackdrop() { return darkTheme(); },
+
+    /** The parcels on offer, in this plot's own metre frame. Empty unless a
+     *  caller handed some over, so every other use of this component is
+     *  untouched. */
+    choosableParcels() {
+      if (!this.parcels?.length || !this.plot.anchor) return [];
+      return this.parcels.flatMap(feature => {
+        const ring = outerRing(feature.geometry);
+        if (ring.length < 4) return [];
+        const local = toLocal(ring, this.plot.anchor);
+        const properties = feature.properties ?? {};
+        const centre = polygonCentroid(local);
+        return [{
+          key: properties.kennzeichen ?? `${properties.zaehler}/${properties.nenner ?? ""}`,
+          id: properties.kennzeichen,
+          number: properties.nenner ? `${properties.zaehler}/${properties.nenner}` : `${properties.zaehler}`,
+          area: area(properties.flaeche_amtlich_m2),
+          size: Number(properties.flaeche_amtlich_m2) || 0,
+          chosen: this.chosenParcels.includes(properties.kennzeichen),
+          problem: this.problemParcels.includes(properties.kennzeichen),
+          ring: local,
+          at: this.p(centre)
+        }];
+      });
+    },
+
+    /** Whether the ground under the drawing already names the parcels. */
+    groundNamesParcels() {
+      return this.hasBackdrop
+        && (this.backdrop === "cadastre" || this.overlay === "liegenschaftskarte");
+    },
+
+    /** Those whose number lands inside the drawing and clear of one already
+     *  placed. A label over empty paper names a parcel the user cannot see, let
+     *  alone click — and two of them in the same spot read as a third number:
+     *  "292/2" over "293/5" came out as "29293/5". The chosen parcel keeps its
+     *  number, then the larger ones, so what gets dropped is the sliver at the
+     *  edge of the frame rather than the plot in the middle of it. */
+    labelledParcels() {
+      // The Liegenschaftskarte writes every parcel number itself, in the
+      // register's own stacked notation. Repeating them upright next to it gave
+      // "96/1" twice per parcel, which reads as a fault rather than a label.
+      if (this.groundNamesParcels) return [];
+      const inset = 14;
+      const inside = this.choosableParcels.filter(parcel =>
+        parcel.at.x > inset && parcel.at.x < this.width - inset
+        && parcel.at.y > inset && parcel.at.y < this.height - inset);
+      const order = [...inside].sort((a, b) =>
+        Number(b.chosen) - Number(a.chosen) || b.size - a.size);
+
+      const placed = [];
+      for (const parcel of order) {
+        const half = LABEL_CHAR_WIDTH * parcel.number.length / 2 + 2;
+        const clash = placed.some(other =>
+          Math.abs(other.at.x - parcel.at.x) < other.half + half
+          && Math.abs(other.at.y - parcel.at.y) < LABEL_LINE_HEIGHT);
+        if (!clash) placed.push({ ...parcel, half });
+      }
+      return placed;
+    },
 
     /** The outline in counter-clockwise order, so "outward" is one fixed sign.
      *  A cadastral ring arrives either way round, and the old chains offset by
@@ -346,7 +476,21 @@ export default {
     /* Frame the plot with a margin, then stretch the box to the frame's aspect
        so the drawing fills the panel instead of floating in it. */
     fit() {
-      const box = boundingBox(this.plot.polygon);
+      /* A frame held across a change of plot. It is kept in WGS84, because the
+         local metres are measured from the plot's own anchor and the new plot
+         has a different one — the same numbers would be a different place. */
+      if (this.heldFrame && this.plot.anchor) {
+        const [centre] = toLocal([this.heldFrame.centre], this.plot.anchor);
+        return { scale: this.heldFrame.scale, mx: centre.x, my: centre.y };
+      }
+      /* With a choice on the table the frame grows by a fixed band of metres so
+         the parcels either side are in it and big enough to hit. Framing *all*
+         of them instead put 33 parcels across 200 m: the neighbours became
+         specks, and their numbers floated in empty paper. A band, not a factor,
+         because the width that matters is a neighbour's, not this plot's. */
+      const box = this.parcels?.length
+        ? grow(boundingBox(this.plot.polygon), CHOICE_BAND_M)
+        : boundingBox(this.plot.polygon);
       /* A caller that hands us a scale is drawing several plots side by side
          and needs them comparable, so its value wins over our own fit. It is
          the smallest of the individual fits, so nothing overflows its frame. */
@@ -486,25 +630,52 @@ export default {
     }
   },
   created() { this._mapRun = 0; },
-  mounted() { this.buildMap(); },
-  beforeUnmount() { this.destroyMap(); },
+  mounted() {
+    this.buildMap();
+    this.watchSize();
+    // The first framing is never a change, so the watcher below would not see
+    // it — and the first pick would then be the one that moves the map.
+    this.rememberFrame();
+  },
+  beforeUnmount() {
+    this._sizeWatcher?.disconnect();
+    this._sizeWatcher = null;
+    this.destroyMap();
+  },
   watch: {
     // A different backdrop means a different style; MapLibre cannot swap sources
     // underneath itself, so the map is torn down and rebuilt.
     wantsBackdrop() { this.rebuildMap(); },
     backdrop() { this.rebuildMap(); },
+    // MapLibre cannot add a source to a running style either, so switching the
+    // overlay is the same rebuild as switching the ground.
+    overlay() { this.rebuildMap(); },
     // Only the vector backdrop has a palette; the aerial photo and the
     // cadastral map are the authority's own raster and look the same either way.
     darkBackdrop() { if (this.backdrop === "map") this.rebuildMap(); },
     measuring(on) { if (!on) this.clearMeasurement(); },
-    "plot.id"() {
+    "plot.id"(_, previous) {
       this.clearMeasurement();
+      /* Another parcel from the picker: the ground is the same ground, so
+         neither the camera nor the map is touched. `_shownFrame` is what the
+         last camera actually showed — this watcher runs before the one that
+         records the next one. */
+      if (this.holdFrame && previous && this._shownFrame) {
+        this.heldFrame = this._shownFrame;
+        // The held frame already carries the zoom and pan that produced it.
+        this.zoomFactor = 1;
+        this.panMetres = { x: 0, y: 0 };
+        return;
+      }
       this.resetView();
       this.rebuildMap();
     },
     navigable(on) { if (!on) this.resetView(); },
     rotation() { this.setCamera(); },
-    view() { this.setCamera(); }
+    view() {
+      this.setCamera();
+      this.rememberFrame();
+    }
   },
   methods: {
     /** MapLibre needs WebGL and a network; neither is guaranteed. Any failure
@@ -512,8 +683,20 @@ export default {
     rebuildMap() {
       this.destroyMap();
       this.mapUnavailable = false;
+      this.mapReady = false;
       // The container only exists once `hasBackdrop` has re-rendered it.
       this.$nextTick(() => this.buildMap());
+    },
+    /** The camera is derived from the drawing's rendered width, and that width
+     *  is not final at mount: the panel around it is still laying out, and a
+     *  measurement of 0 falls back to the unscaled `width`. The backdrop then
+     *  sits at the wrong scale under a drawing that is right — the parcel
+     *  outline no longer matches the parcel under it, with nothing in the
+     *  console. Every later size settles it here. */
+    watchSize() {
+      if (typeof ResizeObserver === "undefined" || !this.$refs.svg) return;
+      this._sizeWatcher = new ResizeObserver(() => this.setCamera());
+      this._sizeWatcher.observe(this.$refs.svg);
     },
     async buildMap() {
       if (!this.hasBackdrop || !this.plot.anchor || this._map) return;
@@ -526,7 +709,9 @@ export default {
       }
       const run = ++this._mapRun;
       try {
-        const style = await BACKDROPS[this.backdrop]();
+        const style = withOverlay(
+          await BACKDROPS[this.backdrop](), this.overlay, this.backdrop
+        );
         // The backdrop may have changed again while the style was in flight.
         if (run !== this._mapRun || !this.$refs.mapContainer || this._map) return;
         this._map = new MapLibreMap({
@@ -540,6 +725,8 @@ export default {
           preserveDrawingBuffer: true
         });
         this._map.on("load", () => this.setCamera());
+        // "idle" means every tile for this view has arrived and been drawn.
+        this._map.on("idle", () => { this.mapReady = true; });
         // A single missing icon or tile is not a broken map. Tearing the
         // backdrop down for one of those is what made it look permanently
         // unavailable; only a style that never loads counts as a failure.
@@ -548,24 +735,56 @@ export default {
       } catch (error) {
         // A missing basemap must not take the drawing down, but staying silent
         // about it would hide a broken build.
-        console.warn("Kartenhintergrund nicht verfügbar:", error);
-        if (run === this._mapRun) this.mapUnavailable = true;
+        this.mapFailed(error, run);
       }
     },
     destroyMap() {
-      if (this._map) { this._map.remove(); this._map = null; }
+      const map = this._map;
+      this._map = null;
+      // A map that never finished starting cannot always be taken apart again:
+      // MapLibre's teardown reaches for internals it never got round to
+      // creating. Unmounting a component must not fail over that.
+      try { map?.remove(); } catch { /* there is nothing left to keep */ }
+    },
+    /** Where the drawing stands, in a frame that survives a change of anchor:
+     *  the local metres are measured from the plot's own anchor, and the next
+     *  plot has a different one. */
+    rememberFrame() {
+      if (!this.plot.anchor) return;
+      this._shownFrame = {
+        centre: toWgs84([{ x: this.view.mx, y: this.view.my }], this.plot.anchor)[0],
+        scale: this.view.scale
+      };
+    },
+    /** No backdrop, and the drawing carries on without one. */
+    mapFailed(error, run) {
+      // Silence would hide a broken build; a thrown error would take the
+      // drawing down with the backdrop, and the drawing is the answer here.
+      console.warn("Kartenhintergrund nicht verfügbar:", error);
+      if (run !== undefined && run !== this._mapRun) return;
+      this.destroyMap();
+      this.mapUnavailable = true;
     },
     /** Put the camera exactly where the drawing is, so overlay and ground agree. */
     setCamera() {
       if (!this._map || !this.plot.anchor) return;
       const renderedWidth = this.$refs.svg?.getBoundingClientRect().width || this.width;
-      this._map.jumpTo(cameraFor({
-        anchor: this.plot.anchor,
-        centreMetres: { x: this.view.mx, y: this.view.my },
-        metresPerPixel: 1 / (this.view.scale * (renderedWidth / this.width)),
-        rotation: this.rotation
-      }));
-      this._map.resize();
+      try {
+        this._map.jumpTo(cameraFor({
+          anchor: this.plot.anchor,
+          centreMetres: { x: this.view.mx, y: this.view.my },
+          metresPerPixel: 1 / (this.view.scale * (renderedWidth / this.width)),
+          rotation: this.rotation
+        }));
+        this._map.resize();
+      } catch (error) {
+        // Without WebGL the constructor succeeds and the first frame does not,
+        // so this is where a backdrop that cannot run announces itself. Once it
+        // has drawn once, a failed camera is not a reason to take it away: this
+        // runs on every pan, and the next change sets the camera again.
+        if (this.mapReady) { console.warn("Karte:", error?.message || error); return; }
+        this.mapFailed(error);
+      }
     },
     /** Pixels per metre that fit a box into this frame, given the margin the
      *  chains outside the outline need. */
@@ -639,23 +858,30 @@ export default {
       this.zoomFactor = 1;
       this.panMetres = { x: 0, y: 0 };
       this.panning = null;
+      // A double click asks for this plot's own framing, held frame or not.
+      this.heldFrame = null;
     },
     /* Measuring and moving the house are what the pointer is for wherever they
        are switched on; panning only gets what is left over. */
     pointerDown(event) {
       if (this.measuring) { this.measureClick(event); return; }
+      /* A press on a parcel on offer. It cannot be a `click` handler: with
+         `navigable` the pan below captures the pointer and calls
+         preventDefault, and a prevented pointerdown produces no click at all.
+         So the press is remembered and the release decides — under a few
+         pixels it picked, beyond that it panned. */
+      const choice = event.target.closest?.(".site-plan__choice");
+      this._pressedChoice = choice
+        ? {
+            x: event.clientX,
+            y: event.clientY,
+            parcel: this.choosableParcels.find(p => p.number === choice.dataset.number)
+          }
+        : null;
       if (this.interactive && this.houseVisible && event.target.closest("[data-house]")) {
         const point = this.toMetres(event);
         this.dragging = { dx: this.building.cx - point.x, dy: this.building.cy - point.y };
         this.$refs.svg.setPointerCapture(event.pointerId);
-        event.preventDefault();
-        return;
-      }
-      if (this.picking) {
-        // Local metres back to a coordinate the cadastre can be asked with.
-        const point = this.toMetres(event);
-        const [[lon, lat]] = toWgs84([point], this.plot.anchor);
-        this.$emit("pick", { lat, lon });
         event.preventDefault();
         return;
       }
@@ -687,7 +913,15 @@ export default {
       if (!this.confineToEnvelope || !this.houseVisible) return wanted;
       return constrainToEnvelope(this.envelope, this.building, wanted);
     },
-    pointerUp() { this.dragging = null; this.panning = null; },
+    pointerUp(event) {
+      const pressed = this._pressedChoice;
+      this._pressedChoice = null;
+      this.dragging = null;
+      this.panning = null;
+      if (!pressed?.parcel) return;
+      const moved = Math.hypot(event.clientX - pressed.x, event.clientY - pressed.y);
+      if (moved <= CLICK_SLOP_PX) this.$emit("choose", pressed.parcel.id);
+    },
     /** Zoom towards the cursor: the metre under it stays where it is. */
     onWheel(event) {
       if (!this.navigable || this.measuring) return;
@@ -725,12 +959,42 @@ export default {
 </script>
 
 <style scoped>
+/* The parcels on offer. Deliberately quiet: the plot itself keeps the halo and
+   the drawn contour, and a candidate is a thin outline with its number — a
+   choice, not a finding. */
+.site-plan__choice{
+  fill: var(--w2b-map-surface); fill-opacity: .12;
+  stroke: var(--w2b-map-boundary); stroke-width: 1; stroke-opacity: .45;
+  cursor: pointer;
+  /* A chosen parcel is drawn with no fill at all, and an untouchable parcel
+     cannot be deselected — which is exactly what "taking one out again does
+     not work" was. `all` hit-tests the area whether or not it is painted. */
+  pointer-events: all;
+}
+.site-plan__choice:hover{ fill-opacity: .3; stroke-opacity: .9; }
+.site-plan__choice:focus-visible{ outline: none; stroke: var(--w2b-primary); stroke-width: 2.5; }
+.site-plan__choice.is-chosen{ fill-opacity: 0; stroke-opacity: 0; }
+/* After `is-chosen`, because a marked parcel is a chosen one: it is in the
+   plot and that is the problem. */
+.site-plan__choice.is-problem{
+  fill: var(--w2b-map-violation); fill-opacity: .22;
+  stroke: var(--w2b-map-violation); stroke-width: 2; stroke-opacity: 1;
+  stroke-dasharray: 7 4;
+}
+
+.site-plan__choice-label{
+  font-family: var(--w2b-font-mono); font-size: 11px; font-weight: 500;
+  fill: var(--w2b-map-boundary); opacity: .7;
+  paint-order: stroke fill; stroke: var(--w2b-map-halo); stroke-width: 3.4px;
+  pointer-events: none; user-select: none;
+}
+.site-plan__choice-label.is-chosen{ opacity: 1; font-weight: 700; }
+
 .site-plan-shell{ position: relative; }
 .site-plan__map{ position: absolute; inset: 0; }
 .site-plan{ display: block; width: 100%; height: auto; touch-action: none; position: relative; }
 .site-plan--dragging{ cursor: grabbing; }
 .site-plan--navigable{ cursor: grab; }
-.site-plan--picking{ cursor: crosshair; }
 .site-plan--panning{ cursor: grabbing; }
 .site-plan--measuring{ cursor: crosshair; }
 .site-plan__dimension--measuring{ fill: var(--w2b-map-violation); }

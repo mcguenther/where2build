@@ -92,17 +92,72 @@ def test_unknown_mode_is_a_422(client: TestClient):
 
 
 @respx.mock
-def test_broken_json_from_the_router_is_a_502(client: TestClient):
+def test_a_route_the_router_cannot_answer_costs_one_row(client: TestClient):
+    """Not the page: a 500 on one destination used to empty the whole table,
+    and the sentence it gave was about the service rather than about which way
+    it applied to."""
+
     respx.get(PLAN_URL).mock(return_value=httpx.Response(200, text="kein json"))
 
     answer = client.post("/api/reachability", json=REQUEST)
 
-    assert answer.status_code == 502
+    assert answer.status_code == 200
+    ergebnis = answer.json()["ergebnisse"][0]
+    assert ergebnis["destination_id"] == "arbeit"
+    assert ergebnis["erreichbar"] is False
+    assert ergebnis["duration_s"] is None
+    assert "gültiges JSON" in ergebnis["hinweis"]
     assert "Traceback" not in answer.text
 
 
 @respx.mock
-def test_slow_router_is_a_504(client: TestClient):
+def test_one_failing_destination_leaves_the_others_standing(client: TestClient):
+    def answer(request: httpx.Request) -> httpx.Response:
+        if "51.04" in str(request.url):
+            return httpx.Response(500, text="kaputt")
+        return httpx.Response(200, json=fixture_json("motis_plan_car.json"))
+
+    respx.get(PLAN_URL).mock(side_effect=answer)
+
+    body = client.post("/api/reachability", json={
+        **REQUEST,
+        "destinations": [
+            REQUEST["destinations"][0],
+            {"id": "kita", "lat": 51.3400, "lon": 12.3800, "name": "Kita"},
+        ],
+    }).json()
+
+    by_id = {row["destination_id"]: row for row in body["ergebnisse"]}
+    assert by_id["arbeit"]["erreichbar"] is False
+    assert "500" in by_id["arbeit"]["hinweis"]
+    assert by_id["kita"]["erreichbar"] is True
+    assert by_id["kita"]["duration_s"] == 4676
+
+
+@respx.mock
+def test_a_slow_router_says_so_in_the_row(client: TestClient):
     respx.get(PLAN_URL).mock(side_effect=httpx.ReadTimeout("langsam"))
 
-    assert client.post("/api/reachability", json=REQUEST).status_code == 504
+    body = client.post("/api/reachability", json=REQUEST).json()
+
+    assert body["ergebnisse"][0]["erreichbar"] is False
+    assert "rechtzeitig" in body["ergebnisse"][0]["hinweis"]
+
+
+@respx.mock
+def test_a_single_server_error_is_retried_before_it_is_believed(client: TestClient):
+    """Transitous answers 5xx now and then and the next request succeeds. One
+    retry turns that into a hiccup; a second one would only delay a real
+    outage's report."""
+
+    answers = [
+        httpx.Response(503, text="kurz weg"),
+        httpx.Response(200, json=fixture_json("motis_plan_car.json")),
+    ]
+    route = respx.get(PLAN_URL).mock(side_effect=answers)
+
+    body = client.post("/api/reachability", json=REQUEST).json()
+
+    assert route.call_count == 2
+    assert body["ergebnisse"][0]["erreichbar"] is True
+    assert body["ergebnisse"][0]["duration_s"] == 4676

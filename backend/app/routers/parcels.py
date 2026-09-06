@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from fastapi import APIRouter, Depends
 
 from ..deps import alkis_service, motis_service
@@ -11,6 +13,7 @@ from ..schemas import (
     GeocodeTreffer,
     ParcelCollection,
     ParcelResolveRequest,
+    ParcelsAroundRequest,
     parse_flurstuecksnummer,
 )
 from ..services.alkis import AlkisService, Flurstueck, expand_gemarkung_key, to_collection
@@ -27,6 +30,16 @@ SHORT_KEY_HINT = (
     "Der Gemarkungsschlüssel „{entered}“ wurde als „{full_key}“ gesucht: in "
     "Sachsen ist er sechsstellig und beginnt mit der Landesnummer 14. Die Kartenebene "
     "„Flurstück“ im Geoportal zeigt nur die letzten vier Stellen."
+)
+
+NOT_FOUND_BY_KEY = (
+    "Zu dem Flurstückskennzeichen {keys} wurde nichts gefunden. Es stammt aus der "
+    "Nachbarschaftsabfrage; bitte die Auswahl auf der Karte noch einmal treffen."
+)
+
+COMPOSED_HINT = (
+    "Das Grundstück besteht aus {count} Flurstücken. Fläche und Umriss sind ihre "
+    "Summe beziehungsweise Vereinigung — so führt das Kataster sie einzeln."
 )
 
 NOT_FOUND_BY_IDENTIFIER = (
@@ -76,14 +89,24 @@ async def resolve(
     hints: list[str] = []
     address_match: GeocodeTreffer | None = None
 
-    if payload.gemarkung and payload.flurstuecksnummern:
+    if payload.kennzeichen:
+        found = await asyncio.gather(
+            *(alkis.by_kennzeichen(key) for key in payload.kennzeichen)
+        )
+        parcels = [parcel for group in found for parcel in group]
+        missing = [key for key, group in zip(payload.kennzeichen, found) if not group]
+        if missing:
+            raise NotFoundError(NOT_FOUND_BY_KEY.format(keys=", ".join(missing)))
+        if len(payload.kennzeichen) > 1:
+            hints.append(COMPOSED_HINT.format(count=len(payload.kennzeichen)))
+    elif payload.gemarkung and payload.flurstuecksnummern:
         # A plot is a set of parcels. Each number is resolved on its own and
         # the union is left to `to_collection`, which has always built it.
         parcels = []
         for number in payload.flurstuecksnummern:
             zaehler, nenner = parse_flurstuecksnummer(number)
-            found = await alkis.by_gemarkung(payload.gemarkung, zaehler, nenner)
-            if not found:
+            numbered = await alkis.by_gemarkung(payload.gemarkung, zaehler, nenner)
+            if not numbered:
                 raise NotFoundError(
                     NOT_FOUND_BY_IDENTIFIER.format(
                         district=payload.gemarkung.strip(),
@@ -91,7 +114,7 @@ async def resolve(
                         explanation="",
                     )
                 )
-            parcels.extend(found)
+            parcels.extend(numbered)
     elif payload.gemarkung and payload.zaehler is not None:
         expanded = expand_gemarkung_key(payload.gemarkung)
         if expanded != payload.gemarkung.strip():
@@ -138,3 +161,26 @@ async def resolve(
         hinweis=" ".join(hints) or None,
         plausibility=assess(parcels, payload.expected_area_m2, address_match),
     )
+
+
+NEARBY_HINT = (
+    "Zur Auswahl: Das erste Flurstück ist das, in dem die Koordinate liegt. Eine "
+    "Adresskoordinate ist keine Flurstücksgrenze — sie sitzt auf dem Gebäude, und "
+    "ein paar Meter daneben liegt das Nachbarflurstück."
+)
+
+
+@router.post("/nearby", response_model=ParcelCollection, summary="Flurstücke in der Nähe")
+async def nearby(
+    payload: ParcelsAroundRequest,
+    alkis: AlkisService = Depends(alkis_service),
+) -> ParcelCollection:
+    """The parcels around a coordinate, for the user to choose between.
+
+    `/resolve` answers with one plot; this answers with the candidates. The
+    union in `grundstueck` is meaningless here and the caller ignores it — what
+    matters is `features`, in order of how near each parcel is to the point.
+    """
+
+    parcels = await alkis.around(payload.lat, payload.lon, payload.umkreis_m)
+    return to_collection(parcels, hinweis=NEARBY_HINT)

@@ -361,6 +361,10 @@ from the user directly. Reopen only if the user asks.
   it becomes a search constraint.
 - **Rank by walking time, never air distance.** Detour ratios reach 2.88x, and
   the nearest thing by air can be unwalkable altogether.
+- **The surroundings service ranks *within* a category, not across them.** Its
+  answer is category by category, so the panel's own order was the category
+  list's — a bus stop one minute away sat below a tram stop half an hour away.
+  `NearbyPanel.found` sorts by walking time and puts what has no walk last.
 - **Let the hard filters decide and the weights only order.** "Bestätigt" means
   plausibility raised no objection *and* exactly one candidate survives the
   filters that are official facts — a parcel key resolved against ALKIS, the
@@ -391,6 +395,51 @@ from the user directly. Reopen only if the user asks.
   one in the listing. `/api/parcels/resolve` takes `expected_area_m2` and
   answers with a `plausibility` block; MOTIS's `type: PLACE` versus `ADDRESS`
   is the sharpest of the three signals, and works even with no listing area.
+- **A geocoded house number is not the parcel that carries it.** "Lessingweg 44
+  Leipzig" geocodes to a point that lies *inside* Flurstück 205, whose
+  Lagebezeichnung is "Lessingweg 46" — 0,3 m on the wrong side of the boundary
+  of 204, which is the one actually named "Lessingweg 44". No radius and no
+  nearest-neighbour rule fixes that; the parcel's own `lagebeztxt` does, when it
+  matches exactly one candidate, and the user's click does when it does not.
+  `/api/parcels/nearby` therefore answers with all 37 parcels within 60 m and
+  the wizard draws them on the cadastral ground, each with its number.
+- **The set of parcels is the user's to assemble, and the register does the
+  arithmetic.** The picker asks `/api/parcels/resolve` with the `kennzeichen` of
+  the whole set, so the union and the summed official areas come from the same
+  code every other way in uses — no polygon union in the browser. Two clicks on
+  Lessingweg 44 and 46 give one plot of 1 299 m² with 8 boundary points, and the
+  plot page, the checks and the print sheet take it unchanged. At least one
+  parcel always stays: a plot with none is not a plot.
+- **A click has two meanings, and the common one is replacing.** Correcting the
+  parcel the coordinate landed on is what nearly every user does; assembling a
+  plot out of several is the rarer case and would otherwise happen by accident.
+  So the default click switches the plot to the parcel clicked, and a switch in
+  the map's toolbar turns on composing, where the same click adds and removes.
+- **A chosen parcel is drawn with no fill, and the drawing above it swallowed
+  the click.** The picker's polygons sat *under* the plot's own fill, so taking a
+  parcel back out never worked: the press landed on the plot, not on the parcel.
+  The group is drawn above the plot now (visually identical — the chosen ones
+  are transparent, the others do not overlap it) and carries
+  `pointer-events: all`, which hit-tests an unpainted area.
+- **A split selection is marked, not refused.** Parcels that do not touch union
+  into a MultiPolygon, which one outline cannot hold — but refusing the click
+  closes the only way back: to drop the middle parcel of three you have to pass
+  through a split plot. So the drawn outline is the piece around the parcel the
+  selection started from (`outerRing` takes `near`, else the largest part), the
+  ones outside it are drawn in red, and "Anlegen und öffnen" is disabled with the
+  reason until they are gone.
+- **The 3 m line's arc at an inward corner is the rule, not decoration.** Where
+  two parcels of unequal depth meet, the plot has a reflex vertex, and "at least
+  3 m from every boundary" means "at least 3 m from that point" — the envelope's
+  own vertices sit at r = 3,00 m from it, measured. Squaring the corner would
+  *remove* buildable land: 1,44 m² on the app's own L-shaped test case (9 − 9π/4
+  = 1,93 m² in theory), and it would pull the corner 1,24 m further in along the
+  diagonal.
+- **`metrics.streetFrontage` measured edge 0, not the street edge.** Harmless
+  on a single parcel whose ring starts at a corner, wrong the moment a plot is
+  a union: the ring then starts where the two outlines meet, and Mölkau 204+205
+  reported a 2,04 m stub as the frontage. It reads `plot.streetEdge` now — the
+  edge the rest of the app already calls the street side.
 - **Real parcels are frequently concave.** Half-plane clipping is only a correct
   inward offset for convex rings; on an L-shaped plot it returns an empty
   envelope. `buildableArea` falls back to a grid contour, biased inward so an
@@ -408,6 +457,32 @@ from the user directly. Reopen only if the user asks.
   vector tile keeps `areTilesLoaded()` false indefinitely, so anything that
   waits for `idle` before photographing a map needs a bounded fallback that
   reports the incomplete render instead of hanging the whole run.
+- **A prevented `pointerdown` produces no `click` at all.** `SitePlan` captures
+  the pointer and calls `preventDefault` so panning follows the hand, which
+  silently kills every click handler under it — the parcels the picker offers
+  looked inert. The press is remembered and the *release* decides: same spot
+  within 4 px picks, further than that panned.
+- **The picker frames the plot and a band, not every candidate.** 33 parcels
+  come back within 60 m of an address; framing all of them made each one a
+  speck and floated the labels over paper. `CHOICE_BAND_M = 18` — about one
+  plot's width — keeps the neighbour either side clickable and the drawing
+  legible.
+- **Two parcel numbers in the same spot read as a third.** "292/2" over "293/5"
+  came out as "29293/5". The labels are culled against each other — the chosen
+  parcel first, then the larger ones — so what gets dropped is the sliver at
+  the edge, not the plot in the middle.
+- **The ground's camera hangs off the drawing's *rendered* width.** The SVG is
+  640 units wide and renders at 776 CSS px inside the panel; `setCamera` divides
+  by that ratio, so a measurement taken before the layout settles — or a window
+  resize afterwards — leaves the backdrop at a different scale than the drawing,
+  and the outline stops sitting on its own parcel with nothing in the console.
+  A `ResizeObserver` on the svg re-sets the camera; measured after a resize, the
+  drawing's metres per pixel and the map's agree to nine decimal places.
+- **A MapLibre map that never finished starting cannot always be removed.**
+  Without WebGL the constructor succeeds and the first frame does not, and
+  `remove()` then throws on internals it never created — which took a component
+  down on unmount. Teardown swallows that, and `setCamera` catches too: it runs
+  on every pan, where a throw would freeze the drawing rather than the backdrop.
 - **`node scripts/screenshots.mjs` serves `frontend/dist`, not the dev server.**
   Run `npm run build` first or the pictures show the previous code.
   Its Playwright import is an absolute sandbox path (`/opt/node22/...`), so the
@@ -429,6 +504,26 @@ from the user directly. Reopen only if the user asks.
   park-and-ride is `CAR_PARKING`, which also returns bare-car itineraries, so
   the answer has to be checked for CAR-then-WALK. Both verified against
   Transitous; see § 9 of `docs/research/routing-motis.md`.
+- **One destination the router cannot answer must not cost the page.**
+  `reachability()` asked for every destination and mode in one `asyncio.gather`,
+  so a single upstream failure raised out of the whole endpoint and every other
+  row was lost with it — which is the 500 an outage produces. It gathers with
+  `return_exceptions=True` now and turns an `AppError` into a row that is not
+  reachable and carries the German sentence in `hinweis`; anything else still
+  raises, because a bug is not a routing result. The way-out sentence therefore
+  travels *in the row*, and the endpoint answers 200.
+- **A single 5xx from an upstream is worth one retry, and only one.**
+  Transitous answers 500/502 now and then under load, and the request that
+  follows 600 ms later succeeds. `upstream.py` retries once on 500, 502, 503,
+  504 and on a transport error; a second failure is believed. More attempts
+  would turn a real outage into a minute of waiting per row.
+- **A placeholder has to have the shape of what is coming.** The route
+  placeholder was a row of thin bars and what arrived was a card as tall as its
+  map, so the page jumped by that height when the answer landed. It lives in
+  `RouteCards` now, behind a `busy` prop, next to the layout it imitates — and
+  the same pulse (`.skeleton*` in `base.css`, since a scoped style reaches
+  exactly one component) serves the check list, the route cards and the two
+  routed columns of the surroundings table.
 - **A dimension chain hangs a fixed number of *pixels* outside the outline, so
   the frame it needs is a pixel margin.** Reserving it in metres needs a scale,
   which the reservation then changes, and the two chase each other — a 35 m plot
@@ -647,7 +742,137 @@ from the user directly. Reopen only if the user asks.
   zero features looks the same whether the plot is clear or the layer is
   empty. `luft/radonvorsorgegebiete` holds 107 municipalities and answers "no"
   for Leipzig but "yes" for Johanngeorgenstadt and Schneeberg — only that
-  second query turns silence into a statement.
+  second query turns silence into a statement. The same check on the other
+  designations: flood HQ100 is empty at Mölkau and names "Vereinigte Mulde" at
+  Grimma, drinking-water protection is empty at Mölkau and names a zone on the
+  Dresden Elbwiese. Every layer in `services/luis.py` has one.
+- **The flood *risk* map is not the flood *extent*.** `wasser/hochwasserrisikokarte`
+  carries affected inhabitants per municipality and cultural sites, and
+  `wasser/hochwasserrisikogebiete` layer 0 is a **polyline** of 4 637
+  watercourses — the same trap as `Kartierungsgebiet` in the noise service, and
+  an area query never hits it. The extents are `wasser/hochwassergefaehrdung`
+  layers 6 to 10, HQ20/25 through Extremhochwasser. `hochwassergefahrenkarte`,
+  without the "-gefaehrdung", answers `Token Required`.
+- **The noise layer's data and its own legend disagree at the bottom band.**
+  `returnDistinctValues` on layer 4 gives seven categories including
+  `Lden4549`; the renderer of that same layer has six, starting at
+  `Lden5054`. So the survey has measured 45 to 49 dB(A) and draws nothing for
+  it. The check text therefore reads the *data* ("below 45 dB(A)" is provable
+  inside a mapped area) and the map key shows the *drawn* bands from 50, saying
+  so. The six colours come from the renderer, not from taste.
+- **The `minScale` dpi clamp holds at every zoom, so the noise layer needs no
+  minimum zoom.** Measured on real 256 px tiles over Mölkau:
+  `dpi = min(96, floor(minScale · 0,0254 · px / bbox_m))` draws at z10 (dpi 8,
+  1:48 149, 59 kB) as well as at z18. Floor, not round — the threshold
+  excludes: at 10 km over 512 px, dpi 65 draws and 66 returns the blank
+  2 231-byte image.
+- **The ALKIS WMS has twelve layers, and its groups are not the
+  Liegenschaftskarte.** `adv_alkis_tatsaechliche_nutzung`, `…_siedlung`,
+  `…_verkehr` draw *land use* — blocks of Wohnbaufläche and Grünfläche that run
+  straight across parcel boundaries, which is what a ground called "Kataster"
+  showed until the layer list was read properly. The cadastral ground is
+  `adv_alkis_flurstuecke` (boundaries and their numbers) plus
+  `adv_alkis_gebaeude`. The capabilities list twelve layers, not the six in the
+  old note.
+- **The cadastral layers have a scale limit of their own, and it is the same
+  trap as the noise layer's `minScale`:** Flurstücke draw *below* 1:2000 and
+  answer a 2 646-byte empty PNG from 1:2000 on, buildings from 1:5000 — no
+  error, nothing in a log. A WMS derives the scale from the standard 0,28 mm
+  pixel, and `MAP_RESOLUTION` says the pixel is a different size, so the same
+  clamp works: on a z18 tile (1:2133) `MAP_RESOLUTION=85` draws and 86 comes
+  back blank, exactly where `bbox · res / (px · 0,0254)` reaches 2000. `DPI=85`
+  answers byte for byte the same; a nonsense parameter changes nothing, which
+  is how you know it is the parameter and not the extra argument.
+  `services/tiles.py` sends it only when the standard pixel would cross the
+  line, so z19 is untouched and z16 still shows the parcel fabric.
+- **There are two cadastral overlays, and they are not spellings of each
+  other.** `adv_alkis_flurstuecke` stops drawing at 1:2000 either way, and the
+  two ways round it produce different pictures. `flurstuecke` renders the tile
+  oversized and scales it back, so its outlines still draw across a district
+  (down to z15) — and its *labels* shrink with the render: measured at z18 over
+  Liebertwolkwitz, the numbers come back as unreadable smudges. That is the
+  search map's ground, where the outlines are the point. `liegenschaftskarte`
+  asks for a plain 256 px tile and moves the limit with `MAP_RESOLUTION`
+  instead, so the same z18 tile carries 101/2, 85/1, the boundary points and
+  „Wiesengasse“ legibly. That is the picker's ground, where the numbers are the
+  point — and `SitePlan.groundNamesParcels` stops drawing its own labels only
+  for that one.
+- **A tile cache keyed by the layer's *name* serves the previous
+  configuration.** `alkis` stood for the land-use layers and then for the
+  parcels, and every cached tile kept the old picture — which looks exactly like
+  a change that did not work, on the reviewer's machine as much as here. The key
+  now carries a digest of what the layer actually asks for (url, layer list,
+  kind, minimum scale), so a changed configuration simply misses.
+- **The picker's ground is the photograph with the cadastre's line work over
+  it.** `adv_alkis_flurstuecke` alone draws boundaries, parcel numbers, boundary
+  points *and street names* on transparent ground — measured over
+  Liebertwolkwitz, no second layer needed — while `adv_alkis_gebaeude` would
+  cover the roofs the photo is there to show. The overlay is drawn at 0,95: the
+  noise veil's 45 % is for areas, and a boundary at that strength is a smudge.
+- **Picking another parcel must not move the camera.** Re-centring on the new
+  outline makes the step look identical before and after the click, and puts the
+  neighbours the user was comparing somewhere else. `SitePlan.holdFrame` keeps
+  the frame across the change — in WGS84, because the local metres are measured
+  from each plot's own anchor, so the same numbers would be a different place.
+  A double click still resets to the plot's own framing.
+- **ArcGIS `query` answers "is anything within r?", never "how far".** So a
+  distance to the nearest protected area is a *band*, and it comes from a
+  binary search over a ladder of radii — three requests, not seven. Mölkau 204
+  has nothing at 300 m and one at 400 m, so the answer is "300–400 m". A single
+  figure out of that would be a measurement nobody made.
+- **The neighbours' outlines need no OpenStreetMap at all.** The simplified
+  ALKIS WFS — the one the parcels come from — carries `ave:GebaeudeBauwerk`, and
+  it was in `docs/research/geodaten-sachsen.md` § 1.1 from the first survey while
+  the feature reached for Overpass and demanded `OVERPASS_ENABLED`. Measured
+  06.09.2026 over Mölkau 204: 146 outlines in a 240 m box, with `funktion`
+  („Wohngebäude"), `lagebeztxt` and `aktualit` per object, through the proxy and
+  its disk cache. Same gap as OSM, though: **no wall height and no storeys**, so
+  § 6's 3 m floor stays the only computable depth. Overpass remains the
+  fallback — it maps garden sheds the cadastre leaves out and is the only source
+  of storeys at all.
+- **A shared class in a scoped `<style>` is styled in exactly one view.**
+  Vue's `[data-v-…]` attribute is per component, so the app's page furniture —
+  `.breadcrumb`, `.page-head`, `.page-head__sub`, `.plan-bar`, `.button-group`,
+  `.toggle`, `.plan-foot`, `.value-list`, `.missing` — was declared in
+  `PlotView.vue` and *copied* into six other views. The views that never copied
+  it rendered the same markup unstyled: the surroundings map and the location
+  record had a breadcrumb without separators, a page head whose buttons dropped
+  under the text, and raw browser buttons in the map toolbar. They now live in
+  `base.css` once; a view that wants another measure overrides the one
+  declaration it cares about. Anything a second view uses belongs there.
+- **ALKIS delivers counter-clockwise rings, and ArcGIS reads one as a *hole*.**
+  A polygon that is nothing but a hole has no area to buffer, so every
+  `distance` query on it answers `{"code": 400, "message": ""}` — an empty
+  message that says nothing about why. Measured 05.09.2026: Flurstück 263/7
+  (86 m², 5 points) failed that way on the borehole and protected-area layers at
+  *every* radius from 50 m up, and the same ring reversed returned 114
+  boreholes; Flurstück 204 (650 m²) answered either way, which is what kept it
+  hidden. `services/luis.py` orients every ring clockwise before it goes out.
+- **A template reference to a computed that does not exist crashes the view,
+  and Vue then renders nothing at all.** `WizardView` read `draftBuilding.width`
+  in the branch that says the footprint fits nowhere, and nothing ever defined
+  `draftBuilding` — so the one plot that needed the message got an empty page
+  under the header instead. A `v-if` around the branch is what let it survive:
+  it only ever ran for a parcel too small for the default footprint.
+- **A suggestion row is read left to right, so the address goes first.** The
+  category sat in the left-hand column and the hit in the right one, which made
+  every row read "Adresse … Lessingweg 44": the useful half last, and furthest
+  from where the caret is. Name first, category small and grey on the right,
+  context underneath.
+- **An absolutely positioned dropdown inside a `.panel` is clipped.** `.panel`
+  carries `overflow: hidden` to keep map canvases off its rounded corners, so
+  the search suggestions were cut after the first row. The list is in the flow
+  instead — it pushes the hint down, and no ancestor can cut it.
+  The same `overflow: hidden` eats a table that grew a column: at 390 px the
+  surroundings table was 438 px wide inside a 340 px panel, so „Strecke“ was
+  simply gone — with no scrollbar, and with the page's own `scrollWidth`
+  reporting no overflow at all. A wide table goes in the `.table-scroll`
+  wrapper `base.css` already has, and gives up its cell padding below 620 px so
+  it fits without needing one.
+- **Chromium hides a closed `<details>` through `::details-content`.** Forcing
+  `display: block` on the children is not enough for print; the pseudo-element
+  needs `content-visibility: visible`. Both spellings are in `print.css`, since
+  older builds hide the children directly.
 - **A German thousands stripper eats a coordinate.** Removing every `.` turned
   `51.189265` into `51189265`, and every Kleinanzeigen listing answered 422
   („Der Wert darf höchstens 90.0 betragen") before the search asked the
@@ -866,11 +1091,11 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 493 passed, 1 skipped (that one needs pyosmium, which only the
-  index builder wants). Six of the 493 need Tesseract and skip without it.
-- `vitest`: 469 passed — plus the integration file, excluded by `npm run test`
+- `pytest`: 524 passed, 8 skipped — one of those needs pyosmium, which only the
+  index builder wants; the other seven need Tesseract and skip without it.
+- `vitest`: 533 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
-- `scripts/screenshots.mjs`: 54 images plus a print PDF. It fails on console
+- `scripts/screenshots.mjs`: 59 images plus two print PDFs. It fails on console
   errors, on horizontal overflow, and if not a single vector tile arrived. It
   also drives the live geocoder, which is slow often enough to blow the 60 s
   wait on the destinations step — two runs failed there and the third passed

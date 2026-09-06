@@ -1,0 +1,121 @@
+{
+ "laerm": {
+  "tag": {
+   "strasse": [
+    "Lden5559",
+    "Lden5054"
+   ],
+   "strassenbahn": [],
+   "flughafen": []
+  },
+  "nacht": {
+   "strasse": [
+    "Lnight4549"
+   ],
+   "strassenbahn": [],
+   "flughafen": []
+  },
+  "kartiert_umkreis": true,
+  "umkreis_m": 2000,
+  "unterste_stufe_db": 45,
+  "quelle": "LfULG Umgebungslärmkartierung (Sachsen), Flurstücksumring",
+  "fehler": null
+ },
+ "trinkwasserschutz": {
+  "betroffen": false,
+  "gebiete": [],
+  "naechstes": null,
+  "abstand_von_m": null,
+  "abstand_bis_m": null,
+  "weitere_im_umkreis": 0,
+  "umkreis_m": null,
+  "quelle": "LfULG Wasserschutzgebiete, 4 Ebenen",
+  "fehler": null
+ },
+ "schutzgebiet": {
+  "betroffen": false,
+  "gebiete": [],
+  "naechstes": {
+   "name": "Östliche Rietzschke - Stünz",
+   "kategorie": "Landschaftsschutzgebiet"
+  },
+  "abstand_von_m": 300.0,
+  "abstand_bis_m": 400.0,
+  "weitere_im_umkreis": 1,
+  "umkreis_m": 1000,
+  "quelle": "LfULG Schutzgebiete Sachsen",
+  "fehler": null
+ },
+ "hochwasser": {
+  "betroffen": false,
+  "gebiete": [],
+  "naechstes": null,
+  "abstand_von_m": null,
+  "abstand_bis_m": null,
+  "weitere_im_umkreis": 0,
+  "umkreis_m": null,
+  "quelle": "LfULG Hochwassergefährdung (HQ20 bis Extremhochwasser)",
+  "fehler": null
+ },
+ "radon": {
+  "betroffen": false,
+  "gebiete": [],
+  "naechstes": null,
+  "abstand_von_m": null,
+  "abstand_bis_m": null,
+  "weitere_im_umkreis": 0,
+  "umkreis_m": null,
+  "quelle": "LfULG Radonvorsorgegebiete nach § 121 StrlSchG",
+  "fehler": null
+ },
+ "hangneigung": {
+  "betroffen": false,
+  "gebiete": [],
+  "naechstes": null,
+  "abstand_von_m": null,
+  "abstand_bis_m": null,
+  "weitere_im_umkreis": 0,
+  "umkreis_m": null,
+  "quelle": "LfULG Hangneigungskulisse (Düngerecht)",
+  "fehler": null
+ },
+ "baugrund": {
+  "bodenart_text": "Hortisol ueber erodierter Parabraunerde aus gemischtem Schluff ueber tiefem periglaziaerem Kies fuehrendem Lehm",
+  "luftkapazitaet_stufe": "LK_IV",
+  "bohrungen_umkreis": 96,
+  "bohrungen_naher_umkreis": 16,
+  "umkreis_m": 500,
+  "naher_umkreis_m": 300,
+  "naechste": {
+   "entfernung_m": 57.7,
+   "endteufe_m": 5.0,
+   "jahr": 1972,
+   "url": "https://www.umwelt.sachsen.de/umwelt/infosysteme/geodin/getportalpage?WEBSITE=BOGE&OBJECTID1=0000115991BRG000&LAYOUT=Grunddaten"
+  },
+  "tiefste": {
+   "entfernung_m": 434.5,
+   "endteufe_m": 75.0,
+   "jahr": 2006,
+   "url": "https://www.umwelt.sachsen.de/umwelt/infosysteme/geodin/getportalpage?WEBSITE=BOGE&OBJECTID1=0000612205BRG000&LAYOUT=Grunddaten"
+  },
+  "quelle": "LfULG BK50, Bodenkennwerte und Aufschlussdatenbank",
+  "fehler": null
+ },
+ "luftqualitaet": {
+  "station": "Leipzig-Mitte",
+  "entfernung_km": 4.6,
+  "werte": {
+   "no2": 10.0,
+   "pm10": 7.5,
+   "pm25": 3.1,
+   "o3": 52.7
+  },
+  "stunden": 48,
+  "stand": "2026-09-05 17:00:00",
+  "uebersprungen": 3,
+  "quelle": "Umweltbundesamt, Luftdaten-API v3 (Stundenmittel)",
+  "fehler": null
+ },
+ "abgerufen_am": "2026-09-05T18:21:56.288708Z",
+ "hinweis": "Die Prüfungen sind eine Recherche, keine behördliche Auskunft. Sie ersetzen weder eine Bauvoranfrage noch ein Baugrundgutachten; maßgeblich sind die Auskünfte der zuständigen Behörden."
+}

@@ -223,6 +223,74 @@ class OverpassSettings(BaseSettings):
     building_origin_margin_m: int = 25
 
 
+class LuisSettings(BaseSettings):
+    """Saxon environmental data (env prefix ``LUIS_``).
+
+    One open ArcGIS REST server carries noise, water, nature, soil, geology and
+    radon for the whole state. It is a different host from the cadastre: maps
+    and parcels live on ``geodienste.sachsen.de``, the environmental record on
+    this one, and guessing a name on the wrong host answers 403 in a way that
+    reads like a block.
+
+    Facts are asked with ``/<layer>/query`` and the parcel outline, never with
+    ``identify`` -- that measures its tolerance in *pixels*, so at a plausible
+    extent 3 px was about 7 m and the service reported a neighbouring polygon
+    as a hit.
+    """
+
+    model_config = SettingsConfigDict(env_prefix="LUIS_", env_file=_ENV_FILE, extra="ignore")
+
+    base_url: str = "https://luis.sachsen.de/arcgis/rest/services"
+    # Native spatial reference of these services; the parcel ring goes out in it.
+    srid: int = 25833
+    # A designation changes when a Rechtsverordnung does, which is rare.
+    cache_ttl_s: int = 30 * 24 * 3600
+    timeout_s: float = 45.0
+    # How far to look for a mapped noise polygon before "no value" may be read
+    # as "quiet". Environmental noise mapping covers agglomerations and major
+    # routes only: a village gets no polygon at all, and that is not silence.
+    noise_coverage_radius_m: int = 2000
+    # Widest ring the nearest protected area is looked for in. Beyond a
+    # kilometre the answer stops being about this plot.
+    protection_radius_m: int = 1000
+    # Boreholes: the wider ring is the count, the narrower one the neighbourhood.
+    borehole_radius_m: int = 500
+    borehole_near_radius_m: int = 300
+    # A single answer may not carry more features than this. Only counts and
+    # names are read, so the cap protects the request, not the meaning.
+    max_features: int = 200
+
+
+class AirQualitySettings(BaseSettings):
+    """UBA air data (env prefix ``AIRQUALITY_``).
+
+    Nationwide, no key. The documented path on ``umweltbundesamt.de`` is a 301
+    to this host, and spells ``air-data`` rather than ``air_data`` -- following
+    neither is how the API comes to look dead.
+    """
+
+    model_config = SettingsConfigDict(
+        env_prefix="AIRQUALITY_", env_file=_ENV_FILE, extra="ignore"
+    )
+
+    base_url: str = "https://luftdaten.umweltbundesamt.de/api/air-data/v3"
+    # A station is built about as often as a road is; the list is 550 kB.
+    stations_cache_ttl_s: int = 7 * 24 * 3600
+    # Measurements arrive hourly, so a shorter life -- but not per request.
+    measures_cache_ttl_s: int = 3 * 3600
+    # How many of the nearest stations to try. The list mixes in research and
+    # historic sites whose "active to" is empty and which answer nothing at
+    # all: around Moelkau the three nearest (1,9-3,0 km) are silent and
+    # Leipzig-Mitte at 4,6 km is the one with values.
+    max_stations: int = 8
+    # Past this a station describes another place, not this plot's air.
+    max_distance_km: float = 25.0
+    # Hours averaged. Two days smooths a single calm night without turning
+    # into a monthly mean.
+    hours: int = 48
+    timeout_s: float = 30.0
+
+
 class TilesSettings(BaseSettings):
     """WMS raster proxy (env prefix ``TILES_``).
 
@@ -238,7 +306,27 @@ class TilesSettings(BaseSettings):
     webatlas_url: str = "https://geodienste.sachsen.de/wms_geosn_webatlas-sn/guest"
     webatlas_layers: str = "Vegetation,Siedlung,Gewaesser,Verkehr,Administrative_Einheiten,Beschriftung"
     alkis_url: str = "https://geodienste.sachsen.de/wms_geosn_alkis-adv/guest"
-    alkis_layers: str = "adv_alkis_tatsaechliche_nutzung,adv_alkis_verkehr,adv_alkis_siedlung"
+    # The parcels themselves, with the buildings for orientation. The land-use
+    # layers (`tatsaechliche_nutzung`, `verkehr`, `siedlung`) draw areas that
+    # cut straight across parcel boundaries, which is the opposite of what a
+    # ground called "Kataster" is for.
+    alkis_layers: str = "adv_alkis_flurstuecke,adv_alkis_gebaeude"
+    # And the parcels stop being drawn at 1:2000 -- an empty image, no error.
+    # A WMS derives the scale of a request from the standard 0,28 mm pixel, and
+    # MAP_RESOLUTION is how a caller says the pixel is a different size, so the
+    # threshold can be steered. Measured on a z18 tile over Liebertwolkwitz on
+    # 05.09.2026: without it the tile is blank, MAP_RESOLUTION=85 draws, 86 is
+    # blank again -- exactly where the scale reaches 1:2000.
+    alkis_min_scale: float = 2000.0
+    # The Liegenschaftskarte itself, for laying over an orthophoto at plot
+    # scale: boundaries, parcel numbers in the register's stacked notation,
+    # boundary points and street names, all as line work on transparent ground.
+    # Measured over Liebertwolkwitz -- the street names ride along with the
+    # parcels, no second layer needed. It is a different picture from the one
+    # below, not a spelling of it: the oversampled render draws its labels at
+    # the enlarged size and they come back a fifth of their height, so at plot
+    # scale that ground has outlines and no numbers.
+    cadastral_map_layers: str = "adv_alkis_flurstuecke"
     # Parcel outlines for laying over an orthophoto. „Gelb“ is the service's own
     # overlay style -- contours, no fills. The layer carries
     # MaxScaleDenominator 2000 and answers 200 with an empty PNG above it, so
@@ -256,6 +344,20 @@ class TilesSettings(BaseSettings):
     parcel_min_zoom: int = 15
     # Roads and their names, transparent at every zoom measured (13 to 19).
     street_layers: str = "Verkehr,Beschriftung"
+    # The noise survey is not a WMS tile source: its service offers EPSG:4326
+    # and 25833 but not 3857, so MapLibre's {bbox-epsg-3857} raster source gets
+    # nothing at all. The ArcGIS ``export`` endpoint reprojects server-side.
+    noise_url: str = (
+        "https://luis.sachsen.de/arcgis/rest/services/laerm/laermkartierung/MapServer/export"
+    )
+    noise_layers: str = "show:4"
+    noise_night_layers: str = "show:5"
+    # Both noise layers carry ``minScale: 50000`` and draw an empty image --
+    # not an error -- above it. ArcGIS derives the scale from the request as
+    # (bbox_width_m / image_width_px) * dpi / 0.0254, so the dpi is what keeps
+    # the layer under the threshold. Measured: at 10 km and 512 px, dpi 65 gives
+    # 1:49 982 and draws, dpi 66 gives 1:50 750 and returns a blank PNG.
+    noise_min_scale: float = 50000.0
     # XYZ tiles are Web Mercator. Should a service reject EPSG:3857, EPSG:4326
     # also works -- the axis order is handled per CRS.
     crs: str = "EPSG:3857"
@@ -327,6 +429,8 @@ class Settings(BaseSettings):
     alkis: AlkisSettings = Field(default_factory=AlkisSettings)
     addresses: AddressSettings = Field(default_factory=AddressSettings)
     boris: BorisSettings = Field(default_factory=BorisSettings)
+    luis: LuisSettings = Field(default_factory=LuisSettings)
+    air_quality: AirQualitySettings = Field(default_factory=AirQualitySettings)
     motis: MotisSettings = Field(default_factory=MotisSettings)
     nearby: NearbySettings = Field(default_factory=NearbySettings)
     overpass: OverpassSettings = Field(default_factory=OverpassSettings)

@@ -112,8 +112,7 @@ export default {
 </script>
 
 <style scoped>
-.page-head{ display: flex; align-items: flex-end; gap: var(--w2b-space-4); flex-wrap: wrap; }
-.page-head__sub{ margin-top: var(--w2b-space-2); color: var(--w2b-graphite); max-width: 62ch; font-size: var(--w2b-text-s); }
+.page-head__sub{ max-width: 62ch; }
 .compare-toggle[aria-pressed="true"]{ background: var(--w2b-primary); color: var(--w2b-primary-on); }
 .compare-toggle[aria-pressed="true"]:hover:not(:disabled){ background: var(--w2b-primary-light); }
 .selection-bar{ display: flex; align-items: center; gap: var(--w2b-space-3); flex-wrap: wrap; padding: var(--w2b-space-3) var(--w2b-space-4); }
