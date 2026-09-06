@@ -777,6 +777,42 @@ from the user directly. Reopen only if the user asks.
   logic. The button's click carries `.prevent` so a real browser does not submit
   twice, and the two paths — `trigger("click")` on the button, `trigger("submit")`
   on the form — are tested separately.
+- **The listing states its Bundesland, and that is the cheapest hard filter
+  there is.** Kleinanzeigen's location field is „PLZ Bundesland – Ort" on all
+  six recorded adverts. ALKIS is state-specific, so a plot in Sachsen-Anhalt has
+  no Saxon Flurstück — and its village usually *does* have a Saxon namesake:
+  „600 m² in Brehna" (advert 3381469778) resolved to Flurstück 50 in Gemarkung
+  Roitzsch near Wurzen, 100 km away and exactly 600 m². Eleven requests spent on
+  an answer no request could have got right. Read the state first, before
+  anything is asked: „Sachsen-Anhalt" contains „Sachsen", so match whole words
+  and longest first. Out of *prose* the same name may only **explain** a run
+  that already found nothing — „gute Anbindung nach Sachsen-Anhalt" is a
+  sentence about a Saxon plot.
+- **A bare „in" before a place is the same trap as „Anbindung an".**
+  „weiterführende Schulen in Roitzsch oder Bitterfeld sind in 10 bis 15
+  Autominuten" put the plot in Roitzsch. An amenity is somewhere to go, never
+  where the thing is; the guard is the noun in front of the preposition, the
+  way `an` has been guarded since Leipzig.
+- **A choice that changes nothing is worse than no choice.** The conflict block
+  offered „Brehna" — a name in no Saxon Gemarkung, so it contributed no anchor
+  and picking it re-ran the search to the same answer, which reads as a button
+  that does not work. An option has to be something the cadastre can be asked
+  about; the Indiz stays in the Verlauf, struck through, with the reason.
+- **Two reasons for one outcome contradict each other.** `verdictSentence` said
+  „die Angaben reichen nicht aus, um die Lage einzugrenzen" directly above the
+  run explaining that the details are complete and point at another state. A
+  template may only supply a reason when the run supplied none.
+- **A longer camera flight alone is not a calmer camera.** The flight is capped
+  at `queueStep * 1.6`, so doubling `FLIGHT_MS` without doubling `BUDGET_MS` and
+  `MIN_DWELL_MS` just interrupts the same movement more often. All three move
+  together; sixteen clues now play over twelve seconds instead of six — and the
+  screenshot script's wait after the verdict has to outlast the budget, or it
+  photographs a map still in flight.
+- **`page.fill` with 171 kB of markup takes ~27 s** — Playwright inserts it
+  through the input pipeline — which sits just under the 30 s default and fails
+  whenever the machine is busy. Measured identical before and after the change
+  that appeared to break it. Dispatch a `paste` with a `DataTransfer` instead:
+  instant, and it is the action the product is actually built around.
 
 ## Commands
 
@@ -830,18 +866,20 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 486 passed, 1 skipped (that one needs pyosmium, which only the
-  index builder wants). Six of the 486 need Tesseract and skip without it.
-- `vitest`: 468 passed — plus the integration file, excluded by `npm run test`
+- `pytest`: 493 passed, 1 skipped (that one needs pyosmium, which only the
+  index builder wants). Six of the 493 need Tesseract and skip without it.
+- `vitest`: 469 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
-- `scripts/screenshots.mjs`: 50 images plus a print PDF. It fails on console
+- `scripts/screenshots.mjs`: 51 images plus a print PDF. It fails on console
   errors, on horizontal overflow, and if not a single vector tile arrived. It
   also drives the live geocoder, which is slow often enough to blow the 60 s
   wait on the destinations step — two runs failed there and the third passed
   with nothing changed. Re-run once before going looking for the bug.
-  The two `suche-*` images run a **real** search against ALKIS, so they need a
+  The three `suche-*` images run a **real** search against ALKIS, so they need a
   backend on :8000 like every other picture here; without one the step reports
   "die Suche kam zu keinem Ergebnis" rather than passing quietly. The three
   `assistent-werte-*` images paste a saved advert
   (`backend/tests/fixtures/inserat-kleinanzeigen.html`) through
-  `/api/listings/extract`, which needs the same backend and no LLM key.
+  `/api/listings/extract`, which needs the same backend and no LLM key, and
+  then open the „Gelesene Werte" fold inside the search step — that list is no
+  longer a step of its own.

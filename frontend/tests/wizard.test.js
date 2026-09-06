@@ -414,7 +414,11 @@ describe("Aufnahme — beide Textwege enden im selben Schritt", () => {
     mountWithRouter(WizardView, { path: "/aufnahme/quelle", props: { stage: "quelle" } });
 
   const answer = {
-    felder: { grundstuecksflaeche_m2: { wert: 1300, quelle_url: null } },
+    felder: {
+      grundstuecksflaeche_m2: { wert: 1300, quelle_url: null },
+      kaufpreis_eur: { wert: 125000, quelle_url: null },
+      adresse: { wert: "Sachsen - Rötha", quelle_url: null }
+    },
     beschreibung: "Baugrundstück im Ortsteil Oelzschau, zugehörig zur Stadt Rötha.",
     bilder: []
   };
@@ -430,10 +434,30 @@ describe("Aufnahme — beide Textwege enden im selben Schritt", () => {
     await flushPromises();
 
     expect(readPage).toHaveBeenCalledWith(answer.beschreibung);
-    // Nicht mehr an der Suche vorbei: erst steht da, was gelesen wurde.
-    expect(w.vm.searchQuery).toBeNull();
+    // Durch denselben Leser wie eine eingefügte Seite — und weiter, ohne
+    // Zwischenschritt: die gelesenen Werte fahren zusammengeklappt mit.
     expect(w.vm.readFields.map(f => f.key)).toContain("grundstuecksflaeche_m2");
     expect(w.vm.description).toContain("Oelzschau");
-    expect(w.vm.returnStage).toBe("werte");
+    expect(w.vm.searchQuery).not.toBeNull();
+    expect(w.vm.returnStage).toBe("suche");
+  });
+
+  it("führt bei der Fläche die Einheit mit, ohne sie in das Feld zu schreiben", async () => {
+    readPage.mockResolvedValue(answer);
+
+    const w = atSource();
+    await w.find('input[value="text"]').setValue();
+    await flushPromises();
+    await typeInto(w.find("#q-text"), answer.beschreibung);
+    await w.find("form").trigger("submit");
+    await flushPromises();
+
+    const area = w.vm.readFields.find(f => f.key === "grundstuecksflaeche_m2");
+    expect(area.unit).toBe("m²");
+    // Nicht im Wert: das ist die Zahl, die ans Kataster geht.
+    expect(String(area.value)).not.toContain("m²");
+    expect(w.vm.readFields.find(f => f.key === "kaufpreis_eur").unit).toBe("€");
+    // A name is not a unit: only the fields that have one carry one.
+    expect(w.vm.readFields.find(f => f.key === "adresse").unit).toBe("");
   });
 });

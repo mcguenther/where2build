@@ -132,6 +132,26 @@ async function mapSettled(page, what) {
   }
 }
 
+/** Put a whole page into a field the way a person does — with one paste.
+ *
+ *  Not `page.fill`: Playwright inserts the text through the input pipeline, and
+ *  171 kB of markup takes ~27 s of it, which sits right under the default
+ *  timeout and fails whenever the machine is busy. A paste is also the truer
+ *  action — it is the one the product is built around, `text/html` and all, so
+ *  this exercises `takePaste` instead of going round it. */
+async function pasteInto(page, selector, text) {
+  await page.waitForSelector(selector, { state: "visible" });
+  await page.$eval(selector, (el, value) => {
+    const data = new DataTransfer();
+    data.setData("text/plain", value);
+    data.setData("text/html", value);
+    el.focus();
+    el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+    el.value = value;
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  }, text);
+}
+
 async function shot(page, name, mode, zusatz = "") {
   await page.waitForTimeout(340);
   // A layout that pushes the page sideways is a defect, and no screenshot shows it.
@@ -168,11 +188,10 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
      register — so it runs here even without an LLM key. */
   await page.getByText("Text durchsuchen").click();
   await page.fill("#q-text", LISTING);
-  // Typed prose goes through the same reader as a pasted page and lands on the
-  // same step, so the search starts from there rather than from the first one.
+  // Typed prose goes through the same reader as a pasted page, and straight on
+  // into the search: what was read rides along folded shut inside that step.
   await page.getByRole("button", { name: "Lesen" }).click();
-  await page.waitForSelector(".suggestions", { timeout: 30000 });
-  await page.getByRole("button", { name: "Flurstück suchen" }).click();
+  await page.waitForSelector(".suche", { timeout: 30000 });
   await page.waitForTimeout(1500);
   await shot(page, "suche-laeuft", mode, narrow ? "-schmal" : "");
   /* Mid-run, once the districts are drawn but before a parcel is named: this
@@ -182,23 +201,28 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
   await shot(page, "suche-indizien", mode, narrow ? "-schmal" : "");
   try {
     await page.waitForSelector(".suche__urteil--bestaetigt, .suche__urteil--mehrdeutig, .suche__urteil--erfolglos", { timeout: 90000 });
-    // Let the queue play the run out; it spends a fixed budget over the backlog.
-    await page.waitForTimeout(8000);
+    // Let the queue play the run out; it spends a fixed budget over the
+    // backlog, and the picture is of a settled map — so this has to outlast
+    // BUDGET_MS plus the last flight, not merely the verdict.
+    await page.waitForTimeout(15000);
   } catch {
     problems.push(`${mode}/${width}: die Suche kam zu keinem Ergebnis`);
   }
   await shot(page, "suche-ergebnis", mode, narrow ? "-schmal" : "");
 
-  /* The pasted page, and the step that shows what was read off it. This is the
-     way in for a portal that refuses a server-side fetch, and it needs no model
-     either: price, area, coordinate and pictures come out of the markup. */
+  /* The pasted page, and what was read off it. This is the way in for a portal
+     that refuses a server-side fetch, and it needs no model either: price,
+     area, coordinate and pictures come out of the markup. The list is folded
+     away inside the search now, so the picture is of it opened. */
   await page.click(".breadcrumb a");
   await page.click(".page-head .btn");
   await page.getByText("Seite einfügen", { exact: true }).click();
-  await page.fill("#q-paste", PASTED_PAGE);
+  await pasteInto(page, "#q-paste", PASTED_PAGE);
   await page.getByRole("button", { name: "Lesen" }).click();
   try {
-    await page.waitForSelector(".suggestions", { timeout: 30000 });
+    await page.waitForSelector("details.gelesen", { timeout: 30000 });
+    await page.click("details.gelesen > summary");
+    await page.waitForSelector(".suggestions", { timeout: 5000 });
   } catch {
     problems.push(`${mode}/${width}: die eingefügte Seite wurde nicht gelesen`);
   }

@@ -65,7 +65,9 @@ from .indicia import (
     AreaStatement,
     collect_indicia,
     describes_part_area,
+    federal_state,
     normalise_parcel_number,
+    outside_saxony,
     read_area,
 )
 from .ladder import Rung, confirmation_rung, tolerance_ladder
@@ -176,6 +178,8 @@ class SearchEngine:
         self._street: str | None = None
         # The sentence saying the plot is a piece of a bigger parcel, if any.
         self._part_area: str | None = None
+        # The federal state the listing names, when it is not Saxony.
+        self._outside: str | None = None
         # District outlines already fetched, by key. Drawn once for the map and
         # reused for the wash under a confirmed parcel.
         self._district_outlines: dict[str, KatasterBezirk] = {}
@@ -231,6 +235,34 @@ class SearchEngine:
             if indiz.id in self.payload.verworfen:
                 indiz.verworfen = True
                 indiz.verworfen_grund = "Von Hand abgewählt."
+
+        # A place the cadastre has never heard of cannot be searched, and
+        # offering it as a choice was worse than not offering it: picking
+        # „Brehna“ re-ran the search with the same anchors and produced the
+        # same answer, which reads as a button that does nothing. It is said
+        # once, in the protocol, with the reason.
+        if self.directory:
+            for indiz in self.state.indicia:
+                if (
+                    indiz.art == "gemarkung"
+                    and not indiz.verworfen
+                    and indiz.beziehung in _ANCHORING
+                    and not self._district_entries(indiz)
+                ):
+                    indiz.verworfen = True
+                    indiz.verworfen_grund = (
+                        "Steht nicht im sächsischen Gemarkungsverzeichnis — "
+                        "als Gemarkung nicht durchsuchbar."
+                    )
+
+        # The one statement in a listing this tool can be certain it cannot
+        # serve, and it costs nothing: the platform's location field names the
+        # Bundesland. ALKIS is state-specific, so a plot in Sachsen-Anhalt has
+        # no Saxon Flurstück — while the village it names very often has a
+        # Saxon namesake holding a parcel of exactly the stated size. Searching
+        # anyway does not fail, it answers, and the answer is a real parcel a
+        # hundred kilometres away.
+        self._outside = outside_saxony(self.payload.adresse)
 
         area_indiz = next((i for i in self.active("flaeche")), None)
         if area_indiz is not None:
@@ -397,8 +429,11 @@ class SearchEngine:
                 # text says the plot is *away from* is evidence against itself,
                 # and one it merely contains is not a reading at all -- putting
                 # either up as an option would ask about something that was
-                # never going to be searched.
-                if art != "gemarkung" or indiz.beziehung in _ANCHORING
+                # never going to be searched. Nor is a name the cadastre does
+                # not know: „Brehna“ is not a Saxon Gemarkung, so choosing it
+                # re-ran the search with the same anchors and the same answer.
+                if art != "gemarkung"
+                or (indiz.beziehung in _ANCHORING and self._district_entries(indiz))
             ]
             values = {self._conflict_key(indiz) for indiz in usable}
             if len(values) < 2:
@@ -743,7 +778,10 @@ class SearchEngine:
         of them, which is the same budget the space step always had.
         """
 
-        anchors = self.anchors()
+        # Nothing to frame outside Saxony: the districts an anchor would name
+        # there are namesakes, and drawing one puts the map on a village the
+        # plot has nothing to do with.
+        anchors = [] if self._outside else self.anchors()
         if not anchors or self.state.areas:
             return
         self.state.areas = await self._outlines(anchors[:MAX_DRAWN_AREAS], [])
@@ -1243,9 +1281,73 @@ class SearchEngine:
             async for event in self.by_number_alone():
                 yield event
 
+    def _outside_note(self) -> str | None:
+        """What to say about a listing that places itself outside Saxony.
+
+        Not „die Angaben reichen nicht aus" — nothing the seller could add
+        would help, and asking for more sends someone looking for a mistake
+        that is not there. The reason is stated instead, together with what was
+        deliberately *not* done.
+        """
+
+        if not self._outside:
+            return None
+        return (
+            f"Das Standortfeld der Anzeige nennt {self._outside}. Dieses Werkzeug fragt "
+            "das sächsische Liegenschaftskataster (ALKIS) ab und kann außerhalb Sachsens "
+            "kein Flurstück nennen. Gleichnamige Orte in Sachsen wurden bewusst nicht "
+            "durchsucht: sie ergäben ein echtes, aber fremdes Flurstück."
+        )
+
+    def _foreign_state_note(self) -> str | None:
+        """Why an empty run was empty, when the prose named another state.
+
+        The location field is the platform's own statement about where the
+        object is, and a state named there stops the run outright. Prose is not
+        that: „40 Minuten bis Sachsen-Anhalt" is a sentence about a Saxon plot,
+        so a state read out of the body may never stop anything.
+
+        It may still *explain*. When the run found no anchor at all — no place
+        in the text is a Saxon Gemarkung — and the text names another state,
+        that is the reason, and „für eine Eingrenzung fehlt eine Ortsangabe"
+        is not: the location is stated plainly, it is simply not here.
+        """
+
+        if self._outside or self.state.candidates or self.anchors():
+            return None
+        state = federal_state(" ".join(p for p in (self.payload.titel, self.payload.text) if p))
+        if state in (None, "Sachsen"):
+            return None
+        return (
+            f"Der Anzeigentext nennt {state}, und keine der genannten Ortsangaben ist eine "
+            "sächsische Gemarkung. Dieses Werkzeug fragt allein das sächsische "
+            "Liegenschaftskataster (ALKIS) ab."
+        )
+
     async def run(self) -> AsyncIterator[SuchEreignis]:
         async for event in self.harvest():
             yield event
+
+        # Outside Saxony there is nothing to ask the cadastre. Every request
+        # from here on would be answered — by parcels belonging to somebody
+        # else — so the run stops with the clues it read and says why.
+        if self._outside:
+            yield SuchEreignis(
+                art="phase",
+                phase="raum",
+                text=f"Das Grundstück liegt in {self._outside}, außerhalb des sächsischen Katasters",
+            )
+            self.state.status = "erfolglos"
+            yield SuchEreignis(
+                art="ergebnis",
+                status="erfolglos",
+                kandidaten=[],
+                anzahl=0,
+                text=self._outside_note(),
+                gebiete=self.state.areas or None,
+                anfragen=self.state.requests,
+            )
+            return
 
         async for event in self.narrow():
             yield event
@@ -1279,9 +1381,13 @@ class SearchEngine:
         self.state.status = self.verdict()
         objection = self.cross_check() or self._set_note()
         huelle = common_envelope(self.state.candidates, district_outline=self.state.outline)
-        question = next_question(self.state.candidates, huelle)
+        foreign = self._foreign_state_note()
+        # „Gemarkung und Flurstücksnummer stehen im Kaufvertrag“ is advice for a
+        # listing this tool could serve. Asking for more input when the input is
+        # complete and points to another state is the wrong question.
+        question = None if foreign else next_question(self.state.candidates, huelle)
         hint = " ".join(
-            p for p in (self._part_area_note(), objection, self.state.hint, question) if p
+            p for p in (self._part_area_note(), objection, foreign, self.state.hint, question) if p
         ) or None
 
         yield SuchEreignis(

@@ -22,7 +22,9 @@ from app.search.indicia import (
     AreaStatement,
     collect_indicia,
     describes_part_area,
+    federal_state,
     normalise_parcel_number,
+    outside_saxony,
     read_area,
 )
 from app.search.ladder import tolerance_ladder
@@ -59,6 +61,11 @@ DIRECTORY = GemarkungDirectory(
         # A common German noun that is also a real Gemarkung. The Machern
         # advert contains it in „geprägt von Wiesen und Feldern".
         GemarkungEntry("Wiesen", "148950", "Stadt Wildenfels"),
+        # Three Saxon Roitzsch, none of them the one near Bitterfeld the Brehna
+        # advert names — 148654 holds a parcel of exactly its stated 600 m².
+        GemarkungEntry("Roitzsch", "143027", "Stadt Dresden"),
+        GemarkungEntry("Roitzsch", "146088", "Stadt Lommatzsch"),
+        GemarkungEntry("Roitzsch", "148654", "Stadt Wurzen"),
     ],
     stand="2026-09-05",
 )
@@ -1095,3 +1102,179 @@ def test_the_borna_advert_answers_with_the_parcel_it_is_cut_from(client: TestCli
     assert "herausgemessen" in final["text"]
     # And the area mismatch is not reported as an objection — it is the point.
     assert "bitte die Flurstücksnummer prüfen" not in final["text"]
+
+
+# --------------------------------------------------------------------------
+# An advert outside Saxony — the sixth, and the one where finding something
+# was the failure
+# --------------------------------------------------------------------------
+
+
+def test_the_location_field_names_the_federal_state():
+    """All six recorded adverts carry it, and „Sachsen-Anhalt“ is not „Sachsen“."""
+
+    assert federal_state("Sachsen-Anhalt - Brehna") == "Sachsen-Anhalt"
+    assert federal_state("04668 Sachsen – Grimma") == "Sachsen"
+    # A street with the state's name in it is not a statement about the state.
+    assert federal_state("Am Sachsenplatz 3") is None
+    assert federal_state(None) is None
+
+
+def test_only_a_state_actually_named_stops_a_run():
+    assert outside_saxony("Sachsen-Anhalt - Brehna") == "Sachsen-Anhalt"
+    assert outside_saxony("Sachsen - Borna") is None
+    # Absence is not evidence: a listing that names no state is searched.
+    assert outside_saxony("04103 Leipzig") is None
+    assert outside_saxony(None) is None
+
+
+def test_an_amenity_is_somewhere_to_go_not_where_the_plot_is():
+    """„weiterführende Schulen in Roitzsch“ — the schools are there, not the plot.
+
+    Roitzsch is a real Gemarkung near Wurzen, ~100 km from the Brehna advert
+    that sentence comes from, and it holds a parcel of exactly the stated
+    600 m². Read as a location it produced that parcel as the answer.
+    """
+
+    indicia = _indicia_of("3381469778")
+    roitzsch = [i for i in indicia if i.art == "gemarkung" and i.wert == "Roitzsch"]
+
+    assert roitzsch and roitzsch[0].beziehung == "erwaehnt"
+
+
+@respx.mock
+def test_a_place_the_cadastre_does_not_know_is_not_offered_as_a_choice(
+    client: TestClient,
+):
+    """Picking „Brehna“ re-ran the search with the same anchors and the same answer.
+
+    A question whose answer changes nothing is worse than no question: it reads
+    as a button that does not work.
+    """
+
+    listing = LISTINGS["3381469778"]
+    respx.post(ALKIS_URL).mock(side_effect=_cadastre({}, {}))
+
+    events = _stream(
+        client,
+        {
+            "titel": listing["titel"],
+            "text": listing["beschreibung"],
+            "adresse": listing["ort"],
+            "flaeche_text": listing["angaben"]["Grundstücksfläche"],
+        },
+    )
+
+    brehna = next(
+        e["indiz"] for e in events
+        if e["art"] == "indiz" and e["indiz"]["art"] == "gemarkung" and e["indiz"]["wert"] == "Brehna"
+    )
+    assert brehna["verworfen"] is True
+    assert "Gemarkungsverzeichnis" in brehna["verworfen_grund"]
+    assert not [e for e in events if e["art"] == "konflikt"]
+
+
+@respx.mock
+def test_an_advert_outside_saxony_is_answered_without_asking_the_cadastre(
+    client: TestClient,
+):
+    """Advert 3381469778 — 600 m² in Brehna, Sachsen-Anhalt.
+
+    Before: eleven requests and Flurstück 50 in Gemarkung Roitzsch near Wurzen,
+    a real parcel a hundred kilometres away that happens to measure 600 m².
+    ALKIS is state-specific, so no request could have produced a right answer —
+    and the listing says which state it is in.
+    """
+
+    listing = LISTINGS["3381469778"]
+    route = respx.post(ALKIS_URL).mock(side_effect=_cadastre({}, {}))
+
+    events = _stream(
+        client,
+        {
+            "titel": listing["titel"],
+            "text": listing["beschreibung"],
+            "adresse": listing["ort"],
+            "flaeche_m2": 600.0,
+            "flaeche_text": listing["angaben"]["Grundstücksfläche"],
+            "lat": listing["lat"],
+            "lon": listing["lon"],
+        },
+    )
+
+    final = events[-1]
+    assert final["status"] == "erfolglos"
+    assert final["anzahl"] == 0
+    assert "Sachsen-Anhalt" in final["text"]
+    # Not „die Angaben reichen nicht aus“: nothing the seller could add helps.
+    assert "reichen nicht aus" not in final["text"]
+    # And the cadastre was never asked — every answer it could give is somebody
+    # else's parcel.
+    assert route.call_count == 0
+    assert final["anfragen"] == 0
+
+
+@respx.mock
+def test_prose_naming_another_state_explains_an_empty_run(client: TestClient):
+    """The text path has no location field, and the prose still says where it is.
+
+    A state read out of the body may never *stop* a run — „40 Minuten bis
+    Sachsen-Anhalt" is a sentence about a Saxon plot. It may explain one that
+    found nothing, and then „für eine Eingrenzung fehlt eine Ortsangabe" is the
+    wrong thing to say: the location is stated plainly, it is simply not here.
+    """
+
+    listing = LISTINGS["3381469778"]
+    respx.post(ALKIS_URL).mock(side_effect=_cadastre({}, {}))
+
+    events = _stream(
+        client,
+        {
+            "titel": listing["titel"],
+            "text": listing["beschreibung"],
+            "flaeche_m2": 600.0,
+            "flaeche_text": listing["angaben"]["Grundstücksfläche"],
+        },
+    )
+
+    final = events[-1]
+    assert final["status"] == "erfolglos"
+    assert "Sachsen-Anhalt" in final["text"]
+    assert "Kaufvertrag" not in final["text"]
+
+
+@respx.mock
+def test_a_saxon_listing_that_merely_mentions_another_state_is_still_searched(
+    client: TestClient,
+):
+    """The guard above must not fire on a plot that is here.
+
+    „Anbindung an Sachsen-Anhalt" is a sentence about how well connected a
+    Saxon plot is — the same trap „Anbindung an Leipzig" already taught.
+    """
+
+    respx.post(ALKIS_URL).mock(
+        side_effect=_cadastre(
+            counts={"144241+502": 1, "144241": 1131},
+            features={"144241+502": "alkis_grossbothen_790_11.gml",
+                      "KatasterBezirk": "alkis_katasterbezirk_grossbothen.gml"},
+        )
+    )
+
+    events = _stream(
+        client,
+        {
+            "titel": "Baugrundstück in Großbothen",
+            "text": (
+                "Das Grundstück liegt in Großbothen und ist 502 m² groß. "
+                "Gute Anbindung nach Sachsen-Anhalt und Thüringen."
+            ),
+            "adresse": "Sachsen - Grimma",
+            "flaeche_m2": 502.0,
+            "flaeche_text": "502 m²",
+        },
+    )
+
+    final = events[-1]
+    assert final["status"] == "bestaetigt"
+    assert "Sachsen-Anhalt" not in (final.get("text") or "")

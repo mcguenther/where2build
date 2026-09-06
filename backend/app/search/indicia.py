@@ -156,6 +156,60 @@ _OT_PLAIN_RE = re.compile(
 # tell two districts of the same name apart.
 _LOCALITY_RE = re.compile(rf"(?:^|[-–—])\s*(?P<municipality>{_NAME})\s*$")
 
+# The same field names the *federal state*, and that is the one statement in a
+# listing this tool can be certain it cannot serve. ALKIS is state-specific, so
+# a plot in Sachsen-Anhalt has no Saxon Flurstück — and a Saxon namesake of the
+# village it names is a real parcel a hundred kilometres away.
+#
+# Longest first, and matched as whole words: „Sachsen-Anhalt“ contains
+# „Sachsen“, and reading it as Saxony is exactly the mistake this guards.
+_FEDERAL_STATES = (
+    "Baden-Württemberg",
+    "Mecklenburg-Vorpommern",
+    "Nordrhein-Westfalen",
+    "Rheinland-Pfalz",
+    "Schleswig-Holstein",
+    "Sachsen-Anhalt",
+    "Niedersachsen",
+    "Brandenburg",
+    "Thüringen",
+    "Hamburg",
+    "Saarland",
+    "Sachsen",
+    "Bayern",
+    "Berlin",
+    "Bremen",
+    "Hessen",
+)
+_STATE_RE = re.compile(
+    r"(?<![\wäöüßÄÖÜ-])(" + "|".join(re.escape(name) for name in _FEDERAL_STATES) + r")(?![\wäöüß-])"
+)
+
+
+def federal_state(adresse: str | None) -> str | None:
+    """The Bundesland the platform's location field names, if it names one.
+
+    „06796 Sachsen-Anhalt - Brehna“ is the whole answer to a listing this tool
+    cannot serve, and it is free: no request, no model, no geometry. All five
+    recorded adverts carry the state in this field, in this shape.
+    """
+
+    if not adresse:
+        return None
+    match = _STATE_RE.search(adresse)
+    return match.group(1) if match else None
+
+
+def outside_saxony(adresse: str | None) -> str | None:
+    """The state named, when the listing places itself outside Saxony.
+
+    ``None`` when the field says Sachsen, names no state at all, or is missing —
+    absence is not evidence, and only a state actually named may stop a run.
+    """
+
+    state = federal_state(adresse)
+    return None if state in (None, "Sachsen") else state
+
 # A street name that begins with one of these is a sentence, not a street:
 # „Ihr Platz zum Träumen“ is a headline and „einen befahrbaren Feldweg“ is a
 # path through a field. German capitalises every noun, so the usual signal —
@@ -317,10 +371,42 @@ def _relation_before(text: str, start: int) -> Ortsbeziehung | None:
             # Only a trigger that runs up to the name itself binds to it;
             # anything further back belongs to another clause.
             if match.end() >= len(window) - 2:
+                if relation == "liegt_in" and _names_an_amenity(window[: match.start()]):
+                    continue
                 position = match.start()
                 if best is None or position > best[0]:
                     best = (position, relation)
     return best[1] if best else None
+
+
+# What „in X“ is about when one of these stands in front of it. The same trap
+# „Anbindung an Leipzig“ already guards, one preposition over: „weiterführende
+# Schulen in Roitzsch“ says where the schools are, not where the plot is — and
+# Roitzsch is a real Gemarkung near Wurzen, a hundred kilometres from the
+# Brehna listing that sentence came from, holding a parcel of exactly the
+# stated size. An amenity is somewhere to go, so it can never place the plot.
+_AMENITY_NOUNS = (
+    "schule", "schulen", "grundschule", "oberschule", "gymnasium", "gymnasien",
+    "kita", "kitas", "kindergarten", "kindergärten", "kindertagesstätte",
+    "einkauf", "einkaufen", "einkaufsmöglichkeit", "einkaufsmöglichkeiten",
+    "supermarkt", "supermärkte", "geschäfte", "läden", "apotheke", "apotheken",
+    "arzt", "ärzte", "praxen", "klinik", "kliniken", "krankenhaus",
+    "universität", "hochschule", "arbeitsplätze", "arbeitgeber",
+    "bahnhof", "bahnhöfe", "flughafen", "anschluss", "anschlüsse",
+    "verbindung", "verbindungen", "anbindung", "haltestelle", "haltestellen",
+)
+
+
+def _names_an_amenity(before: str) -> bool:
+    """Whether the words in front of an „in“ name somewhere to go rather than to be.
+
+    Only the last two words are read: „weiterführende Schulen in …“ puts an
+    adjective between the noun and the preposition, and anything further back
+    belongs to another clause.
+    """
+
+    words = re.findall(r"[\wäöüßÄÖÜ]+", before.lower())
+    return any(word in _AMENITY_NOUNS for word in words[-2:])
 
 
 def _indiz(
@@ -756,6 +842,8 @@ def _place_sentence(name: str, relation: Ortsbeziehung | None, count: int) -> st
 
 __all__ = [
     "AreaStatement",
+    "federal_state",
+    "outside_saxony",
     "SOURCE_CONFIDENCE",
     "collect_indicia",
     "confidence",

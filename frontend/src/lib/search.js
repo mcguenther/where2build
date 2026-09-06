@@ -140,8 +140,14 @@ export const STATUS_LABEL = {
  * The sentence under the heading. Composed from a template, never written by a
  * model — the same rule the findings follow, and for the same reason: the same
  * plot has to read the same way twice.
+ *
+ * `hinweis` is the run's own explanation. Where there is one, this sentence
+ * must not supply a second: an advert in Sachsen-Anhalt was told „die Angaben
+ * reichen nicht aus" directly above the run explaining that the details are
+ * perfectly sufficient and point outside the Saxon cadastre. Guessing a reason
+ * next to a stated one is worse than giving none.
  */
-export function verdictSentence(status, count, huelle) {
+export function verdictSentence(status, count, huelle, hinweis) {
   if (status === "bestaetigt") {
     return `Ein Flurstück, und es hält den amtlichen Prüfungen stand. ${huelle?.text ?? ""}`.trim();
   }
@@ -149,9 +155,10 @@ export function verdictSentence(status, count, huelle) {
     const plural = count === 1 ? "ein mögliches Flurstück" : `${count} mögliche Flurstücke`;
     return `Kein eindeutiges Ergebnis — ${plural}. ${huelle?.text ?? ""}`.trim();
   }
-  return (
-    huelle?.text && huelle.art !== "offen"
-      ? `Kein Flurstück gefunden. Feststeht bisher: ${huelle.text}`
-      : "Kein Flurstück gefunden. Die Angaben reichen nicht aus, um die Lage einzugrenzen."
-  );
+  if (huelle?.text && huelle.art !== "offen") {
+    return `Kein Flurstück gefunden. Feststeht bisher: ${huelle.text}`;
+  }
+  return hinweis
+    ? "Kein Flurstück gefunden."
+    : "Kein Flurstück gefunden. Die Angaben reichen nicht aus, um die Lage einzugrenzen.";
 }

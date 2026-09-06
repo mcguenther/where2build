@@ -136,7 +136,7 @@ describe("Aufnahme", () => {
 
   it("geht mit dem Zurück-Knopf des Browsers einen Schritt zurück, nicht hinaus", async () => {
     const { app, router, wizard } = await wizardWithDraft();
-    wizard.vm.goToStage("werte");
+    wizard.vm.goToStage("suche");
     await flushPromises();
     wizard.vm.goToStage("flurstueck");
     await flushPromises();
@@ -144,7 +144,7 @@ describe("Aufnahme", () => {
 
     router.back();
     await flushPromises();
-    expect(router.currentRoute.value.fullPath).toBe("/aufnahme/werte");
+    expect(router.currentRoute.value.fullPath).toBe("/aufnahme/suche");
     expect(currentView(app)).toBe("wizard");
 
     router.back();
@@ -155,14 +155,14 @@ describe("Aufnahme", () => {
 
   it("nimmt der Zurück-Schaltfläche denselben Weg wie dem Browser", async () => {
     const { router, wizard } = await wizardWithDraft();
-    wizard.vm.goToStage("werte");
+    wizard.vm.goToStage("suche");
     await flushPromises();
     wizard.vm.goToStage("flurstueck");
     await flushPromises();
 
-    wizard.vm.stepBack("werte");
+    wizard.vm.stepBack("suche");
     await flushPromises();
-    expect(router.currentRoute.value.fullPath).toBe("/aufnahme/werte");
+    expect(router.currentRoute.value.fullPath).toBe("/aufnahme/suche");
 
     // It stepped out of the entry instead of pushing a new one: the stage it
     // came from is still ahead, where the browser's forward button expects it.

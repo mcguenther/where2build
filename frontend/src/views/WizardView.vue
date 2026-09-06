@@ -121,34 +121,11 @@
     </section>
 
     <!-- 2 · Gelesene Werte -->
-    <section v-else-if="stage === 'werte'" class="stack">
-      <p class="subtitle">
-        Jedes Feld führt die Quelle mit, aus der es stammt. Erst nach Bestätigung wandern die
-        Werte in die Planung — was die Seite nicht hergibt, bleibt leer und wird nicht erfunden.
-      </p>
-
-      <div class="suggestions">
-        <div v-for="f in readFields" :key="f.key" class="suggestion" :class="{ 'suggestion--empty': !f.value }">
-          <span class="suggestion__head">
-            <span class="field-label">{{ f.label }}</span>
-            <span class="suggestion__tag">{{ f.value ? "automatisch gelesen" : "nicht belegt" }}</span>
-          </span>
-          <input type="text" v-model="f.value" :aria-label="f.label"
-                 :placeholder="f.value ? '' : 'steht nicht auf der Seite'">
-          <span class="suggestion__source">{{ f.source }}</span>
-        </div>
-      </div>
-
-      <div class="row">
-        <button type="button" class="btn" :disabled="busy" @click="lookUpParcel">
-          {{ busy ? "Kataster wird abgefragt …" : "Flurstück suchen" }}
-        </button>
-        <button type="button" class="btn btn--quiet" @click="stepBack('quelle')">Zurück</button>
-      </div>
-    </section>
-
-    <!-- 3 · Flurstück suchen. The listing named a place, not a parcel; this
-         step turns the one into the other and shows what it stood on. -->
+    <!-- 2 · Flurstück suchen. The listing named a place, not a parcel; this
+         step turns the one into the other and shows what it stood on. What the
+         reader got off the page rides along folded up: it is what the search
+         is running on, so it belongs here, and it is a list nobody has to read
+         before carrying on, so it starts closed. -->
     <section v-else-if="stage === 'suche'" class="stack">
       <p class="subtitle">
         Ein Inserat nennt fast nie sein Flurstück. Gesucht wird deshalb über das, was
@@ -156,10 +133,41 @@
         noch möglich ist. Reicht es nicht für ein einzelnes Flurstück, sagt die Antwort,
         worauf sich die Lage eingrenzen lässt.
       </p>
+
+      <details v-if="readSummary" class="gelesen">
+        <summary>
+          <span class="gelesen__titel">Gelesene Werte</span>
+          <span class="gelesen__zahl">{{ readSummary }}</span>
+        </summary>
+        <p class="subtitle">
+          Jedes Feld führt die Quelle mit, aus der es stammt. Was die Seite nicht hergibt,
+          bleibt leer und wird nicht erfunden. Eine Änderung hier startet die Suche neu.
+        </p>
+        <div class="suggestions">
+          <div v-for="f in readFields" :key="f.key" class="suggestion" :class="{ 'suggestion--empty': !f.value }">
+            <span class="suggestion__head">
+              <span class="field-label">{{ f.label }}</span>
+              <span class="suggestion__tag">{{ f.value ? "automatisch gelesen" : "nicht belegt" }}</span>
+            </span>
+            <span class="suggestion__eingabe">
+              <input type="text" v-model="f.value" :aria-label="f.label"
+                     :placeholder="f.value ? '' : 'steht nicht auf der Seite'">
+              <span v-if="f.unit" class="suggestion__einheit" aria-hidden="true">{{ f.unit }}</span>
+            </span>
+            <span class="suggestion__source">{{ f.source }}</span>
+          </div>
+        </div>
+        <div class="row">
+          <button type="button" class="btn btn--quiet" @click="lookUpParcel">
+            Suche mit diesen Werten neu starten
+          </button>
+        </div>
+      </details>
+
       <ParcelSearch v-if="searchQuery" :query="searchQuery" :key="searchRun"
                     @confirm="takeCandidate" @manual="stepBack('quelle')" />
       <div class="row">
-        <button type="button" class="btn btn--quiet" @click="stepBack('werte')">Zurück</button>
+        <button type="button" class="btn btn--quiet" @click="stepBack('quelle')">Zurück</button>
       </div>
     </section>
 
@@ -284,9 +292,14 @@ function fieldsFromResponse(response) {
     flurstuecke: "Flurstücke", kaufpreis_eur: "Kaufpreis",
     grundstuecksflaeche_m2: "Grundstücksfläche"
   };
+  /* Shown beside the box, never inside it: „600" is what the search sends to
+   * the cadastre, and a unit inside the field would travel with it. A number
+   * with no unit next to a price with no unit is a field nobody can read. */
+  const units = { grundstuecksflaeche_m2: "m²", kaufpreis_eur: "€", lat: "°", lon: "°" };
   return Object.entries(fields).map(([key, entry]) => ({
     key,
     label: labels[key] ?? key,
+    unit: units[key] ?? "",
     value: Array.isArray(entry?.wert)
       ? entry.wert.map(v => (typeof v === "object" ? [v.zaehler, v.nenner].filter(Boolean).join("/") : v)).join(", ")
       : entry?.wert ?? "",
@@ -356,7 +369,6 @@ export default {
       // The labels for the stages in `WIZARD_STAGES`, in that order.
       steps: [
         { id: "quelle", name: "Quelle" },
-        { id: "werte", name: "Gelesene Werte" },
         { id: "suche", name: "Flurstück suchen" },
         { id: "flurstueck", name: "Flurstück und Angaben" }
       ],
@@ -379,9 +391,18 @@ export default {
      * this component and are gone after a reload. */
     reachable() {
       if (this.stageIndex <= 0) return true;
-      if (this.stage === "werte") return this.readFields.length > 0;
       if (this.stage === "suche") return Boolean(this.searchQuery);
       return Boolean(this.draft);
+    },
+    /** How much the reader got, for the folded summary line.
+     *
+     *  Empty when it got nothing — „0 von 6 Feldern belegt“ is a box that says
+     *  it has nothing to show, which is worse than not being there. Typed prose
+     *  reaches this state routinely: the extraction endpoint needs a model for
+     *  a plain description, while the search's own pattern reader does not. */
+    readSummary() {
+      const filled = this.readFields.filter(f => f.value).length;
+      return filled ? `${filled} von ${this.readFields.length} Feldern belegt` : "";
     },
     ready() {
       if (this.source === "url") return /^https?:\/\/\S{6,}/.test(this.url.trim());
@@ -480,8 +501,10 @@ export default {
         this.description = response?.beschreibung
           || (this.source === "text" ? this.listingText.trim() : this.pastedText);
         this.images = response?.bilder || [];
-        this.returnStage = "werte";
-        this.goToStage("werte");
+        // Straight on. The read values were a step of their own and answered a
+        // question nobody had asked yet — they are what the search runs on, so
+        // they now travel with it, folded shut.
+        this.lookUpParcel();
       } catch (error) {
         this.error = error.message;
       } finally {
@@ -683,6 +706,30 @@ export default {
 }
 .suggestion--empty .suggestion__tag{ border-color: var(--w2b-error); color: var(--w2b-error); }
 .suggestion__source{ font-family: var(--w2b-font-mono); font-size: 10px; color: var(--w2b-muted); overflow-wrap: anywhere; line-height: 1.45; }
+/* The unit sits beside the box, not in it: what is typed here goes to the
+   cadastre, and „600 m²" is not a number. */
+.suggestion__eingabe{ display: flex; align-items: baseline; gap: var(--w2b-space-2); }
+.suggestion__eingabe input{ flex: 1 1 auto; min-width: 0; }
+.suggestion__einheit{ flex: 0 0 auto; color: var(--w2b-muted); font-size: var(--w2b-text-s); }
+
+/* What was read off the page. Folded shut, because it is what the search is
+   already running on rather than something to approve first. */
+.gelesen{
+  border: 1px solid var(--w2b-line); border-radius: var(--w2b-radius-m);
+  background: var(--w2b-surface-sunken);
+  padding: 0 var(--w2b-space-4);
+}
+.gelesen > summary{
+  display: flex; align-items: baseline; gap: var(--w2b-space-3); flex-wrap: wrap;
+  padding: var(--w2b-space-3) 0; cursor: pointer; list-style: revert;
+}
+.gelesen > summary::marker{ color: var(--w2b-muted); }
+.gelesen__titel{ font-weight: 600; }
+.gelesen__zahl{ color: var(--w2b-muted); font-size: var(--w2b-text-s); }
+.gelesen[open]{ padding-bottom: var(--w2b-space-4); }
+.gelesen .subtitle{ margin-top: 0; }
+.gelesen .suggestions{ margin-top: var(--w2b-space-3); }
+.gelesen .row{ margin-top: var(--w2b-space-3); }
 
 .check-grid{ display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: var(--w2b-space-4); align-items: start; }
 @media (max-width: 900px){ .check-grid{ grid-template-columns: 1fr; } }

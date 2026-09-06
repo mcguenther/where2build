@@ -27,8 +27,12 @@ export const SLACK = 0.35;
  *  A 30 m parcel shown alone is a parcel nobody can check. */
 export const MIN_HALF_WIDTH_M = 120;
 
-/** How long one camera move takes, and how long a clue stands before the next. */
-export const FLIGHT_MS = 900;
+/** How long one camera move takes, and how long a clue stands before the next.
+ *
+ *  Doubled from the first pass. The camera was arriving before the eye had
+ *  followed it — correct on a stopwatch, restless to watch, and the whole
+ *  point of pacing a run is that somebody can follow it. */
+export const FLIGHT_MS = 1800;
 export const DWELL_MS = 2000;
 
 /** The whole backlog has to be played within this, however long it is.
@@ -37,9 +41,14 @@ export const DWELL_MS = 2000;
  *  wrong pace for a run that is already finished — and most are, because a
  *  search takes a handful of seconds while sixteen clues at two seconds is
  *  half a minute of watching. So the dwell shortens with the backlog: still
- *  one clue at a time, still eased, never a wait. */
-export const BUDGET_MS = 6000;
-export const MIN_DWELL_MS = 240;
+ *  one clue at a time, still eased, never a wait.
+ *
+ *  The budget and the floor doubled with the flight, and they had to: a longer
+ *  flight under the old floor is not a calmer camera, it is the same camera
+ *  interrupted more often. Sixteen clues now play over twelve seconds instead
+ *  of six. */
+export const BUDGET_MS = 12000;
+export const MIN_DWELL_MS = 480;
 
 /** What a queue of this length may spend per step. */
 export const dwellFor = (waiting, dwell = DWELL_MS, budget = BUDGET_MS) =>

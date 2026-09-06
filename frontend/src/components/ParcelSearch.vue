@@ -294,7 +294,11 @@ export default {
     running() { return this.streaming || this.queued > 0; },
     statusLabel() { return STATUS_LABEL[this.status] ?? "Suche"; },
     parcelOutlineZoom() { return PARCEL_OUTLINE_MIN_ZOOM; },
-    sentence() { return this.status ? verdictSentence(this.status, this.candidates.length, this.huelle) : ""; },
+    sentence() {
+      return this.status
+        ? verdictSentence(this.status, this.candidates.length, this.huelle, this.hint)
+        : "";
+    },
     chosenCandidate() { return this.candidates.find(c => c.id === this.chosen) ?? null; },
     /** Where „Zum Ergebnis“ goes: the parcel if there is one, else whatever
      *  the answer could still name. */
@@ -314,9 +318,11 @@ export default {
     },
     /** How long the camera may take, matched to how fast the clues are playing.
      *
-     *  A 900 ms flight started every 240 ms spends the whole run interrupting
-     *  itself, which is the twitch the queue exists to prevent. */
-    flight() { return Math.max(260, Math.min(FLIGHT_MS, this.queueStep * 1.6)); },
+     *  A flight started before the last one landed spends the whole run
+     *  interrupting itself, which is the twitch the queue exists to prevent —
+     *  so the duration is tied to the step rather than fixed, and the floor
+     *  moved with it. */
+    flight() { return Math.max(520, Math.min(FLIGHT_MS, this.queueStep * 1.6)); },
     /** The pin, once something stronger has placed the plot elsewhere.
      *
      *  It stays on the map struck through rather than vanishing: whoever opens
