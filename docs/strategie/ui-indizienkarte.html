@@ -219,16 +219,30 @@ code{font-family:var(--font-mono);font-size:12.5px;background:var(--sunken);padd
       <p>Der Ausschnitt umfasst <em>alle</em> noch möglichen Flurstücke, plus 35 % Luft, plus die
         Geometrie des neuen Indizes. Erst wenn ein Kandidat ausscheidet, darf der Ausschnitt enger
         werden.</p>
+      <p><b>Nachgetragen beim Bau:</b> solange es noch gar keine Kandidaten gibt, <em>sind</em> die
+        in Frage kommenden Gemarkungen der Zweifel — die Karte rahmt sie, statt auf ganz Sachsen zu
+        stehen, bis die Treppe fertig ist. Ihre Umringe kostet je eine Anfrage (16,5 kB, gemessen)
+        und beantworten die Frage „wo kann das überhaupt sein“ ab der ersten Sekunde. Und weil
+        zweiundzwanzig Kandidaten über zwei Gemarkungen jeweils ein paar Pixel groß sind, bekommt
+        jeder zusätzlich einen Punkt, der unterhalb von Zoom 17 einblendet und wieder verschwindet,
+        sobald der echte Umriss zu sehen ist. Ein Ort, den man nicht findet, ist nicht verortet.</p>
       <p>Zusätzlich eine harte Untergrenze von 120 m Halbbreite: selbst das bestätigte Flurstück wird
         nie ohne seine Nachbarn gezeigt. Ein Flurstück ohne Umgebung ist nicht prüfbar.</p>
     </div>
     <div class="paar">
-      <h3>Regel 2 — mindestens zwei Sekunden pro Indiz</h3>
+      <h3>Regel 2 — ein Indiz nach dem anderen, aber nie zum Warten</h3>
       <p>Indizien kommen unregelmäßig: die Attributliste sofort, die Texterkennung nach einer halben
         Sekunde, das Modell nach zwei. Kämen drei gleichzeitig, wäre die Animation ein Zucken.</p>
-      <p>Also eine Warteschlange: jedes Indiz steht mindestens 2 s, der Kameraflug dauert 900 ms, und
-        was schneller eintrifft, wartet sichtbar. Der Zähler oben rechts sagt, wie viele anstehen.
-        Klicken im Protokoll überspringt die Schlange — der Mensch wartet nie auf die Animation.</p>
+      <p>Also eine Warteschlange. <b>Nachgebessert beim Bau:</b> zwei Sekunden je Indiz sind der
+        richtige Takt für Indizien, die <em>gerade eintreffen</em> — und der falsche für einen Lauf,
+        der schon fertig ist. Die meisten sind das: eine Suche dauert wenige Sekunden, sechzehn
+        Ereignisse zu je zwei Sekunden sind eine halbe Minute Zuschauen. Die Schlange verteilt
+        deshalb ein festes Budget über das, was ansteht (mindestens 240 ms je Schritt), und der
+        Kameraflug folgt diesem Takt — ein 900-ms-Flug, alle 240 ms neu gestartet, unterbricht sich
+        die ganze Zeit selbst und ist genau das Zucken, das die Schlange verhindern soll.</p>
+      <p>Der Zähler oben rechts sagt, wie viele anstehen. Klicken im Protokoll überspringt die
+        Schlange — der Mensch wartet nie auf die Animation. Und
+        <code>prefers-reduced-motion</code> schaltet das Ganze ab.</p>
     </div>
   </div>
   <div class="col" style="margin-top:20px">

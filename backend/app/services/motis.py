@@ -9,6 +9,7 @@ with the usual precision 5 puts the coordinates off by a factor of ten.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 from datetime import datetime
 from typing import Any
 
@@ -286,10 +287,27 @@ def _parse_time(value: Any) -> datetime | None:
         return None
 
 
+def _instance_key(base_url: str) -> str:
+    """A short, stable stand-in for one MOTIS instance.
+
+    Hashed rather than spelled out: a base URL can carry a key or a port, and
+    it becomes part of a cache *filename*.
+    """
+
+    digest = hashlib.sha256(base_url.rstrip("/").encode("utf-8")).hexdigest()
+    return digest[:12]
+
+
 class MotisService:
     def __init__(self, settings: MotisSettings, app_settings: AppSettings) -> None:
         self.settings = settings
         self.app_settings = app_settings
+        # Which instance answered, as a key prefix. The cache used to be keyed
+        # on the request parameters alone, so pointing MOTIS_BASE_URL at a local
+        # router kept serving Transitous's answers until /cache/motis* was
+        # deleted by hand -- which reports a difference between the two that is
+        # not there and, worse, an agreement that is not there either.
+        self.instance = _instance_key(settings.base_url)
         self.cache = DiskCache(app_settings.cache_dir / "motis", ttl_s=settings.cache_ttl_s)
         # Separate directories, because these answers stay valid far longer
         # than a routed itinerary does.
@@ -326,7 +344,7 @@ class MotisService:
         return params
 
     async def _plan(self, params: dict[str, str]) -> dict[str, Any]:
-        cache_key = repr(sorted(params.items()))
+        cache_key = f"{self.instance}:" + repr(sorted(params.items()))
         cached = self.cache.get_json(cache_key)
         if cached is not None:
             return cached
@@ -567,6 +585,9 @@ class MotisService:
     ) -> Any:
         """One cached GET against MOTIS, returning parsed JSON."""
 
+        # Prefixed here rather than at the call sites, so a new caller cannot
+        # forget it and quietly share another instance's answers.
+        cache_key = f"{self.instance}:{cache_key}"
         cached = cache.get_json(cache_key)
         if cached is not None:
             return cached
@@ -671,7 +692,7 @@ class MotisService:
             "arriveBy": False,
             "withDistance": True,
         }
-        cache_key = "onetomany:" + repr(
+        cache_key = f"{self.instance}:onetomany:" + repr(
             (
                 round(origin.lat, _ORIGIN_PRECISION),
                 round(origin.lon, _ORIGIN_PRECISION),
@@ -731,7 +752,7 @@ class MotisService:
             # MOTIS ranks results near `place` higher; it does not filter by it.
             params["place"] = f"{bias.lat},{bias.lon}"
 
-        cache_key = f"geocode:{repr(sorted(params.items())).casefold()}"
+        cache_key = f"{self.instance}:geocode:{repr(sorted(params.items())).casefold()}"
         cached = self.cache.get_json(cache_key)
         if cached is None:
             async with self._semaphore:

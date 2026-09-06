@@ -239,3 +239,35 @@ async def test_stops_are_requested_grouped_and_cached_on_the_box():
     assert len(first) == len(second) == 9
     assert route.call_count == 1
     assert route.calls[0].request.url.params["grouped"] == "true"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_a_second_instance_does_not_inherit_the_first_one_s_answers():
+    """The cache key used to be the request parameters and nothing else.
+
+    So pointing MOTIS_BASE_URL at a local router kept serving the previous
+    instance's answers out of /cache/motis -- which reports a difference
+    between the two that is not there, and an agreement that is not there
+    either. Both instances are asked here, and each gets its own answer.
+    """
+
+    from app.services.motis import MotisService
+    from app.settings import AppSettings, MotisSettings
+
+    app_settings = AppSettings()
+
+    other = "https://motis.anderswo.example.org"
+    respx.get(GEOCODE_URL).mock(
+        return_value=httpx.Response(200, json=[{"lat": 51.0, "lon": 12.0, "name": "Erster"}])
+    )
+    respx.get(f"{other}/api/v1/geocode").mock(
+        return_value=httpx.Response(200, json=[{"lat": 52.0, "lon": 13.0, "name": "Zweiter"}])
+    )
+
+    first = MotisService(MotisSettings(base_url=MOTIS_URL), app_settings)
+    second = MotisService(MotisSettings(base_url=other), app_settings)
+
+    assert first.instance != second.instance
+    assert (await first.geocode("Leipzig")).lat == 51.0
+    assert (await second.geocode("Leipzig")).lat == 52.0

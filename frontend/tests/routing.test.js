@@ -120,6 +120,7 @@ describe("Aufnahme", () => {
     const { app, router } = await openApp("/aufnahme/quelle");
     const wizard = app.findComponent({ name: "WizardView" });
     wizard.vm.readFields = [{ key: "adresse", label: "Adresse", value: "Muldentalstraße 4", source: "Test" }];
+    wizard.vm.searchQuery = { adresse: "Muldentalstraße 4" };
     wizard.vm.draft = { ...state.data.plots[0] };
     return { app, router, wizard };
   };
@@ -135,15 +136,15 @@ describe("Aufnahme", () => {
 
   it("geht mit dem Zurück-Knopf des Browsers einen Schritt zurück, nicht hinaus", async () => {
     const { app, router, wizard } = await wizardWithDraft();
-    wizard.vm.goToStage(1);
+    wizard.vm.goToStage("suche");
     await flushPromises();
-    wizard.vm.goToStage(2);
+    wizard.vm.goToStage("flurstueck");
     await flushPromises();
     expect(router.currentRoute.value.fullPath).toBe("/aufnahme/flurstueck");
 
     router.back();
     await flushPromises();
-    expect(router.currentRoute.value.fullPath).toBe("/aufnahme/werte");
+    expect(router.currentRoute.value.fullPath).toBe("/aufnahme/suche");
     expect(currentView(app)).toBe("wizard");
 
     router.back();
@@ -154,14 +155,14 @@ describe("Aufnahme", () => {
 
   it("nimmt der Zurück-Schaltfläche denselben Weg wie dem Browser", async () => {
     const { router, wizard } = await wizardWithDraft();
-    wizard.vm.goToStage(1);
+    wizard.vm.goToStage("suche");
     await flushPromises();
-    wizard.vm.goToStage(2);
+    wizard.vm.goToStage("flurstueck");
     await flushPromises();
 
-    wizard.vm.stepBack(1);
+    wizard.vm.stepBack("suche");
     await flushPromises();
-    expect(router.currentRoute.value.fullPath).toBe("/aufnahme/werte");
+    expect(router.currentRoute.value.fullPath).toBe("/aufnahme/suche");
 
     // It stepped out of the entry instead of pushing a new one: the stage it
     // came from is still ahead, where the browser's forward button expects it.

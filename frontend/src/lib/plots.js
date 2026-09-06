@@ -69,6 +69,9 @@ export function plotFromCadastre(response, extra = {}) {
     name: extra.name || (first.lagebezeichnung || "").split(";")[0].trim() || `Flurstück ${numbers[0] ?? ""}`.trim(),
     municipality: extra.municipality || first.gemeinde || "",
     gemarkung: first.gemarkung ?? "",
+    // The key, not just the name: two Gemarkungen share a name (Plagwitz is in
+    // Leipzig and in Machern), so adding a parcel later has to ask with this.
+    gemarkungsnummer: first.gemarkungsnummer ?? null,
     flurstuecke: numbers,
     kennzeichen: first.kennzeichen ?? null,
     lagebezeichnung: first.lagebezeichnung ?? null,

@@ -195,11 +195,40 @@ def test_page_without_any_locator_is_a_400(client: TestClient):
 
 
 @respx.mock
-def test_pasting_without_a_configured_provider_is_a_503(without_llm, client: TestClient):
+def test_bare_text_without_a_provider_says_what_to_paste_instead(without_llm, client: TestClient):
+    """A sentence with no address and no coordinate needs a model. HTML does not.
+
+    So the refusal names the way round it — copy the page itself — rather than
+    only reporting a missing key.
+    """
+
     answer = client.post("/api/listings/extract", json={"text": "Baugrundstück 688 m²"})
 
     assert answer.status_code == 503
-    assert "nicht konfiguriert" in answer.json()["detail"]
+    detail = answer.json()["detail"]
+    assert "nicht eingerichtet" in detail
+    assert "Strg+A" in detail
+
+
+def test_a_pasted_page_is_read_without_a_model_at_all(without_llm, client: TestClient):
+    """The paste field exists for portals that refuse a server-side fetch.
+
+    Requiring a model here made it useless in exactly that case. A page copied
+    out of a browser carries its meta tags, its price and its attribute list,
+    and the parcel search reads the prose itself.
+    """
+
+    answer = client.post(
+        "/api/listings/extract", json={"text": fixture_text("inserat-kleinanzeigen.html")}
+    )
+
+    assert answer.status_code == 200
+    body = answer.json()
+    assert body["weg"] == "eingefuegter-text"
+    assert body["felder"]["kaufpreis_eur"]["wert"] == 80000
+    assert body["felder"]["grundstuecksflaeche_m2"]["wert"] == 1025
+    assert "Ortsteil Lobstädt bei Neukieritzsch" in body["beschreibung"]
+    assert body["bilder"]
 
 
 @respx.mock
@@ -209,3 +238,81 @@ def test_provider_timeout_becomes_a_504(client: TestClient):
     answer = client.post("/api/listings/extract", json={"text": "Baugrundstück"})
 
     assert answer.status_code == 504
+
+
+@respx.mock
+def test_an_answer_cached_by_an_older_reader_is_not_served(client: TestClient):
+    """The cache that holds an extracted listing never expires.
+
+    So an answer written before the price parser existed would be served for
+    ever, and the field stayed empty on exactly the listings the fix was
+    written for. The version in the key is what retires it.
+    """
+
+    from app.deps import llm_client
+    from app.routers.listings import EXTRACTION_VERSION
+    from app.services.llm import normalize_url
+
+    respx.get(KLEINANZEIGEN_URL).mock(return_value=_kleinanzeigen_page())
+    respx.post(CHAT_URL).mock(
+        return_value=httpx.Response(200, json=completion(json.dumps(INSERAT_JSON)))
+    )
+
+    llm = client.app.dependency_overrides.get(llm_client, llm_client)()
+    stale = {
+        "quelle_url": KLEINANZEIGEN_URL,
+        "weg": "meta-tags",
+        "felder": {},
+        "beschreibung": None,
+        "bilder": [],
+    }
+    # Exactly the key the deployed build wrote: the URL and nothing else. That
+    # entry is what is sitting in the cache volume right now.
+    llm.cache.set_json(f"inserat:{normalize_url(KLEINANZEIGEN_URL)}", stale)
+    assert EXTRACTION_VERSION >= 2
+
+    answer = client.post("/api/listings/extract", json={"url": KLEINANZEIGEN_URL})
+
+    assert answer.status_code == 200
+    # The page is read again rather than the empty answer being handed back.
+    assert answer.json()["felder"]["kaufpreis_eur"]["wert"] == 89000
+
+
+def test_a_page_whose_prose_is_searchable_needs_no_locator(without_llm, client: TestClient):
+    """A dropped ImmoScout page carries none of the three locators.
+
+    No coordinate, often only a district for an address, never a parcel
+    number — and prose that names the Ortsteil, the area and the street, which
+    is everything the parcel search runs on. Refusing it sent the one portal
+    the paste field exists for straight back out again.
+    """
+
+    answer = client.post(
+        "/api/listings/extract",
+        json={
+            "text": (
+                "Baugrundstück im Ortsteil Oelzschau, zugehörig zur Stadt Rötha. "
+                "Das Grundstück umfasst eine Gesamtfläche von ca. 1.300 m²."
+            )
+        },
+    )
+
+    assert answer.status_code == 200
+    body = answer.json()
+    assert "Oelzschau" in body["beschreibung"]
+    # No locator was read, and that is not an error any more.
+    assert body["felder"]["adresse"]["wert"] is None
+
+
+def test_prose_that_names_nowhere_is_still_refused(without_llm, client: TestClient):
+    """An area is not an anchor.
+
+    „Baugrundstück 688 m²“ names no place, and every parcel in Saxony of that
+    size is not a candidate set — so this still gets the message that says what
+    to paste instead, rather than a search that cannot go anywhere.
+    """
+
+    answer = client.post("/api/listings/extract", json={"text": "Baugrundstück 688 m²"})
+
+    assert answer.status_code == 503
+    assert "Strg+A" in answer.json()["detail"]

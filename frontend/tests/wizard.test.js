@@ -11,7 +11,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import CadastralDistrictPicker from "../src/components/CadastralDistrictPicker.vue";
 import WizardView from "../src/views/WizardView.vue";
 import { state } from "../src/lib/store.js";
-import { realState, mountWithRouter } from "./helpers.js";
+import { realPlot, realState, mountWithRouter } from "./helpers.js";
 import directory from "./fixtures/gemarkungen.json";
 import moelkau from "./fixtures/parcel-moelkau.json";
 
@@ -27,7 +27,7 @@ vi.mock("../src/lib/api.js", () => ({
   geocode: vi.fn(),
   nearby: vi.fn()
 }));
-const { cadastralDistricts, resolveParcel, landValue } = await import("../src/lib/api.js");
+const { cadastralDistricts, resolveParcel, landValue, readPage } = await import("../src/lib/api.js");
 
 beforeEach(() => {
   localStorage.clear();
@@ -215,5 +215,249 @@ describe("Aufnahme — Schritt Quelle", () => {
     await flushPromises();
 
     expect(resolveParcel).toHaveBeenCalledWith({ gemarkung: "Moritzburg", flurstuecksnummer: "85/1" });
+  });
+});
+
+describe("Aufnahme — Absenden", () => {
+  const atSource = () =>
+    mountWithRouter(WizardView, { path: "/aufnahme/quelle", props: { stage: "quelle" } });
+
+  it("liest die Anzeige auch, wenn im Feld nur Enter gedrückt wurde", async () => {
+    resolveParcel.mockResolvedValue(moelkau);
+    landValue.mockRejectedValue(new Error("Kein Bodenrichtwert."));
+
+    const w = atSource();
+    await w.find('input[value="parcel"]').setValue();
+    await flushPromises();
+
+    await typeInto(w.findComponent(CadastralDistrictPicker).find("input"), "Moritzburg");
+    await typeInto(w.find("#q-parcel-number"), "85/1");
+    // Was das Drücken von Enter in einem Textfeld auslöst.
+    await w.find("form").trigger("submit");
+    await flushPromises();
+
+    expect(resolveParcel).toHaveBeenCalledWith({ gemarkung: "Moritzburg", flurstuecksnummer: "85/1" });
+  });
+
+  it("liest genau einmal, wenn der Knopf geklickt wird", async () => {
+    resolveParcel.mockResolvedValue(moelkau);
+    landValue.mockRejectedValue(new Error("Kein Bodenrichtwert."));
+
+    const w = atSource();
+    await w.find('input[value="parcel"]').setValue();
+    await flushPromises();
+
+    await typeInto(w.findComponent(CadastralDistrictPicker).find("input"), "Moritzburg");
+    await typeInto(w.find("#q-parcel-number"), "85/1");
+    await w.findAll("button").find(b => b.text() === "Nachschlagen").trigger("click");
+    await flushPromises();
+
+    expect(resolveParcel).toHaveBeenCalledTimes(1);
+  });
+
+  it("schickt bei leerem Feld gar nichts los", async () => {
+    const w = atSource();
+    await w.find('input[value="parcel"]').setValue();
+    await flushPromises();
+
+    await w.find("form").trigger("submit");
+    await flushPromises();
+
+    expect(resolveParcel).not.toHaveBeenCalled();
+  });
+
+  it("nimmt das HTML aus der Zwischenablage mit, nicht nur den Text", async () => {
+    readPage.mockResolvedValue({ felder: {}, beschreibung: "", bilder: [] });
+
+    const w = atSource();
+    await w.find('input[value="paste"]').setValue();
+    await flushPromises();
+
+    const field = w.find("#q-paste");
+    const html = "<html><meta property=\"og:latitude\" content=\"51.19\"><body>Baugrundstück in Lobstädt, 1.025 m²</body></html>";
+    await field.trigger("paste", {
+      clipboardData: { getData: kind => (kind === "text/html" ? html : "Baugrundstück in Lobstädt, 1.025 m²") }
+    });
+    await typeInto(field, "Baugrundstück in Lobstädt, 1.025 m²");
+    await flushPromises();
+
+    expect(w.text()).toContain("Das HTML wurde übernommen");
+
+    await w.find("form").trigger("submit");
+    await flushPromises();
+
+    expect(readPage).toHaveBeenCalledWith(html);
+  });
+
+  it("vergisst das HTML, sobald das Feld geleert wird", async () => {
+    readPage.mockResolvedValue({ felder: {}, beschreibung: "", bilder: [] });
+
+    const w = atSource();
+    await w.find('input[value="paste"]').setValue();
+    await flushPromises();
+
+    const field = w.find("#q-paste");
+    await field.trigger("paste", {
+      clipboardData: { getData: () => "<html>die vorige Seite</html>" }
+    });
+    await typeInto(field, "die vorige Seite");
+    await typeInto(field, "");
+    await typeInto(field, "Ein ganz anderer Text, von Hand getippt und lang genug.");
+    await flushPromises();
+
+    await w.find("form").trigger("submit");
+    await flushPromises();
+
+    expect(readPage).toHaveBeenCalledWith("Ein ganz anderer Text, von Hand getippt und lang genug.");
+  });
+});
+
+
+describe("Aufnahme — Flurstück und Angaben in einem Schritt", () => {
+  /** The last stage, with a draft in hand. */
+  const atParcelStage = async () => {
+    const view = mountWithRouter(WizardView, { path: "/aufnahme/quelle", props: { stage: "quelle" } });
+    view.vm.draft = {
+      ...realPlot(),
+      gemarkung: "Liebertwolkwitz",
+      gemarkungsnummer: "145592",
+      flurstuecke: ["85/1"]
+    };
+    await view.setProps({ stage: "flurstueck" });
+    return view;
+  };
+
+  it("fragt beim Klick auf die Zeichnung, was dort liegt, und legt es dazu", async () => {
+    const w = await atParcelStage();
+    const before = [...w.vm.draft.flurstuecke];
+
+    resolveParcel.mockReset();
+    resolveParcel
+      .mockResolvedValueOnce({
+        features: [{ properties: {
+          zaehler: "86", nenner: "2",
+          gemarkung: "Liebertwolkwitz", gemarkungsnummer: "145592"
+        } }]
+      })
+      .mockResolvedValueOnce(moelkau);
+    landValue.mockRejectedValue(new Error("Kein Bodenrichtwert."));
+
+    await w.findAll("button").find(b => /Flurstück hinzufügen/.test(b.text())).trigger("click");
+    expect(w.findComponent({ name: "SitePlan" }).props("picking")).toBe(true);
+
+    await w.vm.addParcelAt({ lat: 51.31, lon: 12.47 });
+    await flushPromises();
+
+    // Erst die Frage nach dem Punkt, dann das Grundstück aus allen Nummern:
+    // die Vereinigung und die Summe der amtlichen Flächen kommen von dort,
+    // wo sie immer herkamen.
+    expect(resolveParcel).toHaveBeenCalledTimes(2);
+    expect(resolveParcel.mock.calls[0][0]).toEqual({ lat: 51.31, lon: 12.47 });
+    expect(resolveParcel.mock.calls[1][0].flurstuecksnummern).toEqual([...before, "86/2"]);
+    expect(resolveParcel.mock.calls[1][0].gemarkung).toBe("145592");
+  });
+
+  it("nimmt dasselbe Flurstück nicht zweimal", async () => {
+    const w = await atParcelStage();
+
+    resolveParcel.mockReset();
+    resolveParcel.mockResolvedValueOnce({
+      features: [{ properties: {
+        zaehler: "85", nenner: "1",
+        gemarkung: "Liebertwolkwitz", gemarkungsnummer: "145592"
+      } }]
+    });
+
+    await w.vm.addParcelAt({ lat: 51.31, lon: 12.47 });
+    await flushPromises();
+
+    // Kein zweiter Aufruf: die summierte Fläche würde sich sonst verdoppeln,
+    // und auf ihr steht jeder Preisvergleich.
+    expect(resolveParcel).toHaveBeenCalledTimes(1);
+    expect(w.text()).toContain("gehört bereits dazu");
+  });
+
+  it("legt kein Flurstück aus einer anderen Gemarkung dazu", async () => {
+    const w = await atParcelStage();
+
+    resolveParcel.mockReset();
+    resolveParcel.mockResolvedValueOnce({
+      features: [{ properties: {
+        zaehler: "12", nenner: null,
+        gemarkung: "Mölkau", gemarkungsnummer: "140427"
+      } }]
+    });
+
+    await w.vm.addParcelAt({ lat: 51.34, lon: 12.47 });
+    await flushPromises();
+
+    expect(resolveParcel).toHaveBeenCalledTimes(1);
+    expect(w.text()).toContain("Mölkau");
+  });
+
+  it("nimmt Name, Kaufpreis und Notiz im selben Schritt auf", async () => {
+    const w = await atParcelStage();
+
+    // Drei Felder waren eine eigene Seite, und der Umriss, den sie beschreiben,
+    // war dabei nicht zu sehen.
+    expect(w.find("#q-name").exists()).toBe(true);
+    expect(w.find("#q-price").exists()).toBe(true);
+    expect(w.find("#q-note").exists()).toBe(true);
+    expect(w.findComponent({ name: "SitePlan" }).exists()).toBe(true);
+    expect(w.text()).toContain("Anlegen und öffnen");
+  });
+});
+
+
+describe("Aufnahme — beide Textwege enden im selben Schritt", () => {
+  const atSource = () =>
+    mountWithRouter(WizardView, { path: "/aufnahme/quelle", props: { stage: "quelle" } });
+
+  const answer = {
+    felder: {
+      grundstuecksflaeche_m2: { wert: 1300, quelle_url: null },
+      kaufpreis_eur: { wert: 125000, quelle_url: null },
+      adresse: { wert: "Sachsen - Rötha", quelle_url: null }
+    },
+    beschreibung: "Baugrundstück im Ortsteil Oelzschau, zugehörig zur Stadt Rötha.",
+    bilder: []
+  };
+
+  it("liest getippten Text über dieselbe Stelle wie eine eingefügte Seite", async () => {
+    readPage.mockResolvedValue(answer);
+
+    const w = atSource();
+    await w.find('input[value="text"]').setValue();
+    await flushPromises();
+    await typeInto(w.find("#q-text"), answer.beschreibung);
+    await w.find("form").trigger("submit");
+    await flushPromises();
+
+    expect(readPage).toHaveBeenCalledWith(answer.beschreibung);
+    // Durch denselben Leser wie eine eingefügte Seite — und weiter, ohne
+    // Zwischenschritt: die gelesenen Werte fahren zusammengeklappt mit.
+    expect(w.vm.readFields.map(f => f.key)).toContain("grundstuecksflaeche_m2");
+    expect(w.vm.description).toContain("Oelzschau");
+    expect(w.vm.searchQuery).not.toBeNull();
+    expect(w.vm.returnStage).toBe("suche");
+  });
+
+  it("führt bei der Fläche die Einheit mit, ohne sie in das Feld zu schreiben", async () => {
+    readPage.mockResolvedValue(answer);
+
+    const w = atSource();
+    await w.find('input[value="text"]').setValue();
+    await flushPromises();
+    await typeInto(w.find("#q-text"), answer.beschreibung);
+    await w.find("form").trigger("submit");
+    await flushPromises();
+
+    const area = w.vm.readFields.find(f => f.key === "grundstuecksflaeche_m2");
+    expect(area.unit).toBe("m²");
+    // Nicht im Wert: das ist die Zahl, die ans Kataster geht.
+    expect(String(area.value)).not.toContain("m²");
+    expect(w.vm.readFields.find(f => f.key === "kaufpreis_eur").unit).toBe("€");
+    // A name is not a unit: only the fields that have one carry one.
+    expect(w.vm.readFields.find(f => f.key === "adresse").unit).toBe("");
   });
 });

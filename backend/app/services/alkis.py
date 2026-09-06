@@ -12,9 +12,10 @@ error text is pointless -- the request has to be right in the first place.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Any, Iterable
+from typing import Any, Iterable, Sequence
 from xml.etree import ElementTree
 from xml.sax.saxutils import escape
 
@@ -58,9 +59,14 @@ _TEXT_FIELDS = (
     "flstnrnen",
     "lagebeztxt",
     "gemeinde",
+    "gmdschl",
     "kreis",
     "aktualit",
     "flaeche",
+    # The actual land use with its area share -- "Wohnbaufläche;502" for a
+    # building plot, "Straßenverkehr;1062" for a carriageway. It rides along
+    # with every feature and the search reads it; see app/search/scoring.py.
+    "tntxt",
 )
 
 
@@ -321,6 +327,95 @@ def to_collection(
     )
 
 
+# --------------------------------------------------------------------------
+# Filter primitives for the parcel search
+#
+# The search asks the same service a great many narrow questions instead of one
+# broad one: how many parcels does this district hold, how many of those measure
+# 502 m2, does this parcel number exist in that district. Each is one ad-hoc
+# ``fes:Filter``, so the conditions are built as strings and combined here.
+#
+# Every one of these was measured against the live service on 05.09.2026; the
+# counts are in docs/research/flurstueck-identifikation.md.
+# --------------------------------------------------------------------------
+
+# ``fes:And`` needs at least two operands. A single condition wrapped in one
+# comes back as the generic Geoportal HTML 400 page with no usable error, which
+# is why this is a function and not string concatenation at the call site.
+def _combine(conditions: Sequence[str]) -> str:
+    if not conditions:
+        raise ValueError("A parcel filter needs at least one condition.")
+    if len(conditions) == 1:
+        return conditions[0]
+    return f"<fes:And>{''.join(conditions)}</fes:And>"
+
+
+def equals(name: str, value: Any) -> str:
+    """``ave:<name>`` is exactly ``value``."""
+
+    return (
+        "<fes:PropertyIsEqualTo>"
+        f"<fes:ValueReference>ave:{name}</fes:ValueReference>"
+        f"<fes:Literal>{escape(str(value))}</fes:Literal>"
+        "</fes:PropertyIsEqualTo>"
+    )
+
+
+def between(name: str, lower: float, upper: float) -> str:
+    """``ave:<name>`` lies in a closed band -- the tolerance staircase's rung."""
+
+    return (
+        "<fes:PropertyIsBetween>"
+        f"<fes:ValueReference>ave:{name}</fes:ValueReference>"
+        f"<fes:LowerBoundary><fes:Literal>{lower:g}</fes:Literal></fes:LowerBoundary>"
+        f"<fes:UpperBoundary><fes:Literal>{upper:g}</fes:Literal></fes:UpperBoundary>"
+        "</fes:PropertyIsBetween>"
+    )
+
+
+def like(name: str, pattern: str) -> str:
+    """Wildcard match, ``*`` being the wildcard.
+
+    Used on ``ave:tntxt`` for the land use and on ``ave:lagebeztxt`` for the
+    street. Both are soft signals -- see ``app/search/scoring.py`` for why
+    neither may ever exclude a candidate.
+    """
+
+    return (
+        '<fes:PropertyIsLike wildCard="*" singleChar="#" escapeChar="!">'
+        f"<fes:ValueReference>ave:{name}</fes:ValueReference>"
+        f"<fes:Literal>{escape(pattern)}</fes:Literal>"
+        "</fes:PropertyIsLike>"
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class KatasterBezirk:
+    """One cadastral district with its outline.
+
+    The committed directory (``app/gemarkung_index.py``) drops the geometry on
+    purpose -- an input mask has no use for a boundary. The search does: the
+    map has to wash the district the candidates share, and that wash is this
+    outline. Measured 05.09.2026: Gemarkung Großbothen comes back as 16.5 kB
+    with 637 boundary points, one request, so it is fetched when needed rather
+    than added to the 490 kB the directory already ships.
+    """
+
+    schluessel: str
+    name: str | None
+    gemeinde: str | None
+    geometry: Any
+
+
+def _number_matched(xml: bytes) -> int:
+    match = re.search(rb'numberMatched="(\d+)"', xml)
+    if match is None:
+        raise UpstreamError(
+            f"{SERVICE_NAME} hat auf eine Zählanfrage keine Anzahl geliefert. {ADVICE}"
+        )
+    return int(match.group(1))
+
+
 class AlkisService:
     """Queries against the simplified ALKIS WFS."""
 
@@ -442,3 +537,96 @@ class AlkisService:
             "</wfs:Query></wfs:GetFeature>"
         )
         return parse_feature_collection(await self._post(body))
+
+    # ------------------------------------------------------------------
+    # The search primitives
+    # ------------------------------------------------------------------
+
+    def _envelope(
+        self,
+        conditions: Sequence[str],
+        *,
+        result_type: str,
+        count: int,
+        type_names: str = "ave:Flurstueck",
+    ) -> str:
+        return (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<wfs:GetFeature xmlns:wfs="http://www.opengis.net/wfs/2.0" '
+            'xmlns:fes="http://www.opengis.net/fes/2.0" '
+            'xmlns:gml="http://www.opengis.net/gml/3.2" '
+            f'xmlns:ave="{AVE_NS}" service="WFS" version="{self.settings.version}" '
+            f'resultType="{result_type}" count="{count}">'
+            f'<wfs:Query typeNames="{type_names}" srsName="{self._crs_urn}">'
+            f"<fes:Filter>{_combine(conditions)}</fes:Filter>"
+            "</wfs:Query></wfs:GetFeature>"
+        )
+
+    async def count(self, conditions: Sequence[str]) -> int:
+        """How many parcels match, without fetching one.
+
+        ``resultType=hits`` is what makes the tolerance staircase affordable:
+        the answer is a few hundred bytes whatever the count, so a rung that
+        comes back empty costs nothing but a round trip. Every rung, every
+        anchor and every parcel-number probe goes through here; only the set
+        that survives is ever fetched with its geometry.
+        """
+
+        body = self._envelope(conditions, result_type="hits", count=1)
+        return _number_matched(await self._post(body))
+
+    async def search(
+        self, conditions: Sequence[str], *, limit: int | None = None
+    ) -> list[Flurstueck]:
+        """The matching parcels themselves, geometry included.
+
+        ALKIS cannot be asked for attributes without geometry -- ``PROPERTYNAME``
+        is either rejected or ignored -- so this is the expensive call and the
+        reason ``count`` exists. Measured 05.09.2026: 25 parcels come to
+        35.6 kB in 1.5 s, about 1.4 kB each.
+        """
+
+        body = self._envelope(
+            conditions,
+            result_type="results",
+            count=limit or self.settings.max_features,
+        )
+        return parse_feature_collection(await self._post(body))
+
+    async def district_outline(self, schluessel: str) -> KatasterBezirk | None:
+        """One cadastral district with its boundary, for the map.
+
+        ``None`` when the key names no district: the search shows what it has
+        rather than failing over a wash it cannot draw.
+        """
+
+        key = expand_gemarkung_key(schluessel)
+        body = self._envelope(
+            [equals("schluessel", key), equals("art", "Gemarkung")],
+            result_type="results",
+            count=1,
+            type_names="ave:KatasterBezirk",
+        )
+        xml = await self._post(body)
+        try:
+            root = ElementTree.fromstring(xml)
+        except ElementTree.ParseError as exc:
+            raise UpstreamError(
+                f"{SERVICE_NAME} hat kein gültiges GML geliefert. {ADVICE}"
+            ) from exc
+        default_srs = root.get("srsName")
+        for element in root.iter():
+            if _local(element.tag) != "KatasterBezirk":
+                continue
+            values = {
+                _local(child.tag): (child.text or "").strip()
+                for child in element
+                if child.text
+            }
+            return KatasterBezirk(
+                schluessel=values.get("schluessel", key),
+                name=values.get("name") or None,
+                gemeinde=values.get("gemeinde") or None,
+                geometry=_parse_geometry(element, default_srs),
+            )
+        return None

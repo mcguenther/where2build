@@ -1,0 +1,66 @@
+# Routing on this machine instead of Transitous.
+#
+#   ./motis/fetch-data.sh                                   # ~350 MB, once
+#   docker compose -f docker-compose.yml -f docker-compose.local-routing.yml up --build
+#
+# Naming this file is the whole opt-in. It used to be a profile flag *plus*
+# MOTIS_BASE_URL on the command line, and forgetting the variable brought the
+# local router up and then routed against Transitous anyway, with nothing to
+# see: the two agree to the last decimal (measured 01.09.2026,
+# docs/research/routing-motis.md § 5), so the only sign was whose bandwidth was
+# being spent.
+#
+# Off by default and staying that way: the inputs are a ~350 MB download, the
+# first import takes about 3,5 minutes at 5,6 GiB peak RSS, and the graph it
+# leaves behind is 3,4 GB. That is not what `docker compose up` should mean.
+services:
+  backend:
+    environment:
+      - MOTIS_BASE_URL=http://motis:8080
+    # The graph is memory-mapped at startup, and a request before that answers
+    # 503 for the first minute of every cold start.
+    depends_on:
+      motis:
+        condition: service_healthy
+
+  # One-shot: turns the OSM extract and the GTFS feed into the graph MOTIS
+  # serves. `motis server` never reads the inputs again, only /data.
+  motis-import:
+    image: ghcr.io/motis-project/motis:2.11.2
+    volumes:
+      - ./motis/data-input:/data-input:ro
+      # Not inside /data-input: docker cannot create a mountpoint inside a
+      # read-only bind.
+      - ./motis/config.yml:/config.yml:ro
+      - motis-graph:/data
+    # Re-importing an unchanged graph costs minutes and buys nothing, so the
+    # import is skipped once it has succeeded. Delete the volume to force it.
+    command: >
+      /bin/sh -c "if [ -f /data/meta/import_done ]; then
+        echo 'Graph already built — delete the motis-graph volume to reimport.';
+      else
+        /motis import -d /data -c /config.yml && touch /data/meta/import_done;
+      fi"
+    restart: "no"
+
+  motis:
+    image: ghcr.io/motis-project/motis:2.11.2
+    depends_on:
+      motis-import:
+        condition: service_completed_successfully
+    volumes:
+      - motis-graph:/data
+    command: ["/motis", "server", "-d", "/data"]
+    healthcheck:
+      # busybox wget; the geocoder only answers once the address index is
+      # mapped, so this is a real readiness check and not just an open port.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/api/v1/geocode?text=Leipzig"]
+      interval: 10s
+      timeout: 10s
+      retries: 6
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  # The built routing graph. Only exists once this file has been used.
+  motis-graph:

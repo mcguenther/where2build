@@ -2,7 +2,7 @@
  * print rendering. Runs against the built app on a static server — no manual
  * steps, so the images always match the current code. */
 import { chromium } from "/opt/node22/lib/node_modules/playwright/index.mjs";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer } from "node:http";
@@ -103,6 +103,36 @@ async function addPlot(page) {
 const taken = [];
 const problems = [];
 
+/* A real listing's description, from the case in
+   docs/research/flurstueck-identifikation.md. It names three places, an area
+   and a street, and resolves to Flurstück 790/11 in Gemarkung Großbothen. */
+const LISTING =
+  "Baugrundstück in ruhiger Lage am Ortsrand von Großbothen, einem OT von Grimma. "
+  + "Das Grundstück ist 502 m² groß und liegt an der Wiesenstraße. "
+  + "Über die B107 erreichen Sie die ca. 6 km entfernte Kreisstadt Grimma. "
+  + "Sehenswert sind das Kloster Nimbschen und die Schiffsmühle in Höfgen.";
+
+/* An advert this tool cannot serve, and the picture of it saying so. Advert
+ * 3381469778, shortened: the location field names Sachsen-Anhalt, „Brehna" is
+ * in no Saxon Gemarkung, and „Schulen in Roitzsch" names one that is — 100 km
+ * away, holding a parcel of exactly the stated 600 m². The run used to find
+ * it. */
+const FOREIGN_LISTING =
+  "Ihr Traum vom Eigenheim: 600 m² Baugrundstück in Brehna. "
+  + "Sachsen-Anhalt - Brehna. "
+  + "Das Grundstück liegt im Geltungsbereich des Bebauungsplans „Wiesewitz/Goethestraße“ "
+  + "OT Brehna der Gemeinde Sandersdorf-Brehna. "
+  + "Kindergarten und Grundschule finden sich im Ort, weiterführende Schulen in "
+  + "Roitzsch oder Bitterfeld sind in 10 bis 15 Autominuten erreichbar.";
+
+/* A saved advert, exactly as the portal served it — the same file the backend
+   tests read. Pasting it is what a person does with Strg+A, Strg+C on a portal
+   that refuses a server-side fetch, and everything the next step shows is read
+   out of this markup without a model. */
+const PASTED_PAGE = readFileSync(
+  new URL("../backend/tests/fixtures/inserat-kleinanzeigen.html", import.meta.url), "utf8"
+);
+
 /* The map reports when every tile for the current view has arrived. A tile
  * that 502s never lets it, and a whole screenshot run must not hang on one --
  * so the wait is bounded and says what it settled for. */
@@ -113,6 +143,26 @@ async function mapSettled(page, what) {
     problems.push(`${what}: Kartenkacheln kamen nicht vollständig an`);
     await page.waitForTimeout(2000);
   }
+}
+
+/** Put a whole page into a field the way a person does — with one paste.
+ *
+ *  Not `page.fill`: Playwright inserts the text through the input pipeline, and
+ *  171 kB of markup takes ~27 s of it, which sits right under the default
+ *  timeout and fails whenever the machine is busy. A paste is also the truer
+ *  action — it is the one the product is built around, `text/html` and all, so
+ *  this exercises `takePaste` instead of going round it. */
+async function pasteInto(page, selector, text) {
+  await page.waitForSelector(selector, { state: "visible" });
+  await page.$eval(selector, (el, value) => {
+    const data = new DataTransfer();
+    data.setData("text/plain", value);
+    data.setData("text/html", value);
+    el.focus();
+    el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+    el.value = value;
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  }, text);
 }
 
 async function shot(page, name, mode, zusatz = "") {
@@ -144,23 +194,88 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
 
   await page.click(".page-head .btn");                      // Grundstück hinzufügen
   await shot(page, "assistent-1", mode, narrow ? "-schmal" : "");
+
+  /* The search, on the way past: this is the step between a listing and a
+     parcel, and the only one whose whole point is showing its working. It
+     needs no model — the text is read with patterns and the Gemarkung
+     register — so it runs here even without an LLM key. */
+  await page.getByText("Text durchsuchen").click();
+  await page.fill("#q-text", LISTING);
+  // Typed prose goes through the same reader as a pasted page, and straight on
+  // into the search: what was read rides along folded shut inside that step.
+  await page.getByRole("button", { name: "Lesen" }).click();
+  await page.waitForSelector(".suche", { timeout: 30000 });
+  await page.waitForTimeout(1500);
+  await shot(page, "suche-laeuft", mode, narrow ? "-schmal" : "");
+  /* Mid-run, once the districts are drawn but before a parcel is named: this
+     is the picture that shows whether the evidence reads against a photograph
+     at all, and it is the state a viewer spends the longest looking at. */
+  await page.waitForTimeout(2500);
+  await shot(page, "suche-indizien", mode, narrow ? "-schmal" : "");
+  try {
+    await page.waitForSelector(".suche__urteil--bestaetigt, .suche__urteil--mehrdeutig, .suche__urteil--erfolglos", { timeout: 90000 });
+    // Let the queue play the run out; it spends a fixed budget over the
+    // backlog, and the picture is of a settled map — so this has to outlast
+    // BUDGET_MS plus the last flight, not merely the verdict.
+    await page.waitForTimeout(15000);
+  } catch {
+    problems.push(`${mode}/${width}: die Suche kam zu keinem Ergebnis`);
+  }
+  await shot(page, "suche-ergebnis", mode, narrow ? "-schmal" : "");
+
+  /* And a listing this tool cannot serve. It costs no cadastre request at all:
+     the location field names the state, and every Saxon answer would be
+     somebody else's parcel. */
+  await page.click(".breadcrumb a");
+  await page.click(".page-head .btn");
+  await page.getByText("Text durchsuchen").click();
+  await page.fill("#q-text", FOREIGN_LISTING);
+  await page.getByRole("button", { name: "Lesen" }).click();
+  try {
+    await page.waitForSelector(".suche__urteil--erfolglos", { timeout: 60000 });
+    await page.waitForTimeout(4000);
+  } catch {
+    problems.push(`${mode}/${width}: das Inserat außerhalb Sachsens wurde nicht als solches erkannt`);
+  }
+  await shot(page, "suche-ausserhalb", mode, narrow ? "-schmal" : "");
+
+  /* The pasted page, and what was read off it. This is the way in for a portal
+     that refuses a server-side fetch, and it needs no model either: price,
+     area, coordinate and pictures come out of the markup. The list is folded
+     away inside the search now, so the picture is of it opened. */
+  await page.click(".breadcrumb a");
+  await page.click(".page-head .btn");
+  await page.getByText("Seite einfügen", { exact: true }).click();
+  await pasteInto(page, "#q-paste", PASTED_PAGE);
+  await page.getByRole("button", { name: "Lesen" }).click();
+  try {
+    await page.waitForSelector("details.gelesen", { timeout: 30000 });
+    await page.click("details.gelesen > summary");
+    await page.waitForSelector(".suggestions", { timeout: 5000 });
+  } catch {
+    problems.push(`${mode}/${width}: die eingefügte Seite wurde nicht gelesen`);
+  }
+  await shot(page, "assistent-werte", mode, narrow ? "-schmal" : "");
+
+  await page.click(".breadcrumb a");
+  await page.click(".page-head .btn");
   await page.getByText("Flurstück direkt").click();
   await pickDistrict(page, "Liebertwolkwitz");
   await page.fill("#q-parcel-number", "85/1");
   await shot(page, "assistent-2", mode, narrow ? "-schmal" : "");
   await page.getByRole("button", { name: "Nachschlagen" }).click();
   await page.waitForSelector(".site-plan", { timeout: 60000 });
+  /* The last step: the outline, what is being taken over, and the three fields
+     that used to be a page of their own. */
   await shot(page, "assistent-3", mode, narrow ? "-schmal" : "");
-  await page.getByRole("button", { name: "Passt" }).click();
-  await shot(page, "assistent-4", mode, narrow ? "-schmal" : "");
 
   /* Every step of the wizard has an address of its own, so the browser's back
    * button steps back one step instead of leaving the wizard. */
   await page.goBack();
   await page.waitForTimeout(200);
   const steppedBackTo = new URL(page.url()).pathname;
-  if (steppedBackTo !== "/aufnahme/flurstueck") {
-    problems.push(`${mode}/${width}: Zurück führte von „Angaben“ nach ${steppedBackTo}`);
+  if (steppedBackTo !== "/aufnahme/quelle") {
+    problems.push(`${mode}/${width}: Zurück führte von „Flurstück“ nach ${steppedBackTo}`);
   }
   await page.goForward();
   await page.waitForSelector("#q-name", { timeout: 10000 });
@@ -267,7 +382,6 @@ countTiles(page);
 await page.goto(address, { waitUntil: "load" });
 await page.evaluate(() => document.fonts.ready);
 await addPlot(page);
-await page.getByRole("button", { name: "Passt" }).click();
 await page.getByRole("button", { name: "Anlegen und öffnen" }).click();
 await page.waitForTimeout(6000);
 await page.emulateMedia({ media: "print" });

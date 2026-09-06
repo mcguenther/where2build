@@ -239,12 +239,32 @@ class TilesSettings(BaseSettings):
     webatlas_layers: str = "Vegetation,Siedlung,Gewaesser,Verkehr,Administrative_Einheiten,Beschriftung"
     alkis_url: str = "https://geodienste.sachsen.de/wms_geosn_alkis-adv/guest"
     alkis_layers: str = "adv_alkis_tatsaechliche_nutzung,adv_alkis_verkehr,adv_alkis_siedlung"
+    # Parcel outlines for laying over an orthophoto. „Gelb“ is the service's own
+    # overlay style -- contours, no fills. The layer carries
+    # MaxScaleDenominator 2000 and answers 200 with an empty PNG above it, so
+    # the floor is measured rather than chosen: z18 is 1:2133 and blank, z19 is
+    # 1:1066 and draws.
+    parcel_layers: str = "adv_alkis_flurstuecke"
+    parcel_styles: str = "Gelb"
+    # The layer's own MaxScaleDenominator, read from its GetCapabilities. The
+    # proxy renders each tile at whatever pixel size puts the denominator under
+    # this and scales the result back down, so the outlines draw far above the
+    # zoom the service would otherwise start at.
+    parcel_max_scale_denominator: float = 2000
+    # z14 would need 4368 px for one tile and the service refuses anything over
+    # 4000, so that is where oversampling runs out. z15 is the floor.
+    parcel_min_zoom: int = 15
+    # Roads and their names, transparent at every zoom measured (13 to 19).
+    street_layers: str = "Verkehr,Beschriftung"
     # XYZ tiles are Web Mercator. Should a service reject EPSG:3857, EPSG:4326
     # also works -- the axis order is handled per CRS.
     crs: str = "EPSG:3857"
     image_format: str = "image/png"
     tile_size: int = 256
     transparent: bool = True
+    # What the service will render in one request. `MaxWidth`/`MaxHeight` in the
+    # ALKIS capabilities; asking for more is refused outright.
+    max_render_size: int = 4000
     cache_ttl_s: int = 30 * 24 * 3600
     max_zoom: int = 21
 
