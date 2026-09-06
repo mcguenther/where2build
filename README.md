@@ -26,7 +26,7 @@ takes to get to work, school and the station.
 
 | | |
 |---|---|
-| **Take a plot in** | From the search field, from a listing URL, from a pasted page, or straight from *Gemarkung* + parcel numbers. The search reads what was typed before it looks anything up — an address never begins with a digit, a coordinate is two numbers, a parcel denominator cannot occur in an address — and where two readings stay plausible it asks both local indexes rather than guessing. A four-step wizard shows what the model read, where each value came from, and what it could not find. |
+| **Take a plot in** | From the search field, from a listing URL, from a pasted page, from a description alone, or straight from *Gemarkung* + parcel numbers. The search reads what was typed before it looks anything up — an address never begins with a digit, a coordinate is two numbers, a parcel denominator cannot occur in an address — and where two readings stay plausible it asks both local indexes rather than guessing. The wizard shows what was read, where each value came from, and what it could not find. Only a description alone ever asks a model. A plot is a *set* of parcels: the last step takes further ones by pointing at them on the drawing. |
 | **Resolve the parcels** | ALKIS gives the outline, the official area and the parcel identifier. A plot is a *set* of parcels — the normal case, not the exception — so geometries are unioned and official areas summed. |
 | **Judge the shape** | Rectangularity as polygon area over the area of its smallest rotated bounding rectangle, plus street frontage and vertex count. |
 | **Judge the price** | €/m² against the BORIS land value for the zone, as a percentage rather than a hunch. |
@@ -101,7 +101,7 @@ if you want it separately.
 | **POI directory** | `backend/data` is mounted read-only. Build the index with `python backend/scripts/build_poi_index.py --download` and `/api/nearby` will use it; without it that endpoint says so for the OpenStreetMap categories instead of answering with an empty list. The default extract is all of Saxony; `--url` and `--out` take any other region — see [Reach of the POI index](#reach-of-the-poi-index). |
 | **Extraction** | Without `LLM_API_KEY` in `backend/.env`, reading a listing page stays switched off. Everything else works. |
 | **Contact address** | Set `APP_CONTACT` before any real use: the Transitous usage policy requires one. |
-| **Own router** | `docker compose --profile local-routing up` runs MOTIS here instead of asking Transitous. See below. |
+| **Own router** | `docker compose -f docker-compose.yml -f docker-compose.local-routing.yml up` runs MOTIS here instead of asking Transitous. See below. |
 
 `backend/.env` is read if it exists and skipped if it does not, so the stack
 comes up either way.
@@ -131,7 +131,7 @@ and replaces a volume, which is a host-side operation, so it stays a host cron
 entry:
 
 ```cron
-40 2 * * 1  cd /srv/where2build && ./motis/fetch-data.sh && docker compose --profile local-routing up -d --force-recreate motis-import motis
+40 2 * * 1  cd /srv/where2build && ./motis/fetch-data.sh && docker compose -f docker-compose.yml -f docker-compose.local-routing.yml up -d --force-recreate motis-import motis
 ```
 
 ### Routing on your own machine
@@ -140,16 +140,20 @@ Routing goes to [Transitous](https://api.transitous.org) by default. That is a
 volunteer service: its policy asks to be contacted before "many requests",
 counts routing itself as resource-intensive, and rules out commercial use
 (`docs/research/routing-motis.md` § 6). Anything past a prototype should bring
-its own router, and the `local-routing` profile is that router.
+its own router, and `docker-compose.local-routing.yml` is that router.
 
 ```bash
 ./motis/fetch-data.sh                                   # ~420 MB of input data
-MOTIS_BASE_URL=http://motis:8080 \
-  docker compose --profile local-routing up --build     # first start imports
+docker compose -f docker-compose.yml -f docker-compose.local-routing.yml \
+  up --build                                           # first start imports
 ```
 
-Without the profile nothing changes: `docker compose up` is still two
-containers and still talks to Transitous.
+Without that second file nothing changes: `docker compose up` is still two
+containers and still talks to Transitous. Naming the file is the whole opt-in —
+it brings the router up *and* points the backend at it, so there is no
+`MOTIS_BASE_URL` to remember. Forgetting it used to start the local router and
+then route against Transitous anyway, with nothing to see: the two agree to the
+last decimal, so the only sign was whose bandwidth was being spent.
 
 | | |
 |---|---|
@@ -243,6 +247,7 @@ nothing else.
 |---|---|---|
 | `POST` | `/api/parcels/resolve` | address, coordinate (WGS84 or ETRS89/UTM33N as the Geoportal prints it), *Gemarkung* + numerator/denominator, or a set of `kennzeichen` → GeoJSON in EPSG:4326 with the official area. A plot is a set of parcels: the geometries are unioned and the official areas summed |
 | `POST` | `/api/parcels/nearby` | one coordinate → the parcels around it, the one covering it first, then by distance — an address coordinate sits on the building the register recorded, and a few metres either way is the neighbour's parcel |
+| `POST` | `/api/parcels/search` | everything a listing says → the parcel it is selling, as **NDJSON**: one object per line while the search runs, so the map grows with it. `…/search/complete` is the same run as one answer |
 | `POST` | `/api/listings/extract` | `{url}` or `{text}` → listing fields, each with its source |
 | `POST` | `/api/housetypes/extract` | `{url}` → house type, fetch restricted to the manufacturer's domain |
 | `GET` | `/api/landvalue` | `?lat=&lon=` → €/m², zone, reference date, and the size of the notional plot the value is quoted for |
@@ -291,8 +296,24 @@ Each of these is verified, not assumed — the details are in
   fails outright on the combined layer. Use `text/plain` or GML.
 - **immobilienscout24.de answers server-side fetches with 401** on every route
   tested, so its adapter goes straight to the paste field.
+- **`adv_alkis_flurstuecke` carries `MaxScaleDenominator: 2000`** and answers
+  HTTP 200 with a transparent PNG above it — and a scale limit is steerable.
+  The denominator is `(bbox / image width) / 0,00028`, so the proxy renders each
+  tile larger (z18 at 512 px, z15 at 2304) and scales it back: the layer draws
+  from zoom 15 instead of 19, and the browser still gets a 10–39 kB tile. It
+  runs out at z14, which would need 4368 px against the service's 4000 limit.
+  Its `Gelb` style is the one meant for overlaying — contours, no fills.
 - **kleinanzeigen.de carries `og:latitude`/`og:longitude`** in its meta tags —
-  parse those and skip both the geocoder and the model call.
+  parse those and skip both the geocoder and the model call. The asking price
+  is there too (`<meta itemprop="price">`, JSON-LD, `#viewad-price`), which is
+  why no listing needs a model to give up its price.
+- **The clipboard carries `text/html` alongside `text/plain`**, and a textarea
+  shows only the second. The paste field keeps the first, so a copied page
+  arrives with its meta tags and is read the same way a fetched one is — no
+  provider key involved.
+- **A dot is a German thousands separator only in groups of three.** Stripping
+  every dot turned the coordinate `51.189265` into `51189265` and made the
+  search endpoint answer 422 for every listing that carried one.
 - **ALKIS stored queries need the `CRS` parameter**; without it the service
   answers HTTP 400 with a generic HTML page rather than an OGC error. Ad-hoc
   `fes:Filter` expressions need the `ave:` namespace prefix.
@@ -312,6 +333,48 @@ Each of these is verified, not assumed — the details are in
 - **Never show example data.** There is no sample state and no fallback. A
   derived figure whose input is missing stays a dash; computing it anyway is
   where "0,00 €" and "−100 % under the land value" came from.
+
+### Finding the parcel a listing is selling
+
+A listing almost never names its Flurstück, and its map pin is not the plot —
+measured 6 235 m away on a real advert, because the platform geocodes its own
+location field. `POST /api/parcels/search` therefore asks the cadastre a series
+of narrow questions instead of one broad one, and reports every step.
+
+* **The cheap case is cheap.** A Gemarkung and a parcel number resolve in
+  **two requests** and stop — but not before the parcel that came back is
+  checked against the other things the listing says, because a misread digit
+  resolves to a real but foreign parcel and validating against ALKIS is exactly
+  what does not catch that.
+* **Contradictions are shown, not resolved quietly.** Several districts named
+  in one text become a `Konflikt` with the sentence each was read from; the
+  user can pick a different one, or switch a clue off, and the search runs
+  again. Often it never has to be asked: the parcel number exists in only one
+  of the contested districts, and four count requests settle it.
+* **When no single parcel can be named, the answer says what is settled** —
+  the street, the district, the municipality. For the land value and for travel
+  times that is often enough.
+
+The measurements behind every threshold are in
+`docs/research/flurstueck-identifikation.md`; the six phases are drawn out in
+`docs/strategie/suchalgorithmus.html`.
+
+**A seller who attaches a Geoportal print has already answered the question.**
+The images are read for „Flurstück“ and „Gemarkung“ — upscale to 1 500 px, then
+`--psm 6`, then `--psm 1` only if nothing matched — but only when the text
+names no parcel, and the loop stops at the first hit. Measured on a real
+advert: image four of seven yielded `Flurstück 790/11` in 862 ms and the whole
+search then took **two** cadastre requests; across 21 real listing images there
+was no false parcel number and no false Gemarkung, which is why every image is
+read and filtered by pattern rather than sorted first.
+
+Tesseract is optional, like the POI index. Without it `/api/health` says so and
+the search runs on the listing's text:
+
+```bash
+apt-get install -y tesseract-ocr tesseract-ocr-deu
+backend/.venv/bin/pip install -e "backend[ocr]"
+```
 
 ## Not done yet
 
@@ -335,6 +398,15 @@ Each of these is verified, not assumed — the details are in
   and broadband portals have no open interface. All three are shown as open
   with the reason rather than left out, because a list that silently omits what
   it cannot answer reads as a complete one.
+- **immobilienscout24.de still answers 401** to every server-side request, so
+  its pictures cannot be fetched here either. The paste field is the way in:
+  image extraction falls back to ordinary `<img>` URLs for pages whose markup
+  is not known, and those CDNs generally do answer.
+- **The street filter uses the cadastre's own address field, not OSM.** That is
+  free and needs no Overpass, but it only covers the parcels that carry an
+  address — half of them in the district measured. The OSM buffer (25 → 5 on
+  the reference case) needs a street index built from the Saxony extract, the
+  same way `scripts/build_poi_index.py` builds the POI one.
 
 ## Attribution
 

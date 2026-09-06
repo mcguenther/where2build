@@ -12,7 +12,7 @@ import { nextTick } from "vue";
 import CadastralDistrictPicker from "../src/components/CadastralDistrictPicker.vue";
 import WizardView from "../src/views/WizardView.vue";
 import { state } from "../src/lib/store.js";
-import { realState, realPlot, mountWithRouter } from "./helpers.js";
+import { realPlot, realState, mountWithRouter } from "./helpers.js";
 import directory from "./fixtures/gemarkungen.json";
 import moelkau from "./fixtures/parcel-moelkau.json";
 import moelkauZwei from "./fixtures/parcel-moelkau-zwei.json";
@@ -32,7 +32,7 @@ vi.mock("../src/lib/api.js", () => ({
   nearby: vi.fn(),
   nearbyParcels: vi.fn()
 }));
-const { cadastralDistricts, resolveParcel, landValue, nearbyParcels } =
+const { cadastralDistricts, resolveParcel, landValue, readPage, nearbyParcels } =
   await import("../src/lib/api.js");
 
 beforeEach(() => {
@@ -251,6 +251,101 @@ describe("Der Schritt „Flurstück“", () => {
 });
 
 
+describe("Aufnahme — Absenden", () => {
+  const atSource = () =>
+    mountWithRouter(WizardView, { path: "/aufnahme/quelle", props: { stage: "quelle" } });
+
+  it("liest die Anzeige auch, wenn im Feld nur Enter gedrückt wurde", async () => {
+    resolveParcel.mockResolvedValue(moelkau);
+    landValue.mockRejectedValue(new Error("Kein Bodenrichtwert."));
+
+    const w = atSource();
+    await w.find('input[value="parcel"]').setValue();
+    await flushPromises();
+
+    await typeInto(w.findComponent(CadastralDistrictPicker).find("input"), "Moritzburg");
+    await typeInto(w.find("#q-parcel-number"), "85/1");
+    // Was das Drücken von Enter in einem Textfeld auslöst.
+    await w.find("form").trigger("submit");
+    await flushPromises();
+
+    expect(resolveParcel).toHaveBeenCalledWith({ gemarkung: "Moritzburg", flurstuecksnummer: "85/1" });
+  });
+
+  it("liest genau einmal, wenn der Knopf geklickt wird", async () => {
+    resolveParcel.mockResolvedValue(moelkau);
+    landValue.mockRejectedValue(new Error("Kein Bodenrichtwert."));
+
+    const w = atSource();
+    await w.find('input[value="parcel"]').setValue();
+    await flushPromises();
+
+    await typeInto(w.findComponent(CadastralDistrictPicker).find("input"), "Moritzburg");
+    await typeInto(w.find("#q-parcel-number"), "85/1");
+    await w.findAll("button").find(b => b.text() === "Nachschlagen").trigger("click");
+    await flushPromises();
+
+    expect(resolveParcel).toHaveBeenCalledTimes(1);
+  });
+
+  it("schickt bei leerem Feld gar nichts los", async () => {
+    const w = atSource();
+    await w.find('input[value="parcel"]').setValue();
+    await flushPromises();
+
+    await w.find("form").trigger("submit");
+    await flushPromises();
+
+    expect(resolveParcel).not.toHaveBeenCalled();
+  });
+
+  it("nimmt das HTML aus der Zwischenablage mit, nicht nur den Text", async () => {
+    readPage.mockResolvedValue({ felder: {}, beschreibung: "", bilder: [] });
+
+    const w = atSource();
+    await w.find('input[value="paste"]').setValue();
+    await flushPromises();
+
+    const field = w.find("#q-paste");
+    const html = "<html><meta property=\"og:latitude\" content=\"51.19\"><body>Baugrundstück in Lobstädt, 1.025 m²</body></html>";
+    await field.trigger("paste", {
+      clipboardData: { getData: kind => (kind === "text/html" ? html : "Baugrundstück in Lobstädt, 1.025 m²") }
+    });
+    await typeInto(field, "Baugrundstück in Lobstädt, 1.025 m²");
+    await flushPromises();
+
+    expect(w.text()).toContain("Das HTML wurde übernommen");
+
+    await w.find("form").trigger("submit");
+    await flushPromises();
+
+    expect(readPage).toHaveBeenCalledWith(html);
+  });
+
+  it("vergisst das HTML, sobald das Feld geleert wird", async () => {
+    readPage.mockResolvedValue({ felder: {}, beschreibung: "", bilder: [] });
+
+    const w = atSource();
+    await w.find('input[value="paste"]').setValue();
+    await flushPromises();
+
+    const field = w.find("#q-paste");
+    await field.trigger("paste", {
+      clipboardData: { getData: () => "<html>die vorige Seite</html>" }
+    });
+    await typeInto(field, "die vorige Seite");
+    await typeInto(field, "");
+    await typeInto(field, "Ein ganz anderer Text, von Hand getippt und lang genug.");
+    await flushPromises();
+
+    await w.find("form").trigger("submit");
+    await flushPromises();
+
+    expect(readPage).toHaveBeenCalledWith("Ein ganz anderer Text, von Hand getippt und lang genug.");
+  });
+});
+
+
 /**
  * A plot is a set of parcels, and this is where the user assembles it: the
  * fixtures are the backend's real answers for Lessingweg 44 alone, together
@@ -399,5 +494,59 @@ describe("Ein Grundstück aus mehreren Flurstücken", () => {
     const create = w.findAll("button").find(b => b.text().includes("Anlegen und öffnen"));
     expect(create.attributes("disabled")).toBeUndefined();
     w.unmount();
+  });
+});
+
+
+describe("Aufnahme — beide Textwege enden im selben Schritt", () => {
+  const atSource = () =>
+    mountWithRouter(WizardView, { path: "/aufnahme/quelle", props: { stage: "quelle" } });
+
+  const answer = {
+    felder: {
+      grundstuecksflaeche_m2: { wert: 1300, quelle_url: null },
+      kaufpreis_eur: { wert: 125000, quelle_url: null },
+      adresse: { wert: "Sachsen - Rötha", quelle_url: null }
+    },
+    beschreibung: "Baugrundstück im Ortsteil Oelzschau, zugehörig zur Stadt Rötha.",
+    bilder: []
+  };
+
+  it("liest getippten Text über dieselbe Stelle wie eine eingefügte Seite", async () => {
+    readPage.mockResolvedValue(answer);
+
+    const w = atSource();
+    await w.find('input[value="text"]').setValue();
+    await flushPromises();
+    await typeInto(w.find("#q-text"), answer.beschreibung);
+    await w.find("form").trigger("submit");
+    await flushPromises();
+
+    expect(readPage).toHaveBeenCalledWith(answer.beschreibung);
+    // Durch denselben Leser wie eine eingefügte Seite — und weiter, ohne
+    // Zwischenschritt: die gelesenen Werte fahren zusammengeklappt mit.
+    expect(w.vm.readFields.map(f => f.key)).toContain("grundstuecksflaeche_m2");
+    expect(w.vm.description).toContain("Oelzschau");
+    expect(w.vm.searchQuery).not.toBeNull();
+    expect(w.vm.returnStage).toBe("suche");
+  });
+
+  it("führt bei der Fläche die Einheit mit, ohne sie in das Feld zu schreiben", async () => {
+    readPage.mockResolvedValue(answer);
+
+    const w = atSource();
+    await w.find('input[value="text"]').setValue();
+    await flushPromises();
+    await typeInto(w.find("#q-text"), answer.beschreibung);
+    await w.find("form").trigger("submit");
+    await flushPromises();
+
+    const area = w.vm.readFields.find(f => f.key === "grundstuecksflaeche_m2");
+    expect(area.unit).toBe("m²");
+    // Nicht im Wert: das ist die Zahl, die ans Kataster geht.
+    expect(String(area.value)).not.toContain("m²");
+    expect(w.vm.readFields.find(f => f.key === "kaufpreis_eur").unit).toBe("€");
+    // A name is not a unit: only the fields that have one carry one.
+    expect(w.vm.readFields.find(f => f.key === "adresse").unit).toBe("");
   });
 });

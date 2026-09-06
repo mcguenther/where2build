@@ -24,6 +24,7 @@ def test_health_lists_every_service(client: TestClient):
         "tiles",
         "basemap",
         "llm",
+        "texterkennung",
     }
     assert dienste["llm"]["konfiguriert"] is True
     assert dienste["alkis"]["endpunkt"].endswith("/wfs")

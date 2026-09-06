@@ -6,7 +6,9 @@
  * in the browser, because only the browser knows what "system" resolved to.
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { vectorStyle, withOverlay, NOISE_BANDS } from "../src/lib/basemap.js";
+import {
+  PARCEL_OUTLINE_MIN_ZOOM, aerialCadastreStyle, vectorStyle, withOverlay, NOISE_BANDS
+} from "../src/lib/basemap.js";
 import { state, darkTheme, watchSystemTheme } from "../src/lib/store.js";
 
 /** Just enough of a style document for `vectorStyle` to hand back. */
@@ -121,13 +123,14 @@ describe("Der Lärmschleier über dem Hintergrund", () => {
   it("zeichnet die Katasterlinien über dem Luftbild fast deckend", () => {
     // A boundary at the noise veil's 45 % is a smudge on a photograph; the
     // bands are areas and must stay translucent, the lines must not.
-    const lines = withOverlay(backdrop(), "flurstuecke", "aerial");
+    const lines = withOverlay(backdrop(), "liegenschaftskarte", "aerial");
     const bands = withOverlay(backdrop(), "laerm", "aerial");
 
     const opacity = style => style.layers.at(-1).paint["raster-opacity"];
     expect(opacity(lines)).toBeGreaterThan(0.9);
     expect(opacity(lines)).toBeGreaterThan(opacity(bands));
-    expect(lines.sources.flurstuecke.tiles[0]).toContain("/api/tiles/flurstuecke/{z}/{x}/{y}.png");
+    expect(lines.sources.liegenschaftskarte.tiles[0])
+      .toContain("/api/tiles/liegenschaftskarte/{z}/{x}/{y}.png");
   });
 
   it("lässt einen unbekannten Namen den Stil unverändert", () => {
@@ -142,5 +145,55 @@ describe("Der Lärmschleier über dem Hintergrund", () => {
     expect(NOISE_BANDS.laerm[0].label).toBe("50–54");
     expect(NOISE_BANDS.laerm.map(b => b.label)).not.toContain("45–49");
     expect(NOISE_BANDS.laerm.every(band => /^rgb\(/.test(band.colour))).toBe(true);
+  });
+
+  it("nimmt für den Grundstücksmaßstab die lesbare Katasterkarte, nicht die Suchkarte", () => {
+    // Beides ist adv_alkis_flurstuecke, aber nicht dasselbe Bild: die Suchkarte
+    // wird vergrößert gerendert, damit ihre Umringe über einen ganzen Bezirk
+    // zeichnen — und ihre Beschriftung schrumpft dabei mit. Über einem
+    // Grundstück sind die Nummern der Zweck, also wird eine schlichte Kachel
+    // geholt und stattdessen die Maßstabsgrenze verschoben.
+    const style = withOverlay(backdrop(), "liegenschaftskarte", "aerial");
+
+    expect(style.sources.liegenschaftskarte.minzoom).toBeUndefined();
+    expect(style.layers.at(-1).minzoom).toBeUndefined();
+    // Der Suchhintergrund dagegen hat eine Untergrenze, weil dort das
+    // Vergrößern irgendwann am Dienst scheitert.
+    expect(aerialCadastreStyle().sources.flurstuecke.minzoom).toBe(PARCEL_OUTLINE_MIN_ZOOM);
+  });
+});
+
+describe("Luftbild mit Kataster", () => {
+  it("legt Foto, Straßen und Flurstücksgrenzen in dieser Reihenfolge übereinander", () => {
+    const style = aerialCadastreStyle();
+
+    // Die Reihenfolge ist der ganze Trick: das Foto unten, die Straßen
+    // darüber, die Grenzen zuoberst.
+    expect(style.layers.map(l => l.id)).toEqual(["dop", "strassen", "flurstuecke"]);
+    style.layers.forEach(layer => expect(layer.type).toBe("raster"));
+  });
+
+  it("holt jede Ebene durch das eigene Backend", () => {
+    const style = aerialCadastreStyle();
+
+    Object.entries(style.sources).forEach(([name, source]) => {
+      expect(source.tiles[0]).toContain(`/api/tiles/${name}/`);
+      expect(source.attribution).toContain("GeoSN");
+    });
+  });
+
+  it("fragt die Flurstücksgrenzen erst da, wo der Dienst sie zeichnet", () => {
+    const style = aerialCadastreStyle();
+
+    // adv_alkis_flurstuecke trägt MaxScaleDenominator 2000 und antwortet
+    // darüber mit einer leeren PNG statt mit einem Fehler. Das Backend rendert
+    // die Kachel deshalb größer und skaliert sie zurück — das trägt bis Zoom 15;
+    // Zoom 14 bräuchte 4368 px, und der Dienst rendert höchstens 4000.
+    expect(PARCEL_OUTLINE_MIN_ZOOM).toBe(15);
+    expect(style.sources.flurstuecke.minzoom).toBe(PARCEL_OUTLINE_MIN_ZOOM);
+    expect(style.layers.find(l => l.id === "flurstuecke").minzoom).toBe(PARCEL_OUTLINE_MIN_ZOOM);
+    // Das Foto und die Straßen dagegen zeichnen auf jeder Stufe.
+    expect(style.sources.dop.minzoom).toBeUndefined();
+    expect(style.sources.strassen.minzoom).toBeUndefined();
   });
 });

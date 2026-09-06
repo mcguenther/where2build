@@ -16,18 +16,31 @@ WORKDIR /app
 # Dependencies first: the sources change far more often than pyproject.toml, so
 # this layer survives most rebuilds.
 COPY pyproject.toml ./
-# osmium links against expat at runtime, and the slim image does not carry it:
+# Two system dependencies, both invisible to pip.
+#
+# osmium links against expat at runtime and the slim image does not carry it:
 # the wheel installs cleanly and then fails on import with
 # "libexpat.so.1: cannot open shared object file", which looks like a broken
 # package rather than a missing system library.
+#
+# Tesseract is the reader for a listing's attached cadastral extract, and the
+# German language data is not optional either -- the patterns key on the words
+# around the number ("Flurstück", "Gemarkung"), which the default English model
+# does not produce. Without both, /api/health reports the channel as missing
+# and every search runs on the listing's text alone, which is what "keine
+# Bilderkennung eingerichtet" was saying.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends libexpat1 \
+ && apt-get install -y --no-install-recommends \
+      libexpat1 \
+      tesseract-ocr \
+      tesseract-ocr-deu \
  && rm -rf /var/lib/apt/lists/*
 
-# The "poi" extra brings osmium, which only the index build needs — but the
-# scheduler runs that build from this image, so leaving it out makes that
-# job fail on an import nobody can fix from outside the container.
-RUN pip install --no-cache-dir ".[poi]" && pip uninstall -y where2build-backend
+# "poi" brings osmium, which only the index build needs — but the scheduler
+# runs that build from this image, so leaving it out makes that job fail on an
+# import nobody can fix from outside the container. "ocr" brings Pillow, which
+# does the upscale that the measurements say buys the most.
+RUN pip install --no-cache-dir ".[poi,ocr]" && pip uninstall -y where2build-backend
 
 COPY app ./app
 # The scheduler runs these, and it runs from this same image — the jobs are

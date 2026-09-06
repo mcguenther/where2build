@@ -698,10 +698,25 @@ describe("Aufnahme — Schritt Flurstück", () => {
       expect(plan.props("building")).toBeNull();
       expect(plan.props("showBuilding")).toBe(false);
       expect(w.find("[data-house]").exists()).toBe(false);
-      // Der Schritt trägt jetzt auch die Angaben: ein „Passt“ dazwischen
-      // entschied nichts.
+      // Der Schritt trägt jetzt auch die Angaben, also endet er beim Anlegen.
       expect(w.text()).toContain("Anlegen und öffnen");
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
+  it("nimmt Name, Kaufpreis und Notiz im selben Schritt auf", async () => {
+    // Drei Felder waren eine eigene Seite, und der Umriss, den sie beschreiben,
+    // war dabei nicht zu sehen.
+    const original = globalThis.fetch;
+    globalThis.fetch = () => new Promise(() => {});
+    try {
+      const w = await atParcelStage();
+
       expect(w.find("#q-name").exists()).toBe(true);
+      expect(w.find("#q-price").exists()).toBe(true);
+      expect(w.find("#q-note").exists()).toBe(true);
+      expect(w.findComponent({ name: "SitePlan" }).exists()).toBe(true);
     } finally {
       globalThis.fetch = original;
     }

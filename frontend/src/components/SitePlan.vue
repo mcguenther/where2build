@@ -200,7 +200,7 @@ import {
 import { cameraFor, toLocal, toWgs84 } from "../lib/projection.js";
 import { outerRing } from "../lib/plots.js";
 import { num, area } from "../lib/format.js";
-import { BACKDROPS, withOverlay } from "../lib/basemap.js";
+import { BACKDROPS, canRenderMap, withOverlay } from "../lib/basemap.js";
 import { darkTheme } from "../lib/store.js";
 // MapLibre 6 ships named exports only — there is no default.
 // Its worker URL is set once in main.js; see the note there.
@@ -394,7 +394,8 @@ export default {
 
     /** Whether the ground under the drawing already names the parcels. */
     groundNamesParcels() {
-      return this.hasBackdrop && (this.backdrop === "cadastre" || this.overlay === "flurstuecke");
+      return this.hasBackdrop
+        && (this.backdrop === "cadastre" || this.overlay === "liegenschaftskarte");
     },
 
     /** Those whose number lands inside the drawing and clear of one already
@@ -699,6 +700,13 @@ export default {
     },
     async buildMap() {
       if (!this.hasBackdrop || !this.plot.anchor || this._map) return;
+      // A raster backdrop needs no network, so without this the map would be
+      // constructed wherever there is no WebGL and only fail on the way out,
+      // inside the library. The flag is a boolean here, not a message.
+      if (!canRenderMap()) {
+        this.mapUnavailable = true;
+        return;
+      }
       const run = ++this._mapRun;
       try {
         const style = withOverlay(

@@ -6,7 +6,7 @@
 # no network of their own.
 #
 #   ./motis/fetch-data.sh
-#   MOTIS_BASE_URL=http://motis:8080 docker compose --profile local-routing up
+#   docker compose -f docker-compose.yml -f docker-compose.local-routing.yml up
 #
 # Both files are licensed CC-BY 4.0 and must be attributed:
 #   - OpenStreetMap contributors (https://www.openstreetmap.org/copyright)
@@ -48,4 +48,4 @@ fetch "$gtfs_url" "$out/timetable.gtfs.zip"
 
 echo
 echo "Inputs ready in $out. Next:"
-echo "  MOTIS_BASE_URL=http://motis:8080 docker compose --profile local-routing up --build"
+echo "  docker compose -f docker-compose.yml -f docker-compose.local-routing.yml up --build"

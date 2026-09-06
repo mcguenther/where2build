@@ -9,7 +9,7 @@
  * the neighbours are on the map either way.
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { mount } from "@vue/test-utils";
+import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import SitePlan from "../src/components/SitePlan.vue";
 import { parcelForAddress } from "../src/lib/plots.js";
@@ -138,9 +138,11 @@ describe("Flurstücksauswahl im Lageplan", () => {
     expect(plan.findAll(".site-plan__choice-label").length).toBeGreaterThan(0);
 
     await plan.setProps({ backdrop: "cadastre" });
+    await flushPromises();
     // Ohne WebGL kommt in jsdom keine Karte hoch, und dann beschriftet der
     // Lageplan selbst: die Regel hängt am vorhandenen Grund, nicht am
-    // gewünschten.
+    // gewünschten. Der Versuch wird deshalb hier abgeschlossen und die Flagge
+    // danach zurückgesetzt — sonst setzt der Aufbau sie gleich wieder.
     plan.vm.mapUnavailable = false;
     await nextTick();
 

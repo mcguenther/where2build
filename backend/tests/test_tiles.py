@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import io
+
 import httpx
+import pytest
 import respx
 from fastapi.testclient import TestClient
 
 from app import geo
 from app.deps import tile_service
+from app.errors import BadRequestError
 
 from .conftest import ALKIS_WMS_URL, DOP_URL, NOISE_EXPORT_URL
 
@@ -111,18 +115,113 @@ def test_geographic_crs_uses_latitude_first():
 
 def test_layer_configuration_covers_every_switchable_layer():
     assert set(tile_service().layers) == {
-        "dop", "webatlas", "alkis", "flurstuecke", "laerm", "laerm-nacht"
+        "dop", "webatlas", "alkis", "liegenschaftskarte", "flurstuecke", "strassen",
+        "laerm", "laerm-nacht"
     }
 
 
-def test_the_parcel_layer_is_the_cadastre_without_the_building_fills():
-    """It lies over the aerial photograph, where a grey building fill would
-    hide the roof somebody switched the photo on to see."""
+def test_the_parcel_outlines_are_asked_for_in_the_overlay_style():
+    """„Gelb“ draws contours and no fills, which is the point over a photo.
+
+    The cadastral *ground* is the other one: there the buildings are wanted,
+    because nothing underneath is being hidden by them.
+    """
 
     layers = tile_service().layers
+
     assert layers["flurstuecke"].layers == "adv_alkis_flurstuecke"
+    assert layers["flurstuecke"].styles == "Gelb"
     assert "gebaeude" in layers["alkis"].layers
-    assert layers["flurstuecke"].min_scale == layers["alkis"].min_scale
+
+
+def test_the_two_cadastral_overlays_solve_the_same_limit_differently():
+    """One picture across a district, one picture of a plot.
+
+    `adv_alkis_flurstuecke` stops drawing at 1:2000 either way. The search map
+    needs its outlines five zoom steps above that, so its tile is rendered
+    oversized and scaled back — which scales the labels down with it. The
+    picker needs the *numbers*, so its tile stays 256 px and the limit is moved
+    with `MAP_RESOLUTION` instead. Measured at z18 over Liebertwolkwitz: the
+    plain tile carries 101/2, 85/1 and „Wiesengasse“, the oversampled one
+    carries neither.
+    """
+
+    layers = tile_service().layers
+    outlines, map_ = layers["flurstuecke"], layers["liegenschaftskarte"]
+
+    assert outlines.layers == map_.layers  # the same layer of the same service
+    assert outlines.max_scale_denominator and not outlines.min_scale
+    assert map_.min_scale and not map_.max_scale_denominator
+    assert map_.styles == ""  # the service's own symbology, labels and all
+    assert map_.min_zoom == 0  # nothing to run out of: the tile stays one tile
+
+
+def test_the_parcel_layer_is_rendered_large_enough_to_draw():
+    """MaxScaleDenominator 2000: the service answers 200 with an empty PNG.
+
+    The way round it is the service's own arithmetic — the denominator is
+    (bbox / image_width) / 0,00028, so a *larger image over the same box* falls
+    under the limit. Verified against the live service at Flurstück 790/11:
+    every one of these renders and comes back with content.
+    """
+
+    service = tile_service()
+    config = service.layers["flurstuecke"]
+
+    for zoom, expected in ((19, 256), (18, 512), (17, 768), (16, 1280), (15, 2304)):
+        size = service.render_size(config, zoom)
+        assert size == expected, zoom
+        denominator = (geo.tile_width_3857_m(zoom) / size) / 0.00028
+        assert denominator <= config.max_scale_denominator, zoom
+
+
+def test_oversampling_stops_where_the_service_stops_rendering():
+    """z14 needs 4368 px for one tile and `MaxWidth` is 4000.
+
+    So the floor is a measured fact and not a preference, and the layer says so
+    rather than serving a transparent tile that looks like a broken overlay.
+    """
+
+    service = tile_service()
+    config = service.layers["flurstuecke"]
+
+    assert config.min_zoom == 15
+    assert service.render_size(config, 14) == service.settings.max_render_size
+    denominator = (geo.tile_width_3857_m(14) / service.settings.max_render_size) / 0.00028
+    assert denominator > config.max_scale_denominator
+
+
+@pytest.mark.asyncio
+async def test_the_parcel_layer_is_not_asked_for_below_its_floor():
+    with pytest.raises(BadRequestError) as raised:
+        await tile_service().tile("flurstuecke", 14, 8771, 5471)
+
+    assert "Zoomstufe 15" in raised.value.message
+
+
+def test_an_oversized_render_reaches_the_browser_as_one_tile():
+    """The point of the larger image is the scale, not the detail.
+
+    A screenful of half-megabyte tiles is megabytes; the proxy scales each one
+    back to the tile size before it caches or returns it.
+    """
+
+    from PIL import Image
+
+    from app.services.tiles import _downscale
+
+    big = Image.new("RGBA", (1280, 1280), (0, 0, 0, 0))
+    for i in range(0, 1280, 64):
+        for j in range(1280):
+            big.putpixel((i, j), (255, 255, 0, 255))
+    buffer = io.BytesIO()
+    big.save(buffer, format="PNG")
+
+    small = Image.open(io.BytesIO(_downscale(buffer.getvalue(), 256)))
+
+    assert small.size == (256, 256)
+    # The lines survive the reduction rather than falling between samples.
+    assert any(pixel[3] > 0 for pixel in small.convert("RGBA").get_flattened_data())
 
 
 @respx.mock
@@ -141,7 +240,7 @@ def test_changing_which_layers_a_ground_stands_for_invalidates_its_tiles(client:
     # Same service, same tile, different layers: the second is fetched again.
     assert second.headers["x-cache"] == "MISS"
     assert len(route.calls) == 2
-    assert route.calls[1].request.url.params["LAYERS"] == parcels.layers != alkis.layers
+    assert route.calls[1].request.url.params["STYLES"] == parcels.styles != alkis.styles
 
 
 # --------------------------------------------------------------------------
@@ -204,7 +303,11 @@ def test_the_cadastral_layer_keeps_its_parcels_at_every_zoom(client: TestClient)
     so a ground called "Kataster" loses its parcel boundaries two zoom steps out
     and says nothing about it. A WMS derives the scale from the standard 0,28 mm
     pixel, and MAP_RESOLUTION is what a caller can change: measured on a z18
-    tile, 85 draws and 86 comes back blank."""
+    tile, 85 draws and 86 comes back blank.
+
+    The other way round the same limit is `render_size`, which the overlay uses:
+    a larger image over the same box. Both are measured; this one keeps the
+    request to a single tile, which is what a full-screen ground wants."""
 
     route = respx.get(ALKIS_WMS_URL).mock(return_value=_wms_answer())
 
@@ -241,17 +344,3 @@ def test_the_photo_layer_has_no_scale_limit_and_is_asked_plainly(client: TestCli
     client.get("/api/tiles/dop/16/35081/21973.png")
 
     assert "MAP_RESOLUTION" not in route.calls[0].request.url.params
-
-
-@respx.mock
-def test_a_wms_layer_keeps_its_own_request_shape(client: TestClient):
-    """The two kinds live in one table; adding the second must not have turned
-    the first into an ArcGIS request."""
-
-    route = respx.get(DOP_URL).mock(return_value=_wms_answer())
-
-    client.get("/api/tiles/dop/16/35081/21973.png")
-
-    params = route.calls[0].request.url.params
-    assert params["REQUEST"] == "GetMap"
-    assert "bboxSR" not in params

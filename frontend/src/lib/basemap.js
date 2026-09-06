@@ -75,6 +75,20 @@ export const GEOSN = "© GeoSN, dl-de/by-2-0";
 export const LFULG = "Umgebungslärmkartierung © LfULG";
 
 /**
+ * The zoom the cadastral outlines stop being drawable at, measured.
+ *
+ * `adv_alkis_flurstuecke` carries `MaxScaleDenominator: 2000` and answers
+ * HTTP 200 with a fully transparent PNG above it, which at a 256 px tile would
+ * mean nothing below zoom 19. The proxy gets round that by rendering each tile
+ * larger — the denominator is (bbox / image width) / 0,00028, so a bigger image
+ * over the same box falls under the limit — and scaling it back to a tile. That
+ * works down to zoom 15; zoom 14 would need 4368 px for one tile and the
+ * service refuses anything over 4000. Below the floor the layer is left out,
+ * because a transparent tile looks like a broken overlay rather than a scale.
+ */
+export const PARCEL_OUTLINE_MIN_ZOOM = 15;
+
+/**
  * Raster layers that go *on top of* a backdrop rather than instead of one.
  *
  * The noise survey is not a WMS tile source — its own service speaks EPSG:4326
@@ -93,8 +107,14 @@ export const OVERLAYS = {
   /* The cadastre as line work: boundaries, parcel numbers, boundary points and
      street names on transparent ground. It is drawn nearly opaque, because a
      line at 45 % over a photograph is a smudge — the veil setting below is for
-     the noise bands, which are areas and must not hide what is under them. */
-  flurstuecke: { name: "Flurstücke", attribution: GEOSN, opacity: 0.95 }
+     the noise bands, which are areas and must not hide what is under them.
+
+     Not the `flurstuecke` layer the search map's ground uses: that one is
+     rendered oversized so its outlines still draw across a district, and its
+     labels come back scaled down with it. Over one plot the numbers are the
+     whole point, so this asks for a plain tile and moves the scale limit
+     instead. */
+  liegenschaftskarte: { name: "Flurstücke", attribution: GEOSN, opacity: 0.95 }
 };
 
 const OVERLAY_OPACITY = { aerial: 0.45, other: 0.62 };
@@ -150,9 +170,67 @@ export function withOverlay(style, id, backdrop = "map") {
   };
 }
 
+/**
+ * Whether this browser can draw a MapLibre map at all.
+ *
+ * Asked before one is constructed, because a backdrop that needs no network —
+ * the raster grounds do not — otherwise builds a half-initialised map wherever
+ * there is no WebGL, and only says so on the way out, where `remove()` throws
+ * inside the library. That is exactly what happens under jsdom, and it is also
+ * what a browser with WebGL switched off does.
+ */
+export function canRenderMap() {
+  try {
+    const canvas = document.createElement("canvas");
+    return Boolean(canvas.getContext("webgl2") || canvas.getContext("webgl"));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The orthophoto with the cadastre drawn on it: what a listing's own
+ * photographs can be compared against.
+ *
+ * Three layers, and the order is the whole trick — the photo underneath, the
+ * roads and their names over it, the parcel outlines on top. Both overlays are
+ * the authority's own transparent renderings, so nothing is drawn by hand.
+ *
+ * The outlines carry a floor; see `PARCEL_OUTLINE_MIN_ZOOM`.
+ */
+export const aerialCadastreStyle = () => {
+  const origin = window.location.origin;
+  const source = layer => ({
+    type: "raster",
+    tiles: [`${origin}/api/tiles/${layer}/{z}/{x}/{y}.png`],
+    tileSize: 256,
+    attribution: GEOSN
+  });
+  return {
+    version: 8,
+    sources: {
+      dop: { ...source("dop"), maxzoom: 20 },
+      strassen: { ...source("strassen"), maxzoom: 20 },
+      flurstuecke: { ...source("flurstuecke"), minzoom: PARCEL_OUTLINE_MIN_ZOOM, maxzoom: 20 }
+    },
+    layers: [
+      { id: "dop", type: "raster", source: "dop" },
+      { id: "strassen", type: "raster", source: "strassen", paint: { "raster-opacity": 0.9 } },
+      {
+        id: "flurstuecke",
+        type: "raster",
+        source: "flurstuecke",
+        minzoom: PARCEL_OUTLINE_MIN_ZOOM
+      }
+    ]
+  };
+};
+
 /** What each backdrop offers. `none` keeps the drawing on plain paper. */
 export const BACKDROPS = {
   map: () => vectorStyle(),
   aerial: async () => rasterStyle("dop", GEOSN),
-  cadastre: async () => rasterStyle("alkis", GEOSN)
+  cadastre: async () => rasterStyle("alkis", GEOSN),
+  /** Photo, streets and parcel outlines together — the search map's ground. */
+  site: async () => aerialCadastreStyle()
 };

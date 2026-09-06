@@ -14,6 +14,7 @@ from ..schemas import (
     ParcelCollection,
     ParcelResolveRequest,
     ParcelsAroundRequest,
+    parse_flurstuecksnummer,
 )
 from ..services.alkis import AlkisService, Flurstueck, expand_gemarkung_key, to_collection
 from ..services.motis import MotisService
@@ -98,6 +99,22 @@ async def resolve(
             raise NotFoundError(NOT_FOUND_BY_KEY.format(keys=", ".join(missing)))
         if len(payload.kennzeichen) > 1:
             hints.append(COMPOSED_HINT.format(count=len(payload.kennzeichen)))
+    elif payload.gemarkung and payload.flurstuecksnummern:
+        # A plot is a set of parcels. Each number is resolved on its own and
+        # the union is left to `to_collection`, which has always built it.
+        parcels = []
+        for number in payload.flurstuecksnummern:
+            zaehler, nenner = parse_flurstuecksnummer(number)
+            numbered = await alkis.by_gemarkung(payload.gemarkung, zaehler, nenner)
+            if not numbered:
+                raise NotFoundError(
+                    NOT_FOUND_BY_IDENTIFIER.format(
+                        district=payload.gemarkung.strip(),
+                        number=number,
+                        explanation="",
+                    )
+                )
+            parcels.extend(numbered)
     elif payload.gemarkung and payload.zaehler is not None:
         expanded = expand_gemarkung_key(payload.gemarkung)
         if expanded != payload.gemarkung.strip():

@@ -16,8 +16,8 @@ services:
       # Declared without a value: compose passes it through only when it is set
       # on the host, and leaves it unset otherwise -- so backend/.env and the
       # built-in default (Transitous) keep their say when nobody asks for
-      # anything else. Point it at the local router with
-      # `MOTIS_BASE_URL=http://motis:8080 docker compose --profile local-routing up`.
+      # anything else. docker-compose.local-routing.yml sets it for the router
+      # that runs here, so it never has to be typed.
       - MOTIS_BASE_URL
     volumes:
       # Answers from the official services, kept between restarts. Losing it
@@ -49,59 +49,11 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  # --- Optional: routing on this machine instead of Transitous ---------------
+  # Routing on this machine instead of Transitous lives in its own file, so
+  # naming that file is the whole opt-in and there is no variable to forget:
   #
-  # Off unless asked for. api.transitous.org is a volunteer service whose policy
-  # asks to be contacted before "many requests" and calls routing itself
-  # resource-intensive (docs/research/routing-motis.md § 6), so anything past a
-  # prototype should bring its own router.
-  #
-  #   ./motis/fetch-data.sh                                     # ~350 MB + extract
-  #   MOTIS_BASE_URL=http://motis:8080 \
-  #     docker compose --profile local-routing up --build
-  #
-  # The first start imports and takes a few minutes; after that the built graph
-  # lives in `motis-graph` and the server is ready in seconds.
-
-  # One-shot: turns the OSM extract and the GTFS feed into the graph MOTIS
-  # serves. `motis server` never reads the inputs again, only /data.
-  motis-import:
-    profiles: ["local-routing"]
-    image: ghcr.io/motis-project/motis:2.11.2
-    volumes:
-      - ./motis/data-input:/data-input:ro
-      # Not inside /data-input: docker cannot create a mountpoint inside a
-      # read-only bind.
-      - ./motis/config.yml:/config.yml:ro
-      - motis-graph:/data
-    # Re-importing an unchanged graph costs minutes and buys nothing, so the
-    # import is skipped once it has succeeded. Delete the volume to force it.
-    command: >
-      /bin/sh -c "if [ -f /data/meta/import_done ]; then
-        echo 'Graph already built — delete the motis-graph volume to reimport.';
-      else
-        /motis import -d /data -c /config.yml && touch /data/meta/import_done;
-      fi"
-    restart: "no"
-
-  motis:
-    profiles: ["local-routing"]
-    image: ghcr.io/motis-project/motis:2.11.2
-    depends_on:
-      motis-import:
-        condition: service_completed_successfully
-    volumes:
-      - motis-graph:/data
-    command: ["/motis", "server", "-d", "/data"]
-    healthcheck:
-      # busybox wget; the geocoder only answers once the address index is
-      # mapped, so this is a real readiness check and not just an open port.
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/api/v1/geocode?text=Leipzig"]
-      interval: 10s
-      timeout: 10s
-      retries: 6
-      start_period: 30s
-    restart: unless-stopped
+  #   ./motis/fetch-data.sh
+  #   docker compose -f docker-compose.yml -f docker-compose.local-routing.yml up --build
 
   # Recurring jobs. Opt-in like the routing, so `docker compose up` stays the
   # two services it has always been:
@@ -133,5 +85,3 @@ services:
 volumes:
   backend-cache:
   scheduler-state:
-  # The built routing graph. Only exists when the local-routing profile has run.
-  motis-graph:

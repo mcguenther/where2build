@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import re
+
 from fastapi import APIRouter, Depends
 from pydantic import ValidationError
 
-from ..deps import llm_client, settings_dep
+from ..deps import gemarkung_directory, llm_client, settings_dep
 from ..errors import BadRequestError, NotConfiguredError, UpstreamError
 from ..schemas import (
     Extraktionsweg,
@@ -16,6 +18,7 @@ from ..schemas import (
     ListingExtractResponse,
     as_vorschlaege,
 )
+from ..search.indicia import collect_indicia
 from ..services.llm import LLMClient, normalize_url
 from ..services.portals import PASTE_HINT, fetch_page, is_blocked, is_kleinanzeigen, parse_page
 from ..settings import Settings
@@ -34,10 +37,52 @@ _STRUCTURE_TASK = (
     "werden nicht erfasst."
 )
 
+# What the reader produces, as a number. It rides in the cache key, because the
+# cache that holds an extracted listing has no expiry (`ttl_s=None`) and is
+# keyed on the URL alone -- so an answer produced before the price parser
+# existed outlived the parser, and the field stayed empty on the very listings
+# the fix was written for. Bump this whenever the extraction's *output* changes:
+# a new field, a new source for one, a corrected parse. Old entries are then
+# simply never asked for again, and the sweeper clears them.
+#
+#   1  the original reader
+#   2  asking price, plot area from the attribute list, description and images
+EXTRACTION_VERSION = 2
+
 _NO_LOCATOR = (
     "Aus dieser Seite ließ sich weder eine Adresse noch eine Koordinate noch ein "
     "Flurstück lesen. Bitte den Seiteninhalt einfügen oder die Angaben von Hand eintragen."
 )
+
+
+def _has_locator(felder: InseratFelder) -> bool:
+    """Whether the deterministic pass found enough to place the plot at all."""
+
+    return bool(
+        felder.adresse
+        or felder.flurstuecke
+        or (felder.lat is not None and felder.lon is not None)
+    )
+
+
+def _area_from(angaben: dict[str, str]) -> int | None:
+    """The plot area out of the portal's own attribute list.
+
+    Structured and therefore better than the same number read out of the prose:
+    a title may hedge („ca. 1.025qm") where the field states 1.025 m², and the
+    tolerance staircase starts where the *wording* says.
+    """
+
+    raw = angaben.get("Grundstücksfläche")
+    if not raw:
+        return None
+    match = re.search(r"\d[\d.\s]*", raw)
+    if not match:
+        return None
+    try:
+        return int(float(match.group(0).replace(".", "").replace(" ", "")))
+    except ValueError:
+        return None
 
 
 def _merge(deterministic: InseratFelder, extracted: InseratFelder | None) -> InseratFelder:
@@ -52,22 +97,67 @@ def _merge(deterministic: InseratFelder, extracted: InseratFelder | None) -> Ins
     return InseratFelder.model_validate(merged)
 
 
+# How much of a page's prose travels back. Enough for a description with its
+# location sentences; not a whole portal page with its navigation.
+_DESCRIPTION_LIMIT = 20_000
+
+
+# What the search can actually start from. A district, a municipality or a
+# named place anchors it; a bare parcel number is probed against the whole
+# state. An *area* alone is not an anchor -- „Baugrundstück 688 m²“ names
+# nowhere, and every parcel in Saxony of that size is not a candidate set. Nor
+# is a street: without a containing area a street name is a 1-in-500 shot.
+_ANCHORS = ("gemarkung", "gemeinde", "ort", "flurstueck")
+
+
+def _is_searchable(text: str) -> bool:
+    """Whether the parcel search could do anything with this prose.
+
+    Not a length test. The search reads a district, a street, an area and the
+    relation between the places named out of the text — a page with none of the
+    three locators is perfectly usable if it carries any of those, which is
+    exactly what the „Text durchsuchen“ way in relies on. Asked with the same
+    reader the search itself uses, so the answer cannot drift away from it.
+
+    An ImmoScout page is the case: no coordinate, often only a district for an
+    address, never a parcel number, and prose that names the Ortsteil.
+    """
+
+    if not text or not text.strip():
+        return False
+    return any(
+        indiz.art in _ANCHORS
+        for indiz in collect_indicia(text=text, directory=gemarkung_directory())
+    )
+
+
 def _answer(
     felder: InseratFelder,
     quelle_url: str | None,
     weg: Extraktionsweg,
     hinweis: str | None = None,
     titel: str | None = None,
+    beschreibung: str | None = None,
+    bilder: list[str] | None = None,
 ) -> ListingExtractResponse:
+    text = " ".join(part for part in (titel, beschreibung) if part).strip()
     try:
         inserat = Inserat(**felder.model_dump(), quelle_url=quelle_url)
     except ValidationError as exc:
-        raise BadRequestError(_NO_LOCATOR) from exc
+        # A locator is what a *stored plot* needs, not what the search needs.
+        # An ImmoScout page carries no coordinate, often only a district as its
+        # address and never a parcel number -- and its prose names the Ortsteil,
+        # the area and the street, which is everything the search runs on.
+        if not _is_searchable(text):
+            raise BadRequestError(_NO_LOCATOR) from exc
+        inserat = None
     return ListingExtractResponse(
-        felder=as_vorschlaege(inserat, InseratVorschlaege, quelle_url),
+        felder=as_vorschlaege(inserat or felder, InseratVorschlaege, quelle_url),
         quelle_url=quelle_url,
         weg=weg,
         hinweis=hinweis or titel,
+        beschreibung=text[:_DESCRIPTION_LIMIT] or None,
+        bilder=bilder or [],
     )
 
 
@@ -78,7 +168,11 @@ async def _from_url(url: str, llm: LLMClient, settings: Settings) -> ListingExtr
 
     if is_kleinanzeigen(url):
         seite = await fetch_page(url, settings.app)
-        deterministic = InseratFelder(adresse=seite.adresse, lat=seite.lat, lon=seite.lon)
+        deterministic = InseratFelder(
+            adresse=seite.adresse, lat=seite.lat, lon=seite.lon,
+            grundstuecksflaeche_m2=_area_from(seite.angaben),
+            kaufpreis_eur=seite.kaufpreis_eur,
+        )
         weg: Extraktionsweg = "meta-tags" if seite.has_coordinates else "llm"
         hinweis = None
         extracted: InseratFelder | None = None
@@ -96,7 +190,17 @@ async def _from_url(url: str, llm: LLMClient, settings: Settings) -> ListingExtr
                 "Das Auslesen von Seiten ist nicht konfiguriert und die Seite trägt "
                 "keine Koordinaten. Bitte den Seiteninhalt einfügen."
             )
-        return _answer(_merge(deterministic, extracted), url, weg, hinweis, seite.titel)
+        return _answer(
+            _merge(deterministic, extracted),
+            url,
+            weg,
+            hinweis,
+            seite.titel,
+            # The description, not the whole page: without this the search
+            # reads a portal's navigation and cookie banner as evidence.
+            seite.beschreibung or seite.text,
+            seite.bilder,
+        )
 
     # Unknown domain: the spec's chain is web_fetch first, then meta tags and
     # JSON-LD from a direct request, then the full text to the model.
@@ -117,6 +221,8 @@ async def _from_url(url: str, llm: LLMClient, settings: Settings) -> ListingExtr
                     url,
                     "meta-tags",
                     titel=seite.titel,
+                    beschreibung=seite.beschreibung or seite.text,
+                    bilder=seite.bilder,
                 )
             raise NotConfiguredError(
                 "Das Auslesen von Seiten ist nicht konfiguriert. "
@@ -129,7 +235,14 @@ async def _from_url(url: str, llm: LLMClient, settings: Settings) -> ListingExtr
         if seite is not None
         else InseratFelder()
     )
-    return _answer(_merge(deterministic, extracted), url, "llm", titel=seite.titel if seite else None)
+    return _answer(
+        _merge(deterministic, extracted),
+        url,
+        "llm",
+        titel=seite.titel if seite else None,
+        beschreibung=(seite.beschreibung if seite and seite.beschreibung else text),
+        bilder=seite.bilder if seite else None,
+    )
 
 
 @router.post("/extract", response_model=ListingExtractResponse, summary="Inserat auslesen")
@@ -140,7 +253,7 @@ async def extract(
 ) -> ListingExtractResponse:
     if payload.url is not None:
         url = str(payload.url)
-        cache_key = f"inserat:{normalize_url(url)}"
+        cache_key = f"inserat:v{EXTRACTION_VERSION}:{normalize_url(url)}"
         cached = llm.cache.get_json(cache_key)
         if cached is not None:
             return ListingExtractResponse.model_validate(cached)
@@ -149,17 +262,49 @@ async def extract(
         return answer
 
     assert payload.text is not None
-    if not llm.settings.configured:
-        raise NotConfiguredError(
-            "Das Auswerten eingefügter Texte ist nicht konfiguriert (LLM_API_KEY fehlt)."
-        )
-    # Pasted HTML still carries meta tags and JSON-LD; use them before the model.
+    # Pasted content is parsed deterministically first, and that is usually the
+    # whole job: a page copied out of a browser carries its meta tags, its
+    # JSON-LD, its price and its attribute list, and the parcel search reads the
+    # prose itself. Requiring a model here was what turned a portal that refuses
+    # a server-side fetch -- the very case this field exists for -- into
+    # „nicht konfiguriert“.
     seite = parse_page("", payload.text) if "<" in payload.text else None
     text = seite.text if seite and seite.text else payload.text
-    extracted = await llm.structure(text, InseratFelder, "inserat", _STRUCTURE_TASK)
     deterministic = (
-        InseratFelder(adresse=seite.adresse, lat=seite.lat, lon=seite.lon)
+        InseratFelder(
+            adresse=seite.adresse,
+            lat=seite.lat,
+            lon=seite.lon,
+            grundstuecksflaeche_m2=_area_from(seite.angaben),
+            kaufpreis_eur=seite.kaufpreis_eur,
+        )
         if seite is not None
         else InseratFelder()
     )
-    return _answer(_merge(deterministic, extracted), None, "eingefuegter-text")
+    beschreibung = (seite.beschreibung if seite and seite.beschreibung else text)
+
+    extracted: InseratFelder | None = None
+    hinweis: str | None = None
+    if llm.settings.configured:
+        try:
+            extracted = await llm.structure(text, InseratFelder, "inserat", _STRUCTURE_TASK)
+        except UpstreamError as exc:
+            hinweis = f"Nur die Angaben der Seite konnten gelesen werden: {exc.message}"
+    elif not _has_locator(deterministic) and not _is_searchable(beschreibung):
+        raise NotConfiguredError(
+            "Aus dem eingefügten Text ließ sich weder eine Adresse noch eine Koordinate "
+            "noch ein Flurstück lesen, und es steht auch kein Beschreibungstext darin, "
+            "den die Flurstückssuche lesen könnte. Ein Modell ist auf diesem Server "
+            "nicht eingerichtet (LLM_API_KEY fehlt). Am zuverlässigsten ist die kopierte "
+            "Seite selbst: im Browser Strg+A, Strg+C — dann kommt das HTML mit "
+            "Meta-Angaben, Preis und Bildern mit, und es braucht kein Modell."
+        )
+
+    return _answer(
+        _merge(deterministic, extracted),
+        None,
+        "eingefuegter-text",
+        hinweis=hinweis,
+        beschreibung=beschreibung,
+        bilder=seite.bilder if seite else None,
+    )

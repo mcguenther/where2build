@@ -1,0 +1,1460 @@
+"""The search itself: six phases, each of which may stop the run.
+
+This is a staircase, not a pipeline. The happy case -- a cadastral district and
+a parcel number, in the text or on an attached extract -- never reaches phase 2:
+it resolves the parcel, checks it against everything else the listing says, and
+stops. Every later phase exists only for the listings that case cannot settle.
+
+    0  Ernten          gather Indizien, ask nothing
+    1  Anker           the smallest container worth trusting -- possibly several
+    2  Raum            how big is the haystack (display only, never an abort)
+    3  Toleranz-Treppe hard first, widen only when a rung comes back empty
+    4  Weiche Bewertung only orders, never removes
+    5  Prüfen          the only phase that may say "found"
+    6  Antwort         always everything, never only the result
+
+Two departures from the drafted algorithm, both measured on 05.09.2026 and both
+recorded in ``docs/research/flurstueck-identifikation.md``:
+
+* **The short circuit verifies.** The draft jumped straight to the verdict when
+  a district and a number were present. But a misread number resolves to a real
+  but foreign parcel, and that is precisely the error checking against ALKIS
+  does not catch -- so the short circuit now cross-checks the parcel it found
+  against the other free statements (the stated area, the municipality) before
+  it may say "bestätigt". It costs no extra request: both values ride along
+  with the parcel.
+* **A parcel number is tested against every contested district at once.** The
+  draft chose one anchor and filtered inside it, which made a wrong relation
+  the only route to a confidently wrong answer. Measured: 790/11 exists in
+  Großbothen and in none of the three other districts the same listing names,
+  so four count requests dissolve the conflict with no relation extraction, no
+  model call and no question to the user.
+"""
+
+from __future__ import annotations
+
+import asyncio
+from dataclasses import dataclass, field, replace
+from typing import AsyncIterator, Sequence
+
+from ..errors import UpstreamError
+from ..gemarkung_index import GemarkungDirectory, GemarkungEntry, fold
+from ..schemas import (
+    Indiz,
+    Kandidat,
+    KandidatProperties,
+    Konflikt,
+    ParcelSearchRequest,
+    SuchEreignis,
+    Suchgebiet,
+    SuchStatus,
+)
+from ..services import ocr
+from ..settings import AppSettings
+from ..services.alkis import (
+    AlkisService,
+    Flurstueck,
+    KatasterBezirk,
+    between,
+    equals,
+    expand_gemarkung_key,
+    like,
+)
+from .envelope import _geojson, common_envelope, next_question
+from .indicia import (
+    AreaStatement,
+    collect_indicia,
+    describes_part_area,
+    federal_state,
+    normalise_parcel_number,
+    outside_saxony,
+    read_area,
+)
+from .ladder import Rung, confirmation_rung, tolerance_ladder
+from .scoring import clean_use, parcel_number, score
+
+# Above this many survivors there is nothing left to score, and the interface
+# asks for the area instead of searching. The limit sits on the *candidate set
+# after the hard filters*, never on the anchor: Stadt Leipzig holds 112 588
+# parcels and an exact area still leaves 78 of them, a perfectly scoreable set,
+# so a rule that refused large anchors was refuted by measuring it.
+MAX_CANDIDATES = 500
+
+# How many candidates are fetched with their geometry. ALKIS cannot be asked
+# for attributes without geometry, and at 1.4 kB each the rest are counted
+# rather than loaded.
+MAX_GEOMETRY = 200
+
+# A parcel number with no district at all is worth a single count request:
+# measured, „790/11“ exists 5 times in Saxony and „85/1“ 672 times. Below this
+# the set is small enough to show; above it the number alone says nothing.
+MAX_STATEWIDE_BY_NUMBER = 40
+
+# How many cadastral districts a named municipality may stand in for. Stadt
+# Grimma has 66 of them; asking 66 counts to avoid one question to the user is
+# the wrong trade, so above this the municipality only informs the answer.
+MAX_MUNICIPALITY_DISTRICTS = 12
+
+# How many districts are worth widening to their municipality when the exact
+# area found nothing. Two requests each, and the second one rarely differs from
+# the first -- neighbouring districts usually share a municipality.
+MAX_MUNICIPALITY_PROBES = 2
+
+# How many of a listing's images are read. Measured at roughly 0,9 s each when
+# the first pass matches and ~3 s when both passes run and find nothing; a
+# dozen covers every advert seen and bounds the worst case.
+MAX_IMAGES = 12
+
+# How many district outlines are drawn as the search space. Enough to show a
+# genuine ambiguity, few enough that the map does not become a patchwork and
+# the run does not spend a request per wash.
+MAX_DRAWN_AREAS = 4
+
+# Which relations make a named place worth a request. „erwaehnt“ deliberately
+# does not: a place the text merely contains is not a statement about where the
+# plot is, and in German -- where every noun is capitalised -- it is as likely
+# to be the word „Wiesen“ as the Gemarkung of that name.
+_ANCHORING = ("liegt_in", "liegt_an", None)
+
+# What the short circuit accepts as agreement between the parcel it resolved
+# and the area the listing states. Wider than the plausibility check's factor
+# of four on purpose: this only decides whether one more phase runs.
+SHORT_CIRCUIT_AREA_FACTOR = 2.0
+
+
+@dataclass
+class Anchor:
+    """One spatial container the search may filter inside.
+
+    Not "the most accurate point" -- the narrowest container worth trusting.
+    The platform's pin never becomes one: measured 6 235 m from the parcel
+    actually offered, because the platform geocodes its own location field.
+    """
+
+    art: str
+    schluessel: str
+    name: str
+    indiz_id: str
+    confidence: float
+    # The municipality this district belongs to, as the directory spells it.
+    # Not decoration: it is what separates the two Gemarkungen called Plagwitz.
+    gemeinde: str | None = None
+
+    @property
+    def condition(self) -> str:
+        return equals("gemaschl" if self.art == "gemarkung" else "gmdschl", self.schluessel)
+
+
+@dataclass
+class SearchState:
+    """Everything the run has established, in the shape the answer needs."""
+
+    indicia: list[Indiz] = field(default_factory=list)
+    conflicts: list[Konflikt] = field(default_factory=list)
+    candidates: list[Flurstueck] = field(default_factory=list)
+    outline: KatasterBezirk | None = None
+    areas: list[Suchgebiet] = field(default_factory=list)
+    requests: int = 0
+    status: SuchStatus = "erfolglos"
+    hint: str | None = None
+
+
+class SearchEngine:
+    """One run. Stateful, single use, and an async generator of events."""
+
+    def __init__(
+        self,
+        payload: ParcelSearchRequest,
+        alkis: AlkisService,
+        directory: GemarkungDirectory | None,
+        app_settings: AppSettings | None = None,
+    ) -> None:
+        self.payload = payload
+        self.alkis = alkis
+        self.directory = directory
+        self.app_settings = app_settings or alkis.app_settings
+        self.state = SearchState()
+        self._area: AreaStatement | None = None
+        self._street: str | None = None
+        # The sentence saying the plot is a piece of a bigger parcel, if any.
+        self._part_area: str | None = None
+        # The federal state the listing names, when it is not Saxony.
+        self._outside: str | None = None
+        # District outlines already fetched, by key. Drawn once for the map and
+        # reused for the wash under a confirmed parcel.
+        self._district_outlines: dict[str, KatasterBezirk] = {}
+
+    # ------------------------------------------------------------------
+    # Small helpers over the Indiz list
+    # ------------------------------------------------------------------
+
+    def active(self, art: str) -> list[Indiz]:
+        """Indicia of one kind the user has not switched off, strongest first."""
+
+        chosen = self.payload.entscheidungen.get(art)
+        found = [
+            indiz
+            for indiz in self.state.indicia
+            if indiz.art == art and not indiz.verworfen
+        ]
+        if chosen:
+            # A decision does not delete the alternatives; it reorders them, so
+            # the map keeps showing what was contested.
+            found.sort(key=lambda indiz: (indiz.id != chosen, -indiz.sicherheit))
+        return found
+
+    async def _count(self, conditions: Sequence[str]) -> int:
+        self.state.requests += 1
+        return await self.alkis.count(conditions)
+
+    async def _search(self, conditions: Sequence[str], limit: int | None = None) -> list[Flurstueck]:
+        self.state.requests += 1
+        return await self.alkis.search(conditions, limit=limit)
+
+    # ------------------------------------------------------------------
+    # Phase 0 -- gather, and notice contradictions
+    # ------------------------------------------------------------------
+
+    async def harvest(self) -> AsyncIterator[SuchEreignis]:
+        yield SuchEreignis(art="phase", phase="ernten", text="Angaben aus dem Inserat lesen")
+
+        self.state.indicia = collect_indicia(
+            text=self.payload.text,
+            titel=self.payload.titel,
+            adresse=self.payload.adresse,
+            gemarkung=self.payload.gemarkung,
+            flurstuecksnummer=self.payload.flurstuecksnummer,
+            flaeche_m2=self.payload.flaeche_m2,
+            flaeche_text=self.payload.flaeche_text,
+            lat=self.payload.lat,
+            lon=self.payload.lon,
+            directory=self.directory,
+            given=self.payload.indizien,
+        )
+        for indiz in self.state.indicia:
+            if indiz.id in self.payload.verworfen:
+                indiz.verworfen = True
+                indiz.verworfen_grund = "Von Hand abgewählt."
+
+        # A place the cadastre has never heard of cannot be searched, and
+        # offering it as a choice was worse than not offering it: picking
+        # „Brehna“ re-ran the search with the same anchors and produced the
+        # same answer, which reads as a button that does nothing. It is said
+        # once, in the protocol, with the reason.
+        if self.directory:
+            for indiz in self.state.indicia:
+                if (
+                    indiz.art == "gemarkung"
+                    and not indiz.verworfen
+                    and indiz.beziehung in _ANCHORING
+                    and not self._district_entries(indiz)
+                ):
+                    indiz.verworfen = True
+                    indiz.verworfen_grund = (
+                        "Steht nicht im sächsischen Gemarkungsverzeichnis — "
+                        "als Gemarkung nicht durchsuchbar."
+                    )
+
+        # The one statement in a listing this tool can be certain it cannot
+        # serve, and it costs nothing: the platform's location field names the
+        # Bundesland. ALKIS is state-specific, so a plot in Sachsen-Anhalt has
+        # no Saxon Flurstück — while the village it names very often has a
+        # Saxon namesake holding a parcel of exactly the stated size. Searching
+        # anyway does not fail, it answers, and the answer is a real parcel a
+        # hundred kilometres away.
+        self._outside = outside_saxony(self.payload.adresse)
+
+        area_indiz = next((i for i in self.active("flaeche")), None)
+        if area_indiz is not None:
+            self._area = read_area(area_indiz.beleg or "") or AreaStatement(
+                value=float(area_indiz.wert), wording=""
+            )
+            # A plot still to be surveyed out of a bigger parcel has no parcel
+            # of its own, so its area belongs to a *future* one. Filtering on it
+            # finds some other parcel of that size and confirms it — exactly the
+            # confidently wrong answer this search exists to refuse.
+            self._part_area = describes_part_area(
+                " ".join(part for part in (self.payload.titel, self.payload.text) if part)
+            )
+            if self._part_area:
+                self._area = replace(self._area, part_of=self._part_area)
+                area_indiz.text = (
+                    f"{area_indiz.text} — noch zu vermessende Teilfläche, "
+                    "also die Größe eines künftigen Flurstücks"
+                )
+                area_indiz.beleg = self._part_area
+
+        street_indiz = next(iter(self.active("strasse")), None)
+        self._street = street_indiz.wert if street_indiz else None
+
+        # The frame before the narration. The clues play out one at a time so a
+        # run can be followed, and the districts used to be emitted *after* all
+        # of them — so the map sat on the whole of Saxony while the list already
+        # named a village, which reads as a map that is not working rather than
+        # one that is waiting. Nothing new is fetched here: it is the same
+        # request the space step made, one step earlier.
+        async for event in self.frame():
+            yield event
+
+        for indiz in self.state.indicia:
+            yield SuchEreignis(art="indiz", indiz=indiz)
+
+        for conflict in self._conflicts():
+            self.state.conflicts.append(conflict)
+            yield SuchEreignis(art="konflikt", konflikt=conflict)
+
+    async def read_images(self) -> AsyncIterator[SuchEreignis]:
+        """Read the listing's images for a cadastral reference, and stop at one.
+
+        Reached only when the text and the metadata did not settle it, and never
+        before them: a Tesseract pass costs 0,9 s when it matches and a few
+        seconds when it does not, and putting that in front of the first thing
+        the map can draw made every run feel broken for the sake of a channel
+        most listings do not have.
+
+        One after another, not all at once. Reading them concurrently was the
+        obvious idea and it is measurably wrong: Tesseract is CPU-bound, and
+        seven of it on one machine push every process past a thirty-second
+        timeout -- which then looks exactly like seven pictures of a lawn.
+        Sequentially each takes 0,9 s when it matches and a few seconds when it
+        does not, and the loop stops at the first parcel number, so the usual
+        cost is a fraction of the worst case.
+
+        Nothing read here is a verdict. A number is an Indiz like any other and
+        goes through the same cross-check, because the failure this channel can
+        produce is not an empty answer but a *plausible wrong* one: at a slight
+        tilt the reader once returned „Flurstück 790717", a number that would
+        resolve to a real but foreign parcel.
+        """
+
+        if not ocr.available():
+            yield SuchEreignis(
+                art="phase",
+                phase="bilder",
+                text=(
+                    f"{len(self.payload.bilder)} Bilder liegen vor, aber auf diesem "
+                    "Server ist keine Texterkennung eingerichtet — sie werden nicht gelesen."
+                ),
+            )
+            return
+
+        urls = self.payload.bilder[:MAX_IMAGES]
+        yield SuchEreignis(
+            art="phase",
+            phase="bilder",
+            text=(
+                f"Der Text allein hat es nicht entschieden — bis zu {len(urls)} "
+                "Bilder werden gelesen"
+            ),
+            anzahl=len(urls),
+        )
+
+        readings: list[ocr.ImageReading] = []
+        failures: list[str] = []
+        for number, url in enumerate(urls, 1):
+            try:
+                reading = await self._read_one(url)
+            except (UpstreamError, OSError) as exc:
+                failures.append(getattr(exc, "message", None) or str(exc))
+                continue
+            if reading.failed:
+                failures.append(reading.failed)
+                continue
+            readings.append(reading)
+            if reading.parcels:
+                # The question is answered. The remaining images are more
+                # photographs of the same plot.
+                yield SuchEreignis(
+                    art="phase",
+                    phase="bilder",
+                    text=f"Bild {number} trägt einen Katasterauszug — die übrigen bleiben ungelesen",
+                    anzahl=number,
+                )
+                break
+
+        found = ocr.as_indicia([r for r in readings if r.useful])
+        if found:
+            # Added to the pile, not emitted here: phase 0 sends every Indiz it
+            # gathered in one pass afterwards, and sending these twice would put
+            # each of them in the protocol twice.
+            self.state.indicia = sorted(
+                [*self.state.indicia, *found], key=lambda indiz: -indiz.sicherheit
+            )
+            return
+
+        # Nothing found is a different sentence from nothing read. Saying "no
+        # cadastral extract attached" after every read failed would be a claim
+        # about the listing that the search never checked.
+        yield SuchEreignis(
+            art="phase",
+            phase="bilder",
+            text=(
+                f"{len(readings)} Bilder gelesen, kein Katasterauszug dabei — Fotos "
+                "eines Grundstücks tragen keinen."
+                if not failures
+                else (
+                    f"{len(failures)} von {len(urls)} Bildern ließen sich nicht lesen "
+                    f"({failures[0]}). Was gelesen wurde, trug keine Katasterangabe."
+                )
+            ),
+            anzahl=len(readings),
+        )
+
+    async def _read_one(self, url: str) -> "ocr.ImageReading":
+        data = await ocr.fetch(url, self.app_settings)
+        # Tesseract is a subprocess and Pillow is CPU work; both would block the
+        # loop that is meanwhile fetching the other images.
+        return await asyncio.to_thread(ocr.read_image, data, url, url)
+
+    def _conflicts(self) -> list[Konflikt]:
+        """Indicia of one kind that cannot all be true.
+
+        The search never resolves this quietly. It follows the most trustworthy
+        reading, says so, and offers the alternatives -- a map extract naming
+        one district and a location field naming another can both be honest,
+        because the seller may have attached the wrong extract.
+        """
+
+        questions = {
+            "gemarkung": "Welche Gemarkung ist gemeint?",
+            "flurstueck": "Welche Flurstücksnummer ist gemeint?",
+            "flaeche": "Welche Grundstücksfläche gilt?",
+        }
+        out: list[Konflikt] = []
+        for art, question in questions.items():
+            usable = [
+                indiz
+                for indiz in self.active(art)
+                # Only readings the search would actually act on. A place the
+                # text says the plot is *away from* is evidence against itself,
+                # and one it merely contains is not a reading at all -- putting
+                # either up as an option would ask about something that was
+                # never going to be searched. Nor is a name the cadastre does
+                # not know: „Brehna“ is not a Saxon Gemarkung, so choosing it
+                # re-ran the search with the same anchors and the same answer.
+                if art != "gemarkung"
+                or (indiz.beziehung in _ANCHORING and self._district_entries(indiz))
+            ]
+            values = {self._conflict_key(indiz) for indiz in usable}
+            if len(values) < 2:
+                continue
+            if art == "flurstueck" and self.named_as_a_set():
+                # „Flurstück 790 sowie 706“ is not two readings of one parcel,
+                # it is one plot made of two -- which this project treats as the
+                # normal case, not the exception. Asking which one is meant
+                # would be asking a question that is not there.
+                continue
+            chosen = self.payload.entscheidungen.get(art) or usable[0].id
+            out.append(
+                Konflikt(
+                    art=art,  # type: ignore[arg-type]
+                    frage=question,
+                    optionen=[indiz.id for indiz in usable],
+                    gewaehlt=chosen,
+                )
+            )
+        return out
+
+    def named_as_a_set(self) -> bool:
+        """Whether the parcel numbers were listed together rather than in dispute.
+
+        A plot is a set of parcels -- the normal case. Numbers that all come
+        from *one* source are that set; numbers from different sources (an
+        image against the body text) are rival readings, and only those are a
+        contradiction worth putting to the user.
+        """
+
+        numbers = self.active("flurstueck")
+        return len(numbers) > 1 and len({indiz.quelle for indiz in numbers}) == 1
+
+    @staticmethod
+    def _conflict_key(indiz: Indiz) -> str:
+        return (indiz.schluessel or fold(indiz.wert)).strip()
+
+    # ------------------------------------------------------------------
+    # Phase 1 -- anchors, and the short circuit
+    # ------------------------------------------------------------------
+
+    def anchors(self) -> list[Anchor]:
+        """Every container worth filtering inside, most trustworthy first.
+
+        Several on purpose, and that is the departure from the drafted
+        algorithm. Choosing one anchor makes a misread relation the single route
+        to a confidently wrong answer; asking all of them costs one count
+        request each and lets the cadastre decide. Measured on the reference
+        listing: with an exact area, Großbothen returns 1 and every other place
+        the text names returns 0.
+
+        A name that is not unique in the directory contributes *all* of its
+        districts -- two Höfgen are two questions, not a reason to drop the
+        name -- and an explicit choice by the user replaces the lot.
+        """
+
+        # Only a place the text actually *places* the plot in. German
+        # capitalises every noun, so a bare directory match finds „Wiesen“ in
+        # „geprägt von Wiesen und Feldern“ — a real Gemarkung name and an
+        # entirely accidental one. A mention without a positional relation
+        # stays in the protocol as weak evidence and is never searched.
+        active = [i for i in self.active("gemarkung") if i.beziehung in _ANCHORING]
+        chosen_id = self.payload.entscheidungen.get("gemarkung")
+        if chosen_id:
+            # A person who picked one has settled it; searching the rejected
+            # readings anyway would be ignoring the answer we asked for.
+            decided = [indiz for indiz in active if indiz.id == chosen_id]
+            active = decided or active
+
+        out: list[Anchor] = []
+        seen: set[str] = set()
+        for indiz in active:
+            for entry in self._district_entries(indiz):
+                key = expand_gemarkung_key(entry.schluessel)
+                if key in seen:
+                    continue
+                seen.add(key)
+                out.append(
+                    Anchor(
+                        art="gemarkung",
+                        schluessel=key,
+                        name=entry.name if entry.name != "?" else indiz.wert,
+                        indiz_id=indiz.id,
+                        confidence=indiz.sicherheit,
+                        gemeinde=entry.gemeinde,
+                    )
+                )
+        return self._filter_by_municipality(out) or self._municipality_anchors()
+
+    def _filter_by_municipality(self, anchors: list[Anchor]) -> list[Anchor]:
+        """Drop the districts that belong to a municipality the listing does not name.
+
+        „Anbindung an Leipzig“ put Gemarkung Leipzig up as an anchor next to
+        Lobstädt, and Leipzig holds two parcels of exactly the stated size. The
+        location field says Neukieritzsch, which is Lobstädt's municipality and
+        not Leipzig's -- and that removes both without touching the area.
+
+        Kept as a *filter with a fallback*, never a hard rule: a municipality
+        read out of a location field is a strong hint (it was right on all four
+        listings measured) but it is not an official fact about this plot, so
+        when nothing matches it the whole set stands.
+        """
+
+        if len(anchors) < 2:
+            return anchors
+        for needle in self.municipalities():
+            kept = [a for a in anchors if a.gemeinde and needle in fold(a.gemeinde)]
+            if kept:
+                return kept
+        return anchors
+
+    def _municipality_anchors(self) -> list[Anchor]:
+        """Fall back to the districts of a named municipality.
+
+        „Großbothen, einem OT von Grimma“ names the level above the one being
+        searched. It is a real container and worth using -- but only when no
+        cadastral district is known, and only while it stays small: Stadt Grimma
+        holds 66 Gemarkungen, and 66 count requests to save one question is the
+        wrong trade.
+        """
+
+        if not self.directory:
+            return []
+        out: list[Anchor] = []
+        for indiz in self.active("gemeinde"):
+            needle = fold(indiz.wert)
+            districts = [
+                entry
+                for entry in self.directory.entries
+                if entry.gemeinde and needle in fold(entry.gemeinde)
+            ]
+            if not districts or len(districts) > MAX_MUNICIPALITY_DISTRICTS:
+                continue
+            out.extend(
+                Anchor(
+                    art="gemarkung",
+                    schluessel=expand_gemarkung_key(entry.schluessel),
+                    name=entry.name,
+                    indiz_id=indiz.id,
+                    confidence=indiz.sicherheit * 0.6,
+                )
+                for entry in districts
+            )
+        return out
+
+    def _district_entries(self, indiz: Indiz) -> list[GemarkungEntry]:
+        """Every cadastral district this Indiz could mean.
+
+        5 339 districts share 4 880 names, so a name is not a key. All of the
+        matches are kept -- each costs one count request, and dropping an
+        ambiguous name would throw away the very case this search is for --
+        *unless* the listing also names a municipality. Then the directory
+        answers the question outright: there are two Gemarkungen called
+        Plagwitz, one in Machern and one in Leipzig, and „Ortsteil Plagwitz von
+        Machern“ leaves exactly one.
+        """
+
+        given = indiz.schluessel or (indiz.wert.strip() if indiz.wert.strip().isdigit() else None)
+        if given:
+            key = expand_gemarkung_key(given)
+            known = [e for e in (self.directory.entries if self.directory else []) if e.schluessel == key]
+            return known or [GemarkungEntry(name=indiz.wert, schluessel=key)]
+        if not self.directory:
+            return []
+        needle = fold(indiz.wert)
+        entries = [entry for entry in self.directory.entries if fold(entry.name) == needle]
+        return self._within_municipality(entries) or entries
+
+    def municipalities(self) -> list[str]:
+        """The municipalities the listing names, folded, strongest first."""
+
+        return [fold(indiz.wert) for indiz in self.active("gemeinde")]
+
+    def _within_municipality(self, entries: list[GemarkungEntry]) -> list[GemarkungEntry]:
+        """The entries whose municipality the listing also names.
+
+        Empty when nothing matches -- the caller then keeps all of them rather
+        than searching nowhere, because a municipality read out of a location
+        field is a hint, not an official fact.
+        """
+
+        if len(entries) < 2:
+            return entries
+        for needle in self.municipalities():
+            kept = [
+                entry
+                for entry in entries
+                if entry.gemeinde and needle in fold(entry.gemeinde)
+            ]
+            if kept:
+                return kept
+        return []
+
+    async def short_circuit(self) -> AsyncIterator[SuchEreignis]:
+        """District plus number: resolve it, check it, and stop.
+
+        The check is the point. It costs nothing -- the official area and the
+        municipality arrive with the parcel -- and it is the only thing standing
+        between a misread digit and an answer that looks exactly as official as
+        the right one.
+        """
+
+        numbers = self.active("flurstueck")
+        anchors = self.anchors()
+        if not numbers or not anchors:
+            return
+
+        yield SuchEreignis(
+            art="phase",
+            phase="kurzschluss",
+            text=_combinations_sentence(len(numbers), len(anchors)),
+        )
+
+        hits: list[tuple[Anchor, Indiz, Flurstueck]] = []
+        for number in numbers:
+            parsed = normalise_parcel_number(number.wert)
+            if not parsed:
+                number.verworfen = True
+                number.verworfen_grund = (
+                    "Keine gültige Flurstücksnummer — der Zähler hat mehr als fünf "
+                    "Stellen. Wahrscheinlich ein Lesefehler."
+                )
+                yield SuchEreignis(art="indiz", indiz=number)
+                continue
+            zaehler, nenner = parsed
+            for anchor in anchors:
+                conditions = [anchor.condition, equals("flstnrzae", zaehler)]
+                if nenner:
+                    conditions.append(equals("flstnrnen", nenner))
+                found = await self._search(conditions, limit=MAX_GEOMETRY)
+                for parcel in found:
+                    hits.append((anchor, number, parcel))
+
+        if not hits:
+            return
+
+        # A number that exists in exactly one of the contested districts has
+        # settled the contest itself: no relation extraction, no model, no
+        # question to the user.
+        districts = {parcel.attributes.get("gemaschl") for _, _, parcel in hits}
+        for conflict in self.state.conflicts:
+            if conflict.art == "gemarkung" and len(districts) == 1:
+                winner = next(a for a, _, _ in hits)
+                conflict.gewaehlt = winner.indiz_id
+                conflict.aufgeloest_durch = (
+                    f"Die Flurstücksnummer gibt es nur in der Gemarkung {winner.name}."
+                )
+                yield SuchEreignis(art="konflikt", konflikt=conflict)
+
+        self.state.candidates = [parcel for _, _, parcel in hits]
+
+        # „604" without a denominator also finds 604/1 to 604/c. The exact area
+        # settles that without a request -- ``flaeche`` came back with each
+        # parcel -- and it is a hard filter, so it may decide.
+        narrowed = self._narrow_by_area(self.state.candidates)
+        if narrowed is not None:
+            yield SuchEreignis(
+                art="phase",
+                phase="kurzschluss",
+                text=(
+                    f"Die Nummer trifft {len(self.state.candidates)} Flurstücke; mit der "
+                    f"exakten Fläche bleibt {'davon eines' if len(narrowed) == 1 else f'{len(narrowed)} davon'} übrig"
+                ),
+                anzahl=len(narrowed),
+            )
+            self.state.candidates = narrowed
+
+        yield SuchEreignis(
+            art="kandidaten",
+            anzahl=len(self.state.candidates),
+            kandidaten=self.to_candidates(self.state.candidates),
+        )
+
+    def _narrow_by_area(self, parcels: list[Flurstueck]) -> list[Flurstueck] | None:
+        """Keep only the parcels whose official area is the one the listing gives.
+
+        ``None`` when there is nothing to narrow with, or when narrowing would
+        empty the set -- a filter that deletes everything has refuted itself,
+        not the candidates.
+        """
+
+        if len(parcels) < 2 or self._area is None or not self._area.exact:
+            return None
+        if self.named_as_a_set():
+            # Their areas are meant to add up, not to match one by one.
+            return None
+        kept = [p for p in parcels if p.flaeche_amtlich_m2 == self._area.value]
+        return kept or None
+
+    def cross_check(self) -> str | None:
+        """What contradicts the parcel the short circuit found, if anything.
+
+        Only free comparisons: the official area against the one the listing
+        states, and the municipality against the platform's location field.
+        Both ride along with the parcel, so this is a rule, not a request.
+        """
+
+        if len(self.state.candidates) != 1:
+            return None
+        parcel = self.state.candidates[0]
+        official = parcel.flaeche_amtlich_m2
+
+        # Not for a part-area: a plot to be surveyed out of a bigger parcel is
+        # *expected* to be smaller than it, so the mismatch is the situation
+        # rather than an objection to it. `_part_area_note` says what is going
+        # on; repeating it as „bitte die Nummer prüfen“ would send someone
+        # looking for a mistake that is not there.
+        if self._area is not None and official and not self._part_area:
+            factor = official / self._area.value
+            if factor >= SHORT_CIRCUIT_AREA_FACTOR or factor <= 1 / SHORT_CIRCUIT_AREA_FACTOR:
+                return (
+                    f"Das gefundene Flurstück misst amtlich {official:g} m², das Inserat "
+                    f"nennt {self._area.value:g} m². Nummer und Fläche widersprechen "
+                    "sich — bitte die Flurstücksnummer prüfen."
+                )
+
+        place = next(iter(self.active("ort")), None)
+        municipality = (parcel.attributes.get("gemeinde") or "").strip()
+        if place and municipality:
+            haystack = fold(place.wert)
+            if fold(municipality) not in haystack and not any(
+                fold(word) in haystack
+                for word in municipality.replace("Stadt ", "").split()
+                if len(word) > 3
+            ):
+                return (
+                    f"Das Flurstück liegt in {municipality}, das Standortfeld der Anzeige "
+                    f"nennt „{place.wert}“. Das muss kein Fehler sein — die Plattform "
+                    "geokodiert ihr eigenes Ortsfeld —, ist aber ungeprüft."
+                )
+        return None
+
+    # ------------------------------------------------------------------
+    # Phases 2 and 3 -- the haystack, then the staircase
+    # ------------------------------------------------------------------
+
+    async def frame(self) -> AsyncIterator[SuchEreignis]:
+        """The districts in play, drawn before anything else is said.
+
+        Answers „where could this be at all“ from the first seconds. Costs one
+        request per district (16,5 kB, measured) and at most `MAX_DRAWN_AREAS`
+        of them, which is the same budget the space step always had.
+        """
+
+        # Nothing to frame outside Saxony: the districts an anchor would name
+        # there are namesakes, and drawing one puts the map on a village the
+        # plot has nothing to do with.
+        anchors = [] if self._outside else self.anchors()
+        if not anchors or self.state.areas:
+            return
+        self.state.areas = await self._outlines(anchors[:MAX_DRAWN_AREAS], [])
+        if self.state.areas:
+            yield SuchEreignis(art="gebiete", phase="ernten", gebiete=self.state.areas)
+
+    async def measure_space(self, anchors: list[Anchor]) -> AsyncIterator[SuchEreignis]:
+        counts = await asyncio.gather(
+            *(self._count([anchor.condition]) for anchor in anchors),
+            return_exceptions=True,
+        )
+        usable = [c for c in counts if isinstance(c, int)]
+        if not usable:
+            return
+        largest = max(usable)
+
+        # The search space, drawn. Sent before any candidate exists so the map
+        # can answer "where could this be" from the first seconds instead of
+        # sitting on the whole of Saxony until the staircase is finished.
+        # 16.5 kB per district, measured, and capped -- a wash nobody can tell
+        # apart from its neighbours is not worth a request.
+        # Already drawn by `frame`, in phase 0. Re-fetched only if that found
+        # nothing to draw — a run reached through a different route.
+        if not self.state.areas:
+            self.state.areas = await self._outlines(anchors[:MAX_DRAWN_AREAS], counts)
+            if self.state.areas:
+                yield SuchEreignis(art="gebiete", phase="raum", gebiete=self.state.areas)
+        yield SuchEreignis(
+            art="phase",
+            phase="raum",
+            text=(
+                f"{_thousands(largest)} Flurstücke hat die größte der "
+                f"{len(anchors)} Gemarkungen, die in Frage kommen"
+                if len(anchors) > 1
+                else f"{_thousands(largest)} Flurstücke hat diese Gemarkung"
+            ),
+            anzahl=largest,
+        )
+
+    async def staircase(self, anchors: list[Anchor]) -> AsyncIterator[SuchEreignis]:
+        """Tightest band first, one rung wider only when nothing came back."""
+
+        rungs = tolerance_ladder(self._area)
+        if not rungs:
+            async for event in self._without_area(anchors):
+                yield event
+            return
+
+        yield SuchEreignis(
+            art="phase",
+            phase="treppe",
+            text=f"Toleranz-Treppe: {len(rungs)} Stufen, engste zuerst",
+        )
+
+        for index, rung in enumerate(rungs):
+            counts = await asyncio.gather(
+                *(self._count([a.condition, between("flaeche", rung.lower, rung.upper)])
+                  for a in anchors)
+            )
+            total = sum(counts)
+            yield SuchEreignis(
+                art="phase",
+                phase="treppe",
+                text=f"Stufe {rung.label} ({rung.text}): {total} Treffer",
+                anzahl=total,
+            )
+            if total == 0:
+                # Before opening the tolerance, open the *place*. An exactly
+                # written area is an official fact; a Gemarkung read out of
+                # prose is not, and widening the number to keep the guess
+                # throws away the better of the two. Measured on a real
+                # listing: „1.076 m² in Bad Lausick" has no match in Gemarkung
+                # Bad Lausick and exactly one in the municipality — Flurstück
+                # 502/47 in Gemarkung Etzoldshain, at „Am Kurpark", which is
+                # what the advert is titled after.
+                if rung.hard:
+                    async for event in self._widen_the_place(anchors, rung):
+                        yield event
+                    if self.state.candidates:
+                        return
+                continue
+            if total > MAX_CANDIDATES:
+                self.state.hint = (
+                    f"Schon bei Stufe {rung.label} bleiben {total} Flurstücke übrig — "
+                    "das lässt sich nicht mehr bewerten. Eine genauere Flächenangabe "
+                    "oder die Gemarkung würde hier am meisten helfen."
+                )
+                return
+
+            survivors = [a for a, c in zip(anchors, counts) if c]
+            found: list[Flurstueck] = []
+            for anchor in survivors:
+                found.extend(
+                    await self._search(
+                        [anchor.condition, between("flaeche", rung.lower, rung.upper)],
+                        limit=MAX_GEOMETRY,
+                    )
+                )
+            self.state.candidates = found
+            for settled in self._settle_district_conflict(survivors):
+                yield SuchEreignis(art="konflikt", konflikt=settled)
+            yield SuchEreignis(
+                art="kandidaten",
+                anzahl=len(found),
+                kandidaten=self.to_candidates(found),
+            )
+
+            async for event in self._confirm(rungs, index, survivors, found):
+                yield event
+            return
+
+        self.state.hint = (
+            "Keine Stufe der Toleranz-Treppe hat etwas geliefert. Die Flächenangabe "
+            "aus dem Inserat passt zu keinem Flurstück im vermuteten Gebiet — "
+            "möglicherweise stimmt die Gemarkung nicht."
+        )
+
+    async def _outlines(
+        self, anchors: list[Anchor], counts: list[Any]
+    ) -> list[Suchgebiet]:
+        """District boundaries for the anchors, as far as they can be had.
+
+        A missing outline is a paler map, never a failed search, so each one is
+        allowed to fail on its own.
+        """
+
+        self.state.requests += len(anchors)
+        results = await asyncio.gather(
+            *(self.alkis.district_outline(anchor.schluessel) for anchor in anchors),
+            return_exceptions=True,
+        )
+        # Padded rather than zipped short: `frame` has no counts yet, and a
+        # bare zip would silently return no outlines at all.
+        padded = list(counts) + [None] * (len(anchors) - len(counts))
+        out: list[Suchgebiet] = []
+        for anchor, count, outline in zip(anchors, padded, results):
+            if not isinstance(outline, KatasterBezirk) or outline is None:
+                continue
+            # Kept whole, not just as GeoJSON: the wash under a confirmed parcel
+            # is this same document, and the common envelope needs its geometry.
+            self._district_outlines[anchor.schluessel] = outline
+            out.append(
+                Suchgebiet(
+                    schluessel=anchor.schluessel,
+                    name=outline.name or anchor.name,
+                    anzahl=count if isinstance(count, int) else None,
+                    geometry=_geojson(outline.geometry),
+                )
+            )
+        return out
+
+    async def _widen_the_place(
+        self, anchors: list[Anchor], rung: Rung
+    ) -> AsyncIterator[SuchEreignis]:
+        """Try the exact area across the whole municipality.
+
+        Costs one request to learn the municipality key -- it rides on any
+        parcel of the district -- plus one count. Only ever tried for a rung
+        that is a hard filter, so a hit here is as official as one inside the
+        named district; what was widened is the guess, not the fact.
+        """
+
+        for anchor in anchors[:MAX_MUNICIPALITY_PROBES]:
+            sample = await self._search([anchor.condition], limit=1)
+            key = sample[0].attributes.get("gmdschl") if sample else None
+            if not key:
+                continue
+            municipality = Anchor(
+                art="gemeinde",
+                schluessel=key,
+                name=sample[0].attributes.get("gemeinde") or anchor.gemeinde or key,
+                indiz_id=anchor.indiz_id,
+                confidence=anchor.confidence * 0.8,
+            )
+            conditions = [
+                municipality.condition,
+                between("flaeche", rung.lower, rung.upper),
+            ]
+            total = await self._count(conditions)
+            yield SuchEreignis(
+                art="phase",
+                phase="gemeinde",
+                text=(
+                    f"In der Gemarkung {anchor.name} gibt es kein Flurstück dieser Größe. "
+                    f"In der ganzen Gemeinde {municipality.name}: {total}"
+                ),
+                anzahl=total,
+            )
+            if 0 < total <= MAX_GEOMETRY:
+                self.state.candidates = await self._search(conditions, limit=MAX_GEOMETRY)
+                self.state.hint = (
+                    f"Gesucht wurde in der ganzen Gemeinde {municipality.name}: in der "
+                    f"Gemarkung {anchor.name}, die das Inserat nennt, gibt es kein "
+                    "Flurstück dieser Größe. Die Fläche ist die verlässlichere der "
+                    "beiden Angaben."
+                )
+                yield SuchEreignis(
+                    art="kandidaten",
+                    anzahl=len(self.state.candidates),
+                    kandidaten=self.to_candidates(self.state.candidates),
+                )
+                return
+
+    def _settle_district_conflict(self, survivors: list[Anchor]) -> list[Konflikt]:
+        """One anchor left standing settles a contested district by itself.
+
+        Returns what changed, so the interface can stop showing a question the
+        cadastre has already answered.
+        """
+
+        if len(survivors) != 1:
+            return []
+        settled: list[Konflikt] = []
+        for conflict in self.state.conflicts:
+            if conflict.art == "gemarkung" and not conflict.aufgeloest_durch:
+                conflict.gewaehlt = survivors[0].indiz_id
+                conflict.aufgeloest_durch = (
+                    f"Nur in der Gemarkung {survivors[0].name} gibt es ein Flurstück "
+                    "dieser Größe."
+                )
+                settled.append(conflict)
+        return settled
+
+    async def _confirm(
+        self,
+        rungs: list[Rung],
+        stopped_at: int,
+        anchors: list[Anchor],
+        found: list[Flurstueck],
+    ) -> AsyncIterator[SuchEreignis]:
+        """One rung wider, to see whether the halt was a coincidence.
+
+        When the stopping rung is a hard filter -- an exactly stated area at
+        zero tolerance -- the extra candidates fail that filter by definition
+        and cannot overturn the hit. They are shown all the same, as other
+        parcels of a similar size nearby, and never as an objection.
+        """
+
+        wider = confirmation_rung(rungs, stopped_at)
+        if wider is None or len(found) > 20:
+            return
+        extra: list[Flurstueck] = []
+        for anchor in anchors:
+            extra.extend(
+                await self._search(
+                    [anchor.condition, between("flaeche", wider.lower, wider.upper)],
+                    limit=MAX_GEOMETRY,
+                )
+            )
+        known = {p.attributes.get("flstkennz") for p in found}
+        neighbours = [p for p in extra if p.attributes.get("flstkennz") not in known]
+        if not neighbours:
+            return
+        hard = rungs[stopped_at].hard
+        yield SuchEreignis(
+            art="phase",
+            phase="gegenprobe",
+            text=(
+                f"Gegenprobe eine Stufe weiter ({wider.text}): {len(neighbours)} weitere "
+                + (
+                    "Flurstücke ähnlicher Größe. Sie erfüllen die exakte Flächenangabe "
+                    "nicht und können den Treffer nicht kippen."
+                    if hard
+                    else "Flurstücke kommen in Frage — die Fläche ist gerundet angegeben, "
+                    "also entscheidet sie hier nicht."
+                )
+            ),
+            anzahl=len(neighbours),
+        )
+        if not hard:
+            # A rounded area is no hard filter, so the neighbours are genuine
+            # rivals and join the set rather than standing beside it.
+            self.state.candidates = found + neighbours
+            yield SuchEreignis(
+                art="kandidaten",
+                anzahl=len(self.state.candidates),
+                kandidaten=self.to_candidates(self.state.candidates),
+            )
+
+    async def _without_area(self, anchors: list[Anchor]) -> AsyncIterator[SuchEreignis]:
+        """No usable area: the land use is all that is left to narrow with.
+
+        It only ranks, so this is a way of getting a scoreable set out of a
+        district, not a filter. A district with more parcels than can be scored
+        is where the interface asks for the area instead of searching on.
+        """
+
+        yield SuchEreignis(
+            art="phase",
+            phase="treppe",
+            text="Keine brauchbare Flächenangabe — es bleibt die Gemarkung",
+        )
+        for anchor in anchors:
+            total = await self._count([anchor.condition, like("tntxt", "*Wohnbau*")])
+            if 0 < total <= MAX_CANDIDATES:
+                self.state.candidates = await self._search(
+                    [anchor.condition, like("tntxt", "*Wohnbau*")], limit=MAX_GEOMETRY
+                )
+                yield SuchEreignis(
+                    art="kandidaten",
+                    anzahl=len(self.state.candidates),
+                    kandidaten=self.to_candidates(self.state.candidates),
+                )
+                return
+        self.state.hint = (
+            "Ohne Flächenangabe bleibt das Gebiet zu groß, um einzelne Flurstücke "
+            "zu bewerten. Die Fläche aus dem Inserat ist die wirksamste einzelne "
+            "Angabe — gemessen: sie führt von 1 131 auf 1."
+        )
+
+    async def by_number_alone(self) -> AsyncIterator[SuchEreignis]:
+        """A parcel number with no district at all.
+
+        Worth exactly one count request: measured, „790/11“ exists five times in
+        Saxony and „85/1“ 672 times. Small enough and the set is an answer;
+        larger and the number says nothing on its own and is left alone.
+        """
+
+        numbers = self.active("flurstueck")
+        if not numbers or self.state.candidates:
+            return
+        parsed = normalise_parcel_number(numbers[0].wert)
+        if not parsed or not parsed[1]:
+            return
+        zaehler, nenner = parsed
+        conditions = [equals("flstnrzae", zaehler), equals("flstnrnen", nenner)]
+        total = await self._count(conditions)
+        yield SuchEreignis(
+            art="phase",
+            phase="nummer-sachsenweit",
+            text=(
+                f"Die Nummer {numbers[0].wert} kommt in ganz Sachsen {total}-mal vor"
+                + ("" if total <= MAX_STATEWIDE_BY_NUMBER else " — zu häufig, um allein zu tragen")
+            ),
+            anzahl=total,
+        )
+        if 0 < total <= MAX_STATEWIDE_BY_NUMBER:
+            self.state.candidates = await self._search(conditions, limit=MAX_GEOMETRY)
+            yield SuchEreignis(
+                art="kandidaten",
+                anzahl=len(self.state.candidates),
+                kandidaten=self.to_candidates(self.state.candidates),
+            )
+
+    # ------------------------------------------------------------------
+    # Phases 5 and 6 -- verdict and answer
+    # ------------------------------------------------------------------
+
+    def to_candidates(self, parcels: Sequence[Flurstueck]) -> list[Kandidat]:
+        """Candidates in the shape the map draws, ordered by points.
+
+        The points order and nothing else -- which is why they may be
+        uncalibrated. What decides is in ``verdict``.
+        """
+
+        out: list[Kandidat] = []
+        for parcel in parcels:
+            points, reasons = score(
+                parcel,
+                stated_area=self._area.value if self._area else None,
+                street=self._street,
+            )
+            out.append(
+                Kandidat(
+                    id=parcel.attributes.get("flstkennz") or parcel.gml_id or "",
+                    geometry=_geojson(parcel.geometry),
+                    properties=KandidatProperties(
+                        kennzeichen=parcel.attributes.get("flstkennz"),
+                        gemarkung=parcel.attributes.get("gemarkung"),
+                        gemarkungsnummer=parcel.attributes.get("gemaschl"),
+                        flurstuecksnummer=parcel_number(parcel),
+                        flaeche_amtlich_m2=parcel.flaeche_amtlich_m2,
+                        lagebezeichnung=parcel.attributes.get("lagebeztxt"),
+                        gemeinde=parcel.attributes.get("gemeinde"),
+                        nutzung=clean_use(parcel.attributes.get("tntxt")),
+                    ),
+                    punkte=points,
+                    begruendung=reasons,
+                )
+            )
+        out.sort(key=lambda candidate: -candidate.punkte)
+        return out
+
+    def verdict(self) -> SuchStatus:
+        """The only place that may say "found".
+
+        "bestätigt" means the hard filters left exactly one candidate and
+        nothing contradicted it. There is no lead threshold and no weight in
+        this decision: a run that always produces an answer eventually produces
+        a wrong one.
+        """
+
+        if not self.state.candidates:
+            return "erfolglos"
+        if len(self.state.candidates) > 1:
+            return "mehrdeutig"
+        if self.cross_check():
+            return "mehrdeutig"
+        # A plot still to be surveyed out of a bigger parcel is not that parcel.
+        # „Bestätigt“ would be a claim about a Flurstück that does not exist
+        # yet, and the listing itself is what says so — the strongest possible
+        # contradiction, and the one no filter can catch.
+        if self._part_area:
+            return "mehrdeutig"
+        # A single candidate reached through a chosen tolerance is not a fact.
+        # It is confirmed only when an official statement -- a parcel number or
+        # an exactly stated area -- is what left it standing.
+        hard = bool(self.active("flurstueck")) or bool(self._area and self._area.exact)
+        return "bestaetigt" if hard else "mehrdeutig"
+
+    def _set_note(self) -> str | None:
+        """What to say when the listing named several parcels at once."""
+
+        if not self.named_as_a_set() or len(self.state.candidates) < 2:
+            return None
+        total = sum(p.flaeche_amtlich_m2 or 0.0 for p in self.state.candidates)
+        numbers = ", ".join(parcel_number(p) for p in self.state.candidates)
+        matches = (
+            self._area is not None
+            and abs(total - self._area.value) <= max(2.0, self._area.value * 0.01)
+        )
+        return (
+            f"Das Inserat nennt mehrere Flurstücke ({numbers}) — ein Grundstück besteht oft "
+            f"aus mehreren. Zusammen messen sie {total:g} m²"
+            + (
+                f", und das passt zu den {self._area.value:g} m² aus dem Inserat."
+                if matches
+                else (
+                    f"; das Inserat nennt {self._area.value:g} m². Bitte prüfen, ob wirklich "
+                    "alle dazugehören."
+                    if self._area is not None
+                    else "."
+                )
+            )
+        )
+
+    def _part_area_note(self) -> str | None:
+        """Said out loud, because it changes what an answer can mean.
+
+        A plot still to be surveyed out of a bigger parcel has no Flurstück of
+        its own, so no parcel *can* be the answer — the useful answer is the
+        parcel it will be cut from. Leaving that unsaid would make an
+        „mehrdeutig“ look like a weak run rather than the right verdict.
+        """
+
+        if not self._part_area:
+            return None
+        return (
+            "Das Inserat beschreibt eine noch zu vermessende Teilfläche: "
+            f"„{self._part_area}“. Ein eigenes Flurstück gibt es dafür noch nicht, "
+            "und die genannte Fläche ist die eines künftigen — sie kann deshalb "
+            "nicht filtern, sondern nur ordnen. Gesucht wird das Flurstück, aus "
+            "dem herausgemessen wird."
+        )
+
+    async def fetch_outline(self) -> None:
+        """The district wash under the candidates, when one district is settled.
+
+        The committed directory drops the geometry on purpose, so this is one
+        extra request -- 16.5 kB, measured -- and only when it can be drawn.
+        """
+
+        keys = {p.attributes.get("gemaschl") for p in self.state.candidates}
+        if len(keys) != 1:
+            return
+        key = keys.pop()
+        if not key:
+            return
+        # `frame` drew the districts in play before anything was narrated, so
+        # the one the answer settled on is usually already in hand. Asking for
+        # it again would be a second request for a document we have.
+        already = self._district_outlines.get(key)
+        if already is not None:
+            self.state.outline = already
+            return
+        try:
+            self.state.requests += 1
+            self.state.outline = await self.alkis.district_outline(key)
+        except UpstreamError:
+            # A missing wash is a paler map, not a failed search.
+            self.state.outline = None
+
+    async def narrow(self) -> AsyncIterator[SuchEreignis]:
+        """From the Indizien in hand to a candidate set. Runs at most twice."""
+
+        anchors = self.anchors()
+        async for event in self.short_circuit():
+            yield event
+
+        if not self.state.candidates and anchors:
+            async for event in self.measure_space(anchors):
+                yield event
+            async for event in self.staircase(anchors):
+                yield event
+
+        if not self.state.candidates:
+            async for event in self.by_number_alone():
+                yield event
+
+    def _outside_note(self) -> str | None:
+        """What to say about a listing that places itself outside Saxony.
+
+        Not „die Angaben reichen nicht aus" — nothing the seller could add
+        would help, and asking for more sends someone looking for a mistake
+        that is not there. The reason is stated instead, together with what was
+        deliberately *not* done.
+        """
+
+        if not self._outside:
+            return None
+        return (
+            f"Das Standortfeld der Anzeige nennt {self._outside}. Dieses Werkzeug fragt "
+            "das sächsische Liegenschaftskataster (ALKIS) ab und kann außerhalb Sachsens "
+            "kein Flurstück nennen. Gleichnamige Orte in Sachsen wurden bewusst nicht "
+            "durchsucht: sie ergäben ein echtes, aber fremdes Flurstück."
+        )
+
+    def _foreign_state_note(self) -> str | None:
+        """Why an empty run was empty, when the prose named another state.
+
+        The location field is the platform's own statement about where the
+        object is, and a state named there stops the run outright. Prose is not
+        that: „40 Minuten bis Sachsen-Anhalt" is a sentence about a Saxon plot,
+        so a state read out of the body may never stop anything.
+
+        It may still *explain*. When the run found no anchor at all — no place
+        in the text is a Saxon Gemarkung — and the text names another state,
+        that is the reason, and „für eine Eingrenzung fehlt eine Ortsangabe"
+        is not: the location is stated plainly, it is simply not here.
+        """
+
+        if self._outside or self.state.candidates or self.anchors():
+            return None
+        state = federal_state(" ".join(p for p in (self.payload.titel, self.payload.text) if p))
+        if state in (None, "Sachsen"):
+            return None
+        return (
+            f"Der Anzeigentext nennt {state}, und keine der genannten Ortsangaben ist eine "
+            "sächsische Gemarkung. Dieses Werkzeug fragt allein das sächsische "
+            "Liegenschaftskataster (ALKIS) ab."
+        )
+
+    async def run(self) -> AsyncIterator[SuchEreignis]:
+        async for event in self.harvest():
+            yield event
+
+        # Outside Saxony there is nothing to ask the cadastre. Every request
+        # from here on would be answered — by parcels belonging to somebody
+        # else — so the run stops with the clues it read and says why.
+        if self._outside:
+            yield SuchEreignis(
+                art="phase",
+                phase="raum",
+                text=f"Das Grundstück liegt in {self._outside}, außerhalb des sächsischen Katasters",
+            )
+            self.state.status = "erfolglos"
+            yield SuchEreignis(
+                art="ergebnis",
+                status="erfolglos",
+                kandidaten=[],
+                anzahl=0,
+                text=self._outside_note(),
+                gebiete=self.state.areas or None,
+                anfragen=self.state.requests,
+            )
+            return
+
+        async for event in self.narrow():
+            yield event
+
+        # The images come *after* the text, and only when the text did not
+        # settle it. They used to be phase 0, which put a Tesseract pass of up
+        # to a few seconds an image in front of the first thing the map could
+        # draw — for a channel that most listings do not even have. The text and
+        # the metadata are what the search runs on; a Geoportal print is the
+        # rescue, not the route.
+        if self.payload.bilder and self.verdict() != "bestaetigt":
+            before = {indiz.id for indiz in self.state.indicia}
+            async for event in self.read_images():
+                yield event
+            fresh = [i for i in self.state.indicia if i.id not in before]
+            for indiz in fresh:
+                yield SuchEreignis(art="indiz", indiz=indiz)
+            # A number off an image is an official statement about *this* plot
+            # and outranks what the prose alone reached, so the narrowing runs
+            # again rather than the reading being noted and ignored.
+            if any(indiz.art in ("flurstueck", "gemarkung") for indiz in fresh):
+                self.state.candidates = []
+                async for event in self.narrow():
+                    yield event
+
+        if self.state.candidates:
+            async for event in self.rank():
+                yield event
+            await self.fetch_outline()
+
+        self.state.status = self.verdict()
+        objection = self.cross_check() or self._set_note()
+        huelle = common_envelope(self.state.candidates, district_outline=self.state.outline)
+        foreign = self._foreign_state_note()
+        # „Gemarkung und Flurstücksnummer stehen im Kaufvertrag“ is advice for a
+        # listing this tool could serve. Asking for more input when the input is
+        # complete and points to another state is the wrong question.
+        question = None if foreign else next_question(self.state.candidates, huelle)
+        hint = " ".join(
+            p for p in (self._part_area_note(), objection, foreign, self.state.hint, question) if p
+        ) or None
+
+        yield SuchEreignis(
+            art="ergebnis",
+            status=self.state.status,
+            kandidaten=self.to_candidates(self.state.candidates),
+            anzahl=len(self.state.candidates),
+            huelle=huelle,
+            text=hint,
+            gemarkung_umriss=_geojson(getattr(self.state.outline, "geometry", None)),
+            gebiete=self.state.areas or None,
+            anfragen=self.state.requests,
+        )
+
+    async def rank(self) -> AsyncIterator[SuchEreignis]:
+        """Phase 4. It removes nobody -- only the check in phase 5 may do that."""
+
+        if len(self.state.candidates) < 2:
+            return
+        features = [
+            name
+            for name, present in (
+                ("Straße", bool(self._street)),
+                ("Nutzungsart", True),
+                ("Fläche", self._area is not None),
+            )
+            if present
+        ]
+        yield SuchEreignis(
+            art="phase",
+            phase="bewertung",
+            text=(
+                f"{len(self.state.candidates)} Kandidaten werden nach "
+                f"{', '.join(features)} sortiert — das ordnet nur, es scheidet niemanden aus"
+            ),
+        )
+        yield SuchEreignis(
+            art="kandidaten",
+            anzahl=len(self.state.candidates),
+            kandidaten=self.to_candidates(self.state.candidates),
+        )
+
+
+async def run_search(
+    payload: ParcelSearchRequest,
+    alkis: AlkisService,
+    directory: GemarkungDirectory | None,
+    app_settings: AppSettings | None = None,
+) -> AsyncIterator[SuchEreignis]:
+    engine = SearchEngine(payload, alkis, directory, app_settings)
+    async for event in engine.run():
+        yield event
+
+
+def _thousands(value: int) -> str:
+    """German thousands separator without depending on a locale: 1131 -> „1 131“."""
+
+    return f"{value:,}".replace(",", " ")
+
+
+def _combinations_sentence(numbers: int, anchors: int) -> str:
+    """What the short circuit is about to ask, in German that counts correctly."""
+
+    total = numbers * anchors
+    if total == 1:
+        return "Flurstücksnummer und Gemarkung liegen vor — sie werden direkt nachgeschlagen"
+    return (
+        f"Flurstücksnummer und Gemarkung liegen vor, aber nicht eindeutig — "
+        f"{total} Kombinationen werden direkt nachgeschlagen"
+    )

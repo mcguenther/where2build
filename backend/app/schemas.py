@@ -195,6 +195,15 @@ class ListingExtractResponse(BaseModel):
     quelle_url: HttpUrl | None = None
     weg: Extraktionsweg
     hinweis: str | None = None
+    # The listing's images, largest variant each. The search reads them for a
+    # cadastral extract; nothing else in the app uses them.
+    bilder: list[str] = Field(default_factory=list)
+    # The listing's own description, as the page carries it. Not an extracted
+    # field and never part of a stored plot: it travels so the parcel search can
+    # read the cadastral district, the street and the relation between the
+    # places named -- all of which live in the prose and in no attribute.
+    # Capped, because a whole page of it is of no use to anything downstream.
+    beschreibung: str | None = Field(default=None, max_length=20_000)
 
 
 class HousetypeExtractRequest(BaseModel):
@@ -286,6 +295,17 @@ class ParcelResolveRequest(BaseModel):
         max_length=20,
         description="Flurstückskennzeichen, die zusammen ein Grundstück bilden.",
     )
+    # The same set named the way a listing names it: one Gemarkung, several
+    # numbers. The keys above come from `/nearby`, these from what was read.
+    flurstuecksnummern: list[str] | None = Field(
+        default=None,
+        max_length=20,
+        description=(
+            "Mehrere Flurstücksnummern derselben Gemarkung, die zusammen ein "
+            "Grundstück bilden. Die Umringe werden vereinigt, die amtlichen "
+            "Flächen summiert."
+        ),
+    )
     # What the listing says the plot measures. Only ever used to judge the
     # answer, never to filter it -- see app/plausibility.py.
     expected_area_m2: int | None = Field(
@@ -300,6 +320,33 @@ class ParcelResolveRequest(BaseModel):
 
     @model_validator(mode="after")
     def _exactly_one_way_in(self) -> "ParcelResolveRequest":
+        if self.flurstuecksnummern:
+            cleaned = [number.strip() for number in self.flurstuecksnummern if number.strip()]
+            if not cleaned:
+                raise ValueError("Die Liste der Flurstücksnummern ist leer.")
+            if self.flurstuecksnummer or self.zaehler is not None:
+                raise ValueError(
+                    "Bitte entweder eine einzelne Flurstücksnummer angeben oder die Liste, "
+                    "nicht beides."
+                )
+            if not self.gemarkung:
+                raise ValueError(
+                    "Zu Flurstücksnummern wird die Gemarkung benötigt — "
+                    "dieselbe Nummer gibt es in jeder Gemarkung."
+                )
+            # Validated here so a typo is a 422 with the number in it rather
+            # than a request that finds nothing and says the parcel is unknown.
+            for number in cleaned:
+                parse_flurstuecksnummer(number)
+            # Duplicates would double the summed area, which is the one figure
+            # every price comparison rests on.
+            seen: list[str] = []
+            for number in cleaned:
+                if number not in seen:
+                    seen.append(number)
+            self.flurstuecksnummern = seen
+            return self
+
         if self.flurstuecksnummer is not None and self.flurstuecksnummer.strip():
             if self.zaehler is not None or self.nenner is not None:
                 raise ValueError(
@@ -1065,3 +1112,250 @@ class HealthResponse(BaseModel):
     status: Literal["ok"] = "ok"
     version: str
     dienste: list[DienstStatus]
+
+
+# --------------------------------------------------------------------------
+# Parcel search (POST /api/parcels/search)
+#
+# The search is a staircase that stops as early as it can, and it reports every
+# step so the map can grow while it runs. Three kinds of object cross the wire:
+# an *Indiz* (one statement about where the plot is, with the evidence for it),
+# a *Kandidat* (one parcel that survived the hard filters), and the *Hülle* (the
+# smallest unit every surviving candidate shares, for when no single parcel can
+# be named). See docs/strategie/suchalgorithmus.html.
+# --------------------------------------------------------------------------
+
+# What an Indiz says something about.
+IndizArt = Literal[
+    "gemarkung",
+    "flurstueck",
+    "flaeche",
+    "strasse",
+    "gemeinde",
+    "ort",
+    "nutzung",
+    "pin",
+]
+
+# Where it came from. The order is the order of trust, and it is the rule that
+# settles a contradiction: an official extract outranks the attribute list,
+# which outranks the body text, which outranks the platform's own pin.
+IndizQuelle = Literal[
+    "nutzer",
+    "bild",
+    "attribut",
+    "fliesstext",
+    "modell",
+    "standortfeld",
+    "pin",
+]
+
+# How a place named in the text relates to the plot. Measured: counting
+# mentions picks the wrong place -- "Grimma" is named three times precisely
+# because the plot is 6 km away from it -- so the relation is extracted and the
+# frequency is not.
+Ortsbeziehung = Literal["liegt_in", "liegt_an", "entfernt_von", "erwaehnt"]
+
+SuchStatus = Literal["bestaetigt", "mehrdeutig", "erfolglos"]
+
+
+class Indiz(BaseModel):
+    """One statement about where the plot is, with what backs it up.
+
+    ``beleg`` is not decoration. A contradiction the user cannot look up is a
+    contradiction they cannot resolve, so every Indiz carries the sentence it
+    was read from -- or, for an image, the rectangle it was read out of.
+    """
+
+    id: str
+    art: IndizArt
+    wert: str
+    # What the interface writes next to it. German, composed from a template,
+    # never from a model -- see frontend/src/lib/findings.js for the rule.
+    text: str
+    beleg: str | None = None
+    quelle: IndizQuelle
+    sicherheit: float = Field(ge=0, le=1)
+    beziehung: Ortsbeziehung | None = None
+    # Key for a Gemarkung, municipality key for a Gemeinde: what the search
+    # actually queries with, as opposed to what the text said.
+    schluessel: str | None = None
+    # Set when the user switched it off, or when a stronger Indiz refuted it.
+    verworfen: bool = False
+    # Why it was dropped, in one German sentence. Never silent.
+    verworfen_grund: str | None = None
+    # The picture this was read out of. A Beleg for an image is a line of OCR
+    # text, which is the least checkable evidence in the whole search -- so when
+    # a reading has to be *chosen*, the image travels with it and the choice is
+    # made against the sheet rather than against a transcription of it.
+    bild_url: str | None = None
+
+
+class Konflikt(BaseModel):
+    """Two or more Indizien of the same kind that cannot both be true.
+
+    The search does not resolve this quietly. It follows the most trustworthy
+    reading, says so, and offers the alternatives: a map extract naming one
+    district and a location field naming another can both be honest -- the
+    seller may have attached the wrong extract.
+    """
+
+    art: IndizArt
+    frage: str
+    # The Indiz ids in play, most trustworthy first.
+    optionen: list[str]
+    gewaehlt: str
+    # Set once a hard filter settled it without asking -- a parcel number that
+    # exists in exactly one of the contested districts, for instance.
+    aufgeloest_durch: str | None = None
+
+
+class KandidatProperties(BaseModel):
+    kennzeichen: str | None = None
+    gemarkung: str | None = None
+    gemarkungsnummer: str | None = None
+    flurstuecksnummer: str | None = None
+    flaeche_amtlich_m2: float | None = None
+    lagebezeichnung: str | None = None
+    gemeinde: str | None = None
+    nutzung: str | None = None
+
+
+class Kandidat(BaseModel):
+    """One parcel that survived every hard filter.
+
+    ``punkte`` orders the list and nothing else. The verdict comes from the
+    hard filters alone, which is why uncalibrated weights here cannot produce a
+    wrong answer -- only an unhelpful ordering.
+    """
+
+    id: str
+    geometry: dict[str, Any] | None = None
+    properties: KandidatProperties
+    punkte: float = 0.0
+    # One German phrase per contribution: „an der Wiesenstraße", „Wohnbaufläche".
+    begruendung: list[str] = Field(default_factory=list)
+
+
+class Huelle(BaseModel):
+    """The smallest unit every surviving candidate shares.
+
+    "Ambiguous" is not a failure as long as the answer says what is settled.
+    Five candidates on one street *is* an answer -- for the land value and for
+    travel times it is often the whole answer.
+    """
+
+    art: Literal["flurstueck", "strasse", "gemarkung", "gemeinde", "offen"]
+    text: str
+    geometry: dict[str, Any] | None = None
+
+
+class Suchgebiet(BaseModel):
+    """One cadastral district the search is prepared to look in.
+
+    Sent before any candidate exists, so the map has something to frame on
+    while the staircase runs — and so the answer to "where could this be" is
+    visible from the first second rather than only at the end. The outline is
+    the district's own ``ave:KatasterBezirk`` boundary.
+    """
+
+    schluessel: str
+    name: str
+    anzahl: int | None = None
+    geometry: dict[str, Any] | None = None
+
+
+class SuchEreignis(BaseModel):
+    """One line of the NDJSON stream.
+
+    One object per line, four kinds. The map needs ``indiz`` and ``kandidaten``,
+    the protocol needs ``phase``, and ``ergebnis`` closes the run. NDJSON over a
+    chunked POST rather than Server-Sent Events: EventSource can only GET, so
+    the indicia would have to be filed under an id first, and this backend has
+    no database to file them in.
+    """
+
+    art: Literal["phase", "indiz", "konflikt", "gebiete", "kandidaten", "ergebnis", "fehler"]
+    phase: str | None = None
+    text: str | None = None
+    indiz: Indiz | None = None
+    konflikt: Konflikt | None = None
+    # The live candidate set. Sent whole rather than as a delta: the map frames
+    # itself on this set, and a frame derived from a patch is a frame that can
+    # silently drift out of step with what is drawn.
+    kandidaten: list[Kandidat] | None = None
+    anzahl: int | None = None
+    huelle: Huelle | None = None
+    status: SuchStatus | None = None
+    # The district wash under the candidates, when one district is settled.
+    gemarkung_umriss: dict[str, Any] | None = None
+    # The districts still in play, with their outlines. The search space, drawn.
+    gebiete: list[Suchgebiet] | None = None
+    anfragen: int | None = None
+
+
+class ParcelSearchRequest(BaseModel):
+    """Everything known about the listing, and nothing about who is selling it."""
+
+    text: str | None = Field(default=None, max_length=200_000)
+    titel: str | None = Field(default=None, max_length=500)
+    adresse: str | None = Field(default=None, max_length=300)
+    # The platform's own pin. Measured 6 235 m from the parcel actually offered,
+    # because the platform geocodes its location field -- so it never narrows
+    # the search, it only ever refutes a candidate.
+    lat: float | None = Field(default=None, ge=-90, le=90)
+    lon: float | None = Field(default=None, ge=-180, le=180)
+    flaeche_m2: float | None = Field(default=None, gt=0, le=10_000_000)
+    # The area exactly as the listing writes it („502 m²", „ca. 500 m²",
+    # „ab 450 m²"). The wording decides where the tolerance staircase starts,
+    # so it travels alongside the number.
+    flaeche_text: str | None = Field(default=None, max_length=120)
+    gemarkung: str | None = Field(default=None, max_length=120)
+    flurstuecksnummer: str | None = Field(default=None, max_length=20)
+    # The listing's images. Read only when the text carries no parcel number:
+    # a seller who attaches a Geoportal print has already answered the question,
+    # and Tesseract reads that print's title block reliably. Measured on a real
+    # advert: one of seven images yielded „Flurstück 790/11", the other six
+    # yielded nothing at all -- which is what makes reading every image and
+    # filtering by pattern safer than classifying images first.
+    bilder: list[str] = Field(default_factory=list, max_length=24)
+    # Indicia the caller gathered elsewhere. Accepted as input so a channel
+    # this server cannot run -- an image the browser holds but the backend
+    # cannot fetch -- still has a way in.
+    indizien: list[Indiz] = Field(default_factory=list)
+    # Indiz ids the user switched off. The search runs again without them.
+    verworfen: list[str] = Field(default_factory=list)
+    # Which option of a conflict the user picked, as {art: indiz_id}.
+    entscheidungen: dict[str, str] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _something_to_go_on(self) -> "ParcelSearchRequest":
+        if not any(
+            (
+                self.text,
+                self.adresse,
+                self.gemarkung,
+                self.flurstuecksnummer,
+                self.indizien,
+                self.lat is not None and self.lon is not None,
+            )
+        ):
+            raise ValueError(
+                "Zum Suchen wird mindestens eine Angabe gebraucht: Anzeigentext, "
+                "Adresse, Gemarkung, Flurstücksnummer oder eine Koordinate."
+            )
+        return self
+
+
+class ParcelSearchResponse(BaseModel):
+    """The whole run at once, for callers that cannot read a stream."""
+
+    status: SuchStatus
+    indizien: list[Indiz]
+    konflikte: list[Konflikt]
+    kandidaten: list[Kandidat]
+    huelle: Huelle
+    gemarkung_umriss: dict[str, Any] | None = None
+    gebiete: list[Suchgebiet] = Field(default_factory=list)
+    anfragen: int
+    hinweis: str | None = None

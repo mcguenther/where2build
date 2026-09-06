@@ -34,6 +34,9 @@ Keep comments sparse and about *why*, not *what*.
 backend/     FastAPI. Proxy and disk cache in front of ALKIS, BORIS, GeoSN
              WMS, MOTIS and the LLM. Owns no geometry maths and no database —
              PostGIS is in the plan, not in the code.
+             `app/search/` is the exception in one direction only: it asks the
+             cadastre a series of narrow questions and answers NDJSON, so the
+             map can grow while it runs. Still no geometry maths.
 frontend/    Vite + Vue 3, Options API. Owns ALL geometry.
 docs/        Spec, service research, screenshots. `strategie/` holds the four
              interactive strategy pages for parcel identification.
@@ -54,7 +57,10 @@ from the user directly. Reopen only if the user asks.
   price-related. The area computed from the polygon differs by a few square
   metres and is for shape analysis only. Both are shown side by side.
 - **A plot is a *set* of parcels.** Not the exception — the normal case.
-  Union the polygons, sum the official areas.
+  Union the polygons, sum the official areas. The search follows the same rule:
+  several parcel numbers from *one* source („790/11 sowie 238/3“) are that set
+  and are never put to the user as a question, while numbers from *different*
+  sources — an image against the body text — are rival readings and are.
 - **No contact details are stored.** The extraction schema does not carry
   agent names or phone numbers, so no personal data reaches the database.
 - **Fonts come from npm (Fontsource)**, never from a CDN.
@@ -70,6 +76,12 @@ from the user directly. Reopen only if the user asks.
   so only the 3 m floor is computable.
   See `docs/research/abstandsflaechen-nachbargebaeude.md`.
 - Region is Saxony only; ALKIS and BORIS are state-specific.
+- **A contradiction is shown, never resolved quietly.** Two Gemarkungen in one
+  listing, or a number on an image that the location field disagrees with, are
+  a `Konflikt`: the search follows the most trustworthy reading, says which and
+  why, carries the *Beleg* for each option, and lets the user pick another —
+  which re-runs the search. A contradiction nobody can look up is one nobody
+  can resolve.
 - **The sentence under a check is composed, not written.** Every finding comes
   from a template in `frontend/src/lib/findings.js`: structured input from one
   service, fixed German text out. No model writes UI copy. That keeps the
@@ -85,6 +97,15 @@ from the user directly. Reopen only if the user asks.
   denominator (`85/1`) cannot occur in an address. Where two readings stay
   plausible — "Lessingweg 44" and "Mölkau 204" are the same shape — the answer
   says so and both local indexes are asked, rather than one being guessed.
+- **The search decides with hard filters and orders with weights.**
+  „Bestätigt“ means an *official* statement left exactly one parcel standing —
+  a parcel number resolved against ALKIS, the Gemarkung, `ave:flaeche` when the
+  listing's figure is exact — and nothing contradicted it. A single survivor
+  reached only through a chosen tolerance is `mehrdeutig`. Everything
+  inferential (a rounded area, a street, land use, a broker's distance) may
+  only order the list, which is why the weights can ship uncalibrated: they
+  can produce an unhelpful ordering, never a wrong answer. See
+  `backend/app/search/`.
 - **Never show example data.** There is no sample state and no fallback: when a
   service fails, the German `detail` from the backend is shown instead. Tests
   run on recorded real responses in `frontend/tests/fixtures/`, not on invented
@@ -229,11 +250,17 @@ from the user directly. Reopen only if the user asks.
   outside the OSM extract from being dropped. Costs, measured: 6 min of import
   at 5,6 GiB peak RSS, a 3,4 GB graph, 1,7 GiB to serve.
   See `docs/research/routing-motis.md` § 5.
-- **The backend's disk cache does not know which MOTIS answered.** Its key is
-  the request parameters alone, so changing `MOTIS_BASE_URL` keeps serving the
-  other instance's answers until `/cache/motis*` is deleted. Comparing the two
-  instances without clearing it reports a difference that is not there — and,
-  worse, an agreement that is not there either.
+- **A cache key that does not name what produced the answer outlives the fix.**
+  Twice now. The MOTIS cache was keyed on the request parameters alone, so
+  changing `MOTIS_BASE_URL` kept serving the other instance's answers until
+  `/cache/motis*` was deleted — reporting a difference between the two that was
+  not there and, worse, an agreement that was not there either. The extracted
+  listing was keyed on the URL alone *and* never expires (`ttl_s=None`), so an
+  answer written before the price parser existed was still being served after
+  it shipped, and the field stayed empty on exactly the listings the fix was
+  written for. Both now carry it in the key: `MotisService.instance` is a hash
+  of the base URL, `EXTRACTION_VERSION` is a number to bump whenever the
+  reader's *output* changes.
 - **The listing pin is the municipality, not the plot.** Measured on a real
   Kleinanzeigen ad (3499632623, 01.09.2026): `og:latitude/longitude` sat
   **6 235 m** from the parcel actually offered, because the platform geocodes
@@ -596,6 +623,121 @@ from the user directly. Reopen only if the user asks.
   `z_GUAN` and `zDDR_`) return no measurements at all, while Leipzig-Mitte at
   4,6 km returns all four pollutants. Pick the nearest station that actually
   answers with values, not the nearest on the map.
+- **A parcel number is a hard filter that can be run against a *set* of
+  anchors, and that is what dissolves a contested Gemarkung.** Measured
+  05.09.2026 on the Grimma ad: 790/11 exists in Großbothen and in **none** of
+  Grimma, Höfgen (144245) or Höfgen (146132). Four `resultType=hits` requests
+  and the contest is over — no relation extraction, no model call, no question
+  to the user. So never *choose* one anchor: ask them all, and let the cadastre
+  answer. An ambiguous name contributes **all** its districts; dropping it for
+  being ambiguous throws away the case the search exists for.
+- **The short circuit has to check, not just resolve.** Gemarkung plus
+  Flurstück is not a verdict on its own: a misread number resolves to a real
+  but foreign parcel, and validating against ALKIS is exactly what does *not*
+  catch that. The cross-check is free — `flaeche` and `gemeinde` arrive **with**
+  the parcel — so the official area is compared against the listing's, and the
+  municipality against the location field, before anything says „bestätigt“.
+  The one string test worth having is the AdV key's own widths: five digits of
+  numerator, four of denominator, so `790717` is not a parcel number at all.
+- **`ave:lagebeztxt` *is* filterable with `PropertyIsLike` — and must never
+  filter.** The earlier note ("a street cannot be matched as an attribute") is
+  too strong: in Gemarkung Großbothen 71 of 1 131 parcels carry `Wiesenstr*`.
+  But 577 carry `"ohne Lage"` and **790/11 is one of them**, so a hard street
+  filter deletes the right answer. Use it to promote, never to demote: a
+  missing address is missing data, not a contradiction. Costs nothing — the
+  field rides along with every feature, so no Overpass request for the common
+  case.
+- **„OT von X“ names the Gemeinde, not the Gemarkung.** „am Ortsrand von
+  Großbothen, einem OT von Grimma“ places the plot in Großbothen and says
+  Grimma is the municipality above it. Read that way the two names stop
+  competing and the frequency trap disappears without a parser or a weight —
+  and the second mention („die ca. 6 km entfernte Kreisstadt Grimma“) turns
+  Grimma into evidence *against* itself. Extract the **level**, not just the
+  place.
+- **`resultType=hits` is what makes the staircase affordable, and ALKIS cannot
+  be asked for attributes without geometry.** A count is a few hundred bytes
+  whatever the number; features are ~1,4 kB each (25 parcels = 35,6 kB in
+  1,5 s, measured). So: count every rung, every anchor and every number probe,
+  and fetch features only once the count is small enough to draw. The abort
+  belongs on the **candidate set after the hard filters** (~500), never on the
+  anchor — Stadt Leipzig has 112 588 Flurstücke and an exact area still leaves
+  78.
+- **`ave:KatasterBezirk` by `schluessel` is one request and 16,5 kB** (637
+  boundary points for Großbothen). That is where the search map's district wash
+  comes from: the committed `gemarkungen-sachsen.json` drops the geometry on
+  purpose, so the outline is fetched on demand rather than added to the file.
+- **`ave:tntxt` splits on the semicolon, not the comma.** The kind and its area
+  share are separated by `;`, but the *name* can contain a comma —
+  „Sport-, Freizeit- und Erholungsfläche;500“. Splitting on both puts „Sport-“
+  in the table as if that were a land use.
+- **A search map must show its candidates at the scale it is standing at.**
+  Twenty-two parcels spread over two Gemarkungen are a few pixels each; the
+  outlines are drawn and nothing is visible. `EvidenceMap` therefore gives
+  every candidate a dot that fades in below zoom 17 and out again once the real
+  outline can be seen.
+- **Two seconds per Indiz is the pace for evidence arriving live, and the wrong
+  pace for a finished run.** Most runs complete in a few seconds while sixteen
+  events at two seconds is half a minute of watching. `StepQueue` therefore
+  spends a fixed budget over whatever is queued (≥ 240 ms per step), and the
+  camera flight follows that pace — a 900 ms flight started every 240 ms is the
+  twitch the queue exists to prevent. `prefers-reduced-motion` skips it all.
+- **`this.timer = setTimeout` and then `this.timer(…)` throws „Illegal
+  invocation“.** The native function ends up with the queue as its receiver.
+  Nothing else fails: the run simply stops after its first line, with the map
+  still showing the whole of Saxony and one entry in the protocol. Wrap the
+  timers (`(fn, ms) => setTimeout(fn, ms)`), do not reference them.
+- **The directory's `gemeinde` column is the key nothing was using.** There are
+  two Gemarkungen called Plagwitz — 140427 in Leipzig, 148642 in Machern — and
+  „Ortsteil Plagwitz von Machern“ picks one with a directory lookup and no
+  request. The same column removes Gemarkung Leipzig as an anchor when the
+  location field says Neukieritzsch, which is what stopped a listing's two
+  false 1 025 m² candidates. Used as a filter *with a fallback*: nothing
+  matching means the whole anchor set stands.
+- **The location field's *municipality* is reliable even though its coordinate
+  is not.** That reads like a contradiction of the 6 235 m pin and is not: the
+  pin is that far out *because* it is the municipality's geocode, so the name
+  it was geocoded from is exactly the part that holds. True on all four
+  adverts measured — Grimma/Großbothen, Machern/Plagwitz,
+  Neukieritzsch/Lobstädt, Bad Lausick/Etzoldshain.
+- **Widen the *place* before the *number*.** „1.076 m² in Bad Lausick“ has **0**
+  matches in Gemarkung Bad Lausick and exactly **1** in the Gemeinde — Flurstück
+  502/47 in Gemarkung *Etzoldshain*, `lagebeztxt` „Am Kurpark“, and the advert
+  is titled „Naturnah wohnen am Kurpark“. An exactly stated area is an official
+  fact; a Gemarkung read out of prose is not, so opening the tolerance to keep
+  the guess throws away the better of the two.
+- **German capitalises every noun, so a capital letter finds nothing.** „geprägt
+  von Wiesen und Feldern“ made Gemarkung Wiesen (148950) an anchor; „Ihr Platz
+  zum Träumen“ and „einen befahrbaren Feldweg“ were read as streets. Only a
+  place with a *positional* relation is searched — a bare mention stays in the
+  protocol as weak evidence and costs no request. And „Anbindung **an**
+  Leipzig“ is connectivity, not location.
+- **„Ortsteil <A> von <B>“ — the district comes first, and both matter.**
+  „Ortsteil Plagwitz von Machern“, „Ortsteil Lobstädt bei Neukieritzsch“,
+  „Ortsteil Plagwitz der Gemeinde Machern“: A is the Gemarkung, B the Gemeinde.
+  „Großbothen, einem OT von Grimma“ is the same statement with the name in
+  front. Reading the *level* is what makes the municipality usable.
+- **Reading a listing's images concurrently is slower, not faster.** Tesseract
+  is CPU-bound; seven at once pushed every process past a 30 s timeout on this
+  machine, where sequentially each takes 0,9–5 s. Read them one at a time and
+  stop at the first parcel number — the drafted algorithm said so and the
+  concurrency was an unmeasured optimisation that made it worse.
+- **A timed-out reader looks exactly like a photograph of a lawn.** Both
+  produce no text, and reporting both as „kein Katasterauszug dabei“ is a claim
+  about the listing that was never checked. `ocr.read()` returns the failure
+  next to the text, and the search says how many images it could not read.
+- **What a portal *serves* is smaller than the reader wants.** Kleinanzeigen's
+  largest variant is 678 x 960 for a cadastral print and 960 x 720 for a
+  photograph, whatever the camera produced — so the 1 500 px upscale runs on
+  every image in production, not on the odd small one.
+- **Kleinanzeigen answers the first request with 403 and the second with the
+  page.** Reproduced on three adverts, exactly once each. Not a block, a
+  warm-up: `fetch_page` retries once.
+- **The whole page is not the listing.** `html_to_text` returns navigation,
+  cookie banner and category tree, and the search read all of it as evidence.
+  The description sits in `#viewad-description-text`, and the attribute list
+  beside it carries the *authoritative* area — a title may hedge („ca.
+  1.025qm“) where the field states 1.025 m², and the tolerance staircase starts
+  from the wording.
 - **Verify a "not affected" against a control point.** A layer that answers
   zero features looks the same whether the plot is clear or the layer is
   empty. `luft/radonvorsorgegebiete` holds 107 municipalities and answers "no"
@@ -643,6 +785,18 @@ from the user directly. Reopen only if the user asks.
   is how you know it is the parameter and not the extra argument.
   `services/tiles.py` sends it only when the standard pixel would cross the
   line, so z19 is untouched and z16 still shows the parcel fabric.
+- **There are two cadastral overlays, and they are not spellings of each
+  other.** `adv_alkis_flurstuecke` stops drawing at 1:2000 either way, and the
+  two ways round it produce different pictures. `flurstuecke` renders the tile
+  oversized and scales it back, so its outlines still draw across a district
+  (down to z15) — and its *labels* shrink with the render: measured at z18 over
+  Liebertwolkwitz, the numbers come back as unreadable smudges. That is the
+  search map's ground, where the outlines are the point. `liegenschaftskarte`
+  asks for a plain 256 px tile and moves the limit with `MAP_RESOLUTION`
+  instead, so the same z18 tile carries 101/2, 85/1, the boundary points and
+  „Wiesengasse“ legibly. That is the picker's ground, where the numbers are the
+  point — and `SitePlan.groundNamesParcels` stops drawing its own labels only
+  for that one.
 - **A tile cache keyed by the layer's *name* serves the previous
   configuration.** `alkis` stood for the land-use layers and then for the
   parcels, and every cached tile kept the old picture — which looks exactly like
@@ -719,6 +873,171 @@ from the user directly. Reopen only if the user asks.
   `display: block` on the children is not enough for print; the pseudo-element
   needs `content-visibility: visible`. Both spellings are in `print.css`, since
   older builds hide the children directly.
+- **A German thousands stripper eats a coordinate.** Removing every `.` turned
+  `51.189265` into `51189265`, and every Kleinanzeigen listing answered 422
+  („Der Wert darf höchstens 90.0 betragen") before the search asked the
+  cadastre anything. A dot separates thousands **only in groups of three**, and
+  a comma settles it outright: `1.025` is 1025, `51.189265` is a coordinate,
+  `1.025,50` is 1025,5. One reader for both — `parseGermanNumber` in
+  `frontend/src/lib/format.js`; the helper that broke this was a local copy in
+  the wizard, which is how it survived.
+- **The price is in the markup three times and never needs a model.**
+  `<meta itemprop="price">`, the JSON-LD `offers.price` and `#viewad-price` —
+  the first hit answered all four measured adverts (60 000 / 165 000 / 80 000 /
+  195 000 €). It had been left to the LLM, so the field stayed empty on exactly
+  the pages that have a known adapter.
+- **The clipboard carries `text/html` next to `text/plain`, and a `<textarea>`
+  shows only the second.** `Strg+A, Strg+C` on a portal page therefore has
+  everything the extraction wants — meta tags, JSON-LD, price, pictures — and
+  the paste field keeps it (`@paste`, capped at 400 000 characters) and sends
+  that instead. So the paste path needs no `LLM_API_KEY`: a model is asked only
+  when no address, no coordinate and no parcel number could be read at all.
+  Emptying the field has to clear the kept HTML, or the next read silently
+  ships the page pasted before.
+- **An optional dependency has to be optional in one place only.** The backend
+  image installed `.[poi]` and never `tesseract-ocr`, so every Compose
+  deployment reported „keine Bilderkennung eingerichtet“ while the code, the
+  tests and the README all said it was wired up. `apt-get install tesseract-ocr
+  tesseract-ocr-deu` plus `.[poi,ocr]`; the German data is not optional either,
+  because the patterns key on the words around the number.
+- **`adv_alkis_flurstuecke` carries `MaxScaleDenominator: 2000` and answers 200
+  with a transparent PNG above it — and a scale limit is *steerable*.** Same
+  shape as the ArcGIS `minScale` trap, different service. At 256 px the layer
+  draws only from z19 (z18 is 1:2133 and empty). But the denominator is
+  `(bbox_width / image_width) / 0,00028`, so asking for a **larger image over
+  the same box** puts it back under the limit: z18 at 512 px, z17 at 768,
+  z16 at 1280, z15 at 2304 — all measured against the live service, all
+  drawing. The proxy scales the render back to a tile, so the browser still
+  gets 10–39 kB. It runs out at z14, which would need 4368 px against the
+  service's `MaxWidth` of **4000**; that is where the floor comes from.
+  Every style behaves the same — it is the scale, not `STYLES` — and
+  `STYLES=default` is rejected outright while `STYLES=` (empty) is accepted.
+  Sibling layers are unaffected: `tatsaechliche_nutzung` and `gebaeude` draw at
+  z18 in the same request. The service's own overlay style is **`Gelb`**, whose
+  abstract says „keine Flaechen sondern nur Konturen“ — that is the one for an
+  orthophoto. Streets and their names come from the WebAtlas as
+  `Verkehr,Beschriftung`, transparent at every zoom from 13 to 19.
+- **A raster style needs no network, and that is what starts a MapLibre
+  instance where none can run.** The vector style is a `fetch`, so in jsdom it
+  failed and the map was never built; the orthophoto ground is assembled
+  locally, so `new MapLibreMap` ran, half-initialised without WebGL, and only
+  said so on the way out — `remove()` throwing inside the library, reported as
+  an unhandled rejection against whichever test file happened to be running.
+  `canRenderMap()` is asked first now. It is not only a test concern: a browser
+  with WebGL switched off did the same thing.
+- **Sorting the clues by confidence destroys the one thing the list is for.**
+  `ParcelSearch` re-sorted `indicia` on every event and kept the phase lines in
+  a separate `<ol>` underneath, so afterwards nobody could tell what came
+  first — which is what makes a run checkable at all. There is one numbered
+  `Verlauf` now, in arrival order, and every row that stands for something on
+  the map flies to it. The geometry is resolved when a row is *clicked*, not
+  when it was recorded: a clue arrives several steps before the outline it
+  names is fetched, so anything captured at the time is null for exactly the
+  rows worth clicking.
+- **A palette tuned for paper disappears on a photograph.** The evidence layers
+  were 0,1 fills and 1,2 px hairlines — right over the app's near-white ground,
+  invisible over an orthophoto, which is mostly green, grey and dark with detail
+  everywhere. Over the photo every fill is stronger and every line carries the
+  halo the site plan has always drawn under its own. The ground is a prop, so
+  the paint follows it rather than being chosen once.
+- **The frame comes before the narration.** The clues play one at a time so a
+  run can be followed, and the district outlines were emitted *after* all of
+  them — so for the first seconds the map sat on the whole of Saxony while the
+  list already named a village, which reads as a map that is broken rather than
+  one that is waiting. Emitting the same request one step earlier fixes it, and
+  costs nothing: the wash under a confirmed parcel is that same document, so
+  `fetch_outline` reuses it instead of asking again.
+- **Reading the images is the rescue, not the route.** OCR was phase 0, so
+  every run began with up to a few seconds an image before the first thing the
+  map could draw — for a channel most listings do not have. The text and the
+  metadata are what the search runs on; the images are read afterwards, and
+  only when the text did not confirm. When they then name a parcel, the
+  narrowing runs again rather than the reading being noted and ignored.
+- **A locator is what a stored plot needs, not what the search needs.** The
+  paste path refused any page without an address, a coordinate or a parcel
+  number — which is every ImmoScout page, the one portal that field exists for.
+  The search reads a district, a street and an area out of prose; the gate now
+  asks `collect_indicia` whether the text yields an *anchor* (a Gemarkung, a
+  Gemeinde, a place or a parcel number). An area alone is not one — every
+  parcel in Saxony of that size is not a candidate set — so „Baugrundstück
+  688 m²“ still gets the message that says what to paste instead.
+- **A test that mocks by call order breaks when the run gets better.** Six
+  tests pinned an ordered `side_effect` list, so fetching the district outline
+  one step earlier failed them all — for a change that made the product better
+  and cost no extra request. `_cadastre()` exists for exactly this and its
+  docstring says so; the ordered lists are gone.
+- **The reader garbles the label, not only the digits.** On the Borna advert's
+  Liegenschaftskarte Tesseract returns „**Fiurstück**: 107/60“ — the l as an i —
+  so the one number on the sheet that means anything was thrown away, while
+  „Gemarkung Thräna“ beside it was read correctly. The pattern tolerates
+  `[li1|]` in that position now; the rest of the word carries the specificity,
+  so it costs no precision (`Fust`, `First`, `Furst`, „die Flur ist 12 ha“ all
+  still match nothing). The district needs no such help: it comes back as
+  „Thrana“ and the directory folds diacritics.
+- **A plot can be advertised that has no Flurstück at all.** „eine noch zu
+  vermessende Teilfläche“ (advert 2418686487, 748,50 m²): the parcel will be cut
+  out at sale, so no existing parcel has that area. Used as a hard filter the
+  figure finds *some other* parcel of that size and confirms it — the one kind
+  of wrong answer this search exists to refuse. `describes_part_area` reads the
+  sentence, `AreaStatement.exact` goes false, and `verdict()` can never say
+  „bestätigt“: the listing itself is the contradiction, and no filter can catch
+  it. The answer names the parcel it will be cut *from* — here 107/60 in
+  Gemarkung Thräna, 2 994 m², in two requests — and says why that is not the
+  plot. The area mismatch is then not reported as an objection either; it is the
+  situation, and „bitte die Flurstücksnummer prüfen“ would send someone looking
+  for a mistake that is not there.
+- **A Beleg read off a picture is the least checkable evidence in the search.**
+  So an Indiz from an image carries `bild_url` and the conflict block shows the
+  sheet: the choice is made against the document rather than against a
+  transcription of it. A Geoportal print carries dozens of neighbouring numbers
+  on the map body — only the labelled one in the title block is ever read, which
+  is what keeps that safe.
+- **A jump that only moves the camera does not say what it jumped to.** The
+  map arrived somewhere and left the reader to guess which of the things on it
+  was the reason. The entry being followed is marked (`gezeigt`, drawn over
+  everything) and its row is marked in the list, so the two refer to each other.
+- **jsdom does not submit a form from a dispatched click.** Wrapping the
+  wizard's first step in a `<form>` (so Enter submits, as it does everywhere
+  else) broke two tests that click the button, with no change to the component's
+  logic. The button's click carries `.prevent` so a real browser does not submit
+  twice, and the two paths — `trigger("click")` on the button, `trigger("submit")`
+  on the form — are tested separately.
+- **The listing states its Bundesland, and that is the cheapest hard filter
+  there is.** Kleinanzeigen's location field is „PLZ Bundesland – Ort" on all
+  six recorded adverts. ALKIS is state-specific, so a plot in Sachsen-Anhalt has
+  no Saxon Flurstück — and its village usually *does* have a Saxon namesake:
+  „600 m² in Brehna" (advert 3381469778) resolved to Flurstück 50 in Gemarkung
+  Roitzsch near Wurzen, 100 km away and exactly 600 m². Eleven requests spent on
+  an answer no request could have got right. Read the state first, before
+  anything is asked: „Sachsen-Anhalt" contains „Sachsen", so match whole words
+  and longest first. Out of *prose* the same name may only **explain** a run
+  that already found nothing — „gute Anbindung nach Sachsen-Anhalt" is a
+  sentence about a Saxon plot.
+- **A bare „in" before a place is the same trap as „Anbindung an".**
+  „weiterführende Schulen in Roitzsch oder Bitterfeld sind in 10 bis 15
+  Autominuten" put the plot in Roitzsch. An amenity is somewhere to go, never
+  where the thing is; the guard is the noun in front of the preposition, the
+  way `an` has been guarded since Leipzig.
+- **A choice that changes nothing is worse than no choice.** The conflict block
+  offered „Brehna" — a name in no Saxon Gemarkung, so it contributed no anchor
+  and picking it re-ran the search to the same answer, which reads as a button
+  that does not work. An option has to be something the cadastre can be asked
+  about; the Indiz stays in the Verlauf, struck through, with the reason.
+- **Two reasons for one outcome contradict each other.** `verdictSentence` said
+  „die Angaben reichen nicht aus, um die Lage einzugrenzen" directly above the
+  run explaining that the details are complete and point at another state. A
+  template may only supply a reason when the run supplied none.
+- **A longer camera flight alone is not a calmer camera.** The flight is capped
+  at `queueStep * 1.6`, so doubling `FLIGHT_MS` without doubling `BUDGET_MS` and
+  `MIN_DWELL_MS` just interrupts the same movement more often. All three move
+  together; sixteen clues now play over twelve seconds instead of six — and the
+  screenshot script's wait after the verdict has to outlast the budget, or it
+  photographs a map still in flight.
+- **`page.fill` with 171 kB of markup takes ~27 s** — Playwright inserts it
+  through the input pipeline — which sits just under the 30 s default and fails
+  whenever the machine is busy. Measured identical before and after the change
+  that appeared to break it. Dispatch a `paste` with a `DataTransfer` instead:
+  instant, and it is the action the product is actually built around.
 
 ## Commands
 
@@ -737,7 +1056,12 @@ docker compose up --build      # http://localhost:8080
 # fetch-data.sh pulls the OSM extract and the DELFI GTFS; the first start
 # imports for ~3.5 min into the motis-graph volume, after that it is seconds.
 ./motis/fetch-data.sh
-MOTIS_BASE_URL=http://motis:8080 docker compose --profile local-routing up --build
+docker compose -f docker-compose.yml -f docker-compose.local-routing.yml up --build
+
+# reading a listing's attached cadastral extract -- optional, and the search
+# says so in /api/health when it is missing
+apt-get install -y tesseract-ocr tesseract-ocr-deu
+backend/.venv/bin/pip install -e "backend[ocr]"
 
 # frontend — needs Node >= 22.19: jsdom 30 pulls in undici 8, and on Node 20
 # vitest dies before loading a test with `markAsUncloneable is not a function`.
@@ -767,11 +1091,20 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 460 passed, 1 skipped
-- `vitest`: 485 passed — plus the integration file, excluded by `npm run test`
+- `pytest`: 524 passed, 8 skipped — one of those needs pyosmium, which only the
+  index builder wants; the other seven need Tesseract and skip without it.
+- `vitest`: 533 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
-- `scripts/screenshots.mjs`: 44 images plus two print PDFs. It fails on console
+- `scripts/screenshots.mjs`: 59 images plus two print PDFs. It fails on console
   errors, on horizontal overflow, and if not a single vector tile arrived. It
   also drives the live geocoder, which is slow often enough to blow the 60 s
   wait on the destinations step — two runs failed there and the third passed
   with nothing changed. Re-run once before going looking for the bug.
+  The `suche-*` images run a **real** search against ALKIS, so they need a
+  backend on :8000 like every other picture here; without one the step reports
+  "die Suche kam zu keinem Ergebnis" rather than passing quietly. The three
+  `assistent-werte-*` images paste a saved advert
+  (`backend/tests/fixtures/inserat-kleinanzeigen.html`) through
+  `/api/listings/extract`, which needs the same backend and no LLM key, and
+  then open the „Gelesene Werte" fold inside the search step — that list is no
+  longer a step of its own.

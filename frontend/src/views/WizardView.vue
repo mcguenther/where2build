@@ -32,7 +32,7 @@
 
     <!-- 1 · Quelle. Also what a stage without its data falls back to, so the
          redirect in `checkStage` never renders a step that has nothing. -->
-    <section v-if="stageIndex === 0 || !reachable" class="stack">
+    <section v-if="stage === 'quelle' || !reachable" class="stack">
       <p class="subtitle">Vier Wege hinein. Welcher passt zu dem, was vorliegt?</p>
       <div class="sources">
         <label v-for="s in sources" :key="s.id" class="source" :class="{ 'source--selected': source === s.id }">
@@ -42,7 +42,9 @@
         </label>
       </div>
 
-      <div class="panel">
+      <!-- A form, so the Enter key does what it does everywhere else. Without
+           one the address field swallowed it and nothing happened. -->
+      <form class="panel" @submit.prevent="submit">
         <div class="panel__body stack">
           <template v-if="source === 'search'">
             <PlotSearch @select="searchPicked" />
@@ -57,7 +59,7 @@
           <template v-else-if="source === 'url'">
             <div class="field">
               <label for="q-url">Adresse der Anzeige</label>
-              <input id="q-url" type="text" v-model="url" placeholder="https://…">
+              <input id="q-url" type="url" inputmode="url" v-model="url" placeholder="https://…">
             </div>
             <p class="hint">
               Die Seite wird auf dem Server geholt und ausgelesen. ImmoScout24 lässt das
@@ -86,54 +88,102 @@
             </p>
           </template>
 
+          <template v-else-if="source === 'text'">
+            <div class="field">
+              <label for="q-text">Beschreibung aus der Anzeige</label>
+              <textarea id="q-text" v-model="listingText"
+                        placeholder="Den Beschreibungstext der Anzeige einfügen — mit Ortsteil, Fläche und Straße"></textarea>
+            </div>
+            <p class="hint">
+              Dieser Weg braucht kein Modell. Gesucht wird über Muster und das
+              Gemarkungsverzeichnis: eine Flurstücksnummer im Text, ein Ortsteil mit
+              seiner Beziehung („OT von“, „am Ortsrand von“, „6 km entfernt“), die
+              Fläche so, wie sie dasteht, und die Straße. Was daraus folgt, steht
+              anschließend Zeile für Zeile im Protokoll.
+            </p>
+          </template>
+
           <template v-else>
             <div class="field">
               <label for="q-paste">Anzeige hier einfügen</label>
-              <textarea id="q-paste" v-model="pastedText"
+              <textarea id="q-paste" v-model="pastedText" @paste="takePaste"
                         placeholder="Strg+V — die kopierte Anzeigenseite"></textarea>
             </div>
+            <p class="hint">
+              Im Browser <span class="mono">Strg+A</span>, <span class="mono">Strg+C</span>,
+              hier <span class="mono">Strg+V</span>. Die Zwischenablage führt neben dem Text
+              auch das HTML mit — daraus kommen Preis, Fläche, Koordinate und die Bilder
+              ohne Modell.
+              <span v-if="pastedHtml"><b>Das HTML wurde übernommen</b> ({{ Math.round(pastedHtml.length / 1024) }} kB).</span>
+            </p>
           </template>
 
           <div v-if="source !== 'search'" class="row">
-            <button type="button" class="btn" :disabled="busy || !ready" @click="read">
-              {{ busy ? "Wird gelesen …" : source === "parcel" ? "Nachschlagen" : "Lesen" }}
+            <!-- The click carries `.prevent`, so the button's own activation
+                 does not submit the form a second time. -->
+            <button type="submit" class="btn" :disabled="busy || !ready" @click.prevent="submit">
+              {{ busy ? "Wird gelesen …" : readLabel }}
             </button>
             <span v-if="busy" class="hint">Der Abruf kann eine Minute dauern.</span>
           </div>
           <p v-else-if="busy" class="hint">Das Kataster wird gefragt …</p>
         </div>
-      </div>
+      </form>
     </section>
 
     <!-- 2 · Gelesene Werte -->
-    <section v-else-if="stageIndex === 1" class="stack">
+    <!-- 2 · Flurstück suchen. The listing named a place, not a parcel; this
+         step turns the one into the other and shows what it stood on. What the
+         reader got off the page rides along folded up: it is what the search
+         is running on, so it belongs here, and it is a list nobody has to read
+         before carrying on, so it starts closed. -->
+    <section v-else-if="stage === 'suche'" class="stack">
       <p class="subtitle">
-        Jedes Feld führt die Quelle mit, aus der es stammt. Erst nach Bestätigung wandern die
-        Werte in die Planung — das Modell antwortet auch dann, wenn die Seite die Zahl gar nicht hergibt.
+        Ein Inserat nennt fast nie sein Flurstück. Gesucht wird deshalb über das, was
+        dasteht — Ortsteil, Fläche, Straße —, und die Karte zeigt dabei durchgehend, was
+        noch möglich ist. Reicht es nicht für ein einzelnes Flurstück, sagt die Antwort,
+        worauf sich die Lage eingrenzen lässt.
       </p>
 
-      <div class="suggestions">
-        <div v-for="f in readFields" :key="f.key" class="suggestion" :class="{ 'suggestion--empty': !f.value }">
-          <span class="suggestion__head">
-            <span class="field-label">{{ f.label }}</span>
-            <span class="suggestion__tag">{{ f.value ? "automatisch gelesen" : "nicht belegt" }}</span>
-          </span>
-          <input type="text" v-model="f.value" :aria-label="f.label"
-                 :placeholder="f.value ? '' : 'steht nicht auf der Seite'">
-          <span class="suggestion__source">{{ f.source }}</span>
+      <details v-if="readSummary" class="gelesen">
+        <summary>
+          <span class="gelesen__titel">Gelesene Werte</span>
+          <span class="gelesen__zahl">{{ readSummary }}</span>
+        </summary>
+        <p class="subtitle">
+          Jedes Feld führt die Quelle mit, aus der es stammt. Was die Seite nicht hergibt,
+          bleibt leer und wird nicht erfunden. Eine Änderung hier startet die Suche neu.
+        </p>
+        <div class="suggestions">
+          <div v-for="f in readFields" :key="f.key" class="suggestion" :class="{ 'suggestion--empty': !f.value }">
+            <span class="suggestion__head">
+              <span class="field-label">{{ f.label }}</span>
+              <span class="suggestion__tag">{{ f.value ? "automatisch gelesen" : "nicht belegt" }}</span>
+            </span>
+            <span class="suggestion__eingabe">
+              <input type="text" v-model="f.value" :aria-label="f.label"
+                     :placeholder="f.value ? '' : 'steht nicht auf der Seite'">
+              <span v-if="f.unit" class="suggestion__einheit" aria-hidden="true">{{ f.unit }}</span>
+            </span>
+            <span class="suggestion__source">{{ f.source }}</span>
+          </div>
         </div>
-      </div>
+        <div class="row">
+          <button type="button" class="btn btn--quiet" @click="lookUpParcel">
+            Suche mit diesen Werten neu starten
+          </button>
+        </div>
+      </details>
 
+      <ParcelSearch v-if="searchQuery" :query="searchQuery" :key="searchRun"
+                    @confirm="takeCandidate" @manual="stepBack('quelle')" />
       <div class="row">
-        <button type="button" class="btn" :disabled="busy" @click="lookUpParcel">
-          {{ busy ? "Kataster wird abgefragt …" : "Flurstück nachschlagen" }}
-        </button>
-        <button type="button" class="btn btn--quiet" @click="stepBack(0)">Zurück</button>
+        <button type="button" class="btn btn--quiet" @click="stepBack('quelle')">Zurück</button>
       </div>
     </section>
 
     <!-- 3 · Grundstück: die Flurstücke und die Angaben dazu -->
-    <section v-else class="stack">
+    <section v-else-if="stage === 'flurstueck'" class="stack">
       <p class="subtitle">
         So liegen die Flurstücke im Kataster. Ein Klick wählt ein anderes — zum
         Zusammensetzen mehrerer umschalten. Den Ausschnitt bewegt die gedrückte
@@ -156,6 +206,8 @@
         Gewählt ist {{ corrected }} — die Lagebezeichnung im Kataster nennt genau diese
         Adresse. Ein Klick auf ein anderes Flurstück ändert das.
       </p>
+
+      <p v-if="addError" class="notice notice--error" role="alert">{{ addError }}</p>
 
       <div class="check-grid">
         <div class="panel">
@@ -184,7 +236,7 @@
                keeps the camera still when another parcel is picked — the point
                of the click is to see which outline moved. -->
           <SitePlan :plot="draft" :width="640" :height="440" backdrop="aerial"
-                    overlay="flurstuecke" north-up :hold-frame="holdFrame"
+                    overlay="liegenschaftskarte" north-up :hold-frame="holdFrame"
                     :show-building="false" :show-dimensions="false" navigable
                     :parcels="choices" :chosen-parcels="selection"
                     :problem-parcels="detached"
@@ -261,20 +313,15 @@
 import SitePlan from "../components/SitePlan.vue";
 import CadastralDistrictPicker from "../components/CadastralDistrictPicker.vue";
 import PlotSearch from "../components/PlotSearch.vue";
+import ParcelSearch from "../components/ParcelSearch.vue";
 import { state, addPlot, autoSeatHouse } from "../lib/store.js";
 import { WIZARD_STAGES, wizardStage } from "../router/stages.js";
 import { readListing, readPage, resolveParcel, landValue, nearbyParcels } from "../lib/api.js";
+import { queryFromFields } from "../lib/search.js";
 import { plotFromCadastre, parcelForAddress, outerRing } from "../lib/plots.js";
 import { polygonArea, polygonCentroid, pointInPolygon } from "../lib/geometry.js";
 import { toLocal } from "../lib/projection.js";
-import { area, euroPerSqm, num } from "../lib/format.js";
-
-/** "212.000 €" and "1.104 m²" as a German listing writes them. */
-function numberFrom(text) {
-  if (text === null || text === undefined || text === "") return null;
-  const match = String(text).replace(/\./g, "").replace(",", ".").match(/-?\d+(\.\d+)?/);
-  return match ? parseFloat(match[0]) : null;
-}
+import { area, euroPerSqm, num, parseGermanNumber as numberFrom } from "../lib/format.js";
 
 /** The backend answers with {feld: {wert, quelle_url, bestaetigt}}. */
 function fieldsFromResponse(response) {
@@ -284,9 +331,14 @@ function fieldsFromResponse(response) {
     flurstuecke: "Flurstücke", kaufpreis_eur: "Kaufpreis",
     grundstuecksflaeche_m2: "Grundstücksfläche"
   };
+  /* Shown beside the box, never inside it: „600" is what the search sends to
+   * the cadastre, and a unit inside the field would travel with it. A number
+   * with no unit next to a price with no unit is a field nobody can read. */
+  const units = { grundstuecksflaeche_m2: "m²", kaufpreis_eur: "€", lat: "°", lon: "°" };
   return Object.entries(fields).map(([key, entry]) => ({
     key,
     label: labels[key] ?? key,
+    unit: units[key] ?? "",
     value: Array.isArray(entry?.wert)
       ? entry.wert.map(v => (typeof v === "object" ? [v.zaehler, v.nenner].filter(Boolean).join("/") : v)).join(", ")
       : entry?.wert ?? "",
@@ -294,16 +346,22 @@ function fieldsFromResponse(response) {
   }));
 }
 
+/** What POST /api/listings/extract accepts in `text`. */
+const PASTE_LIMIT = 400000;
+
 export default {
   name: "WizardView",
-  components: { SitePlan, CadastralDistrictPicker, PlotSearch },
+  components: { SitePlan, CadastralDistrictPicker, PlotSearch, ParcelSearch },
   props: {
     /** The stage's URL segment; the route only matches the four known ones. */
     stage: { type: String, required: true }
   },
   data() {
     return {
-      returnStage: 0,
+      returnStage: "quelle",
+      // What the listing said about price and address, held until a candidate
+      // is chosen and the draft is built.
+      listingExtras: null,
       lost: false,
       // How many history entries this wizard pushed; see `stepBack`.
       ownEntries: 0,
@@ -315,9 +373,30 @@ export default {
       gemarkungEntry: null,
       flurstuecksnummer: "",
       pastedText: "",
+      /* What the clipboard carried as `text/html`. A Ctrl+A copy out of a
+       * browser puts both flavours on the clipboard, and a textarea only ever
+       * receives the plain one — which loses the meta tags, the price, the
+       * coordinate and every image URL. Those are exactly what makes the paste
+       * path work without a model, and they are the whole point of this field:
+       * it exists for the portals that refuse a server-side fetch. */
+      pastedHtml: "",
+      listingText: "",
       busy: false,
       error: "",
       readFields: [],
+      /* The listing's own prose. It is what the search reads the cadastral
+       * district, the street and the relation between the named places out of
+       * — none of which is an attribute anywhere. It never reaches the stored
+       * plot; see lib/plots.js for what a plot actually carries. */
+      description: "",
+      searchQuery: null,
+      /* The listing's pictures. The search reads them only when the text names
+       * no Flurstück — a seller who attaches a Geoportal print has already
+       * answered the question, and one who has not costs three seconds an
+       * image to learn nothing. */
+      images: [],
+      // Bumped to remount the search rather than reuse a finished one.
+      searchRun: 0,
       draft: null,
       doubt: null,
       /** The parcels around the resolved point, for the user to choose from. */
@@ -345,13 +424,15 @@ export default {
       /** The parcel number a Lagebezeichnung match put in place of the one the
        *  coordinate landed in. Null unless it actually differed. */
       corrected: null,
+      /** What went wrong while the plot was being reassembled. */
+      addError: "",
       // The labels for the stages in `WIZARD_STAGES`, in that order. The
       // parcel and the fields are one step: the fields are three inputs, and
       // the "Passt" between them decided nothing.
       steps: [
-        { id: "source", name: "Quelle" },
-        { id: "fields", name: "Gelesene Werte" },
-        { id: "parcel", name: "Flurstück und Angaben" }
+        { id: "quelle", name: "Quelle" },
+        { id: "suche", name: "Flurstück suchen" },
+        { id: "flurstueck", name: "Flurstück und Angaben" }
       ],
       sources: [
         { id: "search", name: "Suchen",
@@ -360,6 +441,8 @@ export default {
           text: "Adresse einer Anzeige. Der Server holt die Seite und liest Adresse, Flurstück, Kaufpreis und Fläche heraus." },
         { id: "parcel", name: "Flurstück direkt",
           text: "Gemarkung und Flurstücksnummer, so wie sie im Geoportal stehen." },
+        { id: "text", name: "Text durchsuchen",
+          text: "Nur der Beschreibungstext. Daraus wird das Flurstück gesucht — ohne Modell, allein über Muster und das Gemarkungsverzeichnis." },
         { id: "paste", name: "Seite einfügen",
           text: "Für Portale, die keinen Serverabruf zulassen. Die kopierte Anzeigenseite einfügen." }
       ]
@@ -368,26 +451,50 @@ export default {
   computed: {
     stageIndex() { return WIZARD_STAGES.indexOf(this.stage); },
     /* What each stage needs in order to have anything to show. Only the first
-     * one stands on its own: the read fields and the draft live in this
-     * component and are gone after a reload. */
+     * one stands on its own: the read fields, the query and the draft live in
+     * this component and are gone after a reload. */
     reachable() {
       if (this.stageIndex <= 0) return true;
-      return this.stageIndex === 1 ? this.readFields.length > 0 : Boolean(this.draft);
+      if (this.stage === "suche") return Boolean(this.searchQuery);
+      return Boolean(this.draft);
+    },
+    /** How much the reader got, for the folded summary line.
+     *
+     *  Empty when it got nothing — „0 von 6 Feldern belegt“ is a box that says
+     *  it has nothing to show, which is worse than not being there. Typed prose
+     *  reaches this state routinely: the extraction endpoint needs a model for
+     *  a plain description, while the search's own pattern reader does not. */
+    readSummary() {
+      const filled = this.readFields.filter(f => f.value).length;
+      return filled ? `${filled} von ${this.readFields.length} Feldern belegt` : "";
     },
     ready() {
       // The search has no button: picking a suggestion is the action.
       if (this.source === "search") return false;
       if (this.source === "url") return /^https?:\/\/\S{6,}/.test(this.url.trim());
       if (this.source === "parcel") return this.gemarkung.trim() && this.flurstuecksnummer.trim();
+      if (this.source === "text") return this.listingText.trim().length > 20;
       return this.pastedText.trim().length > 20;
     },
+    readLabel() {
+      return this.source === "parcel" ? "Nachschlagen" : "Lesen";
+    },
     computedArea() { return this.draft ? polygonArea(this.draft.polygon) : 0; },
+    /** The footprint the seating tried to place, for the sentence that says it
+     *  found no room. The template has always named this and nothing ever
+     *  defined it: the branch only runs for a parcel too small for the default
+     *  body, so the page it crashed was one nobody had reached. */
     /** What the cadastre is asked for: the key of the chosen entry, which is
      *  unambiguous where two districts share a name, else the plain text. */
     gemarkungQuery() { return this.gemarkungEntry?.schluessel || this.gemarkung.trim(); }
   },
   created() { this.checkStage(); },
-  watch: { stage() { this.checkStage(); } },
+  watch: {
+    stage() { this.checkStage(); },
+    // Emptying the field has to empty the clipboard HTML with it, or the next
+    // read silently sends the page that was pasted before.
+    pastedText(value) { if (!value.trim()) this.pastedHtml = ""; }
+  },
   methods: {
     area, euroPerSqm, num,
 
@@ -422,7 +529,7 @@ export default {
       this.busy = true;
       this.error = "";
       try {
-        this.returnStage = 0;
+        this.returnStage = "quelle";
         this.searchedAddress = address ?? null;
         await this.queryCadastre(query, { note: `Gesucht: ${label}` });
       } catch (error) {
@@ -432,24 +539,52 @@ export default {
       }
     },
 
+    /** Keep the clipboard's HTML flavour alongside the text the textarea shows.
+     *
+     *  Capped at what the endpoint accepts: a whole portal page with its inline
+     *  scripts runs past 400 000 characters, and everything the extraction
+     *  wants — meta tags, JSON-LD, the price, the attribute list — sits in the
+     *  first part of the document. */
+    takePaste(event) {
+      const html = event.clipboardData?.getData("text/html");
+      if (html && html.length > this.pastedHtml.length) this.pastedHtml = html.slice(0, PASTE_LIMIT);
+    },
+
+    /** The one way in, for the Enter key and for the button alike. */
+    submit() {
+      if (this.busy || !this.ready) return;
+      this.read();
+    },
+
     async read() {
       this.busy = true;
       this.error = "";
       try {
         if (this.source === "parcel") {
-          this.returnStage = 0;
+          // Nothing to search for: the district and the number are the answer.
+          this.returnStage = "quelle";
           await this.queryCadastre({
             gemarkung: this.gemarkungQuery,
             flurstuecksnummer: this.flurstuecksnummer.trim()
           });
           return;
         }
+        // Everything that is not a parcel key goes through the same reader and
+        // lands on the same step. Typed prose used to jump straight into the
+        // search, so the same page arrived at two different places depending on
+        // which box it was pasted into — and the values it *did* carry (area,
+        // price) were never shown.
         const response = this.source === "url"
           ? await readListing(this.url.trim())
-          : await readPage(this.pastedText);
+          : await readPage(this.source === "text" ? this.listingText.trim() : (this.pastedHtml || this.pastedText));
         this.readFields = fieldsFromResponse(response);
-        this.returnStage = 1;
-        this.goToStage(1);
+        this.description = response?.beschreibung
+          || (this.source === "text" ? this.listingText.trim() : this.pastedText);
+        this.images = response?.bilder || [];
+        // Straight on. The read values were a step of their own and answered a
+        // question nobody had asked yet — they are what the search runs on, so
+        // they now travel with it, folded shut.
+        this.lookUpParcel();
       } catch (error) {
         this.error = error.message;
       } finally {
@@ -457,35 +592,50 @@ export default {
       }
     },
 
-    /** Turn what was read into a cadastral query: coordinate first, else the parcel number. */
-    async lookUpParcel() {
+    /** Hand what was read to the search.
+     *
+     *  Deliberately not a lookup any more. A coordinate resolves to whatever
+     *  parcel it lands on — measured 6 235 m from the plot actually being sold,
+     *  because the platform geocodes its own location field — and a single
+     *  parcel number without its district is a guess. The search asks the
+     *  cadastre a series of narrow questions instead, and shows what each one
+     *  settled.
+     */
+    lookUpParcel() {
       const read = name => this.readFields.find(f => f.key === name)?.value;
-      const lat = numberFrom(read("lat")), lon = numberFrom(read("lon"));
-      const numbers = String(read("flurstuecke") ?? "").split(/[,;]/).map(s => s.trim()).filter(Boolean);
+      this.searchQuery = queryFromFields(this.readFields, {
+        ...(this.description ? { text: this.description } : {}),
+        ...(this.images.length ? { bilder: this.images } : {}),
+        ...(this.gemarkungQuery ? { gemarkung: this.gemarkungQuery } : {})
+      });
+      this.listingExtras = {
+        askingPrice: numberFrom(read("kaufpreis_eur")),
+        note: read("adresse") ? `Aus der Anzeige: ${read("adresse")}` : ""
+      };
+      this.searchRun++;
+      this.returnStage = "suche";
+      this.goToStage("suche");
+    },
 
-      let query = null;
-      if (Number.isFinite(lat) && Number.isFinite(lon)) query = { lat, lon };
-      else if (numbers.length) query = { gemarkung: this.gemarkungQuery || undefined, flurstuecksnummer: numbers[0] };
-      else if (read("adresse")) query = { address: read("adresse") };
-
-      // The listing's own plot area lets the service judge whether the parcel
-      // it found can plausibly be the one being sold. A district address lands
-      // in the field next door, and nothing else would say so.
-      const statedArea = numberFrom(read("grundstuecksflaeche_m2"));
-      if (query && Number.isFinite(statedArea)) query.expected_area_m2 = statedArea;
-
-      if (!query) {
-        this.error = "Aus der Seite ließ sich weder eine Koordinate noch ein Flurstück lesen. "
-          + "Bitte den Weg „Flurstück direkt“ nehmen.";
-        return;
-      }
+    /** One candidate from the search becomes the draft plot.
+     *
+     *  Resolved again through /api/parcels/resolve rather than assembled from
+     *  the search answer: that endpoint is what the rest of the app already
+     *  speaks, and it re-checks the parcel on the way through.
+     */
+    async takeCandidate(candidate) {
+      if (!candidate) return;
       this.busy = true;
       this.error = "";
       try {
-        await this.queryCadastre(query, {
-          askingPrice: numberFrom(read("kaufpreis_eur")),
-          note: read("adresse") ? `Aus der Anzeige: ${read("adresse")}` : ""
-        });
+        await this.queryCadastre(
+          {
+            gemarkung: candidate.properties.gemarkungsnummer || candidate.properties.gemarkung,
+            flurstuecksnummer: candidate.properties.flurstuecksnummer,
+            ...(this.searchQuery?.flaeche_m2 ? { expected_area_m2: Math.round(this.searchQuery.flaeche_m2) } : {})
+          },
+          this.listingExtras || {}
+        );
       } catch (error) {
         this.error = error.message;
       } finally {
@@ -650,7 +800,7 @@ export default {
       this.selection = (answer.features ?? [])
         .map(feature => feature.properties?.kennzeichen)
         .filter(Boolean);
-      this.goToStage(2);
+      this.goToStage("flurstueck");
       // After the step is on screen: the choice is an aid, not a precondition.
       await this.loadChoices(plot, extra);
     },
@@ -721,6 +871,30 @@ export default {
 }
 .suggestion--empty .suggestion__tag{ border-color: var(--w2b-error); color: var(--w2b-error); }
 .suggestion__source{ font-family: var(--w2b-font-mono); font-size: 10px; color: var(--w2b-muted); overflow-wrap: anywhere; line-height: 1.45; }
+/* The unit sits beside the box, not in it: what is typed here goes to the
+   cadastre, and „600 m²" is not a number. */
+.suggestion__eingabe{ display: flex; align-items: baseline; gap: var(--w2b-space-2); }
+.suggestion__eingabe input{ flex: 1 1 auto; min-width: 0; }
+.suggestion__einheit{ flex: 0 0 auto; color: var(--w2b-muted); font-size: var(--w2b-text-s); }
+
+/* What was read off the page. Folded shut, because it is what the search is
+   already running on rather than something to approve first. */
+.gelesen{
+  border: 1px solid var(--w2b-line); border-radius: var(--w2b-radius-m);
+  background: var(--w2b-surface-sunken);
+  padding: 0 var(--w2b-space-4);
+}
+.gelesen > summary{
+  display: flex; align-items: baseline; gap: var(--w2b-space-3); flex-wrap: wrap;
+  padding: var(--w2b-space-3) 0; cursor: pointer; list-style: revert;
+}
+.gelesen > summary::marker{ color: var(--w2b-muted); }
+.gelesen__titel{ font-weight: 600; }
+.gelesen__zahl{ color: var(--w2b-muted); font-size: var(--w2b-text-s); }
+.gelesen[open]{ padding-bottom: var(--w2b-space-4); }
+.gelesen .subtitle{ margin-top: 0; }
+.gelesen .suggestions{ margin-top: var(--w2b-space-3); }
+.gelesen .row{ margin-top: var(--w2b-space-3); }
 
 .check-grid{ display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: var(--w2b-space-4); align-items: start; }
 @media (max-width: 900px){ .check-grid{ grid-template-columns: 1fr; } }

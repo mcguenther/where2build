@@ -311,11 +311,6 @@ class TilesSettings(BaseSettings):
     # cut straight across parcel boundaries, which is the opposite of what a
     # ground called "Kataster" is for.
     alkis_layers: str = "adv_alkis_flurstuecke,adv_alkis_gebaeude"
-    # The same cadastre without the building fills, for laying over the aerial
-    # photograph: boundaries, parcel numbers, boundary points and street names,
-    # all as line work on transparent ground. Measured over Liebertwolkwitz --
-    # the street names ride along with the parcels, no second layer needed.
-    alkis_parcel_layers: str = "adv_alkis_flurstuecke"
     # And the parcels stop being drawn at 1:2000 -- an empty image, no error.
     # A WMS derives the scale of a request from the standard 0,28 mm pixel, and
     # MAP_RESOLUTION is how a caller says the pixel is a different size, so the
@@ -323,6 +318,32 @@ class TilesSettings(BaseSettings):
     # 05.09.2026: without it the tile is blank, MAP_RESOLUTION=85 draws, 86 is
     # blank again -- exactly where the scale reaches 1:2000.
     alkis_min_scale: float = 2000.0
+    # The Liegenschaftskarte itself, for laying over an orthophoto at plot
+    # scale: boundaries, parcel numbers in the register's stacked notation,
+    # boundary points and street names, all as line work on transparent ground.
+    # Measured over Liebertwolkwitz -- the street names ride along with the
+    # parcels, no second layer needed. It is a different picture from the one
+    # below, not a spelling of it: the oversampled render draws its labels at
+    # the enlarged size and they come back a fifth of their height, so at plot
+    # scale that ground has outlines and no numbers.
+    cadastral_map_layers: str = "adv_alkis_flurstuecke"
+    # Parcel outlines for laying over an orthophoto. „Gelb“ is the service's own
+    # overlay style -- contours, no fills. The layer carries
+    # MaxScaleDenominator 2000 and answers 200 with an empty PNG above it, so
+    # the floor is measured rather than chosen: z18 is 1:2133 and blank, z19 is
+    # 1:1066 and draws.
+    parcel_layers: str = "adv_alkis_flurstuecke"
+    parcel_styles: str = "Gelb"
+    # The layer's own MaxScaleDenominator, read from its GetCapabilities. The
+    # proxy renders each tile at whatever pixel size puts the denominator under
+    # this and scales the result back down, so the outlines draw far above the
+    # zoom the service would otherwise start at.
+    parcel_max_scale_denominator: float = 2000
+    # z14 would need 4368 px for one tile and the service refuses anything over
+    # 4000, so that is where oversampling runs out. z15 is the floor.
+    parcel_min_zoom: int = 15
+    # Roads and their names, transparent at every zoom measured (13 to 19).
+    street_layers: str = "Verkehr,Beschriftung"
     # The noise survey is not a WMS tile source: its service offers EPSG:4326
     # and 25833 but not 3857, so MapLibre's {bbox-epsg-3857} raster source gets
     # nothing at all. The ArcGIS ``export`` endpoint reprojects server-side.
@@ -343,6 +364,9 @@ class TilesSettings(BaseSettings):
     image_format: str = "image/png"
     tile_size: int = 256
     transparent: bool = True
+    # What the service will render in one request. `MaxWidth`/`MaxHeight` in the
+    # ALKIS capabilities; asking for more is refused outright.
+    max_render_size: int = 4000
     cache_ttl_s: int = 30 * 24 * 3600
     max_zoom: int = 21
 

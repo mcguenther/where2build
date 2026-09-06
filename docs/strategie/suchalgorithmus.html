@@ -197,14 +197,25 @@ WENN kein vollständiges Flurstück:
         indizien += muster(text)
         WENN Flurstück gefunden: brich ab
 
-WENN Ortsbeziehung unklar:
-    indizien += modell(beschreibung, P1)
-
 KURZSCHLUSS
 WENN indizien enthält gemarkung UND flurstueck:
-    → springe direkt zu Phase 5</pre>
+    für jede Kombination: schlage nach       je 1 Anfrage
+    GEGENPROBE, kostenlos — beides kommt mit dem Flurstück:
+        amtliche Fläche  gegen  Fläche im Inserat
+        Gemeinde         gegen  Standortfeld
+    WENN kein Widerspruch: → fertig, „bestätigt“
+    SONST:                 → weiter, als Widerspruch gemeldet
+
+Das Modell wird hier NICHT gerufen. P1 kommt erst,
+wenn die Treppe nichts entschieden hat — gemessen ist
+das genau dann, wenn es auch etwas nützt.</pre>
       <div class="abbruch"><b>Abbruch:</b> keiner. Diese Phase liefert immer etwas, und sei es
-        nur die leere Menge.</div>
+        nur die leere Menge. <b>Aber sie prüft:</b> eine verlesene Nummer löst ein echtes, nur
+        fremdes Flurstück auf, und genau diesen Fehler fängt die Prüfung gegen ALKIS
+        <em>nicht</em>. Die Gegenprobe kostet keine Anfrage — Fläche und Gemeinde kommen mit dem
+        Flurstück mit. Ein Zähler mit mehr als fünf Stellen ist ohnehin keine Flurstücksnummer
+        (der AdV-Schlüssel gibt ihm fünf Zeichen, dem Nenner vier) und wird verworfen, bevor eine
+        Anfrage dafür ausgegeben wird.</div>
     </div>
 
     <div class="ph" style="--p:var(--primary)">
@@ -212,18 +223,27 @@ WENN indizien enthält gemarkung UND flurstueck:
         <span class="ph-name">Anker wählen<small>Der kleinste räumliche Behälter, dem zu trauen ist.
           Nicht der genaueste Punkt — der engste <em>Behälter</em>.</small></span>
         <span class="ph-kosten">0 Anfragen</span></div>
-<pre>anker = erster Treffer in dieser Reihenfolge:
+<pre>anker = ALLE Gemarkungen, die in Frage kommen:
 
     gemarkung aus Bild-Texterkennung      Vertrauen 1,00
-    gemarkung aus Ortsteilname            0,60   über das Verzeichnis
-    gemeinde aus Standortfeld / PLZ       0,35
-    — sonst: ABBRUCH
+    gemarkung mit Beziehung „liegt_in“    0,60   über das Verzeichnis
+    ein mehrdeutiger Name → alle seine Schlüssel
+    „entfernt_von“        → gar kein Anker
+    — sonst: Gemarkungen der genannten Gemeinde (bis 12)
 
+Nicht auswählen — alle fragen. Es sind Zählanfragen.
 Der Pin geht NIE in den Anker ein.
 Er darf nur widerlegen, nie begrenzen.</pre>
-      <div class="abbruch"><b>Abbruch „zu wenig Ortsangabe“:</b> wenn nicht einmal eine Gemeinde
-        feststeht. Die Oberfläche fragt dann nach Gemarkung und Nummer von Hand — das ist die
-        einzige Angabe, die ein Mensch ohne uns liefern kann.</div>
+      <div class="abbruch"><b>Nachgemessen 05.09.2026 — der Anker wird nicht mehr gewählt:</b>
+        Einen auszusuchen machte eine falsch gelesene Beziehung zum einzigen Weg zu einer
+        selbstbewusst falschen Antwort. Alle zu fragen kostet je eine Zählanfrage und lässt das
+        Kataster entscheiden: Flurstück 790/11 gibt es in Großbothen und in <em>keiner</em> der
+        drei anderen Gemarkungen, die derselbe Text nennt. Ein mehrdeutiger Name liefert alle
+        seine Schlüssel — zwei Höfgen sind zwei billige Fragen, kein Grund, den Namen
+        wegzuwerfen.
+        <br><b>Abbruch „zu wenig Ortsangabe“:</b> wenn nicht einmal eine Gemeinde feststeht. Die
+        Oberfläche fragt dann nach Gemarkung und Nummer von Hand — das ist die einzige Angabe,
+        die ein Mensch ohne uns liefern kann.</div>
     </div>
 
     <div class="ph" style="--p:var(--primary)">
@@ -839,9 +859,12 @@ Kein Schwellwert. Keine Gewichte. Kein „vermutlich“.</pre>
   <div class="zustand">
     <div class="zu" style="--z:var(--primary)">
       <h3>bestätigt</h3>
-      <p>ALKIS hat geliefert, die Plausibilitätsprüfung schweigt, und der Zweitbeste liegt klar
-        zurück. Nur dieser Zustand darf in der Oberfläche als Ergebnis auftreten — und nur er
-        bekommt die gezogene Kontur auf der Karte.</p>
+      <p>Nach den <em>harten</em> Filtern bleibt genau einer übrig, und nichts widerspricht ihm.
+        Kein Vorsprung, kein Schwellwert, keine Gewichte — die sind mit
+        <code>VORSPRUNG_MIN</code> entfallen. Und einer allein genügt nicht: Wer nur durch eine
+        <em>gewählte</em> Toleranz übrig bleibt („ca. 500 m²“), ist <b>mehrdeutig</b>, denn dann
+        hat ihn keine amtliche Angabe ausgesucht. Nur dieser Zustand darf in der Oberfläche als
+        Ergebnis auftreten — und nur er bekommt die gezogene Kontur auf der Karte.</p>
     </div>
     <div class="zu" style="--z:var(--secondary)">
       <h3>mehrdeutig</h3>
@@ -1101,8 +1124,12 @@ Kein Schwellwert. Keine Gewichte. Kein „vermutlich“.</pre>
       in Phase 1, die Ring-Toleranz und die Gewichte in Phase 4. Keine davon kann eine falsche
       Antwort erzeugen — sie beeinflussen Kosten und Reihenfolge, nicht das Urteil. Eichen lohnt,
       sobald gelöste Inserate vorliegen; warten muss man darauf nicht.</p>
-    <p><b>Offen:</b> ob der Kurzschluss in Phase 0 auch dann sicher ist, wenn das Bild eine
-      Gemarkung nennt, die nicht zum Standortfeld passt; ob <code>--dpi 300</code> die
+    <p><b>Beantwortet (05.09.2026):</b> Nein — der Kurzschluss war so nicht sicher, und er
+      prüft jetzt. Er löst das Flurstück auf und vergleicht dessen amtliche Fläche mit der
+      Angabe im Inserat und dessen Gemeinde mit dem Standortfeld, bevor er „bestätigt“ sagen
+      darf. Beides kostet keine Anfrage. Widersprechen sie sich, ist das ein gemeldeter
+      Widerspruch und kein Treffer.</p>
+    <p><b>Offen:</b> ob <code>--dpi 300</code> die
       Texterkennung verbessert (jeder Lauf meldete „Invalid resolution 0 dpi“, ungetestet); und ob
       der Nutzungsartfilter über mehrere Inserate hinweg mehr nützt als schadet.</p>
   </div>
