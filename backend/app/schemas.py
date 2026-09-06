@@ -820,6 +820,16 @@ class NearbyResponse(BaseModel):
 # --------------------------------------------------------------------------
 
 
+# The wall height is what § 6 Abs. 5 SächsBO measures from, and neither source
+# carries one: the simplified ALKIS has no storeys at all, and OSM had them for
+# 11 of 59 buildings around Mölkau 204. So both sentences say the same thing
+# about what is computable and differ only in where the outlines came from.
+NACHBARN_HINWEIS_KATASTER = (
+    "Umrisse aus dem Liegenschaftskataster (ALKIS), ohne Wandhöhen — daraus "
+    "lässt sich nur das Mindestmaß von 3 m nach § 6 Abs. 5 SächsBO rechnen, nie "
+    "0,4 H. Ein Hinweis, keine bauordnungsrechtliche Prüfung."
+)
+
 NACHBARN_HINWEIS = (
     "Umrisse aus OpenStreetMap, ohne Wandhöhen — daraus lässt sich nur das "
     "Mindestmaß von 3 m nach § 6 Abs. 5 SächsBO rechnen, nie 0,4 H. Ein "
@@ -828,16 +838,23 @@ NACHBARN_HINWEIS = (
 
 
 class Nachbargebaeude(BaseModel):
-    """One mapped building outline, as OpenStreetMap has it."""
+    """One building outline, from the cadastre or from OpenStreetMap."""
 
-    osm_id: str
+    id: str = Field(description="Objekt-ID der Quelle — ALKIS-OID oder OSM-Weg.")
     umriss: list[list[float]] = Field(
         description="Geschlossener Ring in [lon, lat], WGS84.", min_length=4
     )
     adresse: str | None = None
+    funktion: str | None = Field(
+        default=None, description="Gebäudefunktion, wie ALKIS sie führt."
+    )
+    aktualitaet: str | None = Field(
+        default=None, description="Fortführungsdatum des Objekts im Kataster."
+    )
     geschosse: int | None = Field(
         default=None,
-        description="Nur wenn OSM es führt; in sächsischen Wohnlagen fast nie.",
+        description="Nur wenn die Quelle es führt; ALKIS-vereinfacht führt es nie "
+        "und OSM in sächsischen Wohnlagen fast nie.",
     )
 
 

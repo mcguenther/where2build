@@ -75,14 +75,14 @@
             <b>Schraffiert: hier reicht die Abstandsfläche des Nachbargebäudes herüber.</b>
             § 6 SächsBO verlangt das nicht von uns — jedes Gebäude hält seine Abstandsfläche
             auf dem eigenen Grundstück. Wo beide sich überdecken würden, ist das eine Frage
-            an die Bauaufsicht, keine Prüfung. Umrisse aus OpenStreetMap, ohne Wandhöhen,
-            gerechnet mit dem Mindestmaß von 3 m.
+            an die Bauaufsicht, keine Prüfung. Umrisse aus {{ neighbourSource }}, ohne
+            Wandhöhen, gerechnet mit dem Mindestmaß von 3 m.
           </span>
           <span v-else-if="neighbourBuildings.length">
             <b>Kein Nachbargebäude steht näher als 3 m an der Grenze.</b>
-            {{ neighbourBuildings.length }} Umrisse aus OpenStreetMap geprüft.
+            {{ neighbourBuildings.length }} Umrisse aus {{ neighbourSource }} geprüft.
           </span>
-          <span v-else>In der Umgebung ist in OpenStreetMap kein Gebäude erfasst.</span>
+          <span v-else>In der Umgebung ist dort kein Gebäude erfasst.</span>
         </p>
 
         <p v-if="state.plan.measuring" class="notice measure-bar">
@@ -425,6 +425,9 @@ export default {
        *  they are large, and the backend keeps them for a month anyway. Only
        *  the preference lives in the document. */
       neighbourBuildings: [],
+      /** Which register the outlines came from — the answer says so, and the
+       *  sentence beside the drawing must not claim a different one. */
+      neighbourSource: "dem Liegenschaftskataster",
       neighboursBusy: false,
       neighboursError: null,
       routesBusy: false,
@@ -699,6 +702,9 @@ export default {
       try {
         const answer = await fetchNeighbourBuildings(this.plot.anchor.lat, this.plot.anchor.lon);
         this.neighbourBuildings = answer?.gebaeude ?? [];
+        this.neighbourSource = /OpenStreetMap|overpass/i.test(answer?.quelle ?? "")
+          ? "OpenStreetMap"
+          : "dem Liegenschaftskataster";
       } catch (error) {
         this.neighboursError = error.message;
       } finally {

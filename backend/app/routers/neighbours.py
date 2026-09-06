@@ -1,4 +1,4 @@
-"""POST /api/neighbours -- the mapped building outlines around a plot.
+"""POST /api/neighbours -- the building outlines around a plot.
 
 They are drawn as a hint, not as a finding: § 6 SächsBO puts each building's
 setback area on its own plot, so a neighbour standing close to the boundary does
@@ -15,23 +15,41 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
-from ..deps import overpass_service
-from ..errors import UpstreamError
-from ..schemas import NachbarnRequest, NachbarnResponse
+from ..deps import alkis_service, overpass_service
+from ..errors import AppError
+from ..schemas import NACHBARN_HINWEIS_KATASTER, NachbarnRequest, NachbarnResponse
+from ..services.alkis import SERVICE_NAME as ALKIS_NAME
+from ..services.alkis import AlkisService
 from ..services.overpass import OverpassService
 
 router = APIRouter(prefix="/api", tags=["Umgebung"])
+
+ALKIS_SOURCE = "ALKIS (ave:GebaeudeBauwerk), GeoSN — dl-de/by-2-0"
 
 
 @router.post("/neighbours", response_model=NachbarnResponse, summary="Nachbargebäude")
 async def neighbours(
     payload: NachbarnRequest,
-    service: OverpassService = Depends(overpass_service),
+    alkis: AlkisService = Depends(alkis_service),
+    overpass: OverpassService = Depends(overpass_service),
 ) -> NachbarnResponse:
-    if not service.enabled:
-        raise UpstreamError(
-            "Für die Nachbargebäude ist keine OpenStreetMap-Quelle eingerichtet. "
-            "Sie lässt sich mit OVERPASS_ENABLED und OVERPASS_URL einschalten."
+    """The outlines around a plot, from the cadastre.
+
+    The register that delivers the parcel delivers the buildings too, on the
+    same WFS: no OpenStreetMap source, no Overpass instance, no key. Overpass
+    stays as the fallback for whoever has one configured -- it maps garden
+    sheds the cadastre leaves out, and it is the only way to get storeys at all.
+    """
+
+    try:
+        buildings = await alkis.buildings_around(
+            payload.origin.lat, payload.origin.lon, payload.umkreis_m
         )
-    answer = await service.buildings(payload.origin, payload.umkreis_m)
-    return NachbarnResponse(**answer)
+        return NachbarnResponse(
+            gebaeude=buildings, quelle=ALKIS_SOURCE, hinweis=NACHBARN_HINWEIS_KATASTER
+        )
+    except AppError:
+        if not overpass.enabled:
+            raise
+        answer = await overpass.buildings(payload.origin, payload.umkreis_m)
+        return NachbarnResponse(**answer)

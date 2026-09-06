@@ -252,7 +252,7 @@ nothing else.
 | `POST` | `/api/nearby` | one coordinate → the nearest school, park, tram stop and so on, ranked by walking time; `linien: true` also names the lines calling at each stop |
 | `GET` | `/api/gemarkungen` | `?q=` → the Saxon cadastral districts, served from a committed index; the WFS is never touched |
 | `POST` | `/api/geocode` | `{text, lat?, lon?}` → candidates, never one answer: the same street name matches in three states |
-| `POST` | `/api/neighbours` | one outline → the neighbouring buildings, for showing where a setback area would reach onto the plot |
+| `POST` | `/api/neighbours` | one coordinate → the neighbouring buildings from `ave:GebaeudeBauwerk`, the same ALKIS WFS the parcels come from — for showing where a setback area would reach onto the plot. Overpass is the fallback where one is configured; nothing has to be |
 | `GET` | `/api/basemap/style.json`, `/api/basemap/{path}` | the vector basemap, rewritten so MapLibre never reaches the internet itself |
 | `GET` | `/api/health` | which services are configured |
 

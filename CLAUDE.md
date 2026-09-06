@@ -642,6 +642,16 @@ from the user directly. Reopen only if the user asks.
   binary search over a ladder of radii — three requests, not seven. Mölkau 204
   has nothing at 300 m and one at 400 m, so the answer is "300–400 m". A single
   figure out of that would be a measurement nobody made.
+- **The neighbours' outlines need no OpenStreetMap at all.** The simplified
+  ALKIS WFS — the one the parcels come from — carries `ave:GebaeudeBauwerk`, and
+  it was in `docs/research/geodaten-sachsen.md` § 1.1 from the first survey while
+  the feature reached for Overpass and demanded `OVERPASS_ENABLED`. Measured
+  06.09.2026 over Mölkau 204: 146 outlines in a 240 m box, with `funktion`
+  („Wohngebäude"), `lagebeztxt` and `aktualit` per object, through the proxy and
+  its disk cache. Same gap as OSM, though: **no wall height and no storeys**, so
+  § 6's 3 m floor stays the only computable depth. Overpass remains the
+  fallback — it maps garden sheds the cadastre leaves out and is the only source
+  of storeys at all.
 - **A shared class in a scoped `<style>` is styled in exactly one view.**
   Vue's `[data-v-…]` attribute is per component, so the app's page furniture —
   `.breadcrumb`, `.page-head`, `.page-head__sub`, `.plan-bar`, `.button-group`,
@@ -727,8 +737,8 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 457 passed, 1 skipped
-- `vitest`: 477 passed — plus the integration file, excluded by `npm run test`
+- `pytest`: 458 passed, 1 skipped
+- `vitest`: 478 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
 - `scripts/screenshots.mjs`: 44 images plus two print PDFs. It fails on console
   errors, on horizontal overflow, and if not a single vector tile arrived. It

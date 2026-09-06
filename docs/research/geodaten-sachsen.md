@@ -51,6 +51,30 @@ Namespace-Präfix: `ave:` → `http://repository.gdi-de.org/schemas/adv/produkt/
 
 Default-SRS: `EPSG:25833`, weitere unterstützte SRS: `EPSG:25832`, `EPSG:4258` (alle drei ✅ live in Capabilities bestätigt).
 
+### 1.1.1 `ave:GebaeudeBauwerk` — die Nachbargebäude, amtlich (✅ live gemessen 06.09.2026)
+
+Der Layer stand von Anfang an in dieser Liste und wurde nie benutzt: die
+Nachbargebäude kamen aus OpenStreetMap über Overpass, mit `OVERPASS_ENABLED` als
+Voraussetzung. Nötig ist das nicht — es ist derselbe WFS, den die Flurstücke
+ohnehin nutzen, mit demselben Proxy und Plattencache.
+
+Gemessen über Mölkau 204 (BBOX in EPSG:25833):
+
+| Anfrage | Antwort |
+|---|---|
+| 240 × 240 m | `numberReturned="146"` Gebäude |
+| 90 × 90 m | 25 Gebäude, 11 davon mit Lagebezeichnung |
+
+Attribute je Objekt: `oid` (z. B. `DESNALK0v9001cc9BL`), `geometrie`
+(`gml:MultiSurface`, EPSG:25833), `gebnutzbez` („Gebäude"), `funktion`
+(„Wohngebäude", „Gebäude für Wirtschaft oder Gewerbe"), `gfkzshh` (ALKIS-Kennzahl,
+z. B. `31001_2000`), `gmdschl`, `lagebeztxt` (wo vorhanden), `aktualit`
+(Fortführungsdatum, hier durchweg `2015-03-28Z`).
+
+⚠️ **Keine Wandhöhe, keine Geschosse** — dieselbe Lücke wie in OSM, nur amtlich.
+Für § 6 Abs. 5 SächsBO bleibt damit ausschließlich das Mindestmaß von 3 m
+rechenbar, nie 0,4 H.
+
 ### 1.2 DescribeFeatureType — Attribute (✅ live abgerufen)
 
 **`ave:Flurstueck`** (das für den Grundstücks-Check zentrale Objekt):
