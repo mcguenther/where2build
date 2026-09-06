@@ -741,6 +741,36 @@ from the user directly. Reopen only if the user asks.
   one step earlier failed them all — for a change that made the product better
   and cost no extra request. `_cadastre()` exists for exactly this and its
   docstring says so; the ordered lists are gone.
+- **The reader garbles the label, not only the digits.** On the Borna advert's
+  Liegenschaftskarte Tesseract returns „**Fiurstück**: 107/60“ — the l as an i —
+  so the one number on the sheet that means anything was thrown away, while
+  „Gemarkung Thräna“ beside it was read correctly. The pattern tolerates
+  `[li1|]` in that position now; the rest of the word carries the specificity,
+  so it costs no precision (`Fust`, `First`, `Furst`, „die Flur ist 12 ha“ all
+  still match nothing). The district needs no such help: it comes back as
+  „Thrana“ and the directory folds diacritics.
+- **A plot can be advertised that has no Flurstück at all.** „eine noch zu
+  vermessende Teilfläche“ (advert 2418686487, 748,50 m²): the parcel will be cut
+  out at sale, so no existing parcel has that area. Used as a hard filter the
+  figure finds *some other* parcel of that size and confirms it — the one kind
+  of wrong answer this search exists to refuse. `describes_part_area` reads the
+  sentence, `AreaStatement.exact` goes false, and `verdict()` can never say
+  „bestätigt“: the listing itself is the contradiction, and no filter can catch
+  it. The answer names the parcel it will be cut *from* — here 107/60 in
+  Gemarkung Thräna, 2 994 m², in two requests — and says why that is not the
+  plot. The area mismatch is then not reported as an objection either; it is the
+  situation, and „bitte die Flurstücksnummer prüfen“ would send someone looking
+  for a mistake that is not there.
+- **A Beleg read off a picture is the least checkable evidence in the search.**
+  So an Indiz from an image carries `bild_url` and the conflict block shows the
+  sheet: the choice is made against the document rather than against a
+  transcription of it. A Geoportal print carries dozens of neighbouring numbers
+  on the map body — only the labelled one in the title block is ever read, which
+  is what keeps that safe.
+- **A jump that only moves the camera does not say what it jumped to.** The
+  map arrived somewhere and left the reader to guess which of the things on it
+  was the reason. The entry being followed is marked (`gezeigt`, drawn over
+  everything) and its row is marked in the list, so the two refer to each other.
 - **jsdom does not submit a form from a dispatched click.** Wrapping the
   wizard's first step in a `<form>` (so Enter submits, as it does everywhere
   else) broke two tests that click the button, with no change to the component's
@@ -800,9 +830,9 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 479 passed, 1 skipped (that one needs pyosmium, which only the
-  index builder wants). Four of the 479 need Tesseract and skip without it.
-- `vitest`: 466 passed — plus the integration file, excluded by `npm run test`
+- `pytest`: 486 passed, 1 skipped (that one needs pyosmium, which only the
+  index builder wants). Six of the 486 need Tesseract and skip without it.
+- `vitest`: 468 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
 - `scripts/screenshots.mjs`: 50 images plus a print PDF. It fails on console
   errors, on horizontal overflow, and if not a single vector tile arrived. It

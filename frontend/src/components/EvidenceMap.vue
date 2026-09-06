@@ -93,6 +93,9 @@ export default {
     /** The same point before anything has refuted it. Framed while nothing
      *  better is known, so the map leaves the whole state at the first clue. */
     pin: { type: Object, default: null },
+    /** The geometry the protocol is currently pointing at, marked on the map so
+     *  a jump says *which* thing it jumped to. One or several. */
+    highlighted: { type: [Object, Array], default: null },
     status: { type: String, default: null },
     height: { type: Number, default: 460 },
     /** What lies under the drawing. `site` is the orthophoto with the roads
@@ -140,6 +143,7 @@ export default {
     districtOutline() { this.draw(); },
     areas() { this.draw(); this.moveCamera(); },
     pin() { this.moveCamera(); },
+    highlighted() { this.drawHighlight(); },
     huelle() { this.draw(); },
     status() { this.draw(); }
   },
@@ -210,7 +214,7 @@ export default {
       const halo = token(element, "--w2b-map-halo");
       const envelope = token(element, "--w2b-map-envelope");
 
-      for (const id of ["gemarkung", "huelle", "kandidaten", "punkte", "bestaetigt"]) {
+      for (const id of ["gemarkung", "huelle", "kandidaten", "punkte", "bestaetigt", "gezeigt"]) {
         this._map.addSource(id, { type: "geojson", data: collection([]) });
       }
 
@@ -297,6 +301,25 @@ export default {
       // one recognises the other without a legend.
       // A contour with nothing inside it reads as a hole, not as a plot. The
       // site plan holds its parcel fill to 42 % over the backdrop; so does this.
+      /* What the Verlauf is pointing at. Without it a jump to a clue was a
+         camera move and nothing else — the map arrived somewhere and never said
+         which of the things on it was the reason. Drawn over everything and
+         only while an entry is selected. */
+      this._map.addLayer({
+        id: "gezeigt-halo", type: "line", source: "gezeigt",
+        layout: { "line-join": "round" },
+        paint: { "line-color": halo, "line-width": 8, "line-opacity": 0.75 }
+      });
+      this._map.addLayer({
+        id: "gezeigt-line", type: "line", source: "gezeigt",
+        layout: { "line-join": "round" },
+        paint: {
+          "line-color": token(element, "--w2b-accent") || selection,
+          "line-width": 3,
+          "line-dasharray": [2, 1.6]
+        }
+      });
+
       this._map.addLayer({
         id: "bestaetigt-fill", type: "fill", source: "bestaetigt",
         paint: { "fill-color": selection, "fill-opacity": 0.42 }
@@ -328,6 +351,15 @@ export default {
       this._map?.getSource(id)?.setData(collection(features));
     },
 
+    /** Mark whatever the protocol is pointing at, so a jump names its reason. */
+    drawHighlight() {
+      if (!this._map || !this._map.getSource("gezeigt")) return;
+      const shapes = Array.isArray(this.highlighted)
+        ? this.highlighted
+        : [this.highlighted].filter(Boolean);
+      this.set("gezeigt", shapes.flatMap(shape => polygonFeature(shape)));
+    },
+
     draw() {
       if (!this._map || !this._map.getSource("kandidaten")) return;
 
@@ -346,6 +378,7 @@ export default {
         )
       );
       this.set("bestaetigt", polygonFeature(confirmed?.geometry));
+      this.drawHighlight();
       // No dot over a confirmed parcel: that one has a contour of its own, and
       // a marker on top of it says "one of several" about the opposite.
       this.set(

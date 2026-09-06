@@ -21,6 +21,7 @@ from app.search.envelope import common_envelope
 from app.search.indicia import (
     AreaStatement,
     collect_indicia,
+    describes_part_area,
     normalise_parcel_number,
     read_area,
 )
@@ -977,3 +978,120 @@ def test_the_districts_are_drawn_before_the_clues_are_narrated(client: TestClien
     kinds = [event["art"] for event in events]
     assert "gebiete" in kinds
     assert kinds.index("gebiete") < kinds.index("indiz")
+
+
+@_needs_tesseract
+def test_a_garbled_label_still_gives_up_its_parcel_number():
+    """The Borna advert's Liegenschaftskarte, read as the reader really reads it.
+
+    Tesseract returns „Fiurstück: 107/60“ — the l as an i — so the one number
+    on the sheet that means anything was thrown away while the Gemarkung beside
+    it was read correctly. The rest of the word carries the specificity, so
+    tolerating the confusion costs no precision.
+    """
+
+    reading = ocr.read_image(fixture_bytes("inserat-liegenschaftskarte.jpg"))
+
+    assert reading.parcels == ["107/60"]
+    # „Thräna“ without its umlaut; the directory folds diacritics, so that is
+    # not a problem — the *label* being unreadable would have been.
+    assert reading.districts == ["Thrana"]
+    assert "Fiurstück" in reading.text
+
+
+def test_the_loosened_label_does_not_start_matching_prose():
+    for text in ("Fust 12/3", "First 12", "Die Flur ist 12 ha groß", "Furst 40"):
+        assert ocr.patterns(text)[0] == [], text
+    for text in ("Fiurstück: 107/60", "F1urstück 85/1", "Flurstück 790/11"):
+        assert ocr.patterns(text)[0], text
+
+
+@_needs_tesseract
+def test_the_neighbours_printed_all_over_the_sheet_are_not_read_as_the_plot():
+    """That sheet carries dozens of numbers: 107/61, 107/13, 105/6, 74/3 …
+
+    Only the title block is labelled, and only a labelled number is taken. The
+    in-map labels come out as garbage anyway, which is the property that makes
+    reading every image and filtering by pattern safe.
+    """
+
+    reading = ocr.read_image(fixture_bytes("inserat-liegenschaftskarte.jpg"))
+
+    assert reading.parcels == ["107/60"]
+
+
+# --------------------------------------------------------------------------
+# A plot that has no Flurstück yet
+# --------------------------------------------------------------------------
+
+
+def test_a_part_area_is_recognised_from_the_advert_s_own_words():
+    """„eine noch zu vermessende Teilfläche“ — the sentence, so it can be shown."""
+
+    listing = LISTINGS["2418686487"]
+
+    found = describes_part_area(listing["beschreibung"])
+
+    assert found and "noch zu vermessende Teilfläche" in found
+
+
+def test_a_pending_survey_is_not_read_into_a_finished_one():
+    assert describes_part_area("Die Vermessung ist bereits erfolgt.") is None
+    assert describes_part_area("Das Grundstück ist 502 m² groß.") is None
+
+
+def test_a_part_area_s_size_may_not_filter():
+    """748,50 m² is the size of a parcel that does not exist yet.
+
+    Used as a hard filter it finds *some other* parcel of that size and calls it
+    confirmed — the one kind of wrong answer this search is built to refuse.
+    """
+
+    exact = AreaStatement(value=748.5, wording="")
+    assert exact.exact is True
+
+    part = AreaStatement(value=748.5, wording="", part_of="noch zu vermessende Teilfläche")
+    assert part.exact is False
+
+
+@respx.mock
+@_needs_tesseract
+def test_the_borna_advert_answers_with_the_parcel_it_is_cut_from(client: TestClient):
+    """The whole case, end to end.
+
+    The advert names no parcel and its Liegenschaftskarte's title block reads
+    „Fiurstück: 107/60“ — the l as an i. With that label understood the run
+    resolves 107/60 in Gemarkung Thräna, and stops there: the plot is a part of
+    it, so „bestätigt“ would be a claim about a parcel that does not exist yet.
+    """
+
+    listing = LISTINGS["2418686487"]
+    respx.post(ALKIS_URL).mock(
+        side_effect=_cadastre({}, {"flstnrzae": "alkis_thraena_107_60.gml"})
+    )
+    respx.get("https://bilder.example.org/1.jpg").mock(
+        return_value=httpx.Response(200, content=fixture_bytes("inserat-liegenschaftskarte.jpg"))
+    )
+
+    events = _stream(
+        client,
+        {
+            "titel": listing["titel"],
+            "text": listing["beschreibung"],
+            "adresse": listing["ort"],
+            "flaeche_m2": 748.5,
+            "flaeche_text": listing["angaben"]["Grundstücksfläche"],
+            "bilder": ["https://bilder.example.org/1.jpg"],
+        },
+    )
+
+    read = [e["indiz"] for e in events if e["art"] == "indiz" and e["indiz"]["quelle"] == "bild"]
+    assert "107/60" in [i["wert"] for i in read]
+
+    final = events[-1]
+    # Not „bestätigt“: the stated size belongs to a parcel that does not exist.
+    assert final["status"] == "mehrdeutig"
+    assert "Teilfläche" in final["text"]
+    assert "herausgemessen" in final["text"]
+    # And the area mismatch is not reported as an objection — it is the point.
+    assert "bitte die Flurstücksnummer prüfen" not in final["text"]

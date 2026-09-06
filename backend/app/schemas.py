@@ -947,6 +947,11 @@ class Indiz(BaseModel):
     verworfen: bool = False
     # Why it was dropped, in one German sentence. Never silent.
     verworfen_grund: str | None = None
+    # The picture this was read out of. A Beleg for an image is a line of OCR
+    # text, which is the least checkable evidence in the whole search -- so when
+    # a reading has to be *chosen*, the image travels with it and the choice is
+    # made against the sheet rather than against a transcription of it.
+    bild_url: str | None = None
 
 
 class Konflikt(BaseModel):

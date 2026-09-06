@@ -34,7 +34,7 @@ recorded in ``docs/research/flurstueck-identifikation.md``:
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import AsyncIterator, Sequence
 
 from ..errors import UpstreamError
@@ -61,7 +61,13 @@ from ..services.alkis import (
     like,
 )
 from .envelope import _geojson, common_envelope, next_question
-from .indicia import collect_indicia, normalise_parcel_number, read_area, AreaStatement
+from .indicia import (
+    AreaStatement,
+    collect_indicia,
+    describes_part_area,
+    normalise_parcel_number,
+    read_area,
+)
 from .ladder import Rung, confirmation_rung, tolerance_ladder
 from .scoring import clean_use, parcel_number, score
 
@@ -168,6 +174,8 @@ class SearchEngine:
         self.state = SearchState()
         self._area: AreaStatement | None = None
         self._street: str | None = None
+        # The sentence saying the plot is a piece of a bigger parcel, if any.
+        self._part_area: str | None = None
         # District outlines already fetched, by key. Drawn once for the map and
         # reused for the wash under a confirmed parcel.
         self._district_outlines: dict[str, KatasterBezirk] = {}
@@ -229,6 +237,21 @@ class SearchEngine:
             self._area = read_area(area_indiz.beleg or "") or AreaStatement(
                 value=float(area_indiz.wert), wording=""
             )
+            # A plot still to be surveyed out of a bigger parcel has no parcel
+            # of its own, so its area belongs to a *future* one. Filtering on it
+            # finds some other parcel of that size and confirms it — exactly the
+            # confidently wrong answer this search exists to refuse.
+            self._part_area = describes_part_area(
+                " ".join(part for part in (self.payload.titel, self.payload.text) if part)
+            )
+            if self._part_area:
+                self._area = replace(self._area, part_of=self._part_area)
+                area_indiz.text = (
+                    f"{area_indiz.text} — noch zu vermessende Teilfläche, "
+                    "also die Größe eines künftigen Flurstücks"
+                )
+                area_indiz.beleg = self._part_area
+
         street_indiz = next(iter(self.active("strasse")), None)
         self._street = street_indiz.wert if street_indiz else None
 
@@ -349,7 +372,7 @@ class SearchEngine:
         data = await ocr.fetch(url, self.app_settings)
         # Tesseract is a subprocess and Pillow is CPU work; both would block the
         # loop that is meanwhile fetching the other images.
-        return await asyncio.to_thread(ocr.read_image, data, url)
+        return await asyncio.to_thread(ocr.read_image, data, url, url)
 
     def _conflicts(self) -> list[Konflikt]:
         """Indicia of one kind that cannot all be true.
@@ -678,7 +701,12 @@ class SearchEngine:
         parcel = self.state.candidates[0]
         official = parcel.flaeche_amtlich_m2
 
-        if self._area is not None and official:
+        # Not for a part-area: a plot to be surveyed out of a bigger parcel is
+        # *expected* to be smaller than it, so the mismatch is the situation
+        # rather than an objection to it. `_part_area_note` says what is going
+        # on; repeating it as „bitte die Nummer prüfen“ would send someone
+        # looking for a mistake that is not there.
+        if self._area is not None and official and not self._part_area:
             factor = official / self._area.value
             if factor >= SHORT_CIRCUIT_AREA_FACTOR or factor <= 1 / SHORT_CIRCUIT_AREA_FACTOR:
                 return (
@@ -1114,6 +1142,12 @@ class SearchEngine:
             return "mehrdeutig"
         if self.cross_check():
             return "mehrdeutig"
+        # A plot still to be surveyed out of a bigger parcel is not that parcel.
+        # „Bestätigt“ would be a claim about a Flurstück that does not exist
+        # yet, and the listing itself is what says so — the strongest possible
+        # contradiction, and the one no filter can catch.
+        if self._part_area:
+            return "mehrdeutig"
         # A single candidate reached through a chosen tolerance is not a fact.
         # It is confirmed only when an official statement -- a parcel number or
         # an exactly stated area -- is what left it standing.
@@ -1144,6 +1178,25 @@ class SearchEngine:
                     else "."
                 )
             )
+        )
+
+    def _part_area_note(self) -> str | None:
+        """Said out loud, because it changes what an answer can mean.
+
+        A plot still to be surveyed out of a bigger parcel has no Flurstück of
+        its own, so no parcel *can* be the answer — the useful answer is the
+        parcel it will be cut from. Leaving that unsaid would make an
+        „mehrdeutig“ look like a weak run rather than the right verdict.
+        """
+
+        if not self._part_area:
+            return None
+        return (
+            "Das Inserat beschreibt eine noch zu vermessende Teilfläche: "
+            f"„{self._part_area}“. Ein eigenes Flurstück gibt es dafür noch nicht, "
+            "und die genannte Fläche ist die eines künftigen — sie kann deshalb "
+            "nicht filtern, sondern nur ordnen. Gesucht wird das Flurstück, aus "
+            "dem herausgemessen wird."
         )
 
     async def fetch_outline(self) -> None:
@@ -1227,7 +1280,9 @@ class SearchEngine:
         objection = self.cross_check() or self._set_note()
         huelle = common_envelope(self.state.candidates, district_outline=self.state.outline)
         question = next_question(self.state.candidates, huelle)
-        hint = " ".join(p for p in (objection, self.state.hint, question) if p) or None
+        hint = " ".join(
+            p for p in (self._part_area_note(), objection, self.state.hint, question) if p
+        ) or None
 
         yield SuchEreignis(
             art="ergebnis",

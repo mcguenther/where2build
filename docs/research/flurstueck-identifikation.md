@@ -996,7 +996,70 @@ the text yields an *anchor* — a Gemarkung, a Gemeinde, a place or a parcel
 number. An area alone is not one, so „Baugrundstück 688 m²“ is still refused,
 with the message that says what to paste instead.
 
-## 21. What is still unverified ⚠️
+## 21. Seventh pass, 06.09.2026: an advert with no Flurstück ✅
+
+Advert 2418686487, „Baugrundstück bei Borna“, reported as finding the wrong
+parcel. Three separate things, and the third is the interesting one.
+
+### 21.1 The reader garbles the label, not only the digits ✅
+
+Its Liegenschaftskarte's title block reads, verbatim from Tesseract:
+
+    Fiurstück: 107/60   Gemeinde: Stadt Boma
+    Gemarkung Thrana (1922)
+
+So the **l became an i** and the pattern — which requires the word — threw the
+one number on the sheet that means anything away, while the Gemarkung beside it
+came through. § 10's rule that a garbled *number* is worse than none still
+holds; this is the label, and losing it costs a whole channel.
+
+`[li1|]` in that position now. The rest of the word carries the specificity:
+`Fust 12/3`, `First 12`, `Furst 40` and „die Flur ist 12 ha groß“ all still
+match nothing.
+
+„Thrana“ needs no help — the directory folds diacritics and resolves it to
+Thräna (141922, Stadt Borna). The four-digit `1922` on the sheet is the short
+form of that key.
+
+### 21.2 The sheet's other numbers ✅
+
+That map body carries **dozens**: 107/61, 107/13, 107/4, 105/6, 106/3, 74/3,
+68/8, 110/9, 54/45… Only the title block is labelled, and only a labelled
+number is ever taken, which is what makes reading every image safe. Where a
+sheet does yield more than one, the reading is a `Konflikt` like any other —
+and the Indiz now carries `bild_url`, so the choice is made against the sheet
+rather than against a line of OCR text.
+
+### 21.3 The plot has no Flurstück ✅
+
+The description says it outright:
+
+> Bei dem Grundstück handelt es sich derzeit um eine **noch zu vermessende
+> Teilfläche**, die im Rahmen des Verkaufsprozesses exakt abgegrenzt und im
+> Grundbuch eingetragen wird.
+
+748,50 m² is therefore the size of a parcel that **does not exist yet**. As a
+hard filter it finds some other parcel of that size and confirms it — exactly
+the confidently wrong answer § 12 is built to refuse, and no cross-check can
+catch it, because the found parcel is perfectly real.
+
+`describes_part_area` reads the sentence (worded as *pending*, so „die
+Vermessung ist erfolgt“ does not match), `AreaStatement.exact` goes false, and
+`verdict()` can never say „bestätigt“ for such a listing. The run then answers
+what is actually true:
+
+| | |
+| --- | --- |
+| Read off the image | Flurstück 107/60, Gemarkung Thräna |
+| Resolved in | **2 requests** |
+| Official area of 107/60 | 2 994 m² |
+| Verdict | `mehrdeutig`, with the sentence that says why |
+
+And the area mismatch is *not* reported as an objection: it is the situation,
+and „bitte die Flurstücksnummer prüfen“ would send someone looking for a
+mistake that is not there.
+
+## 22. What is still unverified ⚠️
 
 * The three prompts in `docs/strategie/extraktion-prompting.html` are drafted
   but have not been run against a model — this listing did not need them.

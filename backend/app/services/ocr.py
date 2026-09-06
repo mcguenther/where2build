@@ -73,11 +73,23 @@ TIMEOUT_S = 30
 # „Flurstück 790/11“, „Flurstücks-Nr. 85/1“, „Flst. 476“. The label has to be
 # there: a bare number on a map is one of the small in-map labels, which the
 # same measurement showed come out as garbage.
+#
+# The `l` is allowed to be an `i`, a `1` or a bar, because that is what the
+# reader actually returns. Measured on the Borna advert's Liegenschaftskarte:
+# the title block came back as „Fiurstück: 107/60“, so the one number on the
+# sheet that means anything was thrown away while the Gemarkung beside it was
+# read correctly. The rest of the word carries the specificity — „urst…ck“
+# preceded by an f and followed by a number is not a shape that occurs by
+# accident — so this costs no precision.
 _PARCEL_RE = re.compile(
-    r"(?:flurst(?:ü|u|ue)?ck(?:s)?[\s\-]*(?:nr\.?|nummer)?|flst\.?[\s\-]*(?:nr\.?)?)"
+    r"(?:f[li1|]urst(?:ü|u|ue|ii)?ck(?:s)?[\s\-]*(?:nr\.?|nummer)?"
+    r"|f[li1|]st\.?[\s\-]*(?:nr\.?)?)"
     r"\s*[:.]?\s*(\d{1,6})\s*(?:/\s*(\d{1,5}|[a-zA-Z]))?",
     re.IGNORECASE,
 )
+# Same tolerance for the district label. „Thräna“ itself comes back without its
+# umlaut („Thrana“) and that costs nothing — the directory folds diacritics —
+# but the *label* has to be recognised or the name is never looked at.
 _DISTRICT_RE = re.compile(
     r"gemarkung\s*[:.]?\s*([A-ZÄÖÜ][\wäöüßÄÖÜ.\-]{2,}(?:[ -][A-ZÄÖÜ][\wäöüßÄÖÜ.\-]+)?)",
     re.IGNORECASE,
@@ -203,6 +215,9 @@ class ImageReading:
     """
 
     quelle: str
+    # The picture itself. A line of OCR text is the least checkable evidence in
+    # the search, so anything read here can be looked at rather than trusted.
+    url: str | None = None
     text: str = ""
     modes: list[str] = field(default_factory=list)
     parcels: list[str] = field(default_factory=list)
@@ -243,10 +258,10 @@ def patterns(text: str) -> tuple[list[str], list[str]]:
     return parcels, districts
 
 
-def read_image(data: bytes, quelle: str = "Bild") -> ImageReading:
+def read_image(data: bytes, quelle: str = "Bild", url: str | None = None) -> ImageReading:
     """The full ladder over one image: upscale, ``psm 6``, then ``psm 1``."""
 
-    reading = ImageReading(quelle=quelle)
+    reading = ImageReading(quelle=quelle, url=url)
     if not available():
         reading.failed = "keine Texterkennung auf diesem Server"
         return reading
@@ -305,6 +320,7 @@ def as_indicia(readings: list[ImageReading], start: int = 0) -> list[Indiz]:
                     beleg=_excerpt(reading.text, number),
                     quelle="bild",
                     sicherheit=0.95,
+                    bild_url=reading.url,
                 )
             )
         for district in reading.districts:
@@ -319,6 +335,7 @@ def as_indicia(readings: list[ImageReading], start: int = 0) -> list[Indiz]:
                     quelle="bild",
                     sicherheit=0.95,
                     beziehung="liegt_in",
+                    bild_url=reading.url,
                 )
             )
     return out

@@ -230,15 +230,21 @@ class AreaStatement:
     value: float
     wording: str
     upper: float | None = None
+    # The sentence saying this plot is a piece of something larger, if there is
+    # one. Then the figure describes a *future* parcel and no existing one, so
+    # it cannot be a hard filter however exactly it is written.
+    part_of: str | None = None
 
     @property
     def exact(self) -> bool:
         """Whether the figure may be used as a hard filter.
 
-        A bare number is exact; anything hedged or bounded is not.
+        A bare number is exact; anything hedged or bounded is not — and neither
+        is a figure for a plot that is still to be surveyed out of a bigger
+        parcel, however precisely it is stated.
         """
 
-        return not self.wording and self.upper is None
+        return not self.wording and self.upper is None and self.part_of is None
 
 
 def read_area(text: str) -> AreaStatement | None:
@@ -252,6 +258,44 @@ def read_area(text: str) -> AreaStatement | None:
         wording = (match.group("wording") or "").strip().lower()
         return AreaStatement(value=value, wording=wording, upper=upper)
     return None
+
+
+# A plot that is a piece of a bigger parcel, not a parcel. Measured on a real
+# advert (2418686487): „eine noch zu vermessende Teilfläche, die im Rahmen des
+# Verkaufsprozesses exakt abgegrenzt und im Grundbuch eingetragen wird“, with a
+# stated 748,50 m². There is no Flurstück with that area, because the plot does
+# not have one yet — so a hard filter on it finds *some other* parcel of that
+# size and calls it confirmed, which is the one kind of wrong answer this
+# search is built to refuse.
+#
+# Worded as pending on purpose: „die Vermessung ist erfolgt“ describes a plot
+# that does have its own parcel.
+_PART_AREA_RE = re.compile(
+    r"[^.!?]*\b("
+    r"teilfl(?:ä|ae)che"
+    r"|noch\s+zu\s+vermessen(?:d\w*)?"
+    r"|wird\s+(?:noch\s+)?(?:neu\s+)?vermessen"
+    r"|nach\s+(?:der\s+)?(?:noch\s+ausstehenden\s+)?vermessung"
+    r"|vermessung\s+steht\s+noch\s+aus"
+    r"|noch\s+(?:zu\s+)?(?:heraus)?zu\s*teilen"
+    r"|nach\s+(?:der\s+)?teilung"
+    r"|herausgemessen"
+    r")[^.!?]*",
+    re.IGNORECASE,
+)
+
+
+def describes_part_area(text: str | None) -> str | None:
+    """The sentence saying the plot is still to be surveyed out of a parcel.
+
+    Returned rather than a boolean because it is the *Beleg*: a figure the
+    search refuses to filter on has to say which sentence took the decision.
+    """
+
+    if not text:
+        return None
+    match = _PART_AREA_RE.search(text)
+    return " ".join(match.group(0).split()) if match else None
 
 
 def _excerpt(text: str, start: int, end: int, pad: int = 45) -> str:

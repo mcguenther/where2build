@@ -38,8 +38,19 @@
           <span class="konflikt__wert">{{ option.wert }}</span>
           <span class="konflikt__quelle">{{ sourceLabel(option.quelle) }}</span>
           <span v-if="option.beleg" class="konflikt__beleg">{{ option.beleg }}</span>
+          <!-- A Beleg read off a picture is a line of OCR text, which is the
+               least checkable evidence in the whole search. So the sheet comes
+               with it: the choice is made against the document, not against a
+               transcription of it. -->
+          <img v-if="option.bild_url" class="konflikt__bild" :src="option.bild_url"
+               alt="Das Bild, aus dem diese Angabe gelesen wurde" loading="lazy">
         </button>
       </div>
+      <p v-if="optionsOf(conflict).some(o => o.bild_url)" class="konflikt__fussnote">
+        Auf einem Katasterauszug stehen die Nummern der Nachbarflurstücke mit auf der
+        Karte. Gelesen wird nur die beschriftete Angabe im Kopf des Auszugs — steht dort
+        mehr als eine, entscheidet das Bild.
+      </p>
     </section>
 
     <div class="suche__buehne">
@@ -73,7 +84,7 @@
         <EvidenceMap ref="karte" :candidates="candidates" :district-outline="districtOutline"
                      :areas="areas" :huelle="huelle" :refuted-pin="refutedPin" :pin="pin"
                      :status="status" :flight="flight" :height="mapHeight"
-                     :ground="ground" @select="pick" />
+                     :ground="ground" :highlighted="highlighted" @select="pick" />
         <p v-if="ground === 'site'" class="panel__footnote">
           Luftbild und Straßen vom GeoSN. Die amtlichen Flurstücksgrenzen zeichnet der
           Dienst erst ab Zoomstufe {{ parcelOutlineZoom }} — darüber liefert er ein leeres Bild.
@@ -99,7 +110,10 @@
           <li v-for="step in steps" :key="step.n"
               class="verlauf__schritt" :class="[
                 `verlauf__schritt--${step.kind}`,
-                { 'verlauf--verworfen': step.indiz && indizOf(step).verworfen }
+                {
+                  'verlauf--verworfen': step.indiz && indizOf(step).verworfen,
+                  'verlauf--gezeigt': shownStep === step.n
+                }
               ]">
             <span class="verlauf__nr" aria-hidden="true">{{ step.n }}</span>
 
@@ -262,6 +276,11 @@ export default {
       queued: 0,
       queueStep: DWELL_MS,
       chosen: null,
+      // Which entry of the Verlauf is being shown, and what it points at. The
+      // map marks it: a jump that only moves the camera arrives somewhere
+      // without saying which of the things on it was the reason.
+      shownStep: null,
+      highlighted: null,
       // The ground under the drawing. Remembered per visit only: which
       // backdrop helps depends on the plot in front of you.
       ground: "site",
@@ -341,6 +360,7 @@ export default {
         streaming: true, error: "", status: null, indicia: [], conflicts: [],
         candidates: [], huelle: null, districtOutline: null, areas: [],
         hint: "", requests: 0, steps: [], chosen: null,
+        shownStep: null, highlighted: null,
         phaseText: "Angaben werden gelesen …"
       });
 
@@ -494,21 +514,32 @@ export default {
       return Array.isArray(geometry) ? geometry.length > 0 : Boolean(geometry);
     },
 
-    /** Clicking an entry jumps to it. Nobody waits for the animation. */
+    /** Clicking an entry jumps to it *and* marks it. Nobody waits for the
+     *  animation, and nobody has to guess what the map just moved to. */
     focusStep(step) {
       this.skip();
       const geometry = this.focusOf(step);
-      if (geometry) this.$refs.karte?.focusOn?.(geometry);
+      if (!geometry) return;
+      this.shownStep = step.n;
+      this.highlighted = geometry;
+      this.$refs.karte?.focusOn?.(geometry);
     },
 
     focusResult() {
       this.skip();
-      if (this.resultGeometry) this.$refs.karte?.focusOn?.(this.resultGeometry);
+      if (!this.resultGeometry) return;
+      this.shownStep = null;
+      this.highlighted = this.resultGeometry;
+      this.$refs.karte?.focusOn?.(this.resultGeometry);
     },
 
     focusEverything() {
       this.skip();
-      if (this.everything.length) this.$refs.karte?.focusOn?.(this.everything);
+      if (!this.everything.length) return;
+      // Showing everything is the opposite of pointing at one thing.
+      this.shownStep = null;
+      this.highlighted = null;
+      this.$refs.karte?.focusOn?.(this.everything);
     },
 
     pick(id) {
@@ -607,6 +638,11 @@ export default {
   border-color: var(--w2b-primary); color: var(--w2b-primary);
 }
 
+/* The row whose subject is marked on the map. The two have to refer to each
+   other, or a jump is a camera move with no explanation. */
+.verlauf--gezeigt{ background: var(--w2b-primary-veil); }
+.verlauf--gezeigt .verlauf__nr{ color: var(--w2b-primary); font-weight: 700; }
+
 .verlauf--verworfen .verlauf__text b{ text-decoration: line-through; color: var(--w2b-muted); }
 .verlauf--verworfen .verlauf__staerke{ background: var(--w2b-line); }
 .verlauf__schalter{
@@ -619,6 +655,15 @@ export default {
 
 /* Three controls in one row do not fit a 390 px panel: without the wrap the
    ground toggle lost its second half to `overflow: hidden`. */
+.konflikt__bild{
+  display: block; width: 100%; max-width: 260px; margin-top: var(--w2b-space-2);
+  border: 1px solid var(--w2b-line); border-radius: var(--w2b-radius-s);
+  background: var(--w2b-surface);
+}
+.konflikt__fussnote{
+  margin: var(--w2b-space-2) 0 0; font-size: var(--w2b-text-xs); color: var(--w2b-muted);
+}
+
 .suche__kartenkopf{ padding-bottom: var(--w2b-space-3); flex-wrap: wrap; gap: var(--w2b-space-2); }
 .grundwahl{
   flex: none; display: inline-flex; border: 1px solid var(--w2b-line);

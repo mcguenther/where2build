@@ -389,6 +389,36 @@ describe("Die Suchansicht", () => {
     expect(shown.length).toBeGreaterThan(1);
   });
 
+  it("markiert auf der Karte, worauf ein Eintrag zeigt", async () => {
+    const wrapper = await openSearch();
+    const map = wrapper.findComponent({ name: "EvidenceMap" });
+    map.vm.focusOn = vi.fn();
+
+    // Vorher zeigt nichts auf etwas Bestimmtes.
+    expect(map.props("highlighted")).toBeNull();
+
+    await wrapper.findAll(".verlauf__zeile").at(-1).trigger("click");
+
+    // Ein Sprung, der nur die Kamera bewegt, kommt irgendwo an, ohne zu sagen,
+    // welches der Dinge dort der Grund war.
+    expect(map.props("highlighted")).toEqual(RESULT.huelle.geometry);
+    expect(wrapper.find(".verlauf--gezeigt").exists()).toBe(true);
+  });
+
+  it("hebt die Markierung auf, wenn wieder alles gezeigt wird", async () => {
+    const wrapper = await openSearch();
+    const map = wrapper.findComponent({ name: "EvidenceMap" });
+    map.vm.focusOn = vi.fn();
+
+    await wrapper.findAll(".verlauf__zeile").at(-1).trigger("click");
+    expect(map.props("highlighted")).toBeTruthy();
+
+    await wrapper.findAll("button").find(b => b.text() === "Alles zeigen").trigger("click");
+
+    expect(map.props("highlighted")).toBeNull();
+    expect(wrapper.find(".verlauf--gezeigt").exists()).toBe(false);
+  });
+
   it("sucht erneut, wenn ein Indiz abgewählt wird", async () => {
     const wrapper = await openSearch();
     const calls = global.fetch.mock.calls.length;
