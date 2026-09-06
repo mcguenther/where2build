@@ -246,7 +246,14 @@ class TilesSettings(BaseSettings):
     # 1:1066 and draws.
     parcel_layers: str = "adv_alkis_flurstuecke"
     parcel_styles: str = "Gelb"
-    parcel_min_zoom: int = 19
+    # The layer's own MaxScaleDenominator, read from its GetCapabilities. The
+    # proxy renders each tile at whatever pixel size puts the denominator under
+    # this and scales the result back down, so the outlines draw far above the
+    # zoom the service would otherwise start at.
+    parcel_max_scale_denominator: float = 2000
+    # z14 would need 4368 px for one tile and the service refuses anything over
+    # 4000, so that is where oversampling runs out. z15 is the floor.
+    parcel_min_zoom: int = 15
     # Roads and their names, transparent at every zoom measured (13 to 19).
     street_layers: str = "Verkehr,Beschriftung"
     # XYZ tiles are Web Mercator. Should a service reject EPSG:3857, EPSG:4326
@@ -255,6 +262,9 @@ class TilesSettings(BaseSettings):
     image_format: str = "image/png"
     tile_size: int = 256
     transparent: bool = True
+    # What the service will render in one request. `MaxWidth`/`MaxHeight` in the
+    # ALKIS capabilities; asking for more is refused outright.
+    max_render_size: int = 4000
     cache_ttl_s: int = 30 * 24 * 3600
     max_zoom: int = 21
 

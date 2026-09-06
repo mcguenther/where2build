@@ -11,6 +11,10 @@ dependencies = [
     "httpx>=0.27",
     "pyproj>=3.6",
     "shapely>=2.0",
+    # The tile proxy scales an oversized WMS render back down to a tile. Not
+    # optional any more: without it the cadastral overlay would go to the
+    # browser at up to half a megabyte per tile.
+    "pillow>=10.0",
 ]
 
 [project.optional-dependencies]

@@ -407,3 +407,33 @@ describe("Aufnahme — Flurstück und Angaben in einem Schritt", () => {
     expect(w.text()).toContain("Anlegen und öffnen");
   });
 });
+
+
+describe("Aufnahme — beide Textwege enden im selben Schritt", () => {
+  const atSource = () =>
+    mountWithRouter(WizardView, { path: "/aufnahme/quelle", props: { stage: "quelle" } });
+
+  const answer = {
+    felder: { grundstuecksflaeche_m2: { wert: 1300, quelle_url: null } },
+    beschreibung: "Baugrundstück im Ortsteil Oelzschau, zugehörig zur Stadt Rötha.",
+    bilder: []
+  };
+
+  it("liest getippten Text über dieselbe Stelle wie eine eingefügte Seite", async () => {
+    readPage.mockResolvedValue(answer);
+
+    const w = atSource();
+    await w.find('input[value="text"]').setValue();
+    await flushPromises();
+    await typeInto(w.find("#q-text"), answer.beschreibung);
+    await w.find("form").trigger("submit");
+    await flushPromises();
+
+    expect(readPage).toHaveBeenCalledWith(answer.beschreibung);
+    // Nicht mehr an der Suche vorbei: erst steht da, was gelesen wurde.
+    expect(w.vm.searchQuery).toBeNull();
+    expect(w.vm.readFields.map(f => f.key)).toContain("grundstuecksflaeche_m2");
+    expect(w.vm.description).toContain("Oelzschau");
+    expect(w.vm.returnStage).toBe("werte");
+  });
+});

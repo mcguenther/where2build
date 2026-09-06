@@ -90,6 +90,9 @@ export default {
     huelle: { type: Object, default: null },
     /** The platform's pin, which is drawn struck through once refuted. */
     refutedPin: { type: Object, default: null },
+    /** The same point before anything has refuted it. Framed while nothing
+     *  better is known, so the map leaves the whole state at the first clue. */
+    pin: { type: Object, default: null },
     status: { type: String, default: null },
     height: { type: Number, default: 460 },
     /** What lies under the drawing. `site` is the orthophoto with the roads
@@ -115,6 +118,11 @@ export default {
       return this.areaGeometries.length
         ? this.areaGeometries
         : [this.districtOutline].filter(Boolean);
+    },
+    /** The advert's own point, as something to frame before anything is found. */
+    pinGeometry() {
+      const pin = this.pin || this.refutedPin;
+      return pin ? [{ type: "Point", coordinates: [pin.lon, pin.lat] }] : [];
     }
   },
   mounted() {
@@ -131,6 +139,7 @@ export default {
     candidates() { this.draw(); this.moveCamera(); },
     districtOutline() { this.draw(); },
     areas() { this.draw(); this.moveCamera(); },
+    pin() { this.moveCamera(); },
     huelle() { this.draw(); },
     status() { this.draw(); }
   },
@@ -205,34 +214,65 @@ export default {
         this._map.addSource(id, { type: "geojson", data: collection([]) });
       }
 
+      /* An orthophoto is not a background, it is a picture — mostly green,
+       * grey and dark, with detail everywhere. A wash tuned for pale paper
+       * disappears into it and a hairline is gone over foliage. So over the
+       * photo every fill is stronger and every line gets the halo the site
+       * plan has always drawn under its own: dark underneath, colour on top,
+       * legible against whatever happens to be beneath it. */
+      const photo = this.ground === "site";
+      const wash = photo ? 0.24 : 0.1;
+      const hullWash = photo ? 0.26 : 0.14;
+      const lineWidth = photo ? 2.2 : 1.4;
+      const haloWidth = photo ? 5 : 0;
+
       // The district wash sits furthest down and fades as the camera goes in:
       // a layer whose extent dwarfs the frame has stopped informing and only
       // tints. Its opacity is set in `draw`, not here.
       this._map.addLayer({
         id: "gemarkung-fill", type: "fill", source: "gemarkung",
-        paint: { "fill-color": envelope, "fill-opacity": 0.1 }
+        paint: { "fill-color": envelope, "fill-opacity": wash }
       });
+      if (haloWidth) {
+        this._map.addLayer({
+          id: "gemarkung-halo", type: "line", source: "gemarkung",
+          layout: { "line-join": "round" },
+          paint: { "line-color": halo, "line-width": haloWidth, "line-opacity": 0.55 }
+        });
+      }
       this._map.addLayer({
         id: "gemarkung-line", type: "line", source: "gemarkung",
-        paint: { "line-color": envelope, "line-width": 1.2, "line-dasharray": [3, 3], "line-opacity": 0.5 }
+        paint: {
+          "line-color": envelope,
+          "line-width": photo ? 2 : 1.2,
+          "line-dasharray": [3, 3],
+          "line-opacity": photo ? 0.95 : 0.5
+        }
       });
 
       // The common envelope: an answer about a street or a district, and never
       // drawn like a hit — no halo, no contour.
       this._map.addLayer({
         id: "huelle-fill", type: "fill", source: "huelle",
-        paint: { "fill-color": selection, "fill-opacity": 0.14 }
+        paint: { "fill-color": selection, "fill-opacity": hullWash }
       });
 
       // Every surviving candidate, equally strong. A ranking is an ordering,
       // not a finding, so nothing here says "this one".
       this._map.addLayer({
         id: "kandidaten-fill", type: "fill", source: "kandidaten",
-        paint: { "fill-color": selection, "fill-opacity": 0.42 }
+        paint: { "fill-color": selection, "fill-opacity": photo ? 0.5 : 0.42 }
       });
+      if (haloWidth) {
+        this._map.addLayer({
+          id: "kandidaten-halo", type: "line", source: "kandidaten",
+          layout: { "line-join": "round" },
+          paint: { "line-color": halo, "line-width": haloWidth }
+        });
+      }
       this._map.addLayer({
         id: "kandidaten-line", type: "line", source: "kandidaten",
-        paint: { "line-color": selection, "line-width": 1.4 }
+        paint: { "line-color": selection, "line-width": lineWidth }
       });
 
       /* Twenty-two candidates spread over two districts are each a couple of
@@ -246,7 +286,7 @@ export default {
           "circle-color": selection,
           "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 3.5, 15, 6, 17, 8],
           "circle-opacity": ["interpolate", ["linear"], ["zoom"], 15.5, 0.85, 17, 0],
-          "circle-stroke-width": 1.2,
+          "circle-stroke-width": photo ? 2.4 : 1.2,
           "circle-stroke-color": halo,
           "circle-stroke-opacity": ["interpolate", ["linear"], ["zoom"], 15.5, 0.9, 17, 0]
         }
@@ -379,10 +419,17 @@ export default {
       const tightened = this._lastCount !== null && count > 0 && count < this._lastCount;
       // Until a candidate exists, the districts in play *are* the doubt, and
       // framing them is how the map says where this could be at all.
+      // Whatever is the best statement about where this is, in that order.
+      // The pin is last and it is not a candidate — it is 6 km out on a real
+      // advert — but it is a *place*, and a map that sits on the whole state
+      // while the list already names a village reads as broken.
+      const known = this.candidateGeometries.length
+        ? this.candidateGeometries
+        : this.districtGeometries.length
+          ? this.districtGeometries
+          : this.pinGeometry;
       const next = frameFor({
-        candidates: this.candidateGeometries.length
-          ? this.candidateGeometries
-          : this.districtGeometries,
+        candidates: known,
         previous: this._frame,
         tightened: tightened || (count > 0 && this._lastCount === null)
       });

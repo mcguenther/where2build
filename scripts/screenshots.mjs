@@ -168,9 +168,18 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
      register — so it runs here even without an LLM key. */
   await page.getByText("Text durchsuchen").click();
   await page.fill("#q-text", LISTING);
+  // Typed prose goes through the same reader as a pasted page and lands on the
+  // same step, so the search starts from there rather than from the first one.
+  await page.getByRole("button", { name: "Lesen" }).click();
+  await page.waitForSelector(".suggestions", { timeout: 30000 });
   await page.getByRole("button", { name: "Flurstück suchen" }).click();
   await page.waitForTimeout(1500);
   await shot(page, "suche-laeuft", mode, narrow ? "-schmal" : "");
+  /* Mid-run, once the districts are drawn but before a parcel is named: this
+     is the picture that shows whether the evidence reads against a photograph
+     at all, and it is the state a viewer spends the longest looking at. */
+  await page.waitForTimeout(2500);
+  await shot(page, "suche-indizien", mode, narrow ? "-schmal" : "");
   try {
     await page.waitForSelector(".suche__urteil--bestaetigt, .suche__urteil--mehrdeutig, .suche__urteil--erfolglos", { timeout: 90000 });
     // Let the queue play the run out; it spends a fixed budget over the backlog.

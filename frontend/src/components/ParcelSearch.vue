@@ -71,7 +71,7 @@
           </button>
         </div>
         <EvidenceMap ref="karte" :candidates="candidates" :district-outline="districtOutline"
-                     :areas="areas" :huelle="huelle" :refuted-pin="refutedPin"
+                     :areas="areas" :huelle="huelle" :refuted-pin="refutedPin" :pin="pin"
                      :status="status" :flight="flight" :height="mapHeight"
                      :ground="ground" @select="pick" />
         <p v-if="ground === 'site'" class="panel__footnote">
@@ -303,12 +303,15 @@ export default {
      *  It stays on the map struck through rather than vanishing: whoever opens
      *  the listing sees this point, so an interface pointing somewhere else
      *  owes them the reason. */
-    refutedPin() {
-      if (!this.candidates.length) return null;
-      const pin = this.indicia.find(indiz => indiz.art === "pin");
-      if (!pin) return null;
-      const [lat, lon] = pin.wert.split(",").map(Number);
+    /** The point the advert itself names, as soon as it is read. */
+    pin() {
+      const indiz = this.indicia.find(entry => entry.art === "pin");
+      if (!indiz) return null;
+      const [lat, lon] = String(indiz.wert).split(",").map(Number);
       return Number.isFinite(lat) && Number.isFinite(lon) ? { lat, lon } : null;
+    },
+    refutedPin() {
+      return this.candidates.length ? this.pin : null;
     }
   },
   mounted() { this.start(); },

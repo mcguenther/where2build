@@ -390,7 +390,7 @@ export default {
       return this.pastedText.trim().length > 20;
     },
     readLabel() {
-      return { parcel: "Nachschlagen", text: "Flurstück suchen" }[this.source] ?? "Lesen";
+      return this.source === "parcel" ? "Nachschlagen" : "Lesen";
     },
     computedArea() { return this.draft ? polygonArea(this.draft.polygon) : 0; },
     /** The footprint the seating tried to place, for the sentence that says it
@@ -459,18 +459,6 @@ export default {
       this.busy = true;
       this.error = "";
       try {
-        if (this.source === "text") {
-          // Straight into the search: no page to fetch and no model to ask.
-          // The text is the evidence, and reading it is what the search does.
-          this.searchQuery = {
-            text: this.listingText.trim(),
-          };
-          this.listingExtras = {};
-          this.searchRun++;
-          this.returnStage = "quelle";
-          this.goToStage("suche");
-          return;
-        }
         if (this.source === "parcel") {
           // Nothing to search for: the district and the number are the answer.
           this.returnStage = "quelle";
@@ -480,11 +468,17 @@ export default {
           });
           return;
         }
+        // Everything that is not a parcel key goes through the same reader and
+        // lands on the same step. Typed prose used to jump straight into the
+        // search, so the same page arrived at two different places depending on
+        // which box it was pasted into — and the values it *did* carry (area,
+        // price) were never shown.
         const response = this.source === "url"
           ? await readListing(this.url.trim())
-          : await readPage(this.pastedHtml || this.pastedText);
+          : await readPage(this.source === "text" ? this.listingText.trim() : (this.pastedHtml || this.pastedText));
         this.readFields = fieldsFromResponse(response);
-        this.description = response?.beschreibung || (this.source === "paste" ? this.pastedText : "");
+        this.description = response?.beschreibung
+          || (this.source === "text" ? this.listingText.trim() : this.pastedText);
         this.images = response?.bilder || [];
         this.returnStage = "werte";
         this.goToStage("werte");

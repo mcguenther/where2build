@@ -99,13 +99,17 @@ export function canRenderMap() {
  * roads and their names over it, the parcel outlines on top. Both overlays are
  * the authority's own transparent renderings, so nothing is drawn by hand.
  *
- * `minzoom` on the outlines is measured, not chosen: `adv_alkis_flurstuecke`
+ * `minzoom` on the outlines is measured, not chosen. `adv_alkis_flurstuecke`
  * carries `MaxScaleDenominator: 2000` and answers HTTP 200 with a fully
- * transparent PNG above it. At Flurstück 790/11, z18 is 1:2133 and empty,
- * z19 is 1:1066 and draws. Without the floor the map asks for hundreds of
- * blank tiles on the way in and looks like a broken layer rather than a scale.
+ * transparent PNG above it, which at a 256 px tile would mean nothing below
+ * zoom 19. The proxy gets round that by rendering each tile larger — the
+ * denominator is (bbox / image width) / 0,00028, so a bigger image over the
+ * same box falls under the limit — and scaling it back to a tile. That works
+ * down to zoom 15; zoom 14 would need 4368 px for one tile and the service
+ * refuses anything over 4000. Below the floor the layer is left out, because a
+ * transparent tile looks like a broken overlay rather than a scale.
  */
-export const PARCEL_OUTLINE_MIN_ZOOM = 19;
+export const PARCEL_OUTLINE_MIN_ZOOM = 15;
 
 export const aerialCadastreStyle = () => {
   const origin = window.location.origin;

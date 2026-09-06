@@ -294,9 +294,12 @@ Each of these is verified, not assumed — the details are in
 - **immobilienscout24.de answers server-side fetches with 401** on every route
   tested, so its adapter goes straight to the paste field.
 - **`adv_alkis_flurstuecke` carries `MaxScaleDenominator: 2000`** and answers
-  HTTP 200 with a transparent PNG above it. Measured at one parcel: z18 is
-  1:2133 and blank, z19 is 1:1066 and draws. Its `Gelb` style is the one meant
-  for overlaying — contours, no fills.
+  HTTP 200 with a transparent PNG above it — and a scale limit is steerable.
+  The denominator is `(bbox / image width) / 0,00028`, so the proxy renders each
+  tile larger (z18 at 512 px, z15 at 2304) and scales it back: the layer draws
+  from zoom 15 instead of 19, and the browser still gets a 10–39 kB tile. It
+  runs out at z14, which would need 4368 px against the service's 4000 limit.
+  Its `Gelb` style is the one meant for overlaying — contours, no fills.
 - **kleinanzeigen.de carries `og:latitude`/`og:longitude`** in its meta tags —
   parse those and skip both the geocoder and the model call. The asking price
   is there too (`<meta itemprop="price">`, JSON-LD, `#viewad-price`), which is

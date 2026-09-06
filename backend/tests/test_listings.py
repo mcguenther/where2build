@@ -276,3 +276,43 @@ def test_an_answer_cached_by_an_older_reader_is_not_served(client: TestClient):
     assert answer.status_code == 200
     # The page is read again rather than the empty answer being handed back.
     assert answer.json()["felder"]["kaufpreis_eur"]["wert"] == 89000
+
+
+def test_a_page_whose_prose_is_searchable_needs_no_locator(without_llm, client: TestClient):
+    """A dropped ImmoScout page carries none of the three locators.
+
+    No coordinate, often only a district for an address, never a parcel
+    number — and prose that names the Ortsteil, the area and the street, which
+    is everything the parcel search runs on. Refusing it sent the one portal
+    the paste field exists for straight back out again.
+    """
+
+    answer = client.post(
+        "/api/listings/extract",
+        json={
+            "text": (
+                "Baugrundstück im Ortsteil Oelzschau, zugehörig zur Stadt Rötha. "
+                "Das Grundstück umfasst eine Gesamtfläche von ca. 1.300 m²."
+            )
+        },
+    )
+
+    assert answer.status_code == 200
+    body = answer.json()
+    assert "Oelzschau" in body["beschreibung"]
+    # No locator was read, and that is not an error any more.
+    assert body["felder"]["adresse"]["wert"] is None
+
+
+def test_prose_that_names_nowhere_is_still_refused(without_llm, client: TestClient):
+    """An area is not an anchor.
+
+    „Baugrundstück 688 m²“ names no place, and every parcel in Saxony of that
+    size is not a candidate set — so this still gets the message that says what
+    to paste instead, rather than a search that cannot go anywhere.
+    """
+
+    answer = client.post("/api/listings/extract", json={"text": "Baugrundstück 688 m²"})
+
+    assert answer.status_code == 503
+    assert "Strg+A" in answer.json()["detail"]

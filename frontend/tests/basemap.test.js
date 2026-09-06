@@ -115,9 +115,10 @@ describe("Luftbild mit Kataster", () => {
     const style = aerialCadastreStyle();
 
     // adv_alkis_flurstuecke trägt MaxScaleDenominator 2000 und antwortet
-    // darüber mit einer leeren PNG statt mit einem Fehler: z18 ist 1:2133 und
-    // leer, z19 ist 1:1066 und zeichnet. Gemessen an Flurstück 790/11.
-    expect(PARCEL_OUTLINE_MIN_ZOOM).toBe(19);
+    // darüber mit einer leeren PNG statt mit einem Fehler. Das Backend rendert
+    // die Kachel deshalb größer und skaliert sie zurück — das trägt bis Zoom 15;
+    // Zoom 14 bräuchte 4368 px, und der Dienst rendert höchstens 4000.
+    expect(PARCEL_OUTLINE_MIN_ZOOM).toBe(15);
     expect(style.sources.flurstuecke.minzoom).toBe(PARCEL_OUTLINE_MIN_ZOOM);
     expect(style.layers.find(l => l.id === "flurstuecke").minzoom).toBe(PARCEL_OUTLINE_MIN_ZOOM);
     // Das Foto und die Straßen dagegen zeichnen auf jeder Stufe.

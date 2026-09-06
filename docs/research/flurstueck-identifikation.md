@@ -933,7 +933,70 @@ streets with their names, parcel outlines from zoom 19 — and the outline layer
 carries that floor as `minzoom`, or the map asks for hundreds of blank tiles on
 the way in and looks like a broken layer rather than a scale.
 
-## 20. What is still unverified ⚠️
+## 20. Sixth pass, 06.09.2026: a scale limit is steerable ✅
+
+### 20.1 Oversampling the cadastre ✅
+
+§ 19 stopped at „the outlines only draw from z19“, which is too deep to be
+useful — the search map spends its time between z14 and z18. The limit is a
+*scale*, and the WMS computes it from what it is handed:
+
+    denominator = (bbox_width / image_width) / 0,00028
+
+So a larger image over the same box falls under it. Measured against the live
+service at Flurstück 790/11, one tile each, then scaled back to 256 px:
+
+| Zoom | render | denominator | upstream | tile it becomes |
+| --- | --- | --- | --- | --- |
+| z19 | 256 px | 1:1066 | 10,7 kB | 10,7 kB |
+| z18 | 512 px | 1:1066 | 27,9 kB | 14,7 kB |
+| z17 | 768 px | 1:1422 | 68,2 kB | 21,4 kB |
+| z16 | 1280 px | 1:1706 | 246 kB | 39,1 kB |
+| z15 | 2304 px | 1:1896 | 499 kB | 33,7 kB |
+| z14 | — | — | — | **impossible** |
+
+z14 would need 4368 px for one tile and the service's `MaxWidth`/`MaxHeight`
+is **4000**, so that is where the floor is — a measured fact, not a
+preference. The upstream cost is paid once and cached for 30 days; the browser
+never sees it.
+
+Rounding up to whole tiles rather than doubling matters: z15 needs 2184 px and
+the next power of two is 4096, over the cap.
+
+### 20.2 What a photograph does to a palette ✅
+
+The evidence layers were built for the app's near-white paper — 0,1 fills,
+1,2 px hairlines. Over an orthophoto, which is mostly green, grey and dark with
+detail everywhere, they are not there. Over the photo the fills go to 0,24–0,5
+and every line gets the halo the site plan has always drawn under its own.
+
+### 20.3 The frame before the narration ✅
+
+The clues are paced so a run can be followed. The district outlines were
+emitted after all of them, so for the first seconds the map sat on the whole
+state while the list already named a village. The same request, one step
+earlier, fixes it — and costs nothing, because the wash under a confirmed
+parcel is that same document and `fetch_outline` now reuses it. The happy case
+is still two requests.
+
+### 20.4 Images last ✅
+
+Reading them was phase 0: up to a few seconds an image in front of the first
+thing the map could draw, for a channel most listings do not have. They are
+read after the text now, and only when the text did not confirm. A number
+found then re-runs the narrowing rather than being noted and ignored.
+
+### 20.5 The paste gate was asking the wrong question ✅
+
+A dropped ImmoScout page was refused for having no address, no coordinate and
+no parcel number — which is every ImmoScout page, the one portal that field
+exists for. None of the three is what the search needs: it reads a district, a
+street and an area out of prose. The gate now asks `collect_indicia` whether
+the text yields an *anchor* — a Gemarkung, a Gemeinde, a place or a parcel
+number. An area alone is not one, so „Baugrundstück 688 m²“ is still refused,
+with the message that says what to paste instead.
+
+## 21. What is still unverified ⚠️
 
 * The three prompts in `docs/strategie/extraktion-prompting.html` are drafted
   but have not been run against a model — this listing did not need them.

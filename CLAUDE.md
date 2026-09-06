@@ -676,14 +676,20 @@ from the user directly. Reopen only if the user asks.
   tesseract-ocr-deu` plus `.[poi,ocr]`; the German data is not optional either,
   because the patterns key on the words around the number.
 - **`adv_alkis_flurstuecke` carries `MaxScaleDenominator: 2000` and answers 200
-  with a transparent PNG above it.** Same shape as the ArcGIS `minScale` trap,
-  different service. Measured at Flurstück 790/11: z17 is 1:4265 and empty, z18
-  is 1:2133 and empty, **z19 is 1:1066 and draws**. Every style behaves the same
-  — it is the scale, not `STYLES` — and `STYLES=default` is rejected outright
-  while `STYLES=` (empty) is accepted. Its sibling layers are not affected:
-  `tatsaechliche_nutzung` and `gebaeude` draw at z18 in the same request. The
-  service's own overlay style is **`Gelb`**, which its abstract describes as
-  „keine Flaechen sondern nur Konturen“ — that is the one to put over an
+  with a transparent PNG above it — and a scale limit is *steerable*.** Same
+  shape as the ArcGIS `minScale` trap, different service. At 256 px the layer
+  draws only from z19 (z18 is 1:2133 and empty). But the denominator is
+  `(bbox_width / image_width) / 0,00028`, so asking for a **larger image over
+  the same box** puts it back under the limit: z18 at 512 px, z17 at 768,
+  z16 at 1280, z15 at 2304 — all measured against the live service, all
+  drawing. The proxy scales the render back to a tile, so the browser still
+  gets 10–39 kB. It runs out at z14, which would need 4368 px against the
+  service's `MaxWidth` of **4000**; that is where the floor comes from.
+  Every style behaves the same — it is the scale, not `STYLES` — and
+  `STYLES=default` is rejected outright while `STYLES=` (empty) is accepted.
+  Sibling layers are unaffected: `tatsaechliche_nutzung` and `gebaeude` draw at
+  z18 in the same request. The service's own overlay style is **`Gelb`**, whose
+  abstract says „keine Flaechen sondern nur Konturen“ — that is the one for an
   orthophoto. Streets and their names come from the WebAtlas as
   `Verkehr,Beschriftung`, transparent at every zoom from 13 to 19.
 - **A raster style needs no network, and that is what starts a MapLibre
@@ -703,6 +709,38 @@ from the user directly. Reopen only if the user asks.
   when it was recorded: a clue arrives several steps before the outline it
   names is fetched, so anything captured at the time is null for exactly the
   rows worth clicking.
+- **A palette tuned for paper disappears on a photograph.** The evidence layers
+  were 0,1 fills and 1,2 px hairlines — right over the app's near-white ground,
+  invisible over an orthophoto, which is mostly green, grey and dark with detail
+  everywhere. Over the photo every fill is stronger and every line carries the
+  halo the site plan has always drawn under its own. The ground is a prop, so
+  the paint follows it rather than being chosen once.
+- **The frame comes before the narration.** The clues play one at a time so a
+  run can be followed, and the district outlines were emitted *after* all of
+  them — so for the first seconds the map sat on the whole of Saxony while the
+  list already named a village, which reads as a map that is broken rather than
+  one that is waiting. Emitting the same request one step earlier fixes it, and
+  costs nothing: the wash under a confirmed parcel is that same document, so
+  `fetch_outline` reuses it instead of asking again.
+- **Reading the images is the rescue, not the route.** OCR was phase 0, so
+  every run began with up to a few seconds an image before the first thing the
+  map could draw — for a channel most listings do not have. The text and the
+  metadata are what the search runs on; the images are read afterwards, and
+  only when the text did not confirm. When they then name a parcel, the
+  narrowing runs again rather than the reading being noted and ignored.
+- **A locator is what a stored plot needs, not what the search needs.** The
+  paste path refused any page without an address, a coordinate or a parcel
+  number — which is every ImmoScout page, the one portal that field exists for.
+  The search reads a district, a street and an area out of prose; the gate now
+  asks `collect_indicia` whether the text yields an *anchor* (a Gemarkung, a
+  Gemeinde, a place or a parcel number). An area alone is not one — every
+  parcel in Saxony of that size is not a candidate set — so „Baugrundstück
+  688 m²“ still gets the message that says what to paste instead.
+- **A test that mocks by call order breaks when the run gets better.** Six
+  tests pinned an ordered `side_effect` list, so fetching the district outline
+  one step earlier failed them all — for a change that made the product better
+  and cost no extra request. `_cadastre()` exists for exactly this and its
+  docstring says so; the ordered lists are gone.
 - **jsdom does not submit a form from a dispatched click.** Wrapping the
   wizard's first step in a `<form>` (so Enter submits, as it does everywhere
   else) broke two tests that click the button, with no change to the component's
@@ -762,11 +800,11 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 472 passed, 1 skipped (that one needs pyosmium, which only the
-  index builder wants). Three of the 472 need Tesseract and skip without it.
-- `vitest`: 465 passed — plus the integration file, excluded by `npm run test`
+- `pytest`: 479 passed, 1 skipped (that one needs pyosmium, which only the
+  index builder wants). Four of the 479 need Tesseract and skip without it.
+- `vitest`: 466 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
-- `scripts/screenshots.mjs`: 47 images plus a print PDF. It fails on console
+- `scripts/screenshots.mjs`: 50 images plus a print PDF. It fails on console
   errors, on horizontal overflow, and if not a single vector tile arrived. It
   also drives the live geocoder, which is slow often enough to blow the 60 s
   wait on the destinations step — two runs failed there and the third passed

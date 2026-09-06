@@ -7,7 +7,7 @@ import re
 from fastapi import APIRouter, Depends
 from pydantic import ValidationError
 
-from ..deps import llm_client, settings_dep
+from ..deps import gemarkung_directory, llm_client, settings_dep
 from ..errors import BadRequestError, NotConfiguredError, UpstreamError
 from ..schemas import (
     Extraktionsweg,
@@ -18,6 +18,7 @@ from ..schemas import (
     ListingExtractResponse,
     as_vorschlaege,
 )
+from ..search.indicia import collect_indicia
 from ..services.llm import LLMClient, normalize_url
 from ..services.portals import PASTE_HINT, fetch_page, is_blocked, is_kleinanzeigen, parse_page
 from ..settings import Settings
@@ -101,6 +102,35 @@ def _merge(deterministic: InseratFelder, extracted: InseratFelder | None) -> Ins
 _DESCRIPTION_LIMIT = 20_000
 
 
+# What the search can actually start from. A district, a municipality or a
+# named place anchors it; a bare parcel number is probed against the whole
+# state. An *area* alone is not an anchor -- „Baugrundstück 688 m²“ names
+# nowhere, and every parcel in Saxony of that size is not a candidate set. Nor
+# is a street: without a containing area a street name is a 1-in-500 shot.
+_ANCHORS = ("gemarkung", "gemeinde", "ort", "flurstueck")
+
+
+def _is_searchable(text: str) -> bool:
+    """Whether the parcel search could do anything with this prose.
+
+    Not a length test. The search reads a district, a street, an area and the
+    relation between the places named out of the text — a page with none of the
+    three locators is perfectly usable if it carries any of those, which is
+    exactly what the „Text durchsuchen“ way in relies on. Asked with the same
+    reader the search itself uses, so the answer cannot drift away from it.
+
+    An ImmoScout page is the case: no coordinate, often only a district for an
+    address, never a parcel number, and prose that names the Ortsteil.
+    """
+
+    if not text or not text.strip():
+        return False
+    return any(
+        indiz.art in _ANCHORS
+        for indiz in collect_indicia(text=text, directory=gemarkung_directory())
+    )
+
+
 def _answer(
     felder: InseratFelder,
     quelle_url: str | None,
@@ -110,13 +140,19 @@ def _answer(
     beschreibung: str | None = None,
     bilder: list[str] | None = None,
 ) -> ListingExtractResponse:
+    text = " ".join(part for part in (titel, beschreibung) if part).strip()
     try:
         inserat = Inserat(**felder.model_dump(), quelle_url=quelle_url)
     except ValidationError as exc:
-        raise BadRequestError(_NO_LOCATOR) from exc
-    text = " ".join(part for part in (titel, beschreibung) if part).strip()
+        # A locator is what a *stored plot* needs, not what the search needs.
+        # An ImmoScout page carries no coordinate, often only a district as its
+        # address and never a parcel number -- and its prose names the Ortsteil,
+        # the area and the street, which is everything the search runs on.
+        if not _is_searchable(text):
+            raise BadRequestError(_NO_LOCATOR) from exc
+        inserat = None
     return ListingExtractResponse(
-        felder=as_vorschlaege(inserat, InseratVorschlaege, quelle_url),
+        felder=as_vorschlaege(inserat or felder, InseratVorschlaege, quelle_url),
         quelle_url=quelle_url,
         weg=weg,
         hinweis=hinweis or titel,
@@ -254,12 +290,13 @@ async def extract(
             extracted = await llm.structure(text, InseratFelder, "inserat", _STRUCTURE_TASK)
         except UpstreamError as exc:
             hinweis = f"Nur die Angaben der Seite konnten gelesen werden: {exc.message}"
-    elif not _has_locator(deterministic):
+    elif not _has_locator(deterministic) and not _is_searchable(beschreibung):
         raise NotConfiguredError(
             "Aus dem eingefügten Text ließ sich weder eine Adresse noch eine Koordinate "
-            "noch ein Flurstück lesen, und das Auswerten durch ein Modell ist auf diesem "
-            "Server nicht eingerichtet (LLM_API_KEY fehlt). Am zuverlässigsten ist die "
-            "kopierte Seite selbst: im Browser Strg+A, Strg+C — dann kommt das HTML mit "
+            "noch ein Flurstück lesen, und es steht auch kein Beschreibungstext darin, "
+            "den die Flurstückssuche lesen könnte. Ein Modell ist auf diesem Server "
+            "nicht eingerichtet (LLM_API_KEY fehlt). Am zuverlässigsten ist die kopierte "
+            "Seite selbst: im Browser Strg+A, Strg+C — dann kommt das HTML mit "
             "Meta-Angaben, Preis und Bildern mit, und es braucht kein Modell."
         )
 

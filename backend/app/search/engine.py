@@ -168,6 +168,9 @@ class SearchEngine:
         self.state = SearchState()
         self._area: AreaStatement | None = None
         self._street: str | None = None
+        # District outlines already fetched, by key. Drawn once for the map and
+        # reused for the wash under a confirmed parcel.
+        self._district_outlines: dict[str, KatasterBezirk] = {}
 
     # ------------------------------------------------------------------
     # Small helpers over the Indiz list
@@ -221,13 +224,6 @@ class SearchEngine:
                 indiz.verworfen = True
                 indiz.verworfen_grund = "Von Hand abgewählt."
 
-        # The images, but only when the text has not already answered. A
-        # seller who attaches a Geoportal print has said it outright; a seller
-        # who has not attached one costs ~3 s per photograph to learn nothing.
-        if self.payload.bilder and not self.active("flurstueck"):
-            async for event in self.read_images():
-                yield event
-
         area_indiz = next((i for i in self.active("flaeche")), None)
         if area_indiz is not None:
             self._area = read_area(area_indiz.beleg or "") or AreaStatement(
@@ -235,6 +231,15 @@ class SearchEngine:
             )
         street_indiz = next(iter(self.active("strasse")), None)
         self._street = street_indiz.wert if street_indiz else None
+
+        # The frame before the narration. The clues play out one at a time so a
+        # run can be followed, and the districts used to be emitted *after* all
+        # of them — so the map sat on the whole of Saxony while the list already
+        # named a village, which reads as a map that is not working rather than
+        # one that is waiting. Nothing new is fetched here: it is the same
+        # request the space step made, one step earlier.
+        async for event in self.frame():
+            yield event
 
         for indiz in self.state.indicia:
             yield SuchEreignis(art="indiz", indiz=indiz)
@@ -245,6 +250,12 @@ class SearchEngine:
 
     async def read_images(self) -> AsyncIterator[SuchEreignis]:
         """Read the listing's images for a cadastral reference, and stop at one.
+
+        Reached only when the text and the metadata did not settle it, and never
+        before them: a Tesseract pass costs 0,9 s when it matches and a few
+        seconds when it does not, and putting that in front of the first thing
+        the map can draw made every run feel broken for the sake of a channel
+        most listings do not have.
 
         One after another, not all at once. Reading them concurrently was the
         obvious idea and it is measurably wrong: Tesseract is CPU-bound, and
@@ -276,7 +287,10 @@ class SearchEngine:
         yield SuchEreignis(
             art="phase",
             phase="bilder",
-            text=f"Kein Flurstück im Text — bis zu {len(urls)} Bilder werden gelesen",
+            text=(
+                f"Der Text allein hat es nicht entschieden — bis zu {len(urls)} "
+                "Bilder werden gelesen"
+            ),
             anzahl=len(urls),
         )
 
@@ -693,6 +707,21 @@ class SearchEngine:
     # Phases 2 and 3 -- the haystack, then the staircase
     # ------------------------------------------------------------------
 
+    async def frame(self) -> AsyncIterator[SuchEreignis]:
+        """The districts in play, drawn before anything else is said.
+
+        Answers „where could this be at all“ from the first seconds. Costs one
+        request per district (16,5 kB, measured) and at most `MAX_DRAWN_AREAS`
+        of them, which is the same budget the space step always had.
+        """
+
+        anchors = self.anchors()
+        if not anchors or self.state.areas:
+            return
+        self.state.areas = await self._outlines(anchors[:MAX_DRAWN_AREAS], [])
+        if self.state.areas:
+            yield SuchEreignis(art="gebiete", phase="ernten", gebiete=self.state.areas)
+
     async def measure_space(self, anchors: list[Anchor]) -> AsyncIterator[SuchEreignis]:
         counts = await asyncio.gather(
             *(self._count([anchor.condition]) for anchor in anchors),
@@ -708,9 +737,12 @@ class SearchEngine:
         # sitting on the whole of Saxony until the staircase is finished.
         # 16.5 kB per district, measured, and capped -- a wash nobody can tell
         # apart from its neighbours is not worth a request.
-        self.state.areas = await self._outlines(anchors[:MAX_DRAWN_AREAS], counts)
-        if self.state.areas:
-            yield SuchEreignis(art="gebiete", phase="raum", gebiete=self.state.areas)
+        # Already drawn by `frame`, in phase 0. Re-fetched only if that found
+        # nothing to draw — a run reached through a different route.
+        if not self.state.areas:
+            self.state.areas = await self._outlines(anchors[:MAX_DRAWN_AREAS], counts)
+            if self.state.areas:
+                yield SuchEreignis(art="gebiete", phase="raum", gebiete=self.state.areas)
         yield SuchEreignis(
             art="phase",
             phase="raum",
@@ -815,10 +847,16 @@ class SearchEngine:
             *(self.alkis.district_outline(anchor.schluessel) for anchor in anchors),
             return_exceptions=True,
         )
+        # Padded rather than zipped short: `frame` has no counts yet, and a
+        # bare zip would silently return no outlines at all.
+        padded = list(counts) + [None] * (len(anchors) - len(counts))
         out: list[Suchgebiet] = []
-        for anchor, count, outline in zip(anchors, counts, results):
+        for anchor, count, outline in zip(anchors, padded, results):
             if not isinstance(outline, KatasterBezirk) or outline is None:
                 continue
+            # Kept whole, not just as GeoJSON: the wash under a confirmed parcel
+            # is this same document, and the common envelope needs its geometry.
+            self._district_outlines[anchor.schluessel] = outline
             out.append(
                 Suchgebiet(
                     schluessel=anchor.schluessel,
@@ -1121,6 +1159,13 @@ class SearchEngine:
         key = keys.pop()
         if not key:
             return
+        # `frame` drew the districts in play before anything was narrated, so
+        # the one the answer settled on is usually already in hand. Asking for
+        # it again would be a second request for a document we have.
+        already = self._district_outlines.get(key)
+        if already is not None:
+            self.state.outline = already
+            return
         try:
             self.state.requests += 1
             self.state.outline = await self.alkis.district_outline(key)
@@ -1128,9 +1173,8 @@ class SearchEngine:
             # A missing wash is a paler map, not a failed search.
             self.state.outline = None
 
-    async def run(self) -> AsyncIterator[SuchEreignis]:
-        async for event in self.harvest():
-            yield event
+    async def narrow(self) -> AsyncIterator[SuchEreignis]:
+        """From the Indizien in hand to a candidate set. Runs at most twice."""
 
         anchors = self.anchors()
         async for event in self.short_circuit():
@@ -1145,6 +1189,34 @@ class SearchEngine:
         if not self.state.candidates:
             async for event in self.by_number_alone():
                 yield event
+
+    async def run(self) -> AsyncIterator[SuchEreignis]:
+        async for event in self.harvest():
+            yield event
+
+        async for event in self.narrow():
+            yield event
+
+        # The images come *after* the text, and only when the text did not
+        # settle it. They used to be phase 0, which put a Tesseract pass of up
+        # to a few seconds an image in front of the first thing the map could
+        # draw — for a channel that most listings do not even have. The text and
+        # the metadata are what the search runs on; a Geoportal print is the
+        # rescue, not the route.
+        if self.payload.bilder and self.verdict() != "bestaetigt":
+            before = {indiz.id for indiz in self.state.indicia}
+            async for event in self.read_images():
+                yield event
+            fresh = [i for i in self.state.indicia if i.id not in before]
+            for indiz in fresh:
+                yield SuchEreignis(art="indiz", indiz=indiz)
+            # A number off an image is an official statement about *this* plot
+            # and outranks what the prose alone reached, so the narrowing runs
+            # again rather than the reading being noted and ignored.
+            if any(indiz.art in ("flurstueck", "gemarkung") for indiz in fresh):
+                self.state.candidates = []
+                async for event in self.narrow():
+                    yield event
 
         if self.state.candidates:
             async for event in self.rank():

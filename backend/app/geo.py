@@ -76,6 +76,20 @@ def tile_bounds_4326(z: int, x: int, y: int) -> tuple[float, float, float, float
     return minlon, minlat, maxlon, maxlat
 
 
+def tile_width_3857_m(z: int) -> float:
+    """How wide one tile is in Web Mercator metres.
+
+    Not ground metres: a WMS derives its scale denominator from the BBOX it is
+    handed, and for EPSG:3857 that box is in Mercator metres. Whoever wants to
+    steer that denominator has to compute it in the same quantity the service
+    does. Only meaningful for a projected CRS in metres, which is what the tile
+    proxy uses.
+    """
+
+    minx, _, maxx, _ = tile_bounds_3857(z, 0, 0)
+    return maxx - minx
+
+
 def wms_bbox(crs: str, z: int, x: int, y: int) -> str:
     """BBOX parameter for a WMS 1.3.0 GetMap of one XYZ tile."""
 

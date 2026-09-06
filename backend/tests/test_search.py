@@ -309,10 +309,8 @@ def test_a_district_and_a_number_stop_after_two_requests(client: TestClient):
     """The happy case takes the short circuit and does nothing else."""
 
     route = respx.post(ALKIS_URL).mock(
-        side_effect=[
-            _gml("alkis_grossbothen_790_11.gml"),
-            _gml("alkis_katasterbezirk_grossbothen.gml"),
-        ]
+        side_effect=_cadastre({}, {"KatasterBezirk": "alkis_katasterbezirk_grossbothen.gml",
+                                   "flstnrzae": "alkis_grossbothen_790_11.gml"})
     )
 
     events = _stream(
@@ -340,13 +338,8 @@ def test_a_contested_district_is_settled_by_the_parcel_number(client: TestClient
     """
 
     respx.post(ALKIS_URL).mock(
-        side_effect=[
-            _gml("alkis_grossbothen_790_11.gml"),  # Großbothen: the hit
-            _gml("alkis_leer.gml"),  # Grimma
-            _gml("alkis_leer.gml"),  # Höfgen 144245
-            _gml("alkis_leer.gml"),  # Höfgen 146132
-            _gml("alkis_katasterbezirk_grossbothen.gml"),
-        ]
+        side_effect=_cadastre({}, {"KatasterBezirk": "alkis_katasterbezirk_grossbothen.gml",
+                                   "144241": "alkis_grossbothen_790_11.gml"})
     )
 
     events = _stream(
@@ -471,10 +464,8 @@ def test_a_number_that_contradicts_the_stated_area_is_not_confirmed(client: Test
     """
 
     respx.post(ALKIS_URL).mock(
-        side_effect=[
-            _gml("alkis_grossbothen_790_11.gml"),
-            _gml("alkis_katasterbezirk_grossbothen.gml"),
-        ]
+        side_effect=_cadastre({}, {"KatasterBezirk": "alkis_katasterbezirk_grossbothen.gml",
+                                   "flstnrzae": "alkis_grossbothen_790_11.gml"})
     )
 
     events = _stream(
@@ -506,10 +497,8 @@ def test_an_upstream_failure_travels_as_a_line_of_the_stream(client: TestClient)
 @respx.mock
 def test_the_complete_endpoint_answers_the_same_run_in_one_object(client: TestClient):
     respx.post(ALKIS_URL).mock(
-        side_effect=[
-            _gml("alkis_grossbothen_790_11.gml"),
-            _gml("alkis_katasterbezirk_grossbothen.gml"),
-        ]
+        side_effect=_cadastre({}, {"KatasterBezirk": "alkis_katasterbezirk_grossbothen.gml",
+                                   "flstnrzae": "alkis_grossbothen_790_11.gml"})
     )
 
     answer = client.post(
@@ -549,10 +538,8 @@ def test_a_number_without_a_denominator_is_narrowed_by_the_area(client: TestClie
     """
 
     respx.post(ALKIS_URL).mock(
-        side_effect=[
-            _gml("alkis_grossbothen_band.gml"),   # 238/3 at 500 m² and 790/11 at 502
-            _gml("alkis_katasterbezirk_grossbothen.gml"),
-        ]
+        side_effect=_cadastre({}, {"KatasterBezirk": "alkis_katasterbezirk_grossbothen.gml",
+                                   "flstnrzae": "alkis_grossbothen_band.gml"})
     )
 
     events = _stream(
@@ -577,11 +564,8 @@ def test_several_numbers_from_one_source_are_a_plot_and_not_a_dispute(client: Te
     """
 
     respx.post(ALKIS_URL).mock(
-        side_effect=[
-            _gml("alkis_grossbothen_band.gml"),   # both, in one answer
-            _gml("alkis_leer.gml"),
-            _gml("alkis_katasterbezirk_grossbothen.gml"),
-        ]
+        side_effect=_cadastre({}, {"KatasterBezirk": "alkis_katasterbezirk_grossbothen.gml",
+                                   "flstnrzae": "alkis_grossbothen_band.gml"})
     )
 
     events = _stream(
@@ -700,8 +684,8 @@ def test_a_listing_image_is_enlarged_before_it_is_read():
 
 
 @respx.mock
-def test_the_images_are_read_only_when_the_text_names_no_parcel(client: TestClient):
-    """A listing that states its Flurstück is not worth three seconds an image."""
+def test_the_images_are_left_unread_once_the_text_has_settled_it(client: TestClient):
+    """A listing the text already confirmed is not worth three seconds an image."""
 
     respx.post(ALKIS_URL).mock(
         side_effect=_cadastre({}, {"KatasterBezirk": "alkis_katasterbezirk_grossbothen.gml",
@@ -746,6 +730,46 @@ def test_a_cadastral_extract_answers_a_listing_whose_text_does_not(client: TestC
     # be looked at is one nobody can resolve a contradiction with.
     assert "Flurstück 790/11" in read[0]["beleg"]
     assert events[-1]["status"] == "bestaetigt"
+
+
+@respx.mock
+@_needs_tesseract
+def test_the_images_come_after_the_text_and_not_before_it(client: TestClient):
+    """Reading the pictures used to be phase 0.
+
+    So every run began with a Tesseract pass of up to a few seconds an image —
+    in front of the first thing the map could draw, for a channel most listings
+    do not even have. The text and the metadata are what the search runs on.
+    """
+
+    respx.post(ALKIS_URL).mock(
+        side_effect=_cadastre({}, {"KatasterBezirk": "alkis_katasterbezirk_grossbothen.gml",
+                                   "144241": "alkis_grossbothen_790_11.gml"})
+    )
+    respx.get("https://bilder.example.org/1.jpg").mock(
+        return_value=httpx.Response(200, content=fixture_bytes("inserat-katasterauszug.jpg"))
+    )
+
+    events = _stream(
+        client,
+        {"text": "Baugrundstück am Ortsrand von Großbothen. 502 m².",
+         "flaeche_text": "502 m²",
+         "bilder": ["https://bilder.example.org/1.jpg"]},
+    )
+
+    phases = [e.get("phase") for e in events if e["art"] == "phase"]
+    first_image = phases.index("bilder")
+    # Everything the text can do has happened by then: the clues are out and
+    # the cadastre has been asked.
+    assert "ernten" in phases[:first_image]
+    assert any(p in ("raum", "treppe", "kurzschluss") for p in phases[:first_image])
+
+    kinds = [e["art"] for e in events]
+    first_text_indiz = kinds.index("indiz")
+    image_phase_at = next(
+        i for i, e in enumerate(events) if e["art"] == "phase" and e.get("phase") == "bilder"
+    )
+    assert first_text_indiz < image_phase_at
 
 
 @respx.mock
@@ -927,3 +951,29 @@ def test_the_listing_page_yields_its_description_and_not_the_portal_around_it():
     # One URL per picture, not the six sizes each is served at.
     assert 0 < len(seite.bilder) <= 8
     assert len(set(seite.bilder)) == len(seite.bilder)
+
+
+@respx.mock
+def test_the_districts_are_drawn_before_the_clues_are_narrated(client: TestClient):
+    """The map used to sit on the whole state while the list named a village.
+
+    The clues play one at a time so a run can be followed, and the districts
+    were emitted after all of them — so for the first seconds the map showed
+    nothing at all, which reads as a map that is broken rather than one that is
+    waiting. Nothing extra is fetched: it is the same request, one step earlier.
+    """
+
+    respx.post(ALKIS_URL).mock(
+        side_effect=_cadastre({}, {"KatasterBezirk": "alkis_katasterbezirk_grossbothen.gml",
+                                   "flstnrzae": "alkis_grossbothen_790_11.gml"})
+    )
+
+    events = _stream(
+        client,
+        {"gemarkung": "Großbothen", "flurstuecksnummer": "790/11", "flaeche_m2": 502,
+         "flaeche_text": "502 m²"},
+    )
+
+    kinds = [event["art"] for event in events]
+    assert "gebiete" in kinds
+    assert kinds.index("gebiete") < kinds.index("indiz")
