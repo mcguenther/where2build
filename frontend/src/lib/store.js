@@ -1,8 +1,11 @@
 /**
  * Application state and its persistence.
  *
- * Everything lives in this browser: no account, no server round trip for the
- * user's own data. `localStorage` is the store; JSON is the way in and out.
+ * Everything lives in this browser: the user's own data makes no round trip to
+ * a server, whether or not this deployment has accounts. `localStorage` is the
+ * store; JSON is the way in and out. (Server-side storage is Etappe 4 of
+ * `docs/entscheidungen/startseite-und-konten.md`; signing in changes who the
+ * backend thinks you are, not yet where the plots live.)
  * Storage can throw (private windows, quota) — every access is guarded, and a
  * failure degrades to an in-memory session rather than breaking the app.
  */
@@ -13,6 +16,7 @@ import {
   alignmentToEdge, boundingBox
 } from "./geometry.js";
 import { coordinatesOf, zubringerOf } from "./routes.js";
+import { authState } from "./api.js";
 
 /** Centre of a ring in the shape a placement expects. The centroid returns
  *  {x, y}; spreading that into a placement silently yields cx/cy of undefined. */
@@ -36,10 +40,22 @@ export const state = reactive({
    * where it is needed, so anything that has to follow the palette — the map
    * backdrop, above all — can watch it like any other reactive value. */
   systemDark: false,
-  plan: { backdrop: "map", northUp: true, showDimensions: true, showSetbacks: true, measuring: false }
+  plan: { backdrop: "map", northUp: true, showDimensions: true, showSetbacks: true, measuring: false },
+  /* Who is signed in. Not part of the document and never stored: the backend
+   * is the only one who knows, and it says so on every load. `eingerichtet`
+   * false means this deployment has no accounts at all, which is the state the
+   * app shipped in and still works in. */
+  account: { eingerichtet: false, angemeldet: false, name: null, kennung: null }
 });
 
 const DARK_QUERY = "(prefers-color-scheme: dark)";
+
+/** Ask the backend who is signed in. Called once when the app starts; the
+ *  answer is a fact about the server, so nothing caches it in storage. */
+export async function loadAccount() {
+  state.account = await authState();
+  return state.account;
+}
 
 /** Whether the interface is dark right now, choice and system setting folded
  *  into one answer. Reactive: reading it inside a computed tracks both. */

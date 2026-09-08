@@ -99,7 +99,7 @@
       </div>
 
       <div class="hero__inner">
-        <p class="eyebrow hero__eyebrow">{{ hasPlots ? "Willkommen zurück" : "Sachsen · Liegenschaftskataster, Bodenrichtwert, Fahrplan" }}</p>
+        <p class="eyebrow hero__eyebrow">{{ greeting }}</p>
         <h1 v-if="hasPlots">Woran heute weiterarbeiten?</h1>
         <h1 v-else>Aus einer Anzeige wird ein <em>geprüftes Grundstück</em>.</h1>
 
@@ -113,6 +113,11 @@
         </p>
 
         <QueryBox class="hero__query panel" :busy="busy" @resolve="startResolve" @read="startRead" />
+
+        <p v-if="signInFailed" class="notice hero__notice" role="alert">
+          Die Anmeldung kam nicht zustande. Bitte noch einmal versuchen; ohne Konto lässt sich
+          hier ohnehin weiterarbeiten.
+        </p>
 
         <p v-if="!backendUp" class="notice notice--error hero__notice" role="alert">
           Das Backend antwortet nicht. Ohne es lassen sich weder Flurstücke nachschlagen noch
@@ -179,8 +184,8 @@
         </div>
       </div>
       <p class="home__storage">
-        Alles bleibt im Speicher dieses Browsers. Zum Mitnehmen gibt es unter „Daten“
-        den Austausch als JSON.
+        Alles bleibt im Speicher dieses Browsers, auch mit Konto: der Serverspeicher ist
+        noch nicht gebaut. Zum Mitnehmen gibt es unter „Daten“ den Austausch als JSON.
       </p>
     </section>
   </div>
@@ -213,6 +218,16 @@ export default {
   },
   computed: {
     hasPlots() { return state.data.plots.length > 0; },
+    /** Named where the provider gave a name, and never claiming a return for
+     *  someone who has not been here before. */
+    greeting() {
+      if (!this.hasPlots) return "Sachsen · Liegenschaftskataster, Bodenrichtwert, Fahrplan";
+      const name = state.account.angemeldet ? state.account.name : null;
+      return name ? `Willkommen zurück, ${name}` : "Willkommen zurück";
+    },
+    /** The backend sends the browser back with this when a sign-in broke off.
+     *  It carries no detail, and none belongs in a URL. */
+    signInFailed() { return this.$route.query.anmeldung === "fehlgeschlagen"; },
     plotCount() { return state.data.plots.length; },
     allLabel() {
       return this.plotCount === 1 ? "Zum Grundstück →" : `Alle ${this.plotCount} Grundstücke →`;

@@ -47,6 +47,9 @@ async function request(path, options = {}) {
       response.status
     );
   }
+  // An endpoint that answers "done" and nothing else sends 204; asking that
+  // for JSON throws on an empty body.
+  if (response.status === 204) return null;
   return response.json();
 }
 
@@ -57,6 +60,27 @@ export async function backendHealth() {
     return null;
   }
 }
+
+/**
+ * Who is signed in, and whether signing in exists here at all.
+ *
+ * Three states, not two: without a configured provider the backend answers
+ * `eingerichtet: false`, and then the app is what it has always been, a thing
+ * that keeps its work in this browser. An unreachable backend reads the same
+ * way, because that is what it means for the person in front of it.
+ */
+export async function authState() {
+  try {
+    return await request("/auth/me");
+  } catch {
+    return { eingerichtet: false, angemeldet: false, name: null, kennung: null };
+  }
+}
+
+/** Where to send the browser to sign in, coming back to where it started. */
+export const signInUrl = (target = "/") => `${BASE}/auth/login?ziel=${encodeURIComponent(target)}`;
+
+export const signOut = () => request("/auth/logout", { method: "POST" });
 
 export const readListing = url => request("/listings/extract", { method: "POST", body: JSON.stringify({ url }) });
 export const readPage = text => request("/listings/extract", { method: "POST", body: JSON.stringify({ text }) });

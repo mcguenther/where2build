@@ -30,6 +30,9 @@ beforeEach(() => {
   // Module state, and one input at a time: a leftover from an earlier test
   // would be picked up by the next wizard that starts.
   takeHandoff();
+  // Signing in is a fact about the deployment, and most of these tests are
+  // about one that has no accounts at all.
+  state.account = { eingerichtet: false, angemeldet: false, name: null, kennung: null };
 });
 
 afterEach(() => {
@@ -104,6 +107,37 @@ describe("Startseite", () => {
     expect(router.currentRoute.value.fullPath).toBe("/aufnahme/quelle");
     // The page resolves nothing itself; it hands the input over untouched.
     expect(takeHandoff()).toEqual({ resolve: payload });
+    view.unmount();
+  });
+
+  it("grüßt mit dem Namen, sobald jemand angemeldet ist", async () => {
+    state.account = { eingerichtet: true, angemeldet: true, name: "Sam Jordan", kennung: "abc" };
+    const view = await open();
+
+    expect(view.text()).toContain("Willkommen zurück, Sam Jordan");
+    view.unmount();
+  });
+
+  it("grüßt ohne Namen, wenn der Anbieter keinen mitgibt", async () => {
+    state.account = { eingerichtet: true, angemeldet: true, name: null, kennung: "abc" };
+    const view = await open();
+
+    const text = view.text();
+    expect(text).toContain("Willkommen zurück");
+    expect(text).not.toContain("Willkommen zurück,");
+    view.unmount();
+  });
+
+  it("sagt es, wenn die Anmeldung abgebrochen ist, ohne den Weg zu versperren", async () => {
+    // The query has to be on the route before the first render, so the router
+    // is made ready here rather than pushed and hoped for.
+    const router = testRouter("/?anmeldung=fehlgeschlagen");
+    await router.isReady();
+    const view = await open({ router });
+
+    expect(view.text()).toContain("Die Anmeldung kam nicht zustande");
+    // The field is the point of the page and stays usable either way.
+    expect(view.findComponent(QueryBox).exists()).toBe(true);
     view.unmount();
   });
 });

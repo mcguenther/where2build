@@ -26,6 +26,18 @@
                   :aria-pressed="String(state.theme === t.id)"
                   @click="applyTheme(t.id)">{{ t.name }}</button>
         </div>
+
+        <!-- Only where accounts exist at all. A deployment without a provider
+             shows nothing here, because there is nothing to sign in to. -->
+        <template v-if="state.account.eingerichtet">
+          <div v-if="state.account.angemeldet" class="account">
+            <span class="account__initials" :title="state.account.name || 'Angemeldet'"
+                  aria-hidden="true">{{ initials }}</span>
+            <span class="account__name">{{ state.account.name || "Angemeldet" }}</span>
+            <button type="button" class="btn btn--quiet btn--small" @click="leave">Abmelden</button>
+          </div>
+          <a v-else class="btn btn--secondary btn--small" :href="signInHref">Anmelden</a>
+        </template>
       </div>
     </header>
 
@@ -48,7 +60,8 @@
 </template>
 
 <script>
-import { state, applyTheme } from "./lib/store.js";
+import { state, applyTheme, loadAccount } from "./lib/store.js";
+import { signInUrl, signOut } from "./lib/api.js";
 
 export default {
   name: "App",
@@ -62,7 +75,20 @@ export default {
       ]
     };
   },
+  async created() {
+    await loadAccount();
+  },
   computed: {
+    /** Two letters off the display name, for the round mark beside it. */
+    initials() {
+      const name = (state.account.name || "").trim();
+      if (!name) return "?";
+      const parts = name.split(/\s+/).filter(Boolean);
+      const letters = parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : name.slice(0, 2);
+      return letters.toUpperCase();
+    },
+    /** Signing in comes back to the page it started on. */
+    signInHref() { return signInUrl(this.$route.fullPath); },
     sections() {
       return [
         { section: "home", to: { name: "home" }, name: "Start", count: null },
@@ -75,6 +101,13 @@ export default {
   },
   methods: {
     applyTheme,
+    /** Sign out and reload the answer rather than assuming it: the cookie is
+     *  the backend's, and only it can say what is left of the session. */
+    async leave() {
+      await signOut().catch(() => {});
+      await loadAccount();
+    },
+
     /** Detail, wizard and comparison all live under "Grundstücke" in the
      *  navigation, so the current section comes from the route, not from the
      *  link being the exact one that was followed. */
@@ -131,6 +164,15 @@ main{ flex: 1; padding-top: var(--w2b-space-5); }
 .theme-switch button + button{ border-left: 1px solid var(--w2b-line); }
 .theme-switch button[aria-pressed="true"]{ background: var(--w2b-primary); color: var(--w2b-primary-on); }
 
+.account{ display: flex; align-items: center; gap: var(--w2b-space-2); }
+.account__initials{
+  display: grid; place-items: center; width: 28px; height: 28px; border-radius: var(--w2b-radius-full);
+  background: var(--w2b-primary); color: var(--w2b-primary-on);
+  font-family: var(--w2b-font-display); font-weight: 700; font-size: 12px;
+}
+.account__name{ font-family: var(--w2b-font-display); font-weight: 600; font-size: var(--w2b-text-s); color: var(--w2b-graphite); }
+a.btn{ text-decoration: none; display: inline-flex; align-items: center; }
+
 .site-footer{ border-top: 1px solid var(--w2b-line); margin-top: var(--w2b-space-8); }
 .site-footer__inner{
   display: flex; justify-content: space-between; gap: var(--w2b-space-4); flex-wrap: wrap;
@@ -139,6 +181,8 @@ main{ flex: 1; padding-top: var(--w2b-space-5); }
 }
 
 @media (max-width: 560px){
+  /* The name is the first thing to go: the mark beside it says the same. */
+  .account__name{ display: none; }
   .brand__word{ font-size: 18px; }
   .main-nav a{ padding: 6px 10px; font-size: 13.5px; }
 }
