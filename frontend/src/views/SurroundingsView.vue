@@ -14,7 +14,7 @@
         <h1>{{ plot.name }} in seiner Umgebung</h1>
         <p class="page-head__sub">
           Der Baukörper an der Stelle, an der er geplant ist, mit so viel Karte darum herum,
-          dass die Gegend wiederzuerkennen ist — und darin, was in der Nähe liegt.
+          dass die Gegend wiederzuerkennen ist, und darin das, was in der Nähe liegt.
         </p>
       </div>
       <div class="spacer"></div>

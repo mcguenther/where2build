@@ -17,7 +17,7 @@
 
     <p v-if="!backendUp" class="notice notice--error" role="alert">
       Das Backend antwortet nicht. Ohne es lassen sich weder Flurstücke nachschlagen noch
-      Seiten auslesen — gespeicherte Grundstücke bleiben aber sichtbar.
+      Seiten auslesen; gespeicherte Grundstücke bleiben aber sichtbar.
     </p>
 
     <div v-if="comparing && hasPlots" class="selection-bar panel no-print">
@@ -40,7 +40,7 @@
 
       <div class="empty-card">
         <h3>{{ hasPlots ? "Noch ein Kandidat?" : "Noch nichts in der Prüfung" }}</h3>
-        <p>Link einer Anzeige, eingefügte Seite oder Gemarkung mit Flurstücksnummer —
+        <p>Link einer Anzeige, eingefügte Seite oder Gemarkung mit Flurstücksnummer:
           drei Wege hinein. Umriss und Fläche kommen aus dem Liegenschaftskataster.</p>
         <button type="button" class="btn btn--secondary" @click="startWizard">Grundstück hinzufügen</button>
       </div>
@@ -74,8 +74,8 @@ export default {
     hasPlots() { return state.data.plots.length > 0; },
     selectionLabel() {
       const n = this.selected.length;
-      if (n === 0) return "Nichts ausgewählt — mindestens zwei Grundstücke anhaken";
-      if (n === 1) return "1 Grundstück ausgewählt — noch mindestens eines";
+      if (n === 0) return "Nichts ausgewählt: mindestens zwei Grundstücke anhaken";
+      if (n === 1) return "1 Grundstück ausgewählt: noch mindestens eines";
       return `${n} Grundstücke ausgewählt`;
     }
   },

@@ -25,7 +25,7 @@
     </ol>
 
     <p v-if="lost" class="notice notice--error" role="alert">
-      Der begonnene Entwurf ist nicht mehr vorhanden — beim Neuladen der Seite bleibt er
+      Der begonnene Entwurf ist nicht mehr vorhanden; beim Neuladen der Seite bleibt er
       nicht erhalten. Bitte noch einmal mit der Quelle beginnen.
     </p>
     <p v-if="error" class="notice notice--error" role="alert">{{ error }}</p>
@@ -66,7 +66,7 @@
     <section v-else-if="stage === 'suche'" class="stack">
       <p class="subtitle">
         Ein Inserat nennt fast nie sein Flurstück. Gesucht wird deshalb über das, was
-        dasteht — Ortsteil, Fläche, Straße —, und die Karte zeigt dabei durchgehend, was
+        dasteht (Ortsteil, Fläche, Straße), und die Karte zeigt dabei durchgehend, was
         noch möglich ist. Reicht es nicht für ein einzelnes Flurstück, sagt die Antwort,
         worauf sich die Lage eingrenzen lässt.
       </p>
@@ -111,7 +111,7 @@
     <!-- 3 · Grundstück: die Flurstücke und die Angaben dazu -->
     <section v-else-if="stage === 'flurstueck'" class="stack">
       <p class="subtitle">
-        So liegen die Flurstücke im Kataster. Ein Klick wählt ein anderes — zum
+        So liegen die Flurstücke im Kataster. Ein Klick wählt ein anderes; zum
         Zusammensetzen mehrerer umschalten. Den Ausschnitt bewegt die gedrückte
         Maustaste, das Mausrad zoomt, ein Doppelklick setzt ihn zurück.
       </p>
@@ -129,7 +129,7 @@
            the neighbours are on the map and the choice is the user's. -->
       <p v-if="corrected" class="notice" role="status">
         <b>Zur gesuchten Adresse gehört ein anderes Flurstück als das unter der Koordinate.</b>
-        Gewählt ist {{ corrected }} — die Lagebezeichnung im Kataster nennt genau diese
+        Gewählt ist {{ corrected }}: die Lagebezeichnung im Kataster nennt genau diese
         Adresse. Ein Klick auf ein anderes Flurstück ändert das.
       </p>
 
@@ -171,7 +171,7 @@
              role="status">{{ selectionNote }}</p>
           <p class="panel__footnote">
             <template v-if="choices.length > 1">
-              {{ choices.length }} Flurstücke im Umkreis — die Katasterlinien beschriften
+              {{ choices.length }} Flurstücke im Umkreis; die Katasterlinien beschriften
               jedes mit seiner Nummer.
               {{ composing ? "Ein Klick nimmt eines dazu oder heraus." : "Ein Klick wählt ein anderes." }}
             </template>
@@ -211,7 +211,7 @@
           </div>
           <div class="field">
             <label for="q-note">Notiz</label>
-            <input id="q-note" type="text" v-model="draft.note" placeholder="Optional — was auffiel">
+            <input id="q-note" type="text" v-model="draft.note" placeholder="Optional: was auffiel">
           </div>
           <p v-if="!draft.bodenrichtwert" class="notice">
             Für dieses Grundstück ließ sich kein Bodenrichtwert abrufen. Die Preiseinordnung
@@ -608,7 +608,7 @@ export default {
         this.detached = this.detachedParcels(plot, answer.features ?? []);
         this.selectionNote = this.detached.length
           ? "Die rot markierten Flurstücke hängen nicht mit dem übrigen Grundstück "
-            + "zusammen. Gezeichnet ist nur der zusammenhängende Teil — entweder die "
+            + "zusammen. Gezeichnet ist nur der zusammenhängende Teil: entweder die "
             + "markierten wieder abwählen oder das Flurstück dazwischen dazunehmen."
           : null;
         this.corrected = null;

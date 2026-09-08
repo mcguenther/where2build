@@ -177,7 +177,7 @@ describe("classifyQuery", () => {
       expect(queryKindLabel(classifyQuery("51.33652, 12.44176"))).toBe("Koordinate");
       expect(queryKindLabel(classifyQuery("321804 5690356"))).toBe("Koordinate (UTM 33)");
       expect(queryKindLabel(classifyQuery("Mölkau 85/1"))).toBe("Flurstück");
-      expect(queryKindLabel(classifyQuery("85/1"))).toBe("Flurstück — Gemarkung fehlt");
+      expect(queryKindLabel(classifyQuery("85/1"))).toBe("Flurstück, Gemarkung fehlt");
       expect(queryKindLabel(classifyQuery("Lessingweg 44"))).toBe("Adresse oder Flurstück");
       expect(queryKindLabel(classifyQuery("https://www.kleinanzeigen.de/s-anzeige/x/1-2-3")))
         .toBe("Link zur Anzeige");

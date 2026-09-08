@@ -448,7 +448,7 @@ describe("Grundstücksseite", () => {
 
   it("benennt die Grenzen nach der Himmelsrichtung", () => {
     const t = mountWithRouter(PlotView, { props: { id: "plot-concave" } }).text();
-    expect(t).toMatch(/(Nord|Ost|Süd|West|Nordost|Nordwest|Südost|Südwest) — zur Straße/);
+    expect(t).toMatch(/(Nord|Ost|Süd|West|Nordost|Nordwest|Südost|Südwest) · zur Straße/);
     expect(t).not.toMatch(/Grenze \d/);
   });
 

@@ -198,7 +198,7 @@ export function queryKindLabel(result) {
     case "coordinate":
       return result.coordinate?.system === "utm33" ? "Koordinate (UTM 33)" : "Koordinate";
     case "parcel":
-      return result.certain ? "Flurstück" : "Flurstück — Gemarkung fehlt";
+      return result.certain ? "Flurstück" : "Flurstück, Gemarkung fehlt";
     case "address":
       return "Adresse";
     case "ambiguous":

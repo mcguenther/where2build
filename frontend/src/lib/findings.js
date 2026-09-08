@@ -119,7 +119,7 @@ export function noiseInterpretation(daySpan, nightSpan, source = "road") {
   if (nightSpan) {
     const nightLoudest = nightSpan[1] === null ? nightSpan[0] : nightSpan[1];
     notes.push(nightLoudest > limits.night
-      ? `Nachts über der Empfehlung von ${limits.night} dB(A) — bei gekipptem Fenster kann der Verkehr den Schlaf stören.`
+      ? `Nachts über der Empfehlung von ${limits.night} dB(A): bei gekipptem Fenster kann der Verkehr den Schlaf stören.`
       : `Nachts unter der Empfehlung von ${limits.night} dB(A).`);
   }
   return {
@@ -152,7 +152,7 @@ export function noiseFinding(data) {
         status: OPEN,
         value: "nicht kartiert",
         text: "Für diesen Ort liegt keine Umgebungslärmkartierung vor. Die Kartierung "
-          + "erfasst Ballungsräume und Hauptverkehrswege — das Grundstück liegt außerhalb. "
+          + "erfasst Ballungsräume und Hauptverkehrswege; das Grundstück liegt außerhalb. "
           + "Das ist keine Aussage über die Ruhe am Ort."
       };
     }
@@ -171,7 +171,7 @@ export function noiseFinding(data) {
   const sentences = [`${names}, tags ${spanText(daySpan)}.`];
   if (nightSpan) sentences.push(`Nachts ${spanText(nightSpan)}.`);
   if (daySpan[1] !== null && daySpan[1] - daySpan[0] > 5) {
-    sentences.push("Das Grundstück schneidet mehrere Bänder — der Wert gilt über die ganze Fläche, nicht für einen Punkt.");
+    sentences.push("Das Grundstück schneidet mehrere Bänder; der Wert gilt über die ganze Fläche, nicht für einen Punkt.");
   }
   // Named without an article: "Kein Straßenbahn" would be wrong, and the
   // genders differ across the sources.
@@ -315,17 +315,17 @@ export function classifySoil(soilText, airCapacityClass = null) {
 
   const sentences = [];
   sentences.push(kind === "bindig"
-    ? `Bindiger Boden (${grains.join(", ")}) — er hält Wasser und lässt es langsam durch.`
+    ? `Bindiger Boden (${grains.join(", ")}): er hält Wasser und lässt es langsam durch.`
     : kind === "rollig"
-      ? `Rolliger Boden (${grains.join(", ")}) — Wasser läuft rasch ab.`
-      : `Gemischter Boden (${grains.join(", ")}) — bindige und rollige Lagen wechseln sich ab.`);
+      ? `Rolliger Boden (${grains.join(", ")}): Wasser läuft rasch ab.`
+      : `Gemischter Boden (${grains.join(", ")}): bindige und rollige Lagen wechseln sich ab.`);
   if (air) {
     sentences.push(`Luftkapazität ${air.label} (${air.range}).`);
   }
   if (kind === "bindig" && air && air.drains === true) {
     sentences.push("Ob Regenwasser vor Ort versickern kann, ist damit offen und muss geprüft werden.");
   } else if (kind === "bindig") {
-    sentences.push("Regenwasser versickert hier voraussichtlich schlecht — ein Anschluss oder eine Rigole ist einzuplanen.");
+    sentences.push("Regenwasser versickert hier voraussichtlich schlecht; ein Anschluss oder eine Rigole ist einzuplanen.");
   }
   return { kind, grains, air, text: sentences.join(" ") };
 }

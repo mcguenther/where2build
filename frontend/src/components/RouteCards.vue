@@ -78,18 +78,18 @@
         <!-- Which way to the first stop was taken, and on what numbers. A mode
              substituted in silence is a figure nobody can check. -->
         <p v-if="feeder(destination)" class="route-card__choice">
-          <b>Anschluss:</b> {{ feeder(destination).name }} — {{ feeder(destination).reason }}
+          <b>Anschluss:</b> {{ feeder(destination).name }}. {{ feeder(destination).reason }}
         </p>
         <p v-if="detour(destination)" class="route-card__choice route-card__choice--detour">
           {{ detour(destination) }}
         </p>
 
         <p v-if="!destination.lat" class="route-card__empty">
-          Adresse noch nicht verortet — unter „Ziele“ nachschlagen lassen.
+          Adresse noch nicht verortet: unter „Ziele“ nachschlagen lassen.
         </p>
         <p v-else-if="!plot.routes[destination.id]" class="route-card__empty">Noch nicht berechnet.</p>
         <p v-else-if="!modes(destination).some(m => m.erreichbar)" class="route-card__empty">
-          Keine Verbindung gefunden — mit keinem Verkehrsmittel.
+          Keine Verbindung gefunden, mit keinem Verkehrsmittel.
         </p>
         <!-- A drawn route is a claim until someone can open it elsewhere. -->
         <p v-if="canLinkOut(destination)" class="route-card__links nicht-drucken no-print">
@@ -98,7 +98,7 @@
           ·
           <a :href="googleLink(destination)" target="_blank" rel="noopener noreferrer">Google Maps</a>
           <span v-if="fastestMode(plot.routes[destination.id]) === 'transit'" class="route-card__links-note">
-            — OpenStreetMap kennt keinen ÖPNV, dort als Autoroute.
+            OpenStreetMap kennt keinen ÖPNV, dort als Autoroute.
           </span>
         </p>
 
@@ -287,7 +287,7 @@ export default {
       if (!beaten.length) return null;
       const best = beaten.reduce((a, b) => (b.duration_s < a.duration_s ? b : a));
       const name = MODES.find(m => m.mode === best.mode).name;
-      return `Durchgehend mit dem ${name === "Rad" ? "Rad" : "Auto"} sind es ${duration(best.duration_s)} — schneller als diese Kombination.`;
+      return `Durchgehend mit dem ${name === "Rad" ? "Rad" : "Auto"} sind es ${duration(best.duration_s)}, schneller als diese Kombination.`;
     },
 
     /**

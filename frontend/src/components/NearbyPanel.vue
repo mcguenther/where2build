@@ -14,7 +14,7 @@
     </p>
     <p v-else-if="error" class="notice notice--error">{{ error }}</p>
     <p v-else-if="!result" class="nearby__empty">
-      Schule, Kita, Park, Spielplatz, Supermarkt, Arzt und die nächsten Haltestellen —
+      Schule, Kita, Park, Spielplatz, Supermarkt, Arzt und die nächsten Haltestellen,
       gerechnet als Fußweg, nicht als Luftlinie.
     </p>
 

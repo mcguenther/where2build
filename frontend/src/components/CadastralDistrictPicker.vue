@@ -49,7 +49,7 @@
         Kein Eintrag im Verzeichnis trägt diesen Namen oder Schlüssel. Nachschlagen lässt sich das trotzdem.
       </p>
       <p v-if="open && omitted" class="gemarkung__hinweis">
-        {{ omitted }} weitere Treffer sind nicht aufgeführt — weiter tippen grenzt ein.
+        {{ omitted }} weitere Treffer sind nicht aufgeführt; weiter tippen grenzt ein.
       </p>
     </template>
   </div>

@@ -35,13 +35,13 @@ was darunter steht, hängt daran, ob jemand angemeldet ist.
 
 - **Abgemeldet gibt es keine Bereichsnavigation**, weil es nichts zu
   navigieren gibt: statt der Kopfzeile der App trägt der Empfang die Marke
-  selbst, und die Seite oberhalb der Falz ist eine Begrüßung — ein Satz, das
+  selbst, und die Seite oberhalb der Falz ist eine Begrüßung: ein Satz, das
   Feld, und daneben ein Lageplan, der zeigt, was am Ende herauskommt. Darunter
   der Erklärblock, den heute die `.empty-card` trägt, plus ein Satz dazu, was
-  ein Konto bringt. Kein Zwang — ohne Anmeldung funktioniert alles weiter wie
+  ein Konto bringt. Kein Zwang: ohne Anmeldung funktioniert alles weiter wie
   heute, lokal.
 - **Alles steht in der Mitte**, und abgemeldet trägt der Empfang die Marke in
-  ihrer Größe — nicht klein in einer Ecke, in der sonst eine Navigation wäre.
+  ihrer Größe, nicht klein in einer Ecke, in der sonst eine Navigation wäre.
 - **Das Grundstück ist Grund, nicht Gegenstand.** Ein Katastergefüge ohne eine
   einzige Beschriftung liegt hinter dem Empfang und blendet zur Mitte hin aus,
   wo das Feld steht; ein einzelnes Flurstück darin trägt Abstandsfläche und
@@ -51,12 +51,12 @@ was darunter steht, hängt daran, ob jemand angemeldet ist.
   sagen, wie gelesen wurde; erklärt wird nur, was fehlt (eine Gemarkung) oder
   offen ist (zwei gleich plausible Lesarten).
 - **Unter den drei Schritten steht kein Knopf.** „Ohne Konto weiter“ hatte
-  kein Ziel — ohne Konto ist man schon da und kann suchen —, und „Anmelden“
+  kein Ziel (ohne Konto ist man schon da und kann suchen), und „Anmelden“
   steht oben rechts. Was bleibt, ist ein Satz darüber, wo die Sachen liegen
   und dass beim späteren Anmelden gefragt wird, ob der lokale Stand ins Konto
   soll.
 - **Keine echten Beispiele im Mockup.** Keine Adresse, keine
-  Flurstücksnummer, keine Anzeige, an der wirklich gearbeitet wurde — ein
+  Flurstücksnummer, keine Anzeige, an der wirklich gearbeitet wurde. Ein
   Mockup darf nach nichts aussehen, was jemand nachschlagen könnte.
 - **Eine angefangene Suche wird nicht angeboten.** Dafür gäbe es keinen
   gespeicherten Zustand, und ihn zu erfinden hieße, einen zu bauen.
@@ -68,7 +68,7 @@ was darunter steht, hängt daran, ob jemand angemeldet ist.
   hervorhebt). `/` wird die neue Route `home`. Der Vergleichsmodus, die
   Auswahlleiste und `PlotCard` bleiben, wo sie sind.
 - **Die Auswahl ist kein Signal.** „Weitermachen“ sortiert nach
-  `updated_at`, nie nach `state.data.selection` — `addPlot` legt jedes neue
+  `updated_at`, nie nach `state.data.selection`: `addPlot` legt jedes neue
   Grundstück dort ab, das sagt über Absicht nichts aus.
 
 ## 2 · Das eine Feld mit Chips
@@ -78,7 +78,7 @@ was darunter steht, hängt daran, ob jemand angemeldet ist.
 als Vorab-Entscheidung.
 
 `lib/queryInput.js` liest heute schon Adresse, Koordinate, Flurstücksnummer und
-AdV-Schlüssel — ohne eine einzige Abfrage, und das bleibt die Regel: erst
+AdV-Schlüssel, ohne eine einzige Abfrage, und das bleibt die Regel: erst
 lesen, dann nachschlagen. Dazu kommen drei Lesarten, alle ebenso billig:
 
 | Lesart | Erkannt an | Chip |
@@ -91,16 +91,16 @@ lesen, dann nachschlagen. Dazu kommen drei Lesarten, alle ebenso billig:
 Zwei Dinge stehen nicht im Feld und bleiben deshalb Chips, die etwas
 aufklappen:
 
-- **Gemarkung + Flurstücksnummer** — zwei Felder, `CadastralDistrictPicker`
+- **Gemarkung + Flurstücksnummer**: zwei Felder, `CadastralDistrictPicker`
   unverändert. Wer „204“ tippt, bekommt den Chip ohnehin vorgeschlagen: eine
   nackte Nummer ist heute schon `kind: "parcel"` ohne Gemarkung, und der Satz
   darunter sagt bereits, welche Hälfte fehlt.
-- **Beschreibungstext vs. eingefügte Anzeige** — unterscheidbar allein daran,
+- **Beschreibungstext vs. eingefügte Anzeige**: unterscheidbar allein daran,
   ob die Zwischenablage HTML mitführte. Wer den Text aus einem PDF kopiert,
   landet bei `prose` und kann auf `page` nicht umstellen, weil es kein HTML
   gibt; umgekehrt schon.
 
-Ein angeklickter Chip **setzt** die Lesart fest, bis das Feld geleert wird —
+Ein angeklickter Chip **setzt** die Lesart fest, bis das Feld geleert wird,
 sichtbar am `×` im Chip. Das ist der Unterschied zur reinen Erkennung: „als
 Beschreibungstext lesen“ muss möglich sein, ohne dass die nächste Eingabe die
 Entscheidung erbt.
@@ -108,7 +108,7 @@ Entscheidung erbt.
 Technisch: eine neue Komponente `QueryBox.vue`, die Startseite und
 Wizard-Schritt 1 gemeinsam nutzen. Sie gibt ein Ereignis mit
 `{ kind, text, html, gemarkung, parcelNumber }` heraus; die Startseite legt das
-in den Store und schickt in den Wizard, **nicht** in die URL — eine eingefügte
+in den Store und schickt in den Wizard, **nicht** in die URL: eine eingefügte
 Seite sind bis zu 400 000 Zeichen. `PlotSearch.vue` bleibt darin als das
 Vorschlagsfeld für Adressen erhalten; die Chips liegen darum herum.
 
@@ -122,8 +122,8 @@ Startseite kommt, sieht sie schon ausgefüllt und läuft direkt in die Suche.
 
 - **Das Backend spricht OIDC, der Provider ist Konfiguration.**
   `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`. Damit ist es egal, ob
-  dahinter ein selbst gehostetes Authentik steht, Keycloak, oder Google —
-  entschieden wird beim Betreiben, nicht im Code. Für `docker compose` kommt
+  dahinter ein selbst gehostetes Authentik steht, Keycloak, oder Google.
+  Entschieden wird beim Betreiben, nicht im Code. Für `docker compose` kommt
   Authentik als eigenes Profil dazu (wie `scheduled-jobs` heute), damit
   `docker compose up` weiterhin zwei Dienste bleibt.
 - **Authorization Code mit PKCE, aber im Backend** (BFF-Muster). Der Browser
@@ -137,11 +137,11 @@ Startseite kommt, sieht sie schon ausgefüllt und läuft direkt in die Suche.
   `GET /api/auth/callback`, `POST /api/auth/logout`, `GET /api/auth/me`.
 - **Ohne konfigurierten Provider läuft alles weiter.** `/api/auth/me` antwortet
   dann „keine Anmeldung eingerichtet“, die Oberfläche bleibt im lokalen Modus,
-  und `/api/health` sagt es — genau wie bei Tesseract heute. Sonst wäre jede
+  und `/api/health` sagt es, genau wie bei Tesseract heute. Sonst wäre jede
   Entwicklungsumgebung erst nach einem Identity-Provider benutzbar.
 - **Gespeichert wird das Minimum:** `issuer`, `subject`, ein Anzeigename.
   Keine Adresse, keine Telefonnummer. Die E-Mail nur, wenn sie für etwas
-  gebraucht wird — heute wird sie für nichts gebraucht.
+  gebraucht wird; heute wird sie für nichts gebraucht.
 
 ## 4 · Server und lokal parallel
 
@@ -151,20 +151,20 @@ Startseite kommt, sieht sie schon ausgefüllt und läuft direkt in die Suche.
   nicht ein Dokument pro Nutzer: „zuletzt geändert“ braucht ein
   `ORDER BY updated_at`, und ein Konflikt soll ein Grundstück betreffen, nicht
   den ganzen Stand. Der Inhalt bleibt das heutige Schema als `jsonb`, mit
-  `schema_version` daneben — dann gilt die vorhandene Validierung und Migration
+  `schema_version` daneben; dann gilt die vorhandene Validierung und Migration
   unverändert für beide Wege.
   Tabellen: `users`, `plots`, `house_types`, `destinations`, `sessions`.
 - **`lib/store.js` bekommt zwei austauschbare Rücken:** `localStore` (wie
   heute) und `serverStore`. Alles außerhalb liest weiter `state.data` und ruft
   weiter `save()`. Der eigentliche Eingriff ist, dass `save()` asynchron wird
-  und fehlschlagen kann — dafür braucht es einen sichtbaren Zustand
+  und fehlschlagen kann; dafür braucht es einen sichtbaren Zustand
   („gespeichert“ / „nicht gespeichert, erneut versuchen“), keine stille
   Verwerfung.
 - **Konflikte:** `updated_at` pro Grundstück wird mitgeschickt. Bei Abweichung
   keine automatische Zusammenführung, sondern die deutsche Meldung, dass dieses
   Grundstück anderswo geändert wurde, mit der Wahl. Kein CRDT.
 - **Übernahme:** liegt beim ersten Login etwas im Browser, fragt ein Banner
-  einmal — „In diesem Browser liegen 3 Grundstücke. Ins Konto übernehmen?“ —,
+  einmal („In diesem Browser liegen 3 Grundstücke. Ins Konto übernehmen?“),
   kopiert bei Ja und löscht lokal nichts. Die Antwort wird gemerkt, damit die
   Frage nicht bei jedem Login wiederkommt.
 - **Der Austausch als JSON unter „Daten“ bleibt**, und wird die Brücke: er
@@ -178,16 +178,16 @@ Kein Teil der Startseite, aber Teil der Entscheidung:
 - **Das Backend ist ein Proxy vor fremden Diensten.** Solange es ein
   Einzelplatz-Prototyp war, war das unstrittig. Ein Deployment mit Konten ist
   genau das, was die Overpass-Policy meint („relying on the public instances as
-  backend“) — und dasselbe gilt für Transitous. Mit Konten wird der eigene
+  backend“), und dasselbe gilt für Transitous. Mit Konten wird der eigene
   MOTIS (`docker-compose.local-routing.yml`) und der eigene POI-Index von einer
   Option zur Voraussetzung, und pro Konto braucht es eine Obergrenze für
   Abrufe. Das gehört in denselben Schritt wie die Anmeldung, nicht danach.
-- **Der Plattencache ist gemeinsam und muss es bleiben** — er hält Antworten
+- **Der Plattencache ist gemeinsam und muss es bleiben**: er hält Antworten
   von Behörden, nicht Nutzerdaten. Nichts Nutzerbezogenes darf hinein.
 
 ## 6 · Reihenfolge
 
-1. **Mockup** der neuen Startseite als HTML — steht als
+1. **Mockup** der neuen Startseite als HTML. Steht als
    `mockup/startseite.html`, heller Zustand, drei Fälle über die Leiste oben
    umschaltbar (angemeldet · angemeldet und leer · nicht angemeldet),
    auf 390 px ohne Überlauf geprüft.
@@ -206,5 +206,5 @@ Kein Teil der Startseite, aber Teil der Entscheidung:
   Datenmodell, deshalb besser vor Schritt 4 entschieden.
 - Läuft das Ganze **öffentlich erreichbar** oder in einem geschlossenen Kreis?
   Davon hängt ab, wie streng die Grenzen aus § 5 sein müssen.
-- Braucht die Startseite eine **Druckansicht**? Vermutlich nein — sie ist der
+- Braucht die Startseite eine **Druckansicht**? Vermutlich nein: sie ist der
   Einstieg, nicht das Ergebnis.

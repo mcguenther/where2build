@@ -123,7 +123,7 @@ export default {
           ? {
               key: "coord-utm", kind: "Koordinate",
               name: `${num(c.easting, 0)} · ${num(c.northing, 0)}`,
-              note: "ETRS89 / UTM 33N — wie im Geoportal",
+              note: "ETRS89 / UTM 33N, wie im Geoportal",
               query: { easting: c.easting, northing: c.northing }
             }
           : {
@@ -166,7 +166,7 @@ export default {
         key: `district-${entry.schluessel}`,
         kind: "Gemarkung",
         name: entry.name,
-        note: `${entry.schluessel} · ${entry.gemeinde} — Flurstücksnummer ergänzen`,
+        note: `${entry.schluessel} · ${entry.gemeinde}. Flurstücksnummer ergänzen`,
         district: entry
       }));
 
@@ -176,7 +176,7 @@ export default {
     /** What the field is still waiting for, when the reading knows. */
     missing() {
       if (this.reading.missing === "district") {
-        return "Zu einer Flurstücksnummer gehört die Gemarkung — dieselbe Nummer gibt es "
+        return "Zu einer Flurstücksnummer gehört die Gemarkung. Dieselbe Nummer gibt es "
           + "in jeder. Etwa „Mölkau 204“.";
       }
       if (this.reading.missing === "parcelNumber") {
@@ -195,7 +195,7 @@ export default {
       // saying so there explains a choice nobody was given.
       const kinds = new Set(this.hits.map(hit => hit.kind));
       if (kinds.has("Flurstück") && (kinds.has("Adresse") || kinds.has("Ort"))) {
-        return "„Lessingweg 44“ und „Mölkau 204“ haben dieselbe Form — deshalb stehen hier "
+        return "„Lessingweg 44“ und „Mölkau 204“ haben dieselbe Form; deshalb stehen hier "
           + "beide Lesarten, statt dass eine geraten wird.";
       }
       return this.hits.length ? "" : "Nichts gefunden. Postleitzahl oder Ort ergänzen hilft oft.";

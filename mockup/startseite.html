@@ -427,15 +427,15 @@ main{ padding-top:var(--w2b-space-6); padding-bottom:var(--w2b-space-8); }
     <h1 data-when="empty">Das erste Grundstück.</h1>
 
     <p class="hero__sub" data-when="out">
-      Link einfügen — gesucht wird das Flurstück im Liegenschaftskataster, gemessen wird
+      Link einfügen: gesucht wird das Flurstück im Liegenschaftskataster, gemessen wird
       amtlich, der Preis geht gegen den Bodenrichtwert, und das Haus stellt sich in die
       Abstandsflächen.
     </p>
     <p class="hero__sub" data-when="in">
-      Ein neuer Fall beginnt hier — unten steht, woran zuletzt gearbeitet wurde.
+      Ein neuer Fall beginnt hier. Unten steht, woran zuletzt gearbeitet wurde.
     </p>
     <p class="hero__sub" data-when="empty">
-      Noch ist nichts gespeichert. Was hier gesucht wird, liegt danach im Konto —
+      Noch ist nichts gespeichert. Was hier gesucht wird, liegt danach im Konto:
       auf diesem Rechner und auf dem nächsten.
     </p>
 
@@ -519,17 +519,17 @@ main{ padding-top:var(--w2b-space-6); padding-bottom:var(--w2b-space-8); }
           <span class="eyebrow">Zweitens</span>
           <h4>Prüfen, was darauf passt</h4>
           <p>Amtliche Fläche gegen Bodenrichtwert, Abstandsflächen nach § 6 SächsBO,
-            Lärm, Hochwasser, Radon — und ein Haustyp im Baufenster.</p>
+            Lärm, Hochwasser, Radon. Dazu ein Haustyp im Baufenster.</p>
         </div>
         <div class="steps__item">
           <span class="eyebrow">Drittens</span>
           <h4>Wege messen</h4>
-          <p>Zu Arbeit, Schule, Bahnhof — mit dem Fahrplan gerechnet, und die Karte
+          <p>Zu Arbeit, Schule, Bahnhof, mit dem Fahrplan gerechnet. Die Karte
             druckt sich mit aus.</p>
         </div>
       </div>
       <p class="signin" data-when="out">
-        Ohne Konto bleibt alles im Speicher dieses Browsers — zum Mitnehmen gibt es den
+        Ohne Konto bleibt alles im Speicher dieses Browsers; zum Mitnehmen gibt es den
         Austausch als JSON. Wer sich später anmeldet, wird gefragt, ob dieser Stand ins
         Konto soll.
       </p>
@@ -571,8 +571,8 @@ const KIND_GROUPS = [
  * Lesarten sind gleich plausibel. Was die Chips schon sagen, wird nicht
  * daruntergeschrieben. */
 const HINTS = {
-  parcel: "<b>Ohne Gemarkung ist die Nummer nicht eindeutig</b> — dieselbe gibt es in Sachsen vielfach.",
-  ambiguous: "<b>Zwei Lesarten sind gleich plausibel.</b> Beide Verzeichnisse werden gefragt, statt eines zu raten — oder hier festlegen."
+  parcel: "<b>Ohne Gemarkung ist die Nummer nicht eindeutig.</b> Dieselbe gibt es in Sachsen vielfach.",
+  ambiguous: "<b>Zwei Lesarten sind gleich plausibel.</b> Beide Verzeichnisse werden gefragt, statt eines zu raten. Oder hier festlegen."
 };
 
 /** Was steht im Feld? Grobe Nachbildung von `classifyQuery`. */
@@ -618,7 +618,7 @@ function render() {
   const pill = k => {
     const s = state(k.id);
     const off = s === "set" ? '<span class="kind__off" aria-hidden="true">✕</span>' : "";
-    const title = s === "set" ? `${k.name} — festgelegt, klicken zum Aufheben` : `Als ${k.name} lesen`;
+    const title = s === "set" ? `${k.name}: festgelegt, klicken zum Aufheben` : `Als ${k.name} lesen`;
     return `<button type="button" class="kind" data-kind="${k.id}" data-state="${s}" aria-label="${title}">${k.name}${off}</button>`;
   };
   kindsBox.innerHTML = `<span class="kinds__label">${label}</span>`

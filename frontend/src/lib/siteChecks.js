@@ -49,7 +49,7 @@ const WITHOUT_SOURCE = [
     value: "—",
     text: "KOSTRA-DWD-2020 liegt beim Deutschen Wetterdienst als Raster zum Herunterladen "
       + "vor, nicht als Abfragedienst. Ohne diesen Import gibt es hier keine Aussage.",
-    quelle: "DWD KOSTRA-2020 — noch nicht eingebunden"
+    quelle: "DWD KOSTRA-2020, noch nicht eingebunden"
   },
   {
     id: "altlasten",
@@ -65,7 +65,7 @@ const WITHOUT_SOURCE = [
     value: "ungeprüft",
     text: "Das Gigabit-Grundbuch und der Breitband-Monitor sind Portalanwendungen ohne "
       + "offene Schnittstelle. Was dort steht, lässt sich nur von Hand nachsehen.",
-    quelle: "gigabitgrundbuch.bund.de — kein Abfragedienst"
+    quelle: "gigabitgrundbuch.bund.de, kein Abfragedienst"
   }
 ];
 
@@ -155,7 +155,7 @@ export function siteFindings(answer) {
       id: "hochwasser", name: "Hochwasser", quelle: source(answer.hochwasser),
       finding: designation(answer.hochwasser, {
         subject: "Überschwemmungsgebiet",
-        absent: "Kein Überschwemmungsgebiet am Grundstück — geprüft von HQ20 bis "
+        absent: "Kein Überschwemmungsgebiet am Grundstück, geprüft von HQ20 bis "
           + "zum Extremhochwasser."
       })
     },
@@ -185,7 +185,7 @@ export function siteFindings(answer) {
         subject: "Hangneigungsgebiet",
         absentValue: "unter 20 %",
         absent: "Das Grundstück liegt nicht in der Kulisse der Flächen über 20 % Neigung. "
-          + "Ein genauer Neigungswert bräuchte das Landeshöhenmodell — diese Kulisse "
+          + "Ein genauer Neigungswert bräuchte das Landeshöhenmodell; diese Kulisse "
           + "stammt aus dem Düngerecht und kennt nur ja und nein."
       })
     },
