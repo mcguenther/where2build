@@ -351,12 +351,17 @@
            themselves as placeholders while they wait. -->
       <RouteCards :plot="plot" :busy="routesBusy && !hasRoutes" />
 
-      <NearbyPanel :plot="plot" auto />
+      <!-- The map and the list of what is nearby answer the same question and
+           belong side by side: the map says where, the table says how far. -->
+      <div class="plot-page__surroundings">
+        <section v-if="hasAnchor" class="panel plot-page__map">
+          <SurroundingsMap :plot="plot" :building="building" :hits="nearbyHits"
+                           :destinations="mapDestinations" :height="560" />
+        </section>
+        <NearbyPanel :plot="plot" auto @loaded="r => (nearbyResult = r)" />
+      </div>
 
       <p v-if="hasAnchor" class="row no-print">
-        <RouterLink class="btn btn--quiet" :to="{ name: 'surroundings', params: { id: plot.id } }">
-          Auf der Umgebungskarte ansehen
-        </RouterLink>
         <RouterLink class="btn btn--quiet" :to="{ name: 'location', params: { id: plot.id } }">
           Lärm, Hochwasser, Baugrund und Luft prüfen
         </RouterLink>
@@ -390,19 +395,20 @@
 import SitePlan from "../components/SitePlan.vue";
 import RouteCards from "../components/RouteCards.vue";
 import NearbyPanel from "../components/NearbyPanel.vue";
+import SurroundingsMap from "../components/SurroundingsMap.vue";
 import {
   state, plotById, placement, houseTypeById, houseFootprint, save, addHouseType,
   newId, setRoutes, CUSTOM_SIZE, DEFAULT_FOOTPRINT
 } from "../lib/store.js";
 import { reachability, neighbourBuildings as fetchNeighbourBuildings } from "../lib/api.js";
-import { zubringerOf } from "../lib/routes.js";
+import { zubringerOf, fastestMode, coordinatesOf, MODES } from "../lib/routes.js";
 import { toLocal } from "../lib/projection.js";
 import { plotMetrics } from "../lib/metrics.js";
 import {
   polygonEdges, edgeCompass, buildableArea, cornersOutside, smallestSetback,
   alignToEdge, alignmentToEdge, findPlacement, neighbourSetbackDepths, hasNeighbourHint
 } from "../lib/geometry.js";
-import { area, euro, euroPerSqm, metres, num, percent, degrees, date } from "../lib/format.js";
+import { area, euro, euroPerSqm, metres, num, percent, degrees, date, duration } from "../lib/format.js";
 
 /** Edge lengths a house can plausibly have, in metres. Anything outside is a typo. */
 const MIN_EDGE = 4;
@@ -410,7 +416,7 @@ const MAX_EDGE = 30;
 
 export default {
   name: "PlotView",
-  components: { SitePlan, RouteCards, NearbyPanel },
+  components: { SitePlan, RouteCards, NearbyPanel, SurroundingsMap },
   props: {
     /** The plot's id, straight out of the URL. */
     id: { type: String, required: true }
@@ -435,6 +441,9 @@ export default {
       neighboursError: null,
       routesBusy: false,
       routesError: null,
+      /** The last /api/nearby answer, as the panel reports it — the map draws
+       *  what the table lists, so both come from the one request. */
+      nearbyResult: null,
       /** Which plot this browser session has already routed. Asking again on
        *  every visit would put the routing service through the whole set for a
        *  page the user only opened to read the area. */
@@ -448,6 +457,27 @@ export default {
     };
   },
   computed: {
+    /** What the panel found, for the map to draw. */
+    nearbyHits() { return this.nearbyResult?.treffer ?? []; },
+    /** Every located destination with the fastest route that was actually
+     *  computed for this plot — the line to draw and the time to name. */
+    mapDestinations() {
+      return this.locatedDestinations.map(destination => {
+        const route = this.plot?.routes?.[destination.id];
+        const mode = fastestMode(route);
+        const leg = mode ? route.modes[mode] : null;
+        return {
+          id: destination.id,
+          name: destination.name,
+          lat: destination.lat,
+          lon: destination.lon,
+          line: leg ? coordinatesOf(leg.geometry) : null,
+          note: leg
+            ? `${MODES.find(m => m.mode === mode)?.name ?? mode} · ${duration(leg.duration_s)}`
+            : ""
+        };
+      });
+    },
     /** Only destinations that carry a coordinate can be routed to. */
     locatedDestinations() {
       return state.data.destinations.filter(d => Number.isFinite(d.lat) && Number.isFinite(d.lon));
@@ -791,6 +821,17 @@ export default {
 .price-band__axis-labels{ display: flex; justify-content: space-between; font-family: var(--w2b-font-mono); font-size: 10.5px; color: var(--w2b-muted); }
 .price-band__statement{ margin-top: var(--w2b-space-3); font-size: var(--w2b-text-s); color: var(--w2b-graphite); }
 .price-band__statement b{ color: var(--w2b-ink); }
+
+/* Map and the list of what is nearby answer the same question from two sides,
+   so on a wide screen they stand next to each other: where on the left, how far
+   on the right. The map holds still while the table scrolls past it. */
+.plot-page__surroundings{
+  display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: var(--w2b-space-4); align-items: start;
+}
+@media (max-width: 1140px){ .plot-page__surroundings{ grid-template-columns: 1fr; } }
+.plot-page__map{ padding: var(--w2b-space-4); position: sticky; top: var(--w2b-space-3); }
+@media (max-width: 1140px){ .plot-page__map{ position: static; } }
 
 .tools{ display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--w2b-space-4); align-items: start; }
 .depth{ width: 72px; padding: 4px 7px; text-align: right; }

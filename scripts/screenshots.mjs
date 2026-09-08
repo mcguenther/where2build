@@ -380,21 +380,18 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
     await page
       .waitForFunction(() => !document.querySelector(".skeleton-cell"), null, { timeout: 60000 })
       .catch(() => {});
-    await shot(page, "grundstueck-umgebung", mode);
-
-    // The map of the same thing: house, ground around it, and every place that
-    // was found. The wait is on a marker, not on the canvas -- an empty map
-    // would otherwise pass as a picture.
-    await page.getByRole("link", { name: "Auf der Umgebungskarte ansehen" }).click();
+    // The map stands beside that list on the same page: house, ground around
+    // it, and every place that was found. The wait is on a marker, not on the
+    // canvas -- an empty map would otherwise pass as a picture.
     await page.waitForSelector(".surroundings__poi", { timeout: 60000 });
     // Not a timeout: the map says when every tile for this view has arrived.
     // Waiting on a clock photographed a quarter-drawn basemap.
     await mapSettled(page, `${mode}/${width} Umgebungskarte`);
-    await shot(page, "umgebungskarte", mode);
+    await shot(page, "grundstueck-umgebung", mode);
     if (!narrow && mode === "hell") {
       await page.getByRole("button", { name: "Mit Zielen" }).click();
       await mapSettled(page, `${mode}/${width} Umgebungskarte mit Zielen`);
-      await shot(page, "umgebungskarte-ziele", mode);
+      await shot(page, "grundstueck-umgebung-ziele", mode);
     }
     await page.click(".breadcrumb a");
 

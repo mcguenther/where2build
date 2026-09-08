@@ -115,9 +115,14 @@ export function testRouter(path = "/") {
 /** Mount one view with a live router. `props` are what the route would pass.
  *  `attach` puts the component in the document, which jsdom needs before
  *  `document.activeElement` can say anything about focus. */
-export const mountWithRouter = (component, { path = "/", props, router = testRouter(path), attach = false } = {}) =>
+export const mountWithRouter = (
+  component,
+  { path = "/", props, router = testRouter(path), attach = false, stubs = {} } = {}
+) =>
   mount(component, {
     props,
-    global: { plugins: [router] },
+    // The surroundings map is a MapLibre instance and jsdom has neither WebGL
+    // nor a route out; the tests that are about that map mount it themselves.
+    global: { plugins: [router], stubs: { SurroundingsMap: true, ...stubs } },
     ...(attach ? { attachTo: document.body } : {})
   });
