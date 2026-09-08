@@ -50,6 +50,11 @@ was darunter steht, hängt daran, ob jemand angemeldet ist.
 - **In der Suchbox steht kein Satz, der nicht zu etwas führt.** Die Chips
   sagen, wie gelesen wurde; erklärt wird nur, was fehlt (eine Gemarkung) oder
   offen ist (zwei gleich plausible Lesarten).
+- **Unter den drei Schritten steht kein Knopf.** „Ohne Konto weiter“ hatte
+  kein Ziel — ohne Konto ist man schon da und kann suchen —, und „Anmelden“
+  steht oben rechts. Was bleibt, ist ein Satz darüber, wo die Sachen liegen
+  und dass beim späteren Anmelden gefragt wird, ob der lokale Stand ins Konto
+  soll.
 - **Keine echten Beispiele im Mockup.** Keine Adresse, keine
   Flurstücksnummer, keine Anzeige, an der wirklich gearbeitet wurde — ein
   Mockup darf nach nichts aussehen, was jemand nachschlagen könnte.

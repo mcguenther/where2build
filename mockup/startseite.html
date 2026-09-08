@@ -276,9 +276,8 @@ main{ padding-top:var(--w2b-space-6); padding-bottom:var(--w2b-space-8); }
 .steps__item h4{ margin-bottom:var(--w2b-space-1); }
 .steps__item p{ font-size:var(--w2b-text-s); color:var(--w2b-graphite); }
 .steps__item .eyebrow{ display:block; margin-bottom:var(--w2b-space-2); }
-.signin{ display:flex; align-items:center; gap:var(--w2b-space-4); flex-wrap:wrap; padding:var(--w2b-space-4);
-  background:var(--w2b-surface-sunken); border-top:1px solid var(--w2b-line); }
-.signin p{ font-size:var(--w2b-text-s); color:var(--w2b-graphite); max-width:62ch; }
+.signin{ padding:var(--w2b-space-3) var(--w2b-space-5); border-top:1px solid var(--w2b-line-faint);
+  font-size:var(--w2b-text-s); color:var(--w2b-muted); }
 
 .site-footer{ border-top:1px solid var(--w2b-line); }
 .site-footer__inner{ display:flex; justify-content:space-between; gap:var(--w2b-space-4); flex-wrap:wrap;
@@ -529,16 +528,11 @@ main{ padding-top:var(--w2b-space-6); padding-bottom:var(--w2b-space-8); }
             druckt sich mit aus.</p>
         </div>
       </div>
-      <div class="signin" data-when="out">
-        <p>
-          <b>Anmelden ist nicht nötig.</b> Ohne Konto bleibt alles im Speicher dieses Browsers —
-          zum Mitnehmen gibt es den Austausch als JSON. Mit Konto liegt derselbe Stand auf jedem
-          Rechner, und der angefangene Fall ist morgen noch da.
-        </p>
-        <div class="spacer"></div>
-        <button type="button" class="btn">Anmelden</button>
-        <button type="button" class="btn btn--quiet">Ohne Konto weiter</button>
-      </div>
+      <p class="signin" data-when="out">
+        Ohne Konto bleibt alles im Speicher dieses Browsers — zum Mitnehmen gibt es den
+        Austausch als JSON. Wer sich später anmeldet, wird gefragt, ob dieser Stand ins
+        Konto soll.
+      </p>
     </div>
   </section>
 
