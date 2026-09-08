@@ -165,8 +165,10 @@ Kein Teil der Startseite, aber Teil der Entscheidung:
 
 ## 6 · Reihenfolge
 
-1. **Mockup** der neuen Startseite als HTML (beide Zustände, beide Themes,
-   390 px), wie beim Mock von damals — erst danach Code.
+1. **Mockup** der neuen Startseite als HTML — steht als
+   `mockup/startseite.html`, heller Zustand, drei Fälle über die Leiste oben
+   umschaltbar (angemeldet · angemeldet und leer · nicht angemeldet),
+   auf 390 px ohne Überlauf geprüft.
 2. **Nur Frontend, kein Backend:** `QueryBox` mit Chips, neue Route `/`,
    Liste nach `/grundstuecke`, „Weitermachen“ aus dem lokalen Stand. Danach ist
    die neue Startseite fertig und angemeldet ist noch niemand.
