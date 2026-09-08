@@ -29,15 +29,21 @@ was darunter steht, hängt daran, ob jemand angemeldet ist.
 │  ┌────────┐ ┌────────┐ ┌────────┐             │   nur wenn es etwas gibt
 │  │ Karte  │ │ Karte  │ │ Karte  │             │   3 zuletzt geänderte
 │  └────────┘ └────────┘ └────────┘             │   PlotCard, unverändert
-│  Angefangen: Suche „1.076 m² in Bad Lausick“  │   abgebrochener Wizard
 └───────────────────────────────────────────────┘
 ```
 
-- **Abgemeldet** steht unter der Suchmaske kein leerer Bereich, sondern der
-  kurze Erklärblock, den heute die `.empty-card` trägt („Umriss und Fläche
-  kommen aus dem Liegenschaftskataster“), plus ein Satz dazu, was ein Konto
-  bringt: derselbe Stand auf dem nächsten Rechner. Kein Zwang — ohne Anmeldung
-  funktioniert alles weiter wie heute, lokal.
+- **Abgemeldet gibt es keine Bereichsnavigation**, weil es nichts zu
+  navigieren gibt: statt der Kopfzeile der App trägt der Empfang die Marke
+  selbst, und die Seite oberhalb der Falz ist eine Begrüßung — ein Satz, das
+  Feld, und daneben ein Lageplan, der zeigt, was am Ende herauskommt. Darunter
+  der Erklärblock, den heute die `.empty-card` trägt, plus ein Satz dazu, was
+  ein Konto bringt. Kein Zwang — ohne Anmeldung funktioniert alles weiter wie
+  heute, lokal.
+- **Der Plan steht dort, wo unten kein Bild folgt** — abgemeldet und im leeren
+  Konto. Wer schon Grundstücke hat, sieht sie als Karten; ein zweites Blatt
+  darüber wäre Doppelung, und verkleinert wird es unleserlich.
+- **Eine angefangene Suche wird nicht angeboten.** Dafür gäbe es keinen
+  gespeicherten Zustand, und ihn zu erfinden hieße, einen zu bauen.
 - **Angemeldet und noch nichts gespeichert**: derselbe Erklärblock. Ein
   „Weitermachen“ mit null Karten wird nicht gezeigt, und schon gar nicht mit
   erfundenen (siehe „Never show example data“).
