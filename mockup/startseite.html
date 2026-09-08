@@ -4,17 +4,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>where2build · Startseite (Mockup)</title>
 
-<!-- Mockup der neuen Startseite. Zwei Zustaende in einem Dokument, umschaltbar
+<!-- Mockup der neuen Startseite. Drei Zustaende in einem Dokument, umschaltbar
      ueber die Leiste ganz oben; nur der helle Zustand, wie besprochen.
 
-     Nicht angemeldet gibt es keine Bereichsnavigation -- da ist nichts zu
-     navigieren -- sondern einen Empfang: Marke, ein Satz, das Feld, und
-     daneben der Lageplan, der zeigt, was am Ende herauskommt. Angemeldet
-     kommt die Kopfzeile der App zurueck und der Empfang schrumpft auf eine
-     Begruessung ueber demselben Feld.
+     Alles steht in der Mitte: die Marke, ein Satz, das Feld. Nicht angemeldet
+     gibt es keine Bereichsnavigation -- da ist nichts zu navigieren --, und
+     die Marke traegt der Empfang selbst, in ihrer Groesse. Der Grund ist ein
+     Katastergefuege ohne eine einzige Beschriftung: es zeigt, worum es geht,
+     ohne gelesen werden zu wollen.
 
-     Die Zahlen sind Platzhalter aus echten Faellen der Recherche
-     (Moelkau 204+205, Grossbothen 790/11, Etzoldshain 502/47).
+     Jede Angabe hier ist erfunden. Keine echte Adresse, keine echte
+     Flurstuecksnummer, keine Anzeige, an der wirklich gearbeitet wurde --
+     ein Mockup darf nach nichts aussehen, was jemand nachschlagen koennte.
      Die Schriften stecken als woff2 im Dokument -- kein CDN, offline lesbar.
 
      Plan: docs/entscheidungen/startseite-und-konten.md -->
@@ -125,10 +126,14 @@ input[type="text"]{
 .mockbar__switch button + button{ border-left:1px solid #4A423A; }
 .mockbar__switch button[aria-pressed="true"]{ background:#E8D4B0; color:#241F1A; }
 
-/* ---------- Marke, in beiden Koepfen dieselbe ---------- */
-.brand{ display:flex; align-items:center; gap:10px; text-decoration:none; }
+/* ---------- Marke ---------- */
+.brand{ display:inline-flex; align-items:center; gap:10px; text-decoration:none; }
 .brand__word{ font-family:var(--w2b-font-display); font-weight:700; font-size:21px; letter-spacing:-.035em; color:var(--w2b-ink); }
 .brand__word b{ color:var(--w2b-secondary-text); }
+/* Abgemeldet ist die Marke das Erste auf der Seite und steht in der Mitte,
+   nicht klein in einer Ecke, in der sonst eine Navigation waere. */
+.brand--large{ gap:16px; }
+.brand--large .brand__word{ font-size:38px; letter-spacing:-.04em; }
 
 /* ---------- Kopfzeile der App: nur angemeldet ---------- */
 .site-header{ background:var(--w2b-surface); border-bottom:1px solid var(--w2b-line); }
@@ -143,8 +148,9 @@ input[type="text"]{
 .main-nav__count{ font-family:var(--w2b-font-mono); font-size:10.5px; font-variant-numeric:tabular-nums;
   padding:0 5px; border-radius:var(--w2b-radius-full); background:var(--w2b-line-faint); color:var(--w2b-muted); }
 .main-nav a[aria-current="page"] .main-nav__count{ background:rgba(255,255,255,.18); color:var(--w2b-primary-on); }
-.theme-switch{ display:flex; border:1px solid var(--w2b-line); border-radius:var(--w2b-radius-s); overflow:hidden; }
-.theme-switch button{ background:var(--w2b-surface); border:0; cursor:pointer; padding:6px 11px;
+.theme-switch{ display:flex; border:1px solid var(--w2b-line); border-radius:var(--w2b-radius-s); overflow:hidden;
+  background:var(--w2b-surface); }
+.theme-switch button{ background:transparent; border:0; cursor:pointer; padding:6px 11px;
   font-family:var(--w2b-font-display); font-weight:600; font-size:var(--w2b-text-xs); color:var(--w2b-muted); }
 .theme-switch button + button{ border-left:1px solid var(--w2b-line); }
 .theme-switch button[aria-pressed="true"]{ background:var(--w2b-primary); color:var(--w2b-primary-on); }
@@ -158,73 +164,45 @@ input[type="text"]{
 .account__caret{ color:var(--w2b-muted); font-size:10px; }
 
 /* ---------- Der Empfang ----------
-   Abgemeldet ist die ganze Seite oberhalb der Falz dieser Bereich: es gibt
-   keine Bereiche zu navigieren, also gibt es auch keine Navigation. Der Grund
-   liegt auf einem Katasterblatt -- feines Gitter, warmes Papier -- und rechts
-   steht der Plan, den die Suche am Ende liefert. */
-.hero{
-  position:relative; overflow:hidden;
+   Alles steht in der Mitte: Marke, ein Satz, das Feld. Der Grund ist ein
+   Katasterausschnitt -- abstrakt, ohne Beschriftung, nach innen ausgeblendet,
+   damit er Bild bleibt und nicht Inhalt wird. */
+.hero{ position:relative; overflow:hidden; border-bottom:1px solid var(--w2b-line); background:var(--w2b-surface); }
+.hero__art{ position:absolute; inset:0; pointer-events:none; }
+.hero__art svg{ width:100%; height:100%; display:block; }
+.hero__art::after{
+  content:""; position:absolute; inset:0;
   background:
-    linear-gradient(180deg, rgba(250,247,241,.92), rgba(241,235,225,.55) 62%, var(--w2b-paper)),
-    repeating-linear-gradient(0deg, transparent 0 23px, rgba(47,74,58,.055) 23px 24px),
-    repeating-linear-gradient(90deg, transparent 0 23px, rgba(47,74,58,.055) 23px 24px),
-    var(--w2b-surface);
-  border-bottom:1px solid var(--w2b-line);
+    radial-gradient(34% 44% at 50% 40%, var(--w2b-surface) 0 42%, rgba(250,247,241,.84) 72%, transparent 100%),
+    linear-gradient(180deg, transparent 68%, var(--w2b-paper));
 }
-.hero__bar{ display:flex; align-items:center; gap:var(--w2b-space-4); flex-wrap:wrap;
-  padding-top:var(--w2b-space-4); padding-bottom:var(--w2b-space-2); }
+.hero__top{
+  position:relative; display:flex; align-items:center; gap:var(--w2b-space-3); justify-content:flex-end;
+  padding-top:var(--w2b-space-4);
+}
 .hero__inner{
-  display:grid; grid-template-columns:minmax(0,1fr) minmax(0,.82fr);
-  gap:var(--w2b-space-6); align-items:center;
+  position:relative; display:flex; flex-direction:column; align-items:center; text-align:center;
   padding-top:var(--w2b-space-6); padding-bottom:var(--w2b-space-7);
 }
-.hero--slim .hero__inner{ padding-top:var(--w2b-space-5); padding-bottom:var(--w2b-space-5); grid-template-columns:minmax(0,1fr) minmax(0,.62fr); }
-/* Angemeldet und mit Stand steht kein Plan daneben: dann gehoert der Platz
-   der Suche, bis zu einer lesbaren Zeilenlaenge. */
-.hero--bare .hero__inner{ grid-template-columns:minmax(0,1fr); }
-.hero--bare .hero__words{ max-width:880px; }
-.hero__words{ max-width:none; }
-.hero h1{ margin-bottom:var(--w2b-space-3); }
-.hero h1 em{ font-style:normal; color:var(--w2b-primary); }
-.hero__sub{ color:var(--w2b-graphite); font-size:var(--w2b-text-l); max-width:52ch; }
-.hero--slim .hero__sub{ font-size:var(--w2b-text-m); }
+.hero--slim .hero__art{ opacity:.34; }
+.hero--slim .hero__inner{ padding-top:var(--w2b-space-5); padding-bottom:var(--w2b-space-5); }
+.hero__mark{ margin-bottom:var(--w2b-space-5); }
 .hero__eyebrow{ display:block; margin-bottom:var(--w2b-space-3); }
+.hero h1{ margin-bottom:var(--w2b-space-3); max-width:20ch; }
+.hero h1 em{ font-style:normal; color:var(--w2b-primary); }
+.hero__sub{ color:var(--w2b-graphite); font-size:var(--w2b-text-l); max-width:56ch; text-wrap:balance; }
+.hero--slim .hero__sub{ font-size:var(--w2b-text-m); }
 
-/* Was die Zahlen unter der Suche wert sind, in einer Zeile: woher sie kommen. */
-.trust{ display:flex; gap:var(--w2b-space-4) var(--w2b-space-5); flex-wrap:wrap; margin-top:var(--w2b-space-5); }
-.trust div{ display:flex; align-items:flex-start; gap:9px; max-width:23ch; }
-.trust svg{ flex:none; margin-top:2px; color:var(--w2b-primary); }
-.trust b{ display:block; font-family:var(--w2b-font-display); font-weight:600; font-size:var(--w2b-text-s); color:var(--w2b-ink); }
-.trust span{ font-size:var(--w2b-text-xs); color:var(--w2b-muted); line-height:1.45; }
+/* Was die Zahlen wert sind: woher sie kommen. Eine Zeile, keine Kaesten. */
+.trust{ display:flex; gap:var(--w2b-space-5); flex-wrap:wrap; justify-content:center;
+  margin-top:var(--w2b-space-5); font-size:var(--w2b-text-s); color:var(--w2b-muted); }
+.trust span{ display:inline-flex; align-items:center; gap:8px; }
+.trust svg{ flex:none; color:var(--w2b-primary); }
+.trust b{ font-family:var(--w2b-font-display); font-weight:600; color:var(--w2b-graphite); }
 
-/* ---------- Der Plan: das Stueck, das zeigt, worum es geht ---------- */
-.showpiece{ position:relative; }
-.showpiece svg{ display:block; width:100%; height:auto; filter:drop-shadow(0 18px 34px rgba(30,26,22,.13)); }
-.showpiece__caption{
-  display:flex; align-items:center; gap:var(--w2b-space-2); flex-wrap:wrap;
-  margin-top:var(--w2b-space-3); padding-left:2px;
-  font-size:var(--w2b-text-xs); color:var(--w2b-muted);
-}
-.showpiece__caption b{ font-family:var(--w2b-font-display); font-weight:600; color:var(--w2b-graphite); }
-
-/* Der Plan zeichnet sich einmal, wie von Hand -- und steht danach still. */
-@media (prefers-reduced-motion: no-preference){
-  .draw{ stroke-dasharray:1400; stroke-dashoffset:1400; animation:draw 1.5s .25s cubic-bezier(.4,0,.2,1) forwards; }
-  .fade{ opacity:0; animation:fade .7s forwards; }
-  .fade--envelope{ animation-delay:1.15s; }
-  .fade--house{ animation-delay:1.5s; }
-  .fade--marks{ animation-delay:1.9s; }
-}
-@keyframes draw{ to{ stroke-dashoffset:0; } }
-@keyframes fade{ to{ opacity:1; } }
-
-/* ---------- Die Suchmaske ---------- */
-.query{ padding:var(--w2b-space-4); box-shadow:var(--w2b-shadow); container-type:inline-size; }
-@container (max-width:540px){
-  .query__field{ flex-wrap:wrap; padding:10px 12px; }
-  .query__field input{ flex:1 1 60%; font-size:16px; padding:6px 0; }
-  .query__field .btn--large{ flex:1 1 100%; }
-}
+/* ---------- Die Suchmaske: die Mitte der Seite ---------- */
+.query{ width:100%; max-width:760px; margin-top:var(--w2b-space-6); padding:var(--w2b-space-4);
+  box-shadow:var(--w2b-shadow); container-type:inline-size; text-align:left; }
 .query__field{
   display:flex; align-items:center; gap:var(--w2b-space-3);
   background:var(--w2b-white); border:1.5px solid var(--w2b-line);
@@ -237,6 +215,11 @@ input[type="text"]{
   font-family:var(--w2b-font-body); font-size:18px; color:var(--w2b-ink); }
 .query__field input:focus{ outline:none; }
 .query__field input::placeholder{ color:var(--w2b-muted); }
+@container (max-width:540px){
+  .query__field{ flex-wrap:wrap; padding:10px 12px; }
+  .query__field input{ flex:1 1 60%; font-size:16px; padding:6px 0; }
+  .query__field .btn--large{ flex:1 1 100%; }
+}
 
 .kinds{ display:flex; align-items:center; gap:var(--w2b-space-2); flex-wrap:wrap; margin-top:var(--w2b-space-3); }
 .kinds__label{ font-family:var(--w2b-font-display); font-weight:600; font-size:10.5px;
@@ -254,12 +237,11 @@ input[type="text"]{
 .kind__off{ display:grid; place-items:center; width:15px; height:15px; margin-right:-3px;
   border-radius:var(--w2b-radius-full); background:rgba(255,255,255,.22); font-size:10px; line-height:1; }
 
-.query__hint{ margin-top:var(--w2b-space-3); font-size:var(--w2b-text-s); color:var(--w2b-muted); max-width:80ch; }
+/* Ein Satz erscheint nur, wenn er zu etwas fuehrt -- eine fehlende Gemarkung,
+   zwei gleich plausible Lesarten. Sonst sagen die Chips genug. */
+.query__hint{ margin-top:var(--w2b-space-3); font-size:var(--w2b-text-s); color:var(--w2b-muted); }
 .query__hint b{ color:var(--w2b-graphite); font-weight:600; }
-.query__examples{ margin-top:var(--w2b-space-2); font-size:var(--w2b-text-xs); color:var(--w2b-muted); }
-.query__examples button{ background:none; border:0; padding:0 2px; cursor:pointer; color:var(--w2b-primary);
-  font-family:var(--w2b-font-mono); font-size:var(--w2b-text-xs); text-decoration:underline; text-underline-offset:2px; }
-.query__pair{ display:grid; grid-template-columns:minmax(220px,420px) 200px; gap:var(--w2b-space-3);
+.query__pair{ display:grid; grid-template-columns:minmax(200px,1fr) 180px; gap:var(--w2b-space-3);
   margin-top:var(--w2b-space-4); padding-top:var(--w2b-space-4); border-top:1px dashed var(--w2b-line); }
 
 /* ---------- Weitermachen ---------- */
@@ -298,28 +280,18 @@ main{ padding-top:var(--w2b-space-6); padding-bottom:var(--w2b-space-8); }
 .site-footer__inner{ display:flex; justify-content:space-between; gap:var(--w2b-space-4); flex-wrap:wrap;
   padding-top:var(--w2b-space-4); padding-bottom:var(--w2b-space-4); font-size:var(--w2b-text-xs); color:var(--w2b-muted); }
 
-/* ---------- Schmaler ----------
-   Der Plan gibt seine Spalte auf, bevor er zur Briefmarke wird: unter dem
-   Feld hat er die ganze Breite und bleibt lesbar. */
-@media (max-width:1120px){
-  .hero__inner, .hero--slim .hero__inner{ grid-template-columns:1fr; gap:var(--w2b-space-5); }
-  .showpiece{ order:2; max-width:560px; width:100%; margin:0 auto; }
-  .showpiece__caption{ justify-content:center; }
-}
-@media (max-width:760px){
-  .plan-fine{ display:none; }
-}
 @media (max-width:560px){
   .brand__word{ font-size:18px; }
+  .brand--large .brand__word{ font-size:27px; }
   .main-nav a{ padding:6px 10px; font-size:13.5px; }
   .container{ padding-left:var(--w2b-space-4); padding-right:var(--w2b-space-4); }
-  .hero__inner{ padding-top:var(--w2b-space-5); padding-bottom:var(--w2b-space-6); }
+  .hero__inner{ padding-bottom:var(--w2b-space-6); }
   .hero__sub{ font-size:var(--w2b-text-m); }
   .query__pair{ grid-template-columns:1fr; }
   /* Auf dem Telefon ist der Zeilenumbruch der Chips die Regel -- die
      Bezeichnung davor kostet dort eine ganze Zeile. */
   .kinds__label{ display:none; }
-  .trust div{ max-width:none; }
+  .trust{ gap:var(--w2b-space-3); }
 }
 </style>
 
@@ -372,16 +344,60 @@ main{ padding-top:var(--w2b-space-6); padding-bottom:var(--w2b-space-8); }
 
 <section class="hero" data-hero>
 
-  <!-- Abgemeldet traegt der Empfang die Marke selbst. -->
-  <div class="container hero__bar" data-when="out">
-    <a class="brand" href="#" aria-label="where2build">
-      <svg viewBox="0 0 48 48" width="30" height="30" aria-hidden="true">
-        <rect x="5.5" y="5.5" width="37" height="37" rx="3.5" fill="none" stroke="var(--w2b-primary)" stroke-width="3"></rect>
-        <rect x="14.5" y="14.5" width="19" height="19" rx="2" fill="var(--w2b-secondary)" transform="rotate(15 24 24)"></rect>
-      </svg>
-      <span class="brand__word">where<b>2</b>build</span>
-    </a>
-    <div class="spacer"></div>
+  <!-- Der Grund: ein Katastergefuege ohne eine einzige Beschriftung. Es zeigt,
+       worum es geht, und liest sich nicht -- deshalb blendet es zur Mitte hin
+       aus, wo das Feld steht. -->
+      <div class="hero__art" aria-hidden="true">
+        <svg viewBox="0 0 1440 820" preserveAspectRatio="xMidYMid slice">
+          <g opacity=".9">
+            <polygon points="-342.5,587.1 1746.0,367.6 1753.1,435.2 -335.4,654.7" fill="var(--w2b-map-street-surface)" stroke="none"></polygon>
+            <g fill="var(--w2b-map-ground)" stroke="var(--w2b-map-neighbour)" stroke-width="1.2" stroke-linejoin="round">
+            <polygon points="-322.6,585.0 -173.4,569.3 -203.2,285.9 -352.4,301.6"></polygon>
+            <polygon points="-173.4,569.3 -77.9,559.3 -104.0,310.7 -199.5,320.7"></polygon>
+            <polygon points="-77.9,559.3 25.5,548.4 -0.6,299.8 -104.0,310.7"></polygon>
+            <polygon points="25.5,548.4 174.7,532.7 148.6,284.1 -0.6,299.8"></polygon>
+            <polygon points="341.8,515.2 445.2,504.3 419.1,255.7 315.6,266.5"></polygon>
+            <polygon points="445.2,504.3 540.7,494.3 509.3,195.9 413.8,205.9"></polygon>
+            <polygon points="540.7,494.3 644.1,483.4 614.3,200.0 510.9,210.8"></polygon>
+            <polygon points="644.1,483.4 747.5,472.5 716.2,174.2 612.7,185.0"></polygon>
+            <polygon points="747.5,472.5 851.0,461.7 824.8,213.0 721.4,223.9"></polygon>
+            <polygon points="851.0,461.7 978.3,448.3 952.1,199.6 824.8,213.0"></polygon>
+            <polygon points="978.3,448.3 1145.3,430.7 1114.0,132.4 946.9,149.9"></polygon>
+            <polygon points="1145.3,430.7 1248.8,419.8 1219.0,136.4 1115.6,147.3"></polygon>
+            <polygon points="1248.8,419.8 1352.2,409.0 1322.4,125.5 1219.0,136.4"></polygon>
+            <polygon points="1352.2,409.0 1501.4,393.3 1470.0,94.9 1320.8,110.6"></polygon>
+            <polygon points="1501.4,393.3 1628.7,379.9 1602.6,131.3 1475.3,144.7"></polygon>
+            <polygon points="1628.7,379.9 1795.8,362.4 1771.7,133.6 1604.6,151.2"></polygon>
+            <polygon points="-375.1,658.9 -233.9,644.1 -214.0,833.0 -355.3,847.9"></polygon>
+            <polygon points="-233.9,644.1 -138.4,634.0 -116.5,842.9 -212.0,852.9"></polygon>
+            <polygon points="-138.4,634.0 2.8,619.2 22.6,808.1 -118.6,823.0"></polygon>
+            <polygon points="2.8,619.2 98.3,609.1 124.4,857.8 28.9,867.8"></polygon>
+            <polygon points="98.3,609.1 229.5,595.3 249.4,784.3 118.1,798.1"></polygon>
+            <polygon points="229.5,595.3 360.8,581.5 380.7,770.5 249.4,784.3"></polygon>
+            <polygon points="360.8,581.5 492.1,567.8 512.0,756.7 380.7,770.5"></polygon>
+            <polygon points="492.1,567.8 587.6,557.7 613.7,806.3 518.2,816.4"></polygon>
+            <polygon points="587.6,557.7 728.8,542.9 754.9,791.5 613.7,806.3"></polygon>
+            <polygon points="728.8,542.9 885.9,526.4 912.1,775.0 754.9,791.5"></polygon>
+            <polygon points="885.9,526.4 1027.1,511.5 1053.3,760.1 912.1,775.0"></polygon>
+            <polygon points="1027.1,511.5 1184.3,495.0 1210.4,743.6 1053.3,760.1"></polygon>
+            <polygon points="1184.3,495.0 1279.8,485.0 1301.7,693.8 1206.2,703.8"></polygon>
+            <polygon points="1279.8,485.0 1375.2,474.9 1397.2,683.8 1301.7,693.8"></polygon>
+            <polygon points="1375.2,474.9 1516.4,460.1 1542.6,708.7 1401.4,723.6"></polygon>
+            <polygon points="1516.4,460.1 1657.7,445.2 1683.8,693.9 1542.6,708.7"></polygon>
+            <polygon points="1657.7,445.2 1814.8,428.7 1834.7,617.7 1677.5,634.2"></polygon>
+            </g>
+            <polygon points="174.7,532.7 341.8,515.2 312.0,231.7 144.9,249.3" fill="var(--w2b-map-surface)" stroke="none"></polygon>
+            <path d="M174.7,532.7 L341.8,515.2 L312.0,231.7 L144.9,249.3 Z M197.8,504.2 L313.2,492.0 L288.8,260.3 L173.5,272.4 Z" fill="var(--w2b-map-setback)" fill-rule="evenodd"></path>
+            <polygon points="174.7,532.7 341.8,515.2 312.0,231.7 144.9,249.3" fill="none" stroke="var(--w2b-map-halo)" stroke-width="7" stroke-linejoin="round"></polygon>
+            <polygon points="174.7,532.7 341.8,515.2 312.0,231.7 144.9,249.3" fill="none" stroke="var(--w2b-map-boundary)" stroke-width="2.4" stroke-linejoin="round"></polygon>
+            <polygon points="197.8,504.2 313.2,492.0 288.8,260.3 173.5,272.4" fill="none" stroke="var(--w2b-map-envelope)" stroke-width="1.6" stroke-dasharray="8 6"></polygon>
+            <polygon points="207.6,462.9 299.1,453.3 288.4,351.9 196.9,361.5" fill="var(--w2b-map-design)" fill-opacity=".85" stroke="var(--w2b-map-design-edge)" stroke-width="1.8" stroke-linejoin="round"></polygon>
+          </g>
+        </svg>
+      </div>
+
+
+  <div class="container hero__top" data-when="out">
     <div class="theme-switch" role="group" aria-label="Darstellung">
       <button type="button" aria-pressed="true">Hell</button>
       <button type="button" aria-pressed="false">Dunkel</button>
@@ -391,183 +407,85 @@ main{ padding-top:var(--w2b-space-6); padding-bottom:var(--w2b-space-8); }
   </div>
 
   <div class="container hero__inner">
-    <div class="hero__words">
-      <span class="eyebrow hero__eyebrow" data-when="out">Sachsen · Liegenschaftskataster, Bodenrichtwert, Fahrplan</span>
-      <span class="eyebrow hero__eyebrow" data-when="in">Willkommen zurück</span>
-      <span class="eyebrow hero__eyebrow" data-when="empty">Konto eingerichtet</span>
+    <!-- Abgemeldet ist die Marke das Erste, was dasteht. -->
+    <a class="brand brand--large hero__mark" href="#" data-when="out" aria-label="where2build">
+      <svg viewBox="0 0 48 48" width="52" height="52" aria-hidden="true">
+        <rect x="5.5" y="5.5" width="37" height="37" rx="3.5" fill="none" stroke="var(--w2b-primary)" stroke-width="3"></rect>
+        <rect x="14.5" y="14.5" width="19" height="19" rx="2" fill="var(--w2b-secondary)" transform="rotate(15 24 24)"></rect>
+      </svg>
+      <span class="brand__word">where<b>2</b>build</span>
+    </a>
 
-      <h1 data-when="out">Aus einer Anzeige wird ein <em>geprüftes Grundstück</em>.</h1>
-      <h1 data-when="in">Woran heute weiterarbeiten?</h1>
-      <h1 data-when="empty">Das erste Grundstück.</h1>
+    <span class="eyebrow hero__eyebrow" data-when="in">Willkommen zurück</span>
+    <span class="eyebrow hero__eyebrow" data-when="empty">Konto eingerichtet</span>
 
-      <p class="hero__sub" data-when="out">
-        Link einfügen — gesucht wird das Flurstück im Liegenschaftskataster, gemessen wird
-        amtlich, der Preis geht gegen den Bodenrichtwert, und das Haus stellt sich in die
-        Abstandsflächen.
-      </p>
-      <p class="hero__sub" data-when="in">
-        Ein neuer Fall beginnt hier — unten steht, woran zuletzt gearbeitet wurde.
-      </p>
-      <p class="hero__sub" data-when="empty">
-        Noch ist nichts gespeichert. Was hier gesucht wird, liegt danach im Konto —
-        auf diesem Rechner und auf dem nächsten.
-      </p>
+    <h1 data-when="out">Aus einer Anzeige wird ein <em>geprüftes Grundstück</em>.</h1>
+    <h1 data-when="in">Woran heute weiterarbeiten?</h1>
+    <h1 data-when="empty">Das erste Grundstück.</h1>
 
-    <section class="panel query">
-      <div class="query__field">
-        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-          <circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path>
+    <p class="hero__sub" data-when="out">
+      Link einfügen — gesucht wird das Flurstück im Liegenschaftskataster, gemessen wird
+      amtlich, der Preis geht gegen den Bodenrichtwert, und das Haus stellt sich in die
+      Abstandsflächen.
+    </p>
+    <p class="hero__sub" data-when="in">
+      Ein neuer Fall beginnt hier — unten steht, woran zuletzt gearbeitet wurde.
+    </p>
+    <p class="hero__sub" data-when="empty">
+      Noch ist nichts gespeichert. Was hier gesucht wird, liegt danach im Konto —
+      auf diesem Rechner und auf dem nächsten.
+    </p>
+
+      <section class="panel query">
+        <div class="query__field">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path>
+          </svg>
+          <input id="query" type="text" autocomplete="off" spellcheck="false"
+                 aria-label="Adresse, Flurstück, Koordinate oder Anzeige"
+                 placeholder="Adresse, Flurstück, Koordinate oder Link">
+          <button type="button" class="btn btn--large">Grundstück finden</button>
+        </div>
+
+        <div class="kinds" data-kinds></div>
+
+        <!-- Nur diese eine Lesart klappt etwas auf: die beiden Angaben passen
+             nicht in ein Feld. -->
+        <div class="query__pair" data-pair hidden>
+          <div class="field">
+            <label for="q-district">Gemarkung</label>
+            <input id="q-district" type="text" placeholder="Name oder Schlüssel" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="q-parcel">Flurstücksnummer</label>
+            <input id="q-parcel" type="text" autocomplete="off">
+          </div>
+        </div>
+
+        <p class="query__hint" data-hint hidden></p>
+      </section>
+
+
+    <div class="trust" data-when="out">
+      <span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="M4 7h16M4 12h16M4 17h16"></path>
         </svg>
-        <input id="query" type="text" autocomplete="off" spellcheck="false"
-               aria-label="Adresse, Flurstück, Koordinate oder Anzeige"
-               placeholder="Adresse, Flurstück, Koordinate oder Link">
-        <button type="button" class="btn btn--large">Grundstück finden</button>
-      </div>
-
-      <div class="kinds" data-kinds></div>
-
-      <!-- Nur diese eine Lesart klappt etwas auf: die beiden Angaben passen
-           nicht in ein Feld. -->
-      <div class="query__pair" data-pair hidden>
-        <div class="field">
-          <label for="q-district">Gemarkung</label>
-          <input id="q-district" type="text" placeholder="Name oder Schlüssel — Großbothen, 143044, 3044" autocomplete="off">
-        </div>
-        <div class="field">
-          <label for="q-parcel">Flurstücksnummer</label>
-          <input id="q-parcel" type="text" placeholder="790/11" autocomplete="off">
-        </div>
-      </div>
-
-      <p class="query__hint" data-hint></p>
-
-      <p class="query__examples">
-        Zum Ausprobieren:
-        <button type="button" data-example="Lessingweg 44 Leipzig">Lessingweg 44 Leipzig</button> ·
-        <button type="button" data-example="790/11">790/11</button> ·
-        <button type="button" data-example="https://www.kleinanzeigen.de/s-anzeige/baugrundstueck/3499632623">Link einer Anzeige</button> ·
-        <button type="button" data-example="Naturnah wohnen am Kurpark. Wir bieten ein sonniges Baugrundstück mit 1.076 m² im Ortsteil Etzoldshain von Bad Lausick, ruhige Lage am Ortsrand, Erschließung liegt an.">Beschreibungstext</button>
-      </p>
-    </section>
-
-
-      <div class="trust" data-when="out">
-        <div>
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path d="M4 6h16M4 12h16M4 18h16"></path>
-          </svg>
-          <span><b>Amtliche Flurstücke</b>Umriss und Fläche kommen aus ALKIS, nicht aus der Anzeige.</span>
-        </div>
-        <div>
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path d="M12 3v18M8 7h6.5a2.5 2.5 0 0 1 0 5H9a2.5 2.5 0 0 0 0 5h7"></path>
-          </svg>
-          <span><b>Preis gegen Bodenrichtwert</b>Der BORIS-Wert zum Stichtag, mit der Abweichung in Prozent.</span>
-        </div>
-        <div>
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3.5 2"></path>
-          </svg>
-          <span><b>Wege nach Fahrplan</b>Zu Arbeit, Schule und Bahnhof gerechnet — nicht Luftlinie.</span>
-        </div>
-      </div>
+        <b>Amtliche Flurstücke</b> aus ALKIS
+      </span>
+      <span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="M12 3v18M8 7h6.5a2.5 2.5 0 0 1 0 5H9a2.5 2.5 0 0 0 0 5h7"></path>
+        </svg>
+        <b>Bodenrichtwert</b> zum Stichtag
+      </span>
+      <span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3.5 2"></path>
+        </svg>
+        <b>Wege nach Fahrplan</b>, nicht Luftlinie
+      </span>
     </div>
-
-      <!-- Das Stueck, das zeigt, wofuer die Suche da ist: ein Lageplan, wie
-           ihn die App am Ende zeichnet -- Flurstueck aus dem Kataster, die
-           3-m-Abstandsflaeche nach § 6 SächsBO, ein Haus darin, Masse dran.
-           Er zeichnet sich einmal und steht dann still. -->
-      <div class="showpiece" data-when="out empty">
-        <svg viewBox="0 0 620 500" role="img"
-             aria-label="Lageplan: Flurstück 790/11 mit Abstandsflächen und einem eingesetzten Haus">
-          <rect x="1" y="1" width="618" height="498" rx="14" fill="var(--w2b-white)" stroke="var(--w2b-line)"></rect>
-          <clipPath id="sheet"><rect x="2" y="2" width="616" height="496" rx="13"></rect></clipPath>
-
-          <g clip-path="url(#sheet)">
-            <g transform="rotate(-7 310 250)">
-              <!-- Nachbarschaft: da, aber leise. -->
-              <g fill="var(--w2b-map-ground)" fill-opacity=".62" stroke="var(--w2b-map-neighbour)" stroke-width="1.1" stroke-opacity=".7">
-                <polygon points="140,44 474,20 478,122 144,146"></polygon>
-                <polygon points="-40,160 136,150 150,352 -30,366"></polygon>
-                <polygon points="492,132 640,124 652,326 500,334"></polygon>
-              </g>
-              <g class="plan-fine" fill="var(--w2b-muted)" font-family="var(--w2b-font-mono)" font-size="11">
-                <text x="290" y="92">788/4</text>
-                <text x="70" y="266">789</text>
-                <text x="556" y="238">791/2</text>
-              </g>
-
-              <!-- Die Strasse, mit ihrem Namen. -->
-              <polygon points="-40,372 528,336 536,400 -32,436" fill="var(--w2b-map-street-surface)"></polygon>
-              <text x="150" y="392" transform="rotate(-3.6 150 392)" fill="var(--w2b-graphite)"
-                    font-family="var(--w2b-font-display)" font-size="13" font-weight="600" letter-spacing=".08em">WIESENSTRASSE</text>
-
-              <!-- Das Flurstueck: Halo unter der Kontur, wie im Lageplan. -->
-              <polygon points="140,150 470,128 486,330 156,352" fill="var(--w2b-map-surface)"></polygon>
-              <!-- Die Abstandsflaeche ist der Streifen zwischen Grenze und
-                   Baufenster -- ein Ring, kein zweites Polygon. -->
-              <path class="fade fade--envelope" fill="var(--w2b-map-setback)" fill-rule="evenodd"
-                    d="M140,150 L470,128 L486,330 L156,352 Z M172,182 L438,162 L452,300 L188,320 Z"></path>
-              <polygon points="140,150 470,128 486,330 156,352" fill="none"
-                       stroke="var(--w2b-map-halo)" stroke-width="7" stroke-linejoin="round"></polygon>
-              <polygon class="draw" points="140,150 470,128 486,330 156,352 140,150" fill="none"
-                       stroke="var(--w2b-map-boundary)" stroke-width="2.4" stroke-linejoin="round"></polygon>
-
-              <!-- Baufenster: was nach 0,4 H mit 3 m Mindestmass uebrig bleibt. -->
-              <polygon class="fade fade--envelope" points="172,182 438,162 452,300 188,320" fill="none"
-                       stroke="var(--w2b-map-envelope)" stroke-width="1.6" stroke-dasharray="7 5"></polygon>
-
-              <!-- Das Haus, mit Anbau. Messing ist im Projekt die Farbe fuer
-                   alles, was der Mensch entwirft. -->
-              <g class="fade fade--house">
-                <polygon points="228,206 388,195 393,283 233,294" fill="var(--w2b-map-design)" fill-opacity=".9"
-                         stroke="var(--w2b-map-design-edge)" stroke-width="1.8" stroke-linejoin="round"></polygon>
-                <line x1="230" y1="250" x2="391" y2="239" stroke="var(--w2b-map-design-edge)" stroke-width="1.1" stroke-opacity=".7"></line>
-                <polygon points="398,199 444,196 448,240 402,243" fill="var(--w2b-map-design)" fill-opacity=".55"
-                         stroke="var(--w2b-map-design-edge)" stroke-width="1.4" stroke-linejoin="round"></polygon>
-              </g>
-
-              <!-- Masse: die Kette an der Strassenkante, die Tiefe rechts, und
-                   das eine Mass, das die ganze Regel erklaert. -->
-              <g class="fade fade--marks" stroke="var(--w2b-graphite)" stroke-width="1.1" fill="none">
-                <path d="M158,372 L488,350 M158,366 L158,378 M488,344 L488,356"></path>
-                <path d="M506,330 L506,148 M500,330 L512,330 M500,148 L512,148"></path>
-                <path d="M300,140 L302,172 M296,140 L306,140 M298,172 L308,172"></path>
-              </g>
-              <g class="fade fade--marks" fill="var(--w2b-graphite)" font-family="var(--w2b-font-mono)" font-size="12"
-                 paint-order="stroke fill" stroke="var(--w2b-white)" stroke-width="3.4" stroke-linejoin="round">
-                <text x="300" y="374" text-anchor="middle" transform="rotate(-3.8 300 374)">28,40 m</text>
-                <text x="520" y="244" transform="rotate(90 520 244)" text-anchor="middle">17,60 m</text>
-                <text class="plan-fine" x="316" y="163">3,00 m</text>
-              </g>
-
-              <!-- Die Nummer steht auf dem Flurstueck, wie im Kataster. -->
-              <text x="196" y="336" fill="var(--w2b-ink)" font-family="var(--w2b-font-mono)" font-size="17"
-                    paint-order="stroke fill" stroke="var(--w2b-white)" stroke-width="3.6">790/11</text>
-
-              <!-- Norden dreht mit dem Blatt, sonst zeigt er woandershin. -->
-              <g transform="translate(556,64)">
-                <path d="M0,-22 L7,10 L0,3 L-7,10 Z" fill="var(--w2b-ink)"></path>
-                <text x="0" y="26" text-anchor="middle" fill="var(--w2b-graphite)"
-                      font-family="var(--w2b-font-display)" font-size="12" font-weight="700">N</text>
-              </g>
-            </g>
-
-            <!-- Der Massstab gehoert zum Blatt, nicht zur Zeichnung. -->
-            <g transform="translate(28,462)" class="fade fade--marks plan-fine">
-              <rect x="0" y="0" width="34" height="6" fill="var(--w2b-ink)"></rect>
-              <rect x="34" y="0" width="34" height="6" fill="none" stroke="var(--w2b-ink)" stroke-width="1"></rect>
-              <text x="0" y="-6" fill="var(--w2b-muted)" font-family="var(--w2b-font-mono)" font-size="10">0</text>
-              <text x="68" y="-6" fill="var(--w2b-muted)" font-family="var(--w2b-font-mono)" font-size="10" text-anchor="middle">20 m</text>
-            </g>
-          </g>
-        </svg>
-        <p class="showpiece__caption">
-          <b>Flurstück 790/11</b> · Gemarkung Großbothen · 502 m² amtlich ·
-          <span class="chip chip--good">Abstandsflächen eingehalten</span>
-        </p>
-      </div>
-
   </div>
 </section>
 
@@ -644,16 +562,12 @@ const KINDS = [
   { id: "prose",      name: "Beschreibungstext" }
 ];
 
+/* Ein Satz steht nur da, wo er zu etwas führt: eine Angabe fehlt, oder zwei
+ * Lesarten sind gleich plausibel. Was die Chips schon sagen, wird nicht
+ * daruntergeschrieben. */
 const HINTS = {
-  empty: "Was hier steht, wird zuerst gelesen und erst dann nachgeschlagen — die Lesart erscheint unten und lässt sich überstimmen.",
-  address: "<b>Adresse.</b> Nachgeschlagen in den amtlichen Hauskoordinaten des GeoSN. Die Hausnummer liegt nicht immer auf dem Flurstück, das sie trägt — die Nachbarn stehen danach zur Wahl.",
-  parcel: "<b>Flurstücksnummer ohne Gemarkung.</b> So ist sie nicht eindeutig; <span class='mono'>790/11</span> gibt es in Sachsen vielfach. Gemarkung dazu wählen — oder eine Anzeige einfügen, aus der sie hervorgeht.",
-  district: "<b>Gemarkung und Flurstücksnummer.</b> Der direkte Weg: das Kataster wird gefragt, gesucht wird nichts. Fläche und Gemeinde kommen mit der Antwort und werden gegengeprüft.",
-  coordinate: "<b>Koordinate</b>, liegt in Sachsen. Gefragt wird das Kataster nach dem Flurstück darunter — ein Punkt aus einer Anzeige ist oft der Ortsmittelpunkt, nicht das Grundstück.",
-  url: "<b>Link zu einer Anzeige.</b> Die Seite wird auf dem Server geholt und ausgelesen. ImmoScout24 lässt das nicht zu — dort <span class='mono'>Strg+A</span>, <span class='mono'>Strg+C</span> und hier einfügen.",
-  page: "<b>Eingefügte Anzeigenseite.</b> Die Zwischenablage führt neben dem Text auch das HTML mit — daraus kommen Preis, Fläche, Koordinate und die Bilder, ohne ein Modell zu fragen.",
-  prose: "<b>Beschreibungstext.</b> Gesucht wird über Muster und das Gemarkungsverzeichnis: eine Flurstücksnummer, ein Ortsteil mit seiner Beziehung („OT von“, „6 km entfernt“), die Fläche so, wie sie dasteht, und die Straße.",
-  ambiguous: "<b>Zwei Lesarten möglich.</b> „Mölkau 204“ ist als Adresse und als Gemarkung mit Flurstück gleich plausibel. Beide Verzeichnisse werden gefragt, statt eines zu raten — oder hier festlegen."
+  parcel: "<b>Ohne Gemarkung ist die Nummer nicht eindeutig</b> — dieselbe gibt es in Sachsen vielfach.",
+  ambiguous: "<b>Zwei Lesarten sind gleich plausibel.</b> Beide Verzeichnisse werden gefragt, statt eines zu raten — oder hier festlegen."
 };
 
 /** Was steht im Feld? Grobe Nachbildung von `classifyQuery`. */
@@ -670,8 +584,8 @@ function readQuery(text) {
   }
   if (/^\d{1,5}(\s*\/\s*[0-9a-z]{1,3})?$/i.test(value)) return ["parcel"];
   if (/^[^\d]+\s+\d{1,5}\s*\/\s*[0-9a-z]{1,3}$/i.test(value)) return ["district"];
-  // „Mölkau 204“ und „Lessingweg 44“ haben dieselbe Gestalt. Ein Straßenwort
-  // entscheidet; sonst stehen beide Lesarten da, und beide werden gezeigt.
+  // Ein Ortsname mit einer Zahl und eine Straße mit einer Hausnummer haben
+  // dieselbe Gestalt. Ein Straßenwort entscheidet; sonst stehen beide da.
   if (/^[^\d]+\s+\d{1,5}$/.test(value) && !/(stra(ss|ß)e|weg|gasse|allee|platz|ring|damm|ufer)\b/i.test(value)) {
     return ["address", "district"];
   }
@@ -703,7 +617,9 @@ function render() {
     return `<button type="button" class="kind" data-kind="${k.id}" data-state="${s}" aria-label="${title}">${k.name}${off}</button>`;
   }).join("");
 
-  hintBox.innerHTML = HINTS[!active ? "empty" : (read.length > 1 && !fixedKind ? "ambiguous" : active)];
+  const hint = HINTS[read.length > 1 && !fixedKind ? "ambiguous" : active];
+  hintBox.hidden = !hint;
+  if (hint) hintBox.innerHTML = hint;
 
   // Das Feldpaar gehört zu genau einer Lesart, und eine nackte Nummer führt
   // von selbst dorthin: ohne Gemarkung ist sie nichts.
@@ -735,35 +651,27 @@ field.addEventListener("paste", event => {
   setTimeout(render, 0);
 });
 
-document.querySelectorAll("[data-example]").forEach(button => {
-  button.addEventListener("click", () => {
-    fixedKind = null; pastedHtml = false;
-    field.value = button.dataset.example;
-    field.focus();
-    render();
-  });
-});
-
 /* ---------- Die Karten ----------
- * Umrisse aus echten Fällen der Recherche; die Beträge sind Platzhalter. */
+ * Erfundene Grundstücke: Namen, Gemarkungen, Nummern und Beträge sind für
+ * dieses Mockup gemacht und schlagen nirgends etwas nach. */
 const PLOTS = [
   {
-    name: "Lessingweg 44 + 46", place: "Leipzig · Flst. 204 · 205",
-    area: "1.299 m²", price: "189.000 €", perSqm: "146 €/m²",
-    chips: [["good", "−9 % ggü. BRW"], ["", "kompakt"]], seen: "zuletzt geöffnet vor 2 Stunden",
+    name: "Ortsrand, Südhang", place: "Gemarkung Buchenau · Flst. 118/3",
+    area: "742 m²", price: "96.000 €", perSqm: "129 €/m²",
+    chips: [["good", "−7 % ggü. BRW"], ["", "kompakt"]], seen: "zuletzt geöffnet vor 2 Stunden",
     outline: "38,150 38,44 150,40 152,96 250,98 252,152 40,156",
     envelope: "62,132 62,70 132,66 134,120", building: [78, 84, 44, 32]
   },
   {
-    name: "Wiesenstraße, Großbothen", place: "Grimma · Flst. 790/11",
-    area: "502 m²", price: "60.000 €", perSqm: "120 €/m²",
-    chips: [["warn", "+34 % ggü. BRW"], ["", "kompakt"]], seen: "zuletzt geöffnet gestern",
+    name: "Am Mühlgraben", place: "Gemarkung Buchenau · Flst. 63/7",
+    area: "512 m²", price: "78.000 €", perSqm: "152 €/m²",
+    chips: [["warn", "+21 % ggü. BRW"], ["", "kompakt"]], seen: "zuletzt geöffnet gestern",
     outline: "70,36 214,44 208,158 64,150",
     envelope: "92,60 192,66 188,134 88,128", building: [108, 76, 56, 40]
   },
   {
-    name: "Am Kurpark, Etzoldshain", place: "Bad Lausick · Flst. 502/47",
-    area: "1.076 m²", price: "—", perSqm: "—",
+    name: "Wiesenrand", place: "Gemarkung Talheim · Flst. 205/1",
+    area: "1.084 m²", price: "—", perSqm: "—",
     chips: [["unknown", "kein Kaufpreis"], ["", "gestreckt"]], seen: "zuletzt geöffnet vor 4 Tagen",
     outline: "34,58 262,40 266,120 30,140",
     envelope: "58,80 238,64 240,104 54,118", building: [92, 78, 60, 26]
@@ -811,14 +719,13 @@ const show = view => {
   document.querySelectorAll("[data-when]").forEach(node => {
     node.hidden = !node.dataset.when.split(" ").includes(view);
   });
-  // Angemeldet ist der Empfang eine Begrüßung, kein Aufschlag: er wird flacher
-  // und der Plan daneben kleiner.
+  // Ein leeres Konto ist überall leer: `emptyState()` bringt weder Haustypen
+  // noch Ziele mit, also steht an keinem Bereich eine Zahl.
   document.querySelectorAll(".main-nav__count").forEach((node, i) => {
     node.textContent = view === "in" ? ["7", "4", "3"][i] : "0";
   });
-  const hero = document.querySelector("[data-hero]");
-  hero.classList.toggle("hero--slim", view !== "out");
-  hero.classList.toggle("hero--bare", view === "in");
+  // Angemeldet ist der Empfang eine Begrüßung, kein Aufschlag.
+  document.querySelector("[data-hero]").classList.toggle("hero--slim", view !== "out");
   document.querySelectorAll(".mockbar__switch button").forEach(button => {
     button.setAttribute("aria-pressed", String(button.dataset.view === view));
   });

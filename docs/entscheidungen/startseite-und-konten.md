@@ -18,12 +18,13 @@ was darunter steht, hängt daran, ob jemand angemeldet ist.
 
 ```
 ┌───────────────────────────────────────────────┐
-│  Wo soll gebaut werden?                       │   Titel + ein Satz
+│              where2build                      │   Marke, groß, mittig
+│      Aus einer Anzeige wird ein               │   (nur abgemeldet)
+│         geprüftes Grundstück.                 │
 │  ┌─────────────────────────────────────────┐  │
-│  │ 🔍  Adresse, Flurstück, Link, Anzeige … │  │   ein Feld
+│  │ 🔍  Adresse, Flurstück, Koordinate …    │  │   ein Feld, zentriert
 │  └─────────────────────────────────────────┘  │
 │  [Adresse ×] Koordinate · Flurstück · Link …  │   Chips: erkannt / setzbar
-│  Erkannt als Adresse. Bleiben zwei Lesarten … │   der Satz von heute
 ├───────────────────────────────────────────────┤
 │  Weitermachen                    Alle ansehen │   nur angemeldet und
 │  ┌────────┐ ┌────────┐ ┌────────┐             │   nur wenn es etwas gibt
@@ -39,9 +40,19 @@ was darunter steht, hängt daran, ob jemand angemeldet ist.
   der Erklärblock, den heute die `.empty-card` trägt, plus ein Satz dazu, was
   ein Konto bringt. Kein Zwang — ohne Anmeldung funktioniert alles weiter wie
   heute, lokal.
-- **Der Plan steht dort, wo unten kein Bild folgt** — abgemeldet und im leeren
-  Konto. Wer schon Grundstücke hat, sieht sie als Karten; ein zweites Blatt
-  darüber wäre Doppelung, und verkleinert wird es unleserlich.
+- **Alles steht in der Mitte**, und abgemeldet trägt der Empfang die Marke in
+  ihrer Größe — nicht klein in einer Ecke, in der sonst eine Navigation wäre.
+- **Das Grundstück ist Grund, nicht Gegenstand.** Ein Katastergefüge ohne eine
+  einzige Beschriftung liegt hinter dem Empfang und blendet zur Mitte hin aus,
+  wo das Feld steht; ein einzelnes Flurstück darin trägt Abstandsfläche und
+  Haus und sitzt am Rand, außerhalb dieser Ausblendung. Angemeldet ist es nur
+  noch Textur, weil die Karten darunter das Bild tragen.
+- **In der Suchbox steht kein Satz, der nicht zu etwas führt.** Die Chips
+  sagen, wie gelesen wurde; erklärt wird nur, was fehlt (eine Gemarkung) oder
+  offen ist (zwei gleich plausible Lesarten).
+- **Keine echten Beispiele im Mockup.** Keine Adresse, keine
+  Flurstücksnummer, keine Anzeige, an der wirklich gearbeitet wurde — ein
+  Mockup darf nach nichts aussehen, was jemand nachschlagen könnte.
 - **Eine angefangene Suche wird nicht angeboten.** Dafür gäbe es keinen
   gespeicherten Zustand, und ihn zu erfinden hieße, einen zu bauen.
 - **Angemeldet und noch nichts gespeichert**: derselbe Erklärblock. Ein
