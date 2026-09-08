@@ -180,6 +180,8 @@ input[type="text"]{
   position:relative; display:flex; align-items:center; gap:var(--w2b-space-3); justify-content:flex-end;
   padding-top:var(--w2b-space-4);
 }
+.hero__top .btn--secondary{ background:var(--w2b-surface); }
+.hero__top .btn--secondary:hover{ background:var(--w2b-primary-veil); }
 .hero__inner{
   position:relative; display:flex; flex-direction:column; align-items:center; text-align:center;
   padding-top:var(--w2b-space-6); padding-bottom:var(--w2b-space-7);
@@ -221,9 +223,11 @@ input[type="text"]{
   .query__field .btn--large{ flex:1 1 100%; }
 }
 
-.kinds{ display:flex; align-items:center; gap:var(--w2b-space-2); flex-wrap:wrap; margin-top:var(--w2b-space-3); }
+.kinds{ display:flex; flex-direction:column; align-items:center; gap:var(--w2b-space-2);
+  margin-top:var(--w2b-space-4); }
 .kinds__label{ font-family:var(--w2b-font-display); font-weight:600; font-size:10.5px;
-  letter-spacing:.1em; text-transform:uppercase; color:var(--w2b-muted); margin-right:2px; }
+  letter-spacing:.1em; text-transform:uppercase; color:var(--w2b-muted); }
+.kinds__group{ display:flex; justify-content:center; gap:var(--w2b-space-2); flex-wrap:wrap; }
 .kind{ display:inline-flex; align-items:center; gap:6px; cursor:pointer; padding:4px 11px;
   border-radius:var(--w2b-radius-full); border:1px solid var(--w2b-line);
   background:var(--w2b-surface); color:var(--w2b-muted);
@@ -552,14 +556,21 @@ main{ padding-top:var(--w2b-space-6); padding-bottom:var(--w2b-space-8); }
  * grob nachgebildet (das Echte steht in frontend/src/lib/queryInput.js), die
  * Chips setzen sie fest, und der Umschalter oben wechselt den Zustand. */
 
-const KINDS = [
-  { id: "address",    name: "Adresse" },
-  { id: "parcel",     name: "Flurstück" },
-  { id: "district",   name: "Gemarkung + Flurstück" },
-  { id: "coordinate", name: "Koordinate" },
-  { id: "url",        name: "Link zur Anzeige" },
-  { id: "page",       name: "Eingefügte Anzeige" },
-  { id: "prose",      name: "Beschreibungstext" }
+/* Zwei Gruppen: was jemand vom Ort weiss, und was er von der Anzeige hat.
+ * Die Trennung ist auch der Umbruch -- so faellt er nicht dorthin, wo der
+ * Platz zufaellig endet. */
+const KIND_GROUPS = [
+  [
+    { id: "address",    name: "Adresse" },
+    { id: "parcel",     name: "Flurstück" },
+    { id: "district",   name: "Gemarkung + Flurstück" },
+    { id: "coordinate", name: "Koordinate" }
+  ],
+  [
+    { id: "url",   name: "Link zur Anzeige" },
+    { id: "page",  name: "Eingefügte Anzeige" },
+    { id: "prose", name: "Beschreibungstext" }
+  ]
 ];
 
 /* Ein Satz steht nur da, wo er zu etwas führt: eine Angabe fehlt, oder zwei
@@ -610,12 +621,14 @@ function render() {
   // Die Bezeichnung sagt, woher die Markierung kommt. „Gelesen als“ über einer
   // Reihe, in der nichts markiert ist, behauptet eine Lesung, die es nicht gab.
   const label = fixedKind ? "Festgelegt als" : (read.length ? "Gelesen als" : "Oder gezielt");
-  kindsBox.innerHTML = `<span class="kinds__label">${label}</span>` + KINDS.map(k => {
+  const pill = k => {
     const s = state(k.id);
     const off = s === "set" ? '<span class="kind__off" aria-hidden="true">✕</span>' : "";
     const title = s === "set" ? `${k.name} — festgelegt, klicken zum Aufheben` : `Als ${k.name} lesen`;
     return `<button type="button" class="kind" data-kind="${k.id}" data-state="${s}" aria-label="${title}">${k.name}${off}</button>`;
-  }).join("");
+  };
+  kindsBox.innerHTML = `<span class="kinds__label">${label}</span>`
+    + KIND_GROUPS.map(group => `<div class="kinds__group">${group.map(pill).join("")}</div>`).join("");
 
   const hint = HINTS[read.length > 1 && !fixedKind ? "ambiguous" : active];
   hintBox.hidden = !hint;
