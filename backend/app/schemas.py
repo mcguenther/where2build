@@ -1115,6 +1115,37 @@ class HealthResponse(BaseModel):
 
 
 # --------------------------------------------------------------------------
+# Sign-in (GET /api/auth/me)
+# --------------------------------------------------------------------------
+
+
+class AnmeldungStatus(BaseModel):
+    """Three states, not two.
+
+    A deployment with no provider configured is not "signed out" -- there is
+    nothing to sign in to, and the frontend then shows no account area at all
+    rather than a button that leads to a 503. Hence ``eingerichtet`` next to
+    ``angemeldet``.
+    """
+
+    eingerichtet: bool = Field(
+        description="Ob auf diesem Server überhaupt eine Anmeldung eingerichtet ist."
+    )
+    angemeldet: bool = Field(description="Ob diese Sitzung angemeldet ist.")
+    name: str | None = Field(
+        default=None,
+        description="Anzeigename, falls der Anmeldedienst einen liefert, sonst null.",
+    )
+    kennung: str | None = Field(
+        default=None,
+        description=(
+            "Stabile, nicht sprechende Kennung des Kontos; aus Issuer und Subject "
+            "gebildet, damit keine Kennung des Anmeldedienstes selbst nach außen geht."
+        ),
+    )
+
+
+# --------------------------------------------------------------------------
 # Parcel search (POST /api/parcels/search)
 #
 # The search is a staircase that stops as early as it can, and it reports every

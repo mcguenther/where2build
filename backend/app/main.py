@@ -21,6 +21,7 @@ from . import __version__
 from .address_index import AddressIndex
 from .errors import AppError
 from .routers import (
+    auth,
     basemap,
     gemarkungen,
     geocode,
@@ -38,7 +39,7 @@ from .routers import (
 from .deps import address_index, gemarkung_directory, nearby_service
 from .services import ocr
 from .schemas import DienstStatus, HealthResponse
-from .settings import get_settings
+from .settings import Settings, get_settings
 from .validation import readable_validation_error
 
 logger = logging.getLogger(__name__)
@@ -124,6 +125,32 @@ def _ocr_hinweis(status: dict[str, Any]) -> str:
         "Bildern eines echten Inserats trug eines den Katasterauszug, die übrigen "
         "sechs lieferten nichts — deshalb wird jedes Bild gelesen und nach Muster "
         "gefiltert, statt Bilder vorher zu sortieren."
+    )
+
+
+def _anmeldung_hinweis(settings: Settings) -> str:
+    """What /api/health says about signing in.
+
+    Same shape as the POI and OCR sentences: absent is "not set up here", never
+    a fault. Without a provider the app keeps every plot in the browser and
+    works exactly as before, so the message says that first and names the
+    variables that are still missing second.
+    """
+
+    missing = settings.oidc.missing
+    if missing:
+        fehlt = ", ".join(missing)
+        return (
+            "Keine Anmeldung eingerichtet; die Anwendung ist ohne Konto vollständig "
+            "benutzbar und die Grundstücke bleiben im Browser. Zum Einrichten fehlt: "
+            f"{fehlt}. Der Anbieter ist frei wählbar (Authentik, Keycloak, Google); "
+            "die Endpunkte kommen aus <OIDC_ISSUER>/.well-known/openid-configuration."
+        )
+    return (
+        f"Anmeldung über {settings.oidc.issuer} (Authorization Code mit PKCE, "
+        f"Scopes: {settings.oidc.scopes}). Der Browser bekommt kein Token, sondern "
+        "ein signiertes HttpOnly-Cookie; gespeichert werden nur Issuer, Subject und "
+        "Anzeigename. Ohne Anmeldung bleibt alles wie bisher."
     )
 
 
@@ -305,6 +332,12 @@ def create_app() -> FastAPI:
                     hinweis=_ocr_hinweis(ocr_status),
                 ),
                 DienstStatus(
+                    name="anmeldung",
+                    konfiguriert=current.oidc.configured,
+                    endpunkt=current.oidc.issuer or None,
+                    hinweis=_anmeldung_hinweis(current),
+                ),
+                DienstStatus(
                     name="llm",
                     konfiguriert=current.llm.configured,
                     endpunkt=current.llm.base_url,
@@ -318,6 +351,7 @@ def create_app() -> FastAPI:
         )
 
     for module in (
+        auth,
         parcels,
         search,
         gemarkungen,

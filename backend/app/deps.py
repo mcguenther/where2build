@@ -18,6 +18,7 @@ from .services.llm import LLMClient
 from .services.luis import LuisService
 from .services.motis import MotisService
 from .services.nearby import NearbyService
+from .services.oidc import OidcService
 from .services.overpass import OverpassService
 from .services.tiles import TileService
 from .settings import Settings, get_settings
@@ -101,6 +102,12 @@ def basemap_service() -> BasemapService:
 
 
 @lru_cache(maxsize=1)
+def oidc_service() -> OidcService:
+    settings = get_settings()
+    return OidcService(settings.oidc, settings.app)
+
+
+@lru_cache(maxsize=1)
 def llm_client() -> LLMClient:
     settings = get_settings()
     return LLMClient(settings.llm, settings.app)
@@ -127,5 +134,6 @@ def reset_services() -> None:
         tile_service,
         basemap_service,
         llm_client,
+        oidc_service,
     ):
         factory.cache_clear()

@@ -420,6 +420,77 @@ class LLMSettings(BaseSettings):
         return self.api_key is not None and bool(self.api_key.get_secret_value())
 
 
+class OidcSettings(BaseSettings):
+    """Sign-in through an OpenID Connect provider (env prefix ``OIDC_``).
+
+    No provider is hard-wired, the same way none is for the LLM: issuer, client
+    id and secret decide whether this is Authentik, Keycloak or Google, and the
+    endpoints come from the issuer's discovery document rather than from a
+    guessed path.
+
+    Absent, the whole feature is absent: ``configured`` is false, ``/api/auth/me``
+    says so, and every other route works exactly as it did before. A development
+    machine must not need an identity provider before it can resolve a parcel.
+
+    This is a backend-for-frontend, so the browser never sees a token. What it
+    gets is a signed, HttpOnly cookie holding issuer, subject, display name and
+    an expiry; the access token lives no longer than the request that fetched it.
+    """
+
+    model_config = SettingsConfigDict(env_prefix="OIDC_", env_file=_ENV_FILE, extra="ignore")
+
+    issuer: str = ""
+    client_id: str = ""
+    client_secret: SecretStr | None = None
+    # "openid" alone would authenticate but hand out no name to greet anyone
+    # with. Deliberately no "email": the project stores no contact detail, so
+    # asking for one would collect what must not be kept.
+    scopes: str = "openid profile"
+    # Signs the session cookie and the short-lived login cookie. No default:
+    # a shipped one would be a public key everyone could forge sessions with.
+    session_secret: SecretStr | None = None
+    # Off only for a plain-HTTP development server. A session cookie without
+    # Secure travels over any http:// request to the same host.
+    cookie_secure: bool = True
+    cookie_name: str = "w2b_sitzung"
+    # The cookie that carries state, nonce and the PKCE verifier from /login to
+    # /callback. Separate from the session, and gone the moment it is used.
+    login_cookie_name: str = "w2b_anmeldung"
+    # Origin the provider redirects back to, e.g. https://where2build.example.
+    # Empty derives it from the request, which is right for a local dev server
+    # and wrong behind a reverse proxy that terminates TLS: the request then
+    # says "http" and the redirect_uri stops matching the registered one.
+    public_base_url: str = ""
+    # How long a session lasts. There is no refresh token kept anywhere, so
+    # this is simply how long until the next sign-in.
+    session_ttl_s: int = 14 * 24 * 3600
+    # How long the handshake may take. Ten minutes is generous for typing a
+    # password and short enough that a stolen login cookie is worth little.
+    login_ttl_s: int = 600
+    # The discovery document changes when a provider is reconfigured, which is
+    # rare, but a key rotation must not need a restart to be noticed.
+    discovery_cache_ttl_s: int = 3600
+    timeout_s: float = 15.0
+
+    @property
+    def missing(self) -> list[str]:
+        """Which env variables a deployment still has to set, in order."""
+
+        secrets = {
+            "OIDC_CLIENT_SECRET": self.client_secret,
+            "OIDC_SESSION_SECRET": self.session_secret,
+        }
+        return [
+            *(["OIDC_ISSUER"] if not self.issuer else []),
+            *(["OIDC_CLIENT_ID"] if not self.client_id else []),
+            *(name for name, value in secrets.items() if not (value and value.get_secret_value())),
+        ]
+
+    @property
+    def configured(self) -> bool:
+        return not self.missing
+
+
 class Settings(BaseSettings):
     """Aggregate of all setting groups."""
 
@@ -437,6 +508,7 @@ class Settings(BaseSettings):
     tiles: TilesSettings = Field(default_factory=TilesSettings)
     basemap: BasemapSettings = Field(default_factory=BasemapSettings)
     llm: LLMSettings = Field(default_factory=LLMSettings)
+    oidc: OidcSettings = Field(default_factory=OidcSettings)
 
 
 @lru_cache(maxsize=1)
