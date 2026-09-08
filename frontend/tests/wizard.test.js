@@ -32,7 +32,7 @@ vi.mock("../src/lib/api.js", () => ({
   nearby: vi.fn(),
   nearbyParcels: vi.fn()
 }));
-const { cadastralDistricts, resolveParcel, landValue, readPage, nearbyParcels } =
+const { cadastralDistricts, resolveParcel, landValue, readPage, nearbyParcels, geocode } =
   await import("../src/lib/api.js");
 
 beforeEach(() => {
@@ -47,6 +47,46 @@ beforeEach(() => {
 const typeInto = async (field, text) => {
   field.element.value = text;
   await field.trigger("input");
+};
+
+/** The recorded `/api/geocode` answer for "Lessingweg 44" — the same one
+ *  `query-box.test.js` types, official Hauskoordinaten first. */
+const LESSINGWEG_44 = {
+  treffer: [
+    {
+      lat: 51.33655, lon: 12.44181, name: "Lessingweg 44",
+      beschreibung: "04316 Leipzig · Mölkau", art: "adresse"
+    }
+  ],
+  hinweis: "Amtliche Hauskoordinaten des GeoSN.",
+  quelle: "Amtliche Hauskoordinaten (GeoSN, dl-de/by-2-0)"
+};
+
+/** The wizard's one field. There is no choice of way in any more: what was
+ *  typed is read, and the reading decides what unfolds. */
+const intoQuery = (w, text) => typeInto(w.find(".search__field input"), text);
+
+/** The suggestions arrive behind a keystroke debounce. */
+const settle = async () => {
+  await new Promise(resolve => setTimeout(resolve, 150));
+  await flushPromises();
+};
+
+const findButton = (w, label) => w.findAll("button").find(b => b.text() === label);
+
+/** A chip by its German name; a fixed one carries the ✕ that takes it back. */
+const chip = (w, name) =>
+  w.findAll(".kind").find(b => b.text().replace("✕", "").trim() === name);
+
+/** Look a parcel up the way the box does it: the bare number unfolds the pair,
+ *  the district goes in beside it, and one button asks the cadastre. */
+const lookUpParcel = async (w, { district, number }) => {
+  await intoQuery(w, number);
+  await flushPromises();                 // the directory the picker fetches
+  await typeInto(w.findComponent(CadastralDistrictPicker).find("input"), district);
+  await flushPromises();
+  await findButton(w, "Grundstück finden").trigger("click");
+  await flushPromises();
 };
 
 /** A mounted picker with the directory already in hand. */
@@ -175,12 +215,18 @@ describe("Aufnahme — Schritt Quelle", () => {
   const atSource = () =>
     mountWithRouter(WizardView, { path: "/aufnahme/quelle", props: { stage: "quelle" } });
 
-  it("bietet das Verzeichnis erst beim Weg „Flurstück direkt“ an", async () => {
+  /* There are no ways in to choose between any more, so the old statement
+     ("only on the way „Flurstück direkt“") has nothing to name. What survives
+     of it is the cost: the directory is 490 kB, and it is fetched only once a
+     reading actually asks for a Gemarkung. */
+  it("lädt das Verzeichnis erst, wenn die Lesart eine Gemarkung verlangt", async () => {
     const w = atSource();
     expect(w.findComponent(CadastralDistrictPicker).exists()).toBe(false);
     expect(cadastralDistricts).not.toHaveBeenCalled();
 
-    await w.find('input[value="parcel"]').setValue();
+    // Eine nackte Nummer ist ohne Gemarkung nichts — erst sie klappt das
+    // Feldpaar auf und holt das Verzeichnis.
+    await intoQuery(w, "85/1");
     expect(w.findComponent(CadastralDistrictPicker).exists()).toBe(true);
     expect(cadastralDistricts).toHaveBeenCalledTimes(1);
   });
@@ -190,16 +236,17 @@ describe("Aufnahme — Schritt Quelle", () => {
     landValue.mockRejectedValue(new Error("Kein Bodenrichtwert."));
 
     const w = atSource();
-    await w.find('input[value="parcel"]').setValue();
+    // Die Nummer wandert von selbst in das Feldpaar; getippt wird nur noch
+    // die Gemarkung daneben.
+    await intoQuery(w, "85/1");
     await flushPromises();
 
     const field = w.findComponent(CadastralDistrictPicker);
     await typeInto(field.find("input"), "Mölk");
     await field.find("[role=option]").trigger("mousedown");
-    await typeInto(w.find("#q-parcel-number"), "85/1");
     await flushPromises();
 
-    await w.findAll("button").find(b => b.text() === "Nachschlagen").trigger("click");
+    await findButton(w, "Grundstück finden").trigger("click");
     await flushPromises();
 
     expect(resolveParcel).toHaveBeenCalledWith({ gemarkung: "145592", flurstuecksnummer: "85/1" });
@@ -210,17 +257,28 @@ describe("Aufnahme — Schritt Quelle", () => {
     landValue.mockRejectedValue(new Error("Kein Bodenrichtwert."));
 
     const w = atSource();
-    await w.find('input[value="parcel"]').setValue();
-    await flushPromises();
-
-    await typeInto(w.findComponent(CadastralDistrictPicker).find("input"), "Moritzburg");
-    await typeInto(w.find("#q-parcel-number"), "85/1");
-    await flushPromises();
-
-    await w.findAll("button").find(b => b.text() === "Nachschlagen").trigger("click");
-    await flushPromises();
+    await lookUpParcel(w, { district: "Moritzburg", number: "85/1" });
 
     expect(resolveParcel).toHaveBeenCalledWith({ gemarkung: "Moritzburg", flurstuecksnummer: "85/1" });
+  });
+
+  it("lässt die Lesart per Chip festlegen, wenn sie nicht abzulesen ist", async () => {
+    resolveParcel.mockResolvedValue(moelkau);
+    landValue.mockRejectedValue(new Error("Kein Bodenrichtwert."));
+
+    // "Moritzburg 85" liest sich als Adresse wie als Flurstück; der Chip
+    // entscheidet, statt dass eine der beiden geraten wird.
+    const w = atSource();
+    await intoQuery(w, "Moritzburg 85");
+    await chip(w, "Gemarkung + Flurstück").trigger("click");
+    await flushPromises();
+
+    expect(w.find("#q-parcel-number").element.value).toBe("85");
+    await typeInto(w.findComponent(CadastralDistrictPicker).find("input"), "Moritzburg");
+    await findButton(w, "Grundstück finden").trigger("click");
+    await flushPromises();
+
+    expect(resolveParcel).toHaveBeenCalledWith({ gemarkung: "Moritzburg", flurstuecksnummer: "85" });
   });
 });
 
@@ -255,21 +313,18 @@ describe("Aufnahme — Absenden", () => {
   const atSource = () =>
     mountWithRouter(WizardView, { path: "/aufnahme/quelle", props: { stage: "quelle" } });
 
-  it("liest die Anzeige auch, wenn im Feld nur Enter gedrückt wurde", async () => {
+  it("schlägt nach, wenn im Suchfeld nur Enter gedrückt wurde", async () => {
     resolveParcel.mockResolvedValue(moelkau);
     landValue.mockRejectedValue(new Error("Kein Bodenrichtwert."));
 
     const w = atSource();
-    await w.find('input[value="parcel"]').setValue();
+    // „Mölkau 204“ lässt genau eine Zeile stehen; Enter nimmt sie, ohne dass
+    // der Knopf daneben gedrückt werden muss.
+    await intoQuery(w, "Mölkau 204");
+    await w.find(".search__field input").trigger("keydown", { key: "Enter" });
     await flushPromises();
 
-    await typeInto(w.findComponent(CadastralDistrictPicker).find("input"), "Moritzburg");
-    await typeInto(w.find("#q-parcel-number"), "85/1");
-    // Was das Drücken von Enter in einem Textfeld auslöst.
-    await w.find("form").trigger("submit");
-    await flushPromises();
-
-    expect(resolveParcel).toHaveBeenCalledWith({ gemarkung: "Moritzburg", flurstuecksnummer: "85/1" });
+    expect(resolveParcel).toHaveBeenCalledWith({ gemarkung: "Mölkau", flurstuecksnummer: "204" });
   });
 
   it("liest genau einmal, wenn der Knopf geklickt wird", async () => {
@@ -277,23 +332,18 @@ describe("Aufnahme — Absenden", () => {
     landValue.mockRejectedValue(new Error("Kein Bodenrichtwert."));
 
     const w = atSource();
-    await w.find('input[value="parcel"]').setValue();
-    await flushPromises();
-
-    await typeInto(w.findComponent(CadastralDistrictPicker).find("input"), "Moritzburg");
-    await typeInto(w.find("#q-parcel-number"), "85/1");
-    await w.findAll("button").find(b => b.text() === "Nachschlagen").trigger("click");
-    await flushPromises();
+    await lookUpParcel(w, { district: "Moritzburg", number: "85/1" });
 
     expect(resolveParcel).toHaveBeenCalledTimes(1);
   });
 
   it("schickt bei leerem Feld gar nichts los", async () => {
     const w = atSource();
-    await w.find('input[value="parcel"]').setValue();
-    await flushPromises();
 
-    await w.find("form").trigger("submit");
+    // Der Knopf ist gesperrt, und Enter im leeren Feld nimmt keine Zeile.
+    expect(findButton(w, "Grundstück finden").attributes("disabled")).toBeDefined();
+    await findButton(w, "Grundstück finden").trigger("click");
+    await w.find(".search__field input").trigger("keydown", { key: "Enter" });
     await flushPromises();
 
     expect(resolveParcel).not.toHaveBeenCalled();
@@ -303,10 +353,7 @@ describe("Aufnahme — Absenden", () => {
     readPage.mockResolvedValue({ felder: {}, beschreibung: "", bilder: [] });
 
     const w = atSource();
-    await w.find('input[value="paste"]').setValue();
-    await flushPromises();
-
-    const field = w.find("#q-paste");
+    const field = w.find(".search__field input");
     const html = "<html><meta property=\"og:latitude\" content=\"51.19\"><body>Baugrundstück in Lobstädt, 1.025 m²</body></html>";
     await field.trigger("paste", {
       clipboardData: { getData: kind => (kind === "text/html" ? html : "Baugrundstück in Lobstädt, 1.025 m²") }
@@ -314,9 +361,10 @@ describe("Aufnahme — Absenden", () => {
     await typeInto(field, "Baugrundstück in Lobstädt, 1.025 m²");
     await flushPromises();
 
-    expect(w.text()).toContain("Das HTML wurde übernommen");
+    // Dass die Seite und nicht bloß ihr Text angekommen ist, sagt der Chip.
+    expect(chip(w, "Eingefügte Anzeige").attributes("data-state")).toBe("read");
 
-    await w.find("form").trigger("submit");
+    await findButton(w, "Grundstück finden").trigger("click");
     await flushPromises();
 
     expect(readPage).toHaveBeenCalledWith(html);
@@ -326,10 +374,7 @@ describe("Aufnahme — Absenden", () => {
     readPage.mockResolvedValue({ felder: {}, beschreibung: "", bilder: [] });
 
     const w = atSource();
-    await w.find('input[value="paste"]').setValue();
-    await flushPromises();
-
-    const field = w.find("#q-paste");
+    const field = w.find(".search__field input");
     await field.trigger("paste", {
       clipboardData: { getData: () => "<html>die vorige Seite</html>" }
     });
@@ -338,7 +383,12 @@ describe("Aufnahme — Absenden", () => {
     await typeInto(field, "Ein ganz anderer Text, von Hand getippt und lang genug.");
     await flushPromises();
 
-    await w.find("form").trigger("submit");
+    expect(chip(w, "Eingefügte Anzeige").attributes("data-state")).toBe("off");
+
+    // Von Hand getippt und zu kurz, um sich selbst als Beschreibung zu
+    // verraten: der Chip legt die Lesart fest.
+    await chip(w, "Beschreibungstext").trigger("click");
+    await findButton(w, "Grundstück finden").trigger("click");
     await flushPromises();
 
     expect(readPage).toHaveBeenCalledWith("Ein ganz anderer Text, von Hand getippt und lang genug.");
@@ -364,11 +414,7 @@ describe("Ein Grundstück aus mehreren Flurstücken", () => {
     nearbyParcels.mockResolvedValue({ features: moelkauZwei.features });
 
     const w = mountWithRouter(WizardView, { path: "/aufnahme/quelle", props: { stage: "quelle" } });
-    await w.find('input[value="parcel"]').setValue();
-    await typeInto(w.findComponent(CadastralDistrictPicker).find("input"), "Mölkau");
-    await typeInto(w.find("#q-parcel-number"), "204");
-    await w.findAll("button").find(b => b.text() === "Nachschlagen").trigger("click");
-    await flushPromises();
+    await lookUpParcel(w, { district: "Mölkau", number: "204" });
     await w.setProps({ stage: "flurstueck" });
     await flushPromises();
     w.vm.composing = composing;
@@ -383,17 +429,20 @@ describe("Ein Grundstück aus mehreren Flurstücken", () => {
     resolveParcel.mockResolvedValue(moelkauNachbar);
     landValue.mockRejectedValue(new Error("Kein Bodenrichtwert."));
     nearbyParcels.mockResolvedValue({ features: moelkauZwei.features });
+    geocode.mockResolvedValue(LESSINGWEG_44);
 
     const w = mountWithRouter(WizardView, { path: "/aufnahme/quelle", props: { stage: "quelle" } });
-    w.vm.searchedAddress = "Lessingweg 44";
-    await w.find('input[value="parcel"]').setValue();
-    await typeInto(w.findComponent(CadastralDistrictPicker).find("input"), "Mölkau");
-    await typeInto(w.find("#q-parcel-number"), "205");
-    await w.findAll("button").find(b => b.text() === "Nachschlagen").trigger("click");
+    await intoQuery(w, "Lessingweg 44");
+    await settle();
+    // Die Adresszeile, nicht die Flurstückszeile: nur sie führt die Adresse
+    // mit, gegen die das Kataster seine Lagebezeichnung prüft.
+    const row = w.findAll(".hit").find(hit => hit.find(".hit__kind").text() === "Adresse");
+    await row.trigger("mousedown");
     await flushPromises();
     await w.setProps({ stage: "flurstueck" });
     await flushPromises();
 
+    expect(w.vm.searchedAddress).toBe("Lessingweg 44");
     expect(w.vm.corrected).toContain("204");
     expect(w.vm.holdFrame).toBe(false);
     expect(w.findComponent({ name: "SitePlan" }).props("holdFrame")).toBe(false);
@@ -516,10 +565,9 @@ describe("Aufnahme — beide Textwege enden im selben Schritt", () => {
     readPage.mockResolvedValue(answer);
 
     const w = atSource();
-    await w.find('input[value="text"]').setValue();
-    await flushPromises();
-    await typeInto(w.find("#q-text"), answer.beschreibung);
-    await w.find("form").trigger("submit");
+    await intoQuery(w, answer.beschreibung);
+    await chip(w, "Beschreibungstext").trigger("click");
+    await findButton(w, "Grundstück finden").trigger("click");
     await flushPromises();
 
     expect(readPage).toHaveBeenCalledWith(answer.beschreibung);
@@ -535,10 +583,9 @@ describe("Aufnahme — beide Textwege enden im selben Schritt", () => {
     readPage.mockResolvedValue(answer);
 
     const w = atSource();
-    await w.find('input[value="text"]').setValue();
-    await flushPromises();
-    await typeInto(w.find("#q-text"), answer.beschreibung);
-    await w.find("form").trigger("submit");
+    await intoQuery(w, answer.beschreibung);
+    await chip(w, "Beschreibungstext").trigger("click");
+    await findButton(w, "Grundstück finden").trigger("click");
     await flushPromises();
 
     const area = w.vm.readFields.find(f => f.key === "grundstuecksflaeche_m2");

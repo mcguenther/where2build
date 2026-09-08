@@ -164,16 +164,37 @@ export default {
     }
   },
   watch: {
-    text(value) {
-      // An empty field is a fresh start: neither the insisted reading nor the
-      // markup of the page pasted before may survive it.
-      if (!value.trim()) {
-        this.fixedKind = null;
-        this.pastedHtml = "";
+    /* The field is what everything else follows.
+     *
+     * An empty field is a fresh start — the insisted reading, the markup of
+     * the page pasted before and the unfolded pair all go with it. Leaving the
+     * parcel number behind was worse than untidy: type "85/1", clear, type
+     * "204", and the cadastre was asked for 85/1 while the field said 204.
+     * A wrong answer that looks exactly as official as the right one is the
+     * one thing this app may not produce.
+     *
+     * And while the pair is open, the number in it follows what is typed: a
+     * bare number belongs in the field that takes numbers, and retyping it
+     * there is work the reading already did. Typing into the pair itself does
+     * not touch the search field, so it stays editable. */
+    text: {
+      immediate: true,
+      handler(value) {
+        if (!value.trim()) {
+          this.fixedKind = null;
+          this.pastedHtml = "";
+          this.parcelNumber = "";
+          this.district = "";
+          this.districtEntry = null;
+          return;
+        }
+        if (!this.wantsPair) return;
+        const bare = value.trim().match(/(\d{1,5}(?:\s*\/\s*[0-9a-z]{1,3})?)$/i);
+        if (bare) this.parcelNumber = bare[1].replace(/\s+/g, "");
       }
     },
-    // A bare number belongs in the field that takes numbers; retyping it there
-    // is work the reading already did.
+    // Overruling the reading can open the pair on its own; the number the
+    // field already carries belongs in it either way.
     wantsPair(open) {
       if (!open || this.parcelNumber) return;
       const bare = this.text.trim().match(/(\d{1,5}(?:\s*\/\s*[0-9a-z]{1,3})?)$/i);
@@ -225,7 +246,7 @@ export default {
 
 .query-box__field{
   display: flex; align-items: center;
-  background: var(--w2b-white); border: 1.5px solid var(--w2b-line);
+  background: var(--w2b-surface); border: 1.5px solid var(--w2b-line);
   border-radius: var(--w2b-radius-m); padding: 6px 6px 6px 16px;
   transition: border-color .14s ease, box-shadow .14s ease;
 }

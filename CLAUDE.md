@@ -1033,6 +1033,13 @@ from the user directly. Reopen only if the user asks.
   together; sixteen clues now play over twelve seconds instead of six — and the
   screenshot script's wait after the verdict has to outlast the budget, or it
   photographs a map still in flight.
+- **A field that is emptied has to empty what it filled.** `QueryBox` unfolds
+  the district beside a bare parcel number and copies the number into it —
+  and kept it there when the search field was cleared. Type „85/1", clear,
+  type „204", and the cadastre was asked for 85/1 while the field read 204:
+  a real parcel, a wrong answer, and nothing on screen to show the
+  difference. Clearing now resets the number, the district and the insisted
+  reading together.
 - **A positional selector into the main navigation breaks the day it grows an
   entry.** `screenshots.mjs` clicked `.main-nav a:nth-child(1..4)`, so adding
   „Start" in front silently shifted every one of them by a place — the run

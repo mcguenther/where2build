@@ -229,7 +229,10 @@ export default {
 .hero__art::after{
   content: ""; position: absolute; inset: 0;
   background:
-    radial-gradient(34% 44% at 50% 40%, var(--w2b-surface) 0 42%, rgba(250,247,241,.84) 72%, transparent 100%),
+    radial-gradient(34% 44% at 50% 40%,
+      var(--w2b-surface) 0 42%,
+      color-mix(in srgb, var(--w2b-surface) 84%, transparent) 72%,
+      transparent 100%),
     linear-gradient(180deg, transparent 68%, var(--w2b-paper));
 }
 .hero__inner{

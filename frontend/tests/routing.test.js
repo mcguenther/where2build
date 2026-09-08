@@ -43,7 +43,7 @@ describe("Adressen", () => {
       ["/haustypen", "houseTypes", "Der Katalog gilt für alle Grundstücke"],
       ["/ziele", "destinations", "Hinterlegte Ziele"],
       ["/daten", "data", "Sicherung und Umzug"],
-      ["/aufnahme/quelle", "wizard", "Welcher passt zu dem, was vorliegt?"],
+      ["/aufnahme/quelle", "wizard", "alles in dasselbe Feld"],
       ["/grundstueck/plot-concave", "plot", "Abstandsflächen"]
     ];
     for (const [path, name, heading] of addresses) {
@@ -184,7 +184,7 @@ describe("Aufnahme", () => {
     const { app, router } = await openApp("/aufnahme/flurstueck");
     expect(router.currentRoute.value.fullPath).toBe("/aufnahme/quelle");
     expect(app.text()).toContain("Der begonnene Entwurf ist nicht mehr vorhanden");
-    expect(app.text()).toContain("Welcher passt zu dem, was vorliegt?");
+    expect(app.text()).toContain("alles in dasselbe Feld");
   });
 
   it("kennt keinen erfundenen Schritt", async () => {

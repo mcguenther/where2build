@@ -90,13 +90,15 @@ async function pickDistrict(page, name) {
 }
 
 /* There is no example data any more: every screenshot needs a plot that was
- * really resolved through ALKIS first. This is the app's own add flow. */
+ * really resolved through ALKIS first. This is the app's own add flow, and it
+ * starts in the one field: a bare parcel number is read as one, which unfolds
+ * the district beside it. */
 async function addPlot(page) {
   await page.click(".page-head .btn");
-  await page.getByText("Flurstück direkt").click();
+  await page.fill(".query-box input[role=\"combobox\"]", "85/1");
+  await page.waitForSelector("#q-parcel-number", { timeout: 10000 });
   await pickDistrict(page, "Liebertwolkwitz");
-  await page.fill("#q-parcel-number", "85/1");
-  await page.getByRole("button", { name: "Nachschlagen" }).click();
+  await page.getByRole("button", { name: "Grundstück finden" }).click();
   await page.waitForSelector(".wizard__preview, .site-plan", { timeout: 60000 });
 }
 

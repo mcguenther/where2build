@@ -133,4 +133,33 @@ describe("QueryBox", () => {
     expect(payload.label).toBe(`Flurstück: ${MOELKAU.name} 85/1`);
     box.unmount();
   });
+
+  it("nimmt die alte Flurstücksnummer nicht mit in die nächste Suche", async () => {
+    const box = mount(QueryBox);
+    await type(box, "85/1");
+    await flushPromises();
+    expect(box.find("#q-parcel-number").element.value).toBe("85/1");
+
+    // Emptying the field is a fresh start. Leaving the number behind asked the
+    // cadastre for 85/1 while the field said 204 -- a real parcel, a wrong
+    // answer, and nothing on screen to show it.
+    await type(box, "");
+    await flushPromises();
+    expect(box.find(".query-box__pair").exists()).toBe(false);
+
+    await type(box, "204");
+    await flushPromises();
+    expect(box.find("#q-parcel-number").element.value).toBe("204");
+
+    const district = box.find(".gemarkung input");
+    district.element.value = MOELKAU.name;
+    await district.trigger("input");
+    await flushPromises();
+    await button(box).trigger("click");
+    await flushPromises();
+
+    const [payload] = box.emitted("resolve")[0];
+    expect(payload.query.flurstuecksnummer).toBe("204");
+    box.unmount();
+  });
 });
