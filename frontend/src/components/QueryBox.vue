@@ -24,7 +24,7 @@
                 :data-state="stateOf(kind.id)"
                 :aria-pressed="fixedKind === kind.id ? 'true' : 'false'"
                 :aria-label="stateOf(kind.id) === 'set'
-                  ? `${kind.name} — festgelegt, klicken zum Aufheben`
+                  ? `${kind.name}: festgelegt, klicken zum Aufheben`
                   : `Als ${kind.name} lesen`"
                 @click="fix(kind.id)">
           {{ kind.name }}<span v-if="stateOf(kind.id) === 'set'" class="kind__off" aria-hidden="true">✕</span>
@@ -92,8 +92,8 @@ export const KIND_GROUPS = [
  * two readings are equally plausible. What the chips already say is not
  * written underneath them. */
 const NOTES = {
-  parcel: "<b>Ohne Gemarkung ist die Nummer nicht eindeutig</b> — dieselbe gibt es in Sachsen vielfach.",
-  ambiguous: "<b>Zwei Lesarten sind gleich plausibel.</b> Beide Verzeichnisse werden gefragt, statt eines zu raten — oder hier festlegen."
+  parcel: "<b>Ohne Gemarkung ist die Nummer nicht eindeutig.</b> Dieselbe gibt es in Sachsen vielfach.",
+  ambiguous: "<b>Zwei Lesarten sind gleich plausibel.</b> Beide Verzeichnisse werden gefragt, statt eines zu raten. Oder hier festlegen."
 };
 
 /** Which chips light up for a reading of `classifyQuery`. */

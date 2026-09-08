@@ -37,7 +37,7 @@
     <section v-if="stage === 'quelle' || !reachable" class="stack">
       <p class="subtitle">
         Adresse, Flurstück, Koordinate, der Link einer Anzeige oder die eingefügte
-        Anzeigenseite — alles in dasselbe Feld.
+        Anzeigenseite: alles in dasselbe Feld.
       </p>
 
       <QueryBox class="panel wizard__query" :busy="busy" @resolve="searchPicked" @read="readPayload" />
@@ -46,13 +46,13 @@
         Was getippt wurde, wird zuerst gelesen und dann nachgeschlagen: eine deutsche
         Adresse beginnt nie mit einer Ziffer, eine Koordinate sind zwei Zahlen, und ein
         Nenner (<span class="mono">85/1</span>) kommt in keiner Adresse vor. Bleiben zwei
-        Lesarten möglich, werden beide Verzeichnisse gefragt statt eine geraten — und was
+        Lesarten möglich, werden beide Verzeichnisse gefragt statt eine geraten. Was
         darunter steht, lässt sich anklicken, wenn es die falsche ist.
         <br>
         <b>Eine Anzeigenseite</b> im Browser mit <span class="mono">Strg+A</span>,
         <span class="mono">Strg+C</span> kopieren und hier einfügen: die Zwischenablage
         führt neben dem Text auch das HTML mit, und daraus kommen Preis, Fläche,
-        Koordinate und die Bilder ohne Modell. ImmoScout24 lässt keinen Serverabruf zu —
+        Koordinate und die Bilder ohne Modell. ImmoScout24 lässt keinen Serverabruf zu;
         dort ist das der Weg.
       </p>
     </section>

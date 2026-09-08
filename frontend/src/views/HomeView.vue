@@ -6,50 +6,94 @@
            out towards the middle, where the field stands. Decorative, so it is
            hidden from anything that reads the page aloud. -->
       <div class="hero__art" aria-hidden="true">
-        <svg viewBox="0 0 1440 820" preserveAspectRatio="xMidYMid slice">
+        <svg viewBox="0 0 1440 1200" preserveAspectRatio="xMidYMin slice">
           <g opacity=".9">
-        <polygon points="-342.5,587.1 1746.0,367.6 1753.1,435.2 -335.4,654.7" fill="var(--w2b-map-street-surface)"></polygon>
-        <g fill="var(--w2b-map-ground)" stroke="var(--w2b-map-neighbour)" stroke-width="1.2" stroke-linejoin="round">
-        <polygon points="-322.6,585.0 -173.4,569.3 -203.2,285.9 -352.4,301.6"></polygon>
-        <polygon points="-173.4,569.3 -77.9,559.3 -104.0,310.7 -199.5,320.7"></polygon>
-        <polygon points="-77.9,559.3 25.5,548.4 -0.6,299.8 -104.0,310.7"></polygon>
-        <polygon points="25.5,548.4 174.7,532.7 148.6,284.1 -0.6,299.8"></polygon>
-        <polygon points="341.8,515.2 445.2,504.3 419.1,255.7 315.6,266.5"></polygon>
-        <polygon points="445.2,504.3 540.7,494.3 509.3,195.9 413.8,205.9"></polygon>
-        <polygon points="540.7,494.3 644.1,483.4 614.3,200.0 510.9,210.8"></polygon>
-        <polygon points="644.1,483.4 747.5,472.5 716.2,174.2 612.7,185.0"></polygon>
-        <polygon points="747.5,472.5 851.0,461.7 824.8,213.0 721.4,223.9"></polygon>
-        <polygon points="851.0,461.7 978.3,448.3 952.1,199.6 824.8,213.0"></polygon>
-        <polygon points="978.3,448.3 1145.3,430.7 1114.0,132.4 946.9,149.9"></polygon>
-        <polygon points="1145.3,430.7 1248.8,419.8 1219.0,136.4 1115.6,147.3"></polygon>
-        <polygon points="1248.8,419.8 1352.2,409.0 1322.4,125.5 1219.0,136.4"></polygon>
-        <polygon points="1352.2,409.0 1501.4,393.3 1470.0,94.9 1320.8,110.6"></polygon>
-        <polygon points="1501.4,393.3 1628.7,379.9 1602.6,131.3 1475.3,144.7"></polygon>
-        <polygon points="1628.7,379.9 1795.8,362.4 1771.7,133.6 1604.6,151.2"></polygon>
-        <polygon points="-375.1,658.9 -233.9,644.1 -214.0,833.0 -355.3,847.9"></polygon>
-        <polygon points="-233.9,644.1 -138.4,634.0 -116.5,842.9 -212.0,852.9"></polygon>
-        <polygon points="-138.4,634.0 2.8,619.2 22.6,808.1 -118.6,823.0"></polygon>
-        <polygon points="2.8,619.2 98.3,609.1 124.4,857.8 28.9,867.8"></polygon>
-        <polygon points="98.3,609.1 229.5,595.3 249.4,784.3 118.1,798.1"></polygon>
-        <polygon points="229.5,595.3 360.8,581.5 380.7,770.5 249.4,784.3"></polygon>
-        <polygon points="360.8,581.5 492.1,567.8 512.0,756.7 380.7,770.5"></polygon>
-        <polygon points="492.1,567.8 587.6,557.7 613.7,806.3 518.2,816.4"></polygon>
-        <polygon points="587.6,557.7 728.8,542.9 754.9,791.5 613.7,806.3"></polygon>
-        <polygon points="728.8,542.9 885.9,526.4 912.1,775.0 754.9,791.5"></polygon>
-        <polygon points="885.9,526.4 1027.1,511.5 1053.3,760.1 912.1,775.0"></polygon>
-        <polygon points="1027.1,511.5 1184.3,495.0 1210.4,743.6 1053.3,760.1"></polygon>
-        <polygon points="1184.3,495.0 1279.8,485.0 1301.7,693.8 1206.2,703.8"></polygon>
-        <polygon points="1279.8,485.0 1375.2,474.9 1397.2,683.8 1301.7,693.8"></polygon>
-        <polygon points="1375.2,474.9 1516.4,460.1 1542.6,708.7 1401.4,723.6"></polygon>
-        <polygon points="1516.4,460.1 1657.7,445.2 1683.8,693.9 1542.6,708.7"></polygon>
-        <polygon points="1657.7,445.2 1814.8,428.7 1834.7,617.7 1677.5,634.2"></polygon>
-        </g>
-        <polygon points="174.7,532.7 341.8,515.2 312.0,231.7 144.9,249.3" fill="var(--w2b-map-surface)"></polygon>
-        <path d="M174.7,532.7 L341.8,515.2 L312.0,231.7 L144.9,249.3 Z M197.8,504.2 L313.2,492.0 L288.8,260.3 L173.5,272.4 Z" fill="var(--w2b-map-setback)" fill-rule="evenodd"></path>
-        <polygon points="174.7,532.7 341.8,515.2 312.0,231.7 144.9,249.3" fill="none" stroke="var(--w2b-map-halo)" stroke-width="7" stroke-linejoin="round"></polygon>
-        <polygon points="174.7,532.7 341.8,515.2 312.0,231.7 144.9,249.3" fill="none" stroke="var(--w2b-map-boundary)" stroke-width="2.4" stroke-linejoin="round"></polygon>
-        <polygon points="197.8,504.2 313.2,492.0 288.8,260.3 173.5,272.4" fill="none" stroke="var(--w2b-map-envelope)" stroke-width="1.6" stroke-dasharray="8 6"></polygon>
-        <polygon points="207.6,462.9 299.1,453.3 288.4,351.9 196.9,361.5" fill="var(--w2b-map-design)" fill-opacity=".85" stroke="var(--w2b-map-design-edge)" stroke-width="1.8" stroke-linejoin="round"></polygon>
+            <polygon points="-402.1,463.4 1845.5,227.1 1852.6,294.8 -395.0,531.0" fill="var(--w2b-map-street-surface)"></polygon>
+            <g fill="var(--w2b-map-ground)" stroke="var(--w2b-map-neighbour)" stroke-width="1.2" stroke-linejoin="round">
+            <polygon points="-402.1,463.4 -306.7,453.3 -338.0,155.0 -433.5,165.0"></polygon>
+            <polygon points="-306.7,453.3 -211.2,443.3 -241.0,159.9 -336.4,169.9"></polygon>
+            <polygon points="-211.2,443.3 -83.9,429.9 -115.2,131.6 -242.5,144.9"></polygon>
+            <polygon points="-83.9,429.9 33.5,417.6 3.7,134.1 -113.7,146.5"></polygon>
+            <polygon points="33.5,417.6 136.9,406.7 105.5,108.4 2.1,119.2"></polygon>
+            <polygon points="286.1,391.0 389.5,380.2 363.4,131.5 259.9,142.4"></polygon>
+            <polygon points="389.5,380.2 556.6,362.6 525.2,64.2 358.2,81.8"></polygon>
+            <polygon points="556.6,362.6 652.1,352.6 622.3,69.1 526.8,79.2"></polygon>
+            <polygon points="652.1,352.6 819.1,335.0 793.0,86.4 625.9,103.9"></polygon>
+            <polygon points="819.1,335.0 986.2,317.4 960.1,68.8 793.0,86.4"></polygon>
+            <polygon points="986.2,317.4 1089.7,306.6 1063.5,57.9 960.1,68.8"></polygon>
+            <polygon points="1089.7,306.6 1217.0,293.2 1187.2,9.8 1059.9,23.1"></polygon>
+            <polygon points="1217.0,293.2 1384.0,275.6 1357.9,27.0 1190.8,44.6"></polygon>
+            <polygon points="1384.0,275.6 1479.5,265.6 1455.5,36.9 1360.0,46.9"></polygon>
+            <polygon points="1479.5,265.6 1575.0,255.6 1545.2,-27.9 1449.7,-17.8"></polygon>
+            <polygon points="1575.0,255.6 1742.1,238.0 1712.3,-45.4 1545.2,-27.9"></polygon>
+            <polygon points="1742.1,238.0 1859.4,225.7 1835.4,-3.1 1718.0,9.3"></polygon>
+            <polygon points="-395.0,531.0 -283.6,519.3 -261.7,728.1 -373.1,739.8"></polygon>
+            <polygon points="-283.6,519.3 -152.4,505.5 -126.2,754.1 -257.5,767.9"></polygon>
+            <polygon points="-152.4,505.5 4.8,489.0 30.9,737.6 -126.2,754.1"></polygon>
+            <polygon points="4.8,489.0 146.0,474.1 167.9,683.0 26.7,697.8"></polygon>
+            <polygon points="146.0,474.1 303.1,457.6 329.3,706.2 172.1,722.8"></polygon>
+            <polygon points="303.1,457.6 398.6,447.6 418.5,636.5 323.0,646.6"></polygon>
+            <polygon points="398.6,447.6 555.7,431.1 577.7,639.9 420.6,656.4"></polygon>
+            <polygon points="555.7,431.1 687.0,417.3 706.9,606.2 575.6,620.0"></polygon>
+            <polygon points="687.0,417.3 818.3,403.5 844.4,652.1 713.2,665.9"></polygon>
+            <polygon points="818.3,403.5 949.6,389.7 975.7,638.3 844.4,652.1"></polygon>
+            <polygon points="949.6,389.7 1061.0,378.0 1082.9,586.8 971.5,598.5"></polygon>
+            <polygon points="1061.0,378.0 1192.2,364.2 1212.1,553.1 1080.8,566.9"></polygon>
+            <polygon points="1192.2,364.2 1323.5,350.4 1345.5,559.2 1214.2,573.0"></polygon>
+            <polygon points="1323.5,350.4 1419.0,340.3 1440.9,549.2 1345.5,559.2"></polygon>
+            <polygon points="1419.0,340.3 1530.4,328.6 1556.5,577.3 1445.1,589.0"></polygon>
+            <polygon points="1530.4,328.6 1641.8,316.9 1667.9,565.5 1556.5,577.3"></polygon>
+            <polygon points="1641.8,316.9 1773.0,303.1 1792.9,492.1 1661.6,505.9"></polygon>
+            <polygon points="1773.0,303.1 1868.5,293.1 1888.4,482.0 1792.9,492.1"></polygon>
+            </g>
+            <polygon points="-402.1,1003.4 1845.5,767.1 1852.6,834.8 -395.0,1071.0" fill="var(--w2b-map-street-surface)"></polygon>
+            <g fill="var(--w2b-map-ground)" stroke="var(--w2b-map-neighbour)" stroke-width="1.2" stroke-linejoin="round">
+            <polygon points="-402.1,1003.4 -253.0,987.7 -277.0,758.9 -426.2,774.6"></polygon>
+            <polygon points="-253.0,987.7 -149.5,976.8 -173.6,748.1 -277.0,758.9"></polygon>
+            <polygon points="-149.5,976.8 -0.3,961.1 -26.5,712.5 -175.7,728.2"></polygon>
+            <polygon points="-0.3,961.1 95.1,951.1 69.0,702.5 -26.5,712.5"></polygon>
+            <polygon points="95.1,951.1 222.4,937.7 192.6,654.3 65.3,667.7"></polygon>
+            <polygon points="222.4,937.7 339.8,925.4 313.7,676.8 196.3,689.1"></polygon>
+            <polygon points="339.8,925.4 443.2,914.5 417.1,665.9 313.7,676.8"></polygon>
+            <polygon points="443.2,914.5 538.7,904.5 507.3,606.1 411.9,616.2"></polygon>
+            <polygon points="538.7,904.5 666.0,891.1 636.2,607.7 508.9,621.0"></polygon>
+            <polygon points="666.0,891.1 761.5,881.1 731.7,597.6 636.2,607.7"></polygon>
+            <polygon points="761.5,881.1 878.8,868.7 849.0,585.3 731.7,597.6"></polygon>
+            <polygon points="878.8,868.7 974.3,858.7 942.9,560.3 847.5,570.4"></polygon>
+            <polygon points="974.3,858.7 1077.7,847.8 1046.4,549.5 942.9,560.3"></polygon>
+            <polygon points="1077.7,847.8 1173.2,837.8 1143.4,554.4 1047.9,564.4"></polygon>
+            <polygon points="1173.2,837.8 1276.6,826.9 1252.6,598.2 1149.2,609.1"></polygon>
+            <polygon points="1276.6,826.9 1443.7,809.4 1419.7,580.6 1252.6,598.2"></polygon>
+            <polygon points="1443.7,809.4 1547.1,798.5 1517.3,515.0 1413.9,525.9"></polygon>
+            <polygon points="1547.1,798.5 1674.4,785.1 1643.1,486.8 1515.8,500.1"></polygon>
+            <polygon points="1674.4,785.1 1841.5,767.5 1815.4,518.9 1648.3,536.5"></polygon>
+            <polygon points="1841.5,767.5 1944.9,756.7 1915.2,473.2 1811.7,484.1"></polygon>
+            <polygon points="-395.0,1071.0 -299.5,1061.0 -273.4,1309.6 -368.9,1319.6"></polygon>
+            <polygon points="-299.5,1061.0 -142.4,1044.4 -120.5,1253.3 -277.6,1269.8"></polygon>
+            <polygon points="-142.4,1044.4 -1.2,1029.6 24.9,1278.2 -116.3,1293.1"></polygon>
+            <polygon points="-1.2,1029.6 155.9,1013.1 182.1,1261.7 24.9,1278.2"></polygon>
+            <polygon points="155.9,1013.1 287.2,999.3 309.2,1208.1 177.9,1221.9"></polygon>
+            <polygon points="287.2,999.3 418.5,985.5 440.4,1194.3 309.2,1208.1"></polygon>
+            <polygon points="418.5,985.5 559.7,970.6 579.6,1159.6 438.4,1174.4"></polygon>
+            <polygon points="559.7,970.6 655.2,960.6 677.1,1169.5 581.7,1179.5"></polygon>
+            <polygon points="655.2,960.6 796.4,945.8 822.5,1194.4 681.3,1209.2"></polygon>
+            <polygon points="796.4,945.8 953.5,929.3 973.4,1118.2 816.3,1134.7"></polygon>
+            <polygon points="953.5,929.3 1064.9,917.5 1086.9,1126.4 975.5,1138.1"></polygon>
+            <polygon points="1064.9,917.5 1206.2,902.7 1232.3,1151.3 1091.1,1166.2"></polygon>
+            <polygon points="1206.2,902.7 1347.4,887.9 1369.3,1096.7 1228.1,1111.5"></polygon>
+            <polygon points="1347.4,887.9 1458.8,876.2 1480.7,1085.0 1369.3,1096.7"></polygon>
+            <polygon points="1458.8,876.2 1554.2,866.1 1580.4,1114.7 1484.9,1124.8"></polygon>
+            <polygon points="1554.2,866.1 1649.7,856.1 1669.6,1045.0 1574.1,1055.1"></polygon>
+            <polygon points="1649.7,856.1 1745.2,846.0 1765.0,1035.0 1669.6,1045.0"></polygon>
+            <polygon points="1745.2,846.0 1840.7,836.0 1862.6,1044.9 1767.1,1054.9"></polygon>
+            <polygon points="1840.7,836.0 1981.9,821.2 2003.8,1030.0 1862.6,1044.9"></polygon>
+            </g>
+            <polygon points="136.9,406.7 286.1,391.0 256.3,107.6 107.1,123.3" fill="var(--w2b-map-surface)"></polygon>
+            <path d="M136.9,406.7 L286.1,391.0 L256.3,107.6 L107.1,123.3 Z M160.0,378.1 L257.5,367.9 L233.1,136.2 L135.7,146.4 Z" fill="var(--w2b-map-setback)" fill-rule="evenodd"></path>
+            <polygon points="136.9,406.7 286.1,391.0 256.3,107.6 107.1,123.3" fill="none" stroke="var(--w2b-map-halo)" stroke-width="7" stroke-linejoin="round"></polygon>
+            <polygon points="136.9,406.7 286.1,391.0 256.3,107.6 107.1,123.3" fill="none" stroke="var(--w2b-map-boundary)" stroke-width="2.4" stroke-linejoin="round"></polygon>
+            <polygon points="160.0,378.1 257.5,367.9 233.1,136.2 135.7,146.4" fill="none" stroke="var(--w2b-map-envelope)" stroke-width="1.6" stroke-dasharray="8 6"></polygon>
+            <polygon points="169.8,336.9 243.4,329.2 232.7,227.7 159.1,235.4" fill="var(--w2b-map-design)" fill-opacity=".85" stroke="var(--w2b-map-design-edge)" stroke-width="1.8" stroke-linejoin="round"></polygon>
           </g>
         </svg>
       </div>
@@ -60,10 +104,10 @@
         <h1 v-else>Aus einer Anzeige wird ein <em>geprüftes Grundstück</em>.</h1>
 
         <p class="hero__sub" v-if="hasPlots">
-          Ein neuer Fall beginnt hier — unten steht, was zuletzt dazukam.
+          Ein neuer Fall beginnt hier. Unten steht, was zuletzt dazukam.
         </p>
         <p class="hero__sub" v-else>
-          Link einfügen — gesucht wird das Flurstück im Liegenschaftskataster, gemessen wird
+          Link einfügen: gesucht wird das Flurstück im Liegenschaftskataster, gemessen wird
           amtlich, der Preis geht gegen den Bodenrichtwert, und das Haus stellt sich in die
           Abstandsflächen.
         </p>
@@ -72,7 +116,7 @@
 
         <p v-if="!backendUp" class="notice notice--error hero__notice" role="alert">
           Das Backend antwortet nicht. Ohne es lassen sich weder Flurstücke nachschlagen noch
-          Seiten auslesen — gespeicherte Grundstücke bleiben aber sichtbar.
+          Seiten auslesen. Gespeicherte Grundstücke bleiben sichtbar.
         </p>
 
         <div v-if="!hasPlots" class="trust">
@@ -125,17 +169,17 @@
           <p class="eyebrow">Zweitens</p>
           <h4>Prüfen, was darauf passt</h4>
           <p>Amtliche Fläche gegen Bodenrichtwert, Abstandsflächen nach § 6 SächsBO,
-            Lärm, Hochwasser, Radon — und ein Haustyp im Baufenster.</p>
+            Lärm, Hochwasser, Radon. Dazu ein Haustyp im Baufenster.</p>
         </div>
         <div class="steps__item">
           <p class="eyebrow">Drittens</p>
           <h4>Wege messen</h4>
-          <p>Zu Arbeit, Schule, Bahnhof — mit dem Fahrplan gerechnet, und die Karte
+          <p>Zu Arbeit, Schule, Bahnhof, mit dem Fahrplan gerechnet. Die Karte
             druckt sich mit aus.</p>
         </div>
       </div>
       <p class="home__storage">
-        Alles bleibt im Speicher dieses Browsers — zum Mitnehmen gibt es unter „Daten“
+        Alles bleibt im Speicher dieses Browsers. Zum Mitnehmen gibt es unter „Daten“
         den Austausch als JSON.
       </p>
     </section>
@@ -222,8 +266,11 @@ export default {
 /* The cards below carry the picture; here the fabric is only texture. */
 .hero--slim .hero__art{ opacity: .34; }
 
-.hero__art{ position: absolute; inset: 0; pointer-events: none; }
-.hero__art svg{ width: 100%; height: 100%; display: block; }
+.hero__art{ position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+/* Fixed box, anchored at the top: the suggestion list makes the reception
+   taller, and a ground that rescales with it reads as slipped. Tall enough
+   that growing never reaches its lower edge, so nothing looks cut off either. */
+.hero__art svg{ display: block; width: 100%; height: max(100%, 1100px); }
 /* Towards the middle the fabric gives way to paper: a drawing behind a field
    is a background, and a background must not be read. */
 .hero__art::after{
@@ -267,6 +314,12 @@ export default {
   padding: var(--w2b-space-3) var(--w2b-space-5);
   border-top: 1px solid var(--w2b-line-faint);
   font-size: var(--w2b-text-s); color: var(--w2b-muted);
+}
+
+@media (max-width: 700px){
+  /* At phone widths the fixed box would crop the fabric to a few huge
+     parcels; a lower one keeps it readable as what it is. */
+  .hero__art svg{ height: max(100%, 820px); }
 }
 
 @media (max-width: 560px){
