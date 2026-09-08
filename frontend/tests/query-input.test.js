@@ -108,6 +108,53 @@ describe("classifyQuery", () => {
     });
   });
 
+  describe("links and listing text", () => {
+    /* Both come from the recorded advert in `backend/tests/fixtures/`, so the
+       shapes are the ones the paste field really receives. */
+    const URL = "https://www.kleinanzeigen.de/s-anzeige/baugrundstueck-ca-1-025qm-direkt-bebaubar/3423861748-207-3935";
+    const DESCRIPTION = "Hier könnte Ihr neues Eigenheim stehen... entsprechend §34 BauGB ist eine "
+      + "Bebauung entsprechend der Umgebungsbebauung möglich. Einem Einfamilien-/ Doppelhaus oder "
+      + "ggf. Mehrfamilienhaus sollte unter gewissen Auflagen nichts im Wege stehen.";
+
+    it("reads a link as a link, and keeps it whole", () => {
+      const r = classifyQuery(URL);
+      expect(r.kind).toBe("url");
+      expect(r.certain).toBe(true);
+      expect(r.url).toBe(URL);
+    });
+
+    it("reads a description as prose once it is longer than a query", () => {
+      expect(DESCRIPTION.length).toBeGreaterThan(160);
+      const r = classifyQuery(DESCRIPTION);
+      expect(r.kind).toBe("prose");
+      expect(r.certain).toBe(true);
+      expect(r.text).toBe(DESCRIPTION);
+    });
+
+    it("reads a short but multi-line text as prose too", () => {
+      // A second line is a paste, never a query: nobody types one into a field.
+      const r = classifyQuery("Ortsteil Lobstädt\nStrom, Wasser & Gas liegt in der Straße an.");
+      expect(r.kind).toBe("prose");
+    });
+
+    it("asks no index about either of them", () => {
+      // The point of the two readings: one is fetched, the other read. Handing
+      // a paragraph to the address index is wasted work in both directions.
+      expect(classifyQuery(URL).search).toEqual([]);
+      expect(classifyQuery(DESCRIPTION).search).toEqual([]);
+    });
+
+    it("leaves an address and a parcel number exactly as they were", () => {
+      // The two readings are new; the short ones they sit in front of must not
+      // have moved. A link is only a link with a scheme, and "http" alone is a
+      // street on its way to being typed.
+      expect(classifyQuery("Lessingweg 44").kind).toBe("ambiguous");
+      expect(classifyQuery("Mölkau 85/1").kind).toBe("parcel");
+      expect(classifyQuery("51.33652, 12.44176").kind).toBe("coordinate");
+      expect(classifyQuery("www.kleinanzeigen.de").kind).not.toBe("url");
+    });
+  });
+
   describe("the digit rule", () => {
     it("stops asking the address index once a digit leads", () => {
       // Neither a coordinate nor a parcel number -- and no German address
@@ -132,6 +179,9 @@ describe("classifyQuery", () => {
       expect(queryKindLabel(classifyQuery("Mölkau 85/1"))).toBe("Flurstück");
       expect(queryKindLabel(classifyQuery("85/1"))).toBe("Flurstück — Gemarkung fehlt");
       expect(queryKindLabel(classifyQuery("Lessingweg 44"))).toBe("Adresse oder Flurstück");
+      expect(queryKindLabel(classifyQuery("https://www.kleinanzeigen.de/s-anzeige/x/1-2-3")))
+        .toBe("Link zur Anzeige");
+      expect(queryKindLabel(classifyQuery("Ortsteil Lobstädt\nStrom liegt an."))).toBe("Beschreibungstext");
     });
   });
 });

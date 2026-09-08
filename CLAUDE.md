@@ -1033,6 +1033,20 @@ from the user directly. Reopen only if the user asks.
   together; sixteen clues now play over twelve seconds instead of six — and the
   screenshot script's wait after the verdict has to outlast the budget, or it
   photographs a map still in flight.
+- **A positional selector into the main navigation breaks the day it grows an
+  entry.** `screenshots.mjs` clicked `.main-nav a:nth-child(1..4)`, so adding
+  „Start" in front silently shifted every one of them by a place — the run
+  would have photographed the wrong pages, not failed. It clicks by name now.
+  Two things to know: a nav entry carries its counter inside its text
+  („Grundstücke7"), so an exact-name match finds nothing, and the brand link's
+  aria-label is „Zur Startseite", so a loose match for „Start" finds two. The
+  selector is `.main-nav a` filtered by text.
+- **A button passed into another component's slot is not a flex child of your
+  own box.** `QueryBox` puts its button into `PlotSearch`'s field through a
+  slot, so the container query that was supposed to drop it below the input at
+  narrow widths wrapped the wrong element: the button stayed beside the input
+  and squeezed it to zero width, with the placeholder simply gone. What has to
+  wrap is the row the button actually sits in — `:deep(.search__field)`.
 - **`page.fill` with 171 kB of markup takes ~27 s** — Playwright inserts it
   through the input pipeline — which sits just under the 30 s default and fails
   whenever the machine is busy. Measured identical before and after the change

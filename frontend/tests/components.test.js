@@ -337,7 +337,7 @@ describe("Grundstückskarte", () => {
 describe("Leere Zustände", () => {
   it("bietet die Aufnahme an, wenn noch nichts da ist", () => {
     state.data = { version: 2, plots: [], houseTypes: [], destinations: [], selection: [] };
-    const t = mountWithRouter(PlotsView).text();
+    const t = mountWithRouter(PlotsView, { path: "/grundstuecke" }).text();
     expect(t).toContain("Noch nichts in der Prüfung");
     expect(t).toContain("Grundstück hinzufügen");
   });

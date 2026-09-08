@@ -165,6 +165,14 @@ async function pasteInto(page, selector, text) {
   }, text);
 }
 
+/** Click a section by its name. Positional selectors break the moment the
+ *  navigation grows an entry -- which is exactly what happened when the start
+ *  page arrived. */
+async function nav(page, name) {
+  await page.locator(".main-nav a").filter({ hasText: name }).first().click();
+  await page.waitForTimeout(150);
+}
+
 async function shot(page, name, mode, zusatz = "") {
   await page.waitForTimeout(340);
   // A layout that pushes the page sideways is a defect, and no screenshot shows it.
@@ -188,8 +196,12 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
   await page.click(`.theme-switch button:nth-child(${mode === "hell" ? 1 : 2})`);
   await page.waitForTimeout(200);
 
-  // The empty state is a real state and worth a picture: this is what the app
-  // looks like before anything has been resolved.
+  // The start page before anything has been resolved: the field, and what the
+  // thing is for. This is the first thing anybody sees.
+  await shot(page, "start-leer", mode, narrow ? "-schmal" : "");
+
+  // The overview, still empty. A real state and worth its own picture.
+  await nav(page, "Grundstücke");
   await shot(page, "uebersicht-leer", mode, narrow ? "-schmal" : "");
 
   await page.click(".page-head .btn");                      // Grundstück hinzufügen
@@ -331,12 +343,12 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
 
   await page.click(".breadcrumb a");
 
-  await page.click('.main-nav a:nth-child(2)');               // Haustypen
+  await nav(page, "Haustypen");
   await shot(page, "haustypen", mode, narrow ? "-schmal" : "");
   if (!narrow) {
     // A destination, looked up for real: the picker is the point here, because
     // this geocoder answers "Am Kirschberg" with Bavaria as readily as Saxony.
-    await page.click('.main-nav a:nth-child(3)');             // Ziele
+    await nav(page, "Ziele");
     await page.getByRole("button", { name: /Ziel hinzufügen|Erstes Ziel anlegen/ }).first().click();
     const fields = await page.locator("input[type=text]").all();
     await fields[0].fill("Bahnhof");
@@ -347,9 +359,15 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
     await page.locator(".match-list__option").first().click();
     await shot(page, "ziele", mode);
 
+    // The start page with a stand behind it: the greeting changes and the
+    // last plots stand under the field.
+    await nav(page, "Start");
+    await page.waitForSelector(".plot-card");
+    await shot(page, "start", mode);
+
     // The overview with something on it, and the comparison mode that has to be
     // asked for. "uebersicht-leer" is the empty state and shows neither.
-    await page.click('.main-nav a:nth-child(1)');
+    await nav(page, "Grundstücke");
     await page.waitForSelector(".plot-card");
     await shot(page, "uebersicht", mode);
     await page.getByRole("button", { name: "Vergleichen" }).click();
@@ -398,7 +416,7 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
     }
     await page.click(".breadcrumb a");
 
-    await page.click('.main-nav a:nth-child(4)');             // Daten
+    await nav(page, "Daten");
     await shot(page, "daten", mode);
   }
   await ctx.close();

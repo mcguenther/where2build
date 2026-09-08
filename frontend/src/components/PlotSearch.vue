@@ -1,6 +1,6 @@
 <template>
-  <div class="search">
-    <label :for="fieldId">Adresse, Flurstück oder Koordinate</label>
+  <div class="search" :class="{ 'search--bare': bare }">
+    <label v-if="!bare" :for="fieldId">Adresse, Flurstück oder Koordinate</label>
 
     <div class="search__field">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -11,15 +11,19 @@
              role="combobox" aria-autocomplete="list"
              :aria-controls="listId" :aria-expanded="open ? 'true' : 'false'"
              :aria-activedescendant="activeIndex >= 0 && open ? optionId(activeIndex) : null"
-             placeholder="Lessingweg 44 · Mölkau 204 · 51.33652, 12.44176"
+             :placeholder="placeholder"
              :value="text"
              @input="type($event.target.value)"
+             @paste="$emit('paste', $event)"
              @focus="open = true"
              @keydown.down.prevent="move(1)"
              @keydown.up.prevent="move(-1)"
              @keydown.enter.prevent="take"
              @keydown.esc="open = false">
-      <span v-if="badge" class="search__badge" :data-certain="String(reading.certain)">{{ badge }}</span>
+      <span v-if="badge && !bare" class="search__badge" :data-certain="String(reading.certain)">{{ badge }}</span>
+      <!-- What sits beside the field is the wrapper's business: the wizard
+           puts nothing there, the start page its button. -->
+      <slot name="action"></slot>
     </div>
 
     <ul v-show="open && hits.length" :id="listId" class="search__hits"
@@ -34,10 +38,12 @@
       </li>
     </ul>
 
-    <p v-if="error" class="search__hint search__hint--warn">{{ error }}</p>
-    <p v-else-if="missing" class="search__hint">{{ missing }}</p>
-    <p v-else-if="busy" class="search__hint">Wird gesucht …</p>
-    <p v-else class="search__hint">{{ hint }}</p>
+    <template v-if="!bare">
+      <p v-if="error" class="search__hint search__hint--warn">{{ error }}</p>
+      <p v-else-if="missing" class="search__hint">{{ missing }}</p>
+      <p v-else-if="busy" class="search__hint">Wird gesucht …</p>
+      <p v-else class="search__hint">{{ hint }}</p>
+    </template>
   </div>
 </template>
 
@@ -72,12 +78,21 @@ export default {
   name: "PlotSearch",
   /** `select` carries a ready `/api/parcels/resolve` payload and the label the
    *  user picked, so the caller neither re-reads the text nor re-derives it. */
-  emits: ["select"],
+  props: {
+    /** The text, so a wrapper can read what is being typed and say something
+     *  about it. Two-way like any field: `update:modelValue` on every stroke. */
+    modelValue: { type: String, default: "" },
+    /** Without its own label, badge and hint — for a wrapper that carries
+     *  those itself. The suggestions and the keyboard stay. */
+    bare: { type: Boolean, default: false },
+    placeholder: { type: String, default: "Lessingweg 44 · Mölkau 204 · 51.33652, 12.44176" }
+  },
+  emits: ["select", "update:modelValue", "paste"],
   data() {
     instances += 1;
     return {
       uid: instances,
-      text: "",
+      text: this.modelValue,
       addresses: [],
       districts: [],
       directory: [],
@@ -86,6 +101,10 @@ export default {
       open: false,
       activeIndex: -1
     };
+  },
+  watch: {
+    // The wrapper may reset or prefill the field; typing here reports back.
+    modelValue(value) { if (value !== this.text) this.text = value; }
   },
   computed: {
     fieldId() { return `plot-search-${this.uid}`; },
@@ -188,6 +207,7 @@ export default {
 
     type(value) {
       this.text = value;
+      this.$emit("update:modelValue", value);
       this.open = true;
       this.activeIndex = -1;
       clearTimeout(this._timer);
@@ -255,6 +275,9 @@ export default {
       // number can be typed after it, rather than resolving to nothing.
       if (hit.district) {
         this.text = `${hit.district.schluessel} `;
+        // The field writes itself here, so the wrapper has to hear about it —
+        // otherwise it reasons about text the input no longer shows.
+        this.$emit("update:modelValue", this.text);
         this.activeIndex = -1;
         this.$refs.input?.focus();
         return;
@@ -270,6 +293,10 @@ export default {
 
 <style scoped>
 .search{ display: flex; flex-direction: column; gap: 6px; }
+/* Without its own label the field sits inside whatever wraps it, and that
+   wrapper brings the border and the padding. */
+.search--bare .search__field{ border: 0; background: none; padding: 0; }
+.search--bare .search__field:focus-within{ border: 0; }
 .search label{
   font-family: var(--w2b-font-display); font-weight: 600;
   font-size: var(--w2b-text-xs); color: var(--w2b-muted);

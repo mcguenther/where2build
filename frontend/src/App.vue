@@ -2,7 +2,7 @@
   <div class="shell">
     <header class="site-header no-print">
       <div class="container site-header__inner">
-        <RouterLink class="brand" :to="{ name: 'plots' }" aria-label="Zur Übersicht">
+        <RouterLink class="brand" :to="{ name: 'home' }" aria-label="Zur Startseite">
           <svg viewBox="0 0 48 48" width="30" height="30" aria-hidden="true">
             <rect x="5.5" y="5.5" width="37" height="37" rx="3.5" fill="none"
                   stroke="var(--w2b-primary)" stroke-width="3" />
@@ -65,6 +65,7 @@ export default {
   computed: {
     sections() {
       return [
+        { section: "home", to: { name: "home" }, name: "Start", count: null },
         { section: "plots", to: { name: "plots" }, name: "Grundstücke", count: state.data.plots.length },
         { section: "houseTypes", to: { name: "houseTypes" }, name: "Haustypen", count: state.data.houseTypes.length },
         { section: "destinations", to: { name: "destinations" }, name: "Ziele", count: state.data.destinations.length },

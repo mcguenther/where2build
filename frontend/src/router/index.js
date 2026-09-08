@@ -9,6 +9,7 @@
  * file writes a path by hand.
  */
 import { createRouter } from "vue-router";
+import HomeView from "../views/HomeView.vue";
 import PlotsView from "../views/PlotsView.vue";
 import PlotView from "../views/PlotView.vue";
 import WizardView from "../views/WizardView.vue";
@@ -22,9 +23,11 @@ import NotFoundView from "../views/NotFoundView.vue";
 import { WIZARD_STAGES, wizardStage } from "./stages.js";
 
 /* `meta.section` is what the header highlights: the detail page, the wizard and
- * the comparison all belong under "Grundstücke". */
+ * the comparison all belong under "Grundstücke". The start page is its own
+ * section — it is where a search begins, not where the list lives. */
 export const routes = [
-  { path: "/", name: "plots", component: PlotsView, meta: { section: "plots" } },
+  { path: "/", name: "home", component: HomeView, meta: { section: "home" } },
+  { path: "/grundstuecke", name: "plots", component: PlotsView, meta: { section: "plots" } },
   { path: "/aufnahme", redirect: () => wizardStage(0) },
   {
     // An unknown stage is a typo, not a stage: it falls through to the 404 route.

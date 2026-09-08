@@ -316,6 +316,7 @@ import PlotSearch from "../components/PlotSearch.vue";
 import ParcelSearch from "../components/ParcelSearch.vue";
 import { state, addPlot, autoSeatHouse } from "../lib/store.js";
 import { WIZARD_STAGES, wizardStage } from "../router/stages.js";
+import { takeHandoff } from "../lib/handoff.js";
 import { readListing, readPage, resolveParcel, landValue, nearbyParcels } from "../lib/api.js";
 import { queryFromFields } from "../lib/search.js";
 import { plotFromCadastre, parcelForAddress, outerRing } from "../lib/plots.js";
@@ -488,7 +489,10 @@ export default {
      *  unambiguous where two districts share a name, else the plain text. */
     gemarkungQuery() { return this.gemarkungEntry?.schluessel || this.gemarkung.trim(); }
   },
-  created() { this.checkStage(); },
+  created() {
+    this.checkStage();
+    this.takeHandoff();
+  },
   watch: {
     stage() { this.checkStage(); },
     // Emptying the field has to empty the clipboard HTML with it, or the next
@@ -497,6 +501,23 @@ export default {
   },
   methods: {
     area, euroPerSqm, num,
+
+    /** An input the start page left behind. It is the same input the first
+     *  step takes, so it runs through the same two methods — the field is
+     *  somewhere else, the work is here. */
+    takeHandoff() {
+      const input = takeHandoff();
+      if (!input) return;
+      if (input.resolve) return this.searchPicked(input.resolve);
+      if (input.read) {
+        this.source = input.read.kind === "url" ? "url" : (input.read.html ? "paste" : "text");
+        this.url = input.read.kind === "url" ? input.read.text : "";
+        this.listingText = input.read.kind === "prose" ? input.read.text : "";
+        this.pastedText = input.read.kind === "page" ? input.read.text : "";
+        this.pastedHtml = input.read.html || "";
+        return this.read();
+      }
+    },
 
     /** A stage reached without the data behind it — a reload, or the back
      *  button after the plot was created — sends the user back to the start

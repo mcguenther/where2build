@@ -37,7 +37,8 @@ describe("Adressen", () => {
   it("führt jede Ansicht unter ihrer eigenen Adresse", async () => {
     // A phrase that only that view shows — the navigation stands on every page.
     const addresses = [
-      ["/", "plots", "Meine Grundstücke"],
+      ["/", "home", "Woran heute weiterarbeiten?"],
+      ["/grundstuecke", "plots", "Meine Grundstücke"],
       ["/vergleich", "compare", "Gleicher Maßstab, gleiche Ausrichtung"],
       ["/haustypen", "houseTypes", "Der Katalog gilt für alle Grundstücke"],
       ["/ziele", "destinations", "Hinterlegte Ziele"],
@@ -60,14 +61,22 @@ describe("Adressen", () => {
   });
 
   it("hebt den Bereich hervor, zu dem die Seite gehört", async () => {
-    for (const path of ["/", "/vergleich", "/aufnahme/quelle", "/grundstueck/plot-concave"]) {
+    /** The one entry the header marks as the page one is on. Exactly one, or
+     *  the navigation says two places at once. */
+    const marked = async path => {
       const { app } = await openApp(path);
       const current = app.findAll(".main-nav a").filter(a => a.attributes("aria-current") === "page");
       expect(current, path).toHaveLength(1);
-      expect(current[0].text(), path).toContain("Grundstücke");
+      return current[0].text();
+    };
+
+    // The list, the detail page, the wizard and the comparison are one section.
+    for (const path of ["/grundstuecke", "/vergleich", "/aufnahme/quelle", "/grundstueck/plot-concave"]) {
+      expect(await marked(path), path).toContain("Grundstücke");
     }
-    const { app } = await openApp("/daten");
-    expect(app.find('.main-nav a[aria-current="page"]').text()).toContain("Daten");
+    // The start page is its own: it is where a search begins, not the list.
+    expect(await marked("/")).toContain("Start");
+    expect(await marked("/daten")).toContain("Daten");
   });
 
   it("erklärt eine unbekannte Adresse auf Deutsch", async () => {
@@ -102,7 +111,7 @@ describe("Verweis auf ein Grundstück", () => {
   });
 
   it("kommt mit dem Zurück-Knopf aus dem Grundstück zurück in die Übersicht", async () => {
-    const { app, router } = await openApp("/");
+    const { app, router } = await openApp("/grundstuecke");
     await router.push({ name: "plot", params: { id: "plot-concave" } });
     await flushPromises();
     expect(currentView(app)).toBe("plot");
@@ -189,7 +198,7 @@ describe("Auswahl für den Vergleich", () => {
     // /vergleich is a link someone can open cold. A selection that is not
     // written down is gone by then, and the page then honestly reports
     // "nothing selected" — which hides the fact that the click did nothing.
-    const { router } = await openApp("/");
+    const { router } = await openApp("/grundstuecke");
     localStorage.clear();
     state.data = realState();
 
@@ -207,7 +216,7 @@ describe("Auswahl für den Vergleich", () => {
   });
 
   it("schreibt auch das Aufheben der Auswahl weg", async () => {
-    const { router } = await openApp("/");
+    const { router } = await openApp("/grundstuecke");
     localStorage.clear();
     state.data = realState();
     state.data.selection = state.data.plots.map(p => p.id);

@@ -120,6 +120,10 @@ a{ color: var(--w2b-primary); text-underline-offset: 2px; text-decoration-thickn
    the map toolbar. One definition, here. A view that wants a different measure
    overrides the one declaration it cares about. */
 
+/* The card column: the overview and the start page both lay plots out this
+   way, and a scoped rule reaches exactly one of them. */
+.card-grid{ display: grid; grid-template-columns: repeat(auto-fill, minmax(292px, 1fr)); gap: var(--w2b-space-4); }
+
 .breadcrumb{ display: flex; align-items: center; gap: var(--w2b-space-2); font-size: var(--w2b-text-xs); color: var(--w2b-muted); }
 .breadcrumb a{ color: var(--w2b-primary); text-decoration: none; }
 .breadcrumb a:hover{ text-decoration: underline; }

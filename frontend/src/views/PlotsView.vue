@@ -117,7 +117,6 @@ export default {
 .compare-toggle[aria-pressed="true"]:hover:not(:disabled){ background: var(--w2b-primary-light); }
 .selection-bar{ display: flex; align-items: center; gap: var(--w2b-space-3); flex-wrap: wrap; padding: var(--w2b-space-3) var(--w2b-space-4); }
 .selection-bar__count{ font-size: var(--w2b-text-s); color: var(--w2b-graphite); }
-.card-grid{ display: grid; grid-template-columns: repeat(auto-fill, minmax(292px, 1fr)); gap: var(--w2b-space-4); }
 .empty-card{
   border: 1px dashed var(--w2b-line); border-radius: var(--w2b-radius-m);
   display: flex; flex-direction: column; align-items: center; justify-content: center;

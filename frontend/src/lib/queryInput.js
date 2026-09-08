@@ -15,6 +15,8 @@
  *    left is a pair — and the pair either falls inside Germany or it does not.
  *  - **A parcel number is a number, optionally over a denominator** (`85/1`,
  *    `41/e`), and it needs a cadastral district beside it to mean anything.
+ *  - **A link and a listing text are neither**: one is fetched, the other
+ *    read, and asking any index about them is wasted work.
  *
  * Where two readings stay plausible the answer says so rather than picking:
  * both indexes are local, so searching both and grouping the results costs a
@@ -37,6 +39,10 @@ const PARCEL_NUMBER = /^(\d{1,5})(?:\s*\/\s*([0-9a-z]{1,3}))?$/i;
 
 /** Six- or four-digit cadastral district key. */
 const DISTRICT_KEY = /^(?:14)?\d{4}$/;
+
+/** Beyond this, a line is not a query any more but the text of a listing.
+ *  The longest real address measured in the Saxon index is well under it. */
+const PROSE_LENGTH = 160;
 
 const inRange = (value, [low, high]) => value >= low && value <= high;
 
@@ -95,6 +101,17 @@ function asCoordinate(numbers) {
 export function classifyQuery(raw) {
   const text = String(raw ?? "").trim();
   if (!text) return { kind: "empty", certain: true, search: [] };
+
+  // 0 — a link, and a whole listing text. Neither is a place to look up: the
+  //     first is fetched, the second is read. Both would otherwise fall
+  //     through to the letters-only case and query the address index with a
+  //     paragraph.
+  if (/^https?:\/\/\S{6,}$/i.test(text)) {
+    return { kind: "url", certain: true, search: [], url: text };
+  }
+  if (text.length > PROSE_LENGTH || text.includes("\n")) {
+    return { kind: "prose", certain: true, search: [], text };
+  }
 
   const compact = text.replace(/\s+/g, "");
 
@@ -186,6 +203,10 @@ export function queryKindLabel(result) {
       return "Adresse";
     case "ambiguous":
       return "Adresse oder Flurstück";
+    case "url":
+      return "Link zur Anzeige";
+    case "prose":
+      return "Beschreibungstext";
     default:
       return "";
   }
