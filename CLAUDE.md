@@ -702,6 +702,26 @@ from the user directly. Reopen only if the user asks.
   still turn out identical and the step waits for a flight that never happens.
   That way round is a calm camera; the other way round is the twitch.
   `prefers-reduced-motion` skips it all.
+- **A sentence that changes every step must not be set as the heading.** The
+  status box above the map put the phase text in its `<h2>` at `text-xl`, and
+  those texts run from four words („Angaben aus dem Inserat lesen") to four
+  lines („Gegenprobe eine Stufe weiter (499.49 bis 504.51 m²): 1 weitere
+  Flurstücke ähnlicher Größe. Sie erfüllen …") — so the box resized under
+  itself sixteen times a run and shoved the whole stage, map included, down and
+  up with it. The heading is the phase's one-word *label* now (the same
+  vocabulary the Verlauf marks its rows with), the wording moved to the body
+  line where two lines are reserved and the running text is clamped to two, and
+  the „Abfragen ans Kataster" slot is kept in the layout while the number is
+  still unknown, because below 700 px it wraps onto its own line. Measured
+  against the live cadastre before and after: **one** box height for the whole
+  run at 1440 px (123 px) and at 390 px (155 px), with the stage's top edge
+  fixed. It still grows once when the answer lands — the verdict sentence and
+  the hint are real content — and clamping *those* to save that one change
+  would be the wrong trade.
+  The pulse along the bottom edge exists because something has to say the run
+  is alive, and what used to say it was the wording jumping about. A bar of a
+  fixed height cannot move the layout, and it needs the faint rail behind it:
+  without one the travelling segment reads as a broken border.
 - **The protocol follows the run, and stops following the moment somebody
   scrolls up.** The list is the one place the order of a run can be checked, and
   it grew past its 560 px box with the newest line always out of sight.
@@ -1286,7 +1306,7 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 - `pytest`: 563 passed, 8 skipped — one of those needs pyosmium, which only the
   index builder wants; the other seven need Tesseract and skip without it.
-- `vitest`: 557 passed — plus the integration file, excluded by `npm run test`
+- `vitest`: 560 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
 - `scripts/bookmarklet.mjs`: the handover across two origins, against the built
   app and a backend on :8000. It asserts the coordinate, which is the field

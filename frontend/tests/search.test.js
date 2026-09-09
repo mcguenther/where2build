@@ -403,6 +403,59 @@ describe("Die Suchansicht", () => {
     element.scrollTop = scrollTop;
   };
 
+  it("setzt die wechselnde Phasenzeile nicht in die Überschrift", async () => {
+    // Sie lief von vier Wörtern bis zu vier Zeilen und stand in text-xl über
+    // der Karte: jede gewonnene Zeile hat die ganze Bühne nach unten geschoben,
+    // sechzehnmal pro Lauf.
+    const wrapper = mount(ParcelSearch, {
+      props: { query: { text: "x" }, paced: true },
+      global: { stubs: { EvidenceMap: true } }
+    });
+    await flushPromises();
+
+    const long = EVENTS.find(e => e.art === "phase" && (e.text || "").length > 80);
+    expect(long).toBeTruthy();
+    wrapper.vm.phaseText = long.text;
+    wrapper.vm.phaseKey = long.phase;
+    await wrapper.vm.$nextTick();
+
+    // Die Überschrift ist das Label der Phase — ein Wort, also feste Höhe.
+    expect(wrapper.get(".suche__urteil h2").text().split(/\s+/).length).toBeLessThan(3);
+    expect(wrapper.get(".suche__urteil .eyebrow").text()).toBe("Suche läuft");
+    expect(wrapper.get(".suche__satz").text()).toBe(long.text);
+    // Auf zwei Zeilen begrenzt, damit die Höhe des Kastens feststeht.
+    expect(wrapper.get(".suche__satz").classes()).toContain("suche__satz--laeuft");
+    wrapper.unmount();
+  });
+
+  it("hält den Platz für die Abfragezahl frei, bevor sie bekannt ist", async () => {
+    // Unter 700 px bricht sie auf eine eigene Zeile um. Erst mit der Antwort zu
+    // erscheinen wäre ein weiterer Schubs für die Karte.
+    const wrapper = mount(ParcelSearch, {
+      props: { query: { text: "x" }, paced: true },
+      global: { stubs: { EvidenceMap: true } }
+    });
+    await flushPromises();
+
+    expect(wrapper.vm.requests).toBe(0);
+    expect(wrapper.find(".suche__kosten").exists()).toBe(true);
+    expect(wrapper.get(".suche__kosten").text()).toBe("");
+    wrapper.unmount();
+  });
+
+  it("zeigt einen Puls, solange der Lauf läuft, und danach keinen", async () => {
+    const running = mount(ParcelSearch, {
+      props: { query: { text: "x" }, paced: true },
+      global: { stubs: { EvidenceMap: true } }
+    });
+    await flushPromises();
+    expect(running.find(".suche__puls").exists()).toBe(true);
+    running.unmount();
+
+    const done = await openSearch();
+    expect(done.find(".suche__puls").exists()).toBe(false);
+  });
+
   it("rollt den Verlauf zum neuesten Eintrag mit", async () => {
     const wrapper = await openSearch();
     const box = wrapper.vm.$refs.protocol;

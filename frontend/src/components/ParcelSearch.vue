@@ -4,16 +4,28 @@
          "probably": a search that always produces an answer eventually
          produces a wrong one. -->
     <div class="suche__urteil" :class="`suche__urteil--${status || 'laeuft'}`" role="status">
-      <div>
+      <div class="suche__urteilstext">
+        <!-- The phase belongs in the eyebrow and its sentence in the body line.
+             It used to be the h2, where a wording that changes every step and
+             runs from four words to four lines resized the box under itself —
+             and the box sits above the map, so the whole stage moved with it. -->
         <p class="eyebrow">{{ running ? "Suche läuft" : "Ergebnis" }}</p>
-        <h2>{{ running ? phaseText : statusLabel }}</h2>
-        <p class="suche__satz">{{ running ? "" : sentence }}</p>
+        <h2>{{ running ? phaseLabel : statusLabel }}</h2>
+        <p class="suche__satz" :class="{ 'suche__satz--laeuft': running }">
+          {{ running ? phaseText : sentence }}
+        </p>
         <p v-if="hint && !running" class="suche__hinweis">{{ hint }}</p>
       </div>
       <div class="spacer"></div>
-      <p v-if="requests" class="suche__kosten">
-        {{ requests }} {{ requests === 1 ? "Abfrage" : "Abfragen" }} ans Kataster
+      <!-- Kept in the layout while it is still unknown rather than appearing
+           with the answer: below 700 px it wraps onto its own line, and a line
+           that arrives at the end is one more shove of the map. -->
+      <p class="suche__kosten">
+        <template v-if="requests">
+          {{ requests }} {{ requests === 1 ? "Abfrage" : "Abfragen" }} ans Kataster
+        </template>
       </p>
+      <span v-if="running" class="suche__puls" aria-hidden="true"></span>
     </div>
 
     <p v-if="error" class="notice notice--error" role="alert">{{ error }}</p>
@@ -276,6 +288,7 @@ export default {
       hint: "",
       requests: 0,
       phaseText: "Angaben werden gelesen …",
+      phaseKey: "ernten",
       // The run in the order it happened. Every event that reaches `apply`
       // becomes one entry, so the sequence is a fact rather than a
       // reconstruction — the clues themselves are still re-sorted by
@@ -305,6 +318,11 @@ export default {
      *  „Ergebnis“ over a half-drawn map is worse than one that waits. */
     running() { return this.streaming || this.queued > 0; },
     statusLabel() { return STATUS_LABEL[this.status] ?? "Suche"; },
+    /** Which stage the run is in. The heading it goes in has to keep its
+     *  height, so this is the phase's *label* — one word, the same vocabulary
+     *  the Verlauf marks its rows with — and the wording goes in the line
+     *  below, where two lines are reserved for it. */
+    phaseLabel() { return PHASE_LABELS[this.phaseKey] ?? "Läuft"; },
     parcelOutlineZoom() { return PARCEL_OUTLINE_MIN_ZOOM; },
     sentence() {
       return this.status
@@ -379,7 +397,7 @@ export default {
         candidates: [], huelle: null, districtOutline: null, areas: [],
         hint: "", requests: 0, steps: [], chosen: null,
         shownStep: null, highlighted: null,
-        phaseText: "Angaben werden gelesen …"
+        phaseText: "Angaben werden gelesen …", phaseKey: "ernten"
       });
 
       // The queue is what keeps the map readable. Clues arrive unevenly and
@@ -417,6 +435,7 @@ export default {
       this.queuePace = this._queue?.pace ?? DWELL_MS;
       if (event.art === "phase") {
         this.phaseText = event.text || this.phaseText;
+        this.phaseKey = event.phase || this.phaseKey;
         if (event.text) this.record({ kind: "phase", phase: event.phase, text: event.text });
       } else if (event.art === "indiz") {
         const rest = this.indicia.filter(indiz => indiz.id !== event.indiz.id);
@@ -600,19 +619,62 @@ export default {
 
 <style scoped>
 .suche__urteil{
+  position: relative;
   display: flex; align-items: flex-start; gap: var(--w2b-space-4); flex-wrap: wrap;
   padding: var(--w2b-space-4) var(--w2b-space-5);
   border: 1.5px solid var(--w2b-line); border-left-width: 5px;
   border-radius: var(--w2b-radius-m); background: var(--w2b-surface);
 }
 .suche__urteil h2{ margin: 2px 0 0; font-size: var(--w2b-text-xl); }
+.suche__urteilstext{ min-width: 0; flex: 1 1 28ch; }
+
+/* The pulse, in place of the resizing text: while a run plays, something has
+   to say it is alive, and it used to be the wording jumping about. A bar of a
+   fixed height cannot move the layout. */
+.suche__puls{
+  position: absolute; left: 0; right: 0; bottom: 0; height: 3px; overflow: hidden;
+  /* A track, not a stray line: without the rail behind it the moving segment
+     reads as a broken border rather than as something travelling along. */
+  background: var(--w2b-line-faint);
+  border-bottom-right-radius: var(--w2b-radius-m);
+}
+.suche__puls::after{
+  content: ""; position: absolute; top: 0; bottom: 0; width: 28%;
+  background: var(--w2b-primary); opacity: .75;
+  animation: w2b-suche-puls 1.5s ease-in-out infinite;
+}
+@keyframes w2b-suche-puls{
+  from{ transform: translateX(-100%); }
+  to{ transform: translateX(457%); }
+}
+@media (prefers-reduced-motion: reduce){
+  .suche__puls::after{ animation: none; width: 100%; opacity: .3; }
+}
 .suche__urteil--bestaetigt{ border-left-color: var(--w2b-primary); }
 .suche__urteil--mehrdeutig{ border-left-color: var(--w2b-secondary); }
 .suche__urteil--erfolglos{ border-left-color: var(--w2b-error); }
 .suche__urteil--laeuft{ border-left-color: var(--w2b-line); }
-.suche__satz{ margin: var(--w2b-space-2) 0 0; color: var(--w2b-graphite); font-size: var(--w2b-text-s); max-width: 74ch; }
+/* Two lines, reserved. The phase sentence changes with every step of the run
+   and the box sits above the map, so a line gained here shoves the whole stage
+   down — sixteen times per run. It reserves the taller of the two states and
+   the running wording is clamped to it; the full sentence is in the Verlauf
+   anyway, which is where a run gets read. The verdict is not clamped: it
+   settles once, and hiding half of it to save one layout change would be the
+   wrong trade. */
+.suche__satz{
+  margin: var(--w2b-space-2) 0 0; color: var(--w2b-graphite);
+  font-size: var(--w2b-text-s); max-width: 74ch;
+  line-height: 1.45; min-height: 2.9em;
+}
+.suche__satz--laeuft{
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  overflow: hidden;
+}
 .suche__hinweis{ margin: var(--w2b-space-2) 0 0; color: var(--w2b-muted); font-size: var(--w2b-text-s); max-width: 74ch; }
-.suche__kosten{ font-family: var(--w2b-font-mono); font-size: var(--w2b-text-xs); color: var(--w2b-muted); margin: 0; }
+.suche__kosten{
+  font-family: var(--w2b-font-mono); font-size: var(--w2b-text-xs);
+  color: var(--w2b-muted); margin: 0; min-height: 1.4em;
+}
 
 .konflikt{
   padding: var(--w2b-space-4); border: 1.5px dashed var(--w2b-secondary);
