@@ -18,6 +18,7 @@ import HouseTypesView from "../views/HouseTypesView.vue";
 import DestinationsView from "../views/DestinationsView.vue";
 import LocationView from "../views/LocationView.vue";
 import DataView from "../views/DataView.vue";
+import AccountView from "../views/AccountView.vue";
 import NotFoundView from "../views/NotFoundView.vue";
 import { WIZARD_STAGES, wizardStage } from "./stages.js";
 
@@ -54,6 +55,9 @@ export const routes = [
   { path: "/haustypen", name: "houseTypes", component: HouseTypesView, meta: { section: "houseTypes" } },
   { path: "/ziele", name: "destinations", component: DestinationsView, meta: { section: "destinations" } },
   { path: "/daten", name: "data", component: DataView, meta: { section: "data" } },
+  /* Reached from the name in the header rather than from the sections: it is
+     about the person, not about a part of the work. */
+  { path: "/konto", name: "account", component: AccountView, meta: { section: "account" } },
   { path: "/:pathMatch(.*)*", name: "notFound", component: NotFoundView }
 ];
 

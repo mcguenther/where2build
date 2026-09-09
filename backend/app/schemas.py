@@ -1186,6 +1186,34 @@ class GrundstueckeAntwort(BaseModel):
     )
 
 
+class KontoAntwort(BaseModel):
+    """What is held about the signed-in account, for the person it is about.
+
+    Deliberately the whole of it and not a summary: this is the answer to
+    "what do you have about me", so a field that exists in the database
+    appears here, and a person can check that the list is short.
+    """
+
+    anbieter: str = Field(
+        description="Der OpenID-Anbieter, der diese Anmeldung bestätigt hat (issuer)."
+    )
+    kennung: str = Field(
+        description="Die Kennung, unter der der Anbieter diese Person führt (subject). "
+        "Sie stammt vom Anbieter, nicht von uns."
+    )
+    anzeigename: str | None = Field(
+        default=None,
+        description="Der Name, den der Anbieter mitgegeben hat; null, wenn er keinen gab.",
+    )
+    angelegt: datetime = Field(
+        description="Wann hier zum ersten Mal etwas für dieses Konto gespeichert wurde."
+    )
+    grundstuecke: int = Field(description="Wie viele Grundstücke im Konto liegen.")
+    groesse_bytes: int = Field(
+        description="Wie viel Platz die gespeicherten Dokumente zusammen belegen."
+    )
+
+
 class SpeicherAnfrage(BaseModel):
     """A write, with the stand it builds on."""
 

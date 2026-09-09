@@ -25,16 +25,18 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Path, Response
 
-from ..deps import current_account, storage_service
+from ..deps import current_account, oidc_service, storage_service
 from ..schemas import (
     EinstellungenAntwort,
     EinstellungenGespeichert,
     GespeichertesGrundstueck,
     GrundstueckGespeichert,
     GrundstueckeAntwort,
+    KontoAntwort,
     SpeicherAnfrage,
 )
-from ..services.oidc import Identity
+from ..errors import NotFoundError
+from ..services.oidc import Identity, OidcService
 from ..services.storage import Storage
 
 router = APIRouter(prefix="/api", tags=["Konto"])
@@ -50,6 +52,77 @@ _ID = Path(
     max_length=_MAX_ID_LENGTH,
     description="Kennung des Grundstücks, wie sie das Frontend vergibt.",
 )
+
+
+@router.get(
+    "/account",
+    response_model=KontoAntwort,
+    summary="Was über dieses Konto gespeichert ist",
+    responses={
+        401: {"description": "Nicht angemeldet"},
+        404: {"description": "Für diese Anmeldung ist hier nichts gespeichert"},
+        503: {"description": "Kein Serverspeicher eingerichtet"},
+    },
+)
+async def account(
+    response: Response,
+    identity: Identity = Depends(current_account),
+    storage: Storage = Depends(storage_service),
+) -> KontoAntwort:
+    """The whole of what is held, not a summary.
+
+    404 rather than an empty answer when the row does not exist: it is created
+    on first *write*, so somebody who signs in and stores nothing has no
+    account here at all, and saying "nothing is stored about you" is the more
+    useful answer than an object full of zeroes.
+    """
+
+    response.headers.update(_NO_STORE)
+    storage.require_configured()
+    overview = await storage.account_overview(identity)
+    if overview is None:
+        raise NotFoundError(
+            "Für diese Anmeldung ist hier nichts gespeichert. Ein Konto entsteht erst, "
+            "wenn das erste Grundstück gesichert wird."
+        )
+    return KontoAntwort(
+        anbieter=overview.issuer,
+        kennung=overview.subject,
+        anzeigename=overview.anzeigename,
+        angelegt=overview.angelegt,
+        grundstuecke=overview.grundstuecke,
+        groesse_bytes=overview.groesse_bytes,
+    )
+
+
+@router.delete(
+    "/account",
+    status_code=204,
+    summary="Konto und alle Daten löschen",
+    responses={
+        204: {"description": "Gelöscht, oder es gab nichts zu löschen"},
+        401: {"description": "Nicht angemeldet"},
+        503: {"description": "Kein Serverspeicher eingerichtet"},
+    },
+)
+async def delete_account(
+    identity: Identity = Depends(current_account),
+    storage: Storage = Depends(storage_service),
+    service: OidcService = Depends(oidc_service),
+) -> Response:
+    """Erase everything and end the session in the same step.
+
+    Leaving the cookie behind would put somebody back into an account that no
+    longer exists, and the next write would quietly build a new one -- so the
+    session goes with the data. 204 either way: whether a row was there is not
+    the caller's business, and "already gone" is the outcome asked for.
+    """
+
+    storage.require_configured()
+    await storage.delete_account(identity)
+    answer = Response(status_code=204, headers=_NO_STORE)
+    service.end_session(answer)
+    return answer
 
 
 @router.get(

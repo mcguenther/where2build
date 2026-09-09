@@ -5,9 +5,10 @@
         <p class="eyebrow">Sicherung und Umzug</p>
         <h1>Daten</h1>
         <p class="page-head__sub">
-          Alles, was ihr hier eingebt, liegt im Speicher dieses Browsers: kein Konto, kein
-          Server. Zum Mitnehmen auf einen anderen Rechner oder als Sicherung gibt es den
-          Austausch als JSON.
+          Alles, was ihr hier eingebt, liegt im Speicher dieses Browsers. Mit Konto liegt
+          eine Kopie im Konto, siehe <RouterLink :to="{ name: 'account' }">Konto</RouterLink>.
+          Zum Mitnehmen auf einen anderen Rechner oder als Sicherung gibt es den Austausch
+          als JSON.
         </p>
       </div>
     </div>

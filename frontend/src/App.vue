@@ -37,9 +37,14 @@
              but the start page then says so in words instead of the app being
              silent about it, which is what made this look broken. -->
         <div v-if="state.account.angemeldet" class="account">
-          <span class="account__initials" :title="state.account.name || 'Angemeldet'"
-                aria-hidden="true">{{ initials }}</span>
-          <span class="account__name">{{ state.account.name || "Angemeldet" }}</span>
+          <!-- The name is the way to the account page: what is stored, and how
+               to get rid of it. A section of its own would put it beside the
+               work, which is not what it is about. -->
+          <RouterLink class="account__link" :to="{ name: 'account' }"
+                      :title="`Konto von ${state.account.name || 'dieser Anmeldung'}`">
+            <span class="account__initials" aria-hidden="true">{{ initials }}</span>
+            <span class="account__name">{{ state.account.name || "Angemeldet" }}</span>
+          </RouterLink>
           <button type="button" class="btn btn--quiet btn--small" @click="leave">Abmelden</button>
         </div>
         <a v-else-if="state.account.eingerichtet" class="btn btn--secondary btn--small"
@@ -219,6 +224,11 @@ main{ flex: 1; padding-top: var(--w2b-space-5); }
   background: var(--w2b-primary); color: var(--w2b-primary-on);
   font-family: var(--w2b-font-display); font-weight: 700; font-size: 12px;
 }
+.account__link{
+  display: flex; align-items: center; gap: var(--w2b-space-2);
+  text-decoration: none; border-radius: var(--w2b-radius-s);
+}
+.account__link:hover .account__name{ color: var(--w2b-primary); }
 .account__name{ font-family: var(--w2b-font-display); font-weight: 600; font-size: var(--w2b-text-s); color: var(--w2b-graphite); }
 a.btn{ text-decoration: none; display: inline-flex; align-items: center; }
 

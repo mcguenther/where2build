@@ -90,6 +90,13 @@ export const signOut = () => request("/auth/logout", { method: "POST" });
  * Only reachable while signed in; without a configured store the backend
  * answers 503 and the app stays what it is, a thing that keeps its work in
  * this browser. */
+/** Everything held about the signed-in account. 404 means nothing is stored
+ *  under this sign-in yet, which is a state and not a failure. */
+export const accountOnServer = () => request("/account");
+/** Erase the account and everything under it. The backend ends the session in
+ *  the same answer, so whoever calls this has to reload who is signed in. */
+export const deleteAccountOnServer = () => request("/account", { method: "DELETE" });
+
 export const plotsOnServer = () => request("/plots");
 export const putPlot = (id, dokument, geaendert_am) =>
   request(`/plots/${encodeURIComponent(id)}`, {

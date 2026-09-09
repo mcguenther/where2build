@@ -92,6 +92,24 @@ class StoredDocument:
     geaendert_am: datetime
 
 
+@dataclass(frozen=True)
+class AccountOverview:
+    """Everything held about one account, for the person it is about.
+
+    The three identifying fields are the whole of what a sign-in leaves here:
+    which provider vouched, the identifier it vouched with, and the display
+    name it granted. Nothing else about a person is stored anywhere in this
+    application, which is what makes the account page able to say so.
+    """
+
+    issuer: str
+    subject: str
+    anzeigename: str | None
+    angelegt: datetime
+    grundstuecke: int
+    groesse_bytes: int
+
+
 def mib(byte_count: float) -> str:
     """A byte count as German MiB: „2,0 MiB“, with a comma for the decimal."""
 
@@ -222,6 +240,64 @@ class Storage:
             identity.subject,
             identity.name,
         )
+
+    async def account_overview(self, identity: Identity) -> AccountOverview | None:
+        """What is held about this account, for the person it is about.
+
+        Every field the ``users`` row carries plus what hangs off it, so the
+        account page can show the whole of it rather than a summary somebody
+        has to trust. ``None`` means nothing has ever been stored under this
+        sign-in, which is a real state: the row is created on first write.
+        """
+
+        pool = await self._pool_or_open()
+        async with _translated(), pool.acquire() as connection:
+            row = await connection.fetchrow(
+                """
+                select u.id, u.issuer, u.subject, u.anzeigename, u.angelegt,
+                       (select count(*) from plots p where p.user_id = u.id) as grundstuecke,
+                       (select coalesce(sum(pg_column_size(p.dokument)), 0)
+                          from plots p where p.user_id = u.id) as groesse_grundstuecke,
+                       (select coalesce(sum(pg_column_size(s.dokument)), 0)
+                          from settings s where s.user_id = u.id) as groesse_rest
+                  from users u
+                 where u.issuer = $1 and u.subject = $2
+                """,
+                identity.issuer,
+                identity.subject,
+            )
+            if row is None:
+                return None
+            return AccountOverview(
+                issuer=row["issuer"],
+                subject=row["subject"],
+                anzeigename=row["anzeigename"],
+                angelegt=row["angelegt"],
+                grundstuecke=row["grundstuecke"],
+                groesse_bytes=int(row["groesse_grundstuecke"]) + int(row["groesse_rest"]),
+            )
+
+    async def delete_account(self, identity: Identity) -> bool:
+        """Erase the account and everything under it. Says whether there was one.
+
+        One statement: ``plots`` and ``settings`` both reference ``users`` with
+        ``on delete cascade``, so the row going means the rest goes with it in
+        the same transaction. There is nothing left to keep -- the display name
+        is the only personal datum here, and it lives in exactly this row.
+
+        Idempotent, like ``delete_plot``: gone is the outcome, not a
+        precondition. The boolean is for the caller's wording, not for a
+        status code.
+        """
+
+        pool = await self._pool_or_open()
+        async with _translated(), pool.acquire() as connection:
+            gone = await connection.execute(
+                "delete from users where issuer = $1 and subject = $2",
+                identity.issuer,
+                identity.subject,
+            )
+            return gone != "DELETE 0"
 
     # -- plots -------------------------------------------------------------
 

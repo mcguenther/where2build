@@ -300,6 +300,6 @@ async def logout(service: OidcService = Depends(oidc_service)) -> Response:
     # the provider itself is the provider's own page, and doing it from here
     # would sign the person out of everything else they have open.
     answer = Response(status_code=204)
-    _clear_cookie(answer, service.settings.cookie_name, path="/", settings=service.settings)
+    service.end_session(answer)
     _clear_login_cookie(answer, service)
     return answer

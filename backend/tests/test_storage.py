@@ -608,3 +608,121 @@ def test_der_upsert_auf_das_konto_serialisiert(database):
     account_blocked, plots_blocked = asyncio.run(scenario())
     assert account_blocked is True
     assert plots_blocked is False
+
+
+# --------------------------------------------------------------------------
+# The account itself: what is held, and getting rid of it
+# --------------------------------------------------------------------------
+
+
+@needs_database
+def test_the_account_page_answers_with_everything_that_is_held(account: TestClient):
+    """The whole of it, because this is the answer to "what do you have about me".
+
+    Every column of the `users` row appears, so the shortness of the list is
+    checkable rather than something to be taken on trust.
+    """
+
+    account.put("/api/plots/plot-1", json={"dokument": PLOT, "geaendert_am": None})
+    account.put("/api/settings", json={"dokument": {"version": 3}, "geaendert_am": None})
+
+    held = account.get("/api/account")
+
+    assert held.status_code == 200
+    body = held.json()
+    assert body["anbieter"] == OIDC_ISSUER
+    assert body["kennung"] == "8f1c-4711"
+    assert body["anzeigename"] == "Erika Musterfrau"
+    assert body["grundstuecke"] == 1
+    assert body["groesse_bytes"] > 0
+    assert body["angelegt"]
+    # Nothing beyond those, or the page would be claiming a completeness it
+    # does not have.
+    assert set(body) == {
+        "anbieter", "kennung", "anzeigename", "angelegt", "grundstuecke", "groesse_bytes"
+    }
+
+
+@needs_database
+def test_signing_in_without_storing_leaves_nothing_to_report(account: TestClient):
+    """404, not an object full of zeroes.
+
+    The row is created on the first write, so "nothing is stored about you" is
+    the true answer here and a nicer one than an empty account.
+    """
+
+    assert account.get("/api/account").status_code == 404
+
+
+@needs_database
+def test_deleting_the_account_takes_the_display_name_with_it(account: TestClient):
+    """Article 17 is the point: the name is the only personal datum stored.
+
+    Emptying the plots is not enough -- the `users` row carries the display
+    name the provider granted, and it used to stand there for ever.
+    """
+
+    account.put("/api/plots/plot-1", json={"dokument": PLOT, "geaendert_am": None})
+    account.put("/api/settings", json={"dokument": {"version": 3}, "geaendert_am": None})
+
+    gone = account.delete("/api/account")
+
+    assert gone.status_code == 204
+    counts = _run(
+        lambda connection: connection.fetchrow(
+            "select (select count(*) from users) as u,"
+            "       (select count(*) from plots) as p,"
+            "       (select count(*) from settings) as s"
+        )
+    )
+    assert (counts["u"], counts["p"], counts["s"]) == (0, 0, 0)
+
+
+@needs_database
+def test_deleting_the_account_ends_the_session(account: TestClient):
+    """Otherwise the next write silently builds the account back up.
+
+    Checked on the response and not on the client's cookie jar: this test
+    client's session cookie is one it set itself, with no domain, so the
+    server's delete lands beside it rather than on top of it and the jar keeps
+    both. What the server owes is the instruction, and that is what is read
+    here -- the browser end of it was walked through by hand.
+    """
+
+    account.put("/api/plots/plot-1", json={"dokument": PLOT, "geaendert_am": None})
+
+    gone = account.delete("/api/account")
+
+    [instruction] = [
+        value for value in gone.headers.get_list("set-cookie") if value.startswith("w2b_sitzung=")
+    ]
+    assert "Max-Age=0" in instruction
+    assert "Path=/" in instruction
+    # The flags have to match the ones it was set with, or the browser keeps
+    # the old cookie and only adds a second, expired one.
+    assert "HttpOnly" in instruction and "SameSite=lax" in instruction
+
+
+@needs_database
+def test_deleting_twice_is_not_an_error(account: TestClient):
+    """Gone is the outcome asked for, not a precondition."""
+
+    account.put("/api/plots/plot-1", json={"dokument": PLOT, "geaendert_am": None})
+    assert account.delete("/api/account").status_code == 204
+
+    _sign_in(account, "8f1c-4711")
+    assert account.delete("/api/account").status_code == 204
+
+
+@needs_database
+def test_one_account_cannot_delete_another(account: TestClient):
+    """The statement filters on the pair the provider guarantees, like every other."""
+
+    account.put("/api/plots/plot-1", json={"dokument": PLOT, "geaendert_am": None})
+
+    _sign_in(account, "jemand-anderes", name="Moritz Mustermann")
+    assert account.delete("/api/account").status_code == 204
+
+    # Erika's row is untouched.
+    row = _run(lambda connection: connection.fetchrow("select * from users"))
+    assert row is not None and row["subject"] == "8f1c-4711"

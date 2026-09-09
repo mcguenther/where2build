@@ -1204,12 +1204,12 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 575 passed, 27 skipped. With `TEST_DATABASE_URL` pointed at a real
-  Postgres it is 594 passed, 8 skipped — the extra 19 are the account store,
+- `pytest`: 575 passed, 33 skipped. With `TEST_DATABASE_URL` pointed at a real
+  Postgres it is 600 passed, 8 skipped — the extra 25 are the account store,
   and they are skipped rather than mocked because what they check is the
   database's own behaviour. Of the remaining 8, one needs pyosmium, which only
   the index builder wants; the other seven need Tesseract.
-- `vitest`: 571 passed — plus the integration file, excluded by `npm run test`
+- `vitest`: 579 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
 - `scripts/screenshots.mjs`: 62 images plus two print PDFs. It fails on console
   errors, on horizontal overflow, and if not a single vector tile arrived. It

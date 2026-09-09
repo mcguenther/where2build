@@ -27,6 +27,8 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlencode
 
+from fastapi import Response
+
 from .. import session
 from ..cache import DiskCache
 from ..errors import AppError, BadRequestError, NotConfiguredError, UpstreamError
@@ -168,6 +170,25 @@ class OidcService:
     @property
     def configured(self) -> bool:
         return self.settings.configured
+
+    def end_session(self, response: Response) -> None:
+        """Drop the session cookie on this response.
+
+        Here rather than in a router, because the flags have to match the ones
+        it was set with or the browser keeps the old cookie: a delete is only a
+        `Set-Cookie` with an empty value, and the path, `httponly`, `samesite`
+        and `secure` are part of the identity of the thing being replaced. Two
+        endpoints end a session -- signing out and deleting the account -- and
+        they must not each carry their own copy of that list.
+        """
+
+        response.delete_cookie(
+            self.settings.cookie_name,
+            path="/",
+            httponly=True,
+            samesite="lax",
+            secure=self.settings.cookie_secure,
+        )
 
     def session_identity(self, cookie: str | None) -> Identity | None:
         """Who this request belongs to, read from the session cookie.
