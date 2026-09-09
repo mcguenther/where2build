@@ -1146,6 +1146,91 @@ class AnmeldungStatus(BaseModel):
 
 
 # --------------------------------------------------------------------------
+# Server storage for an account (GET/PUT /api/plots, GET/PUT /api/settings)
+#
+# The field names are the frontend's own: `dokument` is its document, verbatim,
+# and `geaendert_am` the stand it was last written at. The backend does not look
+# inside `dokument` -- see app/services/storage.py for why that is a decision
+# and not an omission.
+# --------------------------------------------------------------------------
+
+
+def _aware(value: datetime | None) -> datetime | None:
+    """A moment with a time zone. A naive one is read as UTC.
+
+    The frontend echoes back exactly the string it was given, which always
+    carries an offset. A hand-written request may not, and comparing a naive
+    moment against a `timestamptz` is an error rather than a mismatch.
+    """
+
+    if value is None or value.tzinfo is not None:
+        return value
+    return value.replace(tzinfo=timezone.utc)
+
+
+class GespeichertesGrundstueck(BaseModel):
+    """One stored plot: what was written, under which id, at which stand."""
+
+    id: str
+    geaendert_am: datetime = Field(
+        description="Stand des gespeicherten Eintrags; wird beim Schreiben zurückgeschickt."
+    )
+    dokument: dict[str, Any] = Field(
+        description="Das Dokument des Frontends, unverändert."
+    )
+
+
+class GrundstueckeAntwort(BaseModel):
+    eintraege: list[GespeichertesGrundstueck] = Field(
+        description="Alle Grundstücke dieses Kontos, zuletzt geändertes zuerst."
+    )
+
+
+class SpeicherAnfrage(BaseModel):
+    """A write, with the stand it builds on."""
+
+    dokument: dict[str, Any] = Field(
+        description="Das zu speichernde Dokument. Muss ein Objekt sein; der Inhalt bleibt unangetastet."
+    )
+    geaendert_am: datetime | None = Field(
+        default=None,
+        description=(
+            "Der Stand, auf dem der Absender aufsetzt. null heißt „neu anlegen“. "
+            "Weicht er vom gespeicherten ab, antwortet der Server mit 409 und dem "
+            "aktuellen Stand, statt zu überschreiben."
+        ),
+    )
+
+    @field_validator("geaendert_am")
+    @classmethod
+    def _with_time_zone(cls, value: datetime | None) -> datetime | None:
+        return _aware(value)
+
+
+class GrundstueckGespeichert(BaseModel):
+    id: str
+    geaendert_am: datetime = Field(
+        description="Der neue Stand. Er gehört in die nächste Änderung dieses Eintrags."
+    )
+
+
+class EinstellungenAntwort(BaseModel):
+    """The rest of the document: house types, destinations, the selection."""
+
+    dokument: dict[str, Any] = Field(
+        description="Das gespeicherte Dokument; ein leeres Objekt, solange nichts abgelegt wurde."
+    )
+    geaendert_am: datetime | None = Field(
+        default=None,
+        description="null, solange für dieses Konto nichts gespeichert ist.",
+    )
+
+
+class EinstellungenGespeichert(BaseModel):
+    geaendert_am: datetime
+
+
+# --------------------------------------------------------------------------
 # Parcel search (POST /api/parcels/search)
 #
 # The search is a staircase that stops as early as it can, and it reports every

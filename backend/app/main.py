@@ -9,7 +9,8 @@ their answers in a cache, and turning pages into structured suggestions.
 from __future__ import annotations
 
 import logging
-from typing import Any
+from contextlib import asynccontextmanager
+from typing import Any, AsyncIterator
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -34,9 +35,10 @@ from .routers import (
     reachability,
     search,
     sitechecks,
+    storage,
     tiles,
 )
-from .deps import address_index, gemarkung_directory, nearby_service
+from .deps import address_index, gemarkung_directory, nearby_service, storage_service
 from .services import ocr
 from .schemas import DienstStatus, HealthResponse
 from .settings import Settings, get_settings
@@ -153,6 +155,33 @@ def _anmeldung_hinweis(settings: Settings) -> str:
     )
 
 
+def _speicher_hinweis(settings: Settings) -> str:
+    """What /api/health says about the server-side storage.
+
+    Same shape as the sign-in and the OCR sentence: absent is "not set up
+    here", never a fault. Without a database the application keeps every plot
+    in the browser and works exactly as it always has, so the message says that
+    first and what to set second.
+    """
+
+    storage_settings = settings.storage
+    if not storage_settings.configured:
+        return (
+            "Kein Serverspeicher eingerichtet; die Grundstücke bleiben in dem Browser, "
+            "in dem sie angelegt wurden, und die Anwendung ist damit vollständig "
+            "benutzbar. Zum Einrichten DATABASE_URL auf eine Postgres-Datenbank setzen "
+            "(postgresql://nutzer:passwort@host:5432/where2build); die Tabellen legt "
+            "der Server beim Start selbst an."
+        )
+    megabytes = storage_settings.max_document_bytes / (1024 * 1024)
+    return (
+        "Grundstücke, Haustypen und Ziele liegen je Konto in Postgres und stehen damit "
+        "auf jedem Gerät zur Verfügung; der Browser behält seine eigene Kopie. Grenzen "
+        f"je Konto: höchstens {storage_settings.max_plots_per_account} Grundstücke, "
+        f"ein Eintrag höchstens {megabytes:.1f} MiB. Ohne Anmeldung bleibt alles im Browser."
+    )
+
+
 def _adressen_hinweis(index: AddressIndex | None) -> str:
     """What /api/health says about the official Hauskoordinaten.
 
@@ -176,6 +205,25 @@ def _adressen_hinweis(index: AddressIndex | None) -> str:
     )
 
 
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    """Open the server storage, or do nothing at all.
+
+    Without DATABASE_URL there is no connection attempt: a development machine
+    must not need Postgres before it can resolve a parcel, and a start-up that
+    fails on a database nobody configured would make the whole backend look
+    broken. With one, the schema is applied here (CREATE TABLE IF NOT EXISTS,
+    see app/schema.sql) so the first request finds its tables.
+    """
+
+    store = storage_service()
+    await store.start()
+    try:
+        yield
+    finally:
+        await store.close()
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
 
@@ -183,19 +231,23 @@ def create_app() -> FastAPI:
         title="Grundstücks-Check Sachsen — Backend",
         version=__version__,
         description=DESCRIPTION,
+        lifespan=lifespan,
     )
 
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.app.cors_origins,
         allow_credentials=False,
-        allow_methods=["GET", "POST", "OPTIONS"],
+        # PUT and DELETE are the account storage; everything else is GET or POST.
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["*"],
     )
 
     @app.exception_handler(AppError)
     async def _app_error(_: Request, exc: AppError) -> JSONResponse:
-        return JSONResponse(status_code=exc.status_code, content={"detail": exc.message})
+        # `body` is the sentence for almost every error and a little more for
+        # a write conflict, which has to carry what is stored.
+        return JSONResponse(status_code=exc.status_code, content=exc.body)
 
     @app.exception_handler(StarletteHTTPException)
     async def _http_error(_: Request, exc: StarletteHTTPException) -> JSONResponse:
@@ -337,6 +389,12 @@ def create_app() -> FastAPI:
                     hinweis=_anmeldung_hinweis(current),
                 ),
                 DienstStatus(
+                    name="speicher",
+                    konfiguriert=current.storage.configured,
+                    endpunkt=current.storage.endpoint,
+                    hinweis=_speicher_hinweis(current),
+                ),
+                DienstStatus(
                     name="llm",
                     konfiguriert=current.llm.configured,
                     endpunkt=current.llm.base_url,
@@ -364,6 +422,7 @@ def create_app() -> FastAPI:
         neighbours,
         tiles,
         basemap,
+        storage,
     ):
         app.include_router(module.router)
 

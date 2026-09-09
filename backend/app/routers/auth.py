@@ -23,7 +23,7 @@ from .. import session
 from ..deps import oidc_service
 from ..errors import AppError
 from ..schemas import AnmeldungStatus
-from ..services.oidc import Identity, OidcService, challenge_for, new_verifier
+from ..services.oidc import OidcService, challenge_for, new_verifier
 from ..settings import OidcSettings
 
 logger = logging.getLogger(__name__)
@@ -147,16 +147,9 @@ async def me(
     response.headers.update(_NO_STORE)
     if not service.configured:
         return AnmeldungStatus(eingerichtet=False, angemeldet=False)
-    claims = session.read(
-        request.cookies.get(service.settings.cookie_name), _session_secret(service)
-    )
-    if claims is None:
+    identity = service.session_identity(request.cookies.get(service.settings.cookie_name))
+    if identity is None:
         return AnmeldungStatus(eingerichtet=True, angemeldet=False)
-    identity = Identity(
-        issuer=str(claims.get("iss") or ""),
-        subject=str(claims.get("sub") or ""),
-        name=claims.get("name") if isinstance(claims.get("name"), str) else None,
-    )
     return AnmeldungStatus(
         eingerichtet=True,
         angemeldet=True,

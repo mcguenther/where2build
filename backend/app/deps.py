@@ -8,7 +8,10 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from fastapi import Depends, Request
+
 from .address_index import AddressIndex, load_index as load_address_index
+from .errors import UnauthorizedError
 from .gemarkung_index import GemarkungDirectory, load_directory
 from .services.airquality import AirQualityService
 from .services.alkis import AlkisService
@@ -18,8 +21,9 @@ from .services.llm import LLMClient
 from .services.luis import LuisService
 from .services.motis import MotisService
 from .services.nearby import NearbyService
-from .services.oidc import OidcService
+from .services.oidc import Identity, OidcService
 from .services.overpass import OverpassService
+from .services.storage import Storage
 from .services.tiles import TileService
 from .settings import Settings, get_settings
 
@@ -108,6 +112,37 @@ def oidc_service() -> OidcService:
 
 
 @lru_cache(maxsize=1)
+def storage_service() -> Storage:
+    """The account's copy of the document. Opens nothing until it is used."""
+
+    return Storage(get_settings().storage)
+
+
+NOT_SIGNED_IN = (
+    "Für diesen Bereich ist eine Anmeldung nötig. Ohne Konto bleiben die "
+    "Grundstücke in diesem Browser und lassen sich dort unverändert weiter "
+    "bearbeiten."
+)
+
+
+def current_account(
+    request: Request, service: OidcService = Depends(oidc_service)
+) -> Identity:
+    """Who is signed in -- or a 401.
+
+    Checked before the storage routes ask whether this deployment even has a
+    database: a request has to say who it is before the server tells it
+    anything about itself, and "not signed in" is the answer the caller can
+    actually act on.
+    """
+
+    identity = service.session_identity(request.cookies.get(service.settings.cookie_name))
+    if identity is None:
+        raise UnauthorizedError(NOT_SIGNED_IN)
+    return identity
+
+
+@lru_cache(maxsize=1)
 def llm_client() -> LLMClient:
     settings = get_settings()
     return LLMClient(settings.llm, settings.app)
@@ -135,5 +170,6 @@ def reset_services() -> None:
         basemap_service,
         llm_client,
         oidc_service,
+        storage_service,
     ):
         factory.cache_clear()

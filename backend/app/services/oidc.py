@@ -27,6 +27,7 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlencode
 
+from .. import session
 from ..cache import DiskCache
 from ..errors import AppError, BadRequestError, NotConfiguredError, UpstreamError
 from ..settings import AppSettings, OidcSettings
@@ -167,6 +168,29 @@ class OidcService:
     @property
     def configured(self) -> bool:
         return self.settings.configured
+
+    def session_identity(self, cookie: str | None) -> Identity | None:
+        """Who this request belongs to, read from the session cookie.
+
+        The one place a cookie becomes an identity, so ``/api/auth/me`` and
+        every route that stores something for an account agree on what counts
+        as signed in. Every way of failing answers the same: no provider
+        configured, no cookie, a forged one, one signed with the previous
+        secret and an expired one are all simply "nobody", which is the only
+        thing a caller can act on.
+        """
+
+        if not self.configured:
+            return None
+        secret = self.settings.session_secret
+        claims = session.read(cookie, secret.get_secret_value() if secret else "")
+        if claims is None:
+            return None
+        issuer = _text(claims.get("iss"))
+        subject = _text(claims.get("sub"))
+        if not issuer or not subject:
+            return None
+        return Identity(issuer=issuer, subject=subject, name=_name(claims.get("name")))
 
     def require_configured(self) -> None:
         if not self.configured:

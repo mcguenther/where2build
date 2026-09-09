@@ -420,6 +420,67 @@ class LLMSettings(BaseSettings):
         return self.api_key is not None and bool(self.api_key.get_secret_value())
 
 
+class StorageSettings(BaseSettings):
+    """Server-side storage for signed-in accounts (env prefix ``STORAGE_``).
+
+    ``DATABASE_URL`` is deliberately unprefixed: it is the name every hosting
+    platform and every Postgres client already uses, and a deployment that has
+    a database has it under that name.
+
+    Absent, this whole feature is absent. No pool is opened, no schema is
+    applied, ``/api/plots`` and ``/api/settings`` answer 503 with a German
+    sentence and the frontend keeps every plot in the browser, exactly as it
+    did before there was a database at all. Same shape as the sign-in: a
+    development machine must not need Postgres before it can resolve a parcel.
+
+    What is stored is the frontend's own document, verbatim, as ``jsonb``. The
+    backend does not read it, and the two limits below are the only thing it
+    says about it -- see ``app/services/storage.py``.
+    """
+
+    model_config = SettingsConfigDict(env_prefix="STORAGE_", env_file=_ENV_FILE, extra="ignore")
+
+    database_url: str = Field(default="", validation_alias="DATABASE_URL")
+    # Both numbers are picked, not derived: nobody has 200 plots under
+    # appraisal, and no plot document measured so far comes near two megabytes
+    # (the largest recorded one, with routes and site checks, is ~40 kB). They
+    # exist so one account cannot fill the disk, not because a measurement
+    # pointed here, and a deployment that wants other numbers sets them.
+    max_plots_per_account: int = 200
+    max_document_bytes: int = 2 * 1024 * 1024
+    # A prototype's pool. Small on purpose: every request holds a connection
+    # for one or two statements, and Postgres' own default is 100 backends.
+    pool_min_size: int = 1
+    pool_max_size: int = 8
+    # Applies to opening a connection and to each statement. A database that
+    # does not answer in ten seconds is down, and saying so beats hanging the
+    # tab that is trying to save.
+    timeout_s: float = 10.0
+
+    @property
+    def configured(self) -> bool:
+        return bool(self.database_url.strip())
+
+    @property
+    def endpoint(self) -> str | None:
+        """The connection target without its password, for ``/api/health``.
+
+        A DSN carries credentials and the health answer is public, so the
+        password is replaced rather than shortened: a truncated secret is still
+        a secret.
+        """
+
+        url = self.database_url.strip()
+        if not url:
+            return None
+        head, separator, tail = url.rpartition("@")
+        if not separator:
+            return url
+        scheme, _, userinfo = head.rpartition("//")
+        user = userinfo.split(":", 1)[0]
+        return f"{scheme}//{user}@{tail}" if user else url
+
+
 class OidcSettings(BaseSettings):
     """Sign-in through an OpenID Connect provider (env prefix ``OIDC_``).
 
@@ -509,6 +570,7 @@ class Settings(BaseSettings):
     basemap: BasemapSettings = Field(default_factory=BasemapSettings)
     llm: LLMSettings = Field(default_factory=LLMSettings)
     oidc: OidcSettings = Field(default_factory=OidcSettings)
+    storage: StorageSettings = Field(default_factory=StorageSettings)
 
 
 @lru_cache(maxsize=1)
