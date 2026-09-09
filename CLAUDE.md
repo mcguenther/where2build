@@ -1033,6 +1033,13 @@ from the user directly. Reopen only if the user asks.
   together; sixteen clues now play over twelve seconds instead of six — and the
   screenshot script's wait after the verdict has to outlast the budget, or it
   photographs a map still in flight.
+- **A hover rule on the base class fills every variant, including the quiet
+  one.** `.btn:hover:not(:disabled)` paints Loden, and `.btn--quiet:hover`
+  only reset the text and the border, so every still button in the app went
+  solid green under the pointer with dark ink on it. It survived because a
+  screenshot never hovers; it showed up the moment a browser run happened to
+  leave the pointer on one. A variant that changes the resting background has
+  to name the hover background too.
 - **A field that is emptied has to empty what it filled.** `QueryBox` unfolds
   the district beside a bare parcel number and copies the number into it —
   and kept it there when the search field was cleared. Type „85/1", clear,

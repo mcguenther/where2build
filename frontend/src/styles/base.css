@@ -70,7 +70,11 @@ a{ color: var(--w2b-primary); text-underline-offset: 2px; text-decoration-thickn
 .btn--tertiary{ background: var(--w2b-secondary-light); color: var(--w2b-secondary-text); }
 .btn--tertiary:hover:not(:disabled){ background: var(--w2b-secondary-veil); }
 .btn--quiet{ background: transparent; color: var(--w2b-graphite); border-color: var(--w2b-line); }
-.btn--quiet:hover:not(:disabled){ color: var(--w2b-ink); border-color: var(--w2b-muted); }
+/* The background has to be named here. `.btn:hover:not(:disabled)` above
+   fills every button with Loden, and this rule only changed the text and the
+   border, so a quiet button turned solid green under the pointer, with ink on
+   green and no contrast to speak of. */
+.btn--quiet:hover:not(:disabled){ background: var(--w2b-primary-veil); color: var(--w2b-ink); border-color: var(--w2b-muted); }
 .btn--small{ padding: 5px 11px; font-size: var(--w2b-text-s); }
 .btn:disabled{ opacity: .42; cursor: not-allowed; }
 

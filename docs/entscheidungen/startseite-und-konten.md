@@ -194,8 +194,14 @@ Kein Teil der Startseite, aber Teil der Entscheidung:
 2. **Nur Frontend, kein Backend:** `QueryBox` mit Chips, neue Route `/`,
    Liste nach `/grundstuecke`, „Weitermachen“ aus dem lokalen Stand. Danach ist
    die neue Startseite fertig und angemeldet ist noch niemand.
-3. **Anmeldung:** OIDC-BFF im Backend, `/api/auth/me`, Anmeldezustand im
-   Kopfbereich. Daten bleiben lokal.
+3. **Anmeldung:** steht. OIDC als Backend-for-Frontend mit `/api/auth/login`,
+   `/callback`, `/logout`, `/me`; Authorization Code mit PKCE, `state` und
+   `nonce`; Sitzung und Handshake je in einem signierten Cookie, kein Token im
+   Browser. Ohne `OIDC_ISSUER` ändert sich nichts, und `/api/health` sagt, was
+   fehlt. Der Ablauf ist einmal echt durchgespielt worden, mit einem
+   Wegwerf-Anbieter auf `127.0.0.1`: Weiterleitung, Rücksprung, Sitzungscookie
+   (HttpOnly, SameSite=Lax), Name in der Kopfzeile, Abmelden räumt es weg.
+   Die Daten bleiben lokal, siehe Schritt 4.
 4. **Server als Speicher:** Postgres, `plots`-API, Store-Abstraktion,
    Übernahme-Banner, Grenzen pro Konto.
 
