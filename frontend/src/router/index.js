@@ -16,7 +16,6 @@ import WizardView from "../views/WizardView.vue";
 import CompareView from "../views/CompareView.vue";
 import HouseTypesView from "../views/HouseTypesView.vue";
 import DestinationsView from "../views/DestinationsView.vue";
-import SurroundingsView from "../views/SurroundingsView.vue";
 import LocationView from "../views/LocationView.vue";
 import DataView from "../views/DataView.vue";
 import NotFoundView from "../views/NotFoundView.vue";
@@ -45,12 +44,11 @@ export const routes = [
     props: true,
     meta: { section: "plots" }
   },
+  // The surroundings map lives on the plot page itself now; the address it used
+  // to have is kept because it was linkable, and leads there.
   {
     path: "/grundstueck/:id/umgebung",
-    name: "surroundings",
-    component: SurroundingsView,
-    props: true,
-    meta: { section: "plots" }
+    redirect: to => ({ name: "plot", params: { id: to.params.id } })
   },
   { path: "/vergleich", name: "compare", component: CompareView, meta: { section: "plots" } },
   { path: "/haustypen", name: "houseTypes", component: HouseTypesView, meta: { section: "houseTypes" } },
