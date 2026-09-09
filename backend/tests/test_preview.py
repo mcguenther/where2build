@@ -3,13 +3,18 @@
 The point of this file is a channel nobody can see while working: a preview is
 rendered by somebody else's server, in somebody else's app, and nothing about a
 mistake here shows up in a browser. So what is checked is what that fetch
-actually gets -- a page carrying the plot's own name, a card of the right size
-and format, and the two verbs a link expander uses.
+actually gets -- the `og:` block carrying the plot's own name, and a card of the
+right size and format.
 
-Nothing here needs a database or a tile server. The routes are checked against
-a stubbed store, because what they do is not SQL; the drawing is checked with no
-tile service at all, because a card whose ground did not arrive is a real
-outcome and the outline has to survive it.
+The block is a **fragment**, not a page: nginx splices it into the head of
+`index.html` on the shared route, so bot and browser get the same page and
+nothing has to guess which is which. What nginx does with it is checked against
+a real nginx, not here; what is checked here is what it is handed.
+
+Nothing needs a database or a tile server. The routes run against a stubbed
+store, because what they do is not SQL; the drawing runs with no tile service at
+all, because a card whose ground did not arrive is a real outcome and the
+outline has to survive it.
 """
 
 from __future__ import annotations
@@ -174,11 +179,13 @@ def test_eine_geaenderte_zeichnung_erreicht_auch_alte_links(tmp_path: Path):
     assert after != before
 
 
-# -- the page a bot reads ------------------------------------------------------
+# -- the block nginx splices in -------------------------------------------------
+
+HEAD = "/api/shares/AbCdEf123456789012/vorschau-kopf"
 
 
-def test_die_seite_traegt_den_namen_des_grundstuecks(shared: TestClient):
-    answer = shared.get("/geteilt/AbCdEf123456789012")
+def test_der_block_traegt_den_namen_des_grundstuecks(shared: TestClient):
+    answer = shared.get(HEAD)
 
     assert answer.status_code == 200
     assert answer.headers["content-type"].startswith("text/html")
@@ -187,23 +194,36 @@ def test_die_seite_traegt_den_namen_des_grundstuecks(shared: TestClient):
     assert "/api/shares/AbCdEf123456789012/vorschau.jpg" in answer.text
 
 
-def test_der_lesbare_zusatz_im_link_aendert_nichts(shared: TestClient):
-    # The tail exists so a link can grow one later without any link already
-    # sent going dead. It is read and ignored.
-    answer = shared.get("/geteilt/AbCdEf123456789012/lessingweg-44-moelkau")
+def test_der_block_ist_ein_fragment_und_keine_seite(shared: TestClient):
+    """It lands inside a head that already has one.
 
-    assert answer.status_code == 200
-    assert '<meta property="og:title" content="Lessingweg 44">' in answer.text
+    A second `<title>` or another `<html>` would not throw anywhere -- a
+    browser takes the first title and ignores the rest -- so nothing would look
+    broken while the tab of every shared plot showed the wrong name.
+    """
+
+    text = shared.get(HEAD).text
+
+    for stray in ("<html", "<head", "<title", "<!doctype"):
+        assert stray not in text.lower()
+
+
+def test_die_kanonische_adresse_traegt_keinen_lesbaren_zusatz(shared: TestClient):
+    # The tail is decoration a link may grow later. Pointing every copy of a
+    # link at one address is what a canonical URL is for.
+    assert '<meta property="og:url" content="http://testserver/geteilt/AbCdEf123456789012">' in (
+        shared.get(HEAD).text
+    )
 
 
 def test_die_beschreibung_nennt_nur_geteilte_zahlen(shared: TestClient):
-    ohne = shared.get("/geteilt/AbCdEf123456789012").text
+    ohne = shared.get(HEAD).text
     assert "Kaufpreis" not in ohne
     assert "650 m² amtliche Fläche" in ohne
 
     store = _Store(_share({**PLOT, "askingPrice": 349000}))
     fastapi_app.dependency_overrides[storage_service] = lambda: store
-    mit = shared.get("/geteilt/AbCdEf123456789012").text
+    mit = shared.get(HEAD).text
 
     assert "349.000 € Kaufpreis" in mit
 
@@ -214,28 +234,31 @@ def test_ein_name_mit_spitzen_klammern_bleibt_text(shared: TestClient):
     # what the browser stored, and nothing else reads it as markup.
     store = _Store(_share({**PLOT, "name": 'Wiese "<script>alert(1)</script>"'}))
     fastapi_app.dependency_overrides[storage_service] = lambda: store
-    answer = shared.get("/geteilt/AbCdEf123456789012")
+    answer = shared.get(HEAD)
 
     assert "<script>" not in answer.text
     assert "&lt;script&gt;" in answer.text
 
 
-def test_die_seite_bittet_darum_nicht_indexiert_zu_werden(shared: TestClient):
+def test_der_block_bittet_darum_nicht_indexiert_zu_werden(shared: TestClient):
     # Every messenger ignores this, which is what makes it the right place to
     # say it: a link meant for a family is not an invitation to a search index.
-    assert '<meta name="robots" content="noindex, nofollow">' in shared.get(
-        "/geteilt/AbCdEf123456789012"
-    ).text
+    assert '<meta name="robots" content="noindex, nofollow">' in shared.get(HEAD).text
 
 
 @pytest.mark.parametrize("shared", [None], indirect=True)
-def test_ein_abgelaufener_link_traegt_kein_bild(shared: TestClient):
-    answer = shared.get("/geteilt/AbCdEf123456789012")
+def test_ein_abgelaufener_link_liefert_nichts_und_keinen_fehler(shared: TestClient):
+    """200 and empty, not 404.
 
-    assert answer.status_code == 404
-    assert "nicht mehr" in answer.text
-    # And no og:image, so a chat shows a bare link rather than a broken picture.
-    assert "og:image" not in answer.text
+    nginx substitutes nothing for a failed include either way, so the page is
+    the same -- but a 404 per fetch would fill the error log, and the reader
+    still gets the app's own „Dieser Link führt nirgendwohin".
+    """
+
+    answer = shared.get(HEAD)
+
+    assert answer.status_code == 200
+    assert answer.text == ""
 
 
 @pytest.mark.parametrize("shared", [None], indirect=True)
@@ -251,11 +274,10 @@ def test_das_bild_kommt_als_jpeg(shared: TestClient):
     assert Image.open(io.BytesIO(answer.content)).size == preview.CARD
 
 
-def test_beide_adressen_beantworten_auch_ein_head(shared: TestClient):
+def test_das_bild_beantwortet_auch_ein_head(shared: TestClient):
     # A link expander asks HEAD first to see what it is about to fetch, and
     # Starlette adds no HEAD for a GET route -- the 405 that answered made
-    # clients skip the preview before ever reading the page.
-    assert shared.head("/geteilt/AbCdEf123456789012").status_code == 200
+    # clients skip the preview entirely.
     assert shared.head("/api/shares/AbCdEf123456789012/vorschau.jpg").status_code == 200
 
 
@@ -284,7 +306,7 @@ def test_ohne_serverspeicher_gibt_es_keine_vorschau():
     fastapi_app.dependency_overrides[storage_service] = lambda: store
     try:
         client = TestClient(fastapi_app)
-        assert client.get("/geteilt/AbCdEf123456789012").status_code == 404
+        assert client.get(HEAD).text == ""
         assert client.get("/api/shares/AbCdEf123456789012/vorschau.jpg").status_code == 404
     finally:
         fastapi_app.dependency_overrides.pop(storage_service, None)
@@ -295,21 +317,17 @@ def test_die_absolute_adresse_folgt_dem_weitergereichten_schema(
 ):
     """og:url has to name the origin the caller reached, and https matters.
 
-    A messenger that is handed `http://` for a site served over TLS fetches the
-    picture over plain HTTP, and several refuse it outright. The forwarded
-    scheme is believed only where APP_PROXY_HOPS says a proxy of ours is in
-    front -- the same rule the request budget follows, for the same reason.
+    A messenger handed `http://` for a site served over TLS fetches the picture
+    over plain HTTP, and several refuse it outright. The forwarded scheme is
+    believed only where APP_PROXY_HOPS says a proxy of ours is in front -- the
+    same rule the request budget follows, for the same reason.
     """
 
     from app.deps import reset_services
 
     headers = {"X-Forwarded-Proto": "https", "Host": "wo.example"}
-    assert "http://wo.example/geteilt" in shared.get(
-        "/geteilt/AbCdEf123456789012", headers=headers
-    ).text
+    assert "http://wo.example/geteilt" in shared.get(HEAD, headers=headers).text
 
     monkeypatch.setenv("APP_PROXY_HOPS", "1")
     reset_services()
-    assert "https://wo.example/geteilt" in shared.get(
-        "/geteilt/AbCdEf123456789012", headers=headers
-    ).text
+    assert "https://wo.example/geteilt" in shared.get(HEAD, headers=headers).text

@@ -32,7 +32,6 @@ from .routers import (
     nearby,
     neighbours,
     parcels,
-    preview,
     reachability,
     search,
     sitechecks,
@@ -515,11 +514,7 @@ def create_app() -> FastAPI:
     # our own database. Worth knowing that one of its routes has no session at
     # all -- a shared link is meant to be opened by whoever was sent it, so the
     # token is the access. See the module docstring.
-    # `preview` is the one router outside /api. It answers the shared link
-    # itself for a caller that runs no JavaScript -- a chat's preview bot --
-    # and it pays nothing for the same reason `shares` does not: it reads our
-    # own database, and the card it points at is drawn once per share.
-    for module in (auth, gemarkungen, storage, shares, preview):
+    for module in (auth, gemarkungen, storage, shares):
         app.include_router(module.router)
 
     return app

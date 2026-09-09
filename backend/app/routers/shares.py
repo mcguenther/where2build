@@ -29,7 +29,7 @@ something was once there.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Path, Response
+from fastapi import APIRouter, Depends, Path, Request, Response
 
 from ..deps import current_account, preview_service, storage_service
 from ..errors import NotFoundError
@@ -41,8 +41,10 @@ from ..schemas import (
     FreigabeUmfang,
 )
 from ..services.oidc import Identity
+from ..services import sharemeta
 from ..services.preview import PreviewService
 from ..services.storage import Storage, share_scope
+from ..settings import get_settings
 
 router = APIRouter(prefix="/api/shares", tags=["Freigaben"])
 
@@ -215,5 +217,65 @@ async def preview(
         media_type="image/jpeg",
         # Long enough that a chat's own cache carries a link doing the rounds,
         # short enough that withdrawing one takes effect the same day.
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
+
+
+def _public_base(request: Request) -> str:
+    """The origin the caller actually reached us on.
+
+    Only the caller knows it: behind the compose nginx the app answers on
+    :8080, on a server it answers on a name this process never sees. The
+    forwarded scheme is trusted only where ``APP_PROXY_HOPS`` says a proxy of
+    ours stands in front -- the same rule the request budget follows, and for
+    the same reason: a header a caller can write is not evidence.
+
+    `$http_host`, not `$host`, is what nginx has to forward here: `$host` drops
+    the port, and on the compose default every og:url would then name port 80.
+    """
+
+    host = request.headers.get("host") or request.url.netloc
+    scheme = request.url.scheme
+    if get_settings().app.proxy_hops > 0:
+        forwarded = request.headers.get("x-forwarded-proto", "")
+        if forwarded:
+            scheme = forwarded.split(",")[-1].strip() or scheme
+    return f"{scheme}://{host}"
+
+
+@router.get(
+    "/{token}/vorschau-kopf",
+    summary="Die og:-Angaben eines geteilten Grundstücks, als Fragment",
+    response_class=Response,
+    responses={200: {"content": {"text/html": {}}, "description": "Der <meta>-Block"}},
+)
+async def preview_head(
+    request: Request,
+    token: str = _TOKEN,
+    storage: Storage = Depends(storage_service),
+) -> Response:
+    """What nginx splices into the head of `index.html` on a shared link.
+
+    Not a page and not JSON: a fragment, because a preview bot runs no
+    JavaScript and the built app would otherwise hand it the same title for
+    every plot ever shared. Doing it this way means every caller gets the tags
+    -- there is nothing to recognise a bot by, and nothing to get wrong.
+
+    No session: the token is the access, exactly as for the snapshot itself.
+    An unknown or withdrawn token answers **200 with an empty body** rather
+    than 404: nginx substitutes nothing for a failed include, so the page is
+    the same either way, and 200 keeps it out of the error log. The reader then
+    sees the app's own „Dieser Link führt nirgendwohin".
+    """
+
+    empty = Response("", media_type="text/html; charset=utf-8")
+    if not storage.configured:
+        return empty
+    share = await storage.share(token)
+    if share is None:
+        return empty
+    return Response(
+        sharemeta.head(share.dokument, share.id, share.angelegt, _public_base(request)),
+        media_type="text/html; charset=utf-8",
         headers={"Cache-Control": "public, max-age=3600"},
     )

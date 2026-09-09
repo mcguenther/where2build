@@ -268,7 +268,7 @@ nothing else.
 | `POST`, `GET` | `/api/shares` | share a plot by link, and list one's own. What travels beyond the plot's registered facts is switched on per link and defaults to off |
 | `GET`, `DELETE` | `/api/shares/{token}` | the shared snapshot, and withdrawing it. The `GET` has no session: the token is the access |
 | `GET` | `/api/shares/{token}/vorschau.jpg` | the 1200 × 630 card a chat shows for that link, drawn server-side and kept for the life of the share |
-| `GET` | `/geteilt/{token}[/{slug}]` | the one route outside `/api`: the shared link as a preview bot reads it, with the `og:` tags a browser's own page cannot carry. nginx sends only those callers here |
+| `GET` | `/api/shares/{token}/vorschau-kopf` | the plot's `og:` tags as an HTML fragment; nginx splices it into the head of `index.html` on `/geteilt/…`, so a preview bot gets them without the app having to run |
 
 ## Configuration
 
@@ -343,12 +343,16 @@ once. The section is absent while the plot has no open link.
 
 Pasting the link into a chat shows a card: the plot's outline on the
 orthophoto, its name, district and area. That is drawn on the server with
-Pillow — a preview bot runs no JavaScript, so the app's own page would hand it
-the empty shell — and kept for the life of the share, so a link doing the
-rounds costs one file read. `frontend/nginx.conf` sends bots to `/geteilt/…` on
-the backend and everybody else to the app; the tell is the user agent, which is
-the only signal such a fetch carries. A bot the list does not know gets the app
-and no preview, which is where this started.
+Pillow and kept for the life of the share, so a link doing the rounds costs one
+file read.
+
+A preview bot runs no JavaScript, so the built app would hand it the same title
+for every plot ever shared. `index.html` therefore carries one server-side
+include, and `frontend/nginx.conf` switches SSI on for `/geteilt/…` alone:
+nginx fetches the plot's `og:` tags from the backend and splices them into the
+head before the file goes out. Bot or browser, both get the same page and the
+same tags — there is nothing to recognise and nothing to keep a list of. Every
+other page ships the include as an inert HTML comment and costs no request.
 
 ### Request budget
 

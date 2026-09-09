@@ -10,6 +10,14 @@
     <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
+
+    <!-- On a shared link, nginx replaces the next line with the plot's own
+         og: tags (see nginx.conf and app/services/sharemeta.py). A preview bot
+         runs no JavaScript, so without it every shared plot would announce
+         itself as "where2build" and nothing else. Everywhere else this stays
+         an ordinary HTML comment: the server-side include is only switched on
+         for /geteilt/…, so no other page pays a request for it. -->
+    <!--#include virtual="/api/shares/$token/vorschau-kopf" -->
   </head>
   <body>
     <div id="app"></div>
