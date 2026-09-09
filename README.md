@@ -313,6 +313,55 @@ The basemap follows the interface: `BASEMAP_STYLE_PATH` (default
 `styles/dark`) the dark one, and the browser asks for the variant that matches
 the resolved theme. Clearing the dark path serves the light style to everyone.
 
+### Request budget
+
+This backend owns no data. Every answer it gives is a request to somebody
+else's server — the cadastre, BORIS, the Saxon environmental server, the UBA,
+Transitous, and where it is switched on a public Overpass instance. As a
+single-seat prototype that was uncontested; the Overpass manual says occasional
+manual requests are fine. A deployment with accounts is exactly what the same
+manual calls "relying on the public instances as backend", and Transitous is
+run by volunteers. So each account gets a ceiling on the calls it can send
+outward.
+
+```
+RATELIMIT_ENABLED=true           # false for a single-seat run
+RATELIMIT_SERVICE_CALLS=600      # per account and window
+RATELIMIT_MAP_TILES=6000         # tiles and basemap, per account and window
+RATELIMIT_WINDOW_S=3600
+APP_PROXY_HOPS=1                 # only when a reverse proxy of yours is in front
+```
+
+Signed in, the budget belongs to the account; signed out, to the peer.
+`APP_PROXY_HOPS` is what makes the second one worth anything:
+`X-Forwarded-For` is a header and a header is whatever the sender typed, so it
+is read only when this says how many proxies of *yours* stand in front, and
+then from the right — nginx appends the peer it saw, so with one hop the last
+entry is the one it vouched for and everything left of it is the caller's text.
+The bundled `docker-compose.yml` serves `/api` through nginx and therefore sets
+`APP_PROXY_HOPS=1` itself; a plain `uvicorn` run leaves it at 0, where the
+header is ignored entirely. Getting that wrong in a compose deployment does not
+fail loudly — it counts every signed-out caller against nginx's own container
+address, which is one shared budget for all of them.
+
+Past the line the answer is `429` with a German `detail` that says what applies
+and when it continues, plus `Retry-After`. Map tiles have a budget of their own
+because one screen is dozens of them and the shared disk cache covers every
+repeat view; `/api/gemarkungen`, `/api/plots`, `/api/settings` and the sign-in
+ask nobody outside and pay nothing at all. The count lives in this process's
+memory — no Redis, deliberately — so with more than one worker the effective
+ceiling is that many times the number. `/api/health` reports all of that under
+`kontingent`, including that caveat.
+
+Both numbers are picked rather than derived, but there is one measurement to
+put next to them. `node scripts/screenshots.mjs` drives every view of the app
+in one pass — two themes, a narrow pass, three listing searches, one plot
+appraised end to end and both print sheets — and it costs **59 service calls
+and 1 007 map tiles** (measured 09.09.2026, cold cache). So a full
+drive-through of the whole application is a tenth of the hourly service budget
+and a sixth of the tile budget, and the screenshot run needs no exemption. What
+the ceiling actually stops is a scan, not a session.
+
 ## Things that already cost time
 
 Each of these is verified, not assumed — the details are in

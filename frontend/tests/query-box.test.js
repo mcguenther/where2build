@@ -162,4 +162,22 @@ describe("QueryBox", () => {
     expect(payload.query.flurstuecksnummer).toBe("204");
     box.unmount();
   });
+
+  it("behauptet nicht, die Gemarkung fehle, wenn sie dasteht", async () => {
+    // Der Hinweis benennt, was fehlt. Wer ihn über einem gefüllten Feld stehen
+    // lässt, widerspricht sich: die Lesart der Suchzeile ändert sich nämlich
+    // nicht, wenn das Paar darunter vollständig wird.
+    const box = mount(QueryBox);
+    await type(box, "85/1");
+    await flushPromises();
+    expect(box.find(".query-box__note").text()).toContain("Ohne Gemarkung");
+
+    const district = box.find(".gemarkung input");
+    district.element.value = MOELKAU.name;
+    await district.trigger("input");
+    await flushPromises();
+
+    expect(box.find(".query-box__note").exists()).toBe(false);
+    box.unmount();
+  });
 });

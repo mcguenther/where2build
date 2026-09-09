@@ -11,8 +11,9 @@ from functools import lru_cache
 from fastapi import Depends, Request
 
 from .address_index import AddressIndex, load_index as load_address_index
-from .errors import UnauthorizedError
+from .errors import RateLimitedError, UnauthorizedError
 from .gemarkung_index import GemarkungDirectory, load_directory
+from .ratelimit import RateLimiter, client_key, denied_message
 from .services.airquality import AirQualityService
 from .services.alkis import AlkisService
 from .services.basemap import BasemapService
@@ -143,6 +144,51 @@ def current_account(
 
 
 @lru_cache(maxsize=1)
+def service_limiter() -> RateLimiter:
+    """The budget for everything that asks an external service a question."""
+
+    limits = get_settings().rate_limit
+    return RateLimiter(
+        limit=limits.service_calls, window_s=limits.window_s, max_clients=limits.max_clients
+    )
+
+
+@lru_cache(maxsize=1)
+def map_limiter() -> RateLimiter:
+    """The budget for map tiles, which are far more numerous and far cheaper."""
+
+    limits = get_settings().rate_limit
+    return RateLimiter(
+        limit=limits.map_tiles, window_s=limits.window_s, max_clients=limits.max_clients
+    )
+
+
+def _spend(limiter: RateLimiter, request: Request, service: OidcService) -> None:
+    """Draw one call from whoever is calling, or refuse with a 429.
+
+    The identity is read here rather than through ``current_account`` because
+    being signed out is not an error on these routes: it only changes whose
+    budget is spent, from the account to the peer.
+    """
+
+    settings = get_settings()
+    if not settings.rate_limit.enabled:
+        return
+    identity = service.session_identity(request.cookies.get(service.settings.cookie_name))
+    decision = limiter.check(client_key(request, identity, settings.app.proxy_hops))
+    if not decision.allowed:
+        raise RateLimitedError(denied_message(decision), retry_after_s=decision.retry_after_s)
+
+
+def service_budget(request: Request, service: OidcService = Depends(oidc_service)) -> None:
+    _spend(service_limiter(), request, service)
+
+
+def map_budget(request: Request, service: OidcService = Depends(oidc_service)) -> None:
+    _spend(map_limiter(), request, service)
+
+
+@lru_cache(maxsize=1)
 def llm_client() -> LLMClient:
     settings = get_settings()
     return LLMClient(settings.llm, settings.app)
@@ -171,5 +217,7 @@ def reset_services() -> None:
         llm_client,
         oidc_service,
         storage_service,
+        service_limiter,
+        map_limiter,
     ):
         factory.cache_clear()

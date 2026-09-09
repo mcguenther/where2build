@@ -30,6 +30,17 @@ class AppError(Exception):
 
         return {"detail": self.message}
 
+    @property
+    def headers(self) -> dict[str, str] | None:
+        """Response headers this error needs, if any.
+
+        Almost none does; a sentence in ``detail`` is the whole answer. The
+        exception is 429, where ``Retry-After`` is the machine-readable half of
+        what the sentence says in words.
+        """
+
+        return None
+
 
 class BadRequestError(AppError):
     status_code = 400
@@ -96,3 +107,26 @@ class VersionConflictError(ConflictError):
 class PayloadTooLargeError(AppError):
     status_code = 413
     default_message = "Die Anfrage ist zu groß."
+
+
+class RateLimitedError(AppError):
+    """The account (or the peer) has spent its budget of outward calls.
+
+    Not a fault and not an accusation: the message says what applies and when
+    it continues, and ``Retry-After`` says the same in seconds. See
+    ``app/ratelimit.py`` for why there is a budget at all.
+    """
+
+    status_code = 429
+    default_message = (
+        "Das Abrufkontingent für diesen Zugang ist vorerst erreicht. "
+        "Bitte in einigen Minuten noch einmal versuchen."
+    )
+
+    def __init__(self, message: str | None = None, *, retry_after_s: int = 60) -> None:
+        super().__init__(message)
+        self.retry_after_s = max(1, int(retry_after_s))
+
+    @property
+    def headers(self) -> dict[str, str]:
+        return {"Retry-After": str(self.retry_after_s)}

@@ -160,6 +160,12 @@ export default {
     note() {
       if (this.fixedKind) return "";
       if (this.reading.kind === "ambiguous" && this.readChips.length > 1) return NOTES.ambiguous;
+      /* A note names what is missing, so supplying it has to take the note
+       * with it. „Ohne Gemarkung ist die Nummer nicht eindeutig" standing over
+       * a filled Gemarkung contradicts itself, and the reading underneath does
+       * not change when the pair is completed -- the field it asks for is not
+       * the search field. */
+      if (this.readChips[0] === "parcel" && this.districtQuery) return "";
       return NOTES[this.readChips[0]] || "";
     }
   },

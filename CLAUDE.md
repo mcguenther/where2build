@@ -1077,6 +1077,32 @@ from the user directly. Reopen only if the user asks.
   narrow widths wrapped the wrong element: the button stayed beside the input
   and squeezed it to zero width, with the placeholder simply gone. What has to
   wrap is the row the button actually sits in — `:deep(.search__field)`.
+- **A request budget read off `X-Forwarded-For` fails silently in both
+  directions.** Read from the *left*, the header is whatever the caller typed,
+  so a fresh value per request is a fresh budget and the ceiling is decoration.
+  Left unconfigured behind a proxy, every signed-out caller counts against the
+  proxy's own container address, so they all share one budget and the first
+  busy tab locks out everybody else. Neither shows up as an error. So the
+  header is read only when `APP_PROXY_HOPS` says how many proxies of ours stand
+  in front, and then from the right — nginx appends the peer it saw
+  (`$proxy_add_x_forwarded_for`), so the last entry is the one it vouched for.
+  `docker-compose.yml` sets `APP_PROXY_HOPS=1` itself, because it is the file
+  that puts the nginx there.
+- **The screenshot script is the only place the old UI's selectors still
+  lived.** Four steps of it drove the wizard's removed source radios („Text
+  durchsuchen“, „Seite einfügen“, „Flurstück direkt“) and their two field ids
+  (`#q-text`, `#q-paste`) long after `QueryBox` replaced them with one field,
+  and `addPlot` clicked „Grundstück hinzufügen“ on a start page that no longer
+  carries it. Nothing type-checks a Playwright selector, `npm run test` and
+  `pytest` were both green, and the run dies 30 s into a five-minute job — so
+  a UI change is not done until the pictures have actually been taken. The one
+  field is `QUERY_FIELD` now, in one place.
+- **What a whole drive-through of the app costs, measured.** One
+  `node scripts/screenshots.mjs` — two themes, a narrow pass, three listing
+  searches, one plot appraised end to end, both print sheets, 64 images and two
+  PDFs — is **59 service calls and 1 007 map tiles** on a cold cache
+  (09.09.2026). That is the number to size any per-account ceiling against, and
+  it is why the run needs no exemption from the one in `app/ratelimit.py`.
 - **`page.fill` with 171 kB of markup takes ~27 s** — Playwright inserts it
   through the input pipeline — which sits just under the 30 s default and fails
   whenever the machine is busy. Measured identical before and after the change
@@ -1135,11 +1161,14 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 524 passed, 8 skipped — one of those needs pyosmium, which only the
-  index builder wants; the other seven need Tesseract and skip without it.
-- `vitest`: 533 passed — plus the integration file, excluded by `npm run test`
+- `pytest`: 574 passed, 27 skipped. With `TEST_DATABASE_URL` pointed at a real
+  Postgres it is 593 passed, 8 skipped — the extra 19 are the account store,
+  and they are skipped rather than mocked because what they check is the
+  database's own behaviour. Of the remaining 8, one needs pyosmium, which only
+  the index builder wants; the other seven need Tesseract.
+- `vitest`: 561 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
-- `scripts/screenshots.mjs`: 59 images plus two print PDFs. It fails on console
+- `scripts/screenshots.mjs`: 64 images plus two print PDFs. It fails on console
   errors, on horizontal overflow, and if not a single vector tile arrived. It
   also drives the live geocoder, which is slow often enough to blow the 60 s
   wait on the destinations step — two runs failed there and the third passed

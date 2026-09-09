@@ -182,6 +182,7 @@ Kein Teil der Startseite, aber Teil der Entscheidung:
   MOTIS (`docker-compose.local-routing.yml`) und der eigene POI-Index von einer
   Option zur Voraussetzung, und pro Konto braucht es eine Obergrenze für
   Abrufe. Das gehört in denselben Schritt wie die Anmeldung, nicht danach.
+  **Steht** als Schritt 5, siehe unten.
 - **Der Plattencache ist gemeinsam und muss es bleiben**: er hält Antworten
   von Behörden, nicht Nutzerdaten. Nichts Nutzerbezogenes darf hinein.
 
@@ -212,6 +213,26 @@ Kein Teil der Startseite, aber Teil der Entscheidung:
    danach wirklich in der Datenbank. Grenzen: 200 Grundstücke je Konto, 2 MiB
    je Dokument.
 
+5. **Abrufkontingent je Konto:** steht. Jede Route, die einen fremden Dienst
+   befragt, zieht einen Abruf von dem ab, der sie auslöst; Kartenkacheln haben
+   ein eigenes, weites Kontingent, weil ein Bildschirm Dutzende davon sind und
+   der gemeinsame Plattencache jede Wiederholung deckt. Was niemanden fragt,
+   zahlt nichts: das Gemarkungsverzeichnis kommt aus einer mitgelieferten
+   Datei, `/api/plots` und `/api/settings` sprechen nur mit der eigenen
+   Datenbank und haben eigene Grenzen, und ein Kontingent auf das Anmelden
+   selbst würde Leute aus genau dem aussperren, was ihnen ein Kontingent gibt.
+   Über der Grenze antwortet der Server 429 mit `Retry-After` und einem
+   deutschen Satz, der sagt, was gilt und wann es weitergeht, und der niemandem
+   etwas vorwirft. Zugerechnet wird angemeldet dem Konto, abgemeldet der
+   Gegenstelle; `X-Forwarded-For` wird nur gelesen, wenn `APP_PROXY_HOPS` sagt,
+   dass ein eigener Proxy davorsteht, und dann von rechts. Gezählt wird im
+   Arbeitsspeicher des Prozesses, ohne Redis, also je Arbeitsprozess statt je
+   Deployment: das ist für einen Prototyp mit einem uvicorn richtig und irrt in
+   die harmlose Richtung. `/api/health` sagt beides, den Umfang und diesen
+   Vorbehalt. Die Zahlen (600 Abrufe, 6 000 Kacheln je Stunde) sind gegriffen,
+   nicht gemessen, und so gegriffen, dass ein Mensch bei der Arbeit an keine
+   von beiden stößt.
+
 Offen aus Schritt 3, bewusst und mit Grund: ein Compose-Profil für einen
 Anbieter (Authentik, Keycloak, Dex) ist **nicht** dabei. In dieser Umgebung
 läuft kein Docker, also wäre es eine Datei, die niemand gestartet hat, und
@@ -225,6 +246,8 @@ Durchlauf, den es wirklich gab.
   prüfen dasselbe Grundstück), oder gehört jedes genau einem? Ändert das
   Datenmodell, deshalb besser vor Schritt 4 entschieden.
 - Läuft das Ganze **öffentlich erreichbar** oder in einem geschlossenen Kreis?
-  Davon hängt ab, wie streng die Grenzen aus § 5 sein müssen.
+  Davon hängt ab, wie streng die Grenzen aus § 5 sein müssen. Bis das
+  entschieden ist, stehen sie bewusst weit: sie sollen ein Abgrasen bremsen,
+  nicht die Arbeit.
 - Braucht die Startseite eine **Druckansicht**? Vermutlich nein: sie ist der
   Einstieg, nicht das Ergebnis.

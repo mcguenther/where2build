@@ -60,6 +60,15 @@ class AppSettings(BaseSettings):
         "(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
     )
     http_timeout_s: float = 30.0
+    # How many reverse proxies of our own stand in front of this process, and
+    # therefore how far from the right of ``X-Forwarded-For`` the real peer is.
+    # Zero means none, and then the header is not read at all -- a browser can
+    # write it, so believing it without a proxy having put it there lets anyone
+    # spend somebody else's request budget or dodge their own. The bundled
+    # docker compose deployment serves the API through nginx
+    # (``proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for``) and
+    # therefore sets this to 1; a plain ``uvicorn`` run leaves it at 0.
+    proxy_hops: int = Field(default=0, ge=0, le=8)
 
     @property
     def contact_user_agent(self) -> str:
@@ -481,6 +490,53 @@ class StorageSettings(BaseSettings):
         return f"{scheme}//{user}@{tail}" if user else url
 
 
+class RateLimitSettings(BaseSettings):
+    """How many calls one account may send outward (env prefix ``RATELIMIT_``).
+
+    This backend answers nothing of its own: every request it serves becomes a
+    request to the cadastre, to BORIS, to the LUIS environmental server, to
+    Transitous or to a public Overpass instance. A single-seat prototype asking
+    those now and then is what their policies allow; a deployment with accounts
+    is what the Overpass manual means by "relying on the public instances as
+    backend". Hence a per-account ceiling, in the same step as the sign-in.
+
+    Both numbers are picked, not derived, and both are picked so that a single
+    person working normally never meets one. See ``app/ratelimit.py`` for how
+    they are counted and why the count lives in this process's memory.
+    """
+
+    model_config = SettingsConfigDict(env_prefix="RATELIMIT_", env_file=_ENV_FILE, extra="ignore")
+
+    # Off is the single-seat setting: one person on their own machine is the
+    # case the upstream policies already permit, and a limit there only gets in
+    # the way (the screenshot run alone is a few thousand requests).
+    enabled: bool = True
+    window_s: int = Field(default=3600, ge=1)
+    # Everything that asks an authority, the router or the model a question.
+    # Picked rather than derived, but with one measurement beside it:
+    # ``scripts/screenshots.mjs`` drives every view of the app in one pass --
+    # two themes, a narrow pass, three listing searches, one plot appraised end
+    # to end, both print sheets -- and spends 59 of these (measured 09.09.2026
+    # on a cold cache). A search over a listing counts as one however many WFS
+    # requests it makes inside, which is why the ceiling sits well below what
+    # the upstreams would tolerate. So 600 an hour is ten full drive-throughs
+    # of the whole application per hour: nothing a person does by hand comes
+    # near it, and a scan still meets it.
+    service_calls: int = Field(default=600, ge=1)
+    # Map tiles are a different order of magnitude -- one screen is dozens, a
+    # pan is dozens more -- and they are the one thing the shared disk cache
+    # really covers, so the second view of an area costs nothing upstream at
+    # all. The same screenshot run spends 1 007 of these against 59 of the
+    # above, which is the ratio the two numbers are set by. 6 000 an hour is a
+    # hundred a minute sustained for an hour: past any amount of looking at
+    # maps, and still a ceiling on a scan.
+    map_tiles: int = Field(default=6000, ge=1)
+    # How many clients are remembered at once. Each costs at most one timestamp
+    # per call in the window, so the worst case here is a few megabytes; the
+    # least recently seen is dropped first.
+    max_clients: int = Field(default=20000, ge=1)
+
+
 class OidcSettings(BaseSettings):
     """Sign-in through an OpenID Connect provider (env prefix ``OIDC_``).
 
@@ -569,6 +625,7 @@ class Settings(BaseSettings):
     tiles: TilesSettings = Field(default_factory=TilesSettings)
     basemap: BasemapSettings = Field(default_factory=BasemapSettings)
     llm: LLMSettings = Field(default_factory=LLMSettings)
+    rate_limit: RateLimitSettings = Field(default_factory=RateLimitSettings)
     oidc: OidcSettings = Field(default_factory=OidcSettings)
     storage: StorageSettings = Field(default_factory=StorageSettings)
 

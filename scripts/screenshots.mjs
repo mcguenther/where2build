@@ -89,13 +89,19 @@ async function pickDistrict(page, name) {
   await page.locator(".gemarkung__treffer").first().click();
 }
 
+/* The one field everything goes into. Named rather than repeated: it is the
+ * way in on the start page and in every step of the wizard, and the old
+ * per-source ids (#q-text, #q-paste) are gone with the sources. */
+const QUERY_FIELD = ".query-box input[role=\"combobox\"]";
+
 /* There is no example data any more: every screenshot needs a plot that was
- * really resolved through ALKIS first. This is the app's own add flow, and it
- * starts in the one field: a bare parcel number is read as one, which unfolds
- * the district beside it. */
+ * really resolved through ALKIS first. This is the app's own way in, from the
+ * start page: a bare parcel number is read as one, which unfolds the district
+ * beside it, and the start page hands the pair to the wizard. Starting here
+ * rather than at „Grundstück hinzufügen" is not only shorter -- it is the
+ * route a person takes, and it exercises the hand-off. */
 async function addPlot(page) {
-  await page.click(".page-head .btn");
-  await page.fill(".query-box input[role=\"combobox\"]", "85/1");
+  await page.fill(QUERY_FIELD, "85/1");
   await page.waitForSelector("#q-parcel-number", { timeout: 10000 });
   await pickDistrict(page, "Liebertwolkwitz");
   await page.getByRole("button", { name: "Grundstück finden" }).click();
@@ -213,11 +219,12 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
      parcel, and the only one whose whole point is showing its working. It
      needs no model — the text is read with patterns and the Gemarkung
      register — so it runs here even without an LLM key. */
-  await page.getByText("Text durchsuchen").click();
-  await page.fill("#q-text", LISTING);
-  // Typed prose goes through the same reader as a pasted page, and straight on
-  // into the search: what was read rides along folded shut inside that step.
-  await page.getByRole("button", { name: "Lesen" }).click();
+  // Nothing is switched on first: a few sentences are read as a description
+  // text by themselves, and the chip says so. Typed prose goes through the
+  // same reader as a pasted page, and straight on into the search: what was
+  // read rides along folded shut inside that step.
+  await page.fill(QUERY_FIELD, LISTING);
+  await page.getByRole("button", { name: "Grundstück finden" }).click();
   await page.waitForSelector(".suche", { timeout: 30000 });
   await page.waitForTimeout(1500);
   await shot(page, "suche-laeuft", mode, narrow ? "-schmal" : "");
@@ -242,9 +249,8 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
      somebody else's parcel. */
   await page.click(".breadcrumb a");
   await page.click(".page-head .btn");
-  await page.getByText("Text durchsuchen").click();
-  await page.fill("#q-text", FOREIGN_LISTING);
-  await page.getByRole("button", { name: "Lesen" }).click();
+  await page.fill(QUERY_FIELD, FOREIGN_LISTING);
+  await page.getByRole("button", { name: "Grundstück finden" }).click();
   try {
     await page.waitForSelector(".suche__urteil--erfolglos", { timeout: 60000 });
     await page.waitForTimeout(4000);
@@ -259,9 +265,8 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
      away inside the search now, so the picture is of it opened. */
   await page.click(".breadcrumb a");
   await page.click(".page-head .btn");
-  await page.getByText("Seite einfügen", { exact: true }).click();
-  await pasteInto(page, "#q-paste", PASTED_PAGE);
-  await page.getByRole("button", { name: "Lesen" }).click();
+  await pasteInto(page, QUERY_FIELD, PASTED_PAGE);
+  await page.getByRole("button", { name: "Grundstück finden" }).click();
   try {
     await page.waitForSelector("details.gelesen", { timeout: 30000 });
     await page.click("details.gelesen > summary");
@@ -273,11 +278,13 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
 
   await page.click(".breadcrumb a");
   await page.click(".page-head .btn");
-  await page.getByText("Flurstück direkt").click();
+  // A bare number is read as a parcel number, which is the one reading that
+  // unfolds a second field: without a district the number is not unique.
+  await page.fill(QUERY_FIELD, "85/1");
+  await page.waitForSelector("#q-parcel-number", { timeout: 10000 });
   await pickDistrict(page, "Liebertwolkwitz");
-  await page.fill("#q-parcel-number", "85/1");
   await shot(page, "assistent-2", mode, narrow ? "-schmal" : "");
-  await page.getByRole("button", { name: "Nachschlagen" }).click();
+  await page.getByRole("button", { name: "Grundstück finden" }).click();
   await page.waitForSelector(".site-plan", { timeout: 60000 });
   /* The last step: the outline, what is being taken over, and the three fields
      that used to be a page of their own. It is a picture of the ground, so

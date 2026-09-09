@@ -19,6 +19,14 @@ services:
       # anything else. docker-compose.local-routing.yml sets it for the router
       # that runs here, so it never has to be typed.
       - MOTIS_BASE_URL
+      # Exactly one reverse proxy of ours stands in front here: the frontend
+      # container's nginx, which sends `X-Forwarded-For
+      # $proxy_add_x_forwarded_for`. Without this the request budget would
+      # count every signed-out caller against nginx's own container address --
+      # one shared budget for all of them, which is the opposite of what it is
+      # for. With it, the rightmost entry is the peer nginx actually saw and
+      # everything left of it is text the caller wrote.
+      - APP_PROXY_HOPS=1
     volumes:
       # Answers from the official services, kept between restarts. Losing it
       # costs time and other people's bandwidth, not correctness.

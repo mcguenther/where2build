@@ -26,6 +26,7 @@ def test_health_lists_every_service(client: TestClient):
         "llm",
         "texterkennung",
         "anmeldung",
+        "kontingent",
         "speicher",
     }
     assert dienste["llm"]["konfiguriert"] is True

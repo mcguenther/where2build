@@ -74,6 +74,19 @@ def isolated_settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     # Overpass instance.
     monkeypatch.setenv("OVERPASS_ENABLED", "false")
     monkeypatch.setenv("OVERPASS_URL", OVERPASS_URL)
+    # The request budget as a fresh deployment has it, pinned for the same
+    # reason as the rest of this fixture: a developer who set a small ceiling in
+    # backend/.env would otherwise get 429s scattered through the suite, in
+    # tests that are about something else entirely. The limiters are rebuilt
+    # per test by the reset_services() below, so no test spends another's
+    # budget and these numbers only have to be larger than one test's traffic.
+    monkeypatch.setenv("RATELIMIT_ENABLED", "true")
+    monkeypatch.setenv("RATELIMIT_WINDOW_S", "3600")
+    monkeypatch.setenv("RATELIMIT_SERVICE_CALLS", "600")
+    monkeypatch.setenv("RATELIMIT_MAP_TILES", "6000")
+    monkeypatch.setenv("RATELIMIT_MAX_CLIENTS", "20000")
+    # No proxy in front, so X-Forwarded-For is not to be believed.
+    monkeypatch.setenv("APP_PROXY_HOPS", "0")
     # No sign-in unless a test asks for it, and set to empty rather than left
     # alone: a developer's own backend/.env would otherwise configure a real
     # provider and every "nicht eingerichtet" test would stop testing anything.

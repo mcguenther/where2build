@@ -12,7 +12,7 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -38,7 +38,15 @@ from .routers import (
     storage,
     tiles,
 )
-from .deps import address_index, gemarkung_directory, nearby_service, storage_service
+from .deps import (
+    address_index,
+    gemarkung_directory,
+    map_budget,
+    nearby_service,
+    service_budget,
+    storage_service,
+)
+from .ratelimit import window_text
 from .services import ocr
 from .services.storage import mib
 from .schemas import DienstStatus, HealthResponse
@@ -183,6 +191,41 @@ def _speicher_hinweis(settings: Settings) -> str:
     )
 
 
+def _kontingent_hinweis(settings: Settings) -> str:
+    """What /api/health says about the per-account request budget.
+
+    Same shape as the sentences above: the interesting half is what applies
+    here, not that a feature exists. Off is a legitimate deployment (one
+    person, one machine), so that reads as a setting and not as a gap.
+    """
+
+    limits = settings.rate_limit
+    fenster = window_text(limits.window_s)
+    if not limits.enabled:
+        return (
+            "Kein Abrufkontingent; jeder Zugang darf beliebig viele Abrufe an die "
+            "fremden Dienste auslösen. Das ist die Einstellung für den Einzelplatz. "
+            "Für einen Betrieb mit Konten RATELIMIT_ENABLED=true setzen: die fremden "
+            "Dienste (Overpass, Transitous) sind mitbenutzt, nicht gemietet."
+        )
+    zurechnung = (
+        "Nicht angemeldete Abrufe zählen auf die Gegenstelle der Verbindung "
+        "(APP_PROXY_HOPS=0, also kein eigener Proxy davor)."
+        if settings.app.proxy_hops == 0
+        else (
+            "Nicht angemeldete Abrufe zählen auf die Adresse, die der eigene Proxy "
+            f"einträgt (APP_PROXY_HOPS={settings.app.proxy_hops})."
+        )
+    )
+    return (
+        f"Je Konto höchstens {limits.service_calls} Abrufe {fenster} an die fremden "
+        f"Dienste (Kataster, Bodenrichtwert, Standort, Routing, Umgebung, Inserate) "
+        f"und {limits.map_tiles} Kartenkacheln {fenster}; darüber antwortet der Server "
+        f"429 mit Retry-After. {zurechnung} Gezählt wird im Arbeitsspeicher dieses "
+        "Prozesses, die Grenze gilt also je Arbeitsprozess."
+    )
+
+
 def _adressen_hinweis(index: AddressIndex | None) -> str:
     """What /api/health says about the official Hauskoordinaten.
 
@@ -257,7 +300,9 @@ def create_app() -> FastAPI:
     async def _app_error(_: Request, exc: AppError) -> JSONResponse:
         # `body` is the sentence for almost every error and a little more for
         # a write conflict, which has to carry what is stored.
-        return JSONResponse(status_code=exc.status_code, content=exc.body)
+        return JSONResponse(
+            status_code=exc.status_code, content=exc.body, headers=exc.headers
+        )
 
     @app.exception_handler(StarletteHTTPException)
     async def _http_error(_: Request, exc: StarletteHTTPException) -> JSONResponse:
@@ -399,6 +444,12 @@ def create_app() -> FastAPI:
                     hinweis=_anmeldung_hinweis(current),
                 ),
                 DienstStatus(
+                    name="kontingent",
+                    konfiguriert=current.rate_limit.enabled,
+                    endpunkt=None,
+                    hinweis=_kontingent_hinweis(current),
+                ),
+                DienstStatus(
                     name="speicher",
                     konfiguriert=current.storage.configured,
                     endpunkt=current.storage.endpoint,
@@ -417,11 +468,19 @@ def create_app() -> FastAPI:
             ],
         )
 
+    # Three groups, and the grouping *is* the decision about who pays into the
+    # per-account budget (see app/ratelimit.py and § 5 of
+    # docs/entscheidungen/startseite-und-konten.md).
+    #
+    # Every one of these turns one request into at least one request to
+    # somebody else's server: the cadastral WFS, BORIS, the LUIS environmental
+    # server, the UBA, MOTIS/Transitous, a portal page, an Overpass instance or
+    # the model. `search` is the most expensive of them by far -- one call is a
+    # whole staircase of WFS requests -- and still counts as one, which is why
+    # the budget is set well below what the upstreams would tolerate.
     for module in (
-        auth,
         parcels,
         search,
-        gemarkungen,
         listings,
         housetypes,
         landvalue,
@@ -430,10 +489,27 @@ def create_app() -> FastAPI:
         sitechecks,
         nearby,
         neighbours,
-        tiles,
-        basemap,
-        storage,
     ):
+        app.include_router(module.router, dependencies=[Depends(service_budget)])
+
+    # Tiles go outward too, so exempting them would be a hole rather than a
+    # decision -- but one screen is dozens of them and the disk cache is shared
+    # across everybody, so the second view of an area costs nothing upstream.
+    # They get their own, far wider budget instead of the same one. Worth
+    # knowing: a 429 here shows as a missing tile, not as a sentence, because
+    # MapLibre and <img> read the status and not the body. That is the other
+    # reason the number is generous.
+    for module in (tiles, basemap):
+        app.include_router(module.router, dependencies=[Depends(map_budget)])
+
+    # And these ask nothing of anybody, so they pay nothing:
+    # `gemarkungen` is served from a committed file and never touches the WFS,
+    # `storage` speaks only to our own Postgres and has limits of its own
+    # (200 plots, 2 MiB per document), and `auth` does talk to the identity
+    # provider -- but that is this deployment's own provider, not a service
+    # being borrowed, and a budget on signing in would lock people out of the
+    # very thing that gives them a budget.
+    for module in (auth, gemarkungen, storage):
         app.include_router(module.router)
 
     return app
