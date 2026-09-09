@@ -63,7 +63,10 @@
             </div>
             <p class="hint">
               Die Seite wird auf dem Server geholt und ausgelesen. ImmoScout24 lässt das
-              nicht zu — dort den Weg über „Seite einfügen“ nehmen.
+              nicht zu und antwortet jedem Server mit „Ich bin kein Roboter“ — dort führt
+              <button type="button" class="link-button" @click="source = 'paste'">„Seite einfügen“</button>
+              hinein: einmal das Lesezeichen einrichten, dann ist es ein Klick auf der
+              Anzeigenseite.
             </p>
           </template>
 

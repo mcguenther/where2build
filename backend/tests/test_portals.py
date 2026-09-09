@@ -10,7 +10,9 @@ from app.errors import BadRequestError
 from app.services.portals import (
     fetch_page,
     is_blocked,
+    is_immoscout,
     is_kleinanzeigen,
+    parse_immoscout,
     parse_meta_tags,
     parse_page,
 )
@@ -63,7 +65,9 @@ async def test_immobilienscout24_is_never_requested():
         await fetch_page(IMMOSCOUT_URL, get_settings().app)
 
     assert route.call_count == 0
-    assert "Einfügefeld" in error.value.message
+    # The refusal has to name the way that works, not only the one that does not.
+    assert "Seite einfügen" in error.value.message
+    assert "Lesezeichen" in error.value.message
 
 
 @respx.mock
@@ -93,3 +97,114 @@ def test_json_ld_supplies_coordinates_when_meta_tags_do_not():
 
     assert seite.lat == pytest.approx(51.05)
     assert seite.lon == pytest.approx(13.74)
+
+
+# ---------------------------------------------------------------------------
+# immobilienscout24.de
+#
+# The one portal no server may fetch, so both shapes it can arrive in are
+# pinned here: the whole document as the bookmarklet hands it over, and the
+# body alone as the clipboard delivers it. The fixture is a recorded exposé
+# (167953918, Grünau-Siedlung in Leipzig, 09.09.2026).
+
+
+def _immoscout_page() -> str:
+    return fixture_text("inserat-immoscout.html")
+
+
+def _immoscout_body() -> str:
+    """What `Strg+A, Strg+C` leaves: no `<head>`, and no `<script>` anywhere."""
+
+    page = _immoscout_page()
+    body = page[page.index("<body") :]
+    assert "obj_lotArea" not in body
+    assert "og:description" not in body
+    assert "objectDescription" not in body
+    return body
+
+
+def test_an_immoscout_page_is_recognised_in_both_shapes():
+    assert is_immoscout(_immoscout_page())
+    assert is_immoscout(_immoscout_body())
+    assert not is_immoscout(fixture_text("inserat-kleinanzeigen.html"))
+
+
+def test_the_whole_document_gives_up_its_structured_fields():
+    """The analytics block is better than the prose, field by field.
+
+    The listing's own text hedges („eine Fläche von ca. 742 m²") where
+    `obj_lotArea` states 742, and the tolerance staircase starts from the
+    wording -- so reading the structured field is the difference between an
+    exact area, which is a hard filter, and a band, which only ranks.
+    """
+
+    seite = parse_page("https://www.immobilienscout24.de/expose/167953918", _immoscout_page())
+
+    assert seite.angaben["Grundstücksfläche"] == "742 m²"
+    assert seite.kaufpreis_eur == 275_000
+    # The Bundesland is composed in from the portal's own field: ALKIS is
+    # state-specific, and this is the cheapest hard filter the search has.
+    assert seite.adresse == "Grünau-Siedlung, 04207 Leipzig, Sachsen"
+    assert "Leipziger Stadtteil Grünau-Siedlung" in seite.beschreibung
+    assert "Kulkwitzer See" in seite.beschreibung
+    assert seite.bilder and all(
+        url.startswith("https://pictures.immobilienscout24.de/") for url in seite.bilder
+    )
+
+
+def test_a_withheld_address_yields_no_coordinate():
+    """`exposeMap` carries one, and taking it would be the 6 235 m mistake.
+
+    The page says `isFullAddress: false` and `showFullAddress: false`, and the
+    coordinate next to that is the *quarter's* — the same class of thing as
+    Kleinanzeigen's municipality pin, which measured 6 235 m from the parcel
+    actually offered. This app resolves the parcel under a coordinate, so a
+    quarter centroid is not a coarse locator, it is a wrong one.
+    """
+
+    page = _immoscout_page()
+    assert '"latitude":51.30595' in page
+
+    seite = parse_page("https://www.immobilienscout24.de/expose/167953918", page)
+
+    assert seite.lat is None
+    assert seite.lon is None
+
+
+def test_the_body_alone_still_gives_the_area_the_price_and_the_prose():
+    """What a paste can do, and where it falls short of the handover.
+
+    The numbers survive as rendered text in the portal's own `is24qa-*`
+    elements; the Bundesland and the pictures do not, because they live in
+    `<head>` and in a `<script>`.
+    """
+
+    seite = parse_page("", _immoscout_body())
+
+    assert seite.angaben["Grundstücksfläche"] == "742 m²"
+    assert seite.kaufpreis_eur == 275_000
+    assert seite.adresse == "Grünau-Siedlung, 04207 Leipzig"
+    assert "Kulkwitzer See" in seite.beschreibung
+    assert seite.bilder == []
+
+
+def test_the_value_element_is_read_and_not_its_label():
+    """Every `is24qa-*` value has a `…-label` sibling with the same class plus
+    a suffix, and it comes first in the document. Without a guard against the
+    suffix the area read „Grundstücksfläche ca. 742 m²" — label and all."""
+
+    read = parse_immoscout(_immoscout_body())
+
+    assert read["flaeche"] == "742 m²"
+    assert "Grundstücksfläche" not in read["flaeche"]
+
+
+def test_the_agents_disclaimer_is_not_the_listings_prose():
+    """„Wir machen die obigen Angaben nach bestem Wissen …" is a legal note in
+    the same element class as the description. It says nothing about where the
+    plot is, and it must not crowd out the two texts that do."""
+
+    read = parse_immoscout(_immoscout_body())
+
+    assert "nach bestem Wissen" not in read["beschreibung"]
+    assert "Grünau-Siedlung" in read["beschreibung"]

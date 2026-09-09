@@ -273,7 +273,15 @@ the bookmark, which is the one step no app can do for the user.
 Verified across two real origins by `scripts/bookmarklet.mjs`: the recorded
 Kleinanzeigen advert served from a second port, the bookmarklet run in that
 page, and the app reading `og:latitude` 51.13430038927799 out of the handed-over
-document — the exact field a clipboard copy leaves behind.
+document — a field a clipboard copy leaves behind.
+
+**Corrected 09.09.2026, and it matters:** the coordinate is *not* what the
+handover is worth, though this section first said so. A portal's coordinate is
+the municipality's or the quarter's geocode, never the plot's — § 2 of
+`flurstueck-identifikation.md` measured 6 235 m — so losing it costs almost
+nothing, and taking it can cost the right answer (§ 7.2). What the whole
+document actually adds is the portal's **own structured fields**, and on
+ImmoScout that turns out to be most of what the search wants (§ 7).
 
 ### 5.2 A browser extension — the same idea, one step further
 
@@ -347,3 +355,95 @@ precedent in reverse: there the *list* is fetchable and the detail page is not.
 * `flurstueck-identifikation.md` § 20.5's reasoning stands as a description of
   the gate, but its premise ("which is every ImmoScout page") should point at
   § 4 rather than at the portal.
+
+## 7. What an ImmoScout exposé actually carries ✅
+
+Measured 09.09.2026 on a real advert — 167953918, a 742 m² plot in
+Grünau-Siedlung, Leipzig — recorded as
+`backend/tests/fixtures/inserat-immoscout.html`. This is the section § 5.3 was
+guessing at, and the guess was too pessimistic.
+
+### 7.1 The structured fields, not the prose
+
+The page carries an analytics block **twice** — once as `keyValues` in an
+inline script, once as the text of a `<s24-ad-targeting>` element — and it is
+field by field what the search asks for:
+
+| Field | Value | What it is |
+| --- | --- | --- |
+| `obj_lotArea` | `"742"` | the plot area, **exact** |
+| `obj_purchasePrice` | `"275000"` | the asking price |
+| `geo_bln` / `obj_regio1` | `"sachsen"` / `"Sachsen"` | the Bundesland — the cheapest hard filter there is |
+| `geo_krs` / `obj_regio2` | `"leipzig"` / `"Leipzig"` | the Gemeinde |
+| `geo_ot` / `obj_regio4` | `"grünau_siedlung"` / `"Grünau_Siedlung"` | the Ortsteil |
+| `obj_zipCode` | `"04207"` | the postcode |
+| `obj_development` | `"developed"` | erschlossen |
+| `obj_scoutId` | `"167953918"` | the advert |
+
+Plus, in `IS24.ssr.frontendModel`: `objectDescription` and
+`locationDescription` as full prose, `zipRegionAndCountry`
+(„Grünau-Siedlung, 04207 Leipzig"), `addressForMap.region` („Sachsen"), and
+`galleryData` with twelve captioned pictures.
+
+The point is not that these are *more* fields. It is that the area is **exact**
+where the listing's own text hedges („eine Fläche von ca. 742 m²"), and the
+tolerance staircase starts from the wording: an exact area is a hard filter, a
+hedged one may only rank. Same for the Bundesland — ALKIS is state-specific and
+prose only ever mentions a state in passing.
+
+### 7.2 The coordinate is there, and taking it would be the mistake
+
+`exposeMap.location` gives `latitude: 51.30595, longitude: 12.27605` next to
+`coordinateAvailable: true` — and next to `showFullAddress: false` and
+`isFullAddress: false`, with a `quarterBoundsJson` spanning 51.304–51.319 by
+12.267–12.313. That is the **quarter's** point, not the plot's: the same class
+of thing as Kleinanzeigen's municipality pin. This app resolves the parcel
+under a coordinate, so a quarter centroid is not a coarse locator but a wrong
+one. The reader takes a coordinate only when the portal says the address is
+complete.
+
+### 7.3 What the clipboard shape still gets
+
+Pasted, the same page yields the area (742 m²), the price (275 000 €), the
+address line and both description texts — all of it rendered text inside the
+portal's own `is24qa-*` and `expose-*-description` elements, which survive a
+selection. What it does not yield: the Bundesland and the pictures, because
+those live in `<head>` and in a `<script>`. So the paste path is genuinely
+usable here; the handover is better by exactly one hard filter and the images.
+
+### 7.4 „Grünau-Siedlung" is not a Gemarkung — and the Gemeinde is enough
+
+The tempting move is to read the Ortsteil as a cadastral district. Measured
+against the 5 339 names in `gemarkungen-sachsen.json`: Gemarkung **Grünau**
+exists exactly twice, in Großolbersdorf and in Langenweißbach — both ~80 km
+from Leipzig. Reading this listing's Stadtteil as a Gemarkung would anchor the
+search in the Erzgebirge, which is why `collect_indicia` refusing a bare place
+mention is right rather than merely cautious.
+
+Grünau is 1970s building on top of older villages, and the Gemarkungen beneath
+it are Schönau, Lausen, Groß- and Kleinmiltitz and Knauthain — 76 in Stadt
+Leipzig altogether. What the portal *does* state is the Gemeinde, and against
+the live WFS that is enough to get somewhere (four `resultType=hits` requests):
+
+| Filter | Parcels |
+| --- | --- |
+| `gemeinde = "Stadt Leipzig"` | **112 589** |
+| `+ flaeche = 742` | **24** ✅ |
+| `gemarkung = "Schönau"` + 742 | 0 |
+| `gemarkung = "Lausen"` + 742 | **1** ✅ |
+
+And that one is Flurstück **8/a in Gemarkung Lausen**, 742 m²,
+`lagebeztxt` „Staffelsteinstraße 4", `tntxt` `Wohnbaufläche;742` — a residential
+plot on a street in Grünau-Siedlung, which is where the advert says the plot is.
+
+Two things follow, and neither is built yet:
+
+* **The Gemeinde plus an exact area is a working anchor for a city listing.**
+  24 candidates is a scoreable set, exactly as the „anchor's size is not a
+  reason to give up" note predicted for Leipzig at 502 m².
+* **A Stadtteil is worth resolving to the Gemarkungen under it.** The directory
+  cannot do it — it maps Gemarkung → Gemeinde, and „Grünau-Siedlung" is in
+  neither column. What would do it is the district outlines the search already
+  fetches (`ave:KatasterBezirk`) against the quarter bounds the portal hands
+  over: 51.304–51.319 by 12.267–12.313 intersects a handful of Gemarkungen, and
+  those are the anchors. One `fes:BBOX` request, no model, no guessing.

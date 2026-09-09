@@ -663,6 +663,21 @@ describe("Aufnahme — Seite aus dem Browser übernommen", () => {
     expect(w.find("#q-paste").exists()).toBe(true);
   });
 
+  it("führt vom Link-Weg mit einem Druck zum Lesezeichen", async () => {
+    // Wer mit einer ImmoScout-Adresse kommt, landet hier — und der Hinweis,
+    // dass das nicht geht, muss den Weg, der geht, direkt anbieten.
+    const w = mountWithRouter(WizardView, { path: "/aufnahme/quelle", props: { stage: "quelle" } });
+    await w.find('input[value="url"]').setValue();
+    await flushPromises();
+
+    const hint = w.findAll("button.link-button").find(b => b.text().includes("Seite einfügen"));
+    expect(hint).toBeTruthy();
+    await hint.trigger("click");
+
+    expect(w.vm.source).toBe("paste");
+    expect(w.find("details.gelesen a.btn").exists()).toBe(true);
+  });
+
   it("bietet das Lesezeichen mit der eigenen Adresse an", async () => {
     const w = mountWithRouter(WizardView, { path: "/aufnahme/quelle", props: { stage: "quelle" } });
     await w.find('input[value="paste"]').setValue();

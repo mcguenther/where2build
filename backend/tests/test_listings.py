@@ -50,7 +50,7 @@ def test_immobilienscout24_is_not_fetched_and_points_at_the_paste_field(client: 
     answer = client.post("/api/listings/extract", json={"url": IMMOSCOUT_URL})
 
     assert answer.status_code == 400
-    assert "Einfügefeld" in answer.json()["detail"]
+    assert "Seite einfügen" in answer.json()["detail"]
     assert portal.call_count == 0
     assert llm.call_count == 0
 
@@ -191,7 +191,8 @@ def test_page_without_any_locator_is_a_400(client: TestClient):
     )
 
     assert answer.status_code == 400
-    assert "Einfügefeld" in answer.json()["detail"] or "eintragen" in answer.json()["detail"]
+    detail = answer.json()["detail"]
+    assert "einfügen" in detail or "eintragen" in detail
     assert llm.call_count == 2
 
 

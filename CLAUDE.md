@@ -913,10 +913,50 @@ from the user directly. Reopen only if the user asks.
   `lib/bookmarklet.js` does — one click on the listing page hands over
   `document.documentElement.outerHTML` through `postMessage`, so no CORS, no
   request to the portal and nothing circumvented. Verified end to end across
-  two origins by `scripts/bookmarklet.mjs`: the handed-over Kleinanzeigen page
-  yields the coordinate, a pasted one does not. Emptying the paste field has to
-  clear the kept HTML, or the next read silently ships the page pasted before.
-  See `docs/research/immobilienscout24-zugang.md` § 4.
+  two origins by `scripts/bookmarklet.mjs`. **The coordinate is not what is
+  gained**, though the first version of this note said so: a portal's
+  coordinate is the municipality's or the quarter's, never the plot's — that is
+  the 6 235 m measurement two notes above — so losing it costs almost nothing.
+  What the whole document actually adds is the portal's **own structured
+  fields**: on ImmoScout, `obj_lotArea: "742"` where the prose hedges „ca.
+  742 m²", plus `geo_bln`, `geo_krs` and the Ortsteil as separate values. An
+  exactly stated area is a hard filter; a hedged one only ranks. Emptying the
+  paste field has to clear the kept HTML, or the next read silently ships the
+  page pasted before. See `docs/research/immobilienscout24-zugang.md` § 4.
+- **A portal's own field names are worth more than any prose, and they are one
+  block to maintain.** Measured on a recorded ImmoScout exposé (167953918,
+  09.09.2026, `fixtures/inserat-immoscout.html`): the page carries
+  `obj_lotArea: "742"`, `obj_purchasePrice: "275000"`, `geo_bln: "sachsen"`,
+  `geo_krs: "leipzig"` and `obj_regio4: "Grünau_Siedlung"` as separate values —
+  twice, in `keyValues` and in `<s24-ad-targeting>` — while its prose only says
+  „eine Fläche von ca. 742 m²". Exact is a hard filter, hedged only ranks. The
+  clipboard shape gets the same numbers as rendered text out of the portal's
+  `is24qa-*` elements, and neither the Bundesland nor the pictures. So the
+  per-portal patterns live in one delimited block in `services/portals.py` with
+  the recording named, and a rename shows up as a failing test naming the field.
+  Two traps in those patterns: every `is24qa-*` value has a `…-label` sibling
+  carrying the same class plus a suffix and it comes *first*, so a pattern
+  without `(?![-\w])` reads „Grundstücksfläche ca. 742 m²"; and the agent's
+  „Wir machen die obigen Angaben nach bestem Wissen …" sits in the same element
+  class as the description, so short blocks are dropped.
+- **A portal coordinate next to `isFullAddress: false` must not be taken at
+  all.** ImmoScout's `exposeMap` gives 51.30595, 12.27605 for this advert with
+  `showFullAddress: false`: that is the *quarter's* point. The app resolves the
+  parcel under a coordinate, so a quarter centroid is not a coarse locator but
+  a wrong one — the same shape as the 6 235 m Kleinanzeigen pin. Read it only
+  when the portal says the address is complete.
+- **„Grünau-Siedlung" is not a Gemarkung, and the two called „Grünau" are 80 km
+  away.** Measured 09.09.2026 against `gemarkungen-sachsen.json`: Gemarkung
+  Grünau exists exactly twice, in Großolbersdorf and Langenweißbach, both in
+  the Erzgebirge or Vogtland — so reading a Leipzig Stadtteil as a Gemarkung
+  anchors the search 80 km wrong, and `collect_indicia` is right to refuse a
+  bare mention. Stadt Leipzig has 76 Gemarkungen and Grünau sits on the old
+  villages beneath it: Schönau, Lausen, Groß- and Kleinmiltitz, Knauthain. What
+  the portal's structured fields do give is the **Gemeinde**, and that is
+  enough: Stadt Leipzig holds 112 589 Flurstücke, `flaeche = 742` leaves **24**
+  — a scoreable set — and adding Gemarkung Lausen leaves exactly **one**,
+  Flurstück 8/a, 742 m², „Staffelsteinstraße 4", `Wohnbaufläche;742`. So a
+  Stadtteil is worth resolving to the Gemarkungen under it; it is never one.
 - **An optional dependency has to be optional in one place only.** The backend
   image installed `.[poi]` and never `tesseract-ocr`, so every Compose
   deployment reported „keine Bilderkennung eingerichtet“ while the code, the
@@ -1117,9 +1157,9 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 526 passed, 8 skipped — one of those needs pyosmium, which only the
+- `pytest`: 532 passed, 8 skipped — one of those needs pyosmium, which only the
   index builder wants; the other seven need Tesseract and skip without it.
-- `vitest`: 549 passed — plus the integration file, excluded by `npm run test`
+- `vitest`: 550 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
 - `scripts/bookmarklet.mjs`: the handover across two origins, against the built
   app and a backend on :8000. It asserts the coordinate, which is the field
