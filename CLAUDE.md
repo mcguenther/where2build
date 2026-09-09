@@ -1129,6 +1129,18 @@ from the user directly. Reopen only if the user asks.
   noch nicht gebaut" long after it shipped -- stale copy that reports a
   finished feature as missing, which is worse than saying nothing. It reads
   `state.sync.active` instead of asserting anything.
+- **On a phone a radial veil cannot rescue a backdrop, because the text fills
+  the box in both directions.** The reception's quiet core is a
+  `radial-gradient` at 34% of the width, which works on a desktop where the
+  field sits in the middle of a wide drawing. At 390 px the headline and the
+  sentence take nearly the whole width and the field, the three lines and the
+  account note take the whole height: widened enough to clear the type it
+  wipes the drawing out entirely, and anywhere it fades the fabric runs
+  straight through a line of text — the route crossed one, which is where a
+  backdrop stops being one. So the *drawing* steps back there
+  (`.hero__art svg{ opacity: .42 }`) and the core only softens the middle.
+  The opacity goes on the svg, never on `.hero__art`: the veil is that
+  element's own `::after` and would fade with it.
 - **The screenshot run clicks the navigation, so a page that drops it breaks
   the run.** `nav(page, "Grundstücke")` was the first step after `start-leer`,
   and the fresh start page has no sections to click. That step goes by route

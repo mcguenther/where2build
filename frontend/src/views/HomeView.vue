@@ -97,8 +97,10 @@
 
             <!-- A way out, drawn the way `RouteCards` draws a real one: the
                  mode's own colour over the halo every line here carries. It
-                 leaves the house, meets the street where the plot fronts it,
-                 and follows the centre line east off the page.
+                 starts at the middle of the building's lower edge -- where a
+                 drive leaves a house -- meets the street where the plot fronts
+                 it, and follows the centre line east off the page. Starting at
+                 the centroid instead drew the line out through the roof.
                  No marker at either end. The far end would claim a destination
                  the start page knows nothing about, and running off the frame
                  survives every viewport where a fixed point does not. The
@@ -106,9 +108,9 @@
                  here: it is drawn in the violation colour, and in a backdrop
                  there is no legend behind it to say otherwise. -->
             <g fill="none" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M201,286 C202,330 200,368 205,398 Q209,428 240,430 L1560,291"
+              <path d="M206.6,333 C208,354 205,378 206,398 Q209,428 240,430 L1560,291"
                     stroke="var(--w2b-map-halo)" stroke-width="13" opacity=".85"></path>
-              <path d="M201,286 C202,330 200,368 205,398 Q209,428 240,430 L1560,291"
+              <path d="M206.6,333 C208,354 205,378 206,398 Q209,428 240,430 L1560,291"
                     stroke="var(--w2b-primary)" stroke-width="4.6"></path>
             </g>
           </g>
@@ -403,6 +405,24 @@ export default {
   /* At phone widths the fixed box would crop the fabric to a few huge
      parcels; a lower one keeps it readable as what it is. */
   .hero__art svg{ height: max(100%, 820px); }
+  /* On a phone the text fills the reception in both directions: the headline
+     and the sentence take nearly the whole width, and the field, the three
+     lines and the account note take the whole height. A radial core cannot
+     rescue that -- widened enough to clear the text it wipes the drawing out,
+     and anywhere it fades the fabric runs straight through a line of type,
+     which is where a backdrop stops being one.
+     So the drawing itself steps back here, and the core only has to soften the
+     middle. The opacity goes on the svg and not on `.hero__art`, because the
+     veil below is that element's own pseudo-element and would fade with it. */
+  .hero__art svg{ opacity: .42; }
+  .hero__art::after{
+    background:
+      radial-gradient(92% 56% at 50% 48%,
+        var(--w2b-surface) 0 46%,
+        color-mix(in srgb, var(--w2b-surface) 82%, transparent) 78%,
+        transparent 100%),
+      linear-gradient(180deg, transparent 76%, var(--w2b-paper));
+  }
 }
 
 @media (max-width: 560px){
