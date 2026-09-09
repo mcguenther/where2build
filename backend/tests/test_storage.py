@@ -22,7 +22,9 @@ anything you want to keep.
 from __future__ import annotations
 
 import asyncio
+import json
 import os
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -101,9 +103,24 @@ def database(oidc, monkeypatch: pytest.MonkeyPatch):
 
     The tables are dropped rather than emptied, so every test also exercises
     the schema being applied at start-up.
+
+    Every table in the schema, found rather than listed: a named list broke the
+    whole file the day `freigaben` arrived, because it references `users` and
+    the drop then failed on the dependency. What is here has to follow
+    `schema.sql` without anybody remembering to update it.
     """
 
-    _run(lambda connection: connection.execute("drop table if exists plots, settings, users"))
+    _run(
+        lambda connection: connection.execute(
+            """
+            do $$ declare t record; begin
+              for t in select tablename from pg_tables where schemaname = 'public' loop
+                execute format('drop table if exists %I cascade', t.tablename);
+              end loop;
+            end $$;
+            """
+        )
+    )
     monkeypatch.setenv("DATABASE_URL", TEST_DATABASE_URL)
     reset_services()
     yield
@@ -726,3 +743,170 @@ def test_one_account_cannot_delete_another(account: TestClient):
     # Erika's row is untouched.
     row = _run(lambda connection: connection.fetchrow("select * from users"))
     assert row is not None and row["subject"] == "8f1c-4711"
+
+
+# --------------------------------------------------------------------------
+# Sharing a plot by link
+# --------------------------------------------------------------------------
+
+SHARED = {**PLOT, "note": "Verkäufer wirkt in Eile, Preis verhandelbar"}
+
+
+@needs_database
+def test_a_share_never_holds_the_note(account: TestClient):
+    """The one promise this feature makes, kept where it cannot be forgotten.
+
+    Cut in the database layer rather than in the browser: a promise the
+    frontend keeps is one a bug in the frontend can break, and the row must
+    never contain what the link must not show.
+    """
+
+    made = account.post("/api/shares", json={"dokument": SHARED})
+
+    assert made.status_code == 201
+    token = made.json()["id"]
+    stored = json.loads(
+        _run(lambda connection: connection.fetchval("select dokument::text from freigaben"))
+    )
+    # A dict, not a string: double-encoding the document would have stored a
+    # JSON string, and every "is the note in there" check below would then be a
+    # substring test that passes for the wrong reason.
+    assert isinstance(stored, dict)
+    assert "note" not in stored
+    assert "Eile" not in json.dumps(stored)
+    # The rest travels unchanged, price included: without it the comparison
+    # against the Bodenrichtwert says nothing.
+    seen = account.get(f"/api/shares/{token}").json()["dokument"]
+    assert seen["flaeche_amtlich_m2"] == 502
+    assert seen["name"] == "Wiesenstraße, Großbothen"
+
+
+@needs_database
+def test_the_link_is_the_access_and_needs_no_account(database):
+    """The point of a link somebody sends to their family or a surveyor."""
+
+    with TestClient(fastapi_app) as owner:
+        _sign_in(owner, "8f1c-4711")
+        token = owner.post("/api/shares", json={"dokument": SHARED}).json()["id"]
+
+    # A different browser entirely, with no cookie at all.
+    with TestClient(fastapi_app) as stranger:
+        seen = stranger.get(f"/api/shares/{token}")
+        assert seen.status_code == 200
+        assert seen.json()["dokument"]["gemarkung"] == "Großbothen"
+        # And it still cannot reach anything that belongs to an account.
+        assert stranger.get("/api/plots").status_code == 401
+        assert stranger.get("/api/shares").status_code == 401
+
+
+@needs_database
+def test_a_share_is_a_copy_and_does_not_follow_the_original(account: TestClient):
+    """What was shared stays what it was on the day.
+
+    Somebody who got the link weeks ago has no business seeing a corrected
+    price, so the snapshot is stored rather than referenced.
+    """
+
+    token = account.post("/api/shares", json={"dokument": SHARED}).json()["id"]
+    account.put(
+        "/api/plots/plot-x7k2a9f",
+        json={"dokument": {**PLOT, "askingPrice": 99999}, "geaendert_am": None},
+    )
+
+    seen = account.get(f"/api/shares/{token}").json()["dokument"]
+    assert "askingPrice" not in seen
+
+
+@needs_database
+def test_a_withdrawn_link_stops_working(account: TestClient):
+    token = account.post("/api/shares", json={"dokument": SHARED}).json()["id"]
+    assert account.get(f"/api/shares/{token}").status_code == 200
+
+    assert account.delete(f"/api/shares/{token}").status_code == 204
+
+    assert account.get(f"/api/shares/{token}").status_code == 404
+
+
+@needs_database
+def test_an_expired_link_answers_as_if_it_never_was(account: TestClient):
+    """404 and not 410: to whoever holds the link the two are the same, and
+    410 would confirm that something was once there."""
+
+    token = account.post("/api/shares", json={"dokument": SHARED}).json()["id"]
+    _run(lambda connection: connection.execute("update freigaben set laeuft_ab = now() - interval '1 day'"))
+
+    assert account.get(f"/api/shares/{token}").status_code == 404
+    # And it is out of the owner's own list too, rather than shown as dead.
+    assert account.get("/api/shares").json()["eintraege"] == []
+
+
+@needs_database
+def test_every_link_carries_an_end(account: TestClient):
+    """Otherwise the table only grows."""
+
+    made = account.post("/api/shares", json={"dokument": SHARED}).json()
+
+    ends = datetime.fromisoformat(made["laeuft_ab"])
+    starts = datetime.fromisoformat(made["angelegt"])
+    assert 89 <= (ends - starts).days <= 90
+
+
+@needs_database
+def test_the_sweep_removes_what_is_past_its_end(account: TestClient):
+    """The job that keeps the table from becoming a landfill."""
+
+    keep = account.post("/api/shares", json={"dokument": SHARED}).json()["id"]
+    stale = account.post("/api/shares", json={"dokument": SHARED}).json()["id"]
+    _run(
+        lambda connection: connection.execute(
+            "update freigaben set laeuft_ab = now() - interval '1 day' where id = $1", stale
+        )
+    )
+
+    # A fresh service, because an asyncpg pool belongs to the loop that made
+    # it: the one behind `account` was built inside the TestClient's loop, and
+    # driving it from `asyncio.run` here reaches it from a different one.
+    reset_services()
+    removed = asyncio.run(storage_service().sweep_shares())
+
+    assert removed == 1
+    left = _run(lambda connection: connection.fetchval("select id from freigaben"))
+    assert left == keep
+
+
+@needs_database
+def test_a_link_belongs_to_the_account_that_made_it(account: TestClient):
+    """Withdrawing is scoped like every other statement here."""
+
+    token = account.post("/api/shares", json={"dokument": SHARED}).json()["id"]
+
+    _sign_in(account, "jemand-anderes", name="Moritz Mustermann")
+    assert account.delete(f"/api/shares/{token}").status_code == 204
+
+    # Untouched: it was never theirs to withdraw.
+    assert account.get(f"/api/shares/{token}").status_code == 200
+
+
+@needs_database
+def test_the_owner_sees_their_links_with_the_plot_name(account: TestClient):
+    account.post("/api/shares", json={"dokument": SHARED})
+
+    listed = account.get("/api/shares").json()["eintraege"]
+
+    assert len(listed) == 1
+    assert listed[0]["name"] == "Wiesenstraße, Großbothen"
+    assert listed[0]["id"]
+
+
+@needs_database
+def test_deleting_the_account_takes_the_links_with_it(account: TestClient):
+    """The cascade covers them, and it has to: a link is the account's data."""
+
+    token = account.post("/api/shares", json={"dokument": SHARED}).json()["id"]
+
+    account.delete("/api/account")
+
+    # Same client with its cookies dropped rather than a second one: two
+    # TestClients open at once are two event loops on one pool.
+    account.cookies.clear()
+    assert account.get(f"/api/shares/{token}").status_code == 404

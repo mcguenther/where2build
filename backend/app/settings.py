@@ -457,6 +457,14 @@ class StorageSettings(BaseSettings):
     # pointed here, and a deployment that wants other numbers sets them.
     max_plots_per_account: int = 200
     max_document_bytes: int = 2 * 1024 * 1024
+    # A shared link is a copy that outlives the sharing, so the table would
+    # grow for ever without an end date. Ninety days is long enough for a
+    # purchase to run its course and short enough that an abandoned link does
+    # not sit there indefinitely; the sweep job removes what is past it.
+    share_days: int = Field(default=90, ge=1)
+    # And a ceiling per account for the same reason as the one on plots: so one
+    # account cannot fill the table.
+    max_shares_per_account: int = 50
     # A prototype's pool. Small on purpose: every request holds a connection
     # for one or two statements, and Postgres' own default is 100 backends.
     pool_min_size: int = 1

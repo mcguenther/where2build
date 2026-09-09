@@ -27,6 +27,16 @@
       "why": "Keeps the disk cache under APP_CACHE_MAX_BYTES. Nightly, because a ceiling that is never swept to is not a ceiling."
     },
     {
+      "name": "freigaben-sweep",
+      "schedule": "35 3 * * *",
+      "command": [
+        "python",
+        "scripts/sweep_shares.py",
+        "--json"
+      ],
+      "why": "Entfernt abgelaufene geteilte Links. Eine Freigabe ist eine Momentaufnahme und bleibt liegen, bis jemand sie wegräumt; ohne diesen Lauf wächst die Tabelle unbegrenzt. Ein Betrieb ohne Serverspeicher meldet das und tut nichts."
+    },
+    {
       "name": "poi-index",
       "schedule": "20 4 1 */3 *",
       "command": [

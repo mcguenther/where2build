@@ -48,6 +48,31 @@ create table if not exists plots (
 create index if not exists plots_user_geaendert_idx
     on plots (user_id, geaendert_am desc);
 
+-- A plot shared by link. Its own table and not a flag on `plots`, because a
+-- share is a *copy*: what was shared stays what it was on the day, however the
+-- original changes afterwards. Someone who got the link weeks ago has no
+-- business seeing today's asking price.
+--
+-- `id` is the token in the URL and therefore the whole of the access control:
+-- unguessable, and nothing else is checked. `laeuft_ab` is what keeps this
+-- table from being a landfill -- every row has an end, and the sweep job
+-- removes what is past it.
+create table if not exists freigaben (
+    id           text        primary key,
+    user_id      bigint      not null references users (id) on delete cascade,
+    -- The snapshot, already stripped of the personal note. Cut on the way in
+    -- rather than on the way out, so a share can never hold what it must not
+    -- show.
+    dokument     jsonb       not null,
+    angelegt     timestamptz not null default now(),
+    laeuft_ab    timestamptz not null
+);
+
+-- The owner's own list, newest first.
+create index if not exists freigaben_user_idx on freigaben (user_id, angelegt desc);
+-- And the sweep, which asks only "what is past its end".
+create index if not exists freigaben_ablauf_idx on freigaben (laeuft_ab);
+
 -- The rest of the document: house types, destinations, the selection. One row
 -- per account, because none of it is worth a conflict of its own.
 create table if not exists settings (

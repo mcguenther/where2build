@@ -33,6 +33,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import secrets
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime
@@ -93,6 +94,16 @@ class StoredDocument:
 
 
 @dataclass(frozen=True)
+class Share:
+    """One shared plot: the token it lives under, and what it holds."""
+
+    id: str
+    dokument: dict[str, Any]
+    angelegt: datetime
+    laeuft_ab: datetime
+
+
+@dataclass(frozen=True)
 class AccountOverview:
     """Everything held about one account, for the person it is about.
 
@@ -108,6 +119,24 @@ class AccountOverview:
     angelegt: datetime
     grundstuecke: int
     groesse_bytes: int
+
+
+# 16 bytes of randomness, 22 characters of URL. The token is the whole of the
+# access control on a shared link, so it has to be past guessing: 2^128 is not
+# something anybody walks through, and it stays short enough to paste into a
+# chat.
+SHARE_TOKEN_BYTES = 16
+
+# The field a shared plot must never carry. Named here rather than in the
+# frontend because the promise "without the note" has to hold even when a
+# caller forgets -- see `create_share`.
+NOTE_FIELD = "note"
+
+
+def without_note(dokument: dict[str, Any]) -> dict[str, Any]:
+    """The plot as it may be shared."""
+
+    return {key: value for key, value in dokument.items() if key != NOTE_FIELD}
 
 
 def mib(byte_count: float) -> str:
@@ -298,6 +327,115 @@ class Storage:
                 identity.subject,
             )
             return gone != "DELETE 0"
+
+    # -- shares ------------------------------------------------------------
+
+    async def create_share(self, identity: Identity, dokument: dict[str, Any]) -> Share:
+        """Freeze a plot under a fresh token.
+
+        The note is cut here and not in the browser. "Without the note" is a
+        promise made to whoever shares, and a promise the frontend keeps is one
+        a bug in the frontend can break; cut on the way in, the row simply
+        never holds it, and no later reader has to remember to leave it out.
+        """
+
+        self._check_size(dokument)
+        token = secrets.token_urlsafe(SHARE_TOKEN_BYTES)
+        pool = await self._pool_or_open()
+        async with _translated(), pool.acquire() as connection:
+            account = await self._account_id(connection, identity, create=True)
+            await self._check_share_count(connection, account)
+            row = await connection.fetchrow(
+                """
+                insert into freigaben (id, user_id, dokument, laeuft_ab)
+                values ($1, $2, $3, now() + ($4 || ' days')::interval)
+                returning id, dokument, angelegt, laeuft_ab
+                """,
+                token,
+                account,
+                # No json.dumps here: the pool's jsonb codec encodes, and
+                # doing it twice stores a JSON *string* that reads back as one.
+                without_note(dokument),
+                str(self.settings.share_days),
+            )
+            return _share(row)
+
+    async def share(self, token: str) -> Share | None:
+        """One share by its token, for anybody at all.
+
+        No identity: the token *is* the access. An expired one answers as
+        missing rather than as gone, because the two are the same to the reader
+        and the second would say that something was once there.
+        """
+
+        pool = await self._pool_or_open()
+        async with _translated(), pool.acquire() as connection:
+            row = await connection.fetchrow(
+                """
+                select id, dokument, angelegt, laeuft_ab from freigaben
+                 where id = $1 and laeuft_ab > now()
+                """,
+                token,
+            )
+            return _share(row) if row is not None else None
+
+    async def shares(self, identity: Identity) -> list[Share]:
+        """This account's own shares, newest first. Expired ones stay out."""
+
+        pool = await self._pool_or_open()
+        async with _translated(), pool.acquire() as connection:
+            account = await self._account_id(connection, identity, create=False)
+            if account is None:
+                return []
+            rows = await connection.fetch(
+                """
+                select id, dokument, angelegt, laeuft_ab from freigaben
+                 where user_id = $1 and laeuft_ab > now()
+                 order by angelegt desc
+                """,
+                account,
+            )
+            return [_share(row) for row in rows]
+
+    async def delete_share(self, identity: Identity, token: str) -> None:
+        """Withdraw a link. Idempotent, and scoped to the account that made it."""
+
+        pool = await self._pool_or_open()
+        async with _translated(), pool.acquire() as connection:
+            account = await self._account_id(connection, identity, create=False)
+            if account is None:
+                return
+            await connection.execute(
+                "delete from freigaben where user_id = $1 and id = $2", account, token
+            )
+
+    async def sweep_shares(self) -> int:
+        """Drop what is past its end. Says how many, for the job's own report."""
+
+        pool = await self._pool_or_open()
+        async with _translated(), pool.acquire() as connection:
+            gone = await connection.execute("delete from freigaben where laeuft_ab <= now()")
+            return int(gone.rsplit(" ", 1)[-1])
+
+    async def _check_share_count(self, connection: asyncpg.Connection, account: int) -> None:
+        """A ceiling per account, like the one on plots and for the same reason.
+
+        Serialised the same way too: `_account_id(create=True)` took a row lock
+        on `users` before this runs, so two shares for one account queue there
+        and the second counts what the first stored. See the note on
+        `_check_count`.
+        """
+
+        held = await connection.fetchval(
+            "select count(*) from freigaben where user_id = $1 and laeuft_ab > now()",
+            account,
+        )
+        limit = self.settings.max_shares_per_account
+        if held >= limit:
+            raise ConflictError(
+                f"Mehr als {limit} offene Freigaben gehen nicht. "
+                "Bitte einen nicht mehr gebrauchten Link zurückziehen."
+            )
 
     # -- plots -------------------------------------------------------------
 
@@ -507,6 +645,15 @@ class Storage:
             f"In diesem Konto sind bereits {count} Grundstücke gespeichert; mehr als "
             f"{limit} nimmt der Server nicht auf. Bitte zuerst eines löschen."
         )
+
+
+def _share(row: asyncpg.Record) -> Share:
+    return Share(
+        id=row["id"],
+        dokument=row["dokument"],
+        angelegt=row["angelegt"],
+        laeuft_ab=row["laeuft_ab"],
+    )
 
 
 def _plot_conflict(

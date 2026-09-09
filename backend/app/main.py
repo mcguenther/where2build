@@ -35,6 +35,7 @@ from .routers import (
     reachability,
     search,
     sitechecks,
+    shares,
     storage,
     tiles,
 )
@@ -509,7 +510,11 @@ def create_app() -> FastAPI:
     # provider -- but that is this deployment's own provider, not a service
     # being borrowed, and a budget on signing in would lock people out of the
     # very thing that gives them a budget.
-    for module in (auth, gemarkungen, storage):
+    # `shares` is in here for the same reason as `storage`: it speaks only to
+    # our own database. Worth knowing that one of its routes has no session at
+    # all -- a shared link is meant to be opened by whoever was sent it, so the
+    # token is the access. See the module docstring.
+    for module in (auth, gemarkungen, storage, shares):
         app.include_router(module.router)
 
     return app

@@ -1214,6 +1214,44 @@ class KontoAntwort(BaseModel):
     )
 
 
+class FreigabeAnfrage(BaseModel):
+    """A plot to freeze under a link."""
+
+    dokument: dict[str, Any] = Field(
+        description="Das Grundstücksdokument. Die persönliche Notiz wird beim Anlegen "
+        "entfernt und gar nicht erst gespeichert."
+    )
+
+
+class FreigabeAngelegt(BaseModel):
+    """A link that exists, from its owner's side."""
+
+    id: str = Field(description="Der Schlüssel für den Link.")
+    angelegt: datetime
+    laeuft_ab: datetime = Field(
+        description="Ab hier antwortet der Link, als gäbe es ihn nicht."
+    )
+    name: str | None = Field(
+        default=None, description="Name des Grundstücks, damit die Liste lesbar ist."
+    )
+
+
+class FreigabenAntwort(BaseModel):
+    eintraege: list[FreigabeAngelegt] = Field(
+        description="Alle offenen Freigaben dieses Kontos, neueste zuerst."
+    )
+
+
+class FreigabeAntwort(BaseModel):
+    """What somebody with the link gets: the snapshot, and until when."""
+
+    dokument: dict[str, Any] = Field(
+        description="Das Grundstück, wie es beim Teilen aussah. Ohne die Notiz."
+    )
+    angelegt: datetime = Field(description="Wann geteilt wurde; der Stand ist von da.")
+    laeuft_ab: datetime
+
+
 class SpeicherAnfrage(BaseModel):
     """A write, with the stand it builds on."""
 

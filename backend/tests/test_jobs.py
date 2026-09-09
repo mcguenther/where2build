@@ -134,6 +134,8 @@ def test_the_shipped_job_list_is_valid():
 
     shipped = Path(__file__).resolve().parent.parent.parent / "ops" / "jobs.json"
     jobs = run_jobs.load(shipped)
-    assert {j.name for j in jobs} == {"cache-sweep", "poi-index", "address-index"}
+    assert {j.name for j in jobs} == {
+        "cache-sweep", "freigaben-sweep", "poi-index", "address-index"
+    }
     # Every job explains itself; `list` prints this and an operator reads it.
     assert all(j.why for j in jobs)
