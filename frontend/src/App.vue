@@ -41,6 +41,24 @@
       </div>
     </header>
 
+    <div v-if="state.sync.adoption" class="adoption no-print">
+      <div class="container adoption__inner">
+        <p>
+          <b>In diesem Browser liegen {{ state.sync.adoption.plots }}
+            {{ state.sync.adoption.plots === 1 ? "Grundstück" : "Grundstücke" }}.</b>
+          Ins Konto übernehmen? Sie liegen danach auf jedem Rechner, an dem diese Anmeldung gilt.
+          Hier bleiben sie ohnehin.
+        </p>
+        <div class="spacer"></div>
+        <button type="button" class="btn btn--small" :disabled="state.sync.busy" @click="adoptLocal">
+          {{ state.sync.busy ? "Wird übernommen …" : "Übernehmen" }}
+        </button>
+        <button type="button" class="btn btn--quiet btn--small" @click="declineAdoption">Hier lassen</button>
+      </div>
+    </div>
+
+    <p v-if="state.sync.error" class="container sync-error no-print" role="alert">{{ state.sync.error }}</p>
+
     <main class="container">
       <RouterView />
     </main>
@@ -60,7 +78,7 @@
 </template>
 
 <script>
-import { state, applyTheme, loadAccount } from "./lib/store.js";
+import { state, applyTheme, loadAccount, loadFromAccount, adoptLocal, declineAdoption } from "./lib/store.js";
 import { signInUrl, signOut } from "./lib/api.js";
 
 export default {
@@ -77,6 +95,9 @@ export default {
   },
   async created() {
     await loadAccount();
+    // Only after the answer: which document is in force depends on whether
+    // there is an account behind this browser at all.
+    await loadFromAccount();
   },
   computed: {
     /** Two letters off the display name, for the round mark beside it. */
@@ -103,9 +124,15 @@ export default {
     applyTheme,
     /** Sign out and reload the answer rather than assuming it: the cookie is
      *  the backend's, and only it can say what is left of the session. */
+    adoptLocal,
+    declineAdoption,
+
     async leave() {
       await signOut().catch(() => {});
       await loadAccount();
+      // The account's copy goes with the account: what stays is this
+      // browser's, which is what an unsigned session has always worked on.
+      await loadFromAccount();
     },
 
     /** Detail, wizard and comparison all live under "Grundstücke" in the
@@ -163,6 +190,14 @@ main{ flex: 1; padding-top: var(--w2b-space-5); }
 }
 .theme-switch button + button{ border-left: 1px solid var(--w2b-line); }
 .theme-switch button[aria-pressed="true"]{ background: var(--w2b-primary); color: var(--w2b-primary-on); }
+
+.adoption{ background: var(--w2b-secondary-light); border-bottom: 1px solid var(--w2b-line); }
+.adoption__inner{
+  display: flex; align-items: center; gap: var(--w2b-space-3); flex-wrap: wrap;
+  padding-top: var(--w2b-space-3); padding-bottom: var(--w2b-space-3);
+  font-size: var(--w2b-text-s); color: var(--w2b-secondary-text);
+}
+.sync-error{ padding-top: var(--w2b-space-3); font-size: var(--w2b-text-s); color: var(--w2b-error); }
 
 .account{ display: flex; align-items: center; gap: var(--w2b-space-2); }
 .account__initials{

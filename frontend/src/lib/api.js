@@ -10,12 +10,15 @@
 const BASE = "/api";
 const TIMEOUT_MS = 180000;   // the extraction model fetches a page first
 
-/** Error carrying the backend's own German explanation. */
+/** Error carrying the backend's own German explanation, and the body it came
+ *  with: a 409 from the store holds the stand that is on the server, and the
+ *  interface cannot show a conflict without it. */
 export class ServiceError extends Error {
-  constructor(message, status) {
+  constructor(message, status, body = null) {
     super(message);
     this.name = "ServiceError";
     this.status = status;
+    this.body = body;
   }
 }
 
@@ -44,7 +47,8 @@ async function request(path, options = {}) {
     const body = await response.json().catch(() => null);
     throw new ServiceError(
       body?.detail || `Der Dienst antwortete mit HTTP ${response.status}.`,
-      response.status
+      response.status,
+      body
     );
   }
   // An endpoint that answers "done" and nothing else sends 204; asking that
@@ -81,6 +85,22 @@ export async function authState() {
 export const signInUrl = (target = "/") => `${BASE}/auth/login?ziel=${encodeURIComponent(target)}`;
 
 export const signOut = () => request("/auth/logout", { method: "POST" });
+
+/* ---------- The account's copy of the document ----------
+ * Only reachable while signed in; without a configured store the backend
+ * answers 503 and the app stays what it is, a thing that keeps its work in
+ * this browser. */
+export const plotsOnServer = () => request("/plots");
+export const putPlot = (id, dokument, geaendert_am) =>
+  request(`/plots/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    body: JSON.stringify({ dokument, geaendert_am })
+  });
+export const deletePlotOnServer = id =>
+  request(`/plots/${encodeURIComponent(id)}`, { method: "DELETE" });
+export const settingsOnServer = () => request("/settings");
+export const putSettings = (dokument, geaendert_am) =>
+  request("/settings", { method: "PUT", body: JSON.stringify({ dokument, geaendert_am }) });
 
 export const readListing = url => request("/listings/extract", { method: "POST", body: JSON.stringify({ url }) });
 export const readPage = text => request("/listings/extract", { method: "POST", body: JSON.stringify({ text }) });

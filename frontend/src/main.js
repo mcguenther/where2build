@@ -26,13 +26,22 @@ import { createApp } from "vue";
 import { createWebHistory } from "vue-router";
 import App from "./App.vue";
 import { createAppRouter } from "./router/index.js";
-import { load } from "./lib/store.js";
+import { load, flushSave } from "./lib/store.js";
 
 setWorkerUrl(mapWorkerUrl);
 
 /* Before the first route is resolved: a link straight to a plot has to find
  * that plot in the document, and the document lives in this browser. */
 load();
+
+/* Writes to the account are collected and land a moment after the hand comes
+ * to rest. Leaving the page is the one moment that cannot wait, and
+ * `pagehide` is the event that actually fires on a phone, where the tab is
+ * frozen rather than closed. */
+window.addEventListener("pagehide", () => { flushSave(); });
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") flushSave();
+});
 
 createApp(App)
   .use(createAppRouter(createWebHistory(import.meta.env.BASE_URL)))
