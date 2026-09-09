@@ -181,11 +181,28 @@ def client_key(request: Request, identity: Identity | None, proxy_hops: int) -> 
 # is a tab left open on a busy page, not abuse. It says what applies, when it
 # continues, and why there is a budget at all.
 DENIED = (
-    "Das Abrufkontingent für diesen Zugang ist erreicht: höchstens {limit} Abrufe "
+    "Das Abrufkontingent für diesen Zugang ist erreicht: höchstens {allowance} "
     "{window}. Weiter geht es in {wait}. Diese Anwendung fragt für jeden Abruf "
     "fremde Dienste (Kataster, Bodenrichtwerte, Routing, Umweltdaten), die sie nur "
     "mitbenutzen darf; deshalb haushaltet sie mit den Anfragen."
 )
+
+
+def allowance_text(limit: int) -> str:
+    """„ein Abruf“, „600 Abrufe“ -- how many the budget is.
+
+    A limit of one is reachable: a deployment may set it, and a test does. The
+    number alone next to a plural noun („1 Abrufe“) is the same slip as
+    „liegen 1 Grundstück“ -- the noun is declined and the numeral is not.
+    """
+
+    return "ein Abruf" if limit == 1 else f"{limit} Abrufe"
+
+
+def tile_allowance_text(limit: int) -> str:
+    """The same for the tile budget, which needs its own article and plural."""
+
+    return "eine Kartenkachel" if limit == 1 else f"{limit} Kartenkacheln"
 
 
 def window_text(window_s: int) -> str:
@@ -215,7 +232,7 @@ def wait_text(seconds: int) -> str:
 
 def denied_message(decision: Decision) -> str:
     return DENIED.format(
-        limit=decision.limit,
+        allowance=allowance_text(decision.limit),
         window=window_text(decision.window_s),
         wait=wait_text(decision.retry_after_s),
     )

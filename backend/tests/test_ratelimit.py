@@ -333,6 +333,35 @@ def test_health_names_the_budget_and_how_it_is_counted(budget, client: TestClien
     assert "APP_PROXY_HOPS=0" in kontingent["hinweis"]
 
 
+@respx.mock
+def test_a_budget_of_one_is_still_written_in_German(
+    monkeypatch: pytest.MonkeyPatch, client: TestClient
+):
+    """„1 Abrufe" is the same slip as „liegen 1 Grundstück".
+
+    A ceiling of one is reachable -- a deployment may set it, and the sentence
+    is the whole answer a person gets, so the numeral has to agree with the
+    noun. Both budgets are checked, because each carries its own article.
+    """
+
+    monkeypatch.setenv("RATELIMIT_ENABLED", "true")
+    monkeypatch.setenv("RATELIMIT_SERVICE_CALLS", "1")
+    monkeypatch.setenv("RATELIMIT_MAP_TILES", "1")
+    reset_services()
+    _boris()
+
+    client.get(LANDVALUE, params=COORDINATE)
+    detail = client.get(LANDVALUE, params=COORDINATE).json()["detail"]
+    assert "höchstens ein Abruf je Stunde" in detail
+    assert "1 Abrufe" not in detail
+
+    hinweis = {
+        entry["name"]: entry for entry in client.get("/api/health").json()["dienste"]
+    }["kontingent"]["hinweis"]
+    assert "ein Abruf je Stunde" in hinweis
+    assert "eine Kartenkachel je Stunde" in hinweis
+
+
 def test_health_says_when_there_is_no_budget(switched_off, client: TestClient):
     dienste = {entry["name"]: entry for entry in client.get("/api/health").json()["dienste"]}
 

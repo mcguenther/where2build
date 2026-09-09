@@ -46,7 +46,7 @@ from .deps import (
     service_budget,
     storage_service,
 )
-from .ratelimit import window_text
+from .ratelimit import allowance_text, tile_allowance_text, window_text
 from .services import ocr
 from .services.storage import mib
 from .schemas import DienstStatus, HealthResponse
@@ -218,9 +218,9 @@ def _kontingent_hinweis(settings: Settings) -> str:
         )
     )
     return (
-        f"Je Konto höchstens {limits.service_calls} Abrufe {fenster} an die fremden "
+        f"Je Konto höchstens {allowance_text(limits.service_calls)} {fenster} an die fremden "
         f"Dienste (Kataster, Bodenrichtwert, Standort, Routing, Umgebung, Inserate) "
-        f"und {limits.map_tiles} Kartenkacheln {fenster}; darüber antwortet der Server "
+        f"und {tile_allowance_text(limits.map_tiles)} {fenster}; darüber antwortet der Server "
         f"429 mit Retry-After. {zurechnung} Gezählt wird im Arbeitsspeicher dieses "
         "Prozesses, die Grenze gilt also je Arbeitsprozess."
     )
