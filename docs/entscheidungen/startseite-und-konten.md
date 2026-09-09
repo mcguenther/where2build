@@ -205,6 +205,13 @@ Kein Teil der Startseite, aber Teil der Entscheidung:
 4. **Server als Speicher:** Postgres, `plots`-API, Store-Abstraktion,
    Übernahme-Banner, Grenzen pro Konto.
 
+Offen aus Schritt 3, bewusst und mit Grund: ein Compose-Profil für einen
+Anbieter (Authentik, Keycloak, Dex) ist **nicht** dabei. In dieser Umgebung
+läuft kein Docker, also wäre es eine Datei, die niemand gestartet hat, und
+das Repo hält es so, dass nichts hineingeschrieben wird, was nicht einmal
+gelaufen ist. Die README beschreibt stattdessen die Variablen und den einen
+Durchlauf, den es wirklich gab.
+
 ## 7 · Offen
 
 - Sollen Grundstücke zwischen Konten **geteilt** werden können (zwei Leute

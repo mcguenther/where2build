@@ -260,6 +260,9 @@ nothing else.
 | `POST` | `/api/neighbours` | one coordinate → the neighbouring buildings from `ave:GebaeudeBauwerk`, the same ALKIS WFS the parcels come from — for showing where a setback area would reach onto the plot. Overpass is the fallback where one is configured; nothing has to be |
 | `GET` | `/api/basemap/style.json`, `/api/basemap/{path}` | the vector basemap, rewritten so MapLibre never reaches the internet itself |
 | `GET` | `/api/health` | which services are configured |
+| `GET` | `/api/auth/me` | who is signed in, and whether signing in exists here at all |
+| `GET` | `/api/auth/login`, `/api/auth/callback` | the OIDC round trip, run by the backend; `?ziel=` comes back to the page it started on |
+| `POST` | `/api/auth/logout` | drops the session cookie |
 
 ## Configuration
 
@@ -276,6 +279,34 @@ APP_USER_AGENT=where2build/0.1 (contact@example.org)
 No provider is wired in. The client is OpenAI-compatible, so switching is a
 change to `LLM_BASE_URL` and nothing else. `APP_USER_AGENT` must carry a real
 contact address before any real use of Transitous.
+
+### Signing in
+
+Optional, and off until an issuer is named. Without `OIDC_ISSUER` the app is
+what it has always been: everything stays in the browser, the header shows no
+account, and `/api/health` says the same.
+
+```
+OIDC_ISSUER=https://auth.example.org
+OIDC_CLIENT_ID=where2build
+OIDC_CLIENT_SECRET=...
+OIDC_SESSION_SECRET=...          # openssl rand -base64 32
+OIDC_PUBLIC_BASE_URL=https://where2build.example.org
+OIDC_COOKIE_SECURE=true          # false only for a plain-http localhost run
+```
+
+Any OpenID Connect provider will do; nothing about one is wired in. The
+backend reads `<issuer>/.well-known/openid-configuration` and takes the
+endpoints from there. It runs the whole exchange itself, so no token ever
+reaches the browser: what the browser gets is a signed, HttpOnly session
+cookie. `OIDC_PUBLIC_BASE_URL` is the origin the redirect URI is built from,
+and the provider has to allow `<that origin>/api/auth/callback`.
+
+The flow was run end to end once against a throwaway provider on `127.0.0.1`,
+with `OIDC_COOKIE_SECURE=false` because the run was plain http: redirect,
+return, `w2b_sitzung` cookie (HttpOnly, SameSite=Lax), the name in the header,
+and signing out removing it again. Storage is still local either way; the
+server side of it is the next step, not this one.
 
 The basemap follows the interface: `BASEMAP_STYLE_PATH` (default
 `styles/liberty`) is the light map, `BASEMAP_DARK_STYLE_PATH` (default
