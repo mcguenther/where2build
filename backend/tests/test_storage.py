@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+from pathlib import Path
 from typing import Any
 
 import asyncpg
@@ -30,7 +31,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app import session
-from app.deps import reset_services
+from app.deps import reset_services, storage_service
+from app.services.oidc import Identity
 from app.main import app as fastapi_app
 
 from .conftest import OIDC_ISSUER
@@ -529,3 +531,80 @@ def test_deleting_an_account_takes_its_rows_with_it(account: TestClient):
 
     assert _run(lambda connection: connection.fetchval("select count(*) from plots")) == 0
     assert _run(lambda connection: connection.fetchval("select count(*) from settings")) == 0
+
+
+@needs_database
+def test_der_upsert_auf_das_konto_serialisiert(database):
+    """Two writes for one account queue at the account row, and that is what
+    keeps the plot ceiling from being a suggestion.
+
+    Measured on the two statements themselves, because the service cannot show
+    it: both of its calls take the same pooled connection and would queue up
+    even if nothing locked anything. The second upsert on a held row runs into
+    `lock_timeout`; two inserts into `plots` next to each other do not, since a
+    foreign key only takes `for key share` and that is compatible with itself.
+
+    The test exists for the day somebody turns the upsert into "select, and
+    insert if missing" because the row usually exists by then.
+    """
+
+    upsert = """
+        insert into users (issuer, subject, anzeigename) values ($1, $2, $3)
+        on conflict (issuer, subject) do update
+            set anzeigename = coalesce(excluded.anzeigename, users.anzeigename)
+        returning id
+    """
+    key = (OIDC_ISSUER, "serialisiert", "Erika Musterfrau")
+
+    async def scenario() -> tuple[bool, bool]:
+        first = await asyncpg.connect(TEST_DATABASE_URL)
+        second = await asyncpg.connect(TEST_DATABASE_URL)
+        try:
+            await first.execute(
+                (Path(__file__).resolve().parents[1] / "app" / "schema.sql").read_text(encoding="utf-8")
+            )
+            account = await first.fetchval(upsert, *key)
+
+            held = first.transaction()
+            await held.start()
+            await first.fetchval(upsert, *key)
+
+            waited = second.transaction()
+            await waited.start()
+            await second.execute("set local lock_timeout = '400ms'")
+            account_blocked = False
+            try:
+                await second.fetchval(upsert, *key)
+            except asyncpg.LockNotAvailableError:
+                account_blocked = True
+            await waited.rollback()
+            await held.rollback()
+
+            # And the counter-check: the plots themselves do not serialise.
+            held = first.transaction()
+            await held.start()
+            await first.execute(
+                "insert into plots (id, user_id, dokument, geaendert_am) values ('eins', $1, '{}', now())",
+                account,
+            )
+            waited = second.transaction()
+            await waited.start()
+            await second.execute("set local lock_timeout = '400ms'")
+            plots_blocked = False
+            try:
+                await second.execute(
+                    "insert into plots (id, user_id, dokument, geaendert_am) values ('zwei', $1, '{}', now())",
+                    account,
+                )
+            except asyncpg.LockNotAvailableError:
+                plots_blocked = True
+            await waited.rollback()
+            await held.rollback()
+            return account_blocked, plots_blocked
+        finally:
+            await first.close()
+            await second.close()
+
+    account_blocked, plots_blocked = asyncio.run(scenario())
+    assert account_blocked is True
+    assert plots_blocked is False

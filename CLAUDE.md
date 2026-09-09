@@ -1033,6 +1033,22 @@ from the user directly. Reopen only if the user asks.
   together; sixteen clues now play over twelve seconds instead of six — and the
   screenshot script's wait after the verdict has to outlast the budget, or it
   photographs a map still in flight.
+- **The plot ceiling is serialised by the account upsert, not by a lock
+  anybody wrote.** `save_plot` calls `_account_id(create=True)` first, and its
+  `on conflict do update` takes a row lock on `users` that is incompatible
+  with itself, so two writes for one account queue there and the second counts
+  what the first stored. Measured 09.09.2026: a second upsert on a held row
+  runs into `lock_timeout`, while two plain inserts into `plots` do not wait on
+  each other at all, because a foreign key only takes `for key share` and that
+  is compatible with itself. Turning the upsert into "select, and insert if
+  missing" is the obvious tidy-up once the row usually exists, and it would
+  quietly turn the ceiling into a suggestion.
+  Two attempts to *prove* the race first measured something else entirely: an
+  `asyncio.gather` of two `save_plot` calls proves nothing, because both take
+  the same pooled connection, and a write blocked behind an outside `for
+  update` on the account row proves only that the foreign key touches that
+  row. `test_der_upsert_auf_das_konto_serialisiert` measures the two
+  statements themselves and fails when the upsert stops writing.
 - **A hover rule on the base class fills every variant, including the quiet
   one.** `.btn:hover:not(:disabled)` paints Loden, and `.btn--quiet:hover`
   only reset the text and the border, so every still button in the app went

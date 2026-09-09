@@ -405,10 +405,20 @@ class Storage:
     async def _check_count(self, connection: asyncpg.Connection, account: int) -> None:
         """The per-account ceiling, checked before a row is added.
 
-        Racy by construction: two inserts arriving together both see the count
-        below the limit. That is accepted rather than serialised, because the
-        number is a guard against one account filling the disk, not a rule
-        anybody counts on to the last row.
+        Not racy, and not by luck: `_account_id(create=True)` runs first in the
+        same transaction, and its upsert takes a row lock on `users` that is
+        incompatible with itself. Two writes for one account therefore queue at
+        that statement, and the second counts what the first really stored.
+        Measured: a second upsert on a held row waits (and hits `lock_timeout`),
+        while two plain inserts into `plots` do not wait on each other at all,
+        because the foreign key only takes `for key share`, which is compatible
+        with itself.
+
+        So the guard hangs on that upsert staying a write. Turning it into
+        "select, and insert if missing" would be the obvious tidy-up once the
+        row usually exists, and it would quietly make this ceiling a
+        suggestion. `test_der_upsert_auf_das_konto_serialisiert` holds the
+        line.
         """
 
         limit = self.settings.max_plots_per_account
