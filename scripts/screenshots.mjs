@@ -246,6 +246,13 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
   await page.click(".breadcrumb a");
   await page.click(".page-head .btn");
   await page.getByText("Seite einfügen", { exact: true }).click();
+  /* The bookmarklet, with its fold opened. That is what this step is now
+     mostly about: `Strg+A` selects the body alone, so a pasted page has no
+     meta tags and therefore no coordinate, while the bookmarklet hands over
+     the whole document. The knob is the bookmark — it does nothing here. */
+  await page.click("details.gelesen > summary");
+  await page.waitForSelector("details.gelesen a.btn");
+  await shot(page, "assistent-einfuegen", mode, narrow ? "-schmal" : "");
   await pasteInto(page, "#q-paste", PASTED_PAGE);
   await page.getByRole("button", { name: "Lesen" }).click();
   try {

@@ -909,7 +909,12 @@ from the user directly. Reopen only if the user asks.
   every deterministic field at once — which is why it reads as having no
   address, no coordinate and no parcel number, a fact about the clipboard and
   not about the portal. The fix is not more prose parsing: it is getting the
-  real DOM out of the browser that already has it. Emptying the field has to
+  real DOM out of the browser that already has it, which is what
+  `lib/bookmarklet.js` does — one click on the listing page hands over
+  `document.documentElement.outerHTML` through `postMessage`, so no CORS, no
+  request to the portal and nothing circumvented. Verified end to end across
+  two origins by `scripts/bookmarklet.mjs`: the handed-over Kleinanzeigen page
+  yields the coordinate, a pasted one does not. Emptying the paste field has to
   clear the kept HTML, or the next read silently ships the page pasted before.
   See `docs/research/immobilienscout24-zugang.md` § 4.
 - **An optional dependency has to be optional in one place only.** The backend
@@ -1090,6 +1095,9 @@ npm run build
 
 # screenshots of every view, light and dark
 node scripts/screenshots.mjs
+
+# the bookmarklet's handover, across two real origins (needs the build and :8000)
+node scripts/bookmarklet.mjs
 ```
 
 ## Before calling a change done
@@ -1109,11 +1117,14 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 524 passed, 8 skipped — one of those needs pyosmium, which only the
+- `pytest`: 526 passed, 8 skipped — one of those needs pyosmium, which only the
   index builder wants; the other seven need Tesseract and skip without it.
-- `vitest`: 533 passed — plus the integration file, excluded by `npm run test`
+- `vitest`: 549 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
-- `scripts/screenshots.mjs`: 59 images plus two print PDFs. It fails on console
+- `scripts/bookmarklet.mjs`: the handover across two origins, against the built
+  app and a backend on :8000. It asserts the coordinate, which is the field
+  that separates a handed-over document from a pasted one.
+- `scripts/screenshots.mjs`: 62 images plus two print PDFs. It fails on console
   errors, on horizontal overflow, and if not a single vector tile arrived. It
   also drives the live geocoder, which is slow often enough to blow the 60 s
   wait on the destinations step — two runs failed there and the third passed

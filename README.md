@@ -26,7 +26,7 @@ takes to get to work, school and the station.
 
 | | |
 |---|---|
-| **Take a plot in** | From the search field, from a listing URL, from a pasted page, from a description alone, or straight from *Gemarkung* + parcel numbers. The search reads what was typed before it looks anything up — an address never begins with a digit, a coordinate is two numbers, a parcel denominator cannot occur in an address — and where two readings stay plausible it asks both local indexes rather than guessing. The wizard shows what was read, where each value came from, and what it could not find. Only a description alone ever asks a model. A plot is a *set* of parcels: the last step takes further ones by pointing at them on the drawing. |
+| **Take a plot in** | From the search field, from a listing URL, from a pasted page, from a description alone, or straight from *Gemarkung* + parcel numbers. The search reads what was typed before it looks anything up — an address never begins with a digit, a coordinate is two numbers, a parcel denominator cannot occur in an address — and where two readings stay plausible it asks both local indexes rather than guessing. The wizard shows what was read, where each value came from, and what it could not find. Only a description alone ever asks a model. A plot is a *set* of parcels: the last step takes further ones by pointing at them on the drawing. For the portals that refuse a server-side fetch there is a bookmarklet: one click on the listing page and the browser hands the whole document over, `<head>` and all, which is more than any fetch would get and more than the clipboard carries. |
 | **Resolve the parcels** | ALKIS gives the outline, the official area and the parcel identifier. A plot is a *set* of parcels — the normal case, not the exception — so geometries are unioned and official areas summed. |
 | **Judge the shape** | Rectangularity as polygon area over the area of its smallest rotated bounding rectangle, plus street frontage and vertex count. |
 | **Judge the price** | €/m² against the BORIS land value for the zone, as a percentage rather than a hunch. |
@@ -199,10 +199,11 @@ exclusions were justified on Saxon counts. Details in
 ## Tests
 
 ```bash
-backend/.venv/bin/python -m pytest backend/tests -q   # 385 passed, 1 skipped
-cd frontend && npm run test                           # 350 passed, 10 skipped
-cd frontend && npm run test:integration               # the 10, against a running backend
-node scripts/screenshots.mjs                          # 41 images and a print PDF
+backend/.venv/bin/python -m pytest backend/tests -q   # 526 passed, 8 skipped
+cd frontend && npm run test                           # 549 passed
+cd frontend && npm run test:integration               # against a running backend
+node scripts/screenshots.mjs                          # 62 images and two print PDFs
+node scripts/bookmarklet.mjs                          # the handover, across two origins
 ```
 
 The backend suite touches no network: ALKIS, BORIS, MOTIS, OpenFreeMap and the
@@ -407,9 +408,11 @@ backend/.venv/bin/pip install -e "backend[ocr]"
   with the reason rather than left out, because a list that silently omits what
   it cannot answer reads as a complete one.
 - **immobilienscout24.de still answers 401** to every server-side request, so
-  its pictures cannot be fetched here either. The paste field is the way in:
-  image extraction falls back to ordinary `<img>` URLs for pages whose markup
-  is not known, and those CDNs generally do answer.
+  its pictures cannot be fetched here either. The browser that is already
+  looking at the page is the way in — the bookmarklet under „Seite einfügen“
+  hands over the whole document — and image extraction falls back to ordinary
+  `<img>` URLs for pages whose markup is not known, which those CDNs generally
+  do answer.
 - **The street filter uses the cadastre's own address field, not OSM.** That is
   free and needs no Overpass, but it only covers the parcels that carry an
   address — half of them in the district measured. The OSM buffer (25 → 5 on

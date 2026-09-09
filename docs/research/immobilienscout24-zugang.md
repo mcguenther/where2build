@@ -229,7 +229,7 @@ this, since the extracted listing is cached on the URL.
 
 ## 5. The ways in, ranked
 
-### 5.1 A bookmarklet that hands over the real DOM — recommended
+### 5.1 A bookmarklet that hands over the real DOM — built ✅
 
 One `javascript:` bookmark, clicked while the exposé is open. It reads
 `document.documentElement.outerHTML` and POSTs it to the backend, which answers
@@ -250,12 +250,30 @@ Why this is the right answer and not a workaround:
   future portal at once, rather than one set of body-level selectors per
   portal.
 
-What it costs: an endpoint that accepts a POST from a foreign origin (the
-portal's page), so CORS for that one route plus a size cap — an ImmoScout exposé
-is on the order of 1–2 MB, against the paste field's current 400 000-character
-cap. A handover id rather than a URL fragment, because the payload does not fit
-in a URL. And a short German page explaining how to install the bookmark, since
-that is the one step a user cannot be walked through inside the app.
+**As built, 09.09.2026.** No endpoint accepts a foreign POST after all, and
+that turned out to be the better shape: the bookmarklet opens the app
+(`/aufnahme/quelle?uebergabe=<nonce>`) and the two tabs talk by `postMessage`,
+so the request to `/api/listings/extract` is made *by the app, from its own
+origin*. No CORS anywhere. It also sidesteps the portal's own
+Content-Security-Policy, which would govern a `fetch` through `connect-src` and
+a form post through `form-action` but has no directive for `postMessage`.
+
+The tab the bookmarklet opens announces itself and the bookmarklet answers with
+the document; the nonce in the address is what stands in for an origin check,
+since the sender's origin is whichever portal the user was on. `frontend/src/lib/bookmarklet.js`
+holds the source with the app's origin baked in — one line, because a
+`javascript:` URL is a URL and a newline ends the bookmark.
+
+What it cost: the request cap went from 400 000 characters to 3 000 000 (a
+whole document runs past a megabyte and there is no safe place to cut it —
+JSON-LD is routinely the last thing in the body), nginx needed a
+`client_max_body_size`, and the paste step grew a fold explaining how to drag
+the bookmark, which is the one step no app can do for the user.
+
+Verified across two real origins by `scripts/bookmarklet.mjs`: the recorded
+Kleinanzeigen advert served from a second port, the bookmarklet run in that
+page, and the app reading `og:latitude` 51.13430038927799 out of the handed-over
+document — the exact field a clipboard copy leaves behind.
 
 ### 5.2 A browser extension — the same idea, one step further
 
@@ -275,8 +293,11 @@ exposé page — which cannot be fetched here, so it has to come from a paste �
 gives a portal-specific set of patterns of the same kind
 `_DESCRIPTION_PATTERNS` and `_DETAIL_PATTERN` already are.
 
-Do this if the bookmarklet is not wanted. It is smaller, it helps today, and it
-will always be behind § 5.1 by exactly the fields that live in `<head>`.
+Not done, and § 5.1 is why: it will always be behind the handover by exactly
+the fields that live in `<head>`, and it costs a set of selectors per portal
+where the handover costs none. It stays the fallback for someone who will not
+install a bookmark — the paste field is still there and still reads everything
+the body carries.
 
 ### 5.4 Ask for a content-partner permission — see § 3.4
 
