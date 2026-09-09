@@ -277,6 +277,12 @@
   .route-card{ break-inside: avoid; }
   .route-card__sketch{ display: none !important; }   /* route sketches cost ink and say little on paper */
 
+  /* An interactive basemap is a canvas full of ink that says nothing on paper,
+     and the two columns it forms would break across a sheet. The site plan is
+     the drawing this sheet is about. */
+  .plot-page__surroundings{ display: block !important; }
+  .surroundings{ display: none !important; }
+
   .key-figures{ display: block !important; }
   .key-figures > *{ break-inside: avoid; }
 

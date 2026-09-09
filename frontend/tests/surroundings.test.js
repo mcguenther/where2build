@@ -1,14 +1,15 @@
 /**
- * The surroundings view: the house where it is planned, enough map around it
+ * The surroundings map: the house where it is planned, enough map around it
  * to recognise the place, and what was found nearby — on real recorded data.
+ * It sits on the plot page beside the list of what is nearby.
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import SurroundingsMap from "../src/components/SurroundingsMap.vue";
-import SurroundingsView from "../src/views/SurroundingsView.vue";
+import PlotView from "../src/views/PlotView.vue";
 import { state, placement, plotById } from "../src/lib/store.js";
-import { realState, realPlot, realRoutes, realDestinations, testRouter } from "./helpers.js";
+import { realState, realPlot, realRoutes, realDestinations, mountWithRouter } from "./helpers.js";
 import { toLocal } from "../src/lib/projection.js";
 import recorded from "./fixtures/nearby-liebertwolkwitz.json";
 
@@ -105,23 +106,21 @@ describe("Umgebungskarte", () => {
   });
 });
 
-describe("Umgebungsansicht", () => {
-  const openView = (id = "plot-concave") =>
-    mount(SurroundingsView, {
-      props: { id },
-      global: { plugins: [testRouter()], stubs: { SurroundingsMap: true, NearbyPanel: true } }
-    });
+describe("Umgebung auf der Grundstücksseite", () => {
+  const openPlot = (id = "plot-concave") => mountWithRouter(PlotView, { props: { id } });
 
   it("sagt es, wenn das Grundstück keine Koordinate hat", () => {
     const site = realPlot("concave");
     delete site.anchor;
     state.data.plots = [site];
 
-    expect(openView().text()).toContain("keine Koordinate hinterlegt");
+    const w = openPlot();
+    expect(w.findComponent({ name: "SurroundingsMap" }).exists()).toBe(false);
+    expect(w.text()).toContain("keine Koordinate");
   });
 
-  it("erklärt ein Grundstück, das es hier nicht gibt", () => {
-    expect(openView("plot-gibtsnicht").text()).toContain("Dieses Grundstück liegt nicht in diesem Browser");
+  it("stellt die Karte neben die Umgebungsliste", () => {
+    expect(openPlot().find(".plot-page__surroundings").exists()).toBe(true);
   });
 
   it("nimmt zu jedem Ziel die schnellste gerechnete Verbindung mit", () => {
@@ -129,7 +128,7 @@ describe("Umgebungsansicht", () => {
     site.routes = realRoutes();
     state.data.destinations = realDestinations();
 
-    const goals = openView().vm.destinations;
+    const goals = openPlot().vm.mapDestinations;
     expect(goals).toHaveLength(realDestinations().length);
 
     const hbf = goals.find(g => g.id === "zl-hbf");
@@ -138,13 +137,12 @@ describe("Umgebungsansicht", () => {
     expect(hbf.note).toMatch(/^(Auto|Rad|ÖPNV) · /);
   });
 
-  it("nennt ein Ziel ohne gerechneten Weg beim Namen, statt es zu verschweigen", () => {
+  it("gibt ein Ziel ohne gerechneten Weg ohne Linie weiter, statt es zu verschweigen", () => {
     state.data.destinations = realDestinations();
     plotById("plot-concave").routes = {};
 
-    const goals = openView().vm.destinations;
+    const goals = openPlot().vm.mapDestinations;
     expect(goals).toHaveLength(2);
-    expect(goals.every(g => g.line === null)).toBe(true);
-    expect(openView().text()).toContain("Weg noch nicht gerechnet");
+    expect(goals.every(g => g.line === null && g.note === "")).toBe(true);
   });
 });
