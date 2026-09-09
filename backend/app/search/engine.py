@@ -62,6 +62,7 @@ from ..services.alkis import (
 )
 from .envelope import _geojson, common_envelope, next_question
 from .indicia import (
+    ANCHORING,
     AreaStatement,
     collect_indicia,
     describes_part_area,
@@ -122,12 +123,6 @@ MAX_IMAGES = 12
 # genuine ambiguity, few enough that the map does not become a patchwork and
 # the run does not spend a request per wash.
 MAX_DRAWN_AREAS = 4
-
-# Which relations make a named place worth a request. „erwaehnt“ deliberately
-# does not: a place the text merely contains is not a statement about where the
-# plot is, and in German -- where every noun is capitalised -- it is as likely
-# to be the word „Wiesen“ as the Gemarkung of that name.
-_ANCHORING = ("liegt_in", "liegt_an", None)
 
 # What the short circuit accepts as agreement between the parcel it resolved
 # and the area the listing states. Wider than the plausibility check's factor
@@ -264,7 +259,7 @@ class SearchEngine:
                 if (
                     indiz.art == "gemarkung"
                     and not indiz.verworfen
-                    and indiz.beziehung in _ANCHORING
+                    and indiz.beziehung in ANCHORING
                     and not self._district_entries(indiz)
                 ):
                     indiz.verworfen = True
@@ -451,7 +446,7 @@ class SearchEngine:
                 # not know: „Brehna“ is not a Saxon Gemarkung, so choosing it
                 # re-ran the search with the same anchors and the same answer.
                 if art != "gemarkung"
-                or (indiz.beziehung in _ANCHORING and self._district_entries(indiz))
+                or (indiz.beziehung in ANCHORING and self._district_entries(indiz))
             ]
             values = {self._conflict_key(indiz) for indiz in usable}
             if len(values) < 2:
@@ -461,6 +456,14 @@ class SearchEngine:
                 # it is one plot made of two -- which this project treats as the
                 # normal case, not the exception. Asking which one is meant
                 # would be asking a question that is not there.
+                continue
+            if art == "gemarkung" and self.halves_of_one_ortsteil(usable):
+                # „Stadtteil Burghausen-Rückmarsdorf“ is one statement that
+                # admits two Gemarkungen, not two readings that disagree. Both
+                # are searched and both survivors are in the answer, where the
+                # user picks a *parcel*; asking „welche Gemarkung ist gemeint?“
+                # would call the listing contradictory when nothing in it
+                # contradicts.
                 continue
             chosen = self.payload.entscheidungen.get(art) or usable[0].id
             out.append(
@@ -472,6 +475,21 @@ class SearchEngine:
                 )
             )
         return out
+
+    def halves_of_one_ortsteil(self, districts: list[Indiz]) -> bool:
+        """Whether these district readings all come out of one compound name.
+
+        A city Ortsteil is often two former villages joined with a hyphen, and
+        both halves are Gemarkungen while the compound is none. The readings are
+        then one statement, and the same rule applies as to several parcel
+        numbers from one source: it is a set, not a dispute. „in Rückmarsdorf“
+        in a title alongside „Stadtteil Burghausen-Rückmarsdorf“ in the prose is
+        still that one statement, which is why the compound is carried on the
+        surviving reading rather than only on the derived one.
+        """
+
+        compounds = {indiz.teil_von for indiz in districts}
+        return len(compounds) == 1 and None not in compounds
 
     def named_as_a_set(self) -> bool:
         """Whether the parcel numbers were listed together rather than in dispute.
@@ -513,7 +531,7 @@ class SearchEngine:
         # „geprägt von Wiesen und Feldern“ — a real Gemarkung name and an
         # entirely accidental one. A mention without a positional relation
         # stays in the protocol as weak evidence and is never searched.
-        active = [i for i in self.active("gemarkung") if i.beziehung in _ANCHORING]
+        active = [i for i in self.active("gemarkung") if i.beziehung in ANCHORING]
         chosen_id = self.payload.entscheidungen.get("gemarkung")
         if chosen_id:
             # A person who picked one has settled it; searching the rejected

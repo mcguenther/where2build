@@ -270,20 +270,24 @@ async def extract(
     # same parsers, which is the point. Requiring a model here was what turned a
     # portal that refuses a server-side fetch -- the very case this way in
     # exists for -- into „nicht konfiguriert“.
-    seite = parse_page("", payload.text) if "<" in payload.text else None
-    text = seite.text if seite and seite.text else payload.text
-    deterministic = (
-        InseratFelder(
-            adresse=seite.adresse,
-            lat=seite.lat,
-            lon=seite.lon,
-            grundstuecksflaeche_m2=_area_from(seite.angaben),
-            kaufpreis_eur=seite.kaufpreis_eur,
-        )
-        if seite is not None
-        else InseratFelder()
+    #
+    # Unconditionally, markup or not. This used to run only when the text
+    # contained a „<“, which was true of the parsers when it was written and is
+    # not true of them now: the reader in `portal_fields` goes by the German
+    # word and the value's unit, so it reads a *rendered* listing as well as a
+    # marked-up one. The gate therefore answered every field empty for the
+    # plainest paste there is -- „Grundstücksfläche ca. 866 m²“ and „199.000 €“
+    # standing in the text, and „Gelesene Werte“ showing nothing.
+    seite = parse_page("", payload.text)
+    text = seite.text or payload.text
+    deterministic = InseratFelder(
+        adresse=seite.adresse,
+        lat=seite.lat,
+        lon=seite.lon,
+        grundstuecksflaeche_m2=_area_from(seite.angaben),
+        kaufpreis_eur=seite.kaufpreis_eur,
     )
-    beschreibung = (seite.beschreibung if seite and seite.beschreibung else text)
+    beschreibung = seite.beschreibung or text
 
     extracted: InseratFelder | None = None
     hinweis: str | None = None
@@ -310,5 +314,6 @@ async def extract(
         "eingefuegter-text",
         hinweis=hinweis,
         beschreibung=beschreibung,
-        bilder=seite.bilder if seite else None,
+        bilder=seite.bilder,
+        titel=seite.titel,
     )

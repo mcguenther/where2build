@@ -961,6 +961,70 @@ from the user directly. Reopen only if the user asks.
   Lobstädt parcel, ±1500 m returns 8 districts with Lobstädt among them, ±3000 m
   returns 23, ±7000 m returns 69. Runs only when nothing else named a container,
   never outside Saxony, and the verdict can never be „bestätigt" off it.
+  **On that same exposé it no longer runs**, and the note above was written
+  before the reason existed: the coordinate sits next to `isFullAddress: false`,
+  so it is the quarter's point and is refused outright, which leaves that
+  listing „nicht eingrenzbar". Honest, and not fixable from the name — Grünau-
+  Siedlung sits on Gemarkung Lausen and nothing in the directory says so. The
+  pin path still earns its place where a portal states a complete address.
+- **The location field is not one string, and its Ortsteil is in front of the
+  postcode.** Five digits are the only fixed point in a German location line,
+  and the three recorded portals put everything else in three orders around
+  them: „Burghausen-Rückmarsdorf, 04178 Leipzig, Sachsen" (ImmoScout),
+  „04668 Sachsen – Grimma" (Kleinanzeigen), „Maschinenhausstraße, 01587 Riesa,
+  Sachsen" (ohne-makler). Behind the digits stands the Gemeinde — unless that
+  slot holds the Bundesland, and then it is behind the dash; in front of them
+  stands the Ortsteil, which is ImmoScout's own `obj_regio4`. Reading the line
+  as one opaque `ort` Indiz threw both away, and that is what cost advert
+  170438443 (09.09.2026) its answer: with no district anchor the run fell back
+  on Stadt Leipzig, where 112 589 Flurstücke hold **31** of exactly 866 m². The
+  Ortsteil holds two. A street stands in that slot on one portal in three, so
+  the head only counts when the Gemarkungsverzeichnis knows it.
+- **A compound Ortsteil is two Gemarkungen, and the Gemeinde is what makes
+  splitting it safe.** „Burghausen-Rückmarsdorf" is no Gemarkung; Burghausen
+  145507 and Rückmarsdorf 145614 both are, both in Stadt Leipzig, and the plot
+  may be in either — so the answer is *two* candidates, not one. Reading half
+  the name as the whole location is how „Baugrund in Rückmarsdorf" in the title
+  confirmed Rückmarsdorf 250/38 („ohne Lage", Weg) while Burghausen 286/a — the
+  same 866 m², official Lagebezeichnung „Neuburghausener Weg", which the
+  listing names, and „Sport-, Freizeit- und Erholungsfläche", which is the
+  „bisher als Wochenend- bzw. Gartengrundstück genutzt" the listing describes —
+  was never looked at. A part is a *derived* reading, so it only stands when its
+  own Gemeinde is the one the listing names: „Grünau-Siedlung" splits to a
+  Gemarkung Grünau that exists twice, in Großolbersdorf and Langenweißbach,
+  80 km away, and that guard drops both. Measured against all **63** Leipzig
+  Ortsteile: every compound resolves to its own Gemarkungen, every namesake
+  elsewhere is dropped, „Lausen-Grünau" keeps Lausen and drops Grünau in one
+  breath, and the five „Grünau-…" names contribute nothing rather than anchoring
+  wrong. Costs no request.
+- **A Gemeinde named next to a district is not a rival reading of it — but only
+  then.** „in Leipzig – Stadtteil Burghausen-Rückmarsdorf" names both levels in
+  one sentence, and Gemarkung Leipzig holds parcels of every size, so leaving it
+  as an anchor is a third of the 31. Demoting it needs the condition, though:
+  „Sachsen - Bad Lausick" names one place that is a Gemarkung *and* a Gemeinde,
+  and demoting it there leaves the run with no anchor at all — which is the
+  advert whose area has no match in Gemarkung Bad Lausick and exactly one in the
+  municipality. So the rule is: demote the Gemeinde's name only while some
+  *other* district is on the table.
+- **The two halves of one Ortsteil are a set, not a contradiction.** Once
+  „Burghausen-Rückmarsdorf" resolved to both its Gemarkungen the run put them
+  up as a `Konflikt` — „Welche Gemarkung ist gemeint? Die Angaben widersprechen
+  sich" — above a listing in which nothing contradicts. It is the same rule
+  that already covers „790/11 sowie 238/3": readings that came out of **one**
+  source are a set, and only readings from *different* sources are rival. So
+  `Indiz.teil_von` carries the compound a district was taken out of, it survives
+  the dedupe onto whichever reading is kept (a title's „in Rückmarsdorf" is the
+  same statement as the prose's „Stadtteil Burghausen-Rückmarsdorf"), and
+  `halves_of_one_ortsteil` suppresses the question. Both are searched, both
+  survivors are in the answer, and the user picks a *parcel* — which is the
+  choice that was worth offering all along.
+- **The deterministic reader must not be gated on „`<`" being in the paste.**
+  It was, and that was true of the parsers when the gate was written: they read
+  markup. `portal_fields` goes by the German word and the value's unit, so it
+  reads a *rendered* page as well as a marked-up one — „Grundstücksfläche ca.
+  866 m²" and „199.000 €" are right there in the text. The gate answered every
+  field empty for the plainest paste there is, and „Gelesene Werte" showed
+  nothing on exactly the input the reader was written for.
 - **A portal's own field names are worth more than any prose, and they are one
   block to maintain.** Measured on a recorded ImmoScout exposé (167953918,
   09.09.2026, `fixtures/inserat-immoscout.html`): the page carries
@@ -1195,7 +1259,7 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 550 passed, 8 skipped — one of those needs pyosmium, which only the
+- `pytest`: 563 passed, 8 skipped — one of those needs pyosmium, which only the
   index builder wants; the other seven need Tesseract and skip without it.
 - `vitest`: 550 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000

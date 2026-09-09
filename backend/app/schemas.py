@@ -1195,6 +1195,12 @@ class Indiz(BaseModel):
     # a reading has to be *chosen*, the image travels with it and the choice is
     # made against the sheet rather than against a transcription of it.
     bild_url: str | None = None
+    # The compound place name this district was taken out of, where it was one.
+    # „Burghausen-Rückmarsdorf“ is no Gemarkung and both its halves are, so the
+    # two readings are one statement admitting two districts -- not a
+    # contradiction, and never a question. Same rule as several parcel numbers
+    # from one source, which are a plot rather than a dispute.
+    teil_von: str | None = None
 
 
 class Konflikt(BaseModel):

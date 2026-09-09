@@ -368,3 +368,33 @@ def test_prose_that_names_nowhere_is_still_refused(without_llm, client: TestClie
 
     assert answer.status_code == 503
     assert "Strg+A" in answer.json()["detail"]
+
+
+def test_a_paste_with_no_markup_at_all_is_read_too(without_llm, client: TestClient):
+    """The plainest paste there is: the rendered page, as text.
+
+    The deterministic reader used to run only when the text contained a „<“,
+    which was true of the parsers when that gate was written and stopped being
+    true once `portal_fields` began going by the German word and the value's
+    unit. So somebody who selected an ImmoScout exposé and pasted it got every
+    field back empty — „Grundstücksfläche ca. 866 m²“ and „199.000 €“ standing
+    in the text they had just handed over, and „Gelesene Werte“ showing
+    nothing.
+    """
+
+    text = (
+        "Preisreduziert! Baugrund in Rückmarsdorf sucht Hausbauer\n"
+        "Burghausen-Rückmarsdorf, 04178 Leipzig\n"
+        "199.000 €\nKaufpreis 229,79 €/m²\n"
+        "Grundstücksfläche ca.\n866 m²\n"
+        "Zum Verkauf steht ein schönes Baugrundstück in einer gewachsenen Wohnsiedlung."
+    )
+    assert "<" not in text
+
+    answer = client.post("/api/listings/extract", json={"text": text})
+
+    assert answer.status_code == 200
+    read = answer.json()["felder"]
+    assert read["grundstuecksflaeche_m2"]["wert"] == 866
+    assert read["kaufpreis_eur"]["wert"] == 199_000
+    assert read["adresse"]["wert"] == "04178 Leipzig"

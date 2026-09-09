@@ -529,3 +529,143 @@ ERGEBNIS  status=mehrdeutig, 3 Kandidaten
 Three candidates on the map for the user to pick from, the right one first, and
 the verdict `mehrdeutig` rather than `bestätigt` — correctly, because the anchor
 came from a geocode and not from an official statement about this plot.
+
+**That run is no longer reproducible on this recording, and the reason is a
+guard in this same document.** § 7.2 measured that ImmoScout's `exposeMap`
+coordinate for this advert sits next to `showFullAddress: false` — it is the
+*quarter's* point — and the reader was made to refuse a coordinate the portal
+does not call complete. So there is no pin to seed the box with, and the run
+now reports „die Lage ließ sich nicht eingrenzen" (verified against the live
+cadastre, 09.09.2026, before and after § 9's changes: identical).
+
+That is the honest answer for this listing and it is not fixable from the name:
+Grünau-Siedlung sits on Gemarkung Lausen, and nothing in
+`gemarkungen-sachsen.json` says so — the directory maps Gemarkung → Gemeinde and
+the quarter is in neither column. The pin path still earns its place wherever a
+portal states a complete address. What § 9 adds is the channel that does not
+need a coordinate at all.
+
+## 9. The Ortsteil is in the location field ✅
+
+A second ImmoScout exposé, pasted into the app by the user on 09.09.2026:
+**advert 170438443**, „Preisreduziert! Baugrund in Rückmarsdorf sucht
+Hausbauer", Burghausen-Rückmarsdorf, 04178 Leipzig, 866 m², 199 000 €. It came
+back with **31 candidates**. Reproduced exactly, and it is two things.
+
+### 9.1 The location field was read as one string
+
+`collect_indicia` turned the whole field into a single opaque `ort` Indiz. The
+municipality was pulled out of it by a pattern anchored at the end of the line
+(`(?:^|[-–—])\s*NAME\s*$`), which fits „Sachsen – Grimma" and matches nothing
+at all in „Burghausen-Rückmarsdorf, 04178 Leipzig, Sachsen". So neither level
+was read, and with no district anchor the run widened to the Gemeinde:
+
+```
+[raum]     8 529 Flurstücke hat diese Gemarkung        (Gemarkung Leipzig)
+[treppe]   Stufe exakt (genau 866 m²): 0 Treffer
+[gemeinde] In der ganzen Gemeinde Stadt Leipzig: 31
+ERGEBNIS   status=mehrdeutig, 31 Kandidaten
+```
+
+The five digits are the only fixed point in a German location line, and the
+three recorded portals put everything else in three orders around them:
+
+| Portal | field | in front | behind |
+| --- | --- | --- | --- |
+| ImmoScout | `Burghausen-Rückmarsdorf, 04178 Leipzig, Sachsen` | **Ortsteil** | Gemeinde, then state |
+| Kleinanzeigen | `04668 Sachsen – Grimma` | — | state, then Gemeinde |
+| ohne-makler | `Maschinenhausstraße, 01587 Riesa, Sachsen` | street | Gemeinde, then state |
+
+So the field is read around its postcode now: behind it the Gemeinde, unless
+that slot holds the Bundesland and then it is behind the dash; in front of it
+the district, which is ImmoScout's own `obj_regio4`. A street stands there on
+one portal in three, so the head only counts when the Gemarkungsverzeichnis
+knows it — and the postcode-less shape the recorded adverts carry
+(„Sachsen - Machern") keeps the old tail rule as a fallback.
+
+### 9.2 „Burghausen-Rückmarsdorf" is two Gemarkungen
+
+The compound is no Gemarkung. Burghausen 145507 and Rückmarsdorf 145614 both
+are, both in Stadt Leipzig, and the advert does not say which half the plot is
+in — so the answer is **two** candidates and the verdict is `mehrdeutig`:
+
+```
+[raum]    2 091 Flurstücke hat die größte der 2 Gemarkungen, die in Frage kommen
+[treppe]  Stufe exakt (genau 866 m²): 2 Treffer
+ERGEBNIS  status=mehrdeutig, 2 Kandidaten
+            Burghausen    286/a   866 m²  Neuburghausener Weg   Punkte 1.00
+            Rückmarsdorf  250/38  866 m²  ohne Lage             Punkte 0.68
+```
+
+And the ranking is the point of the exercise. Burghausen 286/a carries the
+official Lagebezeichnung **„Neuburghausener Weg"**, which the advert's Lage text
+names outright („Insgesamt ist der Neuburghausener Weg ein angenehmer Ort zum
+Wohnen"), and `tntxt` „Sport-, Freizeit- und Erholungsfläche", which is the
+„bisher als Wochenend- bzw. Gartengrundstück genutzt" of the description.
+Rückmarsdorf 250/38 is „ohne Lage" and a Weg.
+
+**Before this, the plain-text paste answered `bestätigt` for Rückmarsdorf
+250/38** — the title's „Baugrund in Rückmarsdorf" was the only anchor, an exact
+866 m² left one parcel standing in it, and the other half of the Ortsteil was
+never asked. That is the one failure mode this search exists to refuse: a
+confidently wrong parcel, official-looking, in the right city. Reading half a
+compound name as the whole location is the same mistake as reading „Grünau" for
+„Grünau-Siedlung", pointed the other way.
+
+### 9.3 What keeps the split safe
+
+A part of a compound is a *derived* reading, not a stated one, so it only stands
+when its own Gemeinde is the one the listing names. That is what „Grünau-
+Siedlung" needs: Gemarkung Grünau exists exactly twice, in Großolbersdorf and
+in Langenweißbach, both 80 km from Leipzig, and without the guard the split
+would anchor the search there.
+
+Measured against **all 63 Leipzig Ortsteile** and the 5 339 names in
+`gemarkungen-sachsen.json`:
+
+| Ortsteil | split into | dropped |
+| --- | --- | --- |
+| Burghausen-Rückmarsdorf | Burghausen, Rückmarsdorf | — |
+| Knautkleeberg-Knauthain | both | — |
+| Plaußig-Portitz | both | — |
+| Lausen-Grünau | **Lausen** | Grünau/Großolbersdorf, Grünau/Langenweißbach |
+| Hartmannsdorf-Knautnaundorf | both | 5 Hartmannsdorf elsewhere |
+| Grünau-Ost, -Mitte, -Nord, -Siedlung | **nothing** | all three Grünau |
+| Zentrum-Ost, Alt-West, Mockau-Süd | nothing / Mockau | — |
+
+Every compound resolves to its own Gemarkungen, every namesake elsewhere is
+dropped, and the five „Grünau-…" names contribute nothing rather than anchoring
+wrong. It costs no request: the directory is a committed 490 kB file.
+
+One more rule came out of the same run. „in Leipzig – Stadtteil Burghausen-
+Rückmarsdorf" names both levels in one sentence, and Gemarkung Leipzig holds
+parcels of every size — so a Gemeinde's own name is demoted from an anchor to a
+mention, but *only while another district is on the table*. „Sachsen - Bad
+Lausick" names one place that is a Gemarkung and a Gemeinde at once, and
+demoting it there leaves the run with no anchor at all — which is the advert
+whose stated area has no match in Gemarkung Bad Lausick and exactly one in the
+municipality.
+
+### 9.4 And two halves are not a contradiction
+
+With both Gemarkungen on the table the run put them up as a `Konflikt`:
+„Welche Gemarkung ist gemeint? Die Angaben widersprechen sich." Nothing in the
+listing contradicts — it names one Ortsteil, and that Ortsteil has two
+Gemarkungen under it. The rule already existed one field over: „790/11 sowie
+238/3" from *one* source is a plot made of two parcels, not two readings of
+one, and only numbers from *different* sources are rival. `Indiz.teil_von`
+carries the compound a district came out of, and `halves_of_one_ortsteil`
+suppresses the question. The choice that was worth offering is the one in the
+candidate table: „Wählen", per parcel.
+
+### 9.5 And the paste was answering nothing at all
+
+`/api/listings/extract` ran the deterministic reader only when the pasted text
+contained a `<`. That was true of the parsers when the gate was written — they
+read markup — and stopped being true when § 8.1 shipped: `portal_fields` goes
+by the German word and the value's unit, so it reads a rendered page as well as
+a marked-up one. Somebody who selected an exposé and pasted it therefore got
+every field back empty, with „Grundstücksfläche ca. 866 m²" and „199.000 €"
+standing in the text they had just handed over, and „Gelesene Werte" showing
+nothing. The gate is gone; the same paste now reads 866 m², 199 000 € and
+„04178 Leipzig".
