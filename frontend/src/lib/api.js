@@ -97,6 +97,15 @@ export const accountOnServer = () => request("/account");
  *  the same answer, so whoever calls this has to reload who is signed in. */
 export const deleteAccountOnServer = () => request("/account", { method: "DELETE" });
 
+/* ---------- Sharing a plot by link ----------
+ * Three of these need the account; `sharedPlot` deliberately does not, because
+ * the token in the link is the access. */
+export const createShare = dokument =>
+  request("/shares", { method: "POST", body: JSON.stringify({ dokument }) });
+export const sharesOnServer = () => request("/shares");
+export const deleteShare = token => request(`/shares/${encodeURIComponent(token)}`, { method: "DELETE" });
+export const sharedPlot = token => request(`/shares/${encodeURIComponent(token)}`);
+
 export const plotsOnServer = () => request("/plots");
 export const putPlot = (id, dokument, geaendert_am) =>
   request(`/plots/${encodeURIComponent(id)}`, {

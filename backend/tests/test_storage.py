@@ -774,6 +774,9 @@ def test_a_share_never_holds_the_note(account: TestClient):
     assert isinstance(stored, dict)
     assert "note" not in stored
     assert "Eile" not in json.dumps(stored)
+    # And the travel times, which are keyed by destination and would let a
+    # reader count somebody's commute even without the names.
+    assert "routes" not in stored
     # The rest travels unchanged, price included: without it the comparison
     # against the Bodenrichtwert says nothing.
     seen = account.get(f"/api/shares/{token}").json()["dokument"]

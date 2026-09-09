@@ -127,16 +127,24 @@ class AccountOverview:
 # chat.
 SHARE_TOKEN_BYTES = 16
 
-# The field a shared plot must never carry. Named here rather than in the
-# frontend because the promise "without the note" has to hold even when a
-# caller forgets -- see `create_share`.
-NOTE_FIELD = "note"
+# What a shared plot must never carry. Listed here rather than in the frontend
+# because the promise has to hold even when a caller forgets -- see
+# `create_share`.
+#
+# `note` is the obvious one: it is where somebody writes what they think of the
+# seller. `routes` is the one that is easy to miss. It is keyed by destination
+# id and holds the travel times to them, and the destinations are a person's
+# work address, their children's school, their parents' home. The plot is
+# public in a shared link; where its owner commutes to is not, and a reader who
+# cannot see the names could still count the destinations and read off the
+# distances. Both are cut.
+PRIVATE_FIELDS = ("note", "routes")
 
 
-def without_note(dokument: dict[str, Any]) -> dict[str, Any]:
+def for_sharing(dokument: dict[str, Any]) -> dict[str, Any]:
     """The plot as it may be shared."""
 
-    return {key: value for key, value in dokument.items() if key != NOTE_FIELD}
+    return {key: value for key, value in dokument.items() if key not in PRIVATE_FIELDS}
 
 
 def mib(byte_count: float) -> str:
@@ -355,7 +363,7 @@ class Storage:
                 account,
                 # No json.dumps here: the pool's jsonb codec encodes, and
                 # doing it twice stores a JSON *string* that reads back as one.
-                without_note(dokument),
+                for_sharing(dokument),
                 str(self.settings.share_days),
             )
             return _share(row)

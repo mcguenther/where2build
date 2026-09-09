@@ -19,6 +19,7 @@ import DestinationsView from "../views/DestinationsView.vue";
 import LocationView from "../views/LocationView.vue";
 import DataView from "../views/DataView.vue";
 import AccountView from "../views/AccountView.vue";
+import SharedPlotView from "../views/SharedPlotView.vue";
 import NotFoundView from "../views/NotFoundView.vue";
 import { WIZARD_STAGES, wizardStage } from "./stages.js";
 
@@ -58,6 +59,19 @@ export const routes = [
   /* Reached from the name in the header rather than from the sections: it is
      about the person, not about a part of the work. */
   { path: "/konto", name: "account", component: AccountView, meta: { section: "account" } },
+  /* A shared plot, open to anybody with the link.
+     The trailing segment is a readable slug and is never read: the token is
+     the whole address, so `/geteilt/AbC…` and
+     `/geteilt/AbC…/wiesenstrasse-grossbothen` are the same page. Cut this way
+     from the start so a slug can be added later without breaking the links
+     already sent. */
+  {
+    path: "/geteilt/:token/:slug*",
+    name: "shared",
+    component: SharedPlotView,
+    props: true,
+    meta: { section: null }
+  },
   { path: "/:pathMatch(.*)*", name: "notFound", component: NotFoundView }
 ];
 

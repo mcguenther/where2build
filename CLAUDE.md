@@ -1146,6 +1146,38 @@ from the user directly. Reopen only if the user asks.
   and the fresh start page has no sections to click. That step goes by route
   now, with the reason written next to it; every later `nav()` in the run has a
   stand behind it and finds the sections where they belong.
+- **The private half of a plot is not only the note.** A share cuts `note`,
+  which is obvious, and `routes`, which is easy to miss: it is keyed by
+  destination id and holds the travel times to them, and the destinations are
+  somebody's work address, their children's school, their parents' home. A
+  reader who cannot see the names can still count the destinations and read off
+  the distances. Both are cut in `Storage.for_sharing`, on the way *in*: a
+  promise the frontend keeps is one a bug in the frontend can break, and cut at
+  the door the row simply never holds it.
+- **The pool's jsonb codec already encodes, so a second `json.dumps` stores a
+  JSON string.** It reads back as a `str` where every other document is a
+  `dict`, and pydantic is what finally said so. Worse, the test that was meant
+  to prove the note was gone passed anyway: `"note" not in some_string` is a
+  substring test, and it was true for the wrong reason. Assert the row is a
+  dict before asserting anything about its keys.
+- **A test fixture that drops a named list of tables breaks on the next
+  table.** `drop table plots, settings, users` failed outright the day
+  `freigaben` arrived, because it references `users` — and it failed in
+  *setup*, so all 34 database tests errored at once and none of them was about
+  the new feature. The fixture enumerates `pg_tables` now and drops what it
+  finds, so it follows `schema.sql` without anybody remembering.
+- **An asyncpg pool belongs to the loop that made it, and there are two ways to
+  forget that.** A second `TestClient` opened *inside* the first is two event
+  loops on one pool; `asyncio.run(service().sweep())` against a pool built in
+  the client's loop is the same mistake from the other side. Both report a
+  future attached to a different loop, which does not name the cause. Drop the
+  client's cookies instead of opening a second one, and `reset_services()`
+  before driving the service from a loop of your own.
+- **A snapshot cannot look anything up.** A shared plot is one document, and
+  the house type lives in the settings document — so a share made of the plot
+  alone shows no building at all. The footprint and the type's name are
+  resolved into the snapshot when the link is made. Anything else a plot page
+  reads from elsewhere has to travel the same way or be left out on purpose.
 - **`page.fill` with 171 kB of markup takes ~27 s** — Playwright inserts it
   through the input pipeline — which sits just under the 30 s default and fails
   whenever the machine is busy. Measured identical before and after the change
@@ -1204,12 +1236,12 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 575 passed, 33 skipped. With `TEST_DATABASE_URL` pointed at a real
-  Postgres it is 600 passed, 8 skipped — the extra 25 are the account store,
+- `pytest`: 575 passed, 43 skipped. With `TEST_DATABASE_URL` pointed at a real
+  Postgres it is 610 passed, 8 skipped — the extra 35 are the account store,
   and they are skipped rather than mocked because what they check is the
   database's own behaviour. Of the remaining 8, one needs pyosmium, which only
   the index builder wants; the other seven need Tesseract.
-- `vitest`: 579 passed — plus the integration file, excluded by `npm run test`
+- `vitest`: 586 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
 - `scripts/screenshots.mjs`: 62 images plus two print PDFs. It fails on console
   errors, on horizontal overflow, and if not a single vector tile arrived. It
