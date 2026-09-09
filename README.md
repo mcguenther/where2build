@@ -199,8 +199,8 @@ exclusions were justified on Saxon counts. Details in
 ## Tests
 
 ```bash
-backend/.venv/bin/python -m pytest backend/tests -q   # 526 passed, 8 skipped
-cd frontend && npm run test                           # 549 passed
+backend/.venv/bin/python -m pytest backend/tests -q   # 550 passed, 8 skipped
+cd frontend && npm run test                           # 550 passed
 cd frontend && npm run test:integration               # against a running backend
 node scripts/screenshots.mjs                          # 62 images and two print PDFs
 node scripts/bookmarklet.mjs                          # the handover, across two origins

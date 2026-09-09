@@ -436,14 +436,96 @@ And that one is Flurstück **8/a in Gemarkung Lausen**, 742 m²,
 `lagebeztxt` „Staffelsteinstraße 4", `tntxt` `Wohnbaufläche;742` — a residential
 plot on a street in Grünau-Siedlung, which is where the advert says the plot is.
 
-Two things follow, and neither is built yet:
+Two things followed, and both are built now (§ 8):
 
 * **The Gemeinde plus an exact area is a working anchor for a city listing.**
   24 candidates is a scoreable set, exactly as the „anchor's size is not a
   reason to give up" note predicted for Leipzig at 502 m².
 * **A Stadtteil is worth resolving to the Gemarkungen under it.** The directory
   cannot do it — it maps Gemarkung → Gemeinde, and „Grünau-Siedlung" is in
-  neither column. What would do it is the district outlines the search already
-  fetches (`ave:KatasterBezirk`) against the quarter bounds the portal hands
-  over: 51.304–51.319 by 12.267–12.313 intersects a handful of Gemarkungen, and
-  those are the anchors. One `fes:BBOX` request, no model, no guessing.
+  neither column. The district outlines the search already fetches
+  (`ave:KatasterBezirk`) can, against a box around any point in the quarter.
+  One `fes:BBOX` request, no model, no guessing.
+
+## 8. Built, and made portal-independent ✅
+
+The two sections above are about one portal. What went in is not.
+
+### 8.1 Reading by the word, not by the markup
+
+A third portal was fetched to keep this honest — **ohne-makler.net**, which has
+no adapter and never will (advert 476452, a 5 366 m² plot in Riesa, recorded as
+`fixtures/inserat-ohne-makler.html`). Its shape is the awkward one on every
+count:
+
+| | ImmoScout | Kleinanzeigen | ohne-makler |
+| --- | --- | --- | --- |
+| area markup | `<dt>Grundstücksfläche ca.</dt><dd>742 m²</dd>` | `<li>Grundstücksfläche 1.025 m²</li>` | `<span>5.366 m²</span><span>Grundstücksfläche</span>` |
+| order | label, value | one element | **value, label** |
+| price meta tag | no | yes | no |
+| coordinate | quarter's | municipality's | none |
+| JSON-LD | the listing | the listing | **the portal company** |
+
+So structure is the wrong thing to key on. `services/portal_fields.py` flattens
+the document to one line with `|` where the tags were, finds the German label,
+and takes the nearest value of the right *shape* within 60 characters on either
+side. Measured distances: ImmoScout 5 characters, Kleinanzeigen 1,
+ohne-makler 3 with the value first.
+
+Against the three recordings, with no portal knowledge at all:
+
+| Portal | area | price | location line |
+| --- | --- | --- | --- |
+| ImmoScout | 742 m² | 275 000 € | 04207 Leipzig, Sachsen |
+| Kleinanzeigen | 1 025 m² | — (meta tag instead) | 04575 Neukieritzsch, Sachsen |
+| ohne-makler | 5 366 m² | 115 000 € | Maschinenhausstraße, 01587 Riesa, Sachsen |
+
+Four guards, each from a measurement rather than a worry: „370,62 €/m²" sits one
+element from ImmoScout's price and is a rate; bare „Fläche" must not match
+„Wohnfläche"; „Die großzügige Grundstücksfläche bietet ideale Voraussetzungen"
+carries no value and must count for nothing; and the *first* postcode on an
+ImmoScout page is in the analytics block, so the first one followed by a name
+wins. And the ohne-makler JSON-LD is the reminder that a schema.org address may
+only be read from a listing node — its `Organization` puts an address in
+Reinbek, 400 km north of the plot.
+
+This is the floor, not the ceiling. Where a portal names its own fields (§ 7.1)
+that block still wins, because a structured field is a statement and this is a
+reading.
+
+### 8.2 The Stadtteil, resolved
+
+`AlkisService.districts_around(lat, lon, radius_m)` — one BBOX request on
+`ave:KatasterBezirk`, `art` filtered client-side because a WFS GET cannot carry
+a BBOX and a filter at once. The seed is the platform's own pin, which the
+`Anchor` docstring had ruled out entirely; it is still never *the* container,
+but it may say which containers get asked.
+
+That distinction is what makes it safe, and the safety is one-directional: a box
+too small to hold the plot's district makes every anchor count zero and the run
+reports that it found nothing. A bad pin can produce **no** parcel, never a
+wrong one — which is why the radius can be chosen without a corpus of solved
+listings, the same argument that lets the scoring weights ship uncalibrated.
+
+`PIN_RADIUS_M = 1500`, measured against the pin sitting 6 235 m from the
+Lobstädt parcel: ±1500 m returns 8 districts with Lobstädt among them, ±3000 m
+returns 23, ±7000 m returns 69.
+
+The whole chain, run against the live cadastre on the recorded ImmoScout page —
+a listing that names no Gemarkung anywhere:
+
+```
+[raum]    Die Anzeige nennt keine Gemarkung. Um den Kartenpunkt der Anzeige
+          liegen 7 Gemarkungen: Mark Flickert, Lausen, Schönau, Göhrenz,
+          Großmiltitz, Großzschocher und 1 weitere. …
+[raum]    2 892 Flurstücke hat die größte der 7 Gemarkungen
+[treppe]  Stufe exakt (genau 742 m²): 3 Treffer
+ERGEBNIS  status=mehrdeutig, 3 Kandidaten
+            Lausen         8/a    742 m²  Staffelsteinstraße 4
+            Kleinzschocher 861/4  742 m²  ohne Lage
+            Kleinzschocher 861/5  742 m²  Miltenberger Straße 5
+```
+
+Three candidates on the map for the user to pick from, the right one first, and
+the verdict `mehrdeutig` rather than `bestätigt` — correctly, because the anchor
+came from a geocode and not from an official statement about this plot.

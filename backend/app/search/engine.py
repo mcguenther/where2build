@@ -37,7 +37,7 @@ import asyncio
 from dataclasses import dataclass, field, replace
 from typing import AsyncIterator, Sequence
 
-from ..errors import UpstreamError
+from ..errors import AppError, UpstreamError
 from ..gemarkung_index import GemarkungDirectory, GemarkungEntry, fold
 from ..schemas import (
     Indiz,
@@ -95,6 +95,19 @@ MAX_STATEWIDE_BY_NUMBER = 40
 # the wrong trade, so above this the municipality only informs the answer.
 MAX_MUNICIPALITY_DISTRICTS = 12
 
+# How far around the platform's pin to ask which cadastral districts there are,
+# when nothing in the listing named one. Measured 09.09.2026 against the pin of
+# the Lobstädt advert -- the one sitting 6 235 m from the parcel actually
+# offered: ±1500 m returns 8 districts and Lobstädt is among them, ±3000 m
+# returns 23, ±7000 m returns 69. Around Grünau-Siedlung in Leipzig it returns
+# 7, against Stadt Leipzig's 76.
+#
+# The trade is reliability against set size, and it is safe in one direction
+# only, which is what allows a number to be chosen without a corpus: a box too
+# small to contain the plot's district makes every anchor count zero and the run
+# reports that it found nothing. It cannot name a wrong parcel, only no parcel.
+PIN_RADIUS_M = 1500.0
+
 # How many districts are worth widening to their municipality when the exact
 # area found nothing. Two requests each, and the second one rarely differs from
 # the first -- neighbouring districts usually share a municipality.
@@ -127,8 +140,10 @@ class Anchor:
     """One spatial container the search may filter inside.
 
     Not "the most accurate point" -- the narrowest container worth trusting.
-    The platform's pin never becomes one: measured 6 235 m from the parcel
-    actually offered, because the platform geocodes its own location field.
+    The platform's pin is never *the* container: measured 6 235 m from the
+    parcel actually offered, because the platform geocodes its own location
+    field. It may still say which districts to ask, though, and that is a
+    different move -- see `anchors_from_pin`, and the radius note there.
     """
 
     art: str
@@ -183,6 +198,9 @@ class SearchEngine:
         # District outlines already fetched, by key. Drawn once for the map and
         # reused for the wash under a confirmed parcel.
         self._district_outlines: dict[str, KatasterBezirk] = {}
+        # The districts the platform's pin lands among. `None` until asked,
+        # a list -- possibly empty -- afterwards, so it is asked exactly once.
+        self._pin_anchors: list[Anchor] | None = None
 
     # ------------------------------------------------------------------
     # Small helpers over the Indiz list
@@ -521,7 +539,11 @@ class SearchEngine:
                         gemeinde=entry.gemeinde,
                     )
                 )
-        return self._filter_by_municipality(out) or self._municipality_anchors()
+        return (
+            self._filter_by_municipality(out)
+            or self._municipality_anchors()
+            or list(self._pin_anchors or [])
+        )
 
     def _filter_by_municipality(self, anchors: list[Anchor]) -> list[Anchor]:
         """Drop the districts that belong to a municipality the listing does not name.
@@ -1264,9 +1286,81 @@ class SearchEngine:
             # A missing wash is a paler map, not a failed search.
             self.state.outline = None
 
+    async def anchors_from_pin(self) -> AsyncIterator[SuchEreignis]:
+        """Ask the cadastre which districts the advert's own pin lands among.
+
+        The last way in, and it exists because a *Stadtteil* is usually not a
+        Gemarkung. „Grünau-Siedlung" in Leipzig is none — the two Saxon
+        Gemarkungen called „Grünau" are 80 km away in the Erzgebirge — so the
+        name cannot be looked up, and Stadt Leipzig's 76 districts are too many
+        to ask one by one. One BBOX request answers it instead: 7 districts, and
+        with the listing's exact 742 m² they leave 3 candidates where the
+        municipality alone leaves 24.
+
+        The pin is not trusted as a location here, and it does not have to be.
+        It is used to pick a *set* the cadastre then decides between, with the
+        area as the hard filter — and if the plot's district is not in the set,
+        every count is zero and the run says it found nothing. That is why this
+        may run on a point measured 6 235 m off: it cannot turn a bad pin into a
+        wrong parcel, only into no parcel. See `PIN_RADIUS_M`.
+
+        Runs only when nothing better named a container, and only once.
+        """
+
+        if self._pin_anchors is not None or self._outside:
+            return
+        if self.anchors():
+            return
+        pin = next((indiz for indiz in self.active("pin")), None)
+        lat, lon = self.payload.lat, self.payload.lon
+        if pin is None or lat is None or lon is None:
+            return
+
+        self._pin_anchors = []
+        try:
+            districts = await self.alkis.districts_around(lat, lon, PIN_RADIUS_M)
+        except AppError:
+            # An upstream that cannot answer this is not a reason to end the
+            # run: every other route has already been tried and found nothing.
+            return
+        if not districts:
+            return
+
+        for district in districts:
+            key = expand_gemarkung_key(district.schluessel)
+            self._district_outlines.setdefault(key, district)
+            self._pin_anchors.append(
+                Anchor(
+                    art="gemarkung",
+                    schluessel=key,
+                    name=district.name or key,
+                    indiz_id=pin.id,
+                    # As weak as the pin it came from. It may only ever order
+                    # the list; the area is what decides.
+                    confidence=min(pin.sicherheit, 0.25),
+                    gemeinde=district.gemeinde,
+                )
+            )
+
+        names = ", ".join(anchor.name for anchor in self._pin_anchors[:6])
+        more = "" if len(self._pin_anchors) <= 6 else f" und {len(self._pin_anchors) - 6} weitere"
+        yield SuchEreignis(
+            art="phase",
+            phase="raum",
+            text=(
+                f"Die Anzeige nennt keine Gemarkung. Um den Kartenpunkt der Anzeige "
+                f"liegen {len(self._pin_anchors)} Gemarkungen: {names}{more}. "
+                "Der Punkt ist meist der geokodierte Ortsname und nicht das "
+                "Grundstück — er sagt hier nur, welche Gemarkungen gefragt werden, "
+                "entschieden wird über die Fläche."
+            ),
+        )
+
     async def narrow(self) -> AsyncIterator[SuchEreignis]:
         """From the Indizien in hand to a candidate set. Runs at most twice."""
 
+        async for event in self.anchors_from_pin():
+            yield event
         anchors = self.anchors()
         async for event in self.short_circuit():
             yield event

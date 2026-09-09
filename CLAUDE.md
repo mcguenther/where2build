@@ -923,6 +923,44 @@ from the user directly. Reopen only if the user asks.
   exactly stated area is a hard filter; a hedged one only ranks. Emptying the
   paste field has to clear the kept HTML, or the next read silently ships the
   page pasted before. See `docs/research/immobilienscout24-zugang.md` § 4.
+- **Read a listing by the German word and the value's unit, not by the
+  markup.** Three portals were recorded and they agree about nothing else:
+  ImmoScout writes `<dt>Grundstücksfläche ca.</dt><dd>742  m²</dd>`,
+  Kleinanzeigen `<li>Grundstücksfläche 1.025 m²</li>`, and ohne-makler.net
+  `<span>5.366 m²</span><span>Grundstücksfläche</span>` — the **value before its
+  label**, in Tailwind spans with no semantic hook, no `<dt>`, no `<th>`, no
+  price meta tag and no coordinate anywhere. So `services/portal_fields.py`
+  flattens the document to text (tags become `|`), finds the label and takes
+  the nearest value of the right *shape* within 60 characters on either side.
+  That reads all three, and it read the third one before anybody looked at it.
+  Four guards, each measured: „370,62 €/m²" one element from the price is a
+  rate, not the price; bare „Fläche" must not match „Wohnfläche", so the label
+  boundary excludes German letters; „Die großzügige Grundstücksfläche bietet
+  ideale Voraussetzungen" has no value near it and must contribute nothing; and
+  the first postcode on an ImmoScout page sits in the analytics block, so the
+  first postcode *followed by a name* wins. It is the floor under the
+  portal-specific blocks, never above them — a structured field is a statement,
+  this is a reading.
+- **ohne-makler's JSON-LD describes the portal, not the listing.** Its
+  `Organization` node carries the company's own address in Reinbek,
+  Schleswig-Holstein, 400 km from the Saxon plot on the page. So a schema.org
+  address may only be read from a listing-ish node, never from whatever node
+  comes first — the „600 m² in Brehna" lesson, one channel further along.
+- **A Stadtteil is not a Gemarkung, and one BBOX request settles it.**
+  `AlkisService.districts_around` asks `ave:KatasterBezirk` which districts meet
+  a box around a point. Measured 09.09.2026: around Grünau-Siedlung it answers
+  7 against Stadt Leipzig's 76, and with the listing's exact 742 m² those leave
+  3 candidates where the Gemeinde alone leaves 24 — the right one, Lausen 8/a
+  „Staffelsteinstraße 4", first. The seed is the **platform's own pin**, which
+  the `Anchor` docstring used to rule out entirely: it is still never *the*
+  container, but it may say which containers get asked. That is safe in one
+  direction only, and that is what lets the radius be picked without a corpus —
+  a box too small to hold the right district makes every count zero and the run
+  reports nothing found, so a bad pin can produce no parcel but never a wrong
+  one. `PIN_RADIUS_M = 1500`: measured against the pin sitting 6 235 m from the
+  Lobstädt parcel, ±1500 m returns 8 districts with Lobstädt among them, ±3000 m
+  returns 23, ±7000 m returns 69. Runs only when nothing else named a container,
+  never outside Saxony, and the verdict can never be „bestätigt" off it.
 - **A portal's own field names are worth more than any prose, and they are one
   block to maintain.** Measured on a recorded ImmoScout exposé (167953918,
   09.09.2026, `fixtures/inserat-immoscout.html`): the page carries
@@ -1157,7 +1195,7 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 532 passed, 8 skipped — one of those needs pyosmium, which only the
+- `pytest`: 550 passed, 8 skipped — one of those needs pyosmium, which only the
   index builder wants; the other seven need Tesseract and skip without it.
 - `vitest`: 550 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000

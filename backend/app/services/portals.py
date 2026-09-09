@@ -25,6 +25,12 @@ from ..errors import BadRequestError, UpstreamError
 from ..settings import AppSettings
 from ..upstream import request
 from .llm import domain_of
+from .portal_fields import (
+    location_line,
+    read_area_m2,
+    read_location,
+    read_price_eur,
+)
 
 SERVICE_NAME = "Die Anzeigenseite"
 ADVICE = (
@@ -219,6 +225,12 @@ def german_number(raw: str) -> float | None:
         return float(digits)
     except ValueError:
         return None
+
+
+def _area_of(angaben: dict[str, str]) -> str | None:
+    """Whether an area was already read, whatever it looks like."""
+
+    return angaben.get("Grundstücksfläche") or None
 
 
 def parse_price(html: str) -> int | None:
@@ -538,6 +550,20 @@ def parse_page(url: str, html: str) -> Seite:
         # out of. Better nothing than that.
         if "beschreibung" not in read and seite.beschreibung == meta.get("og:description"):
             seite.beschreibung = None
+
+    # The floor: whatever nothing above answered is read without knowing the
+    # portal at all — the label and the value's unit, wherever on the page they
+    # stand. That is what makes an unrecorded portal usable instead of refused.
+    # Only gaps are filled, because a portal's own field or a meta tag is a
+    # statement while this is a reading.
+    if not _area_of(seite.angaben):
+        area = read_area_m2(html)
+        if area is not None:
+            seite.angaben = {**seite.angaben, "Grundstücksfläche": f"{area} m²"}
+    if seite.kaufpreis_eur is None:
+        seite.kaufpreis_eur = read_price_eur(html)
+    if not seite.adresse:
+        seite.adresse = location_line(read_location(html))
 
     return seite
 

@@ -1278,3 +1278,109 @@ def test_a_saxon_listing_that_merely_mentions_another_state_is_still_searched(
     final = events[-1]
     assert final["status"] == "bestaetigt"
     assert "Sachsen-Anhalt" not in (final.get("text") or "")
+
+
+# ---------------------------------------------------------------------------
+# The pin as a seed for the anchor set
+#
+# The gap this closes: a Stadtteil is usually not a Gemarkung. „Grünau-Siedlung"
+# in Leipzig is none, and the two Saxon Gemarkungen called „Grünau" are 80 km
+# away in the Erzgebirge, so the name cannot be looked up and Stadt Leipzig's
+# 76 districts are too many to ask one by one. The recording is the real answer
+# to one BBOX request around the advert's own point
+# (`alkis_katasterbezirke_gruenau.gml`, fetched 09.09.2026): seven districts,
+# Lausen and Kleinzschocher among them.
+
+
+@respx.mock
+def test_the_pin_says_which_districts_to_ask_when_the_listing_names_none(client: TestClient):
+    """One request turns a point into a set, and the area decides inside it.
+
+    Not „the plot is here": the point is the platform's geocode of a place name
+    and may sit kilometres off. It is only allowed to pick the districts that
+    get asked — and the safety of that is one-directional, which is what lets
+    the radius be chosen without a corpus: a box too small to contain the right
+    district makes every count zero and the run reports nothing found. It can
+    never turn a bad pin into a wrong parcel.
+    """
+
+    respx.get(ALKIS_URL).mock(
+        side_effect=lambda request: _gml("alkis_katasterbezirke_gruenau.gml")
+        if "KatasterBezirk" in request.url.query.decode()
+        else _gml("alkis_leer.gml")
+    )
+    respx.post(ALKIS_URL).mock(
+        side_effect=_cadastre(
+            # Only Gemarkung Lausen holds a parcel of exactly that size.
+            {"145573+742": 1},
+            {"145573": "alkis_grossbothen_790_11.gml"},
+        )
+    )
+
+    events = _stream(
+        client,
+        {
+            "adresse": "04207 Leipzig, Sachsen",
+            "text": "Wohnbaugrundstück im Leipziger Stadtteil Grünau-Siedlung.",
+            "lat": 51.30595,
+            "lon": 12.27605,
+            "flaeche_m2": 742,
+            "flaeche_text": "742 m²",
+        },
+    )
+
+    said = " ".join(event.get("text") or "" for event in events)
+    assert "Die Anzeige nennt keine Gemarkung" in said
+    assert "Gemarkungen" in said
+    # The sentence has to say what the point is worth, or the run reads as
+    # though the pin located the plot.
+    assert "nicht das Grundstück" in said
+
+    final = events[-1]
+    assert final["art"] == "ergebnis"
+    # Never „bestätigt" off a pin: the anchor is not an official statement
+    # about this plot, so one survivor is a single candidate, not a verdict.
+    assert final["status"] != "bestaetigt"
+
+
+@respx.mock
+def test_a_pin_is_not_asked_when_the_listing_names_a_district(client: TestClient):
+    """The cheap route stays the route. A district in the text is a statement;
+    the pin is a geocode, and asking it anyway would spend a request to make
+    the answer weaker."""
+
+    districts = respx.get(ALKIS_URL).mock(
+        side_effect=lambda request: _gml("alkis_katasterbezirke_gruenau.gml")
+    )
+    respx.post(ALKIS_URL).mock(
+        side_effect=_cadastre({}, {"KatasterBezirk": "alkis_katasterbezirk_grossbothen.gml",
+                                   "flstnrzae": "alkis_grossbothen_790_11.gml"})
+    )
+
+    _stream(
+        client,
+        {"gemarkung": "Großbothen", "flurstuecksnummer": "790/11", "flaeche_m2": 502,
+         "flaeche_text": "502 m²", "lat": 51.189265, "lon": 12.85},
+    )
+
+    assert districts.call_count == 0
+
+
+@respx.mock
+def test_a_pin_outside_saxony_asks_nothing(client: TestClient):
+    """A box around a point in Sachsen-Anhalt would return Saxon districts on
+    the border, and every one of them is a namesake trap. The run that already
+    knows the state is wrong must not spend a request to find that out again."""
+
+    districts = respx.get(ALKIS_URL).mock(
+        side_effect=lambda request: _gml("alkis_katasterbezirke_gruenau.gml")
+    )
+    respx.post(ALKIS_URL).mock(side_effect=_cadastre({}, {}))
+
+    _stream(
+        client,
+        {"adresse": "06796 Sachsen-Anhalt - Brehna", "text": "600 m² Baugrundstück in Brehna.",
+         "lat": 51.5852, "lon": 12.2478, "flaeche_m2": 600, "flaeche_text": "600 m²"},
+    )
+
+    assert districts.call_count == 0
