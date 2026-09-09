@@ -1038,6 +1038,24 @@ from the user directly. Reopen only if the user asks.
   whenever the machine is busy. Measured identical before and after the change
   that appeared to break it. Dispatch a `paste` with a `DataTransfer` instead:
   instant, and it is the action the product is actually built around.
+- **`docker compose build` fails in the Claude Code cloud sandbox, and it is
+  not a pip problem.** The sandbox re-terminates outbound HTTPS through its
+  own CA (`/root/.ccr/README.md`), which a fresh build container does not
+  trust — `pip install` fails with "self-signed certificate in certificate
+  chain" fetching from pypi.org, and `npm ci` fails the same way against the
+  npm registry (different error text: "Exit handler never called!", same
+  cause). `--network host` alone does not fix it — the interception is a
+  trust problem, not a routing one; pypi.org and the npm registry are already
+  reachable without the proxy. Trusting the sandbox's bundle from inside the
+  container fixes both: `PIP_CERT` / `REQUESTS_CA_BUNDLE` / `SSL_CERT_FILE`
+  for pip, `NODE_EXTRA_CA_CERTS` for npm — Node ships its own CA list and
+  ignores the system trust store the same way pip does.
+  `scripts/docker-build-sandbox.sh build|up` applies that only in a temporary,
+  `sed`-patched copy of each Dockerfile (via BuildKit's `--build-context`, so
+  neither committed Dockerfile is touched) and falls back to a plain
+  `docker compose` call wherever `/root/.ccr/ca-bundle.crt` does not exist —
+  i.e. everywhere but here. On a real machine with direct internet access,
+  `docker compose up --build` needs none of this.
 
 ## Commands
 
@@ -1051,6 +1069,10 @@ backend/.venv/bin/python -m uvicorn app.main:app --reload --app-dir backend
 # the whole thing in containers: nginx serves the build and proxies /api,
 # so there is one origin and no CORS. No database is involved.
 docker compose up --build      # http://localhost:8080
+
+# same thing, but in the Claude Code cloud sandbox -- see "Traps that already
+# cost time" for why a plain `docker compose build` fails there.
+scripts/docker-build-sandbox.sh up -d
 
 # routing on this machine instead of Transitous -- opt-in, off by default.
 # fetch-data.sh pulls the OSM extract and the DELFI GTFS; the first start
