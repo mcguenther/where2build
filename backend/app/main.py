@@ -40,6 +40,7 @@ from .routers import (
 )
 from .deps import address_index, gemarkung_directory, nearby_service, storage_service
 from .services import ocr
+from .services.storage import mib
 from .schemas import DienstStatus, HealthResponse
 from .settings import Settings, get_settings
 from .validation import readable_validation_error
@@ -173,12 +174,12 @@ def _speicher_hinweis(settings: Settings) -> str:
             "(postgresql://nutzer:passwort@host:5432/where2build); die Tabellen legt "
             "der Server beim Start selbst an."
         )
-    megabytes = storage_settings.max_document_bytes / (1024 * 1024)
     return (
         "Grundstücke, Haustypen und Ziele liegen je Konto in Postgres und stehen damit "
         "auf jedem Gerät zur Verfügung; der Browser behält seine eigene Kopie. Grenzen "
         f"je Konto: höchstens {storage_settings.max_plots_per_account} Grundstücke, "
-        f"ein Eintrag höchstens {megabytes:.1f} MiB. Ohne Anmeldung bleibt alles im Browser."
+        f"ein Eintrag höchstens {mib(storage_settings.max_document_bytes)}. Ohne Anmeldung "
+        "bleibt alles im Browser."
     )
 
 
@@ -214,10 +215,19 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     fails on a database nobody configured would make the whole backend look
     broken. With one, the schema is applied here (CREATE TABLE IF NOT EXISTS,
     see app/schema.sql) so the first request finds its tables.
+
+    A database that is configured but unreachable is logged and nothing more.
+    Everything else this backend does -- parcels, tiles, routing, the search --
+    works without it, and refusing to start would take all of that down over
+    one feature. The first request that needs a connection tries again and
+    answers 502 with a German sentence if it still cannot get one.
     """
 
     store = storage_service()
-    await store.start()
+    try:
+        await store.start()
+    except AppError as exc:
+        logger.warning("Server storage did not open at start-up: %s", exc.message)
     try:
         yield
     finally:

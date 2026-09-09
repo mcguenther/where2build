@@ -17,10 +17,10 @@ second reader here would be a second thing to keep in step, and two places that
 know one schema drift apart. That is also why the limits below are about size
 and count rather than about shape.
 
-**No ORM.** Plain SQL over asyncpg. There are three tables and eight
-statements; a mapper would be more code than it replaces, and the statements
-are the interesting part -- the optimistic-concurrency UPDATE says exactly what
-it does.
+**No ORM.** Plain SQL over asyncpg. Three tables and a dozen statements; a
+mapper would be more code than it replaces, and the statements are the
+interesting part -- the optimistic-concurrency UPDATE says exactly what it
+does, where a mapper would hide it behind a version column.
 
 **Absent is a complete state.** Without ``DATABASE_URL`` no pool is opened, no
 connection is attempted, the schema is not applied, and every route here
@@ -48,6 +48,7 @@ from ..errors import (
     UpstreamError,
     VersionConflictError,
 )
+from ..schemas import EinstellungenAntwort, GespeichertesGrundstueck
 from ..settings import StorageSettings
 from .oidc import Identity
 
@@ -91,6 +92,12 @@ class StoredDocument:
     geaendert_am: datetime
 
 
+def mib(byte_count: float) -> str:
+    """A byte count as German MiB: „2,0 MiB“, with a comma for the decimal."""
+
+    return f"{byte_count / (1024 * 1024):.1f} MiB".replace(".", ",")
+
+
 def document_size(document: dict[str, Any]) -> int:
     """How many bytes this document takes as JSON.
 
@@ -110,7 +117,7 @@ async def _register_json(connection: asyncpg.Connection) -> None:
 
 
 class Storage:
-    """The pool, the schema and the eight statements. One instance per process."""
+    """The pool, the schema and the statements. One instance per process."""
 
     def __init__(self, settings: StorageSettings) -> None:
         self.settings = settings
@@ -144,6 +151,7 @@ class Storage:
         async with self._lock:
             if self._pool is not None:
                 return
+            pool = None
             try:
                 pool = await asyncpg.create_pool(
                     self.settings.database_url,
@@ -156,6 +164,12 @@ class Storage:
                 async with pool.acquire() as connection:
                     await connection.execute(SCHEMA_PATH.read_text(encoding="utf-8"))
             except (asyncpg.PostgresError, OSError, TimeoutError) as exc:
+                # A pool that was built and then failed on the schema has open
+                # connections; leaving it to the garbage collector would hold
+                # them until the next restart, and the next attempt would open
+                # more.
+                if pool is not None:
+                    await pool.close()
                 logger.warning("Server storage is not reachable: %s", exc)
                 raise UpstreamError(UNAVAILABLE) from exc
             self._pool = pool
@@ -168,7 +182,8 @@ class Storage:
     async def _pool_or_open(self) -> asyncpg.Pool:
         self.require_configured()
         await self.start()
-        assert self._pool is not None  # start() raises rather than returning None
+        if self._pool is None:  # start() raises rather than leaving it unset
+            raise UpstreamError(UNAVAILABLE)
         return self._pool
 
     # -- accounts ----------------------------------------------------------
@@ -250,6 +265,9 @@ class Storage:
         a last-write-wins.
         """
 
+        # In this order: "this server has no storage" is the more fundamental
+        # answer than "your document is too big for it".
+        self.require_configured()
         self._check_size(document)
         pool = await self._pool_or_open()
         async with _translated(), pool.acquire() as connection, connection.transaction():
@@ -331,6 +349,9 @@ class Storage:
     ) -> datetime:
         """Write the settings row. Same concurrency rule as a plot."""
 
+        # In this order: "this server has no storage" is the more fundamental
+        # answer than "your document is too big for it".
+        self.require_configured()
         self._check_size(document)
         pool = await self._pool_or_open()
         async with _translated(), pool.acquire() as connection, connection.transaction():
@@ -376,10 +397,9 @@ class Storage:
         size = document_size(document)
         if size <= self.settings.max_document_bytes:
             return
-        limit = self.settings.max_document_bytes / (1024 * 1024)
         raise PayloadTooLargeError(
-            f"Dieser Eintrag ist mit {size / (1024 * 1024):.1f} MiB zu groß; "
-            f"gespeichert werden höchstens {limit:.1f} MiB je Eintrag."
+            f"Dieser Eintrag ist mit {mib(size)} zu groß; gespeichert werden "
+            f"höchstens {mib(self.settings.max_document_bytes)} je Eintrag."
         )
 
     async def _check_count(self, connection: asyncpg.Connection, account: int) -> None:
@@ -408,12 +428,13 @@ def _plot_conflict(
 ) -> VersionConflictError:
     """The 409, worded for the case that actually happened."""
 
+    # Serialised through the same model the GET answers with, so `aktuell` is
+    # spelled exactly like the entry it stands for -- down to the trailing Z on
+    # the moment, which a client is entitled to compare as a string.
     aktuell = (
-        {
-            "id": current.id,
-            "geaendert_am": current.geaendert_am.isoformat(),
-            "dokument": current.dokument,
-        }
+        GespeichertesGrundstueck(
+            id=current.id, geaendert_am=current.geaendert_am, dokument=current.dokument
+        ).model_dump(mode="json")
         if current is not None
         else None
     )
@@ -440,7 +461,9 @@ def _settings_conflict(
     current: StoredDocument | None, *, expected: datetime | None
 ) -> VersionConflictError:
     aktuell = (
-        {"dokument": current.dokument, "geaendert_am": current.geaendert_am.isoformat()}
+        EinstellungenAntwort(
+            dokument=current.dokument, geaendert_am=current.geaendert_am
+        ).model_dump(mode="json")
         if current is not None
         else None
     )

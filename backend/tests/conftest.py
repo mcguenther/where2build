@@ -79,6 +79,10 @@ def isolated_settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     # provider and every "nicht eingerichtet" test would stop testing anything.
     for variable in ("OIDC_ISSUER", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET", "OIDC_SESSION_SECRET"):
         monkeypatch.setenv(variable, "")
+    # And no server storage unless a test asks for it, for the same reason and
+    # with more at stake: a developer's own DATABASE_URL would otherwise let the
+    # suite write into a real database.
+    monkeypatch.setenv("DATABASE_URL", "")
     reset_services()
     yield
     reset_services()
