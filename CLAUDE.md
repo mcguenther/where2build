@@ -1038,24 +1038,29 @@ from the user directly. Reopen only if the user asks.
   whenever the machine is busy. Measured identical before and after the change
   that appeared to break it. Dispatch a `paste` with a `DataTransfer` instead:
   instant, and it is the action the product is actually built around.
-- **`docker compose build` fails in the Claude Code cloud sandbox, and it is
-  not a pip problem.** The sandbox re-terminates outbound HTTPS through its
-  own CA (`/root/.ccr/README.md`), which a fresh build container does not
-  trust — `pip install` fails with "self-signed certificate in certificate
-  chain" fetching from pypi.org, and `npm ci` fails the same way against the
-  npm registry (different error text: "Exit handler never called!", same
-  cause). `--network host` alone does not fix it — the interception is a
-  trust problem, not a routing one; pypi.org and the npm registry are already
-  reachable without the proxy. Trusting the sandbox's bundle from inside the
-  container fixes both: `PIP_CERT` / `REQUESTS_CA_BUNDLE` / `SSL_CERT_FILE`
-  for pip, `NODE_EXTRA_CA_CERTS` for npm — Node ships its own CA list and
-  ignores the system trust store the same way pip does.
-  `scripts/docker-build-sandbox.sh build|up` applies that only in a temporary,
-  `sed`-patched copy of each Dockerfile (via BuildKit's `--build-context`, so
-  neither committed Dockerfile is touched) and falls back to a plain
-  `docker compose` call wherever `/root/.ccr/ca-bundle.crt` does not exist —
-  i.e. everywhere but here. On a real machine with direct internet access,
-  `docker compose up --build` needs none of this.
+## Docker builds in the Claude Code cloud sandbox
+
+`docker compose build` fails here out of the box, and it is not a pip
+problem: the sandbox re-terminates outbound HTTPS through its own CA
+(`/root/.ccr/README.md`), which a fresh build container does not trust.
+`pip install` fails against pypi.org with "self-signed certificate in
+certificate chain"; `npm ci` fails the same way against the npm registry,
+just with different error text ("Exit handler never called!"). `--network
+host` alone does not fix it — both registries are already reachable without
+going through the local proxy, so this is a trust problem, not a routing one.
+
+Trusting the sandbox's CA bundle from inside the container fixes both:
+`PIP_CERT` / `REQUESTS_CA_BUNDLE` / `SSL_CERT_FILE` for pip, and
+`NODE_EXTRA_CA_CERTS` for npm — Node ships its own CA list and ignores the
+system trust store exactly the way pip does.
+
+`scripts/docker-build-sandbox.sh build|up` applies that in a temporary,
+`sed`-patched copy of each Dockerfile only — via BuildKit's
+`--build-context`, so neither committed Dockerfile is touched — and falls
+back to a plain `docker compose` call wherever `/root/.ccr/ca-bundle.crt`
+does not exist, i.e. everywhere but here. On a real machine with direct
+internet access, `docker compose up --build` needs none of this and the
+script is a no-op passthrough.
 
 ## Commands
 
@@ -1070,8 +1075,9 @@ backend/.venv/bin/python -m uvicorn app.main:app --reload --app-dir backend
 # so there is one origin and no CORS. No database is involved.
 docker compose up --build      # http://localhost:8080
 
-# same thing, but in the Claude Code cloud sandbox -- see "Traps that already
-# cost time" for why a plain `docker compose build` fails there.
+# same thing, but in the Claude Code cloud sandbox -- see "Docker builds in
+# the Claude Code cloud sandbox" for why a plain `docker compose build` fails
+# there.
 scripts/docker-build-sandbox.sh up -d
 
 # routing on this machine instead of Transitous -- opt-in, off by default.
