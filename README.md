@@ -295,7 +295,11 @@ Each of these is verified, not assumed — the details are in
 - **BORIS `INFO_FORMAT=application/json` returns UTFGrid**, not GeoJSON, and
   fails outright on the combined layer. Use `text/plain` or GML.
 - **immobilienscout24.de answers server-side fetches with 401** on every route
-  tested, so its adapter goes straight to the paste field.
+  tested — an AWS WAF challenge at the CloudFront edge, so no header, protocol
+  or user agent changes it. It **does** publish a documented search and expose
+  API, but only to content partners and with terms that forbid own analyses and
+  storing anything beyond 24 hours, which is this product's core. The way in is
+  the user's own browser. See `docs/research/immobilienscout24-zugang.md`.
 - **`adv_alkis_flurstuecke` carries `MaxScaleDenominator: 2000`** and answers
   HTTP 200 with a transparent PNG above it — and a scale limit is steerable.
   The denominator is `(bbox / image width) / 0,00028`, so the proxy renders each
@@ -307,10 +311,14 @@ Each of these is verified, not assumed — the details are in
   parse those and skip both the geocoder and the model call. The asking price
   is there too (`<meta itemprop="price">`, JSON-LD, `#viewad-price`), which is
   why no listing needs a model to give up its price.
-- **The clipboard carries `text/html` alongside `text/plain`**, and a textarea
-  shows only the second. The paste field keeps the first, so a copied page
-  arrives with its meta tags and is read the same way a fetched one is — no
-  provider key involved.
+- **The clipboard's `text/html` carries the body and nothing else.** `Strg+A`
+  selects the document's body, so every `<meta>` and every JSON-LD block stays
+  behind — measured in Chromium. Body-level markup survives (`#viewad-price`,
+  `.addetailslist--detail`, `<img src>`), which is why a pasted page still has
+  its price and its pictures but not its coordinates. A pasted ImmoScout page
+  loses every deterministic field at once, which is what made it look as though
+  the portal published none. See
+  `docs/research/immobilienscout24-zugang.md` § 4.
 - **A dot is a German thousands separator only in groups of three.** Stripping
   every dot turned the coordinate `51.189265` into `51189265` and made the
   search endpoint answer 422 for every listing that carried one.

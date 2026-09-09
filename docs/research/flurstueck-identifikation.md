@@ -824,16 +824,22 @@ konfiguriert (LLM_API_KEY fehlt)" — the one portal the paste field exists for.
 Two things fix it and neither needs a provider:
 
 * **Read the pasted text with the same deterministic parsers as a fetched
-  page.** A copied page carries its meta tags, its JSON-LD, its price and its
-  attribute list. The model is only asked when *no locator at all* — no
+  page.** A copied page carries its price and its attribute list — but not its
+  meta tags and not its JSON-LD, which the note below corrects. The model is only asked when *no locator at all* — no
   address, no coordinate, no parcel number — could be read, and the refusal
   then says what to paste instead rather than only naming the missing key.
 * **Take the clipboard's HTML flavour.** `Strg+A, Strg+C` in a browser puts
   **both** `text/plain` and `text/html` on the clipboard; a `<textarea>` shows
   only the first. The paste handler keeps the second (capped at 400 000
-  characters — the head of the document is where every locator sits) and sends
-  it instead. Emptying the field clears it, or the next read silently ships the
-  page pasted before.
+  characters) and sends it instead. Emptying the field clears it, or the next
+  read silently ships the page pasted before.
+
+  **Corrected 09.09.2026:** the parenthesis above said "the head of the
+  document is where every locator sits", and that is exactly what does *not*
+  arrive. `Strg+A` selects the body, so no `<meta>` and no JSON-LD is in the
+  clipboard at all — measured in Chromium. Body markup survives. See
+  `immobilienscout24-zugang.md` § 4; § 20.5 below is a consequence of this and
+  not of ImmoScout's markup.
 
 ### 17.4 Enter has to submit ✅
 
@@ -989,8 +995,11 @@ found then re-runs the narrowing rather than being noted and ignored.
 ### 20.5 The paste gate was asking the wrong question ✅
 
 A dropped ImmoScout page was refused for having no address, no coordinate and
-no parcel number — which is every ImmoScout page, the one portal that field
-exists for. None of the three is what the search needs: it reads a district, a
+no parcel number — which is every ImmoScout page *as the clipboard delivers
+it*, the one portal that field exists for. (The reason was found on 09.09.2026
+and is not the portal: the clipboard drops `<head>`, so the meta tags and
+JSON-LD carrying all three never arrive. See `immobilienscout24-zugang.md`
+§ 4. The gate below is still the right gate.) None of the three is what the search needs: it reads a district, a
 street and an area out of prose. The gate now asks `collect_indicia` whether
 the text yields an *anchor* — a Gemarkung, a Gemeinde, a place or a parcel
 number. An area alone is not one, so „Baugrundstück 688 m²“ is still refused,

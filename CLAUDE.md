@@ -133,7 +133,18 @@ from the user directly. Reopen only if the user asks.
 - **BORIS `INFO_FORMAT=application/json` returns UTFGrid**, not GeoJSON, and
   fails outright on the combined layer. Use `text/plain` or GML.
 - **immobilienscout24.de answers server-side fetches with 401** on every route
-  tested. Its adapter goes straight to the paste field.
+  tested. Its adapter goes straight to the paste field. Re-measured 09.09.2026:
+  it is an AWS WAF challenge at the CloudFront edge (`x-cache: Error from
+  cloudfront`), so the request never reaches an origin — a full browser header
+  set, HTTP/1.1, a `ClaudeBot` UA and Anthropic's own fetch all answer 401
+  alike, while `robots.txt` (200) explicitly *allows* `ClaudeBot` and the two
+  exposé sitemaps it advertises answer 401. There is no header to fix. There
+  *is* a documented API (`api.immobilienscout24.de`, search over two-legged
+  OAuth, 2 000 req/min), but it is content-partner only, "not for data delivery
+  use cases", and its terms forbid own databases and analyses and cap storage
+  at 24 hours — so it is not a gate we could pass with paperwork, it is the
+  wrong shape. The way in is the user's own browser.
+  See `docs/research/immobilienscout24-zugang.md`.
 - **kleinanzeigen.de carries `og:latitude`/`og:longitude`** in its meta tags —
   parse those instead of geocoding, and skip the model call entirely.
 - **The authority services DO send CORS headers** — checked with `GET` and an
@@ -886,14 +897,21 @@ from the user directly. Reopen only if the user asks.
   the first hit answered all four measured adverts (60 000 / 165 000 / 80 000 /
   195 000 €). It had been left to the LLM, so the field stayed empty on exactly
   the pages that have a known adapter.
-- **The clipboard carries `text/html` next to `text/plain`, and a `<textarea>`
-  shows only the second.** `Strg+A, Strg+C` on a portal page therefore has
-  everything the extraction wants — meta tags, JSON-LD, price, pictures — and
-  the paste field keeps it (`@paste`, capped at 400 000 characters) and sends
-  that instead. So the paste path needs no `LLM_API_KEY`: a model is asked only
-  when no address, no coordinate and no parcel number could be read at all.
-  Emptying the field has to clear the kept HTML, or the next read silently
-  ships the page pasted before.
+- **The clipboard carries `text/html` next to `text/plain`, and it carries the
+  body and nothing else.** The paste field keeps the HTML flavour (`@paste`,
+  capped at 400 000 characters), which is right — but `Strg+A` selects the
+  *body*, so every `<meta>` and every `<script type="application/ld+json">`
+  stays behind. Measured in Chromium: `og:latitude`, `og:longitude`, a head
+  `itemprop="price"` and JSON-LD are all absent; `#viewad-price`,
+  `.addetailslist--detail`, `<img src>` with its `?rule=$_59` variant and a
+  body-level `itemprop` all survive. So a pasted Kleinanzeigen page loses the
+  coordinates a fetched one gets for free, and a pasted ImmoScout page loses
+  every deterministic field at once — which is why it reads as having no
+  address, no coordinate and no parcel number, a fact about the clipboard and
+  not about the portal. The fix is not more prose parsing: it is getting the
+  real DOM out of the browser that already has it. Emptying the field has to
+  clear the kept HTML, or the next read silently ships the page pasted before.
+  See `docs/research/immobilienscout24-zugang.md` § 4.
 - **An optional dependency has to be optional in one place only.** The backend
   image installed `.[poi]` and never `tesseract-ocr`, so every Compose
   deployment reported „keine Bilderkennung eingerichtet“ while the code, the
