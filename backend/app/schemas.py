@@ -1214,12 +1214,35 @@ class KontoAntwort(BaseModel):
     )
 
 
+class FreigabeUmfang(BaseModel):
+    """What a link may carry beyond the plot itself.
+
+    Every switch defaults to *off*: a shared link is public, and the safe
+    default for a public thing is the least it can be. What is always in it --
+    the outline, the official area, the Gemarkung, the Bodenrichtwert -- are
+    facts about a piece of land that the registers publish anyway.
+    """
+
+    preis: bool = Field(default=False, description="Kaufpreis und der Vergleich damit.")
+    haus: bool = Field(default=False, description="Der geplante Baukörper und sein Haustyp.")
+    wege: bool = Field(
+        default=False,
+        description="Ziele und Wegezeiten. Die Ziele sind Arbeitsplatz, Schule und "
+        "Ähnliches, also die persönlichste Angabe am ganzen Grundstück.",
+    )
+    notiz: bool = Field(default=False, description="Die persönliche Notiz.")
+
+
 class FreigabeAnfrage(BaseModel):
     """A plot to freeze under a link."""
 
     dokument: dict[str, Any] = Field(
-        description="Das Grundstücksdokument. Die persönliche Notiz wird beim Anlegen "
-        "entfernt und gar nicht erst gespeichert."
+        description="Das Grundstücksdokument. Was nicht im Umfang steht, wird beim "
+        "Anlegen entfernt und gar nicht erst gespeichert."
+    )
+    umfang: FreigabeUmfang = Field(
+        default_factory=FreigabeUmfang,
+        description="Was zusätzlich mitgeteilt wird. Fehlt es, wird nichts davon geteilt.",
     )
 
 
@@ -1246,7 +1269,8 @@ class FreigabeAntwort(BaseModel):
     """What somebody with the link gets: the snapshot, and until when."""
 
     dokument: dict[str, Any] = Field(
-        description="Das Grundstück, wie es beim Teilen aussah. Ohne die Notiz."
+        description="Das Grundstück, wie es beim Teilen aussah, beschränkt auf den "
+        "gewählten Umfang."
     )
     angelegt: datetime = Field(description="Wann geteilt wurde; der Stand ist von da.")
     laeuft_ab: datetime

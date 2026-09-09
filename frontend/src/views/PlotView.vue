@@ -22,31 +22,13 @@
         <button type="button" class="btn btn--quiet" :disabled="!hasNext" @click="step(1)">Nächstes ›</button>
         <RouterLink v-if="hasAnchor" class="btn btn--secondary"
                     :to="{ name: 'location', params: { id: plot.id } }">Standort prüfen</RouterLink>
-        <button v-if="state.account.angemeldet" type="button" class="btn btn--secondary"
-                :disabled="sharing" @click="share">
-          {{ sharing ? "Wird geteilt …" : "Teilen" }}
-        </button>
+        <button type="button" class="btn btn--secondary" :aria-pressed="String(sharing)"
+                @click="sharing = !sharing">Teilen</button>
         <button type="button" class="btn btn--secondary" @click="print">Drucken</button>
       </div>
     </div>
 
-    <!-- The link, once it exists. Shown rather than copied silently: what goes
-         out is a public address of a real plot, so whoever made it should read
-         it before sending it. -->
-    <div v-if="shareLink" class="panel no-print share">
-      <div class="panel__body stack">
-        <p><b>Der Link steht.</b> Wer ihn hat, sieht dieses Grundstück, wie es jetzt ist.
-          Persönliche Notiz und Wegezeiten sind nicht dabei. Er läuft nach 90 Tagen ab.</p>
-        <div class="row">
-          <input class="share__link" type="text" readonly :value="shareLink"
-                 aria-label="Geteilter Link" @focus="$event.target.select()">
-          <button type="button" class="btn" @click="copyLink">In die Zwischenablage</button>
-          <button type="button" class="btn btn--quiet" @click="shareLink = ''">Schließen</button>
-        </div>
-        <p v-if="shareMessage" class="hint">{{ shareMessage }}</p>
-      </div>
-    </div>
-    <p v-if="shareFailure" class="notice notice--error no-print" role="alert">{{ shareFailure }}</p>
+    <SharePanel v-if="sharing" :plot="plot" @close="sharing = false" />
 
     <div class="plan-grid print-sheet">
       <div class="plan-frame panel print-sheet__plan">
@@ -415,6 +397,7 @@
 
 <script>
 import SitePlan from "../components/SitePlan.vue";
+import SharePanel from "../components/SharePanel.vue";
 import RouteCards from "../components/RouteCards.vue";
 import NearbyPanel from "../components/NearbyPanel.vue";
 import SurroundingsMap from "../components/SurroundingsMap.vue";
@@ -422,7 +405,7 @@ import {
   state, plotById, placement, houseTypeById, houseFootprint, save, addHouseType,
   newId, setRoutes, CUSTOM_SIZE, DEFAULT_FOOTPRINT
 } from "../lib/store.js";
-import { reachability, neighbourBuildings as fetchNeighbourBuildings, createShare } from "../lib/api.js";
+import { reachability, neighbourBuildings as fetchNeighbourBuildings } from "../lib/api.js";
 import { zubringerOf, fastestMode, coordinatesOf, MODES } from "../lib/routes.js";
 import { toLocal } from "../lib/projection.js";
 import { plotMetrics } from "../lib/metrics.js";
@@ -438,7 +421,7 @@ const MAX_EDGE = 30;
 
 export default {
   name: "PlotView",
-  components: { SitePlan, RouteCards, NearbyPanel, SurroundingsMap },
+  components: { SitePlan, SharePanel, RouteCards, NearbyPanel, SurroundingsMap },
   props: {
     /** The plot's id, straight out of the URL. */
     id: { type: String, required: true }
@@ -451,9 +434,6 @@ export default {
       sizeDraft: { length: null, width: null },
       measurement: { points: [], length: 0 },
       sharing: false,
-      shareLink: "",
-      shareMessage: "",
-      shareFailure: "",
       naming: false,
       typeName: "",
       /** Outlines are not stored with the plot: they are somebody else's data,
@@ -676,44 +656,6 @@ export default {
     },
     print() { window.print(); },
 
-    /** Freeze this plot under a public link.
-     *
-     *  The house type and the footprint are resolved into the snapshot here,
-     *  because they live in the settings document and a share holds one plot:
-     *  a reader has no way to look them up. The note and the travel times are
-     *  cut by the backend, which is where a promise about what a link may not
-     *  show belongs.
-     */
-    async share() {
-      this.sharing = true;
-      this.shareFailure = "";
-      this.shareMessage = "";
-      try {
-        const snapshot = {
-          ...this.plot,
-          placedBuilding: this.plot.house ? placement(this.plot) : null,
-          houseTypeName: houseTypeById(this.plot.houseTypeId)?.name ?? null
-        };
-        const made = await createShare(snapshot);
-        this.shareLink = new URL(
-          this.$router.resolve({ name: "shared", params: { token: made.id, slug: [] } }).href,
-          window.location.origin
-        ).toString();
-      } catch (error) {
-        this.shareFailure = error.message;
-      } finally {
-        this.sharing = false;
-      }
-    },
-
-    async copyLink() {
-      try {
-        await navigator.clipboard.writeText(this.shareLink);
-        this.shareMessage = "In die Zwischenablage gelegt.";
-      } catch {
-        this.shareMessage = "Der Browser lässt das Kopieren nicht zu. Den Link markieren und Strg+C.";
-      }
-    },
     toggleMeasuring() {
       state.plan.measuring = !state.plan.measuring;
       if (!state.plan.measuring) this.measurement = { points: [], length: 0 };
@@ -864,7 +806,6 @@ export default {
 </script>
 
 <style scoped>
-.share__link{ flex: 1; min-width: 220px; font-family: var(--w2b-font-mono); font-size: var(--w2b-text-s); }
 
 
 .page-head__sub{ max-width: 64ch; }

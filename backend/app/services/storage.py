@@ -127,24 +127,46 @@ class AccountOverview:
 # chat.
 SHARE_TOKEN_BYTES = 16
 
-# What a shared plot must never carry. Listed here rather than in the frontend
-# because the promise has to hold even when a caller forgets -- see
-# `create_share`.
+# What a shared link may carry beyond the plot itself, and which fields each
+# switch governs. Everything here is *off* unless the sharer turned it on: a
+# link is public, and the safe default for a public thing is the least it can
+# be. What is always in it -- the outline, the official area, the Gemarkung,
+# the Bodenrichtwert -- are facts about a piece of land that the registers
+# publish anyway.
 #
-# `note` is the obvious one: it is where somebody writes what they think of the
-# seller. `routes` is the one that is easy to miss. It is keyed by destination
-# id and holds the travel times to them, and the destinations are a person's
-# work address, their children's school, their parents' home. The plot is
-# public in a shared link; where its owner commutes to is not, and a reader who
-# cannot see the names could still count the destinations and read off the
-# distances. Both are cut.
-PRIVATE_FIELDS = ("note", "routes")
+# Enforced here and not in the browser, because a promise the frontend keeps is
+# one a bug in the frontend can break. The switches arrive as a request field;
+# the cutting happens at the door, so the row never holds what the link must
+# not show.
+#
+# `wege` is the one worth explaining. `routes` is keyed by destination id and
+# holds the travel times, and `sharedDestinations` is what the frontend adds so
+# the reader can see which destination a row is about -- somebody's work
+# address, their children's school. Both belong to the same switch, and without
+# it a reader could still count the destinations and read off the distances.
+SHARE_OPTIONS: dict[str, tuple[str, ...]] = {
+    "preis": ("askingPrice",),
+    "haus": ("house", "placedBuilding", "houseTypeName", "houseTypeId", "customSize"),
+    "wege": ("routes", "sharedDestinations"),
+    # The trailing comma is not style. `("note")` is the string "note", and
+    # iterating it yields "n", "o", "t", "e" -- so nothing named `note` is ever
+    # withheld and the personal note goes out with every link. Caught by
+    # running it, not by reading it.
+    "notiz": ("note",),
+}
 
 
-def for_sharing(dokument: dict[str, Any]) -> dict[str, Any]:
-    """The plot as it may be shared."""
+def for_sharing(dokument: dict[str, Any], include: dict[str, bool] | None = None) -> dict[str, Any]:
+    """The plot as it may be shared, given what the sharer switched on."""
 
-    return {key: value for key, value in dokument.items() if key not in PRIVATE_FIELDS}
+    chosen = include or {}
+    withheld = {
+        field
+        for option, fields in SHARE_OPTIONS.items()
+        if not chosen.get(option, False)
+        for field in fields
+    }
+    return {key: value for key, value in dokument.items() if key not in withheld}
 
 
 def mib(byte_count: float) -> str:
@@ -338,7 +360,9 @@ class Storage:
 
     # -- shares ------------------------------------------------------------
 
-    async def create_share(self, identity: Identity, dokument: dict[str, Any]) -> Share:
+    async def create_share(
+        self, identity: Identity, dokument: dict[str, Any], include: dict[str, bool] | None = None
+    ) -> Share:
         """Freeze a plot under a fresh token.
 
         The note is cut here and not in the browser. "Without the note" is a
@@ -363,7 +387,7 @@ class Storage:
                 account,
                 # No json.dumps here: the pool's jsonb codec encodes, and
                 # doing it twice stores a JSON *string* that reads back as one.
-                for_sharing(dokument),
+                for_sharing(dokument, include),
                 str(self.settings.share_days),
             )
             return _share(row)

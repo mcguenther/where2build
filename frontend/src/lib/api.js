@@ -100,8 +100,8 @@ export const deleteAccountOnServer = () => request("/account", { method: "DELETE
 /* ---------- Sharing a plot by link ----------
  * Three of these need the account; `sharedPlot` deliberately does not, because
  * the token in the link is the access. */
-export const createShare = dokument =>
-  request("/shares", { method: "POST", body: JSON.stringify({ dokument }) });
+export const createShare = (dokument, umfang) =>
+  request("/shares", { method: "POST", body: JSON.stringify({ dokument, umfang }) });
 export const sharesOnServer = () => request("/shares");
 export const deleteShare = token => request(`/shares/${encodeURIComponent(token)}`, { method: "DELETE" });
 export const sharedPlot = token => request(`/shares/${encodeURIComponent(token)}`);

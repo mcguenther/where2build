@@ -317,6 +317,16 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
   await page.waitForTimeout(6000);                             // Kacheln laden lassen
   await shot(page, "grundstueck", mode, narrow ? "-schmal" : "");
 
+  /* Teilen, abgemeldet. There is no identity provider in this run, so what the
+   * panel shows is the invitation into an account — which is the state most
+   * visitors meet, and the one worth checking reads as an offer rather than as
+   * a broken button. The switches themselves need a session; they are covered
+   * by the unit tests and by a walk against a throwaway provider. */
+  await page.getByRole("button", { name: "Teilen" }).click();
+  await page.waitForSelector(".share", { timeout: 10000 });
+  await shot(page, "teilen", mode, narrow ? "-schmal" : "");
+  await page.getByRole("button", { name: "Schließen" }).click();
+
   if (!narrow) {
     await page.getByRole("button", { name: "Luftbild" }).click();
     await page.waitForTimeout(4000);

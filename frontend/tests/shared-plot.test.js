@@ -106,30 +106,66 @@ describe("Geteiltes Grundstück", () => {
     expect(view.find("a.btn").exists()).toBe(true);
   });
 
-  it("rechnet keinen Preis aus einer fehlenden Zahl", async () => {
-    // Das ist die Stelle, an der „0,00 €“ und „−100 %“ herkamen.
+  it("lässt einen nicht geteilten Preis ganz weg, statt Striche zu zeigen", async () => {
+    // Ein Strich liest sich wie fehlende Daten, nicht wie eine Entscheidung —
+    // und lädt dazu ein, den Rest der Seite auch anzuzweifeln.
     const without = SHARED();
     delete without.dokument.askingPrice;
     globalThis.fetch = vi.fn(() => Promise.resolve(ok(without)));
     const view = await open();
 
-    // Kaufpreis und der daraus abgeleitete Preis je m² bleiben leer, statt aus
-    // einer fehlenden Zahl gerechnet zu werden. Für den Bodenrichtwert gilt das
-    // nicht, der steht in der Momentaufnahme.
     const terms = view.findAll(".value-list dt").map(dt => dt.text());
-    const values = view.findAll(".value-list dd").map(dd => dd.text());
-    const held = Object.fromEntries(terms.map((term, i) => [term, values[i]]));
-    expect(held["Kaufpreis"]).toBe("—");
-    expect(held["Preis je m²"]).toBe("—");
-    expect(held["Gegen den Richtwert"]).toBe("—");
+    expect(terms).not.toContain("Kaufpreis");
+    expect(terms).not.toContain("Preis je m²");
+    expect(terms).not.toContain("Gegen den Richtwert");
+    // Der Bodenrichtwert bleibt: er ist ein amtlicher Wert des Ortes.
+    expect(terms).toContain("Bodenrichtwert");
   });
 
-  it("sagt es, wenn noch kein Haus gestellt war", async () => {
+  it("zeigt kein leeres Hausfeld, wenn das Haus nicht geteilt wurde", async () => {
     const bare = SHARED();
-    bare.dokument.placedBuilding = null;
+    delete bare.dokument.placedBuilding;
+    delete bare.dokument.houseTypeName;
     globalThis.fetch = vi.fn(() => Promise.resolve(ok(bare)));
     const view = await open();
 
-    expect(view.text()).toContain("noch kein Haus gestellt");
+    expect(view.text()).not.toContain("Was daraufpasst");
+  });
+
+  it("zeigt Wege nur mit ihren Namen und nach Dauer geordnet", async () => {
+    const withWays = SHARED();
+    withWays.dokument.routes = {
+      "zl-schule": { modes: { transit: { erreichbar: true, duration_s: 1800 } } },
+      "zl-arbeit": { modes: { transit: { erreichbar: true, duration_s: 600 },
+                              bike: { erreichbar: true, duration_s: 900 } } }
+    };
+    withWays.dokument.sharedDestinations = [
+      { id: "zl-arbeit", name: "Arbeit" }, { id: "zl-schule", name: "Schule" }
+    ];
+    globalThis.fetch = vi.fn(() => Promise.resolve(ok(withWays)));
+    const view = await open();
+
+    const rows = view.findAll(".value-list dt").map(dt => dt.text());
+    // Das schnellere Ziel zuerst, und beide mit Namen statt mit ihrer Kennung.
+    expect(rows.indexOf("Arbeit")).toBeLessThan(rows.indexOf("Schule"));
+    expect(view.text()).not.toContain("zl-arbeit");
+  });
+
+  it("zeigt gar keinen Wege-Abschnitt, wenn nichts geteilt wurde", async () => {
+    const view = await open();
+
+    expect(view.text()).not.toContain("Fahrplan");
+  });
+
+  it("zeigt die Notiz nur, wenn sie mitgeschickt wurde", async () => {
+    const view = await open();
+    expect(view.text()).not.toContain("Notiz");
+
+    const withNote = SHARED();
+    withNote.dokument.note = "Verkäufer wirkt in Eile";
+    globalThis.fetch = vi.fn(() => Promise.resolve(ok(withNote)));
+    const shown = await open();
+
+    expect(shown.text()).toContain("Verkäufer wirkt in Eile");
   });
 });

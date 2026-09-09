@@ -10,11 +10,15 @@ Four endpoints, and the split between them is the whole design:
   a link somebody sends to their family or a surveyor.
 
 That makes the token the only thing standing between a URL and a real plot's
-address and asking price, which is why it is 16 random bytes and why the share
-is a **copy**: what was shared stays what it was on the day, so a link handed
-out weeks ago cannot start showing a corrected price. The personal note is cut
-when the copy is made -- in ``Storage.create_share``, not here and not in the
-browser, so no reader has to remember to leave it out.
+address, which is why it is 16 random bytes and why the share is a **copy**:
+what was shared stays what it was on the day, so a link handed out weeks ago
+cannot start showing a corrected price.
+
+What a link carries beyond the plot itself is chosen switch by switch, and
+every switch defaults to *off* -- a link is public, and the safe default for a
+public thing is the least it can be. The cutting happens in
+``Storage.create_share``, not here and not in the browser, because a promise
+the frontend keeps is one a bug in the frontend can break.
 
 Every link has an end. Without one this table only grows, and an abandoned
 share would sit there for ever; ``STORAGE_SHARE_DAYS`` says how long and the
@@ -70,7 +74,9 @@ async def create(
 ) -> FreigabeAngelegt:
     response.headers.update(_NO_STORE)
     storage.require_configured()
-    share = await storage.create_share(identity, payload.dokument)
+    share = await storage.create_share(
+        identity, payload.dokument, payload.umfang.model_dump()
+    )
     return FreigabeAngelegt(
         id=share.id, angelegt=share.angelegt, laeuft_ab=share.laeuft_ab
     )

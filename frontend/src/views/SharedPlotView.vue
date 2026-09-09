@@ -34,29 +34,50 @@
         <section class="panel">
           <div class="panel__head"><h3>Das Grundstück</h3><div class="spacer"></div><span class="chip">ALKIS</span></div>
           <div class="panel__body">
+            <!-- Only what was actually shared. A row of dashes for a price
+                 that was deliberately withheld reads as missing data rather
+                 than as a decision, and it invites the reader to wonder what
+                 else is broken. -->
             <dl class="value-list">
               <dt>Fläche amtlich</dt><dd>{{ area(plot.officialArea) }}</dd>
-              <dt>Kaufpreis</dt><dd>{{ euro(plot.askingPrice) }}</dd>
-              <dt>Preis je m²</dt><dd>{{ euroPerSqm(pricePerSqm) }}</dd>
+              <template v-if="hasPrice">
+                <dt>Kaufpreis</dt><dd>{{ euro(plot.askingPrice) }}</dd>
+                <dt>Preis je m²</dt><dd>{{ euroPerSqm(pricePerSqm) }}</dd>
+              </template>
               <dt>Bodenrichtwert</dt><dd>{{ euroPerSqm(plot.bodenrichtwert) }}</dd>
-              <dt>Gegen den Richtwert</dt><dd>{{ percent(againstReference) }}</dd>
+              <template v-if="hasPrice">
+                <dt>Gegen den Richtwert</dt><dd>{{ percent(againstReference) }}</dd>
+              </template>
             </dl>
           </div>
         </section>
 
-        <section class="panel">
+        <section v-if="building" class="panel">
           <div class="panel__head"><h3>Was daraufpasst</h3></div>
           <div class="panel__body">
-            <dl v-if="building" class="value-list">
+            <dl class="value-list">
               <dt>Haustyp</dt><dd>{{ plot.houseTypeName || "eigenes Maß" }}</dd>
               <dt>Grundfläche</dt><dd>{{ metres(building.width) }} × {{ metres(building.depth) }}</dd>
             </dl>
-            <p v-else class="missing">
-              In dieser Momentaufnahme war noch kein Haus gestellt.
-            </p>
+          </div>
+        </section>
+
+        <section v-if="ways.length" class="panel">
+          <div class="panel__head"><h3>Wege</h3><div class="spacer"></div><span class="chip">Fahrplan</span></div>
+          <div class="panel__body">
+            <dl class="value-list">
+              <template v-for="way in ways" :key="way.id">
+                <dt>{{ way.name }}</dt><dd>{{ duration(way.seconds) }}</dd>
+              </template>
+            </dl>
           </div>
         </section>
       </div>
+
+      <section v-if="plot.note" class="panel">
+        <div class="panel__head"><h3>Notiz</h3></div>
+        <div class="panel__body"><p>{{ plot.note }}</p></div>
+      </section>
 
       <!-- What this page is not, said plainly. A shared link is a snapshot of
            somebody else's working state, and reading it as an offer or as a
@@ -67,7 +88,7 @@
             Das ist eine Momentaufnahme vom {{ date(sharedAt) }}, geteilt von jemandem, der
             dieses Grundstück geprüft hat. Sie ändert sich nicht mehr, auch wenn sich am
             Grundstück etwas ändert. Der Link läuft am {{ date(expiresAt) }} ab.
-            Persönliche Notizen und Wegezeiten sind nicht enthalten.
+            Geteilt wird nur, was die teilende Person ausgewählt hat.
           </p>
           <p>
             <RouterLink class="btn" :to="{ name: 'home' }">Eigenes Grundstück prüfen</RouterLink>
@@ -93,7 +114,7 @@
  */
 import SitePlan from "../components/SitePlan.vue";
 import { sharedPlot } from "../lib/api.js";
-import { area, euro, euroPerSqm, metres, percent, date } from "../lib/format.js";
+import { area, euro, euroPerSqm, metres, percent, date, duration } from "../lib/format.js";
 
 export default {
   name: "SharedPlotView",
@@ -113,6 +134,23 @@ export default {
     /** Resolved when the link was made: the house type lives in another
      *  document, which a snapshot of one plot cannot reach. */
     building() { return this.plot?.placedBuilding || null; },
+    hasPrice() { return Number.isFinite(this.plot?.askingPrice); },
+    /** The fastest mode per destination, named. Both halves travel under the
+     *  same switch, so either both are here or neither is. */
+    ways() {
+      const names = Object.fromEntries(
+        (this.plot?.sharedDestinations ?? []).map(d => [d.id, d.name])
+      );
+      return Object.entries(this.plot?.routes ?? {})
+        .map(([id, entry]) => {
+          const reachable = Object.values(entry?.modes ?? {})
+            .filter(m => m?.erreichbar && Number.isFinite(m.duration_s));
+          if (!reachable.length) return null;
+          return { id, name: names[id] ?? "Ziel", seconds: Math.min(...reachable.map(m => m.duration_s)) };
+        })
+        .filter(Boolean)
+        .sort((a, b) => a.seconds - b.seconds);
+    },
     pricePerSqm() {
       const { askingPrice, officialArea } = this.plot ?? {};
       // Never computed from a missing input: that is where "0,00 €" came from.
@@ -138,6 +176,6 @@ export default {
       this.busy = false;
     }
   },
-  methods: { area, euro, euroPerSqm, metres, percent, date }
+  methods: { area, euro, euroPerSqm, metres, percent, date, duration }
 };
 </script>

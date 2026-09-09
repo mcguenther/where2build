@@ -1183,6 +1183,27 @@ from the user directly. Reopen only if the user asks.
   whenever the machine is busy. Measured identical before and after the change
   that appeared to break it. Dispatch a `paste` with a `DataTransfer` instead:
   instant, and it is the action the product is actually built around.
+- **`("note")` is the string, not a one-element tuple, and a privacy switch
+  built on it withholds nothing.** `SHARE_OPTIONS` maps a switch to the fields
+  it governs, and the set of withheld names is built by iterating those tuples —
+  so a missing trailing comma iterates the *letters* and the withheld set holds
+  `n`, `o`, `t`, `e` while nothing named `note` is ever cut. Every shared link
+  would have carried the personal note. Nothing about the code reads wrong; it
+  was caught by running the function, and it is pinned now by a table-driven
+  test that walks each switch against exactly its own fields.
+- **What is not shared must not go on the wire either.** Sending the whole plot
+  and trusting the backend to cut it works — and puts somebody's destinations
+  and their note through a request made for a link that does not carry them.
+  `SharePanel.snapshot()` therefore only resolves the house type and the
+  destination names when their switch is on, and the backend cuts again on the
+  way in. Two places, on purpose: the browser decides, the server enforces.
+- **The share panel's most-seen state is the signed-out one.** Sharing needs a
+  server to hold the copy, so it needs an account — and a disabled button with
+  no reason reads as broken, while hiding it means nobody learns the feature
+  exists. Three states, all in words: the invitation with a sign-in link, and
+  where no provider is configured at all a sentence saying so and pointing at
+  the print sheet and the JSON export. `teilen-*.png` in the screenshot run is
+  the signed-out one, because the run has no identity provider.
 
 ## Commands
 
@@ -1236,14 +1257,14 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 575 passed, 43 skipped. With `TEST_DATABASE_URL` pointed at a real
-  Postgres it is 610 passed, 8 skipped — the extra 35 are the account store,
+- `pytest`: 575 passed, 46 skipped. With `TEST_DATABASE_URL` pointed at a real
+  Postgres it is 613 passed, 8 skipped — the extra 38 are the account store,
   and they are skipped rather than mocked because what they check is the
   database's own behaviour. Of the remaining 8, one needs pyosmium, which only
   the index builder wants; the other seven need Tesseract.
-- `vitest`: 586 passed — plus the integration file, excluded by `npm run test`
+- `vitest`: 596 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
-- `scripts/screenshots.mjs`: 62 images plus two print PDFs. It fails on console
+- `scripts/screenshots.mjs`: 65 images plus two print PDFs. It fails on console
   errors, on horizontal overflow, and if not a single vector tile arrived. It
   also drives the live geocoder, which is slow often enough to blow the 60 s
   wait on the destinations step — two runs failed there and the third passed

@@ -913,3 +913,75 @@ def test_deleting_the_account_takes_the_links_with_it(account: TestClient):
     # TestClients open at once are two event loops on one pool.
     account.cookies.clear()
     assert account.get(f"/api/shares/{token}").status_code == 404
+
+
+@needs_database
+def test_nothing_optional_travels_unless_it_was_switched_on(account: TestClient):
+    """The default is the least a link can be.
+
+    A share is public, so the safe default for every optional part is off. This
+    is the whole privacy promise of the feature in one assertion.
+    """
+
+    full = {**SHARED, "house": {"cx": 1, "cy": 2, "rotation": 0}, "houseTypeName": "ELK 159"}
+    token = account.post("/api/shares", json={"dokument": full}).json()["id"]
+
+    seen = account.get(f"/api/shares/{token}").json()["dokument"]
+
+    for withheld in ("note", "askingPrice", "routes", "house", "houseTypeName"):
+        assert withheld not in seen, f"{withheld} ist ungefragt mitgegangen"
+    # What is always there are facts the registers publish anyway.
+    assert seen["gemarkung"] == "Großbothen"
+    assert seen["flaeche_amtlich_m2"] == 502
+
+
+@needs_database
+def test_each_switch_carries_exactly_its_own_fields(account: TestClient):
+    """One switch on must not drag another's fields along.
+
+    Written as a table because the failure mode is silent: a field listed under
+    the wrong switch travels whenever that other one happens to be on.
+    """
+
+    full = {
+        **SHARED,
+        "askingPrice": 60000,
+        "house": {"cx": 1, "cy": 2, "rotation": 0},
+        "houseTypeName": "ELK 159",
+        "sharedDestinations": [{"id": "zl-arbeit", "name": "Arbeit"}],
+    }
+    expected = {
+        "preis": {"askingPrice"},
+        "haus": {"house", "houseTypeName"},
+        "wege": {"routes", "sharedDestinations"},
+        "notiz": {"note"},
+    }
+
+    for switch, fields in expected.items():
+        made = account.post(
+            "/api/shares", json={"dokument": full, "umfang": {switch: True}}
+        ).json()["id"]
+        seen = set(account.get(f"/api/shares/{made}").json()["dokument"])
+
+        optional = {f for group in expected.values() for f in group}
+        assert seen & optional == fields, f"„{switch}“ trägt {seen & optional}, erwartet {fields}"
+
+
+@needs_database
+def test_the_note_is_withheld_by_a_tuple_and_not_by_four_letters(account: TestClient):
+    """`("note")` is the string "note", and iterating it yields its letters.
+
+    Written down because the mistake is invisible in review and its
+    consequence is the worst this feature has: with the comma missing, nothing
+    named `note` is ever withheld and every link carries the personal note.
+    """
+
+    token = account.post("/api/shares", json={"dokument": SHARED}).json()["id"]
+
+    stored = json.loads(
+        _run(lambda connection: connection.fetchval("select dokument::text from freigaben"))
+    )
+    assert "note" not in stored
+    # And the letters are not what got removed either.
+    assert stored["name"] == "Wiesenstraße, Großbothen"
+    assert account.get(f"/api/shares/{token}").json()["dokument"]["gemarkung"] == "Großbothen"
