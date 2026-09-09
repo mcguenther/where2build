@@ -686,12 +686,33 @@ from the user directly. Reopen only if the user asks.
   outlines are drawn and nothing is visible. `EvidenceMap` therefore gives
   every candidate a dot that fades in below zoom 17 and out again once the real
   outline can be seen.
-- **Two seconds per Indiz is the pace for evidence arriving live, and the wrong
-  pace for a finished run.** Most runs complete in a few seconds while sixteen
-  events at two seconds is half a minute of watching. `StepQueue` therefore
-  spends a fixed budget over whatever is queued (≥ 240 ms per step), and the
-  camera flight follows that pace — a 900 ms flight started every 240 ms is the
-  twitch the queue exists to prevent. `prefers-reduced-motion` skips it all.
+- **What the queue paces is the camera, not the reading.** The dwell exists
+  because three camera flights started in one frame is a twitch — and the first
+  two versions of it slowed down *every* line instead, which is the wrong thing
+  in both directions: a phase line, a street, a land use and an area statement
+  all land on a map that stays exactly where it was, so holding each for two
+  seconds is a long wait in front of nothing moving, and the flights that do
+  happen were no calmer for it. `movesTheMap` names the four lines the camera
+  follows — `gebiete`, `kandidaten`, `ergebnis` and the `pin` Indiz — those get
+  the dwell and share the budget, everything else gets `QUICK_MS = 250`.
+  Measured on the recorded Großbothen run: 16 lines, **3** of them camera
+  moves, 21,2 s before and **7,3 s** after, with each flight still getting its
+  full two seconds. Weighed off the event rather than measured off the map,
+  because the queue asks it of lines it has not applied yet — so the frame may
+  still turn out identical and the step waits for a flight that never happens.
+  That way round is a calm camera; the other way round is the twitch.
+  `prefers-reduced-motion` skips it all.
+- **The protocol follows the run, and stops following the moment somebody
+  scrolls up.** The list is the one place the order of a run can be checked, and
+  it grew past its 560 px box with the newest line always out of sight.
+  `record` asks whether the box was at its end *before* the entry is added and
+  only then scrolls — a list that jumps out from under someone reading an
+  earlier clue is worse than one that does not follow at all. The tolerance is
+  about one row, because a browser rounds a scroll position by a fraction of a
+  pixel and an exact comparison reports "scrolled up" on a list nobody touched.
+  And the panel head had to become `position: sticky`: „Rest zeigen" is the
+  only control that matters while a run plays, and it was the first thing to
+  disappear upwards.
 - **`this.timer = setTimeout` and then `this.timer(…)` throws „Illegal
   invocation“.** The native function ends up with the queue as its receiver.
   Nothing else fails: the run simply stops after its first line, with the map
@@ -1193,11 +1214,15 @@ from the user directly. Reopen only if the user asks.
   run explaining that the details are complete and point at another state. A
   template may only supply a reason when the run supplied none.
 - **A longer camera flight alone is not a calmer camera.** The flight is capped
-  at `queueStep * 1.6`, so doubling `FLIGHT_MS` without doubling `BUDGET_MS` and
+  at `queuePace * 1.6`, so doubling `FLIGHT_MS` without doubling `BUDGET_MS` and
   `MIN_DWELL_MS` just interrupts the same movement more often. All three move
-  together; sixteen clues now play over twelve seconds instead of six — and the
-  screenshot script's wait after the verdict has to outlast the budget, or it
-  photographs a map still in flight.
+  together — and the flight is derived from `pace` (what a *camera* step is
+  getting) rather than from `step` (what the step being played is getting), or a
+  run of 250 ms lines in between would shrink the next flight to the floor.
+  `BUDGET_MS` is a divisor, not a total: it is recomputed against the remaining
+  backlog each step, so the pace grows back towards two seconds as the queue
+  empties. The screenshot script's wait after the verdict has to outlast the
+  whole of it, or it photographs a map still in flight.
 - **`page.fill` with 171 kB of markup takes ~27 s** — Playwright inserts it
   through the input pipeline — which sits just under the 30 s default and fails
   whenever the machine is busy. Measured identical before and after the change
@@ -1261,7 +1286,7 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 - `pytest`: 563 passed, 8 skipped — one of those needs pyosmium, which only the
   index builder wants; the other seven need Tesseract and skip without it.
-- `vitest`: 550 passed — plus the integration file, excluded by `npm run test`
+- `vitest`: 557 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
 - `scripts/bookmarklet.mjs`: the handover across two origins, against the built
   app and a backend on :8000. It asserts the coordinate, which is the field

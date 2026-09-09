@@ -97,8 +97,8 @@
            row that stands for something on the map jumps to it, and a clue can
            still be switched off — a contradiction nobody can check is one
            nobody can resolve. -->
-      <div class="panel suche__protokoll">
-        <div class="panel__head">
+      <div ref="protocol" class="panel suche__protokoll">
+        <div class="panel__head suche__protokollkopf">
           <h3>Verlauf</h3>
           <div class="spacer"></div>
           <span v-if="queued" class="chip">{{ queued }} wartet</span>
@@ -211,7 +211,9 @@
  * runs the search again — it is cheap enough for that.
  */
 import EvidenceMap from "./EvidenceMap.vue";
-import { DWELL_MS, FLIGHT_MS, StepQueue, prefersReducedMotion } from "../lib/evidence.js";
+import {
+  DWELL_MS, FLIGHT_MS, StepQueue, movesTheMap, prefersReducedMotion
+} from "../lib/evidence.js";
 import { runSearch, STATUS_LABEL, verdictSentence } from "../lib/search.js";
 import { PARCEL_OUTLINE_MIN_ZOOM } from "../lib/basemap.js";
 import { area } from "../lib/format.js";
@@ -237,6 +239,13 @@ const SOURCE_LABELS = {
   standortfeld: "Standortfeld",
   pin: "Kartenpunkt der Anzeige"
 };
+
+/** How far from the end still counts as following the run.
+ *
+ *  About one row. A browser rounds a scroll position by a fraction of a pixel,
+ *  so an exact comparison against the end reports "scrolled up" on a list
+ *  nobody has touched. */
+const FOLLOW_SLACK_PX = 48;
 
 export default {
   name: "ParcelSearch",
@@ -274,7 +283,10 @@ export default {
       // list there was.
       steps: [],
       queued: 0,
-      queueStep: DWELL_MS,
+      // What a camera move is currently allowed to take. The flight is derived
+      // from it, so a fast run does not start a long flight every quarter
+      // second and spend the whole time interrupting itself.
+      queuePace: DWELL_MS,
       chosen: null,
       // Which entry of the Verlauf is being shown, and what it points at. The
       // map marks it: a jump that only moves the camera arrives somewhere
@@ -322,7 +334,7 @@ export default {
      *  interrupting itself, which is the twitch the queue exists to prevent —
      *  so the duration is tied to the step rather than fixed, and the floor
      *  moved with it. */
-    flight() { return Math.max(520, Math.min(FLIGHT_MS, this.queueStep * 1.6)); },
+    flight() { return Math.max(520, Math.min(FLIGHT_MS, this.queuePace * 1.6)); },
     /** The pin, once something stronger has placed the plot elsewhere.
      *
      *  It stays on the map struck through rather than vanishing: whoever opens
@@ -374,7 +386,10 @@ export default {
       // sometimes all at once — behind a proxy that buffers, the whole run
       // lands in one chunk — and three camera moves in one frame is a twitch,
       // not an animation.
-      this._queue = new StepQueue({ reduced: !this.paced || prefersReducedMotion() });
+      this._queue = new StepQueue({
+        reduced: !this.paced || prefersReducedMotion(),
+        moves: movesTheMap
+      });
       this._queue.onStep = event => this.apply(event);
       this._queue.onIdle = () => { this.queued = 0; };
 
@@ -399,7 +414,7 @@ export default {
     /** One line of the stream, once the queue lets it through. */
     apply(event) {
       this.queued = this._queue?.waiting ?? 0;
-      this.queueStep = this._queue?.step ?? DWELL_MS;
+      this.queuePace = this._queue?.pace ?? DWELL_MS;
       if (event.art === "phase") {
         this.phaseText = event.text || this.phaseText;
         if (event.text) this.record({ kind: "phase", phase: event.phase, text: event.text });
@@ -436,7 +451,33 @@ export default {
 
     /** One entry in the course of the run. */
     record(step) {
+      const following = this.atLatest();
       this.steps = [...this.steps, { ...step, n: this.steps.length + 1 }];
+      if (following) this.$nextTick(() => this.scrollToLatest());
+    },
+
+    /** Whether the protocol is showing its newest entry.
+     *
+     *  Asked *before* the entry is added, and it is what keeps the scroll from
+     *  being a yank: somebody who scrolled up to read an earlier clue is
+     *  reading it, and a list that jumps out from under them is worse than one
+     *  that does not follow. The tolerance is about one row — a list resting a
+     *  few pixels short of the end is still at the end as far as anyone
+     *  reading it is concerned.
+     */
+    atLatest() {
+      const box = this.$refs.protocol;
+      if (!box) return true;
+      return box.scrollHeight - box.scrollTop - box.clientHeight <= FOLLOW_SLACK_PX;
+    },
+
+    scrollToLatest() {
+      const box = this.$refs.protocol;
+      if (!box) return;
+      /* A plain assignment, not `scrollTo`: the smoothness is a stylesheet
+       * question (`scroll-behavior`) and jsdom implements neither, so this is
+       * the one form that is the same everywhere. */
+      box.scrollTop = box.scrollHeight;
     },
 
     indizOf(step) {
@@ -598,7 +639,16 @@ export default {
 .suche__buehne{ display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: var(--w2b-space-4); align-items: start; }
 @media (max-width: 900px){ .suche__buehne{ grid-template-columns: 1fr; } }
 .suche__karte{ padding: var(--w2b-space-3); }
-.suche__protokoll{ max-height: 560px; overflow-y: auto; }
+.suche__protokoll{ max-height: 560px; overflow-y: auto; scroll-behavior: smooth; }
+/* The list scrolls itself as the run plays, so the head has to stay: „Rest
+   zeigen" is the only control that matters while it does, and it was the first
+   thing to disappear upwards. */
+.suche__protokollkopf{
+  position: sticky; top: 0; z-index: 1; background: var(--w2b-surface);
+}
+@media (prefers-reduced-motion: reduce){
+  .suche__protokoll{ scroll-behavior: auto; }
+}
 
 .verlauf{ list-style: none; margin: 0; padding: 0; counter-reset: none; }
 .verlauf__schritt{
