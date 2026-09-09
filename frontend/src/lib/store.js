@@ -480,6 +480,19 @@ export function importJson(text) {
 export const newId = prefix =>
   `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
+/** Nothing has been entered here yet -- the state somebody arrives in, and
+ *  the state they are back in once they clear everything out.
+ *
+ *  Deliberately all three lists and not only the plots: after deleting the
+ *  plots but keeping a destination, the app is still in use and the sections
+ *  still lead somewhere. Being signed in is a fourth reason to be past this
+ *  point, because an account is a stand of its own even while it is empty. */
+export const isFresh = () =>
+  !state.account.angemeldet &&
+  state.data.plots.length === 0 &&
+  state.data.houseTypes.length === 0 &&
+  state.data.destinations.length === 0;
+
 export const plotById = id => state.data.plots.find(p => p.id === id) || null;
 export const houseTypeById = id => state.data.houseTypes.find(h => h.id === id) || null;
 

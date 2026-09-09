@@ -1,6 +1,11 @@
 <template>
   <div class="shell">
-    <header class="site-header no-print">
+    <!-- Fresh, on the way in, the header steps back: the sections all lead to
+         empty pages and their counters all read zero, so the navigation is
+         furniture around a page whose whole job is the one field. What stays is
+         what still does something -- the brand, the palette, and the way into
+         an account. -->
+    <header class="site-header no-print" :class="{ 'site-header--quiet': bareHeader }">
       <div class="container site-header__inner">
         <RouterLink class="brand" :to="{ name: 'home' }" aria-label="Zur Startseite">
           <svg viewBox="0 0 48 48" width="30" height="30" aria-hidden="true">
@@ -12,7 +17,7 @@
           <span class="brand__word">where<b>2</b>build</span>
         </RouterLink>
 
-        <nav class="main-nav" aria-label="Bereiche">
+        <nav v-if="!bareHeader" class="main-nav" aria-label="Bereiche">
           <RouterLink v-for="s in sections" :key="s.section" :to="s.to"
                       :aria-current="isCurrent(s.section) ? 'page' : null">
             {{ s.name }}<span v-if="s.count !== null" class="main-nav__count">{{ s.count }}</span>
@@ -27,17 +32,18 @@
                   @click="applyTheme(t.id)">{{ t.name }}</button>
         </div>
 
-        <!-- Only where accounts exist at all. A deployment without a provider
-             shows nothing here, because there is nothing to sign in to. -->
-        <template v-if="state.account.eingerichtet">
-          <div v-if="state.account.angemeldet" class="account">
-            <span class="account__initials" :title="state.account.name || 'Angemeldet'"
-                  aria-hidden="true">{{ initials }}</span>
-            <span class="account__name">{{ state.account.name || "Angemeldet" }}</span>
-            <button type="button" class="btn btn--quiet btn--small" @click="leave">Abmelden</button>
-          </div>
-          <a v-else class="btn btn--secondary btn--small" :href="signInHref">Anmelden</a>
-        </template>
+        <!-- The way into an account, in every state. Where no provider is
+             configured there is nothing to press, so nothing is drawn here --
+             but the start page then says so in words instead of the app being
+             silent about it, which is what made this look broken. -->
+        <div v-if="state.account.angemeldet" class="account">
+          <span class="account__initials" :title="state.account.name || 'Angemeldet'"
+                aria-hidden="true">{{ initials }}</span>
+          <span class="account__name">{{ state.account.name || "Angemeldet" }}</span>
+          <button type="button" class="btn btn--quiet btn--small" @click="leave">Abmelden</button>
+        </div>
+        <a v-else-if="state.account.eingerichtet" class="btn btn--secondary btn--small"
+           :href="signInHref">Anmelden</a>
       </div>
     </header>
 
@@ -78,7 +84,7 @@
 </template>
 
 <script>
-import { state, applyTheme, loadAccount, loadFromAccount, adoptLocal, declineAdoption } from "./lib/store.js";
+import { state, applyTheme, loadAccount, loadFromAccount, adoptLocal, declineAdoption, isFresh } from "./lib/store.js";
 import { signInUrl, signOut } from "./lib/api.js";
 
 export default {
@@ -110,6 +116,9 @@ export default {
     },
     /** Signing in comes back to the page it started on. */
     signInHref() { return signInUrl(this.$route.fullPath); },
+    /** The reduced header: nothing entered yet, and standing on the page that
+     *  greets somebody. Anywhere else the sections are the way back. */
+    bareHeader() { return isFresh() && this.$route.name === "home"; },
     sections() {
       return [
         { section: "home", to: { name: "home" }, name: "Start", count: null },
@@ -148,6 +157,11 @@ export default {
 main{ flex: 1; padding-top: var(--w2b-space-5); }
 
 .site-header{ background: var(--w2b-surface); border-bottom: 1px solid var(--w2b-line); }
+/* Reduced: the same surface as the reception below it and no rule between the
+   two, so header and hero read as one field rather than as a bar sitting on
+   top of a page. It keeps its height, because the brand and the palette are
+   still in it and a collapsing header would shift the whole page. */
+.site-header--quiet{ border-bottom-color: transparent; }
 .site-header__inner{
   display: flex; align-items: center; gap: var(--w2b-space-4) var(--w2b-space-5);
   flex-wrap: wrap; padding-top: var(--w2b-space-3); padding-bottom: var(--w2b-space-3);

@@ -1103,6 +1103,37 @@ from the user directly. Reopen only if the user asks.
   PDFs — is **59 service calls and 1 007 map tiles** on a cold cache
   (09.09.2026). That is the number to size any per-account ceiling against, and
   it is why the run needs no exemption from the one in `app/ratelimit.py`.
+- **"Has a plot" is not "has been used", and the difference is what greets
+  somebody.** The start page keyed its whole reception on `plots.length`, so
+  after adding plots and destinations and then deleting the plots, the section
+  bar stood there with every counter at zero -- furniture around an empty app
+  instead of a greeting. `isFresh()` reads all three lists *and* the account,
+  because a destination means the app is in use and an account is a stand of
+  its own even while it is empty. The bar is dropped only on the start page:
+  from anywhere else the sections are the way back, and hiding them there is a
+  dead end.
+- **A header that steps back must not take the sign-in with it.** The reduced
+  header keeps the brand, the palette and the way into an account, because the
+  sections are the only part of it that leads nowhere in a fresh state. And
+  where no provider is configured the header could show nothing at all while
+  the page said nothing either -- so a sign-in that simply does not exist in
+  this deployment looked exactly like one that is broken. The start page now
+  names both cases in words: the link where there is a provider, the reason
+  where there is not. Verified by walking a real browser through five states
+  against a throwaway provider (fresh, signed in, signed out again, one
+  destination, everything deleted).
+- **A sentence that names a place nobody can reach from there is a dead end.**
+  The storage note said "unter „Daten“" as plain text, which was fine while the
+  header always carried the sections and wrong the moment it did not. It is a
+  `RouterLink` now. The same note also still claimed "der Serverspeicher ist
+  noch nicht gebaut" long after it shipped -- stale copy that reports a
+  finished feature as missing, which is worse than saying nothing. It reads
+  `state.sync.active` instead of asserting anything.
+- **The screenshot run clicks the navigation, so a page that drops it breaks
+  the run.** `nav(page, "Grundstücke")` was the first step after `start-leer`,
+  and the fresh start page has no sections to click. That step goes by route
+  now, with the reason written next to it; every later `nav()` in the run has a
+  stand behind it and finds the sections where they belong.
 - **`page.fill` with 171 kB of markup takes ~27 s** — Playwright inserts it
   through the input pipeline — which sits just under the 30 s default and fails
   whenever the machine is busy. Measured identical before and after the change
@@ -1166,9 +1197,9 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
   and they are skipped rather than mocked because what they check is the
   database's own behaviour. Of the remaining 8, one needs pyosmium, which only
   the index builder wants; the other seven need Tesseract.
-- `vitest`: 561 passed — plus the integration file, excluded by `npm run test`
+- `vitest`: 571 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
-- `scripts/screenshots.mjs`: 64 images plus two print PDFs. It fails on console
+- `scripts/screenshots.mjs`: 62 images plus two print PDFs. It fails on console
   errors, on horizontal overflow, and if not a single vector tile arrived. It
   also drives the live geocoder, which is slow often enough to blow the 60 s
   wait on the destinations step — two runs failed there and the third passed

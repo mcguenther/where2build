@@ -208,8 +208,14 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
   // thing is for. This is the first thing anybody sees.
   await shot(page, "start-leer", mode, narrow ? "-schmal" : "");
 
-  // The overview, still empty. A real state and worth its own picture.
-  await nav(page, "Grundstücke");
+  /* The overview, still empty. A real state and worth its own picture.
+     Reached by its route rather than by the navigation: with nothing entered
+     the start page carries no sections at all -- every one of them would lead
+     to an empty page with a zero beside it -- so there is no link here to
+     click. Every later `nav()` in this run has a stand behind it and finds
+     the sections where they belong. */
+  await page.goto(`${address}grundstuecke`, { waitUntil: "load" });
+  await page.waitForTimeout(300);
   await shot(page, "uebersicht-leer", mode, narrow ? "-schmal" : "");
 
   await page.click(".page-head .btn");                      // Grundstück hinzufügen

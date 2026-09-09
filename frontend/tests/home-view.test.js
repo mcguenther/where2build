@@ -128,6 +128,46 @@ describe("Startseite", () => {
     view.unmount();
   });
 
+  it("bietet die Anmeldung an, wo es eine gibt", async () => {
+    state.account = { eingerichtet: true, angemeldet: false, name: null, kennung: null };
+    const view = await open();
+
+    const offer = view.find(".hero__account");
+    expect(offer.exists()).toBe(true);
+    // Nicht nur ein Satz darüber, sondern der Weg selbst: die Kopfzeile ist im
+    // frischen Zustand reduziert, und mitten auf der Seite sucht man zuerst.
+    expect(offer.find("a").attributes("href")).toContain("/auth/login");
+    expect(offer.text()).toContain("Konto anlegen");
+    view.unmount();
+  });
+
+  it("sagt, dass keine Anmeldung eingerichtet ist, statt zu schweigen", async () => {
+    // Der Zustand, in dem die Kopfzeile nichts zeigen kann. Vorher stand
+    // nirgends etwas, und das las sich wie eine kaputte Anmeldung statt wie
+    // eine, die es in diesem Betrieb nicht gibt.
+    const view = await open();
+
+    const offer = view.find(".hero__account");
+    expect(offer.exists()).toBe(true);
+    expect(offer.find("a").exists()).toBe(false);
+    expect(offer.text()).toContain("nicht eingerichtet");
+    view.unmount();
+  });
+
+  it("behauptet nicht mehr, der Serverspeicher sei noch nicht gebaut", async () => {
+    // Der Satz war stehen geblieben, nachdem der Speicher fertig war -- eine
+    // fertige Funktion, die die eigene Seite als fehlend meldet.
+    state.sync = { active: true, busy: false, error: "", conflicts: [], savedAt: null, adoption: null };
+    // Der Satz steht im Zweig ohne Grundstücke, also im leeren Stand.
+    state.data.plots = [];
+    const view = await open();
+
+    const note = view.find(".home__storage").text();
+    expect(note).toContain("im Konto");
+    expect(note).not.toContain("noch nicht gebaut");
+    view.unmount();
+  });
+
   it("sagt es, wenn die Anmeldung abgebrochen ist, ohne den Weg zu versperren", async () => {
     // The query has to be on the route before the first render, so the router
     // is made ready here rather than pushed and hoped for.

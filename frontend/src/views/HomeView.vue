@@ -94,6 +94,23 @@
             <polygon points="136.9,406.7 286.1,391.0 256.3,107.6 107.1,123.3" fill="none" stroke="var(--w2b-map-boundary)" stroke-width="2.4" stroke-linejoin="round"></polygon>
             <polygon points="160.0,378.1 257.5,367.9 233.1,136.2 135.7,146.4" fill="none" stroke="var(--w2b-map-envelope)" stroke-width="1.6" stroke-dasharray="8 6"></polygon>
             <polygon points="169.8,336.9 243.4,329.2 232.7,227.7 159.1,235.4" fill="var(--w2b-map-design)" fill-opacity=".85" stroke="var(--w2b-map-design-edge)" stroke-width="1.8" stroke-linejoin="round"></polygon>
+
+            <!-- A way out, drawn the way `RouteCards` draws a real one: the
+                 mode's own colour over the halo every line here carries. It
+                 leaves the house, meets the street where the plot fronts it,
+                 and follows the centre line east off the page.
+                 No marker at either end. The far end would claim a destination
+                 the start page knows nothing about, and running off the frame
+                 survives every viewport where a fixed point does not. The
+                 square that marks a start on a route card read as a warning
+                 here: it is drawn in the violation colour, and in a backdrop
+                 there is no legend behind it to say otherwise. -->
+            <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M201,286 C202,330 200,368 205,398 Q209,428 240,430 L1560,291"
+                    stroke="var(--w2b-map-halo)" stroke-width="13" opacity=".85"></path>
+              <path d="M201,286 C202,330 200,368 205,398 Q209,428 240,430 L1560,291"
+                    stroke="var(--w2b-primary)" stroke-width="4.6"></path>
+            </g>
           </g>
         </svg>
       </div>
@@ -144,6 +161,24 @@
             <b>Wege nach Fahrplan</b>, nicht Luftlinie
           </span>
         </div>
+
+        <!-- The way into an account, said out loud. The header carries the
+             button, but somebody arriving at an empty app looks at the middle
+             of the page, not at the top right corner -- and where no provider
+             is configured the header shows nothing at all, which read as the
+             sign-in being broken rather than absent. Both states say what
+             holds. -->
+        <p v-if="!state.account.angemeldet" class="hero__account">
+          <template v-if="state.account.eingerichtet">
+            <a :href="signInHref">Anmelden oder Konto anlegen</a> — dann liegt der Stand
+            auf jedem Rechner. Ohne Konto bleibt er in diesem Browser, und das reicht
+            für alles hier.
+          </template>
+          <template v-else>
+            Ohne Konto: der Stand bleibt in diesem Browser, und das reicht für alles
+            hier. Eine Anmeldung ist in diesem Betrieb nicht eingerichtet.
+          </template>
+        </p>
       </div>
     </section>
 
@@ -183,9 +218,13 @@
             druckt sich mit aus.</p>
         </div>
       </div>
+      <!-- „Daten“ is a link and not a word, because in the fresh state the
+           header carries no sections: naming a place somebody cannot reach
+           from here would make this sentence a dead end. -->
       <p class="home__storage">
-        Alles bleibt im Speicher dieses Browsers, auch mit Konto: der Serverspeicher ist
-        noch nicht gebaut. Zum Mitnehmen gibt es unter „Daten“ den Austausch als JSON.
+        {{ storageNote }}
+        Zum Mitnehmen gibt es <RouterLink :to="{ name: 'data' }">unter „Daten“</RouterLink>
+        den Austausch als JSON.
       </p>
     </section>
   </div>
@@ -203,7 +242,7 @@
 import QueryBox from "../components/QueryBox.vue";
 import PlotCard from "../components/PlotCard.vue";
 import { state, removePlot } from "../lib/store.js";
-import { backendHealth } from "../lib/api.js";
+import { backendHealth, signInUrl } from "../lib/api.js";
 import { handOff } from "../lib/handoff.js";
 import { wizardStage } from "../router/stages.js";
 
@@ -228,6 +267,17 @@ export default {
     /** The backend sends the browser back with this when a sign-in broke off.
      *  It carries no detail, and none belongs in a URL. */
     signInFailed() { return this.$route.query.anmeldung === "fehlgeschlagen"; },
+    /** Signing in comes back to this page. */
+    signInHref() { return signInUrl(this.$route.fullPath); },
+    /** Where the stand actually lies. This sentence claimed the server store
+     *  was "not built yet" long after it shipped, which is the kind of stale
+     *  copy that makes a working feature look missing. It reads the state
+     *  instead of asserting one. */
+    storageNote() {
+      return state.sync.active
+        ? "Der Stand liegt in diesem Browser und im Konto, und wird dort gesichert, sobald er sich ändert."
+        : "Alles bleibt im Speicher dieses Browsers.";
+    },
     plotCount() { return state.data.plots.length; },
     allLabel() {
       return this.plotCount === 1 ? "Zum Grundstück →" : `Alle ${this.plotCount} Grundstücke →`;
@@ -269,12 +319,22 @@ export default {
    sits in and brings its own. */
 .hero{
   position: relative; overflow: hidden;
+  display: flex; align-items: center;
   margin: calc(-1 * var(--w2b-space-5)) calc(-1 * var(--w2b-space-5)) 0;
-  padding: var(--w2b-space-6) var(--w2b-space-5) var(--w2b-space-7);
+  padding: var(--w2b-space-8) var(--w2b-space-5);
   border-bottom: 1px solid var(--w2b-line);
   background: var(--w2b-surface);
+  /* The reception is the page for somebody arriving, so it gets the screen
+     rather than the top of it: the drawing needs room to read as a place, and
+     the field needs air around it to look like the one thing to do. Measured
+     against the previous fixed padding, this is about a third taller. The
+     viewport share is capped so a tall desktop window does not turn it into a
+     slide nobody scrolls past. */
+  min-height: clamp(600px, 82vh, 940px);
 }
-.hero--slim{ padding-top: var(--w2b-space-5); padding-bottom: var(--w2b-space-5); }
+/* With a stand, the reception steps aside for the cards below it: the page is
+   then about what is already here, not about the invitation. */
+.hero--slim{ min-height: 0; padding-top: var(--w2b-space-5); padding-bottom: var(--w2b-space-5); }
 .hero--slim h1{ font-size: clamp(26px, 3.2vw, 34px); }
 .hero--slim .hero__sub{ font-size: var(--w2b-text-m); }
 .hero--slim .hero__query{ margin-top: var(--w2b-space-5); }
@@ -285,13 +345,13 @@ export default {
 /* Fixed box, anchored at the top: the suggestion list makes the reception
    taller, and a ground that rescales with it reads as slipped. Tall enough
    that growing never reaches its lower edge, so nothing looks cut off either. */
-.hero__art svg{ display: block; width: 100%; height: max(100%, 1100px); }
+.hero__art svg{ display: block; width: 100%; height: max(100%, 1300px); }
 /* Towards the middle the fabric gives way to paper: a drawing behind a field
    is a background, and a background must not be read. */
 .hero__art::after{
   content: ""; position: absolute; inset: 0;
   background:
-    radial-gradient(34% 44% at 50% 40%,
+    radial-gradient(34% 42% at 50% 50%,
       var(--w2b-surface) 0 42%,
       color-mix(in srgb, var(--w2b-surface) 84%, transparent) 72%,
       transparent 100%),
@@ -299,14 +359,21 @@ export default {
 }
 .hero__inner{
   position: relative; display: flex; flex-direction: column; align-items: center;
-  text-align: center; max-width: 860px; margin: 0 auto;
+  text-align: center; width: 100%; max-width: 860px; margin: 0 auto;
 }
 .hero__eyebrow{ margin-bottom: var(--w2b-space-3); }
-.hero h1{ margin-bottom: var(--w2b-space-3); max-width: 20ch; }
+/* Bigger than the page's own h1: this one is the only thing above the field,
+   and at the body scale it read as a section heading rather than as a claim. */
+.hero h1{ margin-bottom: var(--w2b-space-4); max-width: 20ch; font-size: clamp(34px, 4.8vw, 68px); line-height: 1.06; }
 .hero h1 em{ font-style: normal; color: var(--w2b-primary); }
 .hero__sub{ color: var(--w2b-graphite); font-size: var(--w2b-text-l); max-width: 56ch; text-wrap: balance; }
 .hero__query{ width: 100%; max-width: 760px; margin-top: var(--w2b-space-6); padding: var(--w2b-space-4); text-align: left; }
 .hero__notice{ margin-top: var(--w2b-space-4); text-align: left; }
+.hero__account{
+  margin-top: var(--w2b-space-5); max-width: 62ch;
+  font-size: var(--w2b-text-s); color: var(--w2b-muted); text-wrap: balance;
+}
+.hero__account a{ font-family: var(--w2b-font-display); font-weight: 600; color: var(--w2b-primary); }
 
 .trust{
   display: flex; gap: var(--w2b-space-5); flex-wrap: wrap; justify-content: center;
@@ -330,6 +397,7 @@ export default {
   border-top: 1px solid var(--w2b-line-faint);
   font-size: var(--w2b-text-s); color: var(--w2b-muted);
 }
+.home__storage a{ color: var(--w2b-primary); font-weight: 600; }
 
 @media (max-width: 700px){
   /* At phone widths the fixed box would crop the fabric to a few huge
@@ -338,7 +406,7 @@ export default {
 }
 
 @media (max-width: 560px){
-  .hero{ margin-left: calc(-1 * var(--w2b-space-4)); margin-right: calc(-1 * var(--w2b-space-4)); padding: var(--w2b-space-5) var(--w2b-space-4) var(--w2b-space-6); }
+  .hero{ margin-left: calc(-1 * var(--w2b-space-4)); margin-right: calc(-1 * var(--w2b-space-4)); padding: var(--w2b-space-7) var(--w2b-space-4); min-height: 0; }
   .hero__sub{ font-size: var(--w2b-text-m); }
 }
 </style>
