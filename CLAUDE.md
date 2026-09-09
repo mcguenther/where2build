@@ -1204,6 +1204,52 @@ from the user directly. Reopen only if the user asks.
   where no provider is configured at all a sentence saying so and pointing at
   the print sheet and the JSON export. `teilen-*.png` in the screenshot run is
   the signed-out one, because the run has no identity provider.
+- **A preview bot runs no JavaScript, so the app's own page is the empty
+  shell.** A chat, a messenger or a search engine fetching a shared link reads
+  the `og:` tags out of the HTML it is handed and stops — from a Vue route that
+  is one title for every plot anybody ever shared. So `/geteilt/…` is the one
+  backend route outside `/api`: it renders the plot's name and points at a card
+  drawn with Pillow, and `frontend/nginx.conf` sends only those callers there
+  while a browser still gets the app. The tell is the user agent, which is the
+  only signal such a fetch carries; both failure modes are mild and neither is
+  silent (an unknown bot gets no preview, a browser mistaken for one gets a
+  real page with the name, the card and the way in).
+- **Starlette adds no HEAD for a GET route, and a link expander asks HEAD
+  first.** Slack's does. The 405 that answered made the preview be skipped
+  before the page was ever read — nothing in a browser shows it. Both routes
+  answer HEAD now, and as a **route of its own**, not a second method on the
+  same decorator: `methods=["GET", "HEAD"]` gives both operations the same
+  `operationId`, and the OpenAPI document then quietly drops one. A test asserts
+  the ids stay unique.
+- **nginx's `$host` drops the port, `$http_host` keeps it.** The preview is the
+  one route that writes absolute URLs back out, and with `proxy_set_header Host
+  $host` every `og:url` and `og:image` on the compose default
+  (`localhost:8080`) named port 80 — a preview pointing at a server nobody is
+  running. Measured against a real nginx before and after.
+- **A card with a photograph on it must not be a PNG.** The same 1200 × 630
+  card is 574 kB as PNG and ~100 kB as JPEG at quality 86, and several clients
+  — WhatsApp among them — show no preview at all above a few hundred kilobytes,
+  with nothing anywhere to say why. And the switch is the **third** time in this
+  repo a cache key failed to name what produced the answer: the stored PNG kept
+  being served under `Content-Type: image/jpeg`, which every client renders, so
+  the picture looked right and stayed five times too big. `CARD_VERSION` is in
+  the key and covers the format, not just the drawing.
+- **Fontsource ships `.woff` next to `.woff2`, and FreeType reads the first
+  without brotli.** A server-drawn card needs a file Pillow can open, so the
+  three faces the browser loads are vendored into `backend/app/assets/fonts/`
+  as woff (about 18 kB each) and travel as package data. The card is then the
+  app's own typeface rather than DejaVu.
+- **A zoom step is a factor of two, so fitting to one frames a plot anywhere
+  between a third and the whole card.** The preview frame is rendered
+  *oversized* at the zoom that fits and scaled back — the same move `tiles.py`
+  makes to get under a WMS scale limit — so every plot sits at 78 % of the card
+  whatever its size. The drawing goes on *after* the scaling back, or the
+  outline's stroke and its halo shrink with the ground.
+- **The card's ground is the orthophoto, and it is best effort.** At the size a
+  chat shows it, the photograph is what makes a plot look like a place; the
+  outline carries the site plan's halo for exactly that reason. A slow or broken
+  WMS leaves paper behind the drawing rather than an error, because the one part
+  of the card that can fail must not cost the outline.
 
 ## Commands
 
@@ -1257,12 +1303,12 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 575 passed, 46 skipped. With `TEST_DATABASE_URL` pointed at a real
-  Postgres it is 613 passed, 8 skipped — the extra 38 are the account store,
+- `pytest`: 594 passed, 46 skipped. With `TEST_DATABASE_URL` pointed at a real
+  Postgres it is 632 passed, 8 skipped — the extra 38 are the account store,
   and they are skipped rather than mocked because what they check is the
   database's own behaviour. Of the remaining 8, one needs pyosmium, which only
   the index builder wants; the other seven need Tesseract.
-- `vitest`: 596 passed — plus the integration file, excluded by `npm run test`
+- `vitest`: 597 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
 - `scripts/screenshots.mjs`: 65 images plus two print PDFs. It fails on console
   errors, on horizontal overflow, and if not a single vector tile arrived. It

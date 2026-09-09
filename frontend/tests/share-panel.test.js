@@ -102,6 +102,15 @@ describe("Teilen", () => {
     view.unmount();
   });
 
+  it("sagt vorher, dass eine Vorschaukarte mitgeht", async () => {
+    // Das Bild reist mit dem Link, ohne dass jemand es anklickt — wer teilt,
+    // soll das vorher wissen und nicht erst im fremden Chatfenster sehen.
+    const view = await open();
+
+    expect(view.text()).toContain("Vorschaukarte");
+    view.unmount();
+  });
+
   it("lädt abgemeldet freundlich zum Konto ein, statt den Knopf zu sperren", async () => {
     state.account = { eingerichtet: true, angemeldet: false, name: null, kennung: null };
     const view = await open();

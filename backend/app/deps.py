@@ -24,6 +24,7 @@ from .services.motis import MotisService
 from .services.nearby import NearbyService
 from .services.oidc import Identity, OidcService
 from .services.overpass import OverpassService
+from .services.preview import PreviewService
 from .services.storage import Storage
 from .services.tiles import TileService
 from .settings import Settings, get_settings
@@ -98,6 +99,13 @@ def nearby_service() -> NearbyService:
 def tile_service() -> TileService:
     settings = get_settings()
     return TileService(settings.tiles, settings.app)
+
+
+@lru_cache(maxsize=1)
+def preview_service() -> PreviewService:
+    """Draws and keeps the card a chat shows for a shared link."""
+
+    return PreviewService(tile_service(), get_settings().app.cache_dir)
 
 
 @lru_cache(maxsize=1)
@@ -213,6 +221,7 @@ def reset_services() -> None:
         overpass_service,
         nearby_service,
         tile_service,
+        preview_service,
         basemap_service,
         llm_client,
         oidc_service,

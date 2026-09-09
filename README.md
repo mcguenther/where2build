@@ -263,6 +263,12 @@ nothing else.
 | `GET` | `/api/auth/me` | who is signed in, and whether signing in exists here at all |
 | `GET` | `/api/auth/login`, `/api/auth/callback` | the OIDC round trip, run by the backend; `?ziel=` comes back to the page it started on |
 | `POST` | `/api/auth/logout` | drops the session cookie |
+| `GET`, `DELETE` | `/api/account` | what is held for the signed-in person, and deleting all of it — the browser's own copy stays |
+| `GET`, `PUT` | `/api/plots`, `/api/plots/{id}`, `/api/settings` | the account's copy of the document, one row per plot; 200 plots and 2 MiB per document |
+| `POST`, `GET` | `/api/shares` | share a plot by link, and list one's own. What travels beyond the plot's registered facts is switched on per link and defaults to off |
+| `GET`, `DELETE` | `/api/shares/{token}` | the shared snapshot, and withdrawing it. The `GET` has no session: the token is the access |
+| `GET` | `/api/shares/{token}/vorschau.jpg` | the 1200 × 630 card a chat shows for that link, drawn server-side and kept for the life of the share |
+| `GET` | `/geteilt/{token}[/{slug}]` | the one route outside `/api`: the shared link as a preview bot reads it, with the `og:` tags a browser's own page cannot carry. nginx sends only those callers here |
 
 ## Configuration
 
@@ -312,6 +318,32 @@ The basemap follows the interface: `BASEMAP_STYLE_PATH` (default
 `styles/liberty`) is the light map, `BASEMAP_DARK_STYLE_PATH` (default
 `styles/dark`) the dark one, and the browser asks for the variant that matches
 the resolved theme. Clearing the dark path serves the light style to everyone.
+
+### Sharing a plot
+
+A signed-in person can hand out a link to one plot. It is a **snapshot**: the
+document is copied when the link is made, so a link sent weeks ago cannot start
+showing a corrected price, and withdrawing it takes effect at once. Every link
+has an end — `STORAGE_SHARE_DAYS`, 90 by default — and `scripts/sweep_shares.py`
+removes what is past it, so an abandoned share does not sit in the table for
+ever.
+
+What travels is switched on switch by switch, and **every switch starts off**:
+the asking price, the planned building, the destinations with their travel
+times, and the note. Without one, a link carries what the registers publish
+anyway — location, outline, official area, land value. The browser only
+resolves the extras it was told to share, and `Storage.for_sharing` cuts again
+on the way in; a promise only the frontend keeps is one a frontend bug can
+break.
+
+Pasting the link into a chat shows a card: the plot's outline on the
+orthophoto, its name, district and area. That is drawn on the server with
+Pillow — a preview bot runs no JavaScript, so the app's own page would hand it
+the empty shell — and kept for the life of the share, so a link doing the
+rounds costs one file read. `frontend/nginx.conf` sends bots to `/geteilt/…` on
+the backend and everybody else to the app; the tell is the user agent, which is
+the only signal such a fetch carries. A bot the list does not know gets the app
+and no preview, which is where this started.
 
 ### Request budget
 

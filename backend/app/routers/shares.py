@@ -31,7 +31,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Path, Response
 
-from ..deps import current_account, storage_service
+from ..deps import current_account, preview_service, storage_service
 from ..errors import NotFoundError
 from ..schemas import (
     FreigabeAngelegt,
@@ -40,6 +40,7 @@ from ..schemas import (
     FreigabenAntwort,
 )
 from ..services.oidc import Identity
+from ..services.preview import PreviewService
 from ..services.storage import Storage
 
 router = APIRouter(prefix="/api/shares", tags=["Freigaben"])
@@ -163,4 +164,50 @@ async def shared(
         )
     return FreigabeAntwort(
         dokument=share.dokument, angelegt=share.angelegt, laeuft_ab=share.laeuft_ab
+    )
+
+
+# HEAD as well, and as a route of its own rather than a second method on the
+# one below: a link expander asks HEAD first to see the type and the size, and
+# Starlette adds none for a GET route -- but two methods on one decorator give
+# both operations the same id and the OpenAPI document warns about the clash.
+# Out of the schema, because a documented HEAD is noise.
+@router.head("/{token}/vorschau.jpg", include_in_schema=False)
+@router.get(
+    "/{token}/vorschau.jpg",
+    summary="Das Vorschaubild eines geteilten Grundstücks",
+    response_class=Response,
+    responses={
+        200: {"content": {"image/jpeg": {}}, "description": "Die Karte, 1200 × 630"},
+        404: {"description": "Diesen Link gibt es nicht (mehr)"},
+    },
+)
+async def preview(
+    token: str = _TOKEN,
+    storage: Storage = Depends(storage_service),
+    previews: PreviewService = Depends(preview_service),
+) -> Response:
+    """The card a chat shows when somebody pastes the link.
+
+    Public and without a budget, like the page it belongs to: it is drawn once
+    per share and read from disk after that, so a link doing the rounds costs a
+    file read. A budget shared with everything else behind the same proxy would
+    answer a group chat with a broken image.
+
+    A missing share answers 404 with no body -- a picture cannot carry a German
+    sentence anybody would read, and no image is the right outcome for a link
+    that is gone.
+    """
+
+    if not storage.configured:
+        return Response(status_code=404)
+    share = await storage.share(token)
+    if share is None:
+        return Response(status_code=404)
+    return Response(
+        await previews.card(share.id, share.dokument),
+        media_type="image/jpeg",
+        # Long enough that a chat's own cache carries a link doing the rounds,
+        # short enough that withdrawing one takes effect the same day.
+        headers={"Cache-Control": "public, max-age=3600"},
     )

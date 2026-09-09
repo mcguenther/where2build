@@ -52,9 +52,10 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 include = ["app*"]
 
-# The schema is applied from the installed package, not from a checkout.
+# The schema is applied from the installed package, not from a checkout, and
+# the preview card is drawn from fonts that ship with it.
 [tool.setuptools.package-data]
-app = ["schema.sql"]
+app = ["schema.sql", "assets/fonts/*.woff"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

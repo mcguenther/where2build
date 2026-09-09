@@ -50,6 +50,10 @@
         Bodenrichtwert. Das sind Angaben, die die Register ohnehin veröffentlichen.
         Alles Weitere geht nur mit, wenn es hier eingeschaltet ist.
       </p>
+      <p class="hint">
+        Wo der Link eingefügt wird — Chat, Mail, Messenger —, erscheint eine Vorschaukarte
+        mit Luftbild, Umriss und Name des Grundstücks.
+      </p>
 
       <ul class="share__options">
         <li v-for="option in OPTIONS" :key="option.id">
