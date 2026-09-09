@@ -139,11 +139,10 @@ def _anmeldung_hinweis(settings: Settings) -> str:
 
     missing = settings.oidc.missing
     if missing:
-        fehlt = ", ".join(missing)
         return (
             "Keine Anmeldung eingerichtet; die Anwendung ist ohne Konto vollständig "
             "benutzbar und die Grundstücke bleiben im Browser. Zum Einrichten fehlt: "
-            f"{fehlt}. Der Anbieter ist frei wählbar (Authentik, Keycloak, Google); "
+            f"{', '.join(missing)}. Der Anbieter ist frei wählbar (Authentik, Keycloak, Google); "
             "die Endpunkte kommen aus <OIDC_ISSUER>/.well-known/openid-configuration."
         )
     return (

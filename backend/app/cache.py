@@ -62,6 +62,9 @@ _TEMP_SUFFIX = ".tmp"
 _EVICTION_TIERS = {
     "basemap": 0,
     "tiles": 0,
+    # One small public document, one fast request from the provider. It frees
+    # almost nothing, and holding on to it buys almost nothing either.
+    "oidc": 0,
     "motis": 1,
     "motis-stops": 1,
     "motis-matrix": 1,

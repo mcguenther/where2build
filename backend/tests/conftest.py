@@ -30,6 +30,7 @@ LUIS_URL = "https://luis.example.org/arcgis/rest/services"
 NOISE_EXPORT_URL = f"{LUIS_URL}/laerm/laermkartierung/MapServer/export"
 UBA_URL = "https://luftdaten.example.org/api/air-data/v3"
 BASEMAP_URL = "https://tiles.openfreemap.org"
+OIDC_ISSUER = "https://auth.example.org"
 
 
 def fixture_bytes(name: str) -> bytes:
@@ -73,6 +74,11 @@ def isolated_settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     # Overpass instance.
     monkeypatch.setenv("OVERPASS_ENABLED", "false")
     monkeypatch.setenv("OVERPASS_URL", OVERPASS_URL)
+    # No sign-in unless a test asks for it, and set to empty rather than left
+    # alone: a developer's own backend/.env would otherwise configure a real
+    # provider and every "nicht eingerichtet" test would stop testing anything.
+    for variable in ("OIDC_ISSUER", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET", "OIDC_SESSION_SECRET"):
+        monkeypatch.setenv(variable, "")
     reset_services()
     yield
     reset_services()
@@ -120,5 +126,25 @@ def overpass(monkeypatch: pytest.MonkeyPatch):
     """
 
     monkeypatch.setenv("OVERPASS_ENABLED", "true")
+    reset_services()
+    yield
+
+
+@pytest.fixture
+def oidc(monkeypatch: pytest.MonkeyPatch):
+    """A deployment with an OpenID provider configured.
+
+    The provider is invented: no test may reach a real authorization server,
+    and a made-up issuer makes that impossible rather than merely unlikely.
+    ``OIDC_COOKIE_SECURE=false`` is what a plain-HTTP development server sets,
+    and the test client is one: a Secure cookie would be stored and then never
+    sent back over http://testserver.
+    """
+
+    monkeypatch.setenv("OIDC_ISSUER", OIDC_ISSUER)
+    monkeypatch.setenv("OIDC_CLIENT_ID", "where2build")
+    monkeypatch.setenv("OIDC_CLIENT_SECRET", "geheim")
+    monkeypatch.setenv("OIDC_SESSION_SECRET", "sitzungsschluessel-fuer-den-test")
+    monkeypatch.setenv("OIDC_COOKIE_SECURE", "false")
     reset_services()
     yield

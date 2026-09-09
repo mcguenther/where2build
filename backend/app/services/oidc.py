@@ -106,7 +106,7 @@ class Identity:
     name: str | None
 
     @property
-    def kennung(self) -> str:
+    def account_key(self) -> str:
         """A stable, non-speaking identifier for this person at this issuer.
 
         Issuer and subject together are the pair OpenID Connect guarantees to be
@@ -350,7 +350,7 @@ class OidcService:
             raise BadRequestError("Die Antwort des Anmeldedienstes war nicht lesbar.")
         try:
             claims = json.loads(_b64url_decode(parts[1]))
-        except (ValueError, TypeError, json.JSONDecodeError) as exc:
+        except (ValueError, TypeError) as exc:
             raise BadRequestError("Die Antwort des Anmeldedienstes war nicht lesbar.") from exc
         if not isinstance(claims, dict):
             raise BadRequestError("Die Antwort des Anmeldedienstes war nicht lesbar.")

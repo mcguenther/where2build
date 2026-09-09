@@ -41,12 +41,16 @@ _LOGIN_COOKIE_PATH = "/api/auth"
 # pasted into a bug report or kept in the browser's history.
 _FAILED = "/?anmeldung=fehlgeschlagen"
 
+# Nothing here may sit in a cache: /me is per person, and the two redirects
+# carry a Set-Cookie whose value must never be handed to a second browser.
+_NO_STORE = {"Cache-Control": "no-store", "Pragma": "no-cache"}
+
 # A return path is a path, not a document. Long enough for any route this app
 # has, short enough that nobody stores anything in it.
 _MAX_TARGET_LENGTH = 512
 
 
-def _safe_target(ziel: str | None) -> str:
+def _safe_target(target: str | None) -> str:
     """The path to return to after signing in -- or ``/``.
 
     An open redirect is the classic way to turn a login endpoint into a
@@ -57,14 +61,14 @@ def _safe_target(ziel: str | None) -> str:
     it (``/\\example.org``).
     """
 
-    if not ziel or not ziel.startswith("/"):
+    if not target or not target.startswith("/"):
         return "/"
-    if ziel.startswith("//") or ziel.startswith("/\\"):
+    if target.startswith("//") or target.startswith("/\\"):
         return "/"
-    if any(character < " " or character == "\x7f" for character in ziel):
+    if any(character < " " or character == "\x7f" for character in target):
         # A newline in a Location header is a response-splitting attempt.
         return "/"
-    return ziel[:_MAX_TARGET_LENGTH]
+    return target[:_MAX_TARGET_LENGTH]
 
 
 def _redirect_uri(request: Request, settings: OidcSettings) -> str:
@@ -106,6 +110,17 @@ def _clear_cookie(response: Response, name: str, *, path: str, settings: OidcSet
     )
 
 
+def _clear_login_cookie(response: Response, service: OidcService) -> None:
+    """The handshake is single-use: it goes the moment the callback is over."""
+
+    _clear_cookie(
+        response,
+        service.settings.login_cookie_name,
+        path=_LOGIN_COOKIE_PATH,
+        settings=service.settings,
+    )
+
+
 def _session_secret(service: OidcService) -> str:
     secret = service.settings.session_secret
     return secret.get_secret_value() if secret else ""
@@ -114,10 +129,8 @@ def _session_secret(service: OidcService) -> str:
 def _failed(service: OidcService) -> RedirectResponse:
     """Back to the start page, with the one thing the frontend may show."""
 
-    answer = RedirectResponse(_FAILED, status_code=303)
-    _clear_cookie(
-        answer, service.settings.login_cookie_name, path=_LOGIN_COOKIE_PATH, settings=service.settings
-    )
+    answer = RedirectResponse(_FAILED, status_code=303, headers=dict(_NO_STORE))
+    _clear_login_cookie(answer, service)
     return answer
 
 
@@ -126,7 +139,12 @@ def _failed(service: OidcService) -> RedirectResponse:
     response_model=AnmeldungStatus,
     summary="Anmeldezustand",
 )
-async def me(request: Request, service: OidcService = Depends(oidc_service)) -> AnmeldungStatus:
+async def me(
+    request: Request,
+    response: Response,
+    service: OidcService = Depends(oidc_service),
+) -> AnmeldungStatus:
+    response.headers.update(_NO_STORE)
     if not service.configured:
         return AnmeldungStatus(eingerichtet=False, angemeldet=False)
     claims = session.read(
@@ -143,7 +161,7 @@ async def me(request: Request, service: OidcService = Depends(oidc_service)) -> 
         eingerichtet=True,
         angemeldet=True,
         name=identity.name,
-        kennung=identity.kennung,
+        kennung=identity.account_key,
     )
 
 
@@ -169,7 +187,7 @@ async def login(
     except AppError as exc:
         # The browser is in the middle of a navigation, so a JSON error body
         # would be shown as raw text. The start page can say it in German.
-        logger.warning("Anmeldung konnte nicht beginnen: %s", exc.message)
+        logger.warning("Sign-in could not be started: %s", exc.message)
         return _failed(service)
 
     state = secrets.token_urlsafe(32)
@@ -186,6 +204,7 @@ async def login(
             challenge=challenge_for(verifier),
         ),
         status_code=307,
+        headers=dict(_NO_STORE),
     )
     # The handshake travels with the browser rather than in this process: a
     # reload during development and a second worker in production would both
@@ -199,7 +218,7 @@ async def login(
                 "state": state,
                 "nonce": nonce,
                 "verifier": verifier,
-                "ziel": _safe_target(ziel),
+                "target": _safe_target(ziel),
                 # The token endpoint checks redirect_uri against the one the
                 # authorization request carried, so the two must be the same
                 # string even if the request that arrives here looks different.
@@ -233,13 +252,14 @@ async def callback(
     handshake = session.read(request.cookies.get(service.settings.login_cookie_name), secret)
 
     if error:
-        logger.info("Der Anmeldedienst hat abgelehnt: %s", error)
+        # Truncated: this value comes from the provider through the browser.
+        logger.info("The provider refused the sign-in: %s", error[:100])
         return _failed(service)
     if handshake is None:
-        logger.info("Rückkehr ohne gültigen Anmeldeversuch")
+        logger.info("Callback without a sign-in this server started")
         return _failed(service)
     if not code or not state or not hmac.compare_digest(state, str(handshake.get("state", ""))):
-        logger.warning("state passt nicht zum begonnenen Anmeldeversuch")
+        logger.warning("Callback state does not match the sign-in that was started")
         return _failed(service)
 
     try:
@@ -252,10 +272,12 @@ async def callback(
             nonce=str(handshake.get("nonce", "")),
         )
     except AppError as exc:
-        logger.warning("Code-Tausch fehlgeschlagen: %s", exc.message)
+        logger.warning("Code exchange failed: %s", exc.message)
         return _failed(service)
 
-    answer = RedirectResponse(_safe_target(handshake.get("ziel")), status_code=303)
+    answer = RedirectResponse(
+        _safe_target(handshake.get("target")), status_code=303, headers=dict(_NO_STORE)
+    )
     # Issuer, subject, display name. No access token and no refresh token: the
     # browser never sees one, and nothing here outlives this request.
     _set_cookie(
@@ -270,9 +292,7 @@ async def callback(
         path="/",
         settings=service.settings,
     )
-    _clear_cookie(
-        answer, service.settings.login_cookie_name, path=_LOGIN_COOKIE_PATH, settings=service.settings
-    )
+    _clear_login_cookie(answer, service)
     return answer
 
 
@@ -288,7 +308,5 @@ async def logout(service: OidcService = Depends(oidc_service)) -> Response:
     # would sign the person out of everything else they have open.
     answer = Response(status_code=204)
     _clear_cookie(answer, service.settings.cookie_name, path="/", settings=service.settings)
-    _clear_cookie(
-        answer, service.settings.login_cookie_name, path=_LOGIN_COOKIE_PATH, settings=service.settings
-    )
+    _clear_login_cookie(answer, service)
     return answer
