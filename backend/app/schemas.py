@@ -1257,6 +1257,16 @@ class FreigabeAngelegt(BaseModel):
     name: str | None = Field(
         default=None, description="Name des Grundstücks, damit die Liste lesbar ist."
     )
+    grundstueck: str | None = Field(
+        default=None,
+        description="Die Kennung des geteilten Grundstücks, damit dessen Seite die "
+        "eigenen Links zeigen kann.",
+    )
+    umfang: FreigabeUmfang | None = Field(
+        default=None,
+        description="Was der Link tatsächlich trägt, gelesen am gespeicherten "
+        "Dokument statt an den damals gesetzten Schaltern.",
+    )
 
 
 class FreigabenAntwort(BaseModel):

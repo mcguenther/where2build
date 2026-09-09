@@ -192,7 +192,10 @@ async function shot(page, name, mode, zusatz = "") {
   taken.push(file);
 }
 
-for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunkel", 1440, 1000, false], ["dunkel", 402, 900, true]]) {
+// The narrow pass runs in the light theme like the wide one: it is the
+// default a phone arrives in, and having the only phone-width pictures be dark
+// meant nobody ever looked at the layout most people see.
+for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunkel", 1440, 1000, false], ["hell", 402, 900, true]]) {
   const ctx = await browser.newContext({ viewport: { width: width, height: height }, deviceScaleFactor: 2 });
   const page = await ctx.newPage();
   countTiles(page);

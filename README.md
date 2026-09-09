@@ -336,6 +336,11 @@ resolves the extras it was told to share, and `Storage.for_sharing` cuts again
 on the way in; a promise only the frontend keeps is one a frontend bug can
 break.
 
+The links one plot has out are listed at the foot of its own page — with the
+date, the expiry and what each one actually carries, read off the stored row
+rather than remembered — and each can be withdrawn there, which takes effect at
+once. The section is absent while the plot has no open link.
+
 Pasting the link into a chat shows a card: the plot's outline on the
 orthophoto, its name, district and area. That is drawn on the server with
 Pillow — a preview bot runs no JavaScript, so the app's own page would hand it

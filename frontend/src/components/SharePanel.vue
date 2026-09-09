@@ -105,7 +105,7 @@ const OPTIONS = [
 export default {
   name: "SharePanel",
   props: { plot: { type: Object, required: true } },
-  emits: ["close"],
+  emits: ["close", "created"],
   data() {
     return {
       state,
@@ -137,6 +137,9 @@ export default {
           this.$router.resolve({ name: "shared", params: { token: made.id, slug: [] } }).href,
           window.location.origin
         ).toString();
+        // So the list of links on the page below knows about this one without
+        // a reload -- taking it back has to be possible in the same breath.
+        this.$emit("created");
       } catch (error) {
         this.failure = error.message;
       } finally {

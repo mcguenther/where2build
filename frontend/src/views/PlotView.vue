@@ -28,7 +28,8 @@
       </div>
     </div>
 
-    <SharePanel v-if="sharing" :plot="plot" @close="sharing = false" />
+    <SharePanel v-if="sharing" :plot="plot" @close="sharing = false"
+                @created="$refs.links?.load()" />
 
     <div class="plan-grid print-sheet">
       <div class="plan-frame panel print-sheet__plan">
@@ -370,6 +371,11 @@
           Lärm, Hochwasser, Baugrund und Luft prüfen
         </RouterLink>
       </p>
+
+      <!-- At the foot of the page and absent while there is nothing: a link
+           already handed out is the one thing here somebody needs to be able
+           to take back. -->
+      <SharedLinks ref="links" :plot="plot" />
     </section>
   </div>
 
@@ -398,6 +404,7 @@
 <script>
 import SitePlan from "../components/SitePlan.vue";
 import SharePanel from "../components/SharePanel.vue";
+import SharedLinks from "../components/SharedLinks.vue";
 import RouteCards from "../components/RouteCards.vue";
 import NearbyPanel from "../components/NearbyPanel.vue";
 import SurroundingsMap from "../components/SurroundingsMap.vue";
@@ -421,7 +428,7 @@ const MAX_EDGE = 30;
 
 export default {
   name: "PlotView",
-  components: { SitePlan, SharePanel, RouteCards, NearbyPanel, SurroundingsMap },
+  components: { SitePlan, SharePanel, SharedLinks, RouteCards, NearbyPanel, SurroundingsMap },
   props: {
     /** The plot's id, straight out of the URL. */
     id: { type: String, required: true }

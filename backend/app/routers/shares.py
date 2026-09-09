@@ -38,10 +38,11 @@ from ..schemas import (
     FreigabeAnfrage,
     FreigabeAntwort,
     FreigabenAntwort,
+    FreigabeUmfang,
 )
 from ..services.oidc import Identity
 from ..services.preview import PreviewService
-from ..services.storage import Storage
+from ..services.storage import Storage, share_scope
 
 router = APIRouter(prefix="/api/shares", tags=["Freigaben"])
 
@@ -107,6 +108,11 @@ async def mine(
                 angelegt=share.angelegt,
                 laeuft_ab=share.laeuft_ab,
                 name=str(share.dokument.get("name") or "") or None,
+                grundstueck=str(share.dokument.get("id") or "") or None,
+                # Read off the row, not remembered from the request: a list
+                # that says what a link carries has to be checkable against the
+                # thing itself.
+                umfang=FreigabeUmfang(**share_scope(share.dokument)),
             )
             for share in held
         ]

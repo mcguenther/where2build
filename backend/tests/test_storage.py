@@ -902,6 +902,68 @@ def test_the_owner_sees_their_links_with_the_plot_name(account: TestClient):
 
 
 @needs_database
+def test_the_list_says_which_plot_a_link_belongs_to(account: TestClient):
+    """Without it a plot's page cannot show its own links, and that is the
+    only place somebody who has just shared something looks for them."""
+
+    account.post("/api/shares", json={"dokument": SHARED})
+
+    listed = account.get("/api/shares").json()["eintraege"]
+
+    assert listed[0]["grundstueck"] == SHARED["id"]
+
+
+@needs_database
+def test_the_list_reads_the_scope_off_the_row_it_stored(account: TestClient):
+    """What a link carries is not remembered, it is looked at.
+
+    The switches are not kept anywhere -- keeping them would let the two drift
+    apart, and a list claiming a link holds a price it does not hold is worse
+    than no list. Two things follow, and both are here: an option that was
+    switched on shows, and an option switched on for a field this plot does not
+    have does **not** -- because nothing about a price ever reached the row.
+    """
+
+    account.post(
+        "/api/shares",
+        json={
+            "dokument": {**SHARED, "askingPrice": 60000},
+            "umfang": {"preis": True, "haus": True, "notiz": False},
+        },
+    )
+
+    scope = account.get("/api/shares").json()["eintraege"][0]["umfang"]
+
+    assert scope["preis"] is True
+    assert scope["notiz"] is False
+    # Switched on, but this plot carries no building at all.
+    assert scope["haus"] is False
+
+
+@needs_database
+def test_a_switched_on_option_with_nothing_in_it_is_not_claimed(account: TestClient):
+    """Present is not filled, and the difference showed up in a browser.
+
+    A plot with no price still has an `askingPrice` key, so switching the price
+    on writes `null` into the row. Read as "is the field there?" the list then
+    announced a Kaufpreis that nobody can read off the link.
+    """
+
+    account.post(
+        "/api/shares",
+        json={
+            "dokument": {**SHARED, "askingPrice": None, "routes": {}},
+            "umfang": {"preis": True, "wege": True},
+        },
+    )
+
+    scope = account.get("/api/shares").json()["eintraege"][0]["umfang"]
+
+    assert scope["preis"] is False
+    assert scope["wege"] is False
+
+
+@needs_database
 def test_deleting_the_account_takes_the_links_with_it(account: TestClient):
     """The cascade covers them, and it has to: a link is the account's data."""
 

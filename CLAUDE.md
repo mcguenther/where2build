@@ -1250,6 +1250,32 @@ from the user directly. Reopen only if the user asks.
   outline carries the site plan's halo for exactly that reason. A slow or broken
   WMS leaves paper behind the drawing rather than an error, because the one part
   of the card that can fail must not cost the outline.
+- **A link nobody can see is a link nobody can take back.** Sharing shipped
+  without any way to list or withdraw what had been handed out, and a link is
+  public for ninety days — so a slip could only be waited out. `SharedLinks`
+  sits at the foot of the plot's own page (that is where somebody who has just
+  shared something looks, not in the account) and is **absent** while there is
+  nothing: a panel that is always there and usually empty is furniture.
+- **Present is not filled, and the list said so wrongly.** What a link carries
+  is derived from the stored row rather than remembered from the switches —
+  keeping the switches would let the two drift apart. But `field in dokument`
+  is the wrong test: a plot with no price still has an `askingPrice` key, so
+  switching the price on writes `null` into the row and the row then announced
+  a „Kaufpreis" nobody could read off the link. `share_scope` requires a value
+  that is not `None` and not an empty container. Found in a browser walk, not
+  in a test.
+- **Docker builds in this sandbox need three things, and the base image needs
+  patience.** The agent proxy re-terminates TLS, so a build has to run with
+  `--network host`, carry `/root/.ccr/ca-bundle.crt` into an early layer, and
+  be given `--build-arg HTTPS_PROXY=$HTTPS_PROXY` — with the CA but no proxy
+  pip gets past the certificate and then times out, which reads like a
+  different failure. `docker pull python:3.11-slim` also answers **429** from
+  Docker Hub often enough that one retry is normal. None of it belongs in the
+  repo's Dockerfiles; build with a copy under a different `-f`. Verified this
+  way on 09.09.2026: both images build, the shipped `nginx.conf` sends a
+  WhatsApp user agent to the backend and a browser to the app, and the preview
+  card draws **inside** the slim image — so FreeType there really does read the
+  vendored `.woff` without brotli.
 
 ## Commands
 
@@ -1303,14 +1329,16 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 594 passed, 46 skipped. With `TEST_DATABASE_URL` pointed at a real
-  Postgres it is 632 passed, 8 skipped — the extra 38 are the account store,
+- `pytest`: 594 passed, 49 skipped. With `TEST_DATABASE_URL` pointed at a real
+  Postgres it is 635 passed, 8 skipped — the extra 41 are the account store,
   and they are skipped rather than mocked because what they check is the
   database's own behaviour. Of the remaining 8, one needs pyosmium, which only
   the index builder wants; the other seven need Tesseract.
-- `vitest`: 597 passed — plus the integration file, excluded by `npm run test`
+- `vitest`: 603 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
-- `scripts/screenshots.mjs`: 65 images plus two print PDFs. It fails on console
+- `scripts/screenshots.mjs`: 65 images plus two print PDFs. The narrow pass
+  runs in the **light** theme like the wide one, so the phone-width pictures
+  are named `*-hell-schmal.png`. It fails on console
   errors, on horizontal overflow, and if not a single vector tile arrived. It
   also drives the live geocoder, which is slow often enough to blow the 60 s
   wait on the destinations step — two runs failed there and the third passed

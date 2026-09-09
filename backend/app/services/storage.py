@@ -156,6 +156,29 @@ SHARE_OPTIONS: dict[str, tuple[str, ...]] = {
 }
 
 
+def share_scope(dokument: dict[str, Any]) -> dict[str, bool]:
+    """What a stored share actually holds, read off the row itself.
+
+    Not the switches somebody set -- those are not kept, and keeping them would
+    let the two drift apart. The row is the truth: an option counts as shared
+    when one of its fields survived the cut. So the list can never claim a link
+    carries a price it does not carry.
+    """
+
+    def carries(field: str) -> bool:
+        # Present is not the same as filled. A plot with no price still has an
+        # `askingPrice` key, so the switch puts `null` into the row -- and a
+        # list saying „enthält außerdem: Kaufpreis" would then name a figure
+        # nobody can read. Measured in a browser, not reasoned about.
+        value = dokument.get(field)
+        return value is not None and value != {} and value != [] and value != ""
+
+    return {
+        option: any(carries(field) for field in fields)
+        for option, fields in SHARE_OPTIONS.items()
+    }
+
+
 def for_sharing(dokument: dict[str, Any], include: dict[str, bool] | None = None) -> dict[str, Any]:
     """The plot as it may be shared, given what the sharer switched on."""
 
