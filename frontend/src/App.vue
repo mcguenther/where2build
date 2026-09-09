@@ -44,10 +44,10 @@
     <div v-if="state.sync.adoption" class="adoption no-print">
       <div class="container adoption__inner">
         <p>
-          <b>In diesem Browser liegen {{ state.sync.adoption.plots }}
-            {{ state.sync.adoption.plots === 1 ? "Grundstück" : "Grundstücke" }}.</b>
-          Ins Konto übernehmen? Sie liegen danach auf jedem Rechner, an dem diese Anmeldung gilt.
-          Hier bleiben sie ohnehin.
+          <b>In diesem Browser {{ state.sync.adoption.plots === 1 ? "liegt ein Grundstück" :
+            `liegen ${state.sync.adoption.plots} Grundstücke` }}.</b>
+          Ins Konto übernehmen? Der Stand liegt danach auf jedem Rechner, an dem diese
+          Anmeldung gilt. Hier bleibt er ohnehin.
         </p>
         <div class="spacer"></div>
         <button type="button" class="btn btn--small" :disabled="state.sync.busy" @click="adoptLocal">

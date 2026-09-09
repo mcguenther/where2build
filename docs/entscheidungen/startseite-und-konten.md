@@ -202,8 +202,15 @@ Kein Teil der Startseite, aber Teil der Entscheidung:
    Wegwerf-Anbieter auf `127.0.0.1`: Weiterleitung, Rücksprung, Sitzungscookie
    (HttpOnly, SameSite=Lax), Name in der Kopfzeile, Abmelden räumt es weg.
    Die Daten bleiben lokal, siehe Schritt 4.
-4. **Server als Speicher:** Postgres, `plots`-API, Store-Abstraktion,
-   Übernahme-Banner, Grenzen pro Konto.
+4. **Server als Speicher:** steht. Postgres mit einer Zeile je Grundstück und
+   einer je Konto für den Rest, `/api/plots` und `/api/settings` hinter der
+   Anmeldung, `save()` bleibt synchron und schreibt weiter zuerst in den
+   Browser, die Kopie im Konto folgt gesammelt. Ein Konflikt wird gezeigt, nie
+   still aufgelöst. Beides ist echt durchgespielt worden: mit geleertem
+   `localStorage` kommt das Grundstück aus dem Konto zurück, und wer sich mit
+   vorhandenem lokalem Stand anmeldet, wird einmal gefragt und der Stand landet
+   danach wirklich in der Datenbank. Grenzen: 200 Grundstücke je Konto, 2 MiB
+   je Dokument.
 
 Offen aus Schritt 3, bewusst und mit Grund: ein Compose-Profil für einen
 Anbieter (Authentik, Keycloak, Dex) ist **nicht** dabei. In dieser Umgebung
