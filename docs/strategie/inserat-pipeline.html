@@ -266,6 +266,20 @@ pre i{color:var(--muted);font-style:normal}
 .gf-urteil.weg{border-color:var(--error);color:var(--error-text);background:var(--error-surface)}
 .gf-grund{grid-column:1/-1;font-size:12px;color:var(--muted)}
 
+/* --- Kartenwerk: Entfernungsbänder --- */
+.karte-werk{border:1px solid var(--line);border-radius:12px;background:var(--surface);
+  overflow:hidden;margin-top:18px}
+.kw-kopf{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center;
+  padding:13px 16px;border-bottom:1px solid var(--line-faint);background:var(--sunken)}
+.kw-quellen{display:flex;flex-wrap:wrap;gap:6px}
+.kw-werte{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--graphite)}
+.karte-werk canvas{display:block;width:100%;height:auto;background:var(--sunken)}
+.kw-regler{display:grid;gap:14px;padding:14px 16px;border-top:1px solid var(--line-faint)}
+@media(min-width:640px){.kw-regler{grid-template-columns:1fr 1fr}}
+.kw-regler label{display:grid;gap:6px;font-size:13px;color:var(--graphite)}
+.kw-regler input[type=range]{width:100%;accent-color:var(--primary)}
+.kw-fuss{padding:0 16px 14px;font-size:12.5px;color:var(--muted)}
+
 /* --- Stufenplan --- */
 .stufen{display:grid;gap:10px;margin-top:20px}
 .st{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;padding:15px 17px;border-radius:11px;
@@ -285,11 +299,13 @@ pre i{color:var(--muted);font-style:normal}
   <p class="eyebrow">Strategiepapier · 10.09.2026 · nichts davon ist gebaut</p>
   <h1>Vom Inserat zum Flurstück</h1>
   <p class="lede col">Was heute aus einer Anzeige gelesen wird, wie der Suchlauf daraus ein
-  Flurstück macht, an welchen sechs Stellen er bricht — und wie ein Modell als weiterer
-  Kanal angebunden wird, ohne dass es je etwas entscheiden darf.</p>
+  Flurstück macht, an welchen sechs Stellen er bricht, was Entfernungsangaben aus dem Inserat wirklich
+  wert sind — und wie ein Modell als weiterer Kanal angebunden wird, ohne dass es je
+  etwas entscheiden darf.</p>
   <div class="marken">
     <span class="marke stark">Bestandsaufnahme</span>
     <span class="marke stark">Suchstrategie</span>
+    <span class="marke stark">Entfernungsbänder</span>
     <span class="marke stark">Wertekatalog</span>
     <span class="marke stark">Modellanbindung</span>
     <span class="marke">geprüft an 6 aufgezeichneten Inseraten</span>
@@ -634,8 +650,204 @@ pre i{color:var(--muted);font-style:normal}
   </div>
 </section>
 
-<section id="gegenprobe">
+<section id="baender">
   <p class="eyebrow">Teil 6</p>
+  <h2>Entfernungsbänder</h2>
+  <div class="col stack" style="margin-top:14px">
+    <p>„Über die B107 gelangt man in ca. 7 min mit dem Auto in die ca. 6 km entfernte
+    Kreisstadt Grimma“ — eine Ortsangabe, die kein Ortsname ist. Als Kreis gezeichnet wäre
+    sie falsch: 6 km ist keine Entfernung, sondern ein Bereich. Als <b>Band</b> — ein Ring
+    mit Innen- und Außenradius — ist sie genau das, was sie ist, und der Schnitt mehrerer
+    Bänder grenzt die Gegend ein, ohne je ein Flurstück zu benennen.</p>
+    <p>Die Frage war, ob die Routenplanung dieses Band schärfer machen kann als die
+    Luftlinie. Die Antwort steht unten und ist nicht die erwartete: Der Umweg ist das
+    kleinste der drei Probleme.</p>
+  </div>
+
+  <h3 style="margin-top:30px">Gemessen, nicht geschätzt</h3>
+  <p class="col" style="font-size:14px;color:var(--graphite);margin-top:8px">
+    Am 10.09.2026 gegen Transitous, ausgehend von den drei Flurstücken, deren Lösung
+    bekannt ist. Die Koordinaten stammen aus den ALKIS-Aufzeichnungen im Repository, die
+    Entfernungen aus <code>/api/v1/one-to-many</code> mit <code>withDistance</code>.</p>
+  <div class="scroll" style="margin-top:14px">
+  <table>
+    <thead><tr><th>Von → nach</th><th>Inserat</th><th class="n">Luftlinie</th><th class="n">zu Fuß</th><th class="n">Rad</th><th class="n">Auto</th><th class="n">Umweg</th></tr></thead>
+    <tbody>
+      <tr><td><b>Großbothen 790/11</b> → Grimma (Ortsmitte)</td><td>„ca. 6 km“, „ca. 7 min mit dem Auto“</td>
+        <td class="n">5,34 km</td><td class="n">6,54 km</td><td class="n">6,64 km</td><td class="n">7,37 km · 8,2 min</td><td class="n">1,22–1,38×</td></tr>
+      <tr><td>790/11 → Bahnhof Großbothen</td><td>„Fernbahnhof 1,6 km“</td>
+        <td class="n">1,41 km</td><td class="n">1,66 km</td><td class="n">1,80 km</td><td class="n">2,85 km</td><td class="n">1,17–2,01×</td></tr>
+      <tr><td>790/11 → nächste Bushaltestelle</td><td>„Bus 0,3 km“</td>
+        <td class="n">0,40 km</td><td class="n">0,95 km</td><td class="n">—</td><td class="n">—</td><td class="n">2,39×</td></tr>
+      <tr><td><b>Etzoldshain 502/47</b> → Bad Lausick</td><td>—</td>
+        <td class="n">1,39 km</td><td class="n">1,76 km</td><td class="n">2,45 km</td><td class="n">3,67 km</td><td class="n">1,26–2,63×</td></tr>
+      <tr><td>502/47 → Bahnhof Bad Lausick</td><td>—</td>
+        <td class="n">1,22 km</td><td class="n">1,59 km</td><td class="n">2,40 km</td><td class="n">3,56 km</td><td class="n">1,30–2,91×</td></tr>
+      <tr><td><b>Thräna 107/60</b> → Borna (Ortsmitte)</td><td>„bei Borna“</td>
+        <td class="n">6,39 km</td><td class="n">7,54 km</td><td class="n">8,00 km</td><td class="n">8,72 km</td><td class="n">1,18–1,36×</td></tr>
+      <tr><td>107/60 → Bahnhof Borna</td><td>—</td>
+        <td class="n">5,49 km</td><td class="n">6,99 km</td><td class="n">6,94 km</td><td class="n">nicht routbar</td><td class="n">1,26–1,27×</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="bruch" style="margin-top:20px">
+    <article class="bs bs--klein">
+      <div class="bs-kopf"><b>Neu geprüft</b><span class="bs-grad">10.09.2026</span></div>
+      <h3><code>one-to-many</code> beherrscht CAR — die App fragt es nur nicht</h3>
+      <p><code>_STREET_MODES</code> kennt heute nur <code>walk</code> und <code>bike</code>.
+      Der Dienst nimmt <code>"mode": "CAR"</code> an und liefert Dauer <em>und</em> Distanz.
+      Und er ist nicht immer der kürzeste Weg: zum Bahnhof Großbothen sind es zu Fuß
+      1,66 km und mit dem Auto 2,85 km.</p>
+      <p class="beleg">Eine Strecke kam als „nicht routbar“ zurück (Auto zum Bahnhof Borna).
+      Ein Band aus Routen braucht also dieselbe Regel wie die Erreichbarkeitstabelle: eine
+      Antwort, die fehlt, kostet eine Zeile — nie die Seite.</p>
+    </article>
+    <article class="bs bs--hoch">
+      <div class="bs-kopf"><b>Der Befund</b><span class="bs-grad">entscheidend</span></div>
+      <h3>Der Bezugspunkt ist unschärfer als der Umweg</h3>
+      <p>Was heißt „6 km bis Grimma“? Der Geocoder gibt vier plausible Antworten für
+      dieselbe Stadt, und sie liegen bis zu <b>1,73 km</b> auseinander. Vom Flurstück aus
+      gemessen schwankt die Luftlinie dadurch zwischen <b>3,88 km und 5,34 km</b> — 27 %,
+      allein durch die Wahl des Punktes.</p>
+      <p class="beleg">Der Umweg zu Fuß beträgt in derselben Messung 1,22×. Die
+      Routenplanung würde also eine Ungenauigkeit von 22 % beseitigen und eine von 27 %
+      stehen lassen. Für eine <em>Stadt</em> ist geroutete Genauigkeit Scheingenauigkeit.</p>
+    </article>
+  </div>
+
+  <div class="merk merk--rot col" style="margin-top:20px">
+    <p><b>Und die größte Ungenauigkeit macht das Inserat selbst.</b> „Bus 0,3 km“: Die
+    nächste Haltestelle liegt 399 m Luftlinie und 950 m Fußweg entfernt — die Angabe
+    unterschreitet den Fußweg um zwei Drittel. Ein Band, das diese Zahl mit ±10 % ernst
+    nimmt, schließt das richtige Flurstück aus. Genau deshalb darf ein Entfernungsband
+    niemals filtern.</p>
+  </div>
+
+  <h3 style="margin-top:34px">Drei Unsicherheiten, ein Band</h3>
+  <div class="zwei" style="margin-top:14px">
+    <div class="tafel stack-s">
+      <h4>Wie das Band gebaut wird</h4>
+      <pre>Band(P, d) = { x : r<b>innen</b> ≤ dist(x, P) ≤ r<b>außen</b> }
+
+r<b>innen</b>  = d / ϱ        <i>ϱ = Umwegfaktor, gemessen 1,17…2,91</i>
+r<b>außen</b>  = d · (1+ε) + u <i>ε = Fehler der Angabe, u = Bezugspunkt</i>
+
+Luftlinie ist <b>immer</b> die untere Schranke:
+  dist<b>route</b> ≥ dist<b>luft</b>, gemessen ohne Ausnahme.
+Also kann ein Kandidat, dessen <b>Luftlinie</b> schon größer
+ist als r<b>außen</b>, die Angabe nicht erfüllen — die einzige
+Richtung, in der eine Entfernungsangabe etwas beweist.</pre>
+      <p style="font-size:13px;color:var(--muted)">Der Modus kommt aus dem Wortlaut:
+      „Autominuten“ → CAR, „Gehminuten“ → WALK, eine blanke Kilometerangabe → das engste
+      Band über alle Modi, weil niemand weiß, was der Makler gemessen hat.</p>
+    </div>
+    <div class="tafel stack-s">
+      <h4>Was die Route wofür taugt</h4>
+      <ul style="font-size:13.5px;color:var(--graphite)">
+        <li><b>Für eine Stadt: nichts.</b> Der Bezugspunkt streut weiter als der Umweg.
+        Ein weites Luftlinienband ist ehrlicher und kostet keine Anfrage.</li>
+        <li><b>Für einen Punkt: viel.</b> Bahnhof, Haltestelle, Autobahnauffahrt, Schule —
+        hier ist der Bezugspunkt eindeutig, und „Fernbahnhof 1,6 km“ trifft den gemessenen
+        Fußweg von 1,66 km auf 4 % genau.</li>
+        <li><b>Nicht die Fläche routen, die Kandidaten.</b> Ein
+        <code>one-to-many</code>-POST beantwortet 128 Ziele in ~150 ms. Die Kandidaten sind
+        die Ziele — drei genannte Orte gegen 128 Flurstücke sind drei Anfragen.</li>
+        <li><b>Ein gerouteter Ring ist zeichenbar, aber teuer.</b> Als Raster bräuchte ein
+        6-km-Band bei 250 m Auflösung ~3 600 Punkte, also 29 POSTs. Billiger wäre eine
+        Strahlensuche: 72 Richtungen × Binärsuche ≈ 360 Punkte = 3 POSTs. Sie setzt voraus,
+        dass die Routendistanz entlang eines Strahls monoton wächst — plausibel, aber
+        ungeprüft, und deshalb hier nur notiert.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3 style="margin-top:34px">Der Schnitt, zum Anfassen</h3>
+  <p class="col" style="font-size:14px;color:var(--graphite);margin-top:8px">
+    Die drei Entfernungsangaben des Großbothen-Inserats, an ihren echten Orten, mit dem
+    richtigen Flurstück als Kreuz. Die Regler bestimmen, wie breit das Band um jede Angabe
+    gelegt wird. Die Bus-Angabe ist zu Beginn aus — sie einzuschalten zeigt in einem Zug,
+    warum ein solcher Schnitt nichts ausschließen darf.</p>
+
+  <div class="karte-werk">
+    <div class="kw-kopf">
+      <div class="kw-quellen" role="group" aria-label="Angaben verwenden">
+        <button class="chip" data-band="grimma" aria-pressed="true">Grimma 6 km</button>
+        <button class="chip" data-band="bahnhof" aria-pressed="true">Fernbahnhof 1,6 km</button>
+        <button class="chip" data-band="bus" aria-pressed="false">Bus 0,3 km</button>
+      </div>
+      <div class="kw-werte">
+        <span class="mono" id="kw-flaeche">—</span>
+        <span class="mono" id="kw-treffer">—</span>
+      </div>
+    </div>
+    <canvas id="kw-bild" width="1320" height="880" role="img"
+      aria-label="Karte mit Entfernungsbändern um Grimma, den Bahnhof Großbothen und die nächste Bushaltestelle; das richtige Flurstück ist als Kreuz eingezeichnet"></canvas>
+    <div class="kw-regler">
+      <label for="kw-eps">Aufschlag nach außen <b class="mono" id="kw-eps-wert">25 %</b>
+        <input type="range" id="kw-eps" min="0" max="80" step="5" value="25"></label>
+      <label for="kw-rho">Umwegfaktor nach innen <b class="mono" id="kw-rho-wert">1,30×</b>
+        <input type="range" id="kw-rho" min="100" max="300" step="5" value="130"></label>
+    </div>
+    <p class="kw-fuss" id="kw-fuss"></p>
+  </div>
+
+  <h3 style="margin-top:34px">Wie es in den Lauf eingebaut wird</h3>
+  <div class="col stack" style="margin-top:12px">
+    <p>Als <b>Indiz</b>, wie alles andere auch — eine neue Art <code>entfernung</code> neben
+    <code>gemarkung</code>, <code>flaeche</code> und <code>strasse</code>. Es trägt den
+    genannten Ort, die Zahl, den Modus aus dem Wortlaut, den aufgelösten Bezugspunkt mit
+    seiner Streuung und den Satz, aus dem es stammt. Damit ist es abwählbar, es steht im
+    Verlauf, und sein Band lässt sich anklicken wie jede andere Zeile.</p>
+  </div>
+  <div class="stufen" style="margin-top:16px">
+    <div class="st">
+      <span class="st-nr">Rolle 1</span>
+      <div class="st-was"><h4>Anker vorauswählen — der einzige produktive Einsatz</h4>
+        <p>Der Schnitt der Bänder wird mit den Gemarkungsumrissen verschnitten; was ihn
+        berührt, kommt in die Ankermenge. Derselbe Zug wie beim Pin und in derselben
+        Richtung sicher: Ist das Band falsch, zählt jeder Anker null und der Lauf meldet,
+        dass er nichts gefunden hat. Ein falsches Flurstück kann daraus nicht entstehen.</p></div>
+      <span class="st-mass">1 BBOX-Anfrage<br>nur wenn kein Ort genannt ist</span>
+    </div>
+    <div class="st">
+      <span class="st-nr">Rolle 2</span>
+      <div class="st-was"><h4>Kandidaten ordnen — mit Route, wo sie etwas bringt</h4>
+        <p>Ein Trapez über der gemessenen Entfernung, wie die übrigen weichen Merkmale, und
+        wie diese in die gewichtete Summe — <em>nicht</em> ins Produkt. Hier ist der Grund
+        greifbar: Die drei Orte des Großbothen-Inserats liegen alle im selben Dorf, ihre
+        Fehler sind derselbe Fehler, und ein Produkt zählte ihn dreimal.</p></div>
+      <span class="st-mass">1 POST je Ort und Modus<br>≤ 128 Kandidaten</span>
+    </div>
+    <div class="st">
+      <span class="st-nr">Rolle 3</span>
+      <div class="st-was"><h4>Widersprechen — aber nur nach außen und nur laut</h4>
+        <p>Liegt ein Kandidat schon nach Luftlinie weiter weg als das Außenband erlaubt, ist
+        die Angabe für ihn unerfüllbar. Das ist mathematisch sauber, denn die Route ist nie
+        kürzer als die Luftlinie — und trotzdem löscht es nichts: Es setzt den Kandidaten
+        nach hinten und schreibt den Satz dazu. Die Angabe, an der das zuerst auffiele,
+        wäre „Bus 0,3 km“, und sie ist die falsche.</p></div>
+      <span class="st-mass">0 Anfragen<br>rein geometrisch</span>
+    </div>
+    <div class="st st--spaeter">
+      <span class="st-nr">Nie</span>
+      <div class="st-was"><h4>Bestätigen</h4>
+        <p>Kein Schnitt von Bändern, wie klein auch immer, macht „bestätigt“. Das bleibt
+        amtlichen Aussagen vorbehalten — Flurstücksnummer, Gemarkung, exakte Fläche. Ein
+        Band ist die Aussage eines Maklers über eine Fahrzeit.</p></div>
+      <span class="st-mass">Regel, keine Grenze</span>
+    </div>
+  </div>
+  <div class="merk merk--gruen col" style="margin-top:20px">
+    <p><b>Und für die Karte ist es unabhängig davon gut.</b> Die Bänder sind das einzige
+    Indiz, das zeigt, <em>warum</em> die Suche dort sucht, wo sie sucht — auch dann, wenn
+    sie nichts ausschließen. Auf der Indizienkarte gehören sie deshalb sichtbar unter die
+    Kandidaten, mit weichem Rand, weil die Unschärfe der Inhalt ist.</p>
+  </div>
+</section>
+
+<section id="gegenprobe">
+  <p class="eyebrow">Teil 7</p>
   <h2>Gegenprobe an sechs Inseraten</h2>
   <div class="col stack" style="margin-top:14px">
     <p>Dieselben sechs aufgezeichneten Anzeigen, gegen die auch die Tests laufen
@@ -719,7 +931,7 @@ pre i{color:var(--muted);font-style:normal}
 </section>
 
 <section id="katalog">
-  <p class="eyebrow">Teil 7</p>
+  <p class="eyebrow">Teil 8</p>
   <h2>Was sich zusätzlich belegen ließe</h2>
   <div class="col stack" style="margin-top:14px">
     <p>Neunzehn Werte, jeder mit einem wörtlichen Beleg aus einem der sechs aufgezeichneten
@@ -741,7 +953,7 @@ pre i{color:var(--muted);font-style:normal}
 </section>
 
 <section id="modell">
-  <p class="eyebrow">Teil 8</p>
+  <p class="eyebrow">Teil 9</p>
   <h2>Das Modell als Kanal</h2>
   <div class="col stack" style="margin-top:14px">
     <p>Ein Sprachmodell ist in dieser Kette der <em>letzte</em> Leser, nicht der erste. Die
@@ -857,7 +1069,7 @@ pre i{color:var(--muted);font-style:normal}
 </section>
 
 <section id="reihenfolge">
-  <p class="eyebrow">Teil 9</p>
+  <p class="eyebrow">Teil 10</p>
   <h2>Reihenfolge</h2>
   <p class="lede col" style="margin-top:12px">Nach Nutzen je Aufwand, und so geschnitten,
   dass jede Stufe für sich ausgeliefert werden kann. Die ersten beiden ändern die Steuerung
@@ -905,6 +1117,15 @@ pre i{color:var(--muted);font-style:normal}
     </div>
     <div class="st st--spaeter">
       <span class="st-nr">Stufe 6</span>
+      <div class="st-was"><h4>Entfernungsbänder als Indiz</h4>
+        <p>Ort, Zahl und Modus aus dem Satz lesen, den Bezugspunkt auflösen, das Band
+        zeichnen — und die Kandidaten mit einem <code>one-to-many</code>-POST je Ort dagegen
+        messen. Setzt <code>CAR</code> in <code>_STREET_MODES</code> voraus, was der Dienst
+        längst kann. Vor allem ein Gewinn für die Karte.</p></div>
+      <span class="st-mass">mittel · neue Indizart<br>1 POST je Ort und Modus</span>
+    </div>
+    <div class="st st--spaeter">
+      <span class="st-nr">Stufe 7</span>
       <div class="st-was"><h4>Modellkanal mit Befund-Vorlage und Beleg-Gate</h4>
         <p>Unabhängig von Stufe 4 und jederzeit einschaltbar. Wirkt am stärksten zusammen
         mit Stufe 1: Was das Modell besser kann als jedes Muster, ist die Ortsbeziehung.</p></div>
@@ -1358,7 +1579,228 @@ sim.index = schritte().length;
 zeichneSim();
 
 /* ------------------------------------------------------------------ *
- * Teil 7 — Wertekatalog
+ * Teil 6 — Entfernungsbänder, gezeichnet und geschnitten
+ *
+ * Alle Koordinaten sind echt: das Flurstück aus der ALKIS-Aufzeichnung,
+ * die drei Orte aus dem Transitous-Geocoder, die Behauptungen aus dem
+ * Anzeigentext. Gerechnet wird in Metern über eine ebene Näherung — bei
+ * acht Kilometern Kantenlänge liegt deren Fehler unter einem Meter.
+ * ------------------------------------------------------------------ */
+const FLURSTUECK = { lat: 51.189239, lon: 12.741040, name: "790/11" };
+const ANGABEN = {
+  grimma:  { name: "Grimma", lat: 51.23664, lon: 12.72890, d: 6000, wortlaut: "ca. 6 km",
+             gemessen: "Luftlinie 5,34 km · Auto 7,37 km" },
+  bahnhof: { name: "Bahnhof Großbothen", lat: 51.18417, lon: 12.75966, d: 1600,
+             wortlaut: "Fernbahnhof 1,6 km", gemessen: "Luftlinie 1,41 km · Fußweg 1,66 km" },
+  bus:     { name: "Bushaltestelle", lat: 51.19221, lon: 12.74425, d: 300, wortlaut: "Bus 0,3 km",
+             gemessen: "Luftlinie 0,40 km · Fußweg 0,95 km" }
+};
+
+const bild = document.getElementById("kw-bild");
+if (bild) {
+  const ctx = bild.getContext("2d");
+  const MITTE = { lat: FLURSTUECK.lat + 0.0072, lon: FLURSTUECK.lon };
+  const HALBHOEHE = 2600;                    // Meter vom Bildmittelpunkt nach oben
+  const px = bild.height / (2 * HALBHOEHE);  // Bildpunkte je Meter
+  const aktiv = new Set(["grimma", "bahnhof"]);
+
+  // Meter je Breitengrad bei 51° N. Der Äquatorwert (110 574) läge hier 0,6 %
+  // daneben, und die Beschriftung nennt dieselben Zahlen wie die Messtabelle
+  // darüber — eine Abweichung in der dritten Stelle liest sich als Fehler.
+  const M_BREITE = 111250, M_LAENGE = 111320;
+  const meter = (a, b) => {
+    const mitte = ((a.lat + b.lat) / 2) * Math.PI / 180;
+    const dx = (b.lon - a.lon) * Math.cos(mitte) * M_LAENGE;
+    const dy = (b.lat - a.lat) * M_BREITE;
+    return { dx, dy, d: Math.hypot(dx, dy) };
+  };
+  const auf = punkt => {
+    const { dx, dy } = meter(MITTE, punkt);
+    return { x: bild.width / 2 + dx * px, y: bild.height / 2 - dy * px };
+  };
+  const farbe = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const zahl = (wert, stellen = 2) =>
+    wert.toLocaleString("de-DE", { minimumFractionDigits: stellen, maximumFractionDigits: stellen });
+
+  function baender() {
+    const eps = Number(document.getElementById("kw-eps").value) / 100;
+    const rho = Number(document.getElementById("kw-rho").value) / 100;
+    return [...aktiv].map(schluessel => {
+      const a = ANGABEN[schluessel];
+      return { ...a, schluessel, innen: a.d / rho, aussen: a.d * (1 + eps) };
+    });
+  }
+
+  function zeichne() {
+    const gewaehlt = baender();
+    const ink = farbe("--ink"), muted = farbe("--muted"), primary = farbe("--primary");
+    const secondary = farbe("--secondary"), fehler = farbe("--error"), grund = farbe("--sunken");
+    ctx.clearRect(0, 0, bild.width, bild.height);
+    ctx.fillStyle = grund;
+    ctx.fillRect(0, 0, bild.width, bild.height);
+
+    // Der Schnitt, abgetastet statt konstruiert: bei 8 km Kantenlänge ist ein
+    // Raster ehrlicher zu lesen als eine Kette von Kreisbogenschnitten.
+    const schritt = 4;
+    const zelle = schritt / px;
+    let zellen = 0;
+    ctx.fillStyle = primary;
+    ctx.globalAlpha = 0.26;
+    for (let y = 0; y < bild.height; y += schritt) {
+      for (let x = 0; x < bild.width; x += schritt) {
+        const lat = MITTE.lat + ((bild.height / 2 - y) / px) / M_BREITE;
+        const lon = MITTE.lon + ((x - bild.width / 2) / px) /
+          (Math.cos((MITTE.lat * Math.PI) / 180) * M_LAENGE);
+        let drin = gewaehlt.length > 0;
+        for (const b of gewaehlt) {
+          const d = meter(b, { lat, lon }).d;
+          if (d < b.innen || d > b.aussen) { drin = false; break; }
+        }
+        if (drin) { ctx.fillRect(x, y, schritt, schritt); zellen += 1; }
+      }
+    }
+    ctx.globalAlpha = 1;
+
+    // Jedes Band einzeln: zwei Kreise, dazwischen ein Hauch Farbe.
+    for (const b of gewaehlt) {
+      const m = auf(b);
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, b.aussen * px, 0, Math.PI * 2);
+      ctx.arc(m.x, m.y, b.innen * px, 0, Math.PI * 2, true);
+      ctx.fillStyle = secondary;
+      ctx.globalAlpha = 0.09;
+      ctx.fill("evenodd");
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = secondary;
+      ctx.setLineDash([9, 7]);
+      ctx.lineWidth = 2;
+      for (const r of [b.innen, b.aussen]) {
+        ctx.beginPath();
+        ctx.arc(m.x, m.y, r * px, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
+      beschrifte(b, m, ink, muted);
+    }
+
+    // Das richtige Flurstück, als Kreuz.
+    const f = auf(FLURSTUECK);
+    ctx.strokeStyle = ink;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(f.x - 13, f.y); ctx.lineTo(f.x + 13, f.y);
+    ctx.moveTo(f.x, f.y - 13); ctx.lineTo(f.x, f.y + 13);
+    ctx.stroke();
+    ctx.font = "600 21px " + farbe("--font-body");
+    ctx.fillStyle = ink;
+    ctx.textAlign = "left";
+    ctx.fillText("Flurstück 790/11 — die Lösung", f.x + 19, f.y + 7);
+
+    massstab(ink, muted);
+
+    const trefferliste = gewaehlt.filter(b => {
+      const d = meter(b, FLURSTUECK).d;
+      return d < b.innen || d > b.aussen;
+    });
+    melde(zellen * zelle * zelle, gewaehlt, trefferliste, fehler);
+  }
+
+  function beschrifte(b, m, ink, muted) {
+    ctx.font = "600 20px " + farbe("--font-body");
+    ctx.fillStyle = ink;
+    const drin = m.x > 40 && m.x < bild.width - 40 && m.y > 40 && m.y < bild.height - 40;
+    if (drin) {
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, 7, 0, Math.PI * 2);
+      ctx.fillStyle = farbe("--secondary");
+      ctx.fill();
+      ctx.fillStyle = ink;
+      ctx.textAlign = "left";
+      ctx.fillText(b.name, m.x + 13, m.y - 10);
+      ctx.font = "18px " + farbe("--font-mono");
+      ctx.fillStyle = muted;
+      ctx.fillText(b.wortlaut, m.x + 13, m.y + 14);
+      return;
+    }
+    // Außerhalb des Bildes: am Rand anschreiben, mit Pfeil und Entfernung.
+    const rand = 26;
+    const x = Math.min(Math.max(m.x, rand + 150), bild.width - rand - 150);
+    const y = Math.min(Math.max(m.y, rand + 26), bild.height - rand);
+    const pfeil = m.y < 0 ? "↑" : m.y > bild.height ? "↓" : m.x < 0 ? "←" : "→";
+    ctx.textAlign = "center";
+    ctx.fillStyle = ink;
+    ctx.fillText(`${pfeil} ${b.name}`, x, y);
+    ctx.font = "18px " + farbe("--font-mono");
+    ctx.fillStyle = muted;
+    ctx.fillText(`${b.wortlaut} · ${zahl(meter(b, FLURSTUECK).d / 1000)} km Luftlinie`, x, y + 24);
+  }
+
+  function massstab(ink, muted) {
+    const laenge = 1000 * px;
+    const x = 34, y = bild.height - 34;
+    ctx.strokeStyle = muted;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x, y); ctx.lineTo(x + laenge, y);
+    ctx.moveTo(x, y - 7); ctx.lineTo(x, y + 7);
+    ctx.moveTo(x + laenge, y - 7); ctx.lineTo(x + laenge, y + 7);
+    ctx.stroke();
+    ctx.font = "18px " + farbe("--font-mono");
+    ctx.fillStyle = muted;
+    ctx.textAlign = "left";
+    ctx.fillText("1 km", x + laenge + 10, y + 6);
+  }
+
+  function melde(flaeche, gewaehlt, verfehlt, fehler) {
+    const f = document.getElementById("kw-flaeche");
+    const t = document.getElementById("kw-treffer");
+    if (!gewaehlt.length) {
+      f.textContent = "keine Angabe gewählt";
+      t.textContent = "";
+      t.style.color = "";
+      return;
+    }
+    f.textContent = flaeche > 0
+      ? `Schnittfläche ${zahl(flaeche / 1e6, flaeche > 1e6 ? 1 : 2)} km²`
+      : "Schnittfläche leer — die Angaben widersprechen sich";
+    if (verfehlt.length) {
+      t.textContent = "das richtige Flurstück liegt außerhalb (" +
+        verfehlt.map(b => b.wortlaut).join(", ") + ")";
+      t.style.color = fehler;
+    } else {
+      t.textContent = "das richtige Flurstück liegt im Schnitt";
+      t.style.color = farbe("--primary");
+    }
+  }
+
+  const fussnote = document.getElementById("kw-fuss");
+  fussnote.textContent =
+    "Gezeichnet wird Luftlinie — sie ist die untere Schranke jeder Route und braucht keine " +
+    "Anfrage. Gemessen am 10.09.2026: " +
+    Object.values(ANGABEN).map(a => `${a.wortlaut} → ${a.gemessen}`).join(" · ") + ".";
+
+  document.querySelectorAll(".chip[data-band]").forEach(k => k.addEventListener("click", () => {
+    const an = k.getAttribute("aria-pressed") === "true";
+    if (an) aktiv.delete(k.dataset.band); else aktiv.add(k.dataset.band);
+    k.setAttribute("aria-pressed", an ? "false" : "true");
+    zeichne();
+  }));
+  const eps = document.getElementById("kw-eps"), rho = document.getElementById("kw-rho");
+  eps.addEventListener("input", () => {
+    document.getElementById("kw-eps-wert").textContent = eps.value + " %";
+    zeichne();
+  });
+  rho.addEventListener("input", () => {
+    document.getElementById("kw-rho-wert").textContent = zahl(Number(rho.value) / 100, 2) + "×";
+    zeichne();
+  });
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", zeichne);
+  document.getElementById("kw-rho-wert").textContent = zahl(1.3, 2) + "×";
+  zeichne();
+}
+
+/* ------------------------------------------------------------------ *
+ * Teil 8 — Wertekatalog
  * ------------------------------------------------------------------ */
 const WERTE = [
   { name: "Frontbreite", gruppe: "suche", zitat: "(Frontbreite ca. 26 m)", quelle: "Plagwitz",
@@ -1435,7 +1877,7 @@ document.getElementById("katalog-aus").addEventListener("click", () => {
 zeichneKatalog();
 
 /* ------------------------------------------------------------------ *
- * Teil 8 — Beleg-Gate
+ * Teil 9 — Beleg-Gate
  * ------------------------------------------------------------------ */
 const GATE_TEXT =
   "Zum Verkauf steht ein attraktives, ca. 748,50 m² großes Baugrundstück in der aufstrebenden " +
