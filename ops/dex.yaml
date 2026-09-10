@@ -1,0 +1,40 @@
+# A local identity provider, so `docker compose up` is a complete app.
+#
+# Sign-in is optional in this project -- without a provider everything stays in
+# the browser and every account route says so. But the accounts, the server
+# storage and the shared links cannot be tried at all without one, and asking
+# somebody to install Keycloak first to click "Teilen" is not an answer.
+#
+# Dex, in memory, with one account. Nothing here is a secret and nothing here
+# belongs on a server: the client secret and the password are in this file, the
+# storage is gone when the container stops, and the issuer names localhost. A
+# real deployment sets OIDC_* against its own provider and never reads this.
+#
+#   Anmelden:  probe@where2build.example / wo-bauen
+issuer: http://localhost:8080/dex
+
+storage:
+  type: memory
+
+web:
+  http: 0.0.0.0:5556
+
+# One account, one client, one click: the approval screen would ask a question
+# that has one possible answer in a stack like this.
+oauth2:
+  skipApprovalScreen: true
+
+staticClients:
+  - id: where2build
+    name: where2build
+    secret: nur-fuer-den-lokalen-stapel
+    redirectURIs:
+      - http://localhost:8080/api/auth/callback
+
+enablePasswordDB: true
+staticPasswords:
+  # bcrypt of "wo-bauen".
+  - email: probe@where2build.example
+    hash: "$2b$10$HFetUhTChySy3woH4ggCvOWHANuSdpX1SjaskFYqNZGTk9ngAP4ya"
+    username: Probe Nutzerin
+    userID: 6f6a0b1c-6f0f-4a5e-9a4a-1b2c3d4e5f60

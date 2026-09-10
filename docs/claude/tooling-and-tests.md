@@ -35,7 +35,10 @@ log file rather than the reason.
 
 It does not survive a sandbox restart, and the failure looks like a code bug:
 `ConnectionRefusedError` in **fixture setup**, so all 41 database tests error at
-once and none of them is about what changed.
+once and none of them is about what changed. The port lives nowhere but in the
+start command — `postgresql.conf` carries `listen_addresses` and no `port` — so
+a `pg_ctl … start` without `-o '-p 5433'` comes up happily on 5432 and produces
+that same failure while `pg_isready` on 5432 says everything is fine.
 
 `TEST_DATABASE_URL` points the suite at it. Everything in that database is
 dropped between tests, so it must never name anything worth keeping.
@@ -86,8 +89,23 @@ to be copied into the build context — and falls back to a plain
 everywhere but here. On a real machine `docker compose up --build` needs none
 of it and the script is a passthrough.
 
+Its `up` already builds, so **`… up -d --build` fails**: the `--build` is
+passed through to the plain `docker compose up` behind it, which is the
+untrusted build the script exists to avoid. The error arrives as a pip
+certificate failure, i.e. as though the script had not worked.
+
 `docker pull python:3.11-slim` answers **429** from Docker Hub often enough
 that one retry is routine.
+
+**`docker compose up` brings the whole app, not a demo of half of it.** For a
+while the stack was nginx plus the backend, so a person who ran the documented
+command got an app whose sign-in button was absent and whose „Teilen" answered
+„Teilen ist in diesem Betrieb nicht eingerichtet" — two symptoms, one cause,
+and nothing anywhere said a database and a provider were missing. The file now
+also starts Postgres and dex (`ops/dex.yaml`, demo login
+`probe@where2build.example` / `wo-bauen`). An optional feature may default to
+off in the code and still have to be **on in the stack that is handed to
+someone to try**, or the first thing they meet is a dead end.
 
 To reach the dev Postgres from a container, it has to listen on the bridge
 (`listen_addresses = '*'`) *and* the bridge has to be in `pg_hba.conf`. The
@@ -187,17 +205,15 @@ line looks right and does not match.
   that appeared to break it. Dispatch a `paste` with a `DataTransfer` instead:
   instant, and it is the action the product is actually built around.
 
-- **Docker builds in this sandbox need three things, and the base image needs
-  patience.** The agent proxy re-terminates TLS, so a build has to run with
-  `--network host`, carry `/root/.ccr/ca-bundle.crt` into an early layer, and
-  be given `--build-arg HTTPS_PROXY=$HTTPS_PROXY` — with the CA but no proxy
-  pip gets past the certificate and then times out, which reads like a
-  different failure. `docker pull python:3.11-slim` also answers **429** from
-  Docker Hub often enough that one retry is normal. None of it belongs in the
-  repo's Dockerfiles; build with a copy under a different `-f`. Verified this
-  way on 09.09.2026: both images build, the shipped `nginx.conf` sends a
-  WhatsApp user agent to the backend and a browser to the app, and the preview
-  card draws **inside** the slim image — so FreeType there really does read the
+- **A note that says three causes where there is one sends the next reader
+  looking in two wrong places.** The first version of the Docker entry above
+  named `--network host` and `--build-arg HTTPS_PROXY` alongside the CA,
+  because the run that finally worked had all three. Re-measured 10.09.2026,
+  one at a time: with the CA in place and neither of the others, the build
+  reaches pypi and the npm registry. Only the CA was ever doing anything. A
+  finding is what a variable was *held against*, not what happened to be set.
+  What the run did confirm stands: both images build, and the preview card
+  draws **inside** the slim image — so FreeType there really does read the
   vendored `.woff` without brotli.
 
 - **A `vi.mock` factory that omits a new named export breaks at *import*
@@ -209,3 +225,11 @@ line looks right and does not match.
   state and an uncalled `readPage`, neither of them the cause. Adding an
   export means adding it to the factories.
 
+- **`git checkout <file>` on an uncommitted file is a delete, not an undo.** A
+  line was broken on purpose to check that a test would catch it; `git
+  checkout backend/app/services/oidc.py` put the file back to `HEAD` and took
+  the whole day's unstaged change with it. The break was two characters, so
+  `git diff` looked plausible right up until `grep -c _reachable` answered 0.
+  Undo a deliberate break with the editor, or stage the work first — and after
+  any checkout of a file that was dirty, grep for the thing that should be
+  there.

@@ -156,8 +156,9 @@ backend/.venv/bin/pip install -e "backend[dev]"
 backend/.venv/bin/python -m pytest backend/tests -q
 backend/.venv/bin/python -m uvicorn app.main:app --reload --app-dir backend
 
-# the whole thing in containers: nginx serves the build and proxies /api,
-# so there is one origin and no CORS. No database is involved.
+# the whole thing in containers: nginx with the build, the backend, Postgres
+# and a local identity provider. One origin, so no CORS.
+#   Anmelden: probe@where2build.example / wo-bauen
 docker compose up --build      # http://localhost:8080
 # the same thing in the Claude Code cloud sandbox, where a plain build fails
 # on the proxy's own CA -- see docs/claude/tooling-and-tests.md for why
@@ -205,8 +206,8 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 634 passed, 49 skipped. With `TEST_DATABASE_URL` pointed at a real
-  Postgres it is 675 passed, 8 skipped — the extra 41 are the account store,
+- `pytest`: 638 passed, 49 skipped. With `TEST_DATABASE_URL` pointed at a real
+  Postgres it is 679 passed, 8 skipped — the extra 41 are the account store,
   and they are skipped rather than mocked because what they check is the
   database's own behaviour. Of the remaining 8, one needs pyosmium, which only
   the index builder wants; the other seven need Tesseract.

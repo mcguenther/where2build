@@ -81,13 +81,21 @@ and imports it as JSON.
 
 ## Deploying it
 
-Two containers, no database. The backend is a proxy and a disk cache in front
-of the official services; everything a user enters stays in their browser.
+Four containers: nginx with the built app, the backend, Postgres, and a local
+identity provider. Without an account everything a user enters stays in their
+browser; with one it is stored server-side and a plot can be shared by link.
 
 ```bash
 cp backend/.env.example backend/.env    # optional — only LLM_API_KEY matters
 docker compose up --build               # then open http://localhost:8080
 ```
+
+Sign in as **probe@where2build.example / wo-bauen**. The database and the
+provider are part of the default stack because without them a third of the app
+is unreachable — no account, no server storage, no shared link. Both are
+deliberately local: the credentials are in `docker-compose.yml` and
+`ops/dex.yaml`, the provider keeps its state in memory, and everything names
+`localhost`. A deployment replaces them; see [Signing in](#signing-in).
 
 nginx serves the built frontend and proxies `/api` to the backend, so the
 browser only ever sees one origin and CORS never enters into it. The backend
@@ -102,6 +110,7 @@ if you want it separately.
 | **Extraction** | Without `LLM_API_KEY` in `backend/.env`, reading a listing page stays switched off. Everything else works. |
 | **Contact address** | Set `APP_CONTACT` before any real use: the Transitous usage policy requires one. |
 | **Own router** | `docker compose -f docker-compose.yml -f docker-compose.local-routing.yml up` runs MOTIS here instead of asking Transitous. See below. |
+| **Accounts** | `docker compose down -v` throws the database away with the volume `db-data`. Point `DATABASE_URL` at your own Postgres and the `OIDC_*` variables at your own provider to deploy this for real, and drop the `db` and `auth` services. |
 
 `backend/.env` is read if it exists and skipped if it does not, so the stack
 comes up either way.
@@ -300,7 +309,19 @@ OIDC_CLIENT_SECRET=...
 OIDC_SESSION_SECRET=...          # openssl rand -base64 32
 OIDC_PUBLIC_BASE_URL=https://where2build.example.org
 OIDC_COOKIE_SECURE=true          # false only for a plain-http localhost run
+OIDC_INTERNAL_BASE_URL=          # only where the issuer is not reachable from the backend
 ```
+
+`OIDC_INTERNAL_BASE_URL` is for one situation and it is the compose stack's:
+an issuer is a single string that the *browser* is redirected to and that an
+ID token is checked against, and inside a container network those two come
+apart. The provider there is `http://localhost:8080/dex` for the browser and
+`http://auth:5556/dex` from the backend, which is the same provider by two
+routes. Set this and the discovery document, the token endpoint and userinfo
+are fetched at that address, while the authorization URL and the `iss` check
+keep the public issuer. Keycloak calls the same thing a "frontend URL". Leave
+it empty anywhere the issuer is reachable from both sides — which is every
+ordinary deployment.
 
 Any OpenID Connect provider will do; nothing about one is wired in. The
 backend reads `<issuer>/.well-known/openid-configuration` and takes the

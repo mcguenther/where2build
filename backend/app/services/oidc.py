@@ -221,17 +221,36 @@ class OidcService:
                 "dann in diesem Browser."
             )
 
+    def _reachable(self, url: str | None) -> str | None:
+        """The same endpoint, as this backend can reach it.
+
+        Only for the calls this server makes itself. The authorization URL is
+        left alone -- it goes into the browser's address bar -- and so is the
+        issuer, which is what an ID token is checked against. ``None`` passes
+        through: ``userinfo_endpoint`` is optional and a provider that omits
+        it must not turn this into an attribute error.
+        """
+
+        base = self.settings.internal_base_url.rstrip("/")
+        public = self.settings.issuer.rstrip("/")
+        if not url or not base or not public or not url.startswith(public):
+            return url
+        return base + url[len(public) :]
+
     async def provider(self) -> Provider:
         """The issuer's endpoints, from its discovery document."""
 
         self.require_configured()
         issuer = self.settings.issuer.rstrip("/")
-        key = f"discovery:{issuer}"
+        # The internal address belongs in the key: pointing this at another
+        # provider while the issuer stays the same would otherwise keep
+        # serving the first one's endpoints out of the cache.
+        key = f"discovery:{issuer}:{self.settings.internal_base_url}"
         document = self.cache.get_json(key)
         if document is None:
             response = await request(
                 "GET",
-                f"{issuer}/.well-known/openid-configuration",
+                self._reachable(f"{issuer}/.well-known/openid-configuration"),
                 service=SERVICE_NAME,
                 advice=ADVICE,
                 timeout_s=self.settings.timeout_s,
@@ -263,8 +282,8 @@ class OidcService:
             # for the identifier "typically obtained during Discovery".
             issuer=_text(document.get("issuer")) or issuer,
             authorization_endpoint=authorization,
-            token_endpoint=token,
-            userinfo_endpoint=_text(document.get("userinfo_endpoint")),
+            token_endpoint=self._reachable(token),
+            userinfo_endpoint=self._reachable(_text(document.get("userinfo_endpoint"))),
             auth_methods=tuple(m for m in methods if isinstance(m, str))
             if isinstance(methods, list)
             else (),

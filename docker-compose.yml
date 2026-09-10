@@ -1,8 +1,17 @@
-# Two services and no database: the backend is a proxy and a disk cache in
-# front of ALKIS, BORIS, MOTIS, the tile servers and the extraction model, and
-# everything a user enters lives in their own browser.
+# The whole app, ready to use: nginx serves the build and proxies /api, the
+# backend proxies and caches the official services, Postgres holds what a
+# signed-in person stores, and a local identity provider makes signing in
+# possible at all.
 #
 #   docker compose up --build      then open http://localhost:8080
+#   Anmelden: probe@where2build.example / wo-bauen
+#
+# The database and the provider are here because without them a third of the
+# app is unreachable -- no account, no server storage, no shared link, and a
+# „Teilen" button that can only explain why it does nothing. Both are
+# deliberately local: the credentials below are in a committed file, the
+# provider's storage is in memory, and every one of them names localhost. A
+# deployment replaces them; see README, "Signing in".
 services:
   backend:
     build:
@@ -13,6 +22,22 @@ services:
       - path: ./backend/.env
         required: false
     environment:
+      # The database in this stack. A deployment sets its own DATABASE_URL --
+      # this one is reachable from nowhere but the compose network.
+      - DATABASE_URL=postgresql://where2build:where2build@db:5432/where2build
+      # Sign-in against the provider below. The issuer is the address the
+      # *browser* uses; OIDC_INTERNAL_BASE_URL is where this container reaches
+      # the same provider, because "localhost:8080" in here is this container.
+      - OIDC_ISSUER=http://localhost:8080/dex
+      - OIDC_INTERNAL_BASE_URL=http://auth:5556/dex
+      - OIDC_CLIENT_ID=where2build
+      - OIDC_CLIENT_SECRET=nur-fuer-den-lokalen-stapel
+      # Signs the session cookie. A shipped one is a key everybody has, which
+      # is exactly why this stack is for a laptop and not for a server.
+      - OIDC_SESSION_SECRET=nur-fuer-den-lokalen-stapel-nicht-verwenden
+      - OIDC_PUBLIC_BASE_URL=http://localhost:8080
+      # http on localhost: a Secure cookie would never be sent back.
+      - OIDC_COOKIE_SECURE=false
       # Declared without a value: compose passes it through only when it is set
       # on the host, and leaves it unset otherwise -- so backend/.env and the
       # built-in default (Transitous) keep their say when nobody asks for
@@ -35,6 +60,9 @@ services:
       # backend only ever reads it. Absent, /api/nearby says so for those
       # categories instead of answering with an empty list.
       - ./backend/data:/app/data:ro
+    depends_on:
+      db:
+        condition: service_healthy
     healthcheck:
       # No curl in the slim image, and adding one for this would be the only
       # reason to have it.
@@ -43,6 +71,37 @@ services:
       timeout: 10s
       retries: 6
       start_period: 20s
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=where2build
+      - POSTGRES_PASSWORD=where2build
+      - POSTGRES_DB=where2build
+    volumes:
+      # Plots and shared links survive a restart; `docker compose down -v`
+      # is what throws them away.
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      # The backend applies its schema at start-up, so it must not start
+      # before this answers -- and `pg_isready` answers before the first
+      # initialisation is finished, hence the start period.
+      test: ["CMD-SHELL", "pg_isready -U where2build -d where2build"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  # The local identity provider. Reached by the browser as
+  # http://localhost:8080/dex through the nginx below, and by the backend
+  # directly as http://auth:5556/dex -- one issuer, two ways to it.
+  auth:
+    image: ghcr.io/dexidp/dex:v2.41.1
+    command: ["dex", "serve", "/etc/dex/dex.yaml"]
+    volumes:
+      - ./ops/dex.yaml:/etc/dex/dex.yaml:ro
     restart: unless-stopped
 
   frontend:
@@ -93,3 +152,4 @@ services:
 volumes:
   backend-cache:
   scheduler-state:
+  db-data:

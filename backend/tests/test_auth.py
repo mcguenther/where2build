@@ -598,3 +598,154 @@ def test_nothing_about_a_sign_in_may_be_cached(oidc, client: TestClient):
     assert client.get("/api/auth/me").headers["cache-control"] == "no-store"
     login = client.get("/api/auth/login", follow_redirects=False)
     assert login.headers["cache-control"] == "no-store"
+
+
+# --------------------------------------------------------------------------
+# The provider on two addresses: one for the browser, one for this server
+# --------------------------------------------------------------------------
+
+INTERNAL = "http://auth:5556"
+
+
+@respx.mock
+def test_the_backend_may_reach_the_provider_at_another_address(
+    oidc, client: TestClient, monkeypatch
+):
+    """An issuer is one string doing two jobs, and in a container they part.
+
+    The browser knows the provider as `http://localhost:8080/dex`; from inside
+    the backend's container that address is the backend itself. So the
+    discovery document and the token endpoint are fetched at
+    `OIDC_INTERNAL_BASE_URL`, while the address the browser is *sent* to and
+    the `iss` an ID token is checked against stay public. Get it wrong and
+    sign-in fails at the token exchange, after the password was already typed.
+    """
+
+    monkeypatch.setenv("OIDC_INTERNAL_BASE_URL", INTERNAL)
+    reset_services()
+    inside_discovery = respx.get(f"{INTERNAL}/.well-known/openid-configuration").mock(
+        return_value=httpx.Response(200, json=DISCOVERY)
+    )
+    # The public addresses must not be called at all.
+    outside_discovery = _discovery_route()
+    outside_token = _token_route(_id_token())
+
+    handshake = _begin(client, "/grundstuecke")
+    inside_token = respx.post(f"{INTERNAL}/token").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "access_token": "zugang",
+                "token_type": "Bearer",
+                "expires_in": 300,
+                "id_token": _id_token(nonce=handshake["nonce"]),
+            },
+        )
+    )
+    answer = client.get(
+        "/api/auth/callback",
+        params={"code": "abc", "state": handshake["state"]},
+        follow_redirects=False,
+    )
+
+    assert answer.status_code in (302, 303, 307)
+    assert inside_discovery.called and inside_token.called
+    assert not outside_discovery.called and not outside_token.called
+    # And somebody is signed in, rather than sent to the failure page.
+    assert client.get("/api/auth/me").json()["angemeldet"] is True
+
+
+@respx.mock
+def test_the_issuer_that_is_checked_is_still_the_public_one(
+    oidc, client: TestClient, monkeypatch
+):
+    """The internal address is a route, not an identity.
+
+    An ID token says `iss: https://auth.example.org` however it was fetched, so
+    believing the internal address here would reject every token the provider
+    ever issues. The nonce is the correct one on purpose: the issuer has to be
+    the only thing wrong, or this passes without testing anything.
+    """
+
+    monkeypatch.setenv("OIDC_INTERNAL_BASE_URL", INTERNAL)
+    reset_services()
+    respx.get(f"{INTERNAL}/.well-known/openid-configuration").mock(
+        return_value=httpx.Response(200, json=DISCOVERY)
+    )
+
+    handshake = _begin(client)
+    respx.post(f"{INTERNAL}/token").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "access_token": "zugang",
+                "token_type": "Bearer",
+                "expires_in": 300,
+                "id_token": _id_token(nonce=handshake["nonce"], iss=INTERNAL),
+            },
+        )
+    )
+    client.get(
+        "/api/auth/callback",
+        params={"code": "abc", "state": handshake["state"]},
+        follow_redirects=False,
+    )
+
+    assert client.get("/api/auth/me").json()["angemeldet"] is False
+
+
+@respx.mock
+def test_without_the_internal_address_nothing_changes(oidc, client: TestClient):
+    # The default is empty, and then every call goes to the issuer itself.
+    discovery = _discovery_route()
+
+    handshake = _begin(client)
+    token = _token_route(_id_token(nonce=handshake["nonce"]))
+    client.get(
+        "/api/auth/callback",
+        params={"code": "abc", "state": handshake["state"]},
+        follow_redirects=False,
+    )
+
+    assert discovery.called and token.called
+    assert client.get("/api/auth/me").json()["angemeldet"] is True
+
+
+@respx.mock
+def test_a_provider_without_userinfo_still_works_at_the_other_address(
+    oidc, client: TestClient, monkeypatch
+):
+    """`userinfo_endpoint` is optional, and rewriting it must survive that.
+
+    Dex advertises one, several providers do not, and the rewrite reached for
+    `.startswith` on whatever the document held. With the internal address set
+    and the key missing that is an attribute error inside discovery -- i.e.
+    the whole sign-in falls over on a provider that is entirely within spec.
+    """
+
+    monkeypatch.setenv("OIDC_INTERNAL_BASE_URL", INTERNAL)
+    reset_services()
+    without_userinfo = {k: v for k, v in DISCOVERY.items() if k != "userinfo_endpoint"}
+    respx.get(f"{INTERNAL}/.well-known/openid-configuration").mock(
+        return_value=httpx.Response(200, json=without_userinfo)
+    )
+
+    handshake = _begin(client)
+    respx.post(f"{INTERNAL}/token").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "access_token": "zugang",
+                "token_type": "Bearer",
+                "expires_in": 300,
+                "id_token": _id_token(nonce=handshake["nonce"]),
+            },
+        )
+    )
+    client.get(
+        "/api/auth/callback",
+        params={"code": "abc", "state": handshake["state"]},
+        follow_redirects=False,
+    )
+
+    assert client.get("/api/auth/me").json()["angemeldet"] is True

@@ -169,3 +169,24 @@ server.
   a „Kaufpreis" nobody could read off the link. `share_scope` requires a value
   that is not `None` and not an empty container. Found in a browser walk, not
   in a test.
+
+- **An issuer is one string doing two jobs, and inside a compose network the
+  two addresses differ.** The provider is `http://localhost:8080/dex` for the
+  browser and `http://auth:5556/dex` for the backend, and OIDC has no field
+  for that: the discovery document, the token endpoint and userinfo all come
+  back naming the public address, which the backend cannot resolve. It fails
+  as a connection error during the callback, i.e. as „Anmeldung
+  fehlgeschlagen" with nothing in the browser to say why. `OIDC_INTERNAL_BASE_URL`
+  rewrites **only the URLs this backend fetches itself**
+  (`OidcService._reachable`); the authorization URL the browser is sent to and
+  the `iss` that is checked against the token stay public, because rewriting
+  either would send the user to a hostname their machine does not have, or
+  make the check pass for a token issued by somebody else. Keycloak calls the
+  same setting a „frontend URL", from the other end. Three tests hold the
+  split: the fetch goes to the internal address, the check stays on the public
+  one, and without the setting nothing changes. A fourth followed from reading
+  the rewrite again: `userinfo_endpoint` is optional in the discovery document,
+  and the first version called `.startswith` on whatever was there — a provider
+  that omits it (dex does not, several do) would have died inside discovery
+  with an attribute error, with the internal address set and nothing else
+  wrong.
