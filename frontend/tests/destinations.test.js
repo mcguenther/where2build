@@ -17,6 +17,10 @@ import { realState, realPlot, realRoutes, realDestinations, mountWithRouter } fr
 import { zubringerOf } from "../src/lib/routes.js";
 
 vi.mock("../src/lib/api.js", () => ({
+  // The cap the module exports next to the call that sends it. A factory
+  // that omits a named export makes every importer fail at *import* time,
+  // which shows up as unrelated component errors.
+  PAGE_LIMIT: 3000000,
   geocode: vi.fn(),
   nearby: vi.fn(() => Promise.reject(new Error("nicht Teil dieses Tests"))),
   reachability: vi.fn(() => Promise.reject(new Error("nicht Teil dieses Tests")))

@@ -50,7 +50,20 @@ export const DWELL_MS = 2000;
 export const BUDGET_MS = 12000;
 export const MIN_DWELL_MS = 480;
 
-/** What a queue of this length may spend per step. */
+/** What a step that leaves the map where it is may spend.
+ *
+ *  Long enough that the list still arrives line by line and can be followed,
+ *  and nowhere near long enough to be a wait. The pacing above exists for the
+ *  *camera* — three flights started in one frame is a twitch — and most clues
+ *  never touch it: a phase line, a street, a land use and an area all land on
+ *  a map that stays exactly where it was. Holding those for two seconds each
+ *  is half a minute of watching nothing move. */
+export const QUICK_MS = 250;
+
+/** What a queue with this many camera moves in it may spend on each of them.
+ *
+ *  Camera moves, not steps: the budget is there to keep a finished run from
+ *  taking half a minute, and what makes it long is the flying. */
 export const dwellFor = (waiting, dwell = DWELL_MS, budget = BUDGET_MS) =>
   waiting <= 1 ? dwell : Math.max(MIN_DWELL_MS, Math.min(dwell, budget / waiting));
 
@@ -176,9 +189,16 @@ export function contextOpacity(layerBounds, frame, { full = 0.9, floor = 0 } = {
  *
  * Indicia arrive unevenly: the attribute list at once, image recognition after
  * half a second, a model after two. Three arriving together would be a twitch,
- * so each stands for `dwell` and the camera flight gets `flight` to finish.
+ * so each stands on its own and the camera flight gets time to finish.
  * A person clicking in the protocol skips the queue — nobody waits for an
  * animation.
+ *
+ * **What is being paced is the camera, not the reading.** `moves` says whether
+ * a step will fly the map; those get `dwell`, sharing the budget between them,
+ * and everything else gets `quick`. Pacing every step alike was the first
+ * version and it was wrong in both directions: sixteen clues at two seconds is
+ * half a minute of watching a map that mostly does not move, while the flights
+ * that *do* happen were no calmer for it.
  *
  * The timers are injected so this can be tested without waiting in real time,
  * and `reduced` collapses every wait to nothing for
@@ -191,18 +211,27 @@ export class StepQueue {
    * run then stops after its first line, with the map still showing Saxony. */
   constructor({
     dwell = DWELL_MS,
+    quick = QUICK_MS,
     budget = BUDGET_MS,
     reduced = false,
+    /* Whether a step will move the map. Weighed rather than measured: it is
+     * asked of items still queued, so it can only read the event itself — and
+     * erring towards "yes" costs a calm camera, never a twitch. */
+    moves = () => true,
     timer = (fn, ms) => setTimeout(fn, ms),
     cancel = id => clearTimeout(id)
   } = {}) {
     this.dwell = reduced ? 0 : dwell;
+    this.quick = reduced ? 0 : quick;
     this.budget = budget;
     this.reduced = reduced;
-    /* What the current step is actually taking. The camera flight is derived
-     * from it, so a fast run does not start a 900 ms flight every 240 ms and
-     * spend the whole time interrupting itself. */
+    this.moves = moves;
+    /* What the current step is actually taking. */
     this.step = this.dwell;
+    /* What a camera step is currently getting. The flight duration is derived
+     * from this and not from `step`, so a run of quick steps in between does
+     * not shrink the next flight to nothing. */
+    this.pace = this.dwell;
     this.timer = timer;
     this.cancel = cancel;
     this.pending = [];
@@ -234,8 +263,13 @@ export class StepQueue {
     }
     this.running = true;
     // Recomputed each step: the backlog grows while the stream is open and
-    // shrinks as it plays, so the pace follows what is actually waiting.
-    this.step = dwellFor(this.pending.length + 1, this.dwell, this.budget);
+    // shrinks as it plays, so the pace follows what is actually waiting. Only
+    // the camera moves are counted — the budget exists to keep a finished run
+    // short to watch, and what makes it long is the flying.
+    const flies = Boolean(this.moves(next));
+    const waiting = this.pending.filter(item => this.moves(item)).length + (flies ? 1 : 0);
+    this.pace = dwellFor(Math.max(waiting, 1), this.dwell, this.budget);
+    this.step = flies ? this.pace : this.quick;
     this.onStep(next);
     this.handle = this.timer(() => this.advance(), this.step);
   }
@@ -257,6 +291,24 @@ export class StepQueue {
     this.running = false;
   }
 }
+
+/**
+ * Whether one line of the search stream will move the camera.
+ *
+ * The camera follows the *candidate set* — and before there is one, the
+ * districts still in play, and before those, the advert's own pin. So exactly
+ * four kinds of line can fly it, and a phase line, a conflict, a street, a
+ * land use or an area statement all land on a map that stays where it was.
+ * Read off the event alone, because the queue asks this of lines it has not
+ * applied yet: the frame may still turn out identical, and then the step waits
+ * for a flight that never happens. That way round is a calm camera; the other
+ * way round is the twitch.
+ */
+export const movesTheMap = event =>
+  event?.art === "gebiete" ||
+  event?.art === "kandidaten" ||
+  event?.art === "ergebnis" ||
+  (event?.art === "indiz" && event.indiz?.art === "pin");
 
 /** Whether this browser has been asked to keep motion down. */
 export const prefersReducedMotion = () =>

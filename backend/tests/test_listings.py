@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 
 import httpx
+import pytest
 import respx
 from fastapi.testclient import TestClient
 
@@ -49,7 +50,7 @@ def test_immobilienscout24_is_not_fetched_and_points_at_the_paste_field(client: 
     answer = client.post("/api/listings/extract", json={"url": IMMOSCOUT_URL})
 
     assert answer.status_code == 400
-    assert "Einfügefeld" in answer.json()["detail"]
+    assert "Seite einfügen" in answer.json()["detail"]
     assert portal.call_count == 0
     assert llm.call_count == 0
 
@@ -190,7 +191,8 @@ def test_page_without_any_locator_is_a_400(client: TestClient):
     )
 
     assert answer.status_code == 400
-    assert "Einfügefeld" in answer.json()["detail"] or "eintragen" in answer.json()["detail"]
+    detail = answer.json()["detail"]
+    assert "einfügen" in detail or "eintragen" in detail
     assert llm.call_count == 2
 
 
@@ -210,12 +212,12 @@ def test_bare_text_without_a_provider_says_what_to_paste_instead(without_llm, cl
     assert "Strg+A" in detail
 
 
-def test_a_pasted_page_is_read_without_a_model_at_all(without_llm, client: TestClient):
-    """The paste field exists for portals that refuse a server-side fetch.
+def test_a_whole_document_is_read_without_a_model_at_all(without_llm, client: TestClient):
+    """This way in exists for portals that refuse a server-side fetch.
 
-    Requiring a model here made it useless in exactly that case. A page copied
-    out of a browser carries its meta tags, its price and its attribute list,
-    and the parcel search reads the prose itself.
+    Requiring a model here made it useless in exactly that case. A whole
+    document -- what the bookmarklet hands over -- carries its meta tags, its
+    price and its attribute list, and the parcel search reads the prose itself.
     """
 
     answer = client.post(
@@ -227,8 +229,58 @@ def test_a_pasted_page_is_read_without_a_model_at_all(without_llm, client: TestC
     assert body["weg"] == "eingefuegter-text"
     assert body["felder"]["kaufpreis_eur"]["wert"] == 80000
     assert body["felder"]["grundstuecksflaeche_m2"]["wert"] == 1025
+    # The coordinate is in `<head>`, which is what separates a handed-over
+    # document from a clipboard copy -- see the test below.
+    assert body["felder"]["lat"]["wert"] == pytest.approx(51.13430038927799)
     assert "Ortsteil Lobstädt bei Neukieritzsch" in body["beschreibung"]
     assert body["bilder"]
+
+
+def test_a_clipboard_copy_keeps_the_body_and_loses_the_head(without_llm, client: TestClient):
+    """What the paste field can and cannot do, pinned against the difference.
+
+    `Strg+A` selects the document's *body*, so a pasted page arrives without
+    `<head>` and without any `<script>` -- measured in Chromium, see
+    `docs/research/immobilienscout24-zugang.md` § 4. The price, the attribute
+    list, the images and the prose are body markup and survive; the coordinate
+    lives in `og:latitude` and does not. That is why a pasted ImmoScout page
+    read as having no address, no coordinate and no parcel number, which was
+    recorded as a fact about the portal and is a fact about the clipboard.
+    """
+
+    page = fixture_text("inserat-kleinanzeigen.html")
+    body_only = page[page.index("<body") :]
+    assert "og:latitude" not in body_only
+
+    answer = client.post("/api/listings/extract", json={"text": body_only})
+
+    assert answer.status_code == 200
+    read = answer.json()["felder"]
+    assert read["kaufpreis_eur"]["wert"] == 80000
+    assert read["grundstuecksflaeche_m2"]["wert"] == 1025
+    assert read["lat"]["wert"] is None
+    assert read["lon"]["wert"] is None
+
+
+def test_a_handed_over_document_may_be_megabytes(without_llm, client: TestClient):
+    """The cap has to hold a whole portal page, not a clipboard's worth.
+
+    It was 400 000 characters while the clipboard was the only way in.
+    `document.documentElement.outerHTML` runs past a megabyte, and there is no
+    safe place to cut it: JSON-LD is routinely the last thing in the body.
+    """
+
+    page = fixture_text("inserat-kleinanzeigen.html")
+    padding = "<!-- {} -->".format("x" * 1_000_000)
+    inflated = page.replace("</body>", padding + "</body>")
+    assert len(inflated) > 1_000_000
+
+    answer = client.post("/api/listings/extract", json={"text": inflated})
+    assert answer.status_code == 200
+    assert answer.json()["felder"]["kaufpreis_eur"]["wert"] == 80000
+
+    too_much = "x" * 3_000_001
+    assert client.post("/api/listings/extract", json={"text": too_much}).status_code == 422
 
 
 @respx.mock
@@ -316,3 +368,33 @@ def test_prose_that_names_nowhere_is_still_refused(without_llm, client: TestClie
 
     assert answer.status_code == 503
     assert "Strg+A" in answer.json()["detail"]
+
+
+def test_a_paste_with_no_markup_at_all_is_read_too(without_llm, client: TestClient):
+    """The plainest paste there is: the rendered page, as text.
+
+    The deterministic reader used to run only when the text contained a „<“,
+    which was true of the parsers when that gate was written and stopped being
+    true once `portal_fields` began going by the German word and the value's
+    unit. So somebody who selected an ImmoScout exposé and pasted it got every
+    field back empty — „Grundstücksfläche ca. 866 m²“ and „199.000 €“ standing
+    in the text they had just handed over, and „Gelesene Werte“ showing
+    nothing.
+    """
+
+    text = (
+        "Preisreduziert! Baugrund in Rückmarsdorf sucht Hausbauer\n"
+        "Burghausen-Rückmarsdorf, 04178 Leipzig\n"
+        "199.000 €\nKaufpreis 229,79 €/m²\n"
+        "Grundstücksfläche ca.\n866 m²\n"
+        "Zum Verkauf steht ein schönes Baugrundstück in einer gewachsenen Wohnsiedlung."
+    )
+    assert "<" not in text
+
+    answer = client.post("/api/listings/extract", json={"text": text})
+
+    assert answer.status_code == 200
+    read = answer.json()["felder"]
+    assert read["grundstuecksflaeche_m2"]["wert"] == 866
+    assert read["kaufpreis_eur"]["wert"] == 199_000
+    assert read["adresse"]["wert"] == "04178 Leipzig"

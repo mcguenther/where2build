@@ -188,3 +188,19 @@ that collapsed at 390 px. None of them threw.
   (`.hero__art svg{ opacity: .42 }`) and the core only softens the middle.
   The opacity goes on the svg, never on `.hero__art`: the veil is that
   element's own `::after` and would fade with it.
+
+- **`handoff` and `handover` are one letter apart and different things.**
+  `lib/handoff.js` is what the start page leaves behind for the wizard — an
+  input already typed somewhere else. The *handover* is a whole page arriving
+  from another tab because somebody clicked the bookmarklet on a portal. They
+  meet in `WizardView`, so both names are spelled out where they are declared;
+  do not shorten either.
+- **Two folds with the same class, one step apart, make a wait match the wrong
+  one.** The entry step grew a `details.gelesen` for the bookmarklet while the
+  search step has had one for the read values. `scripts/bookmarklet.mjs` waits
+  for the fold to know the page was read — and would have matched the entry
+  step's immediately, then waited out its timeout on a list one step away. The
+  bookmarklet's carries `gelesen--lesezeichen` and the script asks for
+  `:not(.gelesen--lesezeichen)`; a test asserts the entry step has no plain
+  one.
+

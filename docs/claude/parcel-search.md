@@ -403,8 +403,236 @@ also "Decisions that are settled" in `CLAUDE.md`.
   template may only supply a reason when the run supplied none.
 
 - **A longer camera flight alone is not a calmer camera.** The flight is capped
-  at `queueStep * 1.6`, so doubling `FLIGHT_MS` without doubling `BUDGET_MS` and
+  at `queuePace * 1.6`, so doubling `FLIGHT_MS` without doubling `BUDGET_MS` and
   `MIN_DWELL_MS` just interrupts the same movement more often. All three move
-  together; sixteen clues now play over twelve seconds instead of six — and the
-  screenshot script's wait after the verdict has to outlast the budget, or it
-  photographs a map still in flight.
+  together — and the flight is derived from `pace` (what a *camera* step is
+  getting) rather than from `step` (what the step being played is getting), or a
+  run of 250 ms lines in between would shrink the next flight to the floor.
+  `BUDGET_MS` is a divisor, not a total: it is recomputed against the remaining
+  backlog each step, so the pace grows back towards two seconds as the queue
+  empties. The screenshot script's wait after the verdict has to outlast the
+  whole of it, or it photographs a map still in flight.
+
+- **What the queue paces is the camera, not the reading.** The dwell exists
+  because three camera flights started in one frame is a twitch — and the first
+  two versions of it slowed down *every* line instead, which is the wrong thing
+  in both directions: a phase line, a street, a land use and an area statement
+  all land on a map that stays exactly where it was, so holding each for two
+  seconds is a long wait in front of nothing moving, and the flights that do
+  happen were no calmer for it. `movesTheMap` names the four lines the camera
+  follows — `gebiete`, `kandidaten`, `ergebnis` and the `pin` Indiz — those get
+  the dwell and share the budget, everything else gets `QUICK_MS = 250`.
+  Measured on the recorded Großbothen run: 16 lines, **3** of them camera
+  moves, 21,2 s before and **7,3 s** after, with each flight still getting its
+  full two seconds. Weighed off the event rather than measured off the map,
+  because the queue asks it of lines it has not applied yet — so the frame may
+  still turn out identical and the step waits for a flight that never happens.
+  That way round is a calm camera; the other way round is the twitch.
+  `prefers-reduced-motion` skips it all.
+
+- **A sentence that changes every step must not be set as the heading.** The
+  status box above the map put the phase text in its `<h2>` at `text-xl`, and
+  those texts run from four words („Angaben aus dem Inserat lesen") to four
+  lines („Gegenprobe eine Stufe weiter (499.49 bis 504.51 m²): 1 weitere
+  Flurstücke ähnlicher Größe. Sie erfüllen …") — so the box resized under
+  itself sixteen times a run and shoved the whole stage, map included, down and
+  up with it. The heading is the phase's one-word *label* now (the same
+  vocabulary the Verlauf marks its rows with), the wording moved to the body
+  line where two lines are reserved and the running text is clamped to two, and
+  the „Abfragen ans Kataster" slot is kept in the layout while the number is
+  still unknown, because below 700 px it wraps onto its own line. Measured
+  against the live cadastre before and after: **one** box height for the whole
+  run at 1440 px (123 px) and at 390 px (155 px), with the stage's top edge
+  fixed. It still grows once when the answer lands — the verdict sentence and
+  the hint are real content — and clamping *those* to save that one change
+  would be the wrong trade.
+  The pulse along the bottom edge exists because something has to say the run
+  is alive, and what used to say it was the wording jumping about. A bar of a
+  fixed height cannot move the layout, and it needs the faint rail behind it:
+  without one the travelling segment reads as a broken border.
+
+- **The protocol follows the run, and stops following the moment somebody
+  scrolls up.** The list is the one place the order of a run can be checked, and
+  it grew past its 560 px box with the newest line always out of sight.
+  `record` asks whether the box was at its end *before* the entry is added and
+  only then scrolls — a list that jumps out from under someone reading an
+  earlier clue is worse than one that does not follow at all. The tolerance is
+  about one row, because a browser rounds a scroll position by a fraction of a
+  pixel and an exact comparison reports "scrolled up" on a list nobody touched.
+  And the panel head had to become `position: sticky`: „Rest zeigen" is the
+  only control that matters while a run plays, and it was the first thing to
+  disappear upwards.
+
+- **The clipboard carries `text/html` next to `text/plain`, and it carries the
+  body and nothing else.** The paste field keeps the HTML flavour (`@paste`,
+  capped at 400 000 characters), which is right — but `Strg+A` selects the
+  *body*, so every `<meta>` and every `<script type="application/ld+json">`
+  stays behind. Measured in Chromium: `og:latitude`, `og:longitude`, a head
+  `itemprop="price"` and JSON-LD are all absent; `#viewad-price`,
+  `.addetailslist--detail`, `<img src>` with its `?rule=$_59` variant and a
+  body-level `itemprop` all survive. So a pasted Kleinanzeigen page loses the
+  coordinates a fetched one gets for free, and a pasted ImmoScout page loses
+  every deterministic field at once — which is why it reads as having no
+  address, no coordinate and no parcel number, a fact about the clipboard and
+  not about the portal. The fix is not more prose parsing: it is getting the
+  real DOM out of the browser that already has it, which is what
+  `lib/bookmarklet.js` does — one click on the listing page hands over
+  `document.documentElement.outerHTML` through `postMessage`, so no CORS, no
+  request to the portal and nothing circumvented. Verified end to end across
+  two origins by `scripts/bookmarklet.mjs`. **The coordinate is not what is
+  gained**, though the first version of this note said so: a portal's
+  coordinate is the municipality's or the quarter's, never the plot's — that is
+  the 6 235 m measurement two notes above — so losing it costs almost nothing.
+  What the whole document actually adds is the portal's **own structured
+  fields**: on ImmoScout, `obj_lotArea: "742"` where the prose hedges „ca.
+  742 m²", plus `geo_bln`, `geo_krs` and the Ortsteil as separate values. An
+  exactly stated area is a hard filter; a hedged one only ranks. Emptying the
+  paste field has to clear the kept HTML, or the next read silently ships the
+  page pasted before. See `docs/research/immobilienscout24-zugang.md` § 4.
+
+- **Read a listing by the German word and the value's unit, not by the
+  markup.** Three portals were recorded and they agree about nothing else:
+  ImmoScout writes `<dt>Grundstücksfläche ca.</dt><dd>742  m²</dd>`,
+  Kleinanzeigen `<li>Grundstücksfläche 1.025 m²</li>`, and ohne-makler.net
+  `<span>5.366 m²</span><span>Grundstücksfläche</span>` — the **value before its
+  label**, in Tailwind spans with no semantic hook, no `<dt>`, no `<th>`, no
+  price meta tag and no coordinate anywhere. So `services/portal_fields.py`
+  flattens the document to text (tags become `|`), finds the label and takes
+  the nearest value of the right *shape* within 60 characters on either side.
+  That reads all three, and it read the third one before anybody looked at it.
+  Four guards, each measured: „370,62 €/m²" one element from the price is a
+  rate, not the price; bare „Fläche" must not match „Wohnfläche", so the label
+  boundary excludes German letters; „Die großzügige Grundstücksfläche bietet
+  ideale Voraussetzungen" has no value near it and must contribute nothing; and
+  the first postcode on an ImmoScout page sits in the analytics block, so the
+  first postcode *followed by a name* wins. It is the floor under the
+  portal-specific blocks, never above them — a structured field is a statement,
+  this is a reading.
+
+- **ohne-makler's JSON-LD describes the portal, not the listing.** Its
+  `Organization` node carries the company's own address in Reinbek,
+  Schleswig-Holstein, 400 km from the Saxon plot on the page. So a schema.org
+  address may only be read from a listing-ish node, never from whatever node
+  comes first — the „600 m² in Brehna" lesson, one channel further along.
+
+- **A Stadtteil is not a Gemarkung, and one BBOX request settles it.**
+  `AlkisService.districts_around` asks `ave:KatasterBezirk` which districts meet
+  a box around a point. Measured 09.09.2026: around Grünau-Siedlung it answers
+  7 against Stadt Leipzig's 76, and with the listing's exact 742 m² those leave
+  3 candidates where the Gemeinde alone leaves 24 — the right one, Lausen 8/a
+  „Staffelsteinstraße 4", first. The seed is the **platform's own pin**, which
+  the `Anchor` docstring used to rule out entirely: it is still never *the*
+  container, but it may say which containers get asked. That is safe in one
+  direction only, and that is what lets the radius be picked without a corpus —
+  a box too small to hold the right district makes every count zero and the run
+  reports nothing found, so a bad pin can produce no parcel but never a wrong
+  one. `PIN_RADIUS_M = 1500`: measured against the pin sitting 6 235 m from the
+  Lobstädt parcel, ±1500 m returns 8 districts with Lobstädt among them, ±3000 m
+  returns 23, ±7000 m returns 69. Runs only when nothing else named a container,
+  never outside Saxony, and the verdict can never be „bestätigt" off it.
+  **On that same exposé it no longer runs**, and the note above was written
+  before the reason existed: the coordinate sits next to `isFullAddress: false`,
+  so it is the quarter's point and is refused outright, which leaves that
+  listing „nicht eingrenzbar". Honest, and not fixable from the name — Grünau-
+  Siedlung sits on Gemarkung Lausen and nothing in the directory says so. The
+  pin path still earns its place where a portal states a complete address.
+
+- **The location field is not one string, and its Ortsteil is in front of the
+  postcode.** Five digits are the only fixed point in a German location line,
+  and the three recorded portals put everything else in three orders around
+  them: „Burghausen-Rückmarsdorf, 04178 Leipzig, Sachsen" (ImmoScout),
+  „04668 Sachsen – Grimma" (Kleinanzeigen), „Maschinenhausstraße, 01587 Riesa,
+  Sachsen" (ohne-makler). Behind the digits stands the Gemeinde — unless that
+  slot holds the Bundesland, and then it is behind the dash; in front of them
+  stands the Ortsteil, which is ImmoScout's own `obj_regio4`. Reading the line
+  as one opaque `ort` Indiz threw both away, and that is what cost advert
+  170438443 (09.09.2026) its answer: with no district anchor the run fell back
+  on Stadt Leipzig, where 112 589 Flurstücke hold **31** of exactly 866 m². The
+  Ortsteil holds two. A street stands in that slot on one portal in three, so
+  the head only counts when the Gemarkungsverzeichnis knows it.
+
+- **A compound Ortsteil is two Gemarkungen, and the Gemeinde is what makes
+  splitting it safe.** „Burghausen-Rückmarsdorf" is no Gemarkung; Burghausen
+  145507 and Rückmarsdorf 145614 both are, both in Stadt Leipzig, and the plot
+  may be in either — so the answer is *two* candidates, not one. Reading half
+  the name as the whole location is how „Baugrund in Rückmarsdorf" in the title
+  confirmed Rückmarsdorf 250/38 („ohne Lage", Weg) while Burghausen 286/a — the
+  same 866 m², official Lagebezeichnung „Neuburghausener Weg", which the
+  listing names, and „Sport-, Freizeit- und Erholungsfläche", which is the
+  „bisher als Wochenend- bzw. Gartengrundstück genutzt" the listing describes —
+  was never looked at. A part is a *derived* reading, so it only stands when its
+  own Gemeinde is the one the listing names: „Grünau-Siedlung" splits to a
+  Gemarkung Grünau that exists twice, in Großolbersdorf and Langenweißbach,
+  80 km away, and that guard drops both. Measured against all **63** Leipzig
+  Ortsteile: every compound resolves to its own Gemarkungen, every namesake
+  elsewhere is dropped, „Lausen-Grünau" keeps Lausen and drops Grünau in one
+  breath, and the five „Grünau-…" names contribute nothing rather than anchoring
+  wrong. Costs no request.
+
+- **A Gemeinde named next to a district is not a rival reading of it — but only
+  then.** „in Leipzig – Stadtteil Burghausen-Rückmarsdorf" names both levels in
+  one sentence, and Gemarkung Leipzig holds parcels of every size, so leaving it
+  as an anchor is a third of the 31. Demoting it needs the condition, though:
+  „Sachsen - Bad Lausick" names one place that is a Gemarkung *and* a Gemeinde,
+  and demoting it there leaves the run with no anchor at all — which is the
+  advert whose area has no match in Gemarkung Bad Lausick and exactly one in the
+  municipality. So the rule is: demote the Gemeinde's name only while some
+  *other* district is on the table.
+
+- **The two halves of one Ortsteil are a set, not a contradiction.** Once
+  „Burghausen-Rückmarsdorf" resolved to both its Gemarkungen the run put them
+  up as a `Konflikt` — „Welche Gemarkung ist gemeint? Die Angaben widersprechen
+  sich" — above a listing in which nothing contradicts. It is the same rule
+  that already covers „790/11 sowie 238/3": readings that came out of **one**
+  source are a set, and only readings from *different* sources are rival. So
+  `Indiz.teil_von` carries the compound a district was taken out of, it survives
+  the dedupe onto whichever reading is kept (a title's „in Rückmarsdorf" is the
+  same statement as the prose's „Stadtteil Burghausen-Rückmarsdorf"), and
+  `halves_of_one_ortsteil` suppresses the question. Both are searched, both
+  survivors are in the answer, and the user picks a *parcel* — which is the
+  choice that was worth offering all along.
+
+- **The deterministic reader must not be gated on „`<`" being in the paste.**
+  It was, and that was true of the parsers when the gate was written: they read
+  markup. `portal_fields` goes by the German word and the value's unit, so it
+  reads a *rendered* page as well as a marked-up one — „Grundstücksfläche ca.
+  866 m²" and „199.000 €" are right there in the text. The gate answered every
+  field empty for the plainest paste there is, and „Gelesene Werte" showed
+  nothing on exactly the input the reader was written for.
+
+- **A portal's own field names are worth more than any prose, and they are one
+  block to maintain.** Measured on a recorded ImmoScout exposé (167953918,
+  09.09.2026, `fixtures/inserat-immoscout.html`): the page carries
+  `obj_lotArea: "742"`, `obj_purchasePrice: "275000"`, `geo_bln: "sachsen"`,
+  `geo_krs: "leipzig"` and `obj_regio4: "Grünau_Siedlung"` as separate values —
+  twice, in `keyValues` and in `<s24-ad-targeting>` — while its prose only says
+  „eine Fläche von ca. 742 m²". Exact is a hard filter, hedged only ranks. The
+  clipboard shape gets the same numbers as rendered text out of the portal's
+  `is24qa-*` elements, and neither the Bundesland nor the pictures. So the
+  per-portal patterns live in one delimited block in `services/portals.py` with
+  the recording named, and a rename shows up as a failing test naming the field.
+  Two traps in those patterns: every `is24qa-*` value has a `…-label` sibling
+  carrying the same class plus a suffix and it comes *first*, so a pattern
+  without `(?![-\w])` reads „Grundstücksfläche ca. 742 m²"; and the agent's
+  „Wir machen die obigen Angaben nach bestem Wissen …" sits in the same element
+  class as the description, so short blocks are dropped.
+
+- **A portal coordinate next to `isFullAddress: false` must not be taken at
+  all.** ImmoScout's `exposeMap` gives 51.30595, 12.27605 for this advert with
+  `showFullAddress: false`: that is the *quarter's* point. The app resolves the
+  parcel under a coordinate, so a quarter centroid is not a coarse locator but
+  a wrong one — the same shape as the 6 235 m Kleinanzeigen pin. Read it only
+  when the portal says the address is complete.
+
+- **„Grünau-Siedlung" is not a Gemarkung, and the two called „Grünau" are 80 km
+  away.** Measured 09.09.2026 against `gemarkungen-sachsen.json`: Gemarkung
+  Grünau exists exactly twice, in Großolbersdorf and Langenweißbach, both in
+  the Erzgebirge or Vogtland — so reading a Leipzig Stadtteil as a Gemarkung
+  anchors the search 80 km wrong, and `collect_indicia` is right to refuse a
+  bare mention. Stadt Leipzig has 76 Gemarkungen and Grünau sits on the old
+  villages beneath it: Schönau, Lausen, Groß- and Kleinmiltitz, Knauthain. What
+  the portal's structured fields do give is the **Gemeinde**, and that is
+  enough: Stadt Leipzig holds 112 589 Flurstücke, `flaeche = 742` leaves **24**
+  — a scoreable set — and adding Gemarkung Lausen leaves exactly **one**,
+  Flurstück 8/a, 742 m², „Staffelsteinstraße 4", `Wohnbaufläche;742`. So a
+  Stadtteil is worth resolving to the Gemarkungen under it; it is never one.

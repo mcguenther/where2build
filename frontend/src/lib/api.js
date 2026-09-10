@@ -119,7 +119,22 @@ export const putSettings = (dokument, geaendert_am) =>
   request("/settings", { method: "PUT", body: JSON.stringify({ dokument, geaendert_am }) });
 
 export const readListing = url => request("/listings/extract", { method: "POST", body: JSON.stringify({ url }) });
-export const readPage = text => request("/listings/extract", { method: "POST", body: JSON.stringify({ text }) });
+/** How much page content travels to the reader, capped in one place.
+ *
+ *  Raised from 400 000 when the bookmarklet arrived: that hands over
+ *  `document.documentElement.outerHTML`, and a portal exposé runs past a
+ *  megabyte. The old cap came with the assumption that everything the
+ *  extraction wants sits in the first part of the document, which is not true
+ *  of a whole one -- JSON-LD is routinely the last thing in the body. The
+ *  endpoint's own `max_length` is the same number, and nginx needs a
+ *  `client_max_body_size` above it.
+ *
+ *  Cut here rather than at each caller: two callers hand a page over -- the
+ *  paste field and the bookmarklet -- and a cap one of them forgets is a 422
+ *  with a German sentence about a length nobody typed. */
+export const PAGE_LIMIT = 3000000;
+export const readPage = text =>
+  request("/listings/extract", { method: "POST", body: JSON.stringify({ text: String(text).slice(0, PAGE_LIMIT) }) });
 export const readHouseType = url => request("/housetypes/extract", { method: "POST", body: JSON.stringify({ url }) });
 
 /** Address, coordinate, or Gemarkung plus the parcel number as written (`85/1`). */

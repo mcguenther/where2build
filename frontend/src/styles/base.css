@@ -29,6 +29,14 @@ h4{ font-size: var(--w2b-text-l); font-weight: 600; letter-spacing: -.01em; }
 p{ margin: 0; }
 
 a{ color: var(--w2b-primary); text-underline-offset: 2px; text-decoration-thickness: 1px; }
+/* A switch inside a sentence. It changes what is on this page rather than
+   going anywhere, so it is a button — and it reads like the link it sits
+   among, because that is what says it can be pressed. */
+.link-button{
+  background: none; border: 0; padding: 0; font: inherit; cursor: pointer;
+  color: var(--w2b-primary); text-decoration: underline;
+  text-underline-offset: 2px; text-decoration-thickness: 1px;
+}
 :focus-visible{ outline: 2px solid var(--w2b-primary-light); outline-offset: 2px; border-radius: var(--w2b-radius-xs); }
 [hidden]{ display: none !important; }
 

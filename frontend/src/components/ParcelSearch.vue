@@ -4,16 +4,28 @@
          "probably": a search that always produces an answer eventually
          produces a wrong one. -->
     <div class="suche__urteil" :class="`suche__urteil--${status || 'laeuft'}`" role="status">
-      <div>
+      <div class="suche__urteilstext">
+        <!-- The phase belongs in the eyebrow and its sentence in the body line.
+             It used to be the h2, where a wording that changes every step and
+             runs from four words to four lines resized the box under itself —
+             and the box sits above the map, so the whole stage moved with it. -->
         <p class="eyebrow">{{ running ? "Suche läuft" : "Ergebnis" }}</p>
-        <h2>{{ running ? phaseText : statusLabel }}</h2>
-        <p class="suche__satz">{{ running ? "" : sentence }}</p>
+        <h2>{{ running ? phaseLabel : statusLabel }}</h2>
+        <p class="suche__satz" :class="{ 'suche__satz--laeuft': running }">
+          {{ running ? phaseText : sentence }}
+        </p>
         <p v-if="hint && !running" class="suche__hinweis">{{ hint }}</p>
       </div>
       <div class="spacer"></div>
-      <p v-if="requests" class="suche__kosten">
-        {{ requests }} {{ requests === 1 ? "Abfrage" : "Abfragen" }} ans Kataster
+      <!-- Kept in the layout while it is still unknown rather than appearing
+           with the answer: below 700 px it wraps onto its own line, and a line
+           that arrives at the end is one more shove of the map. -->
+      <p class="suche__kosten">
+        <template v-if="requests">
+          {{ requests }} {{ requests === 1 ? "Abfrage" : "Abfragen" }} ans Kataster
+        </template>
       </p>
+      <span v-if="running" class="suche__puls" aria-hidden="true"></span>
     </div>
 
     <p v-if="error" class="notice notice--error" role="alert">{{ error }}</p>
@@ -97,8 +109,8 @@
            row that stands for something on the map jumps to it, and a clue can
            still be switched off — a contradiction nobody can check is one
            nobody can resolve. -->
-      <div class="panel suche__protokoll">
-        <div class="panel__head">
+      <div ref="protocol" class="panel suche__protokoll">
+        <div class="panel__head suche__protokollkopf">
           <h3>Verlauf</h3>
           <div class="spacer"></div>
           <span v-if="queued" class="chip">{{ queued }} wartet</span>
@@ -211,7 +223,9 @@
  * runs the search again — it is cheap enough for that.
  */
 import EvidenceMap from "./EvidenceMap.vue";
-import { DWELL_MS, FLIGHT_MS, StepQueue, prefersReducedMotion } from "../lib/evidence.js";
+import {
+  DWELL_MS, FLIGHT_MS, StepQueue, movesTheMap, prefersReducedMotion
+} from "../lib/evidence.js";
 import { runSearch, STATUS_LABEL, verdictSentence } from "../lib/search.js";
 import { PARCEL_OUTLINE_MIN_ZOOM } from "../lib/basemap.js";
 import { area } from "../lib/format.js";
@@ -237,6 +251,13 @@ const SOURCE_LABELS = {
   standortfeld: "Standortfeld",
   pin: "Kartenpunkt der Anzeige"
 };
+
+/** How far from the end still counts as following the run.
+ *
+ *  About one row. A browser rounds a scroll position by a fraction of a pixel,
+ *  so an exact comparison against the end reports "scrolled up" on a list
+ *  nobody has touched. */
+const FOLLOW_SLACK_PX = 48;
 
 export default {
   name: "ParcelSearch",
@@ -267,6 +288,7 @@ export default {
       hint: "",
       requests: 0,
       phaseText: "Angaben werden gelesen …",
+      phaseKey: "ernten",
       // The run in the order it happened. Every event that reaches `apply`
       // becomes one entry, so the sequence is a fact rather than a
       // reconstruction — the clues themselves are still re-sorted by
@@ -274,7 +296,10 @@ export default {
       // list there was.
       steps: [],
       queued: 0,
-      queueStep: DWELL_MS,
+      // What a camera move is currently allowed to take. The flight is derived
+      // from it, so a fast run does not start a long flight every quarter
+      // second and spend the whole time interrupting itself.
+      queuePace: DWELL_MS,
       chosen: null,
       // Which entry of the Verlauf is being shown, and what it points at. The
       // map marks it: a jump that only moves the camera arrives somewhere
@@ -293,6 +318,11 @@ export default {
      *  „Ergebnis“ over a half-drawn map is worse than one that waits. */
     running() { return this.streaming || this.queued > 0; },
     statusLabel() { return STATUS_LABEL[this.status] ?? "Suche"; },
+    /** Which stage the run is in. The heading it goes in has to keep its
+     *  height, so this is the phase's *label* — one word, the same vocabulary
+     *  the Verlauf marks its rows with — and the wording goes in the line
+     *  below, where two lines are reserved for it. */
+    phaseLabel() { return PHASE_LABELS[this.phaseKey] ?? "Läuft"; },
     parcelOutlineZoom() { return PARCEL_OUTLINE_MIN_ZOOM; },
     sentence() {
       return this.status
@@ -322,7 +352,7 @@ export default {
      *  interrupting itself, which is the twitch the queue exists to prevent —
      *  so the duration is tied to the step rather than fixed, and the floor
      *  moved with it. */
-    flight() { return Math.max(520, Math.min(FLIGHT_MS, this.queueStep * 1.6)); },
+    flight() { return Math.max(520, Math.min(FLIGHT_MS, this.queuePace * 1.6)); },
     /** The pin, once something stronger has placed the plot elsewhere.
      *
      *  It stays on the map struck through rather than vanishing: whoever opens
@@ -367,14 +397,17 @@ export default {
         candidates: [], huelle: null, districtOutline: null, areas: [],
         hint: "", requests: 0, steps: [], chosen: null,
         shownStep: null, highlighted: null,
-        phaseText: "Angaben werden gelesen …"
+        phaseText: "Angaben werden gelesen …", phaseKey: "ernten"
       });
 
       // The queue is what keeps the map readable. Clues arrive unevenly and
       // sometimes all at once — behind a proxy that buffers, the whole run
       // lands in one chunk — and three camera moves in one frame is a twitch,
       // not an animation.
-      this._queue = new StepQueue({ reduced: !this.paced || prefersReducedMotion() });
+      this._queue = new StepQueue({
+        reduced: !this.paced || prefersReducedMotion(),
+        moves: movesTheMap
+      });
       this._queue.onStep = event => this.apply(event);
       this._queue.onIdle = () => { this.queued = 0; };
 
@@ -399,9 +432,10 @@ export default {
     /** One line of the stream, once the queue lets it through. */
     apply(event) {
       this.queued = this._queue?.waiting ?? 0;
-      this.queueStep = this._queue?.step ?? DWELL_MS;
+      this.queuePace = this._queue?.pace ?? DWELL_MS;
       if (event.art === "phase") {
         this.phaseText = event.text || this.phaseText;
+        this.phaseKey = event.phase || this.phaseKey;
         if (event.text) this.record({ kind: "phase", phase: event.phase, text: event.text });
       } else if (event.art === "indiz") {
         const rest = this.indicia.filter(indiz => indiz.id !== event.indiz.id);
@@ -436,7 +470,33 @@ export default {
 
     /** One entry in the course of the run. */
     record(step) {
+      const following = this.atLatest();
       this.steps = [...this.steps, { ...step, n: this.steps.length + 1 }];
+      if (following) this.$nextTick(() => this.scrollToLatest());
+    },
+
+    /** Whether the protocol is showing its newest entry.
+     *
+     *  Asked *before* the entry is added, and it is what keeps the scroll from
+     *  being a yank: somebody who scrolled up to read an earlier clue is
+     *  reading it, and a list that jumps out from under them is worse than one
+     *  that does not follow. The tolerance is about one row — a list resting a
+     *  few pixels short of the end is still at the end as far as anyone
+     *  reading it is concerned.
+     */
+    atLatest() {
+      const box = this.$refs.protocol;
+      if (!box) return true;
+      return box.scrollHeight - box.scrollTop - box.clientHeight <= FOLLOW_SLACK_PX;
+    },
+
+    scrollToLatest() {
+      const box = this.$refs.protocol;
+      if (!box) return;
+      /* A plain assignment, not `scrollTo`: the smoothness is a stylesheet
+       * question (`scroll-behavior`) and jsdom implements neither, so this is
+       * the one form that is the same everywhere. */
+      box.scrollTop = box.scrollHeight;
     },
 
     indizOf(step) {
@@ -559,19 +619,62 @@ export default {
 
 <style scoped>
 .suche__urteil{
+  position: relative;
   display: flex; align-items: flex-start; gap: var(--w2b-space-4); flex-wrap: wrap;
   padding: var(--w2b-space-4) var(--w2b-space-5);
   border: 1.5px solid var(--w2b-line); border-left-width: 5px;
   border-radius: var(--w2b-radius-m); background: var(--w2b-surface);
 }
 .suche__urteil h2{ margin: 2px 0 0; font-size: var(--w2b-text-xl); }
+.suche__urteilstext{ min-width: 0; flex: 1 1 28ch; }
+
+/* The pulse, in place of the resizing text: while a run plays, something has
+   to say it is alive, and it used to be the wording jumping about. A bar of a
+   fixed height cannot move the layout. */
+.suche__puls{
+  position: absolute; left: 0; right: 0; bottom: 0; height: 3px; overflow: hidden;
+  /* A track, not a stray line: without the rail behind it the moving segment
+     reads as a broken border rather than as something travelling along. */
+  background: var(--w2b-line-faint);
+  border-bottom-right-radius: var(--w2b-radius-m);
+}
+.suche__puls::after{
+  content: ""; position: absolute; top: 0; bottom: 0; width: 28%;
+  background: var(--w2b-primary); opacity: .75;
+  animation: w2b-suche-puls 1.5s ease-in-out infinite;
+}
+@keyframes w2b-suche-puls{
+  from{ transform: translateX(-100%); }
+  to{ transform: translateX(457%); }
+}
+@media (prefers-reduced-motion: reduce){
+  .suche__puls::after{ animation: none; width: 100%; opacity: .3; }
+}
 .suche__urteil--bestaetigt{ border-left-color: var(--w2b-primary); }
 .suche__urteil--mehrdeutig{ border-left-color: var(--w2b-secondary); }
 .suche__urteil--erfolglos{ border-left-color: var(--w2b-error); }
 .suche__urteil--laeuft{ border-left-color: var(--w2b-line); }
-.suche__satz{ margin: var(--w2b-space-2) 0 0; color: var(--w2b-graphite); font-size: var(--w2b-text-s); max-width: 74ch; }
+/* Two lines, reserved. The phase sentence changes with every step of the run
+   and the box sits above the map, so a line gained here shoves the whole stage
+   down — sixteen times per run. It reserves the taller of the two states and
+   the running wording is clamped to it; the full sentence is in the Verlauf
+   anyway, which is where a run gets read. The verdict is not clamped: it
+   settles once, and hiding half of it to save one layout change would be the
+   wrong trade. */
+.suche__satz{
+  margin: var(--w2b-space-2) 0 0; color: var(--w2b-graphite);
+  font-size: var(--w2b-text-s); max-width: 74ch;
+  line-height: 1.45; min-height: 2.9em;
+}
+.suche__satz--laeuft{
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  overflow: hidden;
+}
 .suche__hinweis{ margin: var(--w2b-space-2) 0 0; color: var(--w2b-muted); font-size: var(--w2b-text-s); max-width: 74ch; }
-.suche__kosten{ font-family: var(--w2b-font-mono); font-size: var(--w2b-text-xs); color: var(--w2b-muted); margin: 0; }
+.suche__kosten{
+  font-family: var(--w2b-font-mono); font-size: var(--w2b-text-xs);
+  color: var(--w2b-muted); margin: 0; min-height: 1.4em;
+}
 
 .konflikt{
   padding: var(--w2b-space-4); border: 1.5px dashed var(--w2b-secondary);
@@ -598,7 +701,16 @@ export default {
 .suche__buehne{ display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: var(--w2b-space-4); align-items: start; }
 @media (max-width: 900px){ .suche__buehne{ grid-template-columns: 1fr; } }
 .suche__karte{ padding: var(--w2b-space-3); }
-.suche__protokoll{ max-height: 560px; overflow-y: auto; }
+.suche__protokoll{ max-height: 560px; overflow-y: auto; scroll-behavior: smooth; }
+/* The list scrolls itself as the run plays, so the head has to stay: „Rest
+   zeigen" is the only control that matters while it does, and it was the first
+   thing to disappear upwards. */
+.suche__protokollkopf{
+  position: sticky; top: 0; z-index: 1; background: var(--w2b-surface);
+}
+@media (prefers-reduced-motion: reduce){
+  .suche__protokoll{ scroll-behavior: auto; }
+}
 
 .verlauf{ list-style: none; margin: 0; padding: 0; counter-reset: none; }
 .verlauf__schritt{

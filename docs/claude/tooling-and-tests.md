@@ -18,7 +18,8 @@ having is worth breaking on purpose once to see the test fail.
 | `vitest` | Components in jsdom: geometry, formats, what a view renders from which state | Layout, colour, anything needing WebGL or a network |
 | `node scripts/screenshots.mjs` | Collapsed layouts, unreadable colour, console errors, horizontal overflow, a map that drew nothing | Anything behind a sign-in — the run has no identity provider |
 | A browser walk against the throwaway provider | Sign-in, the account page, sharing, withdrawing — the paths a screenshot cannot reach | Everything it was not written to click |
-| The containers (`docker compose`) | The shipped `nginx.conf`, the images, what actually ends up inside them | Nothing the compose stack does not start — there is no database in it |
+| `node scripts/bookmarklet.mjs` | The handover across two real origins: a real `window.open`, a real `postMessage`, and the coordinate that only a whole document carries | Everything else about the wizard |
+| The containers (`scripts/docker-build-sandbox.sh up`) | The shipped `nginx.conf`, the images, what actually ends up inside them | Nothing the compose stack does not start — there is no database in it |
 
 None of them replaces another. The share switches were green in `vitest` and
 correct in the browser walk, and the walk is what found that the list announced
@@ -62,21 +63,31 @@ dockerd > /var/log/dockerd.log 2>&1 &
 until docker info >/dev/null 2>&1; do sleep 1; done
 ```
 
-A build then needs **three** things, because the agent proxy re-terminates TLS:
+`docker compose build` then still fails, and it is not a pip problem: the
+sandbox re-terminates outbound HTTPS through its own CA
+(`/root/.ccr/README.md`), which a fresh build container does not trust.
+`pip install` fails against pypi.org with "self-signed certificate in
+certificate chain"; `npm ci` fails the same way against the npm registry, just
+with different error text ("Exit handler never called!"). It is a **trust**
+problem, not a routing one — measured again 10.09.2026: with the CA in place a
+build reaches pypi with no proxy variable and no `--network host`, and adding
+either changes nothing.
 
-```bash
-docker build --network host --build-arg HTTPS_PROXY="$HTTPS_PROXY" \
-  -f <a copy of the Dockerfile with the CA added> -t … <context>
-```
+Trusting the bundle from inside the container fixes both: `PIP_CERT` /
+`REQUESTS_CA_BUNDLE` / `SSL_CERT_FILE` for pip, `NODE_EXTRA_CA_CERTS` for npm
+— Node ships its own CA list and ignores the system trust store exactly the
+way pip does.
 
-with `/root/.ccr/ca-bundle.crt` copied into the context and installed in an
-early layer. Missing the CA gives "certificate verify failed"; having the CA
-but not the proxy gets *past* the certificate and then times out mid-download,
-which reads like a completely different failure. `docker pull python:3.11-slim`
-answers **429** from Docker Hub often enough that one retry is routine.
+**Use `scripts/docker-build-sandbox.sh build|up`.** It applies that to a
+temporary, `sed`-patched copy of each Dockerfile — through BuildKit's
+`--build-context`, so neither committed Dockerfile is touched and nothing has
+to be copied into the build context — and falls back to a plain
+`docker compose` call wherever `/root/.ccr/ca-bundle.crt` does not exist, i.e.
+everywhere but here. On a real machine `docker compose up --build` needs none
+of it and the script is a passthrough.
 
-None of that belongs in the repo's Dockerfiles — build from a copy under a
-different `-f`, and delete it afterwards.
+`docker pull python:3.11-slim` answers **429** from Docker Hub often enough
+that one retry is routine.
 
 To reach the dev Postgres from a container, it has to listen on the bridge
 (`listen_addresses = '*'`) *and* the bridge has to be in `pg_hba.conf`. The
@@ -188,3 +199,13 @@ line looks right and does not match.
   WhatsApp user agent to the backend and a browser to the app, and the preview
   card draws **inside** the slim image — so FreeType there really does read the
   vendored `.woff` without brotli.
+
+- **A `vi.mock` factory that omits a new named export breaks at *import*
+  time.** `PAGE_LIMIT` moved into `lib/api.js` — next to the request that
+  sends it, so neither the paste field nor the bookmarklet can forget the cap
+  — and five test files mock that module by listing its surface. The importer
+  then throws before a single test body runs, and vitest reports it against
+  whichever component happened to be mounting: two failures about a chip's
+  state and an uncalled `readPage`, neither of them the cause. Adding an
+  export means adding it to the factories.
+

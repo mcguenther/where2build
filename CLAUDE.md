@@ -159,6 +159,9 @@ backend/.venv/bin/python -m uvicorn app.main:app --reload --app-dir backend
 # the whole thing in containers: nginx serves the build and proxies /api,
 # so there is one origin and no CORS. No database is involved.
 docker compose up --build      # http://localhost:8080
+# the same thing in the Claude Code cloud sandbox, where a plain build fails
+# on the proxy's own CA -- see docs/claude/tooling-and-tests.md for why
+scripts/docker-build-sandbox.sh up -d
 
 # routing on this machine instead of Transitous -- opt-in, off by default.
 # fetch-data.sh pulls the OSM extract and the DELFI GTFS; the first start
@@ -180,6 +183,9 @@ npm run build
 
 # screenshots of every view, light and dark
 node scripts/screenshots.mjs
+
+# the bookmarklet's handover, across two real origins (needs the build and :8000)
+node scripts/bookmarklet.mjs
 ```
 
 ## Before calling a change done
@@ -199,25 +205,30 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 595 passed, 49 skipped. With `TEST_DATABASE_URL` pointed at a real
-  Postgres it is 636 passed, 8 skipped — the extra 41 are the account store,
+- `pytest`: 634 passed, 49 skipped. With `TEST_DATABASE_URL` pointed at a real
+  Postgres it is 675 passed, 8 skipped — the extra 41 are the account store,
   and they are skipped rather than mocked because what they check is the
   database's own behaviour. Of the remaining 8, one needs pyosmium, which only
   the index builder wants; the other seven need Tesseract.
-- `vitest`: 603 passed — plus the integration file, excluded by `npm run test`
+- `vitest`: 630 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
-- `scripts/screenshots.mjs`: 65 images plus two print PDFs. The narrow pass
+- `scripts/bookmarklet.mjs`: the handover across two origins, against the built
+  app and a backend on :8000. It asserts the coordinate, which is the field
+  that separates a handed-over document from a pasted one, and it writes
+  `assistent-uebergabe.png`.
+- `scripts/screenshots.mjs`: 69 images plus two print PDFs. The narrow pass
   runs in the **light** theme like the wide one, so the phone-width pictures
-  are named `*-hell-schmal.png`. It fails on console
-  errors, on horizontal overflow, and if not a single vector tile arrived. It
+  are named `*-hell-schmal.png`. It fails on console errors, on horizontal
+  overflow, and if not a single vector tile arrived. It
   also drives the live geocoder, which is slow often enough to blow the 60 s
   wait on the destinations step — two runs failed there and the third passed
   with nothing changed. Re-run once before going looking for the bug.
   The `suche-*` images run a **real** search against ALKIS, so they need a
   backend on :8000 like every other picture here; without one the step reports
-  "die Suche kam zu keinem Ergebnis" rather than passing quietly. The three
+  "die Suche kam zu keinem Ergebnis" rather than passing quietly. The
   `assistent-werte-*` images paste a saved advert
   (`backend/tests/fixtures/inserat-kleinanzeigen.html`) through
   `/api/listings/extract`, which needs the same backend and no LLM key, and
   then open the „Gelesene Werte" fold inside the search step — that list is no
-  longer a step of its own.
+  longer a step of its own. The `assistent-einfuegen-*` images are the same
+  step with the bookmarklet's fold open.

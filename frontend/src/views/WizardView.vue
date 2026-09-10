@@ -40,7 +40,15 @@
         Anzeigenseite: alles in dasselbe Feld.
       </p>
 
-      <QueryBox class="panel wizard__query" :busy="busy" @resolve="searchPicked" @read="readPayload" />
+      <!-- A document the bookmarklet handed over. Not the field's business:
+           nothing was typed, there is nothing to correct, and a textarea
+           holding two megabytes of markup would show nobody anything. -->
+      <p v-if="handoverWaiting" class="hint">
+        Warten auf die Seite aus dem Tab, in dem das Lesezeichen geklickt wurde …
+      </p>
+
+      <QueryBox v-else class="panel wizard__query" :busy="busy"
+                @resolve="searchPicked" @read="readPayload" />
 
       <p class="hint">
         Was getippt wurde, wird zuerst gelesen und dann nachgeschlagen: eine deutsche
@@ -51,10 +59,36 @@
         <br>
         <b>Eine Anzeigenseite</b> im Browser mit <span class="mono">Strg+A</span>,
         <span class="mono">Strg+C</span> kopieren und hier einfügen: die Zwischenablage
-        führt neben dem Text auch das HTML mit, und daraus kommen Preis, Fläche,
-        Koordinate und die Bilder ohne Modell. ImmoScout24 lässt keinen Serverabruf zu;
-        dort ist das der Weg.
+        führt neben dem Text auch das HTML mit, und daraus kommen Preis, Fläche und die
+        Bilder ohne Modell. Der <i>Kopf</i> der Seite kommt dabei nicht mit —
+        <span class="mono">Strg+A</span> wählt nur den Rumpf aus, also fehlen die
+        Meta-Angaben und mit ihnen die Koordinate. ImmoScout24 lässt außerdem keinen
+        Serverabruf zu; dort ist das Einfügen der Weg.
       </p>
+
+      <!-- Its own modifier, and that is not decoration: the search step has a
+           `details.gelesen` too, so a script waiting for one would match this
+           one on the step before and then wait for a list that never comes. -->
+      <details class="gelesen gelesen--lesezeichen no-print">
+        <summary>
+          <span class="gelesen__titel">Ein Klick statt Kopieren</span>
+          <span class="gelesen__zahl">Lesezeichen, einmal einrichten</span>
+        </summary>
+        <p class="subtitle">
+          Diesen Knopf in die Lesezeichenleiste ziehen — ist sie nicht zu sehen, holt
+          <span class="mono">Strg+Umschalt+B</span> sie hervor. Auf der Anzeigenseite dann
+          darauf klicken: der Browser schickt die Seite, die er ohnehin vor sich hat,
+          hierher. Vollständig, also mit allem, was das Kopieren verliert.
+        </p>
+        <p class="row">
+          <a class="btn" :href="bookmarkletLink" @click.prevent>Grundstück prüfen</a>
+        </p>
+        <p class="hint">
+          Der Knopf tut hier nichts, er <i>ist</i> das Lesezeichen. Er öffnet
+          <span class="mono">{{ appOrigin }}</span> in einem neuen Tab und übergibt die
+          Seite dorthin; an das Portal geht dabei keine Anfrage.
+        </p>
+      </details>
     </section>
 
     <!-- 2 · Gelesene Werte -->
@@ -242,12 +276,17 @@ import QueryBox from "../components/QueryBox.vue";
 import { state, addPlot, autoSeatHouse } from "../lib/store.js";
 import { WIZARD_STAGES, wizardStage } from "../router/stages.js";
 import { takeHandoff } from "../lib/handoff.js";
-import { readListing, readPage, resolveParcel, landValue, nearbyParcels } from "../lib/api.js";
+import {
+  readListing, readPage, resolveParcel, landValue, nearbyParcels, PAGE_LIMIT
+} from "../lib/api.js";
 import { queryFromFields } from "../lib/search.js";
 import { plotFromCadastre, parcelForAddress, outerRing } from "../lib/plots.js";
 import { polygonArea, polygonCentroid, pointInPolygon } from "../lib/geometry.js";
 import { toLocal } from "../lib/projection.js";
 import { area, euroPerSqm, num, parseGermanNumber as numberFrom } from "../lib/format.js";
+import {
+  HANDOVER_QUERY, HANDOVER_READY, HANDOVER_PAGE, bookmarkletHref
+} from "../lib/bookmarklet.js";
 
 /** The backend answers with {feld: {wert, quelle_url, bestaetigt}}. */
 function fieldsFromResponse(response) {
@@ -289,6 +328,19 @@ export default {
       lost: false,
       // How many history entries this wizard pushed; see `stepBack`.
       ownEntries: 0,
+      /* The document a bookmarklet handed over: `{ url, html }`.
+       *
+       * Not the field's state and not a paste. `handoff` (one f, lib/handoff.js)
+       * is a different thing entirely -- what the start page leaves behind for
+       * this view; this is a whole page arriving from another tab. */
+      handover: null,
+      /* The nonce this tab was opened with, while the other tab has not
+       * answered yet. Two things are checked before a document is taken: the
+       * message comes from the window that opened this one, and it carries
+       * this nonce. The sender's origin cannot be checked -- it is whichever
+       * portal the user was looking at -- so the nonce stands in for it. */
+      handoverNonce: "",
+      handoverWaiting: false,
       busy: false,
       error: "",
       readFields: [],
@@ -365,10 +417,18 @@ export default {
       return filled ? `${filled} von ${this.readFields.length} Feldern belegt` : "";
     },
     computedArea() { return this.draft ? polygonArea(this.draft.polygon) : 0; },
+    /** The app's own address, which is what the bookmarklet has to be told:
+     *  it runs on the portal's page and knows nothing else about us. */
+    appOrigin() { return window.location.origin; },
+    bookmarkletLink() { return bookmarkletHref(this.appOrigin); },
   },
   created() {
     this.checkStage();
     this.takeHandoff();
+    this.startHandover();
+  },
+  beforeUnmount() {
+    this.stopHandover();
   },
   watch: {
     stage() { this.checkStage(); }
@@ -384,6 +444,48 @@ export default {
       if (!input) return;
       if (input.resolve) return this.searchPicked(input.resolve);
       if (input.read) return this.readPayload(input.read);
+    },
+
+    /** Announce this tab to the bookmarklet that opened it.
+     *
+     *  The bookmarklet cannot send the document straight away: this app has to
+     *  be mounted and listening first, and nothing else tells it when that is.
+     *  So the tab it opened says so, and the nonce in its own address is what
+     *  it says it with. */
+    startHandover() {
+      const nonce = this.$route.query[HANDOVER_QUERY];
+      if (this.handoverNonce || this.handover) return;
+      if (typeof nonce !== "string" || !nonce) return;
+      // Opened by hand, or the opener is gone: there is nobody to answer, and
+      // the field below is then the right answer without saying anything.
+      if (!window.opener) return;
+      this.handoverNonce = nonce;
+      this.handoverWaiting = true;
+      window.addEventListener("message", this.takeHandover);
+      // `"*"`, because the portal's origin is not knowable from here — and
+      // there is nothing to keep: the nonce is in this tab's own address bar.
+      window.opener.postMessage({ w2b: HANDOVER_READY, [HANDOVER_QUERY]: nonce }, "*");
+    },
+
+    /** The document, once the other tab sends it. Then straight into reading:
+     *  the click on the bookmarklet was the instruction. */
+    takeHandover(event) {
+      const data = event.data;
+      if (!this.handoverNonce || event.source !== window.opener) return;
+      if (!data || data.w2b !== HANDOVER_PAGE || data[HANDOVER_QUERY] !== this.handoverNonce) return;
+      if (typeof data.html !== "string" || !data.html) return;
+      this.stopHandover();
+      this.handover = {
+        url: typeof data.url === "string" ? data.url : "",
+        html: data.html.slice(0, PAGE_LIMIT)
+      };
+      this.readPayload({ kind: "paste", text: "", html: this.handover.html });
+    },
+
+    stopHandover() {
+      this.handoverNonce = "";
+      this.handoverWaiting = false;
+      window.removeEventListener("message", this.takeHandover);
     },
 
     /** A stage reached without the data behind it — a reload, or the back

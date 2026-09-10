@@ -12,7 +12,10 @@ import { nextTick } from "vue";
 import CadastralDistrictPicker from "../src/components/CadastralDistrictPicker.vue";
 import WizardView from "../src/views/WizardView.vue";
 import { state } from "../src/lib/store.js";
-import { realPlot, realState, mountWithRouter } from "./helpers.js";
+import { realPlot, realState, mountWithRouter, testRouter } from "./helpers.js";
+import {
+  HANDOVER_QUERY, HANDOVER_READY, HANDOVER_PAGE
+} from "../src/lib/bookmarklet.js";
 import directory from "./fixtures/gemarkungen.json";
 import moelkau from "./fixtures/parcel-moelkau.json";
 import moelkauZwei from "./fixtures/parcel-moelkau-zwei.json";
@@ -20,6 +23,10 @@ import moelkauGetrennt from "./fixtures/parcel-moelkau-getrennt.json";
 import moelkauNachbar from "./fixtures/parcel-moelkau-205.json";
 
 vi.mock("../src/lib/api.js", () => ({
+  // The cap the module exports next to the call that sends it. A factory
+  // that omits a named export makes every importer fail at *import* time,
+  // which shows up as unrelated component errors.
+  PAGE_LIMIT: 3000000,
   cadastralDistricts: vi.fn(),
   resolveParcel: vi.fn(),
   landValue: vi.fn(),
@@ -595,5 +602,142 @@ describe("Aufnahme — beide Textwege enden im selben Schritt", () => {
     expect(w.vm.readFields.find(f => f.key === "kaufpreis_eur").unit).toBe("€");
     // A name is not a unit: only the fields that have one carry one.
     expect(w.vm.readFields.find(f => f.key === "adresse").unit).toBe("");
+  });
+});
+
+
+/**
+ * The wizard's half of the handover. The bookmarklet's half — and the fact
+ * that the generated one-liner runs at all — is in `bookmarklet.test.js`.
+ */
+describe("Aufnahme — Seite aus dem Browser übernommen", () => {
+  const answer = {
+    felder: {
+      adresse: { wert: "Wiesenstraße, 04668 Großbothen", quelle: "gelesen" },
+      lat: { wert: 51.189265, quelle: "gelesen" },
+      lon: { wert: 12.85, quelle: "gelesen" },
+      grundstuecksflaeche_m2: { wert: 502, quelle: "gelesen" },
+      kaufpreis_eur: { wert: 60000, quelle: "gelesen" }
+    },
+    weg: "eingefuegter-text",
+    beschreibung: "Am Ortsrand von Großbothen, einem OT von Grimma. Flurstück 790/11.",
+    bilder: []
+  };
+
+  /** The tab the bookmarklet opened: an address carrying the nonce, and an
+   *  opener to answer.
+   *
+   *  The router has to be *ready* before it is handed to `mount`, and that is
+   *  not a detail: `router.push` is async, so at install time `currentRoute`
+   *  is still the start location and vue-router pushes the history's own — `/`
+   *  — which lands after ours and wins. The component then sees an empty
+   *  query. No existing test noticed because every view takes its state from
+   *  props, and this is the first one that reads the address itself. */
+  const opened = async (nonce = "1757403600123456") => {
+    const opener = { postMessage: vi.fn() };
+    Object.defineProperty(window, "opener", { value: opener, writable: true, configurable: true });
+    const router = testRouter(`/aufnahme/quelle?${HANDOVER_QUERY}=${nonce}`);
+    await router.isReady();
+    const w = mountWithRouter(WizardView, { router, props: { stage: "quelle" } });
+    await flushPromises();
+    return { w, opener, nonce };
+  };
+
+  /** A message as the other tab sends it. `source` is a prototype getter, so
+   *  it has to be shadowed — which is the check the wizard leans on. */
+  const from = (source, data) => {
+    const event = new MessageEvent("message", { data });
+    Object.defineProperty(event, "source", { value: source });
+    return event;
+  };
+
+  afterEach(() => {
+    Object.defineProperty(window, "opener", { value: null, writable: true, configurable: true });
+  });
+
+  it("meldet sich beim Tab, der es geöffnet hat, und wartet", async () => {
+    const { w, opener, nonce } = await opened();
+
+    expect(opener.postMessage).toHaveBeenCalledWith(
+      { w2b: HANDOVER_READY, [HANDOVER_QUERY]: nonce },
+      "*"
+    );
+    // Statt des Feldes steht da, worauf gewartet wird — niemand hat etwas zu tun.
+    expect(w.text()).toContain("Warten auf die Seite");
+    expect(w.find(".query-box").exists()).toBe(false);
+    expect(readPage).not.toHaveBeenCalled();
+  });
+
+  it("liest die übergebene Seite, ohne dass noch etwas geklickt wird", async () => {
+    readPage.mockResolvedValue(answer);
+    resolveParcel.mockResolvedValue(moelkau);
+
+    const { w, opener, nonce } = await opened();
+
+    const html = '<html><head><meta property="og:latitude" content="51.189265">'
+      + "</head><body>Baugrundstück 502 m²</body></html>";
+    window.dispatchEvent(from(opener, {
+      w2b: HANDOVER_PAGE, [HANDOVER_QUERY]: nonce, url: "https://portal.example/expose/1", html
+    }));
+    await flushPromises();
+
+    // Genau das, was der Browser vor sich hatte — mit Kopf, den das Kopieren verliert.
+    expect(readPage).toHaveBeenCalledWith(html);
+    expect(w.vm.handover.url).toBe("https://portal.example/expose/1");
+    expect(w.vm.readFields.find(f => f.key === "kaufpreis_eur").value).toBe(60000);
+  });
+
+  it("nimmt keine Nachricht mit falscher Nonce und keine aus einem anderen Fenster", async () => {
+    const { opener, nonce } = await opened();
+
+    const html = "<html><body>x</body></html>";
+    window.dispatchEvent(from(opener, {
+      w2b: HANDOVER_PAGE, [HANDOVER_QUERY]: "fremd", html
+    }));
+    window.dispatchEvent(from({ postMessage: vi.fn() }, {
+      w2b: HANDOVER_PAGE, [HANDOVER_QUERY]: nonce, html
+    }));
+    await flushPromises();
+
+    expect(readPage).not.toHaveBeenCalled();
+  });
+
+  it("zeigt ohne öffnenden Tab einfach das Feld", async () => {
+    // Von Hand aufgerufen, oder der andere Tab ist fort: es gibt niemanden,
+    // der antworten könnte. Dann ist das gewöhnliche Feld die Antwort, und es
+    // muss dazu nichts sagen.
+    Object.defineProperty(window, "opener", { value: null, writable: true, configurable: true });
+    const router = testRouter(`/aufnahme/quelle?${HANDOVER_QUERY}=1757403600123456`);
+    await router.isReady();
+    const w = mountWithRouter(WizardView, { router, props: { stage: "quelle" } });
+    await flushPromises();
+
+    expect(w.vm.handoverWaiting).toBe(false);
+    expect(w.find(".query-box").exists()).toBe(true);
+    expect(w.text()).not.toContain("Warten auf die Seite");
+  });
+
+  it("bietet das Lesezeichen mit der eigenen Adresse an, ohne dass jemand einen Weg wählt", async () => {
+    // Es gibt keine Wege mehr, unter denen es sich verstecken könnte: ein Feld,
+    // und darunter der Klappkasten. Wer mit einer ImmoScout-Adresse kommt,
+    // findet ihn also, ohne den Hinweis gelesen zu haben.
+    const w = mountWithRouter(WizardView, { path: "/aufnahme/quelle", props: { stage: "quelle" } });
+    await flushPromises();
+
+    const link = w.find("details.gelesen--lesezeichen a.btn");
+    expect(link.exists()).toBe(true);
+    const href = link.attributes("href");
+    expect(href.startsWith("javascript:")).toBe(true);
+    expect(decodeURI(href)).toContain(JSON.stringify(window.location.origin));
+  });
+
+  it("verwechselt den eigenen Klappkasten nicht mit dem der Suche", async () => {
+    // Beide heißen `details.gelesen`. Ein Skript, das auf einen wartet, würde
+    // sonst den der Einstiegsseite treffen und auf eine Liste warten, die dort
+    // nie kommt — genau das ist beim Zusammenführen fast passiert.
+    const w = mountWithRouter(WizardView, { path: "/aufnahme/quelle", props: { stage: "quelle" } });
+    await flushPromises();
+
+    expect(w.findAll("details.gelesen:not(.gelesen--lesezeichen)")).toHaveLength(0);
   });
 });

@@ -68,10 +68,10 @@
 import PlotSearch from "./PlotSearch.vue";
 import CadastralDistrictPicker from "./CadastralDistrictPicker.vue";
 import { classifyQuery } from "../lib/queryInput.js";
+// The cap lives with the call that sends it; see `PAGE_LIMIT` in api.js.
+import { PAGE_LIMIT } from "../lib/api.js";
 
-/** A pasted page is capped: the clipboard can carry a megabyte of markup and
- *  the reader wants the description, not the whole site. */
-const PASTE_LIMIT = 400000;
+
 
 /** The readings, in two groups — the break between them is the grouping. */
 export const KIND_GROUPS = [
@@ -217,7 +217,7 @@ export default {
     },
     takePaste(event) {
       const html = event.clipboardData?.getData("text/html");
-      if (html && html.length > this.pastedHtml.length) this.pastedHtml = html.slice(0, PASTE_LIMIT);
+      if (html && html.length > this.pastedHtml.length) this.pastedHtml = html.slice(0, PAGE_LIMIT);
     },
     go() {
       if (this.busy || !this.ready) return;

@@ -23,8 +23,18 @@ of Overpass or a local extract, the listing portals, and the extraction model.
   fails outright on the combined layer. Use `text/plain` or GML.
 
 - **immobilienscout24.de answers server-side fetches with 401** on every route
-  tested. Its adapter goes straight to the paste field.
-
+  tested. Its adapter goes straight to the paste field. Re-measured 09.09.2026:
+  it is an AWS WAF challenge at the CloudFront edge (`x-cache: Error from
+  cloudfront`), so the request never reaches an origin — a full browser header
+  set, HTTP/1.1, a `ClaudeBot` UA and Anthropic's own fetch all answer 401
+  alike, while `robots.txt` (200) explicitly *allows* `ClaudeBot` and the two
+  exposé sitemaps it advertises answer 401. There is no header to fix. There
+  *is* a documented API (`api.immobilienscout24.de`, search over two-legged
+  OAuth, 2 000 req/min), but it is content-partner only, "not for data delivery
+  use cases", and its terms forbid own databases and analyses and cap storage
+  at 24 hours — so it is not a gate we could pass with paperwork, it is the
+  wrong shape. The way in is the user's own browser.
+  See `docs/research/immobilienscout24-zugang.md`.
 - **kleinanzeigen.de carries `og:latitude`/`og:longitude`** in its meta tags —
   parse those instead of geocoding, and skip the model call entirely.
 
