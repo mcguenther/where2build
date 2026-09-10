@@ -25,7 +25,7 @@ import secrets
 import time
 from dataclasses import dataclass
 from typing import Any
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 
 from fastapi import Response
 
@@ -229,13 +229,41 @@ class OidcService:
         issuer, which is what an ID token is checked against. ``None`` passes
         through: ``userinfo_endpoint`` is optional and a provider that omits
         it must not turn this into an attribute error.
+
+        What is swapped is the *origin*, not the issuer as a prefix. A
+        provider's endpoints need not live under its issuer -- authentik's
+        issuer is ``/application/o/<app>/`` while its token endpoint is
+        ``/application/o/token/`` -- so matching on the issuer would leave
+        exactly the endpoint unrewritten that the exchange depends on.
         """
 
         base = self.settings.internal_base_url.rstrip("/")
-        public = self.settings.issuer.rstrip("/")
-        if not url or not base or not public or not url.startswith(public):
+        public = urlsplit(self.settings.issuer)
+        if not url or not base or not public.scheme or not public.netloc:
             return url
-        return base + url[len(public) :]
+        origin = f"{public.scheme}://{public.netloc}"
+        if not url.startswith(origin):
+            return url
+        return base + url[len(origin) :]
+
+    def _as_public(self, url: str) -> dict[str, str]:
+        """The ``Host`` a rerouted request has to keep carrying.
+
+        A provider builds the absolute URLs it hands out -- every endpoint in
+        the discovery document, and the ``iss`` of an ID token -- from the host
+        it was asked as. Fetched at ``http://authentik:9000`` it therefore
+        answers with a document that names ``authentik:9000`` everywhere, and
+        the browser is then redirected to a name only this container network
+        knows. So the connection goes to the internal address while the request
+        still says it is for the public one, which is what any reverse proxy in
+        front of such a provider does.
+        """
+
+        base = self.settings.internal_base_url.rstrip("/")
+        public = urlsplit(self.settings.issuer)
+        if not base or not public.netloc or not url.startswith(base):
+            return {}
+        return {"Host": public.netloc}
 
     async def provider(self) -> Provider:
         """The issuer's endpoints, from its discovery document."""
@@ -248,13 +276,15 @@ class OidcService:
         key = f"discovery:{issuer}:{self.settings.internal_base_url}"
         document = self.cache.get_json(key)
         if document is None:
+            document_url = self._reachable(f"{issuer}/.well-known/openid-configuration")
             response = await request(
                 "GET",
-                self._reachable(f"{issuer}/.well-known/openid-configuration"),
+                document_url,
                 service=SERVICE_NAME,
                 advice=ADVICE,
                 timeout_s=self.settings.timeout_s,
                 user_agent=self.app_settings.user_agent,
+                headers=self._as_public(document_url),
             )
             try:
                 document = response.json()
@@ -351,7 +381,7 @@ class OidcService:
             timeout_s=self.settings.timeout_s,
             user_agent=self.app_settings.user_agent,
             data=form,
-            headers={"Accept": "application/json"},
+            headers={"Accept": "application/json", **self._as_public(provider.token_endpoint)},
             **kwargs,
         )
         try:
@@ -465,7 +495,11 @@ class OidcService:
                 advice=ADVICE,
                 timeout_s=self.settings.timeout_s,
                 user_agent=self.app_settings.user_agent,
-                headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"},
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "Accept": "application/json",
+                    **self._as_public(provider.userinfo_endpoint),
+                },
             )
             claims = response.json()
         except (AppError, ValueError):

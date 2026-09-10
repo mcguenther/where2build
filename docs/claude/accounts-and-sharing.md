@@ -171,22 +171,68 @@ server.
   in a test.
 
 - **An issuer is one string doing two jobs, and inside a compose network the
-  two addresses differ.** The provider is `http://localhost:8080/dex` for the
-  browser and `http://auth:5556/dex` for the backend, and OIDC has no field
-  for that: the discovery document, the token endpoint and userinfo all come
-  back naming the public address, which the backend cannot resolve. It fails
-  as a connection error during the callback, i.e. as „Anmeldung
-  fehlgeschlagen" with nothing in the browser to say why. `OIDC_INTERNAL_BASE_URL`
-  rewrites **only the URLs this backend fetches itself**
-  (`OidcService._reachable`); the authorization URL the browser is sent to and
-  the `iss` that is checked against the token stay public, because rewriting
-  either would send the user to a hostname their machine does not have, or
-  make the check pass for a token issued by somebody else. Keycloak calls the
-  same setting a „frontend URL", from the other end. Three tests hold the
-  split: the fetch goes to the internal address, the check stays on the public
-  one, and without the setting nothing changes. A fourth followed from reading
-  the rewrite again: `userinfo_endpoint` is optional in the discovery document,
-  and the first version called `.startswith` on whatever was there — a provider
-  that omits it (dex does not, several do) would have died inside discovery
-  with an attribute error, with the internal address set and nothing else
-  wrong.
+  two addresses differ.** The provider is `http://localhost:9000` for the
+  browser and `http://authentik:9000` for the backend, and OIDC has no field
+  for that: everything comes back naming the public address, which the backend
+  cannot resolve. It fails as a connection error during the callback, i.e. as
+  „Anmeldung fehlgeschlagen" with nothing in the browser to say why.
+  `OIDC_INTERNAL_BASE_URL` reroutes **only the calls this backend makes
+  itself** (`OidcService._reachable`); the authorization URL the browser is
+  sent to and the `iss` that is checked against the token stay public, because
+  rewriting either would send the user to a hostname their machine does not
+  have, or make the check pass for a token issued by somebody else. Keycloak
+  calls the same setting a „frontend URL", from the other end.
+
+- **The rerouted request has to keep saying which host it is for.** The first
+  version only swapped the address, and the browser was then redirected to
+  `http://authentik:9000/application/o/authorize/` — a name only the compose
+  network knows, so the page did not load at all. A provider builds every
+  absolute URL it hands out, the discovery document's endpoints and an ID
+  token's `iss` among them, **from the host header it was asked as**. So the
+  connection goes inside while the request still carries the public `Host`,
+  which is what any reverse proxy in front of such a provider does. Nothing
+  about this is visible in a unit test with a fixed discovery document — it
+  took a real authentik and a browser.
+
+- **The endpoints are not under the issuer, so the swap is by origin.**
+  authentik's issuer is `/application/o/where2build/` and its token endpoint
+  is `/application/o/token/`, one path up. Matching the issuer as a prefix
+  therefore rewrote the discovery URL and left the token endpoint alone —
+  which is the one call the sign-in cannot do without.
+
+- **`userinfo_endpoint` is optional**, and the rewrite called `.startswith` on
+  whatever the document held. A provider that omits it (authentik does not,
+  several do) would have died inside discovery with an attribute error, with
+  the internal address set and nothing else wrong.
+
+- **The discovery document is cached on disk, and the cache key cannot know
+  the code changed.** After the Host header was added, the backend kept
+  redirecting to the internal address: the key names the issuer and the
+  internal base URL, both unchanged, so the stale document — the one fetched
+  before, with the wrong endpoints in it — kept being served. It reads as
+  „the fix did nothing". Clear `/cache` after changing how a provider is
+  reached.
+
+- **A blueprint writes the whole object, so a field left out is a field
+  cleared.** Switching registration on means one field on an existing stage
+  (`default-authentication-identification.enrollment_flow`), and a blueprint
+  entry with just that field made authentik refuse the whole file: „When no
+  user fields are selected, at least one source must be selected" — because
+  `user_fields` was now empty. Every field that must survive has to be
+  repeated in the entry.
+
+- **authentik masks the error it is reporting.** The message that came out was
+  `KeyOf: failed to find entry with id of 'enrollment'`, which points at a
+  reference that is perfectly fine: the real error was raised while
+  *serialising* the failed entry for the log, because `repr()` of an
+  unresolved `!KeyOf` tag re-raises. The way to the actual message is to run
+  `ak shell` with `authentik.events.utils.sanitize_item` wrapped in a
+  try/except and call `Importer.validate()` by hand.
+
+- **The provider's own pages are only half translatable.** The brand carries
+  `attributes.settings.locale: de`, and that does translate the buttons — but
+  authentik 2025.2's German flow bundle holds about 35 strings, so „Email or
+  Username" and „Need an account? Sign up." stay English however the brand is
+  configured. What *is* ours: the flow titles, every label in the enrollment
+  form, the brand title and the logo (`branding_logo`, pointed at the app's
+  own `favicon.svg`, mounted into authentik's media directory).

@@ -102,10 +102,17 @@ while the stack was nginx plus the backend, so a person who ran the documented
 command got an app whose sign-in button was absent and whose „Teilen" answered
 „Teilen ist in diesem Betrieb nicht eingerichtet" — two symptoms, one cause,
 and nothing anywhere said a database and a provider were missing. The file now
-also starts Postgres and dex (`ops/dex.yaml`, demo login
-`probe@where2build.example` / `wo-bauen`). An optional feature may default to
-off in the code and still have to be **on in the stack that is handed to
-someone to try**, or the first thing they meet is a dead end.
+also starts Postgres and authentik (`ops/authentik/where2build.yaml`). An
+optional feature may default to off in the code and still have to be **on in
+the stack that is handed to someone to try**, or the first thing they meet is
+a dead end.
+
+The first provider in that stack was dex, which was a **second** dead end and
+a subtler one: it came up, it answered, and it had no registration at all —
+so a page whose own button says „Anmelden oder Konto anlegen" led to a bare
+English form where the only account was one nobody could guess. A stack that
+runs is not the same as a stack somebody can get through. authentik was what
+the plan named in the first place.
 
 To reach the dev Postgres from a container, it has to listen on the bridge
 (`listen_addresses = '*'`) *and* the bridge has to be in `pg_hba.conf`. The

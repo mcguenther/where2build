@@ -1,17 +1,26 @@
 # The whole app, ready to use: nginx serves the build and proxies /api, the
 # backend proxies and caches the official services, Postgres holds what a
-# signed-in person stores, and a local identity provider makes signing in
-# possible at all.
+# signed-in person stores, and authentik is the identity provider that makes
+# signing in -- and registering -- possible at all.
 #
 #   docker compose up --build      then open http://localhost:8080
-#   Anmelden: probe@where2build.example / wo-bauen
+#
+# There is no demo account, because there is a „Konto anlegen" link on the
+# sign-in page and it works: the first visit creates a real account in the
+# local authentik. The administrator (http://localhost:9000/if/admin/) is
+# `akadmin` with the password below.
 #
 # The database and the provider are here because without them a third of the
 # app is unreachable -- no account, no server storage, no shared link, and a
 # „Teilen" button that can only explain why it does nothing. Both are
-# deliberately local: the credentials below are in a committed file, the
-# provider's storage is in memory, and every one of them names localhost. A
-# deployment replaces them; see README, "Signing in".
+# deliberately local: the credentials are in this committed file, the
+# provider is reachable only from this machine, and everything names
+# localhost. A deployment replaces them; see README, "Signing in".
+#
+# authentik is a real identity provider and takes about a minute to come up
+# the first time -- it applies its own database schema and the blueprint in
+# ops/authentik/. Until it answers, „Anmelden" leads to a page that is not
+# there yet.
 services:
   backend:
     build:
@@ -26,10 +35,11 @@ services:
       # this one is reachable from nowhere but the compose network.
       - DATABASE_URL=postgresql://where2build:where2build@db:5432/where2build
       # Sign-in against the provider below. The issuer is the address the
-      # *browser* uses; OIDC_INTERNAL_BASE_URL is where this container reaches
-      # the same provider, because "localhost:8080" in here is this container.
-      - OIDC_ISSUER=http://localhost:8080/dex
-      - OIDC_INTERNAL_BASE_URL=http://auth:5556/dex
+      # *browser* uses; OIDC_INTERNAL_BASE_URL is the origin this container
+      # reaches the same provider at, because "localhost" in here is this
+      # container.
+      - OIDC_ISSUER=http://localhost:9000/application/o/where2build/
+      - OIDC_INTERNAL_BASE_URL=http://authentik:9000
       - OIDC_CLIENT_ID=where2build
       - OIDC_CLIENT_SECRET=nur-fuer-den-lokalen-stapel
       # Signs the session cookie. A shipped one is a key everybody has, which
@@ -94,15 +104,88 @@ services:
       start_period: 10s
     restart: unless-stopped
 
-  # The local identity provider. Reached by the browser as
-  # http://localhost:8080/dex through the nginx below, and by the backend
-  # directly as http://auth:5556/dex -- one issuer, two ways to it.
-  auth:
-    image: ghcr.io/dexidp/dex:v2.41.1
-    command: ["dex", "serve", "/etc/dex/dex.yaml"]
-    volumes:
-      - ./ops/dex.yaml:/etc/dex/dex.yaml:ro
+  # authentik needs a database of its own, and this stack already runs a
+  # Postgres. One short-lived container creates it if it is not there, which
+  # also covers a volume from before authentik existed -- an init script under
+  # docker-entrypoint-initdb.d would not, because that runs once ever.
+  authentik-db:
+    image: postgres:16-alpine
+    environment:
+      - PGPASSWORD=where2build
+    entrypoint:
+      - sh
+      - -c
+      - >
+        psql -h db -U where2build -tc "select 1 from pg_database where datname = 'authentik'"
+        | grep -q 1 || psql -h db -U where2build -c "create database authentik"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  # authentik keeps its sessions and its task queue here.
+  authentik-cache:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     restart: unless-stopped
+
+  # The identity provider. On its own port, not behind the nginx below:
+  # authentik serves from the root of its origin (/if/, /application/,
+  # /static/ and an /api/ of its own) and has no setting for a sub-path, so
+  # sharing one origin with this app would collide on /api.
+  #
+  # The browser reaches it as http://localhost:9000, the backend as
+  # http://authentik:9000 -- see OIDC_INTERNAL_BASE_URL above.
+  authentik: &authentik
+    image: ghcr.io/goauthentik/server:2025.2.4
+    command: server
+    environment: &authentik-env
+      # Signs authentik's own sessions. Committed on purpose, like everything
+      # else in this stack, and the first thing a deployment replaces.
+      - AUTHENTIK_SECRET_KEY=nur-fuer-den-lokalen-stapel-nicht-verwenden
+      - AUTHENTIK_POSTGRESQL__HOST=db
+      - AUTHENTIK_POSTGRESQL__USER=where2build
+      - AUTHENTIK_POSTGRESQL__PASSWORD=where2build
+      - AUTHENTIK_POSTGRESQL__NAME=authentik
+      - AUTHENTIK_REDIS__HOST=authentik-cache
+      # The administrator, so the stack is usable without a first-run wizard.
+      - AUTHENTIK_BOOTSTRAP_PASSWORD=wo-bauen-verwaltung
+      - AUTHENTIK_BOOTSTRAP_EMAIL=admin@where2build.example
+      # Nothing about this machine goes anywhere.
+      - AUTHENTIK_ERROR_REPORTING__ENABLED=false
+      - AUTHENTIK_DISABLE_UPDATE_CHECK=true
+      - AUTHENTIK_DISABLE_STARTUP_ANALYTICS=true
+      - AUTHENTIK_AVATARS=initials
+    volumes: &authentik-volumes
+      # Applied at start-up: the provider, the application, the enrollment
+      # flow and German as the language.
+      - ./ops/authentik:/blueprints/custom:ro
+      - authentik-media:/media
+      # The mark the sign-in page shows; the blueprint points the brand at it.
+      - ./frontend/public/favicon.svg:/media/where2build.svg:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      authentik-db:
+        condition: service_completed_successfully
+      authentik-cache:
+        condition: service_healthy
+    ports:
+      - "${WHERE2BUILD_AUTH_PORT:-9000}:9000"
+    restart: unless-stopped
+
+  # The other half of authentik: it applies the blueprint and runs the
+  # background tasks. Same image, same configuration, no port.
+  authentik-worker:
+    <<: *authentik
+    command: worker
+    environment: *authentik-env
+    volumes: *authentik-volumes
+    ports: []
 
   frontend:
     build:
@@ -153,3 +236,4 @@ volumes:
   backend-cache:
   scheduler-state:
   db-data:
+  authentik-media:

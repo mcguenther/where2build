@@ -1,0 +1,234 @@
+# Everything this stack needs from authentik, as a file.
+#
+# authentik discovers blueprints under /blueprints/custom and applies them at
+# start-up, so `docker compose up` yields a provider that is already wired: no
+# click path through an admin interface, and the same result every time.
+#
+# What it sets up:
+#   * an OAuth2/OIDC provider and an application, so the issuer is
+#     http://localhost:9000/application/o/where2build/
+#   * an enrollment flow, so „Konto anlegen" on the login page leads somewhere
+#   * German as the interface language
+#
+# The client secret is here in the open. That is the point of this file -- it
+# describes a stack meant for one laptop. A deployment configures its own
+# provider and sets OIDC_* against it; nothing here is read then.
+version: 1
+metadata:
+  name: where2build
+
+entries:
+  # ---------------------------------------------------------------- sign-in
+  - model: authentik_providers_oauth2.oauth2provider
+    id: provider
+    identifiers:
+      name: where2build
+    attrs:
+      client_type: confidential
+      client_id: where2build
+      client_secret: nur-fuer-den-lokalen-stapel
+      # `strict` and the full URL: a redirect_uri is the one field an attacker
+      # would like to be generous.
+      redirect_uris:
+        - matching_mode: strict
+          url: http://localhost:8080/api/auth/callback
+      # per_provider puts the application's own slug in the issuer, which is
+      # what the backend's OIDC_ISSUER names.
+      issuer_mode: per_provider
+      # The subject is a hash and not the e-mail address: the backend keeps it
+      # forever as the account key, and an address can change hands.
+      sub_mode: hashed_user_id
+      authorization_flow:
+        !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
+      invalidation_flow: !Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]
+      signing_key: !Find [authentik_crypto.certificatekeypair, [name, authentik Self-signed Certificate]]
+      property_mappings:
+        - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-openid]]
+        - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-email]]
+        - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-profile]]
+
+  - model: authentik_core.application
+    identifiers:
+      slug: where2build
+    attrs:
+      name: where2build
+      provider: !KeyOf provider
+      meta_description: Grundstücke prüfen in Sachsen.
+
+  # ------------------------------------------------------------- the language
+  # authentik ships English. This stack is German like the app it belongs to.
+  - model: authentik_brands.brand
+    identifiers:
+      domain: authentik-default
+    attrs:
+      branding_title: where2build
+      # The app's own mark, mounted into authentik's media directory by
+      # docker-compose.yml. Without it the page a „Anmelden" click leads to
+      # carries another product's logo.
+      branding_logo: /media/where2build.svg
+      branding_favicon: /media/where2build.svg
+      attributes:
+        settings:
+          locale: de
+
+  # The heading over the sign-in form. authentik ships „Welcome to authentik!",
+  # which is the wrong product's name in the wrong language for somebody who
+  # just clicked „Anmelden" in a German app. The other fields are repeated
+  # because a blueprint writes the whole object -- see the identification
+  # stage at the end of this file.
+  #
+  # The two lines under it -- „Email or Username" and „Need an account? Sign
+  # up." -- stay English: they come from authentik's own interface, whose
+  # German catalogue has about 35 strings in this version and not those.
+  - model: authentik_flows.flow
+    identifiers:
+      slug: default-authentication-flow
+    attrs:
+      name: Bei where2build anmelden
+      title: Bei where2build anmelden
+      designation: authentication
+      authentication: none
+
+  # -------------------------------------------------- registering an account
+  # authentik has no enrollment flow out of the box, so „Konto anlegen" has
+  # nowhere to go and the login page does not even offer it. This is the
+  # shipped two-stage example (/blueprints/example/flows-enrollment-2-stage.yaml)
+  # with German labels, bound to the login page at the bottom.
+  - model: authentik_flows.flow
+    id: enrollment
+    identifiers:
+      slug: where2build-enrollment
+    attrs:
+      name: Konto anlegen
+      title: Konto anlegen
+      designation: enrollment
+      authentication: require_unauthenticated
+
+  - model: authentik_stages_prompt.prompt
+    id: field-email
+    identifiers:
+      name: where2build-enrollment-email
+    attrs:
+      field_key: email
+      label: E-Mail-Adresse
+      type: email
+      required: true
+      placeholder: name@beispiel.de
+      placeholder_expression: false
+      order: 0
+
+  - model: authentik_stages_prompt.prompt
+    id: field-name
+    identifiers:
+      name: where2build-enrollment-name
+    attrs:
+      field_key: name
+      label: Name
+      type: text
+      required: true
+      placeholder: Vor- und Nachname
+      placeholder_expression: false
+      order: 1
+
+  - model: authentik_stages_prompt.prompt
+    id: field-username
+    identifiers:
+      name: where2build-enrollment-username
+    attrs:
+      field_key: username
+      label: Benutzername
+      type: username
+      required: true
+      placeholder: Benutzername
+      placeholder_expression: false
+      order: 2
+
+  - model: authentik_stages_prompt.prompt
+    id: field-password
+    identifiers:
+      name: where2build-enrollment-password
+    attrs:
+      field_key: password
+      label: Passwort
+      type: password
+      required: true
+      placeholder: Passwort
+      placeholder_expression: false
+      order: 3
+
+  - model: authentik_stages_prompt.prompt
+    id: field-password-repeat
+    identifiers:
+      name: where2build-enrollment-password-repeat
+    attrs:
+      field_key: password_repeat
+      label: Passwort wiederholen
+      type: password
+      required: true
+      placeholder: Passwort wiederholen
+      placeholder_expression: false
+      order: 4
+
+  - model: authentik_stages_prompt.promptstage
+    id: stage-prompt
+    identifiers:
+      name: where2build-enrollment-prompt
+    attrs:
+      fields:
+        - !KeyOf field-email
+        - !KeyOf field-name
+        - !KeyOf field-username
+        - !KeyOf field-password
+        - !KeyOf field-password-repeat
+
+  - model: authentik_stages_user_write.userwritestage
+    id: stage-write
+    identifiers:
+      name: where2build-enrollment-write
+    attrs:
+      user_creation_mode: always_create
+
+  # Signed in straight away: a stack somebody is trying out must not ask for
+  # the password twice in a row.
+  - model: authentik_stages_user_login.userloginstage
+    id: stage-login
+    identifiers:
+      name: where2build-enrollment-login
+
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf enrollment
+      stage: !KeyOf stage-prompt
+      order: 10
+
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf enrollment
+      stage: !KeyOf stage-write
+      order: 20
+
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf enrollment
+      stage: !KeyOf stage-login
+      order: 30
+
+  # The link on the login page. Without this the flow above exists and nobody
+  # can reach it.
+  #
+  # `user_fields` is repeated although only `enrollment_flow` changes: a
+  # blueprint hands the serializer the whole object, so a field left out is a
+  # field cleared -- and an identification stage with no user fields and no
+  # source is refused outright ("When no user fields are selected, at least
+  # one source must be selected"), which is what the error turns into.
+  - model: authentik_stages_identification.identificationstage
+    identifiers:
+      name: default-authentication-identification
+    attrs:
+      user_fields:
+        - email
+        - username
+      case_insensitive_matching: true
+      show_matched_user: true
+      pretend_user_exists: true
+      enrollment_flow: !KeyOf enrollment

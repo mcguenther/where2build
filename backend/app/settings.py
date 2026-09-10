@@ -582,14 +582,14 @@ class OidcSettings(BaseSettings):
     # /callback. Separate from the session, and gone the moment it is used.
     login_cookie_name: str = "w2b_anmeldung"
     # Where this backend reaches the provider, when that is not where the
-    # browser reaches it.
+    # browser reaches it. An *origin* -- scheme, host, port -- and no path.
     #
     # An issuer is one string doing two jobs: it is the address the browser is
     # sent to, and it is the name an ID token is checked against. Inside a
     # container network those two come apart -- the browser knows
-    # `http://localhost:8080/dex`, and from in here that is this container
-    # itself. Set this to the address that works from the server side
-    # (`http://auth:5556/dex`) and the discovery document, the token endpoint
+    # `http://localhost:9000`, and from in here that is this container itself.
+    # Set this to the origin that works from the server side
+    # (`http://authentik:9000`) and the discovery document, the token endpoint
     # and userinfo are fetched there; the authorization URL and the `iss`
     # check keep the public issuer, because those belong to the browser and to
     # the token. Every provider deployed this way needs it -- Keycloak calls

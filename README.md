@@ -90,12 +90,26 @@ cp backend/.env.example backend/.env    # optional — only LLM_API_KEY matters
 docker compose up --build               # then open http://localhost:8080
 ```
 
-Sign in as **probe@where2build.example / wo-bauen**. The database and the
-provider are part of the default stack because without them a third of the app
-is unreachable — no account, no server storage, no shared link. Both are
-deliberately local: the credentials are in `docker-compose.yml` and
-`ops/dex.yaml`, the provider keeps its state in memory, and everything names
-`localhost`. A deployment replaces them; see [Signing in](#signing-in).
+There is no demo account: „Anmelden" leads to a sign-in page with a
+„Konto anlegen" link that works, and the account it creates is a real one in
+the local provider. The administrator is `akadmin` with the password in
+`docker-compose.yml`, at <http://localhost:9000/if/admin/>.
+
+The database and the provider are part of the default stack because without
+them a third of the app is unreachable — no account, no server storage, no
+shared link. Both are deliberately local: the credentials are in
+`docker-compose.yml`, the provider is published only on this machine, and
+everything names `localhost`. A deployment replaces them; see
+[Signing in](#signing-in).
+
+The provider is [authentik](https://goauthentik.io), configured entirely by
+`ops/authentik/where2build.yaml` — the OIDC provider and application, an
+enrollment flow so registering works, and German as the interface language.
+It is a real identity provider, so give it about a minute on the first start;
+until then „Anmelden" leads to a page that is not up yet. It listens on
+**9000** of its own, not behind the nginx below: authentik serves from the
+root of its origin, including an `/api/` of its own, and has no setting for a
+sub-path.
 
 nginx serves the built frontend and proxies `/api` to the backend, so the
 browser only ever sees one origin and CORS never enters into it. The backend
@@ -315,13 +329,26 @@ OIDC_INTERNAL_BASE_URL=          # only where the issuer is not reachable from t
 `OIDC_INTERNAL_BASE_URL` is for one situation and it is the compose stack's:
 an issuer is a single string that the *browser* is redirected to and that an
 ID token is checked against, and inside a container network those two come
-apart. The provider there is `http://localhost:8080/dex` for the browser and
-`http://auth:5556/dex` from the backend, which is the same provider by two
-routes. Set this and the discovery document, the token endpoint and userinfo
-are fetched at that address, while the authorization URL and the `iss` check
-keep the public issuer. Keycloak calls the same thing a "frontend URL". Leave
-it empty anywhere the issuer is reachable from both sides — which is every
-ordinary deployment.
+apart. The provider there is `http://localhost:9000` for the browser and
+`http://authentik:9000` from the backend, which is the same provider by two
+routes. Set this to that **origin** — scheme, host, port, no path — and the
+discovery document, the token endpoint and userinfo are fetched there.
+
+Two details make it work, and both are load-bearing:
+
+* What is swapped is the origin, not the issuer as a prefix. A provider's
+  endpoints need not live under its issuer: authentik's issuer is
+  `/application/o/where2build/` while its token endpoint is
+  `/application/o/token/`, one path up.
+* The rerouted request still carries the public `Host`. A provider builds
+  every absolute URL it hands out — the endpoints in its discovery document
+  and the `iss` of an ID token — from the host it was asked as, so asked as
+  `authentik:9000` it answers with an authorization URL naming a host the
+  browser has never heard of. This is exactly what a reverse proxy in front
+  of such a provider does.
+
+Keycloak calls the same thing a "frontend URL". Leave it empty anywhere the
+issuer is reachable from both sides — which is every ordinary deployment.
 
 Any OpenID Connect provider will do; nothing about one is wired in. The
 backend reads `<issuer>/.well-known/openid-configuration` and takes the

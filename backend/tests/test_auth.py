@@ -749,3 +749,128 @@ def test_a_provider_without_userinfo_still_works_at_the_other_address(
     )
 
     assert client.get("/api/auth/me").json()["angemeldet"] is True
+
+
+@respx.mock
+def test_an_endpoint_outside_the_issuer_path_is_rewritten_too(
+    oidc, client: TestClient, monkeypatch
+):
+    """A provider's endpoints need not sit under its issuer.
+
+    authentik's issuer is `/application/o/<app>/` and its token endpoint is
+    `/application/o/token/` -- one path up. Matching the issuer as a prefix
+    therefore left exactly the endpoint the exchange depends on pointing at an
+    address this container cannot reach, and sign-in died after the password.
+    What is swapped is the origin.
+    """
+
+    app_issuer = f"{OIDC_ISSUER}/application/o/where2build/"
+    monkeypatch.setenv("OIDC_ISSUER", app_issuer)
+    monkeypatch.setenv("OIDC_INTERNAL_BASE_URL", INTERNAL)
+    reset_services()
+    shaped_like_authentik = {
+        **DISCOVERY,
+        "issuer": app_issuer,
+        "authorization_endpoint": f"{OIDC_ISSUER}/application/o/authorize/",
+        "token_endpoint": f"{OIDC_ISSUER}/application/o/token/",
+        "userinfo_endpoint": f"{OIDC_ISSUER}/application/o/userinfo/",
+    }
+    respx.get(f"{INTERNAL}/application/o/where2build/.well-known/openid-configuration").mock(
+        return_value=httpx.Response(200, json=shaped_like_authentik)
+    )
+
+    handshake = _begin(client)
+    inside_token = respx.post(f"{INTERNAL}/application/o/token/").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "access_token": "zugang",
+                "token_type": "Bearer",
+                "expires_in": 300,
+                "id_token": _id_token(nonce=handshake["nonce"], iss=app_issuer),
+            },
+        )
+    )
+    client.get(
+        "/api/auth/callback",
+        params={"code": "abc", "state": handshake["state"]},
+        follow_redirects=False,
+    )
+
+    assert inside_token.called
+    assert client.get("/api/auth/me").json()["angemeldet"] is True
+
+
+@respx.mock
+def test_the_browser_is_sent_to_the_public_address(oidc, client: TestClient, monkeypatch):
+    """The one URL that must never be rewritten is the one the browser gets.
+
+    `http://authentik:9000` is a name only the compose network knows; putting
+    it in a Location header sends the person to a page their machine cannot
+    open.
+    """
+
+    monkeypatch.setenv("OIDC_INTERNAL_BASE_URL", INTERNAL)
+    reset_services()
+    respx.get(f"{INTERNAL}/.well-known/openid-configuration").mock(
+        return_value=httpx.Response(200, json=DISCOVERY)
+    )
+
+    answer = client.get("/api/auth/login", follow_redirects=False)
+
+    assert answer.headers["location"].startswith(AUTHORIZE_URL)
+
+
+@respx.mock
+def test_a_rerouted_request_still_says_which_host_it_is_for(
+    oidc, client: TestClient, monkeypatch
+):
+    """The provider builds its own URLs from the host it was asked as.
+
+    Fetched at the internal address, authentik answers a discovery document
+    naming that address in every endpoint -- including the authorization URL,
+    which then goes into a Location header and sends the browser to a name
+    only the container network knows. Measured against a real authentik: the
+    redirect read `http://authentik:9000/...` and the page did not load. The
+    connection therefore goes inside while the request keeps saying it is for
+    the public host, which is what a reverse proxy in front of such a provider
+    does.
+    """
+
+    monkeypatch.setenv("OIDC_INTERNAL_BASE_URL", INTERNAL)
+    reset_services()
+    inside = respx.get(f"{INTERNAL}/.well-known/openid-configuration").mock(
+        return_value=httpx.Response(200, json=DISCOVERY)
+    )
+
+    handshake = _begin(client)
+    token = respx.post(f"{INTERNAL}/token").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "access_token": "zugang",
+                "token_type": "Bearer",
+                "expires_in": 300,
+                "id_token": _id_token(nonce=handshake["nonce"]),
+            },
+        )
+    )
+    client.get(
+        "/api/auth/callback",
+        params={"code": "abc", "state": handshake["state"]},
+        follow_redirects=False,
+    )
+
+    expected = urlsplit(OIDC_ISSUER).netloc
+    assert inside.calls.last.request.headers["host"] == expected
+    assert token.calls.last.request.headers["host"] == expected
+
+
+@respx.mock
+def test_without_an_internal_address_no_host_is_forced(oidc, client: TestClient):
+    """httpx sets the Host from the URL, and that is right when nothing moved."""
+
+    discovery = _discovery_route()
+    client.get("/api/auth/login", follow_redirects=False)
+
+    assert discovery.calls.last.request.headers["host"] == urlsplit(OIDC_ISSUER).netloc

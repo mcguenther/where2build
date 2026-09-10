@@ -157,11 +157,14 @@ backend/.venv/bin/python -m pytest backend/tests -q
 backend/.venv/bin/python -m uvicorn app.main:app --reload --app-dir backend
 
 # the whole thing in containers: nginx with the build, the backend, Postgres
-# and a local identity provider. One origin, so no CORS.
-#   Anmelden: probe@where2build.example / wo-bauen
+# and authentik. The app is one origin, so no CORS; authentik is on 9000 of
+# its own because it serves from the root of an origin, /api/ included.
+# No demo account -- „Anmelden" leads to a page whose „Konto anlegen" works.
+# authentik needs about a minute on the first start.
 docker compose up --build      # http://localhost:8080
 # the same thing in the Claude Code cloud sandbox, where a plain build fails
-# on the proxy's own CA -- see docs/claude/tooling-and-tests.md for why
+# on the proxy's own CA -- see docs/claude/tooling-and-tests.md for why.
+# No --build here: it reaches the plain `docker compose` behind the script.
 scripts/docker-build-sandbox.sh up -d
 
 # routing on this machine instead of Transitous -- opt-in, off by default.
@@ -206,8 +209,8 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 638 passed, 49 skipped. With `TEST_DATABASE_URL` pointed at a real
-  Postgres it is 679 passed, 8 skipped — the extra 41 are the account store,
+- `pytest`: 642 passed, 49 skipped. With `TEST_DATABASE_URL` pointed at a real
+  Postgres it is 683 passed, 8 skipped — the extra 41 are the account store,
   and they are skipped rather than mocked because what they check is the
   database's own behaviour. Of the remaining 8, one needs pyosmium, which only
   the index builder wants; the other seven need Tesseract.
