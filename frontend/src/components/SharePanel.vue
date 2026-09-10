@@ -19,7 +19,7 @@
           Anmelden dauert einen Moment, und das Grundstück bleibt dabei genau so stehen,
           wie es jetzt ist.
         </p>
-        <p><a class="btn" :href="signInHref">Anmelden oder Konto anlegen</a></p>
+        <p><a class="btn" :href="signInHref" @click.prevent="signIn">Anmelden oder Konto anlegen</a></p>
       </template>
       <template v-else>
         <p>
@@ -92,6 +92,7 @@
  */
 import { state, placement, houseTypeById, destinationName } from "../lib/store.js";
 import { createShare, signInUrl } from "../lib/api.js";
+import { beginSignIn } from "../lib/signIn.js";
 
 /** What may travel beyond the plot, and why somebody might not want it to.
  *  The ids match `FreigabeUmfang` in the backend. */
@@ -128,6 +129,10 @@ export default {
     }
   },
   methods: {
+    /** Signing in runs in a window of its own, so this page stays standing --
+     *  with whatever is half-entered on it. A refused window falls back to a
+     *  full navigation; see lib/signIn.js. */
+    signIn() { return beginSignIn(this.$route.fullPath); },
     async create() {
       this.busy = true;
       this.failure = "";

@@ -172,7 +172,7 @@
              holds. -->
         <p v-if="!state.account.angemeldet" class="hero__account">
           <template v-if="state.account.eingerichtet">
-            <a :href="signInHref">Anmelden oder Konto anlegen</a> — dann liegt der Stand
+            <a :href="signInHref" @click.prevent="signIn">Anmelden oder Konto anlegen</a> — dann liegt der Stand
             auf jedem Rechner. Ohne Konto bleibt er in diesem Browser, und das reicht
             für alles hier.
           </template>
@@ -245,6 +245,7 @@ import QueryBox from "../components/QueryBox.vue";
 import PlotCard from "../components/PlotCard.vue";
 import { state, removePlot } from "../lib/store.js";
 import { backendHealth, signInUrl } from "../lib/api.js";
+import { beginSignIn } from "../lib/signIn.js";
 import { handOff } from "../lib/handoff.js";
 import { wizardStage } from "../router/stages.js";
 
@@ -297,6 +298,10 @@ export default {
     this.backendUp = Boolean(await backendHealth());
   },
   methods: {
+    /** Signing in runs in a window of its own, so this page stays standing --
+     *  with whatever is half-entered on it. A refused window falls back to a
+     *  full navigation; see lib/signIn.js. */
+    signIn() { return beginSignIn(this.$route.fullPath); },
     open(id) { this.$router.push({ name: "plot", params: { id } }); },
     remove(plot) {
       const confirmed = window.confirm(`„${plot.name}“ aus der Liste entfernen? Der Stand dieses Grundstücks geht verloren.`);

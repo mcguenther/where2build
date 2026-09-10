@@ -20,6 +20,7 @@ import LocationView from "../views/LocationView.vue";
 import DataView from "../views/DataView.vue";
 import AccountView from "../views/AccountView.vue";
 import SharedPlotView from "../views/SharedPlotView.vue";
+import SignInDoneView from "../views/SignInDoneView.vue";
 import NotFoundView from "../views/NotFoundView.vue";
 import { WIZARD_STAGES, wizardStage } from "./stages.js";
 
@@ -70,6 +71,15 @@ export const routes = [
     name: "shared",
     component: SharedPlotView,
     props: true,
+    meta: { section: null }
+  },
+  /* Where the sign-in exchange ends. Normally seen by nobody: it runs in a
+     window of its own, which closes here -- see lib/signIn.js. The path is
+     the `ziel` the backend is given, so it has to be a route. */
+  {
+    path: "/anmeldung-fertig",
+    name: "signInDone",
+    component: SignInDoneView,
     meta: { section: null }
   },
   { path: "/:pathMatch(.*)*", name: "notFound", component: NotFoundView }

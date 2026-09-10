@@ -236,3 +236,34 @@ server.
   configured. What *is* ours: the flow titles, every label in the enrollment
   form, the brand title and the logo (`branding_logo`, pointed at the app's
   own `favicon.svg`, mounted into authentik's media directory).
+
+- **A successful registration ended on a refusal.** Somebody who signs in at
+  authentik itself rather than by clicking „Anmelden" has to end up
+  *somewhere*, and authentik's own answer is its user interface — which
+  refuses exactly the accounts this stack creates. They are `external` (people
+  who use where2build, not authentik), and an external user gets „Die
+  Oberfläche kann nur von internen Nutzern geöffnet werden", immediately after
+  the account was created successfully. authentik has the remedy built in and
+  the field even says so: `Brand.default_application` — „external users will
+  be redirected to this application after authenticating". It is pointed at
+  the application's `meta_launch_url`, and that is **`/api/auth/login`**, not
+  the start page: arriving at the start page would leave somebody signed in at
+  authentik and signed out of where2build, i.e. looking at „Anmelden" in the
+  corner seconds after registering. The sign-in endpoint bounces through the
+  provider once more, silently, because the session is already there.
+
+- **Signing in ran in the page and cost everything the page held.** The
+  exchange is five redirects across three origins, so the app unloaded and
+  came back: a pasted advert, a dragged building and a half-filled search were
+  reloaded from storage on the way back, or gone where they were never stored
+  — at exactly the moment somebody wanted an account *so that* their work
+  would be kept. It runs in a window of its own now (`lib/signIn.js`), which
+  lands on `/anmeldung-fertig`, posts to its opener and closes; the page never
+  unloads. Three things that make it hold up: `window.open` has to be reached
+  synchronously from the click or every browser refuses it; a refused window
+  falls back to the old full navigation, because a button that does nothing is
+  worse than a page change; and whether it worked is asked of `/api/auth/me`
+  afterwards rather than read off the message, because a window closed by hand
+  posts nothing and a window that posts and then closes is a race. A sign-in
+  that breaks off still lands on the start page with „Die Anmeldung kam nicht
+  zustande" — in the small window, which is where it happened.

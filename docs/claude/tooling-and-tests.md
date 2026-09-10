@@ -240,3 +240,11 @@ line looks right and does not match.
   Undo a deliberate break with the editor, or stage the work first — and after
   any checkout of a file that was dirty, grep for the thing that should be
   there.
+
+- **Compose takes the project name from the directory unless it is told
+  one.** A clone in a differently named folder is then a second stack with its
+  own containers and volumes, and `--remove-orphans` in one cannot see the
+  other's leftovers. `docker-compose.yml` names itself now. `--remove-orphans`
+  is worth typing on every `up` and `down`: a service renamed between two
+  versions of the file leaves its container running, and Compose mentions it
+  in one line that scrolls past.

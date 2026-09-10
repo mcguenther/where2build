@@ -22,7 +22,7 @@
       <div class="panel__body stack">
         <template v-if="state.account.eingerichtet">
           <p>Für dieses Konto ist hier nichts zu sehen, solange niemand angemeldet ist.</p>
-          <p><a class="btn btn--secondary" :href="signInHref">Anmelden oder Konto anlegen</a></p>
+          <p><a class="btn btn--secondary" :href="signInHref" @click.prevent="signIn">Anmelden oder Konto anlegen</a></p>
         </template>
         <template v-else>
           <p>
@@ -114,6 +114,7 @@
  */
 import { state, loadAccount, loadFromAccount } from "../lib/store.js";
 import { accountOnServer, deleteAccountOnServer, plotsOnServer, settingsOnServer, signInUrl } from "../lib/api.js";
+import { beginSignIn } from "../lib/signIn.js";
 import { date } from "../lib/format.js";
 
 export default {
@@ -143,6 +144,10 @@ export default {
   },
   created() { this.load(); },
   methods: {
+    /** Signing in runs in a window of its own, so this page stays standing --
+     *  with whatever is half-entered on it. A refused window falls back to a
+     *  full navigation; see lib/signIn.js. */
+    signIn() { return beginSignIn(this.$route.fullPath); },
     date,
     async load() {
       if (!state.account.angemeldet) return;

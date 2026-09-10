@@ -21,6 +21,12 @@
 # the first time -- it applies its own database schema and the blueprint in
 # ops/authentik/. Until it answers, „Anmelden" leads to a page that is not
 # there yet.
+# The project name, spelled out rather than taken from the directory. Compose
+# derives it from the folder otherwise, so a clone in `where2build-2` becomes a
+# second stack with its own containers and its own volumes, and
+# `--remove-orphans` in one no longer sees the other's leftovers.
+name: where2build
+
 services:
   backend:
     build:
@@ -108,7 +114,7 @@ services:
   # Postgres. One short-lived container creates it if it is not there, which
   # also covers a volume from before authentik existed -- an init script under
   # docker-entrypoint-initdb.d would not, because that runs once ever.
-  authentik-db:
+  authentik-db-init:
     image: postgres:16-alpine
     environment:
       - PGPASSWORD=where2build
@@ -170,7 +176,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      authentik-db:
+      authentik-db-init:
         condition: service_completed_successfully
       authentik-cache:
         condition: service_healthy

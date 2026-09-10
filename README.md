@@ -87,8 +87,24 @@ browser; with one it is stored server-side and a plot can be shared by link.
 
 ```bash
 cp backend/.env.example backend/.env    # optional — only LLM_API_KEY matters
-docker compose up --build               # then open http://localhost:8080
+docker compose up --build --remove-orphans   # then open http://localhost:8080
 ```
+
+`--remove-orphans` is worth typing every time: a service that was renamed or
+dropped between two versions of this file leaves its container running, and
+Compose only says so in a line that scrolls past. Two more, for when the stack
+is not wanted:
+
+```bash
+docker compose down --remove-orphans    # stop; the volumes stay, so does the work
+docker compose down -v                  # and throw the volumes away with it
+docker image prune                      # images nothing points at any more
+```
+
+`docker compose down` on its own keeps four volumes: the backend's cache of
+official answers, the scheduler's state, Postgres, and authentik's media. That
+is the point of them — `up` again and the plots are still there. `-v` is what
+empties the database, and `docker system df` says what any of it costs.
 
 There is no demo account: „Anmelden" leads to a sign-in page with a
 „Konto anlegen" link that works, and the account it creates is a real one in

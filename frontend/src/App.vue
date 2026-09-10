@@ -48,7 +48,7 @@
           <button type="button" class="btn btn--quiet btn--small" @click="leave">Abmelden</button>
         </div>
         <a v-else-if="state.account.eingerichtet" class="btn btn--secondary btn--small"
-           :href="signInHref">Anmelden</a>
+           :href="signInHref" @click.prevent="signIn">Anmelden</a>
       </div>
     </header>
 
@@ -91,6 +91,7 @@
 <script>
 import { state, applyTheme, loadAccount, loadFromAccount, adoptLocal, declineAdoption, isFresh } from "./lib/store.js";
 import { signInUrl, signOut } from "./lib/api.js";
+import { beginSignIn } from "./lib/signIn.js";
 
 export default {
   name: "App",
@@ -135,6 +136,10 @@ export default {
     }
   },
   methods: {
+    /** Signing in runs in a window of its own, so this page stays standing --
+     *  with whatever is half-entered on it. A refused window falls back to a
+     *  full navigation; see lib/signIn.js. */
+    signIn() { return beginSignIn(this.$route.fullPath); },
     applyTheme,
     /** Sign out and reload the answer rather than assuming it: the cookie is
      *  the backend's, and only it can say what is left of the session. */

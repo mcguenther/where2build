@@ -48,12 +48,23 @@ entries:
         - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-profile]]
 
   - model: authentik_core.application
+    id: application
     identifiers:
       slug: where2build
     attrs:
       name: where2build
       provider: !KeyOf provider
       meta_description: Grundstücke prüfen in Sachsen.
+      # Where somebody belongs after signing in. Not decoration: the brand
+      # below sends people here, and without it they land on authentik's own
+      # pages -- see there.
+      #
+      # The *sign-in* endpoint rather than the start page, because arriving at
+      # the start page would leave them signed in at authentik and signed out
+      # of where2build -- „Anmelden" in the corner right after registering.
+      # This one bounces through the provider once more, silently, since the
+      # session is already there, and lands them signed in.
+      meta_launch_url: http://localhost:8080/api/auth/login
 
   # ------------------------------------------------------------- the language
   # authentik ships English. This stack is German like the app it belongs to.
@@ -67,6 +78,15 @@ entries:
       # carries another product's logo.
       branding_logo: /media/where2build.svg
       branding_favicon: /media/where2build.svg
+      # Somebody who signs in at authentik itself -- rather than by clicking
+      # „Anmelden" in the app -- has to end up *somewhere*, and authentik's
+      # own answer is its user interface. That interface refuses the accounts
+      # this stack creates: they are `external` (people who use where2build,
+      # not authentik), and an external user gets „Die Oberfläche kann nur von
+      # internen Nutzern geöffnet werden" -- a refusal, right after a
+      # successful registration. `default_application` is authentik's own
+      # remedy: external users are sent to that application's launch URL.
+      default_application: !KeyOf application
       attributes:
         settings:
           locale: de
