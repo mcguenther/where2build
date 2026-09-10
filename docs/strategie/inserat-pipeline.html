@@ -1,0 +1,1511 @@
+<title>Vom Inserat zum Flurstück</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --primary:#2F4A3A; --primary-light:#456B52; --primary-dark:#1C2E23; --primary-veil:rgba(47,74,58,.10);
+  --secondary:#B5813C; --secondary-text:#7C5620; --secondary-light:#E8D4B0; --secondary-veil:rgba(181,129,60,.16);
+  --sage:#9DB39A; --sage-light:#DCE4DA;
+  --ink:#1E1A16; --graphite:#4A443C; --muted:#6F675C; --line:#DCD3C6; --line-faint:#EBE4D9;
+  --surface:#FAF7F1; --sunken:#F3EFE6; --paper:#F1EBE1; --white:#FFFFFF;
+  --warning:#BE8524; --warning-text:#7C5620; --warning-surface:#F6E9CE;
+  --error:#A8402C; --error-text:#8E3524; --error-surface:#F2DED8;
+  --good:#2F4A3A; --good-surface:#DEE7DF;
+  --on-primary:#FFFFFF;
+  --shadow:0 1px 2px rgba(30,26,22,.05),0 10px 24px -18px rgba(30,26,22,.45);
+  --font-display:"Archivo",system-ui,-apple-system,sans-serif;
+  --font-body:"Public Sans",system-ui,-apple-system,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --primary:#7FA98A; --primary-light:#9BC0A4; --primary-dark:#24382C; --primary-veil:rgba(127,169,138,.14);
+  --secondary:#D9A55E; --secondary-text:#DBB273; --secondary-light:#3E3021; --secondary-veil:rgba(217,165,94,.18);
+  --sage:#6E8470; --sage-light:#26302A;
+  --ink:#F1EBE1; --graphite:#C4BCB0; --muted:#948B7E; --line:#3A342C; --line-faint:#2A2620;
+  --surface:#201C17; --sunken:#191510; --paper:#16130F;
+  --warning:#D8A340; --warning-text:#E3BC72; --warning-surface:#3A2E19;
+  --error:#E0705A; --error-text:#E88C77; --error-surface:#3B211B;
+  --good:#7FA98A; --good-surface:#1F2C24;
+  --on-primary:#16130F;
+  --shadow:0 1px 2px rgba(0,0,0,.5),0 12px 28px -20px rgba(0,0,0,.85);
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --primary:#7FA98A; --primary-light:#9BC0A4; --primary-dark:#24382C; --primary-veil:rgba(127,169,138,.14);
+  --secondary:#D9A55E; --secondary-text:#DBB273; --secondary-light:#3E3021; --secondary-veil:rgba(217,165,94,.18);
+  --sage:#6E8470; --sage-light:#26302A;
+  --ink:#F1EBE1; --graphite:#C4BCB0; --muted:#948B7E; --line:#3A342C; --line-faint:#2A2620;
+  --surface:#201C17; --sunken:#191510; --paper:#16130F;
+  --warning:#D8A340; --warning-text:#E3BC72; --warning-surface:#3A2E19;
+  --error:#E0705A; --error-text:#E88C77; --error-surface:#3B211B;
+  --good:#7FA98A; --good-surface:#1F2C24;
+  --on-primary:#16130F;
+  --shadow:0 1px 2px rgba(0,0,0,.5),0 12px 28px -20px rgba(0,0,0,.85);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--font-body);font-size:16px;line-height:1.6;
+  -webkit-font-smoothing:antialiased;margin:0;padding-block:0 80px}
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+.col{max-width:70ch}
+h1,h2,h3,h4{font-family:var(--font-display);text-wrap:balance;line-height:1.16;margin:0}
+h1{font-size:clamp(30px,5vw,46px);font-weight:700;letter-spacing:-.02em}
+h2{font-size:clamp(21px,3vw,27px);font-weight:600;letter-spacing:-.01em}
+h3{font-size:17px;font-weight:600}
+h4{font-size:14.5px;font-weight:600}
+p{margin:0}
+ul{margin:0;padding-left:1.15em}
+li+li{margin-top:5px}
+.eyebrow{font-family:var(--font-mono);font-size:11.5px;font-weight:500;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--muted)}
+.lede{font-size:19px;line-height:1.55;color:var(--graphite)}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.stack{display:flex;flex-direction:column;gap:16px}
+.stack-s{display:flex;flex-direction:column;gap:9px}
+section{padding:46px 0;border-top:1px solid var(--line-faint)}
+.tafel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px;box-shadow:var(--shadow)}
+a{color:var(--primary);text-underline-offset:3px}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:4px}
+code{font-family:var(--font-mono);font-size:.87em;background:var(--sunken);border:1px solid var(--line-faint);
+  border-radius:4px;padding:1px 5px}
+.merk{border-left:3px solid var(--secondary);background:var(--secondary-veil);padding:14px 18px;border-radius:0 8px 8px 0}
+.merk p{font-size:14.5px}
+.merk p+p{margin-top:9px}
+.merk--rot{border-left-color:var(--error);background:var(--error-surface)}
+.merk--gruen{border-left-color:var(--primary);background:var(--good-surface)}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line-faint);vertical-align:top}
+th{font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:500}
+td.n{font-family:var(--font-mono);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.scroll{overflow-x:auto}
+.scroll table{min-width:620px}
+
+/* --- Kopf --- */
+.hero{padding:56px 0 30px}
+.hero h1{margin:12px 0 16px;max-width:20ch}
+.marken{display:flex;flex-wrap:wrap;gap:7px;margin-top:22px}
+.marke{font-family:var(--font-mono);font-size:12px;padding:6px 11px;border-radius:999px;
+  border:1px solid var(--line);background:var(--surface);color:var(--graphite);white-space:nowrap}
+.marke.stark{border-color:var(--primary);color:var(--primary);background:var(--primary-veil)}
+.kennzahlen{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;margin-top:28px;
+  background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.kz{background:var(--surface);padding:15px 17px}
+.kz b{display:block;font-family:var(--font-mono);font-size:25px;font-weight:500;letter-spacing:-.02em;
+  font-variant-numeric:tabular-nums;color:var(--ink)}
+.kz span{display:block;font-size:12.5px;color:var(--muted);margin-top:3px;line-height:1.35}
+
+/* --- Filterleiste --- */
+.filter{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin:18px 0 14px}
+.filter b{font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);font-weight:500;margin-right:2px}
+.chip{font-family:var(--font-mono);font-size:12px;padding:5px 11px;border-radius:999px;cursor:pointer;
+  border:1px solid var(--line);background:var(--surface);color:var(--graphite);transition:.15s}
+.chip:hover{border-color:var(--primary-light)}
+.chip[aria-pressed="true"]{border-color:var(--primary);background:var(--primary);color:var(--on-primary)}
+
+/* --- Inventar --- */
+.inv{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--surface)}
+.inv-zeile{display:grid;grid-template-columns:minmax(0,1fr);gap:2px 14px;padding:11px 16px;
+  border-top:1px solid var(--line-faint);cursor:pointer;align-items:baseline}
+.inv-zeile:first-child{border-top:0}
+.inv-zeile:hover{background:var(--sunken)}
+@media(min-width:760px){.inv-zeile{grid-template-columns:minmax(0,17ch) minmax(0,1fr) 13ch 11ch}}
+.inv-feld{font-family:var(--font-mono);font-size:12.5px;color:var(--ink);font-weight:500;overflow-wrap:anywhere}
+.inv-was{font-size:13.5px;color:var(--graphite)}
+.inv-kanal,.inv-rolle{font-family:var(--font-mono);font-size:11px;letter-spacing:.04em;color:var(--muted)}
+.inv-rolle i{font-style:normal;display:inline-block;width:7px;height:7px;border-radius:2px;margin-right:6px;
+  background:var(--muted);vertical-align:baseline}
+.r-hart i{background:var(--primary)} .r-hart{color:var(--primary)}
+.r-ordnet i{background:var(--secondary)} .r-ordnet{color:var(--secondary-text)}
+.r-zeigt i{background:var(--sage)}
+.r-unbenutzt i{background:var(--error)} .r-unbenutzt{color:var(--error-text)}
+.inv-beleg{grid-column:1/-1;font-size:12.5px;color:var(--muted);padding-top:7px;display:none}
+.inv-zeile.offen .inv-beleg{display:block}
+.inv-beleg q{color:var(--graphite);font-style:italic}
+.inv-leer{padding:22px 16px;font-size:13.5px;color:var(--muted)}
+
+/* --- Ablauf --- */
+.ablauf{margin-top:20px;border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:16px}
+.ablauf svg{display:block;width:100%;height:auto;min-width:660px}
+.knoten rect{fill:var(--sunken);stroke:var(--line);stroke-width:1.2;cursor:pointer}
+.knoten:hover rect,.knoten[aria-current="true"] rect{fill:var(--primary-veil);stroke:var(--primary)}
+.knoten text{font-family:var(--font-body);font-size:12.5px;fill:var(--ink);pointer-events:none}
+.knoten .nr{font-family:var(--font-mono);font-size:10px;fill:var(--muted);letter-spacing:.1em}
+.kante{stroke:var(--muted);stroke-width:1.4;fill:none;marker-end:url(#pfeil)}
+#pfeil path{fill:var(--muted)}
+#pfeil-rot path{fill:var(--error)}
+.kante.zurueck{stroke:var(--error);stroke-dasharray:5 4;opacity:0;transition:opacity .4s;marker-end:url(#pfeil-rot)}
+.zeigt-rueck .kante.zurueck{opacity:1}
+.kante-text{font-family:var(--font-mono);font-size:10.5px;fill:var(--muted)}
+.zurueck-text{fill:var(--error-text);opacity:0;transition:opacity .4s}
+.zeigt-rueck .zurueck-text{opacity:1}
+.laeufer{fill:var(--secondary)}
+.ablauf-detail{margin-top:14px;border-top:1px solid var(--line-faint);padding-top:14px;font-size:13.5px;
+  display:grid;gap:6px;min-height:104px}
+.ablauf-detail h4{font-size:14.5px}
+.ablauf-detail .wo{font-family:var(--font-mono);font-size:11.5px;color:var(--muted)}
+.ablauf-detail .abbruch{color:var(--error-text);font-size:12.5px}
+</style>
+<style>
+/* --- Bruchstellen --- */
+.bruch{display:grid;gap:14px;margin-top:22px}
+@media(min-width:820px){.bruch{grid-template-columns:1fr 1fr}}
+.bs{border:1px solid var(--line);border-left:4px solid var(--sev,var(--line));border-radius:10px;
+  background:var(--surface);padding:16px 18px;display:grid;gap:9px;align-content:start}
+.bs--hoch{--sev:var(--error)} .bs--mittel{--sev:var(--warning)} .bs--klein{--sev:var(--sage)}
+.bs-kopf{display:flex;gap:10px;align-items:baseline;justify-content:space-between}
+.bs-kopf b{font-family:var(--font-mono);font-size:11px;letter-spacing:.12em;color:var(--muted);font-weight:500}
+.bs-grad{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;
+  padding:2px 8px;border-radius:999px;border:1px solid var(--sev);color:var(--sev);white-space:nowrap}
+.bs p{font-size:13.5px;color:var(--graphite)}
+.bs .beleg{font-size:12.5px;color:var(--muted);border-left:2px solid var(--line);padding-left:11px}
+.bs .beleg q{font-style:italic;color:var(--graphite)}
+.bs .fix{font-size:13px;color:var(--ink);background:var(--good-surface);border-radius:7px;padding:10px 12px}
+.bs .fix b{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--primary);display:block;margin-bottom:3px}
+
+/* --- Agenda-Simulator --- */
+.sim{border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow:hidden;margin-top:20px}
+.sim-kopf{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;
+  padding:14px 16px;border-bottom:1px solid var(--line-faint);background:var(--sunken)}
+.sim-fall{display:flex;flex-wrap:wrap;gap:6px}
+.sim-steuer{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.sim-modus{display:inline-flex;gap:6px}
+.knopf{font-family:var(--font-body);font-size:13px;font-weight:500;padding:7px 14px;border-radius:8px;
+  border:1px solid var(--primary);background:var(--primary);color:var(--on-primary);cursor:pointer}
+.knopf.leise{background:var(--surface);color:var(--graphite);border-color:var(--line)}
+.knopf:disabled{opacity:.45;cursor:default}
+.sim-koerper{display:grid;gap:0}
+@media(min-width:860px){.sim-koerper{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr)}}
+.sim-schritte{padding:14px 16px;display:flex;flex-direction:column;gap:7px;min-height:330px}
+@media(min-width:860px){.sim-schritte{border-right:1px solid var(--line-faint)}}
+.sch{display:grid;grid-template-columns:2.2ch minmax(0,1fr) auto;gap:11px;align-items:baseline;
+  padding:9px 11px;border-radius:9px;border:1px solid transparent;background:var(--sunken);
+  opacity:.32;transition:opacity .35s,border-color .35s,transform .35s;transform:translateY(3px)}
+.sch.da{opacity:1;transform:none;border-color:var(--line-faint)}
+.sch.jetzt{border-color:var(--primary);background:var(--primary-veil)}
+.sch-nr{font-family:var(--font-mono);font-size:10.5px;color:var(--muted)}
+.sch-text{font-size:13.5px}
+.sch-text small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.sch-zahl{font-family:var(--font-mono);font-size:12px;font-variant-numeric:tabular-nums;color:var(--graphite);white-space:nowrap}
+.sch.aus .sch-text{text-decoration:line-through;text-decoration-color:var(--error);color:var(--muted)}
+.sch.treffer{border-color:var(--primary);background:var(--good-surface)}
+.sim-tafel{padding:14px 16px;display:flex;flex-direction:column;gap:12px}
+.sim-zaehler{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);
+  border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.sim-zaehler div{background:var(--surface);padding:9px 10px}
+.sim-zaehler b{display:block;font-family:var(--font-mono);font-size:19px;font-variant-numeric:tabular-nums}
+.sim-zaehler span{font-size:11px;color:var(--muted)}
+.sim-lage{font-size:13px;color:var(--graphite);min-height:3.2em}
+.sim-urteil{font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  padding:5px 11px;border-radius:999px;align-self:start;border:1px solid var(--line);color:var(--muted)}
+.sim-urteil.bestaetigt{border-color:var(--primary);color:var(--primary);background:var(--good-surface)}
+.sim-urteil.mehrdeutig{border-color:var(--warning);color:var(--warning-text);background:var(--warning-surface)}
+.sim-urteil.erfolglos{border-color:var(--error);color:var(--error-text);background:var(--error-surface)}
+.sim-fuss{padding:11px 16px;border-top:1px solid var(--line-faint);font-size:12px;color:var(--muted);background:var(--sunken)}
+
+/* --- Balken --- */
+.balken{display:grid;gap:7px;margin-top:18px}
+.bl{display:grid;grid-template-columns:minmax(0,20ch) minmax(0,1fr) 9ch;gap:12px;align-items:center;
+  padding:4px 0}
+@media(max-width:640px){.bl{grid-template-columns:minmax(0,1fr) 9ch}.bl-spur{grid-column:1/-1}}
+.bl-name{font-size:13px;color:var(--graphite)}
+.bl-spur{height:15px;border-radius:3px;background:var(--sunken);border:1px solid var(--line-faint);overflow:hidden}
+.bl-spur i{display:block;height:100%;background:var(--primary);border-radius:0 3px 3px 0;
+  transform-origin:left;animation:wachsen .7s cubic-bezier(.2,.7,.3,1) both}
+.bl-spur i.weich{background:var(--secondary);opacity:.75}
+.bl-wert{font-family:var(--font-mono);font-size:12.5px;font-variant-numeric:tabular-nums;text-align:right;color:var(--ink)}
+@keyframes wachsen{from{transform:scaleX(.02)}to{transform:scaleX(1)}}
+.legende{display:flex;flex-wrap:wrap;gap:7px 18px;margin-top:12px;padding-top:11px;
+  border-top:1px solid var(--line-faint);font-size:12px;color:var(--muted)}
+.legende span{display:inline-flex;align-items:center;gap:7px}
+.legende i{width:12px;height:12px;border-radius:3px;flex:none}
+
+/* --- Wertekatalog --- */
+.katalog{display:grid;gap:12px;margin-top:16px}
+@media(min-width:700px){.katalog{grid-template-columns:1fr 1fr}}
+@media(min-width:1000px){.katalog{grid-template-columns:repeat(3,1fr)}}
+.wert{border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:14px 16px;display:grid;gap:7px;align-content:start}
+.wert h4{font-size:14px}
+.wert .zitat{font-size:12.5px;color:var(--graphite);font-style:italic;border-left:2px solid var(--secondary);padding-left:10px}
+.wert .nutzen{font-size:12.5px;color:var(--muted)}
+.wert .fuss{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}
+.tag{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.05em;padding:2px 8px;border-radius:999px;
+  border:1px solid var(--line);color:var(--muted);background:var(--sunken)}
+.tag.suche{border-color:var(--primary);color:var(--primary)}
+.tag.bewertung{border-color:var(--secondary);color:var(--secondary-text)}
+.tag.anzeige{border-color:var(--sage)}
+
+/* --- Modellkanal --- */
+.zwei{display:grid;gap:18px;margin-top:20px}
+@media(min-width:900px){.zwei{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+/* Ein Grid-Kind ist standardmäßig so breit wie sein Inhalt — ein <pre> mit
+   eigenem Scroller sprengt sonst die Spur und damit die Seite. */
+.zwei>*,.sim-koerper>*,.bruch>*,.katalog>*,.stack-s{min-width:0}
+pre{max-width:100%}
+pre{margin:0;background:var(--sunken);border:1px solid var(--line);border-radius:10px;padding:14px 16px;
+  font-family:var(--font-mono);font-size:12px;line-height:1.6;overflow-x:auto;color:var(--ink)}
+pre b{color:var(--primary);font-weight:500}
+pre i{color:var(--muted);font-style:normal}
+.gate{border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow:hidden}
+.gate-kopf{padding:13px 16px;border-bottom:1px solid var(--line-faint);background:var(--sunken);
+  display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+.gate-kopf h3{font-size:15px}
+.gate-text{padding:13px 16px;font-size:12.5px;color:var(--graphite);border-bottom:1px solid var(--line-faint);
+  max-height:104px;overflow-y:auto;background:var(--surface)}
+.gate-liste{padding:13px 16px;display:grid;gap:9px}
+.gf{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 12px;padding:10px 12px;border-radius:9px;
+  border:1px solid var(--line-faint);background:var(--sunken);align-items:start}
+.gf-name{font-family:var(--font-mono);font-size:12px;color:var(--ink);overflow-wrap:anywhere}
+.gf-wert{font-size:13px;color:var(--graphite)}
+.gf-beleg{grid-column:1/-1;width:100%;font-family:var(--font-body);font-size:12.5px;color:var(--graphite);
+  background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:7px 9px;resize:vertical;min-height:44px}
+.gf-urteil{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;
+  padding:3px 9px;border-radius:999px;white-space:nowrap;border:1px solid var(--line);color:var(--muted)}
+.gf-urteil.ok{border-color:var(--primary);color:var(--primary);background:var(--good-surface)}
+.gf-urteil.weg{border-color:var(--error);color:var(--error-text);background:var(--error-surface)}
+.gf-grund{grid-column:1/-1;font-size:12px;color:var(--muted)}
+
+/* --- Stufenplan --- */
+.stufen{display:grid;gap:10px;margin-top:20px}
+.st{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;padding:15px 17px;border-radius:11px;
+  border:1px solid var(--line);background:var(--surface);border-left:4px solid var(--primary)}
+@media(min-width:820px){.st{grid-template-columns:9ch minmax(0,1fr) 16ch;gap:18px;align-items:baseline}}
+.st-nr{font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.st-was h4{margin-bottom:4px}
+.st-was p{font-size:13.5px;color:var(--graphite)}
+.st-mass{font-family:var(--font-mono);font-size:11.5px;color:var(--muted);line-height:1.5}
+.st--spaeter{border-left-color:var(--line);opacity:.92}
+.fuss{margin-top:44px;padding-top:22px;border-top:1px solid var(--line);font-size:13px;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+<div class="wrap">
+
+<header class="hero">
+  <p class="eyebrow">Strategiepapier · 10.09.2026 · nichts davon ist gebaut</p>
+  <h1>Vom Inserat zum Flurstück</h1>
+  <p class="lede col">Was heute aus einer Anzeige gelesen wird, wie der Suchlauf daraus ein
+  Flurstück macht, an welchen sechs Stellen er bricht — und wie ein Modell als weiterer
+  Kanal angebunden wird, ohne dass es je etwas entscheiden darf.</p>
+  <div class="marken">
+    <span class="marke stark">Bestandsaufnahme</span>
+    <span class="marke stark">Suchstrategie</span>
+    <span class="marke stark">Wertekatalog</span>
+    <span class="marke stark">Modellanbindung</span>
+    <span class="marke">geprüft an 6 aufgezeichneten Inseraten</span>
+  </div>
+  <div class="kennzahlen">
+    <div class="kz"><b>26</b><span>Angaben, die heute irgendwo gelesen werden</span></div>
+    <div class="kz"><b>6</b><span>Felder im Extraktionsschema <code>InseratFelder</code></span></div>
+    <div class="kz"><b>1</b><span>Wert aus dem Inserat, der im gespeicherten Grundstück landet</span></div>
+    <div class="kz"><b>3</b><span>Rückwege, die der Suchlauf nicht hat</span></div>
+    <div class="kz"><b>19</b><span>Werte, die sich zusätzlich belegen ließen</span></div>
+  </div>
+</header>
+
+<section id="inventar">
+  <p class="eyebrow">Teil 1</p>
+  <h2>Was heute gelesen wird</h2>
+  <div class="col stack" style="margin-top:14px">
+    <p>Sechs Kanäle liefern Angaben, und sie sind streng nach Vertrauen geordnet: Nutzer,
+    Bild, Portalattribut, Fließtext, Modell, Standortfeld, Pin. Die Rangfolge steht in
+    <code>SOURCE_CONFIDENCE</code> und ist die Regel, die einen Widerspruch entscheidet.
+    Wichtiger als die Herkunft ist aber die <em>Rolle</em>: Nur amtliche Aussagen dürfen
+    filtern, alles Erschlossene darf ausschließlich ordnen. Genau das erlaubt es, die
+    Gewichte unkalibriert auszuliefern.</p>
+    <p>Die Tabelle ist der vollständige Bestand. Eine Zeile anklicken zeigt den Beleg und
+    die Stelle im Code.</p>
+  </div>
+
+  <div class="filter" role="group" aria-label="Inventar filtern">
+    <b>Kanal</b>
+    <button class="chip" data-f="kanal" data-v="portal" aria-pressed="false">Portalfeld</button>
+    <button class="chip" data-f="kanal" data-v="text" aria-pressed="false">Wortleser</button>
+    <button class="chip" data-f="kanal" data-v="prosa" aria-pressed="false">Fließtext</button>
+    <button class="chip" data-f="kanal" data-v="bild" aria-pressed="false">Bild</button>
+    <button class="chip" data-f="kanal" data-v="modell" aria-pressed="false">Modell</button>
+    <button class="chip" data-f="kanal" data-v="nutzer" aria-pressed="false">Nutzer</button>
+  </div>
+  <div class="filter" role="group" aria-label="Nach Rolle filtern">
+    <b>Rolle</b>
+    <button class="chip" data-f="rolle" data-v="hart" aria-pressed="false">filtert hart</button>
+    <button class="chip" data-f="rolle" data-v="ordnet" aria-pressed="false">ordnet nur</button>
+    <button class="chip" data-f="rolle" data-v="zeigt" aria-pressed="false">wird nur gezeigt</button>
+    <button class="chip" data-f="rolle" data-v="unbenutzt" aria-pressed="false">liegt brach</button>
+    <button class="chip leise" id="filter-aus" type="button">alles zeigen</button>
+  </div>
+
+  <div class="inv" id="inventar-liste"></div>
+  <p class="inv-zaehler eyebrow" id="inv-zaehler" style="margin-top:10px"></p>
+
+  <div class="merk merk--rot col" style="margin-top:24px">
+    <p><b>Von 26 gelesenen Angaben erreicht genau eine das gespeicherte Grundstück.</b>
+    <code>WizardView.lookUpParcel</code> reicht <code>askingPrice</code> und eine Notiz mit
+    der Adresse weiter; Fläche, Lage und Nutzung holt die App danach amtlich aus ALKIS.
+    Provision, Erschließung, Bebauungsplan, Frontbreite, Verfügbarkeit — alles, was ein
+    Käufer für die Bewertung bräuchte — wird gelesen oder überlesen und in beiden Fällen
+    weggeworfen.</p>
+  </div>
+</section>
+
+<section id="ablauf">
+  <p class="eyebrow">Teil 2</p>
+  <h2>Wie der Lauf heute arbeitet</h2>
+  <div class="col stack" style="margin-top:14px">
+    <p>Eine Treppe, keine Pipeline: Jede Phase darf den Lauf beenden. Der glückliche Fall —
+    Gemarkung und Flurstücksnummer, im Text oder auf einem angehängten Auszug — erreicht
+    Phase 2 nie. Zwei Umwege sind eingebaut und beide sind gemessen: die Gemeinde-Weitung,
+    wenn die exakte Fläche in der genannten Gemarkung nichts findet, und die Bilder, die
+    <em>nach</em> dem Text gelesen werden und den Lauf ein zweites Mal starten.</p>
+    <p>Was fehlt, sind Rückwege. Der rote Schalter zeigt die drei Kanten, die es nicht gibt.</p>
+  </div>
+
+  <div class="filter" style="margin-top:18px">
+    <button class="chip" id="rueck-schalter" aria-pressed="false">fehlende Rückwege zeigen</button>
+  </div>
+
+  <div class="ablauf" id="ablauf">
+    <div class="scroll">
+    <svg viewBox="0 0 900 448" role="img" aria-label="Ablauf des Suchlaufs in sieben Phasen mit zwei Umwegen und drei fehlenden Rückwegen">
+      <defs>
+        <marker id="pfeil" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,1 L9,5 L0,9 z"/>
+        </marker>
+        <marker id="pfeil-rot" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,1 L9,5 L0,9 z"/>
+        </marker>
+      </defs>
+      <g stroke="none" fill="none" color="var(--muted)">
+        <path class="kante" d="M155,67 H190"/>
+        <path class="kante" d="M325,67 H360"/>
+        <path class="kante" d="M525,67 H560"/>
+        <path class="kante" d="M695,67 H730"/>
+        <path class="kante" d="M260,94 V165"/>
+        <path class="kante" d="M325,197 H360"/>
+        <path class="kante" d="M525,197 H560"/>
+        <path class="kante" d="M630,170 V99"/>
+        <path class="kante" d="M445,224 V295"/>
+        <path class="kante" d="M570,327 H605 V229"/>
+        <path class="kante" d="M490,224 V276 H715 V295"/>
+        <path class="kante" d="M715,327 H830 V197 H700"/>
+        <path class="kante" d="M690,94 V110 H862 V412 H92 V359"/>
+        <path class="kante" d="M170,327 H180 V67 H190"/>
+      </g>
+      <g stroke="none" fill="none" color="var(--error)">
+        <path class="kante zurueck" d="M445,94 V165"/>
+        <path class="kante zurueck" d="M600,40 V18 H260 V35"/>
+        <path class="kante zurueck" d="M565,80 H545 V197 H530"/>
+      </g>
+      <g class="kante-text">
+        <text x="266" y="136">kein Treffer</text>
+        <text x="439" y="252" text-anchor="end">Stufe 0 leer</text>
+        <text x="600" y="269">Gegenprobe</text>
+        <text x="98" y="405">nicht bestätigt</text>
+        <text x="186" y="200" transform="rotate(-90 186 200)">zweiter Durchlauf</text>
+      </g>
+      <g class="kante-text zurueck-text">
+        <text x="452" y="132">R1</text>
+        <text x="266" y="14">R2</text>
+        <text x="549" y="116">R3</text>
+      </g>
+      <g class="laeufer" id="laeufer"></g>
+      <g id="knoten"></g>
+    </svg>
+    </div>
+    <div class="ablauf-detail" id="ablauf-detail" aria-live="polite"></div>
+  </div>
+
+  <div class="stack col" style="margin-top:22px">
+    <div class="merk merk--rot">
+      <p><b>R1 — der Kurzschluss kennt keinen Rückweg.</b> <code>narrow()</code> startet die
+      Toleranz-Treppe nur, <em>wenn noch keine Kandidaten da sind</em>. Eine Flurstücksnummer,
+      die ein echtes, aber fremdes Flurstück trifft, blockiert damit den Flächenweg, der die
+      richtige Antwort gefunden hätte. Gemeldet wird der Widerspruch — <code>cross_check()</code>
+      schreibt einen Satz und stuft auf „mehrdeutig“ zurück —, verfolgt wird er nicht.</p>
+      <p><b>R2 — kein Ankerwechsel nach der Bewertung.</b> Die Anker werden einmal in Phase 1
+      bestimmt. Bleibt der beste Kandidat schwach, wird kein zweiter Anker geöffnet.</p>
+      <p><b>R3 — die Treppe läuft nur vorwärts.</b> Die Gegenprobe schaut genau eine Stufe
+      weiter und nur, wenn höchstens 20 Treffer stehen. Eine einmal genommene Stufe wird nie
+      zurückgenommen.</p>
+    </div>
+  </div>
+</section>
+
+<section id="bruchstellen">
+  <p class="eyebrow">Teil 3</p>
+  <h2>Sechs Bruchstellen</h2>
+  <p class="lede col" style="margin-top:12px">Jede ist am Code oder an einem der sechs
+  aufgezeichneten Inserate nachgewiesen, nicht vermutet.</p>
+
+  <div class="bruch">
+    <article class="bs bs--hoch">
+      <div class="bs-kopf"><b>B1 · Kurzschluss</b><span class="bs-grad">hoch</span></div>
+      <h3>Eine Nummer, die nicht passt, blockiert den Flächenweg</h3>
+      <p><code>narrow()</code> startet die Toleranz-Treppe nur, solange die Kandidatenliste
+      leer ist. Findet die Flurstücksnummer irgendein Flurstück, ist der Flächenweg zu.
+      <code>cross_check()</code> widerspricht erst ab Faktor 2,0 — 700 m² gegen angegebene
+      502 m² sind Faktor 1,39 und gehen als „bestätigt“ durch.</p>
+      <p class="beleg"><code>engine.py</code>: <q>if not self.state.candidates and anchors:</q>
+      · <code>SHORT_CIRCUIT_AREA_FACTOR = 2.0</code></p>
+      <p>Und weil die Bilder nur gelesen werden, wenn der Text es <em>nicht</em> entschieden
+      hat, wird der angehängte Katasterauszug, der die Nummer widerlegt hätte, in genau
+      diesem Fall nie geöffnet.</p>
+      <div class="fix"><b>Vorschlag</b>Der Widerspruch wird ein Zweig, keine Fußnote: Der
+      Nummerntreffer bleibt stehen, der Flächenweg läuft zusätzlich, beide stehen mit Grund
+      im Verlauf. Die Schwelle kommt aus der Toleranz-Treppe des Inserats (0–5 %), nicht aus
+      einem Faktor 2.</div>
+    </article>
+
+    <article class="bs bs--hoch">
+      <div class="bs-kopf"><b>B2 · Mehrere Nummern</b><span class="bs-grad">hoch</span></div>
+      <h3>„Ein Satz“ wird am Kanal erkannt, nicht am Dokument</h3>
+      <p><code>named_as_a_set()</code> hält Nummern für ein zusammengehöriges Grundstück,
+      wenn sie <em>dieselbe Quelle</em> haben. Jeder OCR-Fund trägt <code>quelle="bild"</code>
+      — auch Funde aus verschiedenen Bildern. Zwei Nummern von zwei Fotos gelten damit als
+      ein Grundstück: keine Rückfrage, und <code>_narrow_by_area</code> verzichtet
+      ausdrücklich darauf, sie mit der Fläche zu trennen.</p>
+      <p class="beleg">Genau der Fall „auf dem Screenshot stehen mehrere Flurstücksnummern“.
+      Ein Geoportal-Auszug trägt Dutzende Nummern im Kartenbild; gelesen wird nur die im
+      Titelblock — was heute davor schützt, aber nicht dann, wenn zwei Auszüge dabei sind.</p>
+      <div class="fix"><b>Vorschlag</b>Quellenidentität = Kanal + Dokument + Fundstelle.
+      Mehrere Nummern aus <em>einem</em> Titelblock oder <em>einem</em> Satz sind ein Satz;
+      Nummern aus zwei Bildern sind rivalisierende Lesungen — Konflikt, beide Zweige einzeln
+      gegen die Fläche geprüft, der unterlegene bleibt sichtbar durchgestrichen.</div>
+    </article>
+
+    <article class="bs bs--hoch">
+      <div class="bs-kopf"><b>B3 · Ortsbeziehung</b><span class="bs-grad">hoch</span></div>
+      <h3>Die Beziehung wird nur nach links gelesen</h3>
+      <p><code>_relation_before()</code> sucht den Auslöser in den 60 Zeichen <em>vor</em>
+      dem Namen. Steht er dahinter, fällt die Aussage auf <code>erwaehnt</code> (0,20) zurück
+      und der Ort wird nie zum Anker.</p>
+      <p class="beleg">Inserat 2418686487: <q>Thräna ist mit seinen etwa 765 Einwohnern ein
+      kleiner Ortsteil der Kreisstadt Borna.</q> — und Thräna ist die Lösung. Gemessen am
+      heutigen Leser: <code>gemarkung Thräna · erwaehnt · 0,20</code>, also kein Anker.</p>
+      <div class="fix"><b>Vorschlag</b>Prädikative Muster als eigene Regel („X ist ein
+      Ortsteil von Y“, „X gehört zu Y“, „X, ein Ortsteil der Kreisstadt Y“). Dieselbe Klasse
+      Satz ist auch der erste Fall, in dem ein Sprachmodell echten Mehrwert bringt: es liest
+      die Richtung, ohne dass jemand ein Muster dafür pflegen muss.</div>
+    </article>
+
+    <article class="bs bs--mittel">
+      <div class="bs-kopf"><b>B4 · Straßenname</b><span class="bs-grad">mittel</span></div>
+      <h3>Das Muster trifft Wörter, keine Straßen</h3>
+      <p>Am selben Leser gemessen: „Stellplatz“ und „Bundesstraße“ werden als Straßennamen
+      erfasst, „Am Kurpark“ nicht — weil das Muster ein Suffix verlangt. „Am Kurpark“ ist
+      ausgerechnet die amtliche Lagebezeichnung von 502/47, dem richtigen Flurstück des
+      Bad-Lausick-Inserats.</p>
+      <p class="beleg">Die Straße ordnet nur (Gewicht 0,9), kann also nichts falsch machen —
+      aber sie ist das stärkste zweite Merkmal, das es gibt: gemessen 25 Kandidaten auf 5.</p>
+      <div class="fix"><b>Vorschlag</b>Kandidatennamen gegen die <code>lagebeztxt</code>-Werte
+      im Anker prüfen statt gegen ein Suffixmuster — die Liste kommt ohnehin mit jedem
+      Flurstück. Formen ohne Suffix („Am Kurpark“, „Zur Mühle“) zulassen, Gattungswörter
+      („Bundesstraße“, „Feldweg“, „Stellplatz“) ausschließen.</div>
+    </article>
+
+    <article class="bs bs--mittel">
+      <div class="bs-kopf"><b>B5 · Geometrie</b><span class="bs-grad">mittel</span></div>
+      <h3>Die Form des Grundstücks wird nie gefragt</h3>
+      <p>Gefiltert und bewertet wird ausschließlich über Attribute. Dabei liegt die Geometrie
+      längst vor — jeder Kandidat kommt mit seinem Umring, Gebäudeumrisse liefert
+      <code>ave:GebaeudeBauwerk</code> aus demselben Dienst.</p>
+      <p class="beleg">Ungenutzt in den sechs Inseraten: <q>Frontbreite ca. 26 m</q>,
+      <q>am Ende eines Wendehammers</q>, <q>der direkt angrenzende Steingrundbach</q>,
+      <q>verfügt lediglich über Garagen/Lagergebäude</q>.</p>
+      <div class="fix"><b>Vorschlag</b>Vier weiche Merkmale, jedes aus vorhandenen Daten:
+      Frontbreite gegen die Straßenkante, Berührung mit einer Verkehrsfläche, bebaut oder
+      nicht, Grenze an Gewässer. Weich bleibt weich — ein Grundstück mit unerwartetem
+      Gebäude sinkt in der Liste, es verschwindet nicht.</div>
+    </article>
+
+    <article class="bs bs--mittel">
+      <div class="bs-kopf"><b>B6 · Zustand</b><span class="bs-grad">mittel</span></div>
+      <h3>Eine Entscheidung startet alles neu</h3>
+      <p>Ein Konflikt ist eine Frage an den Nutzer, und die Antwort läuft als
+      <code>entscheidungen</code> in einen komplett neuen Lauf. Was der erste Lauf schon
+      ausgeschlossen hat, weiß der zweite nicht — er fragt es noch einmal.</p>
+      <p class="beleg">Das Brehna-Inserat kostete elf Anfragen für eine Antwort, die keine
+      Anfrage hätte richtig beantworten können. Heute stoppt der Bundesland-Filter das vorher
+      — die Anfragen selbst werden aber weiterhin nirgends verbucht.</p>
+      <div class="fix"><b>Vorschlag</b>Ein Lauf führt Buch: jede Bedingung mit ihrer Antwort.
+      Gleiche Bedingung wird nie zweimal gefragt, und eine Entscheidung nimmt nur den
+      betroffenen Zweig wieder auf statt den ganzen Lauf.</div>
+    </article>
+  </div>
+</section>
+
+<section id="trennschaerfe">
+  <p class="eyebrow">Teil 4</p>
+  <h2>Trennschärfe pro Anfrage</h2>
+  <div class="col stack" style="margin-top:14px">
+    <p>Die Grundlage jeder Reihenfolge. Alle Werte sind an der Gemarkung Großbothen
+    (1 131 Flurstücke) und an Stadt Leipzig gemessen, jede Zeile ist eine einzige
+    <code>resultType=hits</code>-Anfrage von ein paar hundert Byte. Die Balken zeigen, wie
+    viel eine Angabe vom Heuhaufen übrig lässt — kürzer ist besser.</p>
+  </div>
+  <div class="balken" id="balken"></div>
+  <div class="legende">
+    <span><i style="background:var(--primary)"></i>amtliche Aussage — darf hart filtern</span>
+    <span><i style="background:var(--secondary);opacity:.75"></i>erschlossen — darf nur ordnen</span>
+  </div>
+  <div class="merk col" style="margin-top:20px">
+    <p>Daraus folgt die Reihenfolge, und zwar ohne Kalibrierung: Nimm die Hypothese, deren
+    erwartete Restmenge am kleinsten und deren Preis am niedrigsten ist. Da nur amtliche
+    Aussagen überhaupt filtern dürfen, kann eine schlechte Schätzung die Liste unpraktisch
+    ordnen — falsch machen kann sie nichts.</p>
+  </div>
+</section>
+
+<section id="strategie">
+  <p class="eyebrow">Teil 5</p>
+  <h2>Die Strategie: eine Agenda statt einer Treppe</h2>
+  <div class="col stack" style="margin-top:14px">
+    <p>Die Treppe ist an ihrem glücklichen Fall gebaut und für ihn richtig. Was ihr fehlt,
+    ist ein Platz für die Frage „und wenn das nicht stimmt?“. Der Vorschlag ändert nicht die
+    Filter — die sind gemessen und gut — sondern die Steuerung: Aus sieben festen Phasen
+    wird eine <b>Agenda von Hypothesen</b>, die nach Trennschärfe pro Anfrage abgearbeitet
+    wird. Rückverfolgung ist dann kein Sonderfall mehr, sondern schlicht der nächste
+    Eintrag in der Liste.</p>
+  </div>
+
+  <div class="zwei">
+    <div class="tafel stack-s">
+      <h3>Eine Hypothese</h3>
+      <pre><b>Hypothese</b>
+  anker      Menge von Gemarkungen oder Gemeinden
+  flaeche    Band, aus dem Wortlaut abgeleitet
+  zusatz     harte Zusatzfilter (Nummer, Nutzung …)
+  herkunft   welche Indizien sie tragen
+  kosten     Anfragen, die sie kostet   <i>meist 1</i>
+  erwartet   geschätzte Restmenge       <i>aus Teil 4</i>
+  hart       nur harte Filter benutzt?  <i>ja/nein</i></pre>
+      <p style="font-size:13.5px;color:var(--graphite)">Vier Ausgänge, keiner davon löscht
+      etwas: <b>bestätigt</b> (genau ein Überlebender, alle Filter hart, kein Widerspruch),
+      <b>offen</b> (bewertbare Menge), <b>leer</b> (erzeugt Folgehypothesen), <b>widerlegt</b>
+      (bleibt mit Grund im Verlauf stehen).</p>
+    </div>
+    <div class="tafel stack-s">
+      <h3>Vier Regeln, die bleiben</h3>
+      <ul style="font-size:13.5px;color:var(--graphite)">
+        <li><b>Harte Filter entscheiden, weiche ordnen.</b> Eine Hypothese darf nur
+        „bestätigt“ liefern, wenn ausschließlich amtliche Aussagen sie geformt haben.</li>
+        <li><b>Ein Widerspruch wird gezeigt, nie still aufgelöst.</b> Jetzt zusätzlich:
+        er wird <em>verfolgt</em>. Beide Zweige laufen, beide stehen im Verlauf.</li>
+        <li><b>Kein Beispiel, keine Erfindung.</b> Eine leere Hypothese liefert einen Grund,
+        keinen Näherungswert.</li>
+        <li><b>Nie eine Anfrage zweimal.</b> Der Lauf führt Buch über Bedingung und Antwort;
+        eine Nutzerentscheidung nimmt nur den betroffenen Zweig wieder auf.</li>
+      </ul>
+      <p style="font-size:13px;color:var(--muted)">Budget statt Phasenzahl: Der Lauf endet
+      bei „bestätigt“ oder wenn das Anfragenbudget erschöpft ist — nicht, weil die Treppe
+      zu Ende ist.</p>
+    </div>
+  </div>
+
+  <div class="sim" id="sim">
+    <div class="sim-kopf">
+      <div class="sim-fall" role="group" aria-label="Fall wählen">
+        <button class="chip" data-fall="lausick" aria-pressed="true">Bad Lausick · 1 076 m²</button>
+        <button class="chip" data-fall="borna" aria-pressed="false">Borna · Teilfläche</button>
+        <button class="chip" data-fall="zwei" aria-pressed="false">Screenshot mit zwei Nummern</button>
+      </div>
+      <div class="sim-steuer">
+        <span class="sim-modus" role="group" aria-label="Variante">
+          <button class="chip" data-modus="heute" aria-pressed="true">heute</button>
+          <button class="chip" data-modus="geplant" aria-pressed="false">geplant</button>
+        </span>
+        <button class="knopf" id="sim-play">Lauf abspielen</button>
+        <button class="knopf leise" id="sim-schritt">Schritt</button>
+      </div>
+    </div>
+    <div class="sim-koerper">
+      <div class="sim-schritte" id="sim-schritte"></div>
+      <div class="sim-tafel">
+        <div class="sim-zaehler">
+          <div><b id="z-anfragen">0</b><span>Anfragen</span></div>
+          <div><b id="z-kandidaten">—</b><span>Kandidaten</span></div>
+          <div><b id="z-zweige">0</b><span>Zweige</span></div>
+        </div>
+        <p class="sim-lage" id="sim-lage"></p>
+        <span class="sim-urteil" id="sim-urteil">läuft noch nicht</span>
+      </div>
+    </div>
+    <p class="sim-fuss" id="sim-fuss"></p>
+  </div>
+</section>
+
+<section id="gegenprobe">
+  <p class="eyebrow">Teil 6</p>
+  <h2>Gegenprobe an sechs Inseraten</h2>
+  <div class="col stack" style="margin-top:14px">
+    <p>Dieselben sechs aufgezeichneten Anzeigen, gegen die auch die Tests laufen
+    (<code>backend/tests/fixtures/inserate-sachsen.json</code>). Die Spalte „heute“ ist
+    kein Modell des Laufs, sondern der Leser, wie er heute ist: Die Indizien in ihr wurden
+    am 10.09.2026 mit <code>collect_indicia</code> auf genau diesen Texten erzeugt.</p>
+  </div>
+  <div class="scroll" style="margin-top:18px">
+  <table>
+    <thead><tr><th>Inserat</th><th>Lösung</th><th>Was der Leser heute daraus macht</th><th>Was der Vorschlag ändert</th></tr></thead>
+    <tbody>
+      <tr class="gut">
+        <td><b>Großbothen</b><br><span class="mono" style="font-size:11.5px;color:var(--muted)">3499632623 · 502 m²</span></td>
+        <td>790/11<br>Großbothen</td>
+        <td>Gemarkung Großbothen (0,68, <code>liegt_in</code>), Gemeinde Grimma, Fläche 502
+        exakt aus der Attributliste. Stufe 0 lässt genau eines übrig — <b>bestätigt</b>,
+        zwei Anfragen. Grimma und Höfgen bleiben als bloße Erwähnung ohne Anker.</td>
+        <td>Nichts. Der Fall ist der glückliche, und die Agenda spielt ihn identisch.</td>
+      </tr>
+      <tr>
+        <td><b>Plagwitz</b><br><span class="mono" style="font-size:11.5px;color:var(--muted)">3375124391 · 1 489 m²</span></td>
+        <td>309/6<br>Plagwitz</td>
+        <td>Gemarkung Plagwitz gibt es zweimal in Sachsen — Leipzig 140427 und Machern
+        148642. Die Gemeinde-Spalte des Verzeichnisses wählt Machern, die exakte Fläche
+        entscheidet. „Wiesen“ und „Leipzig“ werden korrekt nur erwähnt.</td>
+        <td>Nichts am Ergebnis. <q>Frontbreite ca. 26 m</q> wird zusätzlich zum weichen
+        Merkmal und stützt den Treffer sichtbar.</td>
+      </tr>
+      <tr>
+        <td><b>Lobstädt</b><br><span class="mono" style="font-size:11.5px;color:var(--muted)">3423861748 · 1 025 m²</span></td>
+        <td>51/3<br>Lobstädt</td>
+        <td>Titel hedged („ca. 1.025qm“), die Attributliste nicht — die Treppe startet
+        deshalb bei exakt. „Anbindung an Leipzig“ wird als Verkehrsanbindung erkannt und
+        nicht als Lage. <b>bestätigt</b>.</td>
+        <td><q>Garagen/Lagergebäude, pauschal vermietet</q> wird zum Bebauungsmerkmal:
+        ein Kandidat ohne Gebäude sinkt, einer mit steigt.</td>
+      </tr>
+      <tr>
+        <td><b>Bad Lausick</b><br><span class="mono" style="font-size:11.5px;color:var(--muted)">3503721553 · 1 076 m²</span></td>
+        <td>502/47<br>Etzoldshain</td>
+        <td>Kein Gemarkungsname im Text außer „Bad Lausick“ selbst. In dieser Gemarkung:
+        null Treffer. Die eingebaute Gemeinde-Weitung findet genau eines in der Gemeinde —
+        Etzoldshain. Funktioniert, ist aber ein Sonderfall mit zwei fest verdrahteten
+        Grenzen (nur harte Stufe, höchstens zwei Anker).</td>
+        <td>Aus dem Sonderfall wird eine gewöhnliche Folgehypothese. <q>am Kurpark</q> im
+        Titel trifft die amtliche Lagebezeichnung „Am Kurpark“ — heute ungelesen, weil das
+        Straßenmuster ein Suffix verlangt.</td>
+      </tr>
+      <tr>
+        <td><b>Borna</b><br><span class="mono" style="font-size:11.5px;color:var(--muted)">2418686487 · 748,50 m²</span></td>
+        <td>107/60<br>Thräna<br><small>Teilfläche</small></td>
+        <td>Kein Anker außer der Gemeinde Borna: <q>Thräna ist … ein kleiner Ortsteil der
+        Kreisstadt Borna</q> wird zur bloßen Erwähnung (0,20), weil der Auslöser hinter dem
+        Namen steht. Die Fläche darf nicht filtern, weil es eine noch zu vermessende
+        Teilfläche ist. Gerettet wird der Lauf allein von der Texterkennung, die auf der
+        Liegenschaftskarte <q>Fiurstück: 107/60</q> und „Gemarkung Thräna“ liest.</td>
+        <td>Der Anker steht sofort und ohne Bild. Die Nummer aus dem Bild bestätigt dann
+        einen Zweig, statt ihn erst zu eröffnen — und das Urteil bleibt richtigerweise
+        „mehrdeutig“, weil es das Flurstück noch nicht gibt.</td>
+      </tr>
+      <tr>
+        <td><b>Brehna</b><br><span class="mono" style="font-size:11.5px;color:var(--muted)">3381469778 · 600 m²</span></td>
+        <td>keines<br><small>Sachsen-Anhalt</small></td>
+        <td>Das Standortfeld nennt das Bundesland, der Lauf endet vor der ersten Anfrage.
+        Ohne diesen Filter hätte er Flurstück 50 in Gemarkung Roitzsch bei Wurzen gefunden:
+        real, 600 m², 100 km entfernt. „Stellplatz“ und „Goethestraße“ werden als Straßen
+        gelesen, „Roitzsch“ korrekt nicht als Lage.</td>
+        <td>Nichts. Der Kontrollfall bleibt der Beweis, dass ein Lauf auch nichts finden
+        können muss.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="merk merk--gruen col" style="margin-top:20px">
+    <p><b>Ergebnis der Gegenprobe:</b> Vier von fünf sächsischen Inseraten löst der heutige
+    Lauf richtig, eines nur über die Texterkennung. Der Vorschlag verändert keines dieser
+    Ergebnisse — er nimmt zwei Sonderfälle in die Regel auf und macht die Fälle sicher, die
+    in dieser Stichprobe nicht vorkommen: eine falsche Nummer, zwei Nummern auf Bildern,
+    ein Ort, dessen Beziehung hinter dem Namen steht.</p>
+  </div>
+</section>
+
+<section id="katalog">
+  <p class="eyebrow">Teil 7</p>
+  <h2>Was sich zusätzlich belegen ließe</h2>
+  <div class="col stack" style="margin-top:14px">
+    <p>Neunzehn Werte, jeder mit einem wörtlichen Beleg aus einem der sechs aufgezeichneten
+    Inserate — nichts davon ist ausgedacht, und nichts davon wird heute erfasst. Getrennt
+    danach, wozu sie taugen: die Suche schärfen, die Bewertung tragen, oder nur gezeigt und
+    geprüft werden.</p>
+    <p style="font-size:13.5px;color:var(--muted)">Unverändert ausgenommen bleiben
+    Kontaktdaten: keine Namen, keine Telefonnummern, keine Maklerangaben. Die
+    Anbieter-Objekt-ID ist eine Objektnummer und kein Personenbezug.</p>
+  </div>
+  <div class="filter" role="group" aria-label="Wertekatalog filtern">
+    <b>Wozu</b>
+    <button class="chip" data-k="suche" aria-pressed="false">schärft die Suche</button>
+    <button class="chip" data-k="bewertung" aria-pressed="false">trägt die Bewertung</button>
+    <button class="chip" data-k="anzeige" aria-pressed="false">zeigen und prüfen</button>
+    <button class="chip leise" id="katalog-aus" type="button">alles zeigen</button>
+  </div>
+  <div class="katalog" id="katalog"></div>
+</section>
+
+<section id="modell">
+  <p class="eyebrow">Teil 8</p>
+  <h2>Das Modell als Kanal</h2>
+  <div class="col stack" style="margin-top:14px">
+    <p>Ein Sprachmodell ist in dieser Kette der <em>letzte</em> Leser, nicht der erste. Die
+    Portalfelder sind Aussagen, der Wortleser ist eine Lesung, das Modell ist eine Vermutung
+    mit Beleg — und die Rangfolge in <code>SOURCE_CONFIDENCE</code> sagt das bereits:
+    <code>modell</code> steht bei 0,45, unter dem Fließtext. Daraus folgt die einzige harte
+    Regel dieses Teils: <b>ein Modellwert darf nie hart filtern und nie „bestätigt“
+    auslösen.</b> Er darf ordnen, er darf eine Lücke füllen, und er darf einen Zweig
+    eröffnen, den ein amtlicher Filter dann prüft.</p>
+    <p>Wo es wirklich hilft, ist nicht die Zahl — Fläche und Preis liest der deterministische
+    Leser besser und umsonst — sondern der <b>Satzbau</b>: „Thräna ist ein kleiner Ortsteil
+    der Kreisstadt Borna“, „am Ortsrand von Großbothen, einem OT von Grimma“. Beziehung und
+    Ebene sind genau das, wofür heute Muster gepflegt werden und woran sie scheitern.</p>
+  </div>
+
+  <div class="zwei">
+    <div class="stack-s">
+      <h3>Die Vorlage: <code>InseratBefund v1</code></h3>
+      <pre>{
+  <b>"vorlage"</b>: "inserat-befund/1",
+  <b>"lauf"</b>: { "modell": "…", "gelesen_am": "2026-09-10",
+             "textlaenge": 2596, "bilder": 11 },
+
+  <i>// Jeder Wert reist im selben Umschlag.</i>
+  <b>"felder"</b>: {
+    "grundstuecksflaeche_m2": {
+      "wert": 748.5,
+      "wortlaut": "ca. 748,50 m²",   <i>// entscheidet die Treppe</i>
+      "beleg": "ca. 748,50 m² großes Baugrundstück",
+      "sicherheit": 0.9
+    },
+    "kaufpreis_eur": { "wert": null, "beleg": null, … }
+  },
+
+  <i>// Der eigentliche Gewinn: Ebene und Beziehung.</i>
+  <b>"orte"</b>: [
+    { "name": "Thräna", "ebene": "gemarkung",
+      "beziehung": "liegt_in", "entfernung_km": null,
+      "beleg": "Thräna ist mit seinen etwa 765 Einwohnern
+                ein kleiner Ortsteil der Kreisstadt Borna" },
+    { "name": "Borna", "ebene": "gemeinde",
+      "beziehung": "liegt_in", "beleg": "…" }
+  ],
+
+  <b>"flurstuecke"</b>: [
+    { "gemarkung": "Thräna", "zaehler": 107, "nenner": "60",
+      "fundort": "bild:3", "beleg": "Flurstück: 107/60" }
+  ],
+
+  <b>"vorbehalte"</b>: ["teilflaeche"],
+  <b>"nicht_erfasst"</b>: ["kontaktdaten"]
+}</pre>
+      <p style="font-size:13px;color:var(--muted)">Die Vorlage ist nicht
+      <code>InseratFelder</code> mit mehr Feldern: Sie ist ein <em>Befund</em>. Jeder Wert
+      trägt seinen Beleg, und ohne Beleg gibt es keinen Wert. Dieselbe Form nimmt der
+      Suchlauf schon entgegen — <code>ParcelSearchRequest.indizien</code>.</p>
+    </div>
+
+    <div class="stack-s">
+      <h3>Das Beleg-Gate</h3>
+      <p style="font-size:13.5px;color:var(--graphite)">Vier Prüfungen, bevor ein Modellwert
+      überhaupt ein Indiz wird. Die erste ist die wirksamste und kostet nichts: <b>Der Beleg
+      muss wörtlich im übergebenen Text stehen.</b> Unten liegt der echte Anzeigentext,
+      darunter drei Felder, wie ein Modell sie geliefert hätte. Die Belege sind
+      veränderbar — das Urteil rechnet sofort neu.</p>
+      <div class="gate">
+        <div class="gate-kopf">
+          <h3>Anzeige 2418686487, Auszug</h3>
+          <span class="mono" style="font-size:11px;color:var(--muted)" id="gate-stand"></span>
+        </div>
+        <div class="gate-text" id="gate-text"></div>
+        <div class="gate-liste" id="gate-liste"></div>
+      </div>
+      <div class="merk" style="margin-top:4px">
+        <p><b>Rechnen ist nicht Lesen.</b> Das dritte Feld oben ist der Fall, für den das
+        Gate gebaut ist: 748,5 × 92,00 € ergibt 68 862 €, das Modell rundet auf 69 000 € und
+        schreibt einen Beleg dazu, der so nirgends steht. Ein Preis, den niemand
+        geschrieben hat, ist keine Anzeigenangabe.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="zwei" style="margin-top:22px">
+    <div class="tafel stack-s">
+      <h4>Die vier Prüfungen</h4>
+      <ul style="font-size:13.5px;color:var(--graphite)">
+        <li><b>Beleg wörtlich vorhanden</b> — normalisiert über Leerraum, Anführungszeichen
+        und Groß-/Kleinschreibung, sonst nichts.</li>
+        <li><b>Wert steht im Beleg</b> — in deutscher Schreibweise, „1.076“ und „1076“
+        gelten als dieselbe Zahl.</li>
+        <li><b>Grenzen</b> — dieselben Pydantic-Schranken wie heute; ein unplausibler Wert
+        ist ein Lesefehler, kein Grundstück.</li>
+        <li><b>Abgleich</b> — widerspricht der Modellwert einem deterministisch gelesenen,
+        gewinnt der deterministische und die Abweichung wird ein sichtbarer Konflikt.</li>
+      </ul>
+    </div>
+    <div class="tafel stack-s">
+      <h4>Betrieb</h4>
+      <ul style="font-size:13.5px;color:var(--graphite)">
+        <li><b>Zwei Aufrufe, nicht einer.</b> <code>tools:[web_fetch]</code> und
+        <code>response_format:json_schema</code> gehen nicht zusammen — an drei Modellen
+        gemessen. Erst holen, dann strukturieren.</li>
+        <li><b>Nur bei Lücke.</b> Das Modell läuft, wenn ein deterministischer Kanal etwas
+        offenlässt, das den Lauf ändern würde. Ein vollständig gelesenes Kleinanzeigen-Inserat
+        ruft es nie.</li>
+        <li><b>Der Cache-Schlüssel nennt, was geantwortet hat</b> — Vorlagenversion, Modell-ID,
+        Prompt-Hash, Texthash. Zweimal ist genau diese Regel schon gebrochen worden.</li>
+        <li><b>Keine Kontaktdaten im Schema.</b> Was nicht im Schema steht, kann nicht
+        geliefert werden — das ist der Datenschutz, nicht die Bitte im Prompt.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="reihenfolge">
+  <p class="eyebrow">Teil 9</p>
+  <h2>Reihenfolge</h2>
+  <p class="lede col" style="margin-top:12px">Nach Nutzen je Aufwand, und so geschnitten,
+  dass jede Stufe für sich ausgeliefert werden kann. Die ersten beiden ändern die Steuerung
+  des Laufs nicht — sie machen nur den Leser richtig.</p>
+  <div class="stufen">
+    <div class="st">
+      <span class="st-nr">Stufe 1</span>
+      <div class="st-was"><h4>Beziehung nach rechts lesen, Straßennamen gegen das Kataster</h4>
+        <p>Prädikative Muster („X ist ein Ortsteil von Y“) und Lagebezeichnungen ohne Suffix.
+        Behebt B3 und B4 und macht das Borna-Inserat unabhängig von der Bilderkennung.</p></div>
+      <span class="st-mass">klein · kein Risiko<br>Prüffall 2418686487</span>
+    </div>
+    <div class="st">
+      <span class="st-nr">Stufe 2</span>
+      <div class="st-was"><h4>Quellenidentität: Dokument statt Kanal</h4>
+        <p>Ein Satz Nummern kommt aus einem Titelblock oder einem Satz, nicht aus „irgendeinem
+        Bild“. Behebt B2 und ist die Voraussetzung dafür, dass mehrere Nummern überhaupt
+        gegeneinander geprüft werden können.</p></div>
+      <span class="st-mass">klein · berührt <code>named_as_a_set</code></span>
+    </div>
+    <div class="st">
+      <span class="st-nr">Stufe 3</span>
+      <div class="st-was"><h4>Widerspruch wird ein Zweig</h4>
+        <p>Die Schwelle kommt aus der Toleranz-Treppe statt aus Faktor 2, und ein
+        widersprochener Nummerntreffer öffnet den Flächenweg, statt ihn zu blockieren.
+        Behebt B1 — die einzige Bruchstelle, die heute eine falsche Bestätigung erzeugen
+        kann.</p></div>
+      <span class="st-mass">mittel · berührt <code>narrow()</code></span>
+    </div>
+    <div class="st">
+      <span class="st-nr">Stufe 4</span>
+      <div class="st-was"><h4>Agenda und Buchführung</h4>
+        <p>Die Phasen werden zu Hypothesengeneratoren, die Reihenfolge kommt aus Teil 4, und
+        jede Anfrage wird verbucht. Filter und Gewichte bleiben unangetastet, die
+        NDJSON-Ereignisse ebenfalls — das Frontend merkt nur, dass mehr Zeilen im Verlauf
+        stehen.</p></div>
+      <span class="st-mass">groß · Umbau von <code>engine.py</code></span>
+    </div>
+    <div class="st st--spaeter">
+      <span class="st-nr">Stufe 5</span>
+      <div class="st-was"><h4>Geometrische Merkmale</h4>
+        <p>Frontbreite, Straßenberührung, Bebauung, Gewässergrenze — alle vier aus Daten,
+        die der Lauf ohnehin holt. Weiche Merkmale, die nur ordnen.</p></div>
+      <span class="st-mass">mittel · neue Merkmale in <code>scoring.py</code></span>
+    </div>
+    <div class="st st--spaeter">
+      <span class="st-nr">Stufe 6</span>
+      <div class="st-was"><h4>Modellkanal mit Befund-Vorlage und Beleg-Gate</h4>
+        <p>Unabhängig von Stufe 4 und jederzeit einschaltbar. Wirkt am stärksten zusammen
+        mit Stufe 1: Was das Modell besser kann als jedes Muster, ist die Ortsbeziehung.</p></div>
+      <span class="st-mass">mittel · neues Schema, zwei Aufrufe</span>
+    </div>
+  </div>
+  <div class="merk col" style="margin-top:22px">
+    <p><b>Der Prüfkorpus ist die eigentliche Investition.</b> Sechs Anzeigen mit bekannter
+    Lösung sind wenig, und sie decken genau die Fälle nicht ab, gegen die hier gebaut wird:
+    eine falsch abgetippte Nummer, zwei Katasterauszüge, ein Ort ohne Gemarkung. Jede Stufe
+    sollte ihren Fall mitbringen — aufgezeichnet, nicht erfunden.</p>
+  </div>
+</section>
+
+<footer class="fuss col">
+  <p><b>Was dieses Dokument ist:</b> ein Plan. Nichts davon ist implementiert, und der
+  heutige Lauf ist in Teil 2 und Teil 6 so beschrieben, wie er am 10.09.2026 im Code steht.
+  Die Messwerte stammen aus <code>docs/research/flurstueck-identifikation.md</code> und den
+  Notizen in <code>CLAUDE.md</code>; die Indizien in Teil 6 wurden für dieses Dokument mit
+  <code>collect_indicia</code> auf den sechs aufgezeichneten Anzeigen neu erzeugt.</p>
+  <p style="margin-top:10px">Anschluss an die vier bestehenden Strategieseiten:
+  <code>fall-grossbothen.html</code> (der Fall), <code>extraktion-prompting.html</code>
+  (die Leiter bis zum Modell), <code>suche-triangulation.html</code> (Filter und Gewichte),
+  <code>suchalgorithmus.html</code> (die sechs Phasen), <code>ui-indizienkarte.html</code>
+  (die Karte).</p>
+</footer>
+
+</div>
+
+<script>
+(() => {
+"use strict";
+const ruhig = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const el = (tag, cls, text) => {
+  const node = document.createElement(tag);
+  if (cls) node.className = cls;
+  if (text != null) node.textContent = text;
+  return node;
+};
+
+/* ------------------------------------------------------------------ *
+ * Teil 1 — Inventar
+ * ------------------------------------------------------------------ */
+const ROLLEN = { hart: "filtert hart", ordnet: "ordnet nur", zeigt: "wird gezeigt", unbenutzt: "liegt brach" };
+const KANAELE = { portal: "Portalfeld", text: "Wortleser", prosa: "Fließtext", bild: "Bild", modell: "Modell", nutzer: "Nutzer" };
+
+const INVENTAR = [
+  { feld: "Grundstücksfläche", was: "aus der Attributliste des Portals", kanal: "portal", rolle: "hart",
+    beleg: "Kleinanzeigen <code>.addetailslist--detail</code>, ImmoScout <code>obj_lotArea: \"742\"</code>. Exakt geschrieben, also ein amtlich prüfbarer Filter — der Titel daneben darf hedgen." },
+  { feld: "Kaufpreis", was: "Angebotspreis der Anzeige", kanal: "portal", rolle: "zeigt",
+    beleg: "Dreifach im Markup: <code>&lt;meta itemprop=\"price\"&gt;</code>, JSON-LD <code>offers.price</code>, <code>#viewad-price</code>. Der erste Treffer genügte auf allen vier gemessenen Anzeigen." },
+  { feld: "Bundesland", was: "aus dem Standortfeld", kanal: "portal", rolle: "hart",
+    beleg: "<q>Sachsen-Anhalt – Brehna</q>. <code>outside_saxony()</code> beendet den Lauf vor der ersten Katasteranfrage — sonst hätte er Flurstück 50 in Roitzsch gefunden, 100 km entfernt und exakt 600 m²." },
+  { feld: "Gemeinde", was: "hinter der Postleitzahl im Standortfeld", kanal: "portal", rolle: "hart",
+    beleg: "Auf allen sechs Anzeigen verlässlich — und zwar gerade weil der Pin daraus geokodiert wird: der Name hält, die Koordinate nicht." },
+  { feld: "Ortsteil", was: "vor der Postleitzahl bzw. <code>obj_regio4</code>", kanal: "portal", rolle: "hart",
+    beleg: "<q>Burghausen-Rückmarsdorf, 04178 Leipzig</q>. Wird über das Verzeichnis zu Gemarkungen aufgelöst; ein zusammengesetzter Name ergibt zwei, keine Rückfrage." },
+  { feld: "Koordinate", was: "Pin der Plattform", kanal: "portal", rolle: "ordnet",
+    beleg: "Gemessen 6 235 m vom angebotenen Flurstück entfernt. Darf nur noch sagen, welche Gemarkungen gefragt werden (±1 500 m) — und nur, wenn das Portal die Adresse als vollständig meldet." },
+  { feld: "Bild-URLs", was: "Anzeigenbilder in größter Variante", kanal: "portal", rolle: "zeigt",
+    beleg: "<code>fullSizePictureUrl</code>, Kleinanzeigen <code>rule=$_59</code>. Eingang für die Texterkennung; größer als 678 × 960 liefert das Portal für einen Katasterauszug nicht." },
+  { feld: "Beschreibung", was: "der eigentliche Anzeigentext", kanal: "portal", rolle: "zeigt",
+    beleg: "<code>#viewad-description-text</code>, <code>expose-description-body</code>. Ohne diesen Schnitt liest die Suche Navigation, Cookie-Banner und Kategoriebaum als Beweise." },
+  { feld: "Grundstücksart, Angebotsart, Verfügbarkeit, Provision", was: "restliche Attributliste", kanal: "portal", rolle: "unbenutzt",
+    beleg: "Steht neben der Fläche im selben Block und wird nicht gelesen. <q>Käuferprovision: 5,95 % inkl. gesetzl. MwSt.</q> ist ein Kostenblock, der den Vergleich mit dem Bodenrichtwert verschiebt." },
+  { feld: "Grundstücksfläche", was: "über das deutsche Wort und die Einheit", kanal: "text", rolle: "hart",
+    beleg: "<code>portal_fields</code> liest drei Portale, die sich in nichts einig sind — auch eine gerenderte Seite ohne Markup. Vier gemessene Schutzregeln, darunter: <q>370,62 €/m²</q> ist keine Fläche." },
+  { feld: "Kaufpreis", was: "über Wort und Einheit", kanal: "text", rolle: "zeigt",
+    beleg: "Derselbe Leser. Der Boden unter den portalspezifischen Blöcken, nie über ihnen: ein strukturiertes Feld ist eine Aussage, das hier ist eine Lesung." },
+  { feld: "PLZ, Ort, Straße", was: "Standortzeile in drei Reihenfolgen", kanal: "text", rolle: "ordnet",
+    beleg: "Fünf Ziffern sind der einzige feste Punkt einer deutschen Ortszeile. Die erste Postleitzahl <em>mit folgendem Namen</em> gewinnt — die allererste steht bei ImmoScout im Analytik-Block." },
+  { feld: "Gemarkung", was: "Name im Fließtext", kanal: "prosa", rolle: "hart",
+    beleg: "Nur mit Ortsbeziehung. Ein bloß erwähnter Name wird nicht gesucht: <q>geprägt von Wiesen und Feldern</q> machte Gemarkung Wiesen (148950) zum Anker." },
+  { feld: "Gemeinde", was: "die Ebene über der Gemarkung", kanal: "prosa", rolle: "hart",
+    beleg: "<q>in Großbothen, einem OT von Grimma</q>. Filtert die Gemarkungsliste über die <code>gemeinde</code>-Spalte des Verzeichnisses — das trennt die beiden Gemarkungen namens Plagwitz." },
+  { feld: "Flurstücksnummer", was: "Zähler und Nenner", kanal: "prosa", rolle: "hart",
+    beleg: "Der AdV-Schlüssel gibt die Breiten vor: fünf Stellen Zähler, vier Nenner. <q>790717</q> ist damit keine Flurstücksnummer, sondern ein Lesefehler." },
+  { feld: "Fläche und ihr Wortlaut", was: "Zahl plus „ca.“, „ab“, „bis“", kanal: "prosa", rolle: "hart",
+    beleg: "Der Wortlaut entscheidet, wo die Toleranz-Treppe anfängt: „502 m²“ bei null, „ca. 500 m²“ bei einem Prozent. Die stärkste einzelne Angabe überhaupt — 1 131 Flurstücke auf eines." },
+  { feld: "Ortsbeziehung", was: "liegt_in · liegt_an · entfernt_von · erwähnt", kanal: "prosa", rolle: "hart",
+    beleg: "Entscheidet, ob ein Ort überhaupt Anker wird. Häufigkeit hilft nicht: Grimma kommt dreimal vor, gerade weil das Grundstück 6 km davon entfernt liegt." },
+  { feld: "Straße", was: "Straßenname im Text", kanal: "prosa", rolle: "ordnet",
+    beleg: "Gewicht 0,9 und das stärkste zweite Merkmal — 25 Kandidaten auf 5. Filtern darf es nie: 577 von 1 131 Flurstücken tragen <q>ohne Lage</q>, und 790/11 ist eines davon." },
+  { feld: "Teilflächensatz", was: "„noch zu vermessende Teilfläche“", kanal: "prosa", rolle: "hart",
+    beleg: "Verbietet „bestätigt“. Die genannte Fläche gehört einem künftigen Flurstück, also findet sie als Filter irgendein anderes von dieser Größe — genau der Fehler, den diese Suche ausschließen soll." },
+  { feld: "Bundesland aus der Prosa", was: "Landesname im Text", kanal: "prosa", rolle: "zeigt",
+    beleg: "Darf einen leeren Lauf nur erklären, nie einen stoppen: <q>gute Anbindung nach Sachsen-Anhalt</q> ist ein Satz über ein sächsisches Grundstück." },
+  { feld: "Flurstücksnummer", was: "aus dem Titelblock eines Auszugs", kanal: "bild", rolle: "hart",
+    beleg: "Tesseract liest den Titelblock zuverlässig und das Kartenbild gar nicht — deshalb wird nach Muster gefiltert statt Bilder zu klassifizieren. <q>Fiurstück: 107/60</q> wird toleriert, das l als i." },
+  { feld: "Gemarkung", was: "neben der Nummer auf dem Auszug", kanal: "bild", rolle: "hart",
+    beleg: "<q>Gemarkung Thräna</q>. Die Behördenzeile wird ausgeschlossen: „Olbrichtplatz“ ist die Anschrift des GeoSN und steht auf jedem Blatt." },
+  { feld: "adresse, lat, lon, flurstuecke, kaufpreis_eur, grundstuecksflaeche_m2", was: "das gesamte Extraktionsschema", kanal: "modell", rolle: "ordnet",
+    beleg: "<code>InseratFelder</code>, sechs Felder. <code>_merge()</code> lässt das Modell ausschließlich Lücken füllen — ein deterministisch gelesener Wert wird nie überschrieben." },
+  { feld: "Gemarkung, Flurstück von Hand", was: "Eingabe im Assistenten", kanal: "nutzer", rolle: "hart",
+    beleg: "Höchste Vertrauensstufe (1,00). Was ein Mensch eingibt, wird gesucht — geprüft wird es trotzdem gegen ALKIS." },
+  { feld: "Konfliktentscheidung", was: "welche Lesung gilt", kanal: "nutzer", rolle: "hart",
+    beleg: "<code>entscheidungen</code>. Löscht die Alternativen nicht, sondern ordnet sie um — und startet heute den ganzen Lauf neu." },
+  { feld: "Flurstückswahl auf der Karte", was: "Klick auf das richtige Flurstück", kanal: "nutzer", rolle: "hart",
+    beleg: "<code>/api/parcels/nearby</code> liefert alle Flurstücke im Umkreis von 60 m mit ihren Nummern. Der Klick ersetzt — oder ergänzt, wenn das Zusammenstellen eingeschaltet ist." }
+];
+
+const liste = document.getElementById("inventar-liste");
+const zaehler = document.getElementById("inv-zaehler");
+const filterZustand = { kanal: new Set(), rolle: new Set() };
+
+function zeichneInventar() {
+  liste.textContent = "";
+  const sichtbar = INVENTAR.filter(z =>
+    (filterZustand.kanal.size === 0 || filterZustand.kanal.has(z.kanal)) &&
+    (filterZustand.rolle.size === 0 || filterZustand.rolle.has(z.rolle)));
+  if (!sichtbar.length) {
+    liste.append(el("p", "inv-leer", "Keine Angabe passt zu dieser Auswahl."));
+  }
+  for (const z of sichtbar) {
+    const zeile = el("div", "inv-zeile");
+    zeile.tabIndex = 0;
+    zeile.setAttribute("role", "button");
+    zeile.setAttribute("aria-expanded", "false");
+    const feld = el("div", "inv-feld"); feld.innerHTML = z.feld;
+    const was = el("div", "inv-was"); was.innerHTML = z.was;
+    const kanal = el("div", "inv-kanal", KANAELE[z.kanal]);
+    const rolle = el("div", "inv-rolle r-" + z.rolle);
+    rolle.innerHTML = "<i></i>" + ROLLEN[z.rolle];
+    const beleg = el("div", "inv-beleg"); beleg.innerHTML = z.beleg;
+    zeile.append(feld, was, kanal, rolle, beleg);
+    const um = () => {
+      const offen = zeile.classList.toggle("offen");
+      zeile.setAttribute("aria-expanded", offen ? "true" : "false");
+    };
+    zeile.addEventListener("click", um);
+    zeile.addEventListener("keydown", e => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); um(); }
+    });
+    liste.append(zeile);
+  }
+  zaehler.textContent = sichtbar.length + " von " + INVENTAR.length + " Angaben";
+}
+
+document.querySelectorAll("#inventar .chip[data-f]").forEach(knopf => {
+  knopf.addEventListener("click", () => {
+    const menge = filterZustand[knopf.dataset.f];
+    const an = knopf.getAttribute("aria-pressed") === "true";
+    if (an) menge.delete(knopf.dataset.v); else menge.add(knopf.dataset.v);
+    knopf.setAttribute("aria-pressed", an ? "false" : "true");
+    zeichneInventar();
+  });
+});
+document.getElementById("filter-aus").addEventListener("click", () => {
+  filterZustand.kanal.clear(); filterZustand.rolle.clear();
+  document.querySelectorAll("#inventar .chip[data-f]").forEach(k => k.setAttribute("aria-pressed", "false"));
+  zeichneInventar();
+});
+zeichneInventar();
+
+/* ------------------------------------------------------------------ *
+ * Teil 2 — Ablauf
+ * ------------------------------------------------------------------ */
+const KNOTEN = [
+  { id: "ernten", x: 15, y: 40, w: 140, nr: "Phase 0", name: "Ernten",
+    text: "Liest Text, Titel, Standortfeld, Portalfelder und die übergebenen Indizien. Fragt nichts.",
+    kosten: "0 Anfragen", abbruch: "Nennt das Standortfeld ein anderes Bundesland, endet der Lauf hier.",
+    wo: "engine.harvest() · indicia.collect_indicia()" },
+  { id: "anker", x: 195, y: 40, w: 130, nr: "Phase 1", name: "Anker",
+    text: "Der kleinste Behälter, dem zu trauen ist — und zwar alle davon, nicht der beste. Eine Gemarkung, eine Gemeinde, notfalls die Bezirke um den Pin.",
+    kosten: "1 Zählung je Anker", abbruch: "Kein Anker: es bleibt die Nummer allein, landesweit.",
+    wo: "engine.anchors() · anchors_from_pin()" },
+  { id: "kurz", x: 365, y: 40, w: 160, nr: "Abkürzung", name: "Kurzschluss",
+    text: "Gemarkung und Nummer: jede Kombination wird nachgeschlagen, nicht eine ausgewählt. Der Treffer wird gegen Fläche und Gemeinde gegengeprüft, bevor er gilt.",
+    kosten: "Nummern × Anker", abbruch: "Kein Treffer: weiter über die Fläche. Ein Treffer schließt den Flächenweg — das ist B1.",
+    wo: "engine.short_circuit() · cross_check()" },
+  { id: "raum", x: 195, y: 170, w: 130, nr: "Phase 2", name: "Raum",
+    text: "Wie groß ist der Heuhaufen? Reine Anzeige — Stadt Leipzig mit 112 588 Flurstücken ist kein Abbruchgrund.",
+    kosten: "0 zusätzlich", abbruch: "Keiner. Die Grenze sitzt auf der Kandidatenmenge, nie auf dem Anker.",
+    wo: "engine.measure_space()" },
+  { id: "treppe", x: 365, y: 170, w: 160, nr: "Phase 3", name: "Toleranz-Treppe",
+    text: "Eng zuerst, weiter nur wenn eine Stufe leer bleibt. Der Wortlaut der Anzeige bestimmt, wo sie beginnt.",
+    kosten: "1 Zählung je Stufe und Anker", abbruch: "Über 500 Überlebende: nicht mehr bewertbar, die Oberfläche fragt nach der Fläche.",
+    wo: "engine.staircase() · ladder.tolerance_ladder()" },
+  { id: "bewertung", x: 565, y: 170, w: 130, nr: "Phase 4", name: "Bewertung",
+    text: "Fläche, Straße, Nutzungsart als gewichtete Summe — kein Produkt, weil die Merkmale korreliert sind. Ordnet nur.",
+    kosten: "0 Anfragen", abbruch: "Keiner. Diese Phase scheidet niemanden aus.",
+    wo: "scoring.score()" },
+  { id: "pruefen", x: 565, y: 40, w: 130, nr: "Phase 5", name: "Prüfen",
+    text: "Die einzige Stelle, die „gefunden“ sagen darf: genau ein Überlebender, ausschließlich harte Filter, kein Widerspruch.",
+    kosten: "0 Anfragen", abbruch: "Alles andere ist „mehrdeutig“ — und das ist eine Antwort, keine Niederlage.",
+    wo: "engine.verdict()" },
+  { id: "antwort", x: 735, y: 40, w: 150, nr: "Phase 6", name: "Antwort",
+    text: "Immer alles: Indizien, Konflikte, Kandidaten, die gemeinsame Hülle und die Zahl der Anfragen. Auch ein erfolgloser Lauf ist vollständig.",
+    kosten: "—", abbruch: "—", wo: "SuchEreignis(art=\"ergebnis\")" },
+  { id: "bilder", x: 15, y: 300, w: 155, nr: "Umweg", name: "Bilder lesen",
+    text: "Erst wenn der Text es nicht entschieden hat. Nacheinander, nicht gleichzeitig — sieben Tesseract-Läufe auf einmal laufen alle in den Timeout.",
+    kosten: "0,9 s je Bild, höchstens 12", abbruch: "Findet ein Bild eine Nummer, bleiben die übrigen ungelesen.",
+    wo: "engine.read_images() · services/ocr.py" },
+  { id: "gemeinde", x: 400, y: 300, w: 170, nr: "Umweg", name: "Gemeinde weiten",
+    text: "Die exakte Fläche ist eine amtliche Aussage, die aus der Prosa gelesene Gemarkung nicht. Also wird der Ort geweitet, nicht die Zahl.",
+    kosten: "2 Anfragen je Anker", abbruch: "Nur nach einer harten Stufe und höchstens für zwei Anker.",
+    wo: "engine._widen_the_place()" },
+  { id: "gegenprobe", x: 630, y: 300, w: 170, nr: "Umweg", name: "Gegenprobe",
+    text: "Eine Stufe weiter, um zu sehen, ob der Halt Zufall war. Bei einer harten Stufe stehen die Nachbarn daneben, bei einer gerundeten treten sie mit an.",
+    kosten: "1 Anfrage je Anker", abbruch: "Nur bei höchstens 20 Treffern.",
+    wo: "engine._confirm() · ladder.confirmation_rung()" }
+];
+
+const NS = "http://www.w3.org/2000/svg";
+const knotenGruppe = document.getElementById("knoten");
+const detail = document.getElementById("ablauf-detail");
+
+function zeigeKnoten(k) {
+  detail.textContent = "";
+  const kopf = el("h4", null, k.nr + " · " + k.name);
+  const text = el("p", null, k.text);
+  text.style.fontSize = "13.5px";
+  const kosten = el("p", "wo", k.kosten === "—" ? "" : "Kosten: " + k.kosten);
+  const ab = el("p", "abbruch", k.abbruch === "—" ? "" : k.abbruch);
+  const wo = el("p", "wo", k.wo);
+  detail.append(kopf, text, kosten, ab, wo);
+  knotenGruppe.querySelectorAll("g").forEach(g =>
+    g.setAttribute("aria-current", g.dataset.id === k.id ? "true" : "false"));
+}
+
+for (const k of KNOTEN) {
+  const g = document.createElementNS(NS, "g");
+  g.setAttribute("class", "knoten");
+  g.dataset.id = k.id;
+  g.setAttribute("tabindex", "0");
+  g.setAttribute("role", "button");
+  g.setAttribute("aria-label", k.nr + " " + k.name);
+  const r = document.createElementNS(NS, "rect");
+  r.setAttribute("x", k.x); r.setAttribute("y", k.y);
+  r.setAttribute("width", k.w); r.setAttribute("height", 54); r.setAttribute("rx", 9);
+  const nr = document.createElementNS(NS, "text");
+  nr.setAttribute("class", "nr");
+  nr.setAttribute("x", k.x + 13); nr.setAttribute("y", k.y + 20);
+  nr.textContent = k.nr.toUpperCase();
+  const t = document.createElementNS(NS, "text");
+  t.setAttribute("x", k.x + 13); t.setAttribute("y", k.y + 39);
+  t.textContent = k.name;
+  g.append(r, nr, t);
+  g.addEventListener("click", () => zeigeKnoten(k));
+  g.addEventListener("keydown", e => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); zeigeKnoten(k); }
+  });
+  knotenGruppe.append(g);
+}
+zeigeKnoten(KNOTEN[2]);
+
+const rueck = document.getElementById("rueck-schalter");
+rueck.addEventListener("click", () => {
+  const an = rueck.getAttribute("aria-pressed") === "true";
+  rueck.setAttribute("aria-pressed", an ? "false" : "true");
+  document.getElementById("ablauf").classList.toggle("zeigt-rueck", !an);
+});
+
+if (!ruhig) {
+  const laeufer = document.getElementById("laeufer");
+  const punkt = document.createElementNS(NS, "circle");
+  punkt.setAttribute("r", "4.5");
+  punkt.setAttribute("cx", "0"); punkt.setAttribute("cy", "0");
+  const bewegung = document.createElementNS(NS, "animateMotion");
+  bewegung.setAttribute("path", "M85,67 H810");
+  bewegung.setAttribute("dur", "6s");
+  bewegung.setAttribute("repeatCount", "indefinite");
+  punkt.append(bewegung);
+  laeufer.append(punkt);
+}
+
+/* ------------------------------------------------------------------ *
+ * Teil 4 — Trennschärfe
+ * ------------------------------------------------------------------ */
+const DIAGRAMME = [
+  { titel: "In der Gemarkung Großbothen — 1 131 Flurstücke, jede Zeile eine Zählung",
+    basis: 1131,
+    zeilen: [
+      { name: "ohne Flächenangabe", rest: 1131, hart: false },
+      { name: "Fläche ±20 %", rest: 83, hart: false },
+      { name: "Fläche ±10 %", rest: 46, hart: false },
+      { name: "Fläche ±5 %", rest: 25, hart: false },
+      { name: "Fläche ±2 %", rest: 12, hart: false },
+      { name: "Fläche ±1 %", rest: 5, hart: false },
+      { name: "Fläche ±0,5 %", rest: 2, hart: false },
+      { name: "Fläche exakt 502 m²", rest: 1, hart: true }
+    ] },
+  { titel: "Von den 25 Kandidaten der ±5-%-Stufe — das zweite Merkmal",
+    basis: 25,
+    zeilen: [
+      { name: "±5 % allein", rest: 25, hart: false },
+      { name: "+ Nutzung Wohnbaufläche", rest: 16, hart: false },
+      { name: "+ Entfernungsringe", rest: 8, hart: false },
+      { name: "+ Straßenpuffer 80 m", rest: 5, hart: false },
+      { name: "+ exakte Fläche", rest: 1, hart: true }
+    ] }
+];
+
+const balkenRaum = document.getElementById("balken");
+for (const d of DIAGRAMME) {
+  const kopf = el("p", "eyebrow", d.titel);
+  kopf.style.marginTop = "10px";
+  balkenRaum.append(kopf);
+  for (const z of d.zeilen) {
+    const zeile = el("div", "bl");
+    zeile.append(el("div", "bl-name", z.name));
+    const spur = el("div", "bl-spur");
+    const füllung = el("i", z.hart ? "" : "weich");
+    füllung.style.width = Math.max(1.5, (z.rest / d.basis) * 100) + "%";
+    spur.append(füllung);
+    zeile.append(spur, el("div", "bl-wert", z.rest === 1 ? "1 Flurstück" : z.rest + " übrig"));
+    balkenRaum.append(zeile);
+  }
+}
+const fussnote = el("p", null,
+  "Größere Behälter verhalten sich genauso: Stadt Leipzig hat 112 588 Flurstücke, eine exakte Fläche lässt 78 bzw. 24 stehen, und die zugehörige Gemarkung genau eines. Nicht die Größe des Ankers ist das Problem, sondern die Größe der Kandidatenmenge danach.");
+fussnote.style.cssText = "font-size:13px;color:var(--muted);margin-top:14px;max-width:70ch";
+balkenRaum.append(fussnote);
+
+/* ------------------------------------------------------------------ *
+ * Teil 5 — Agenda-Simulator
+ * ------------------------------------------------------------------ */
+const FAELLE = {
+  lausick: {
+    fuss: "Aufgezeichnetes Inserat 3503721553. Die Zahlen der Spalte „heute“ folgen dem Code; die der Spalte „geplant“ sind geschätzt.",
+    heute: [
+      { t: "Angaben lesen", d: "1 076 m² exakt aus der Attributliste · Gemeinde Bad Lausick · kein Gemarkungsname im Text außer dem Ort selbst", z: "0 Anfragen", a: 0, k: "—", zw: 1 },
+      { t: "Anker: Gemarkung Bad Lausick (143836)", d: "Der Ortsname ist Gemarkung und Gemeinde zugleich — gesucht wird zuerst in der Gemarkung", z: "1 Zählung", a: 1, k: "—", zw: 1 },
+      { t: "Stufe „exakt“ (1 076 m²): 0 Treffer", d: "Die engste Stufe ist leer. Weil sie hart ist, wird jetzt der Ort geweitet und nicht die Zahl", z: "1 Zählung", a: 2, k: "0", zw: 1 },
+      { t: "Gemeindeschlüssel nachschlagen", d: "Er steht nicht im Verzeichnis, also wird ein beliebiges Flurstück der Gemarkung geholt, nur um sein gmdschl zu lesen", z: "1 Abfrage", a: 3, k: "0", zw: 1 },
+      { t: "Ganze Gemeinde, 1 076 m²: 1 Treffer", d: "Flurstück 502/47, Gemarkung Etzoldshain, amtliche Lage „Am Kurpark“", z: "2 Anfragen", a: 5, k: "1", zw: 1, art: "treffer" },
+      { t: "bestätigt", d: "Harte Filter, genau ein Überlebender, kein Widerspruch", z: "", a: 5, k: "1", zw: 1, art: "treffer",
+        urteil: "bestaetigt", lage: "Gerettet vom Sonderfall „Gemeinde weiten“ — der fest verdrahtet ist: nur nach einer harten Stufe, höchstens zwei Anker." }
+    ],
+    geplant: [
+      { t: "Angaben lesen", d: "Zusätzlich gelesen: „am Kurpark“ als Lagebezeichnung ohne Straßensuffix", z: "0 Anfragen", a: 0, k: "—", zw: 1 },
+      { t: "Agenda: drei Hypothesen", d: "Gemarkung × exakt · Gemeinde × exakt · Gemeinde × ±1 % — geordnet nach erwarteter Restmenge je Anfrage", z: "0 Anfragen", a: 0, k: "—", zw: 3 },
+      { t: "H1 leer — widerlegt, bleibt stehen", d: "Mit Grund im Verlauf: in der Gemarkung Bad Lausick gibt es kein Flurstück dieser Größe", z: "1 Zählung", a: 1, k: "0", zw: 3, art: "aus" },
+      { t: "H2: ein Treffer", d: "502/47 · Etzoldshain · 1 076 m² — dieselbe Antwort, ohne Ausnahmeregel", z: "2 Anfragen", a: 3, k: "1", zw: 3, art: "treffer" },
+      { t: "Weiches Merkmal stützt die Wahl", d: "Amtliche Lage „Am Kurpark“ trifft den Titel „Naturnah wohnen am Kurpark“ — ordnet nur, ist aber sichtbar", z: "0 Anfragen", a: 3, k: "1", zw: 3 },
+      { t: "bestätigt", d: "Nähme der Verzeichnis-Bauer den Gemeindeschlüssel mit auf, entfiele auch die Nachschlage-Anfrage", z: "", a: 3, k: "1", zw: 3, art: "treffer",
+        urteil: "bestaetigt", lage: "Kein neuer Filter, keine neue Datenquelle — nur die Reihenfolge kommt aus der Agenda statt aus einer Ausnahme im Code." }
+    ]
+  },
+  borna: {
+    fuss: "Aufgezeichnetes Inserat 2418686487. Die Lösung ist 107/60 in Gemarkung Thräna — eine Teilfläche daraus, kein eigenes Flurstück.",
+    heute: [
+      { t: "Angaben lesen", d: "748,50 m², aber „noch zu vermessende Teilfläche“: die Fläche darf nicht filtern. „Thräna“ gilt als bloße Erwähnung (0,20)", z: "0 Anfragen", a: 0, k: "—", zw: 1 },
+      { t: "Anker: Gemeinde Borna", d: "Der einzige Behälter, den der Leser hergibt", z: "1 Zählung", a: 1, k: "—", zw: 1 },
+      { t: "Keine harte Fläche — es bleibt die Nutzungsart", d: "Wohnbauflächen in der ganzen Gemeinde: eine große, nur grob geordnete Menge", z: "2 Anfragen", a: 3, k: "viele", zw: 1 },
+      { t: "Bilder lesen (11)", d: "Bild 3 trägt die Liegenschaftskarte: „Fiurstück: 107/60“ und „Gemarkung Thräna“", z: "~4 s", a: 3, k: "viele", zw: 1 },
+      { t: "Zweiter Durchlauf: Kurzschluss", d: "Gemarkung Thräna × 107/60 → ein Flurstück, amtlich 2 994 m²", z: "1 Abfrage", a: 4, k: "1", zw: 1, art: "treffer" },
+      { t: "mehrdeutig — und das ist richtig", d: "Ein eigenes Flurstück gibt es noch nicht; genannt wird das, aus dem herausgemessen wird", z: "", a: 4, k: "1", zw: 1,
+        urteil: "mehrdeutig", lage: "Ohne den angehängten Katasterauszug hätte dieser Lauf nichts gefunden — obwohl die Ortsangabe die ganze Zeit im Text stand." }
+    ],
+    geplant: [
+      { t: "Angaben lesen", d: "„Thräna ist … ein kleiner Ortsteil der Kreisstadt Borna“ wird als liegt_in gelesen: Gemarkung Thräna, Gemeinde Borna", z: "0 Anfragen", a: 0, k: "—", zw: 2 },
+      { t: "Agenda: Thräna vor Borna", d: "Der kleinere Behälter zuerst; eine Zählung sagt, wie groß er ist", z: "1 Zählung", a: 1, k: "—", zw: 2 },
+      { t: "Fläche bleibt weich", d: "Hypothese „Thräna × Wohnbaufläche“ liefert eine bewertbare Menge statt einer gemeindeweiten", z: "1 Anfrage", a: 2, k: "wenige", zw: 2 },
+      { t: "Das Bild bestätigt den Zweig", d: "107/60 in Thräna — der Anker stand schon, also eine Kombination statt mehrerer", z: "1 Abfrage", a: 3, k: "1", zw: 2, art: "treffer" },
+      { t: "Gegenprobe: 2 994 m² gegen 748,50 m²", d: "Kein Einspruch — bei einer Teilfläche ist der Unterschied die Lage der Dinge und kein Fehler", z: "0 Anfragen", a: 3, k: "1", zw: 2 },
+      { t: "mehrdeutig, mit Begründung", d: "Dieselbe Antwort wie heute", z: "", a: 3, k: "1", zw: 2,
+        urteil: "mehrdeutig", lage: "Der Unterschied ist nicht das Ergebnis, sondern die Abhängigkeit: die Antwort hängt nicht mehr daran, dass jemand einen Katasterauszug anhängt." }
+    ]
+  },
+  zwei: {
+    fuss: "Konstruierter Fall — aus gemessenen Flurstücken: 790/11 misst 502 m², das benachbarte 238/3 misst 500 m² und liegt 1 730 m entfernt. Genau dieser Fall kommt in den sechs Aufzeichnungen nicht vor.",
+    heute: [
+      { t: "Zwei Bilder, zwei Katasterauszüge", d: "Gelesen: 790/11 und 238/3 — beide tragen quelle = „bild“", z: "~2 s", a: 0, k: "—", zw: 1 },
+      { t: "named_as_a_set() ist wahr", d: "Gleiche Quelle heißt „ein Grundstück aus mehreren Flurstücken“ — keine Rückfrage, kein Widerspruch", z: "0 Anfragen", a: 0, k: "—", zw: 1 },
+      { t: "Kurzschluss: beide Nummern nachgeschlagen", d: "Beide existieren in der Gemarkung", z: "2 Abfragen", a: 2, k: "2", zw: 1 },
+      { t: "Die Fläche darf nicht trennen", d: "Bei einem Satz sollen sich die Flächen addieren: 502 + 500 = 1 002 m² gegen 502 m² im Inserat", z: "0 Anfragen", a: 2, k: "2", zw: 1, art: "aus" },
+      { t: "mehrdeutig, zwei Flurstücke", d: "Der Hinweis bittet zu prüfen, ob wirklich beide dazugehören", z: "", a: 2, k: "2", zw: 1,
+        urteil: "mehrdeutig", lage: "Die falsche Nummer wird nie widerlegt, sie wird mitgeschleppt — und die Entscheidung des Nutzers startet den ganzen Lauf neu." }
+    ],
+    geplant: [
+      { t: "Zwei Dokumente, zwei Lesungen", d: "Quellenidentität = Kanal + Dokument: zwei Auszüge sind rivalisierende Lesungen, kein Satz", z: "~2 s", a: 0, k: "—", zw: 2 },
+      { t: "Konflikt: „Welche Flurstücksnummer ist gemeint?“", d: "Beide Zweige laufen, beide bleiben sichtbar — mit dem Bild als Beleg, nicht mit der Abschrift", z: "0 Anfragen", a: 0, k: "—", zw: 2 },
+      { t: "Zweig A: 790/11 → 502 m²", d: "Trifft die exakt angegebene Fläche", z: "1 Abfrage", a: 1, k: "1", zw: 2, art: "treffer" },
+      { t: "Zweig B: 238/3 → 500 m²", d: "Verfehlt die exakte Angabe und liegt 1 730 m entfernt — widerlegt, bleibt durchgestrichen im Verlauf stehen", z: "1 Abfrage", a: 2, k: "1", zw: 2, art: "aus" },
+      { t: "bestätigt: 790/11", d: "Genau ein Überlebender, und was ihn stehen lässt, ist eine amtliche Aussage", z: "", a: 2, k: "1", zw: 2, art: "treffer",
+        urteil: "bestaetigt", lage: "Derselbe Eingang, ein Urteil statt keinem — weil zwei Lesungen einzeln geprüft werden dürfen, sobald sie nicht mehr als ein Satz gelten." }
+    ]
+  }
+};
+
+const sim = { fall: "lausick", modus: "heute", index: 0, timer: null };
+const schritteRaum = document.getElementById("sim-schritte");
+const anzeigen = { a: document.getElementById("z-anfragen"), k: document.getElementById("z-kandidaten"),
+  zw: document.getElementById("z-zweige"), lage: document.getElementById("sim-lage"),
+  urteil: document.getElementById("sim-urteil"), fuss: document.getElementById("sim-fuss") };
+
+function schritte() { return FAELLE[sim.fall][sim.modus]; }
+
+function zeichneSim() {
+  schritteRaum.textContent = "";
+  const alle = schritte();
+  alle.forEach((s, i) => {
+    const zeile = el("div", "sch" + (s.art ? " " + s.art : ""));
+    if (i < sim.index) zeile.classList.add("da");
+    if (i === sim.index - 1) zeile.classList.add("jetzt");
+    zeile.append(el("div", "sch-nr", String(i + 1)));
+    const text = el("div", "sch-text");
+    text.append(document.createTextNode(s.t));
+    if (s.d) text.append(el("small", null, s.d));
+    zeile.append(text, el("div", "sch-zahl", s.z || ""));
+    schritteRaum.append(zeile);
+  });
+  const jetzt = sim.index > 0 ? alle[sim.index - 1] : null;
+  anzeigen.a.textContent = jetzt ? jetzt.a : 0;
+  anzeigen.k.textContent = jetzt ? jetzt.k : "—";
+  anzeigen.zw.textContent = jetzt ? jetzt.zw : 0;
+  anzeigen.lage.textContent = jetzt && jetzt.lage ? jetzt.lage :
+    (sim.index === 0 ? "Noch nichts gefragt. „Lauf abspielen“ spielt die Schritte in Echtzeitabständen ab, „Schritt“ geht einen weiter." : "");
+  const urteil = jetzt && jetzt.urteil ? jetzt.urteil : null;
+  const URTEILE = { bestaetigt: "bestätigt", mehrdeutig: "mehrdeutig", erfolglos: "erfolglos" };
+  anzeigen.urteil.className = "sim-urteil" + (urteil ? " " + urteil : "");
+  anzeigen.urteil.textContent = urteil ? URTEILE[urteil] : (sim.index === 0 ? "läuft noch nicht" : "läuft");
+  anzeigen.fuss.textContent = FAELLE[sim.fall].fuss;
+}
+
+function weiter() {
+  if (sim.index >= schritte().length) return false;
+  sim.index += 1;
+  zeichneSim();
+  return sim.index < schritte().length;
+}
+
+function stoppe() { if (sim.timer !== null) { clearTimeout(sim.timer); sim.timer = null; } }
+
+function spiele() {
+  stoppe();
+  if (sim.index >= schritte().length) sim.index = 0;
+  const takt = () => {
+    if (weiter()) sim.timer = setTimeout(takt, ruhig ? 60 : 1100);
+    else sim.timer = null;
+  };
+  takt();
+}
+
+function setzeZurueck() { stoppe(); sim.index = 0; zeichneSim(); }
+
+document.getElementById("sim-play").addEventListener("click", spiele);
+document.getElementById("sim-schritt").addEventListener("click", () => { stoppe(); weiter(); });
+document.querySelectorAll("#sim .chip[data-fall]").forEach(k => k.addEventListener("click", () => {
+  document.querySelectorAll("#sim .chip[data-fall]").forEach(a => a.setAttribute("aria-pressed", String(a === k)));
+  sim.fall = k.dataset.fall; setzeZurueck();
+}));
+document.querySelectorAll("#sim .chip[data-modus]").forEach(k => k.addEventListener("click", () => {
+  document.querySelectorAll("#sim .chip[data-modus]").forEach(a => a.setAttribute("aria-pressed", String(a === k)));
+  sim.modus = k.dataset.modus; setzeZurueck();
+}));
+// Im Ruhezustand steht der Lauf fertig da: der erste Blick soll zeigen, was
+// herauskommt, nicht ein leeres Gerüst. „Lauf abspielen“ beginnt von vorn.
+sim.index = schritte().length;
+zeichneSim();
+
+/* ------------------------------------------------------------------ *
+ * Teil 7 — Wertekatalog
+ * ------------------------------------------------------------------ */
+const WERTE = [
+  { name: "Frontbreite", gruppe: "suche", zitat: "(Frontbreite ca. 26 m)", quelle: "Plagwitz",
+    nutzen: "Gegen die Straßenkante des Kandidaten messbar — die App kennt sie als <code>plot.streetEdge</code>. Weiches Merkmal, weil die Angabe gerundet ist." },
+  { name: "Ortsbeziehung und Ebene", gruppe: "suche", zitat: "Thräna ist … ein kleiner Ortsteil der Kreisstadt Borna", quelle: "Borna",
+    nutzen: "Der Anker selbst. Heute nur erkannt, wenn der Auslöser vor dem Namen steht — die häufigste Bauform steht dahinter." },
+  { name: "Lagebezeichnung ohne Suffix", gruppe: "suche", zitat: "Naturnah wohnen am Kurpark", quelle: "Bad Lausick",
+    nutzen: "Trifft die amtliche Lage „Am Kurpark“ von 502/47. Das Straßenmuster verlangt heute ein Suffix und übersieht sie." },
+  { name: "Altbestand auf dem Grundstück", gruppe: "suche", zitat: "verfügt lediglich über Garagen/Lagergebäude", quelle: "Lobstädt",
+    nutzen: "<code>ave:GebaeudeBauwerk</code> liefert Gebäudeumrisse aus demselben Dienst. Ein Kandidat ohne jedes Gebäude passt schlechter — weich, denn Gartenhäuser fehlen im Kataster." },
+  { name: "Zuwegung", gruppe: "suche", zitat: "Der Zugang zum Grundstück erfolgt unmittelbar von der davor verlaufenden Straße", quelle: "Großbothen",
+    nutzen: "Berührt der Kandidat eine Verkehrsfläche? <code>ave:tntxt</code> nennt „Straßenverkehr“ und braucht dafür keine OSM-Anfrage." },
+  { name: "Bebauungsplan-Nummer", gruppe: "suche", zitat: "Es liegt im Bebauungsplan Nr. 28 „Badspitzen“", quelle: "Bad Lausick",
+    nutzen: "Benennt ein Gebiet punktgenau. Wo die Gemeinde ihre Pläne offen bereitstellt, ist das ein harter räumlicher Filter — und sonst ein starkes Ordnungsmerkmal." },
+  { name: "Entfernungstabelle", gruppe: "suche", zitat: "Fernbahnhof 1,6 km · Bus 0,3 km · Flughafen 40,5 km", quelle: "Großbothen",
+    nutzen: "Gegenprobe gegen MOTIS. Nur ordnend: die Angaben desselben Inserats lagen gemessen 12 % und 32 % daneben." },
+  { name: "GRZ, GFZ, Vollgeschosse", gruppe: "bewertung", zitat: "GRZ 0,4, GFZ 0,7, ein Satteldach und bis zu zwei Vollgeschosse", quelle: "Bad Lausick",
+    nutzen: "Deckelt die bebaubare Fläche (0,4 × 1 076 m² = 430 m²) und liefert die Geschosszahl — die einzige Quelle für eine Wandhöhe, die weder OSM noch ALKIS hat. Geht direkt in § 6 SächsBO ein." },
+  { name: "Baurechtlicher Status", gruppe: "bewertung", zitat: "Die Bebauung laut Bauvorbescheid ist für ein 1-2 geschossiges Einfamilienhaus vorgesehen", quelle: "Borna",
+    nutzen: "§ 34 BauGB, Bauvoranfrage, Bauvorbescheid oder Bebauungsplan — die Antwort auf „darf hier überhaupt gebaut werden“, und sie steht in fünf der sechs Anzeigen." },
+  { name: "Erschließung", gruppe: "bewertung", zitat: "Wasser, Abwasser, Strom, Gas und Telekommunikation liegen in der Straße vor dem Grundstück", quelle: "Bad Lausick",
+    nutzen: "Ein Kostenblock im fünfstelligen Bereich, der den Vergleich mit dem Bodenrichtwert verschiebt. Je Medium als ja/nein/unbekannt erfassbar." },
+  { name: "Abwasserlösung", gruppe: "bewertung", zitat: "Abwasser wird flexibel über eine biologische Kleinkläranlage sichergestellt", quelle: "Plagwitz",
+    nutzen: "Weicht von „voll erschlossen“ ab und kostet laufend. Genau die Angabe, die in einer Zusammenfassung untergeht." },
+  { name: "Käuferprovision", gruppe: "bewertung", zitat: "Käuferprovision: 5,95 % inkl. gesetzl. MwSt.", quelle: "Lobstädt",
+    nutzen: "Steht in der Attributliste und wird heute überlesen. Zusammen mit Grunderwerbsteuer und Notar ist das der Unterschied zwischen Kaufpreis und Kosten." },
+  { name: "Abstandsauflage aus dem B-Plan", gruppe: "bewertung", zitat: "Der bestehende Bebauungsplan sieht zur Wohnbebauung einen Abstand von 15 m vor", quelle: "Bad Lausick",
+    nutzen: "Strenger als § 6 SächsBO und damit maßgeblich für das Baufenster. Die App zeichnet heute nur die 3-m-Untergrenze." },
+  { name: "Topografie", gruppe: "bewertung", zitat: "Das sonst ebene und größtenteils unbebaute Grundstück", quelle: "Lobstädt",
+    nutzen: "Eben oder Hang entscheidet über Aushub und Keller. Prüfbar gegen das Geländemodell, sobald es angebunden ist." },
+  { name: "Bebaubarkeit nach Haustyp", gruppe: "bewertung", zitat: "Einem Einfamilien-/ Doppelhaus oder ggf. Mehrfamilienhaus sollte … nichts im Wege stehen", quelle: "Lobstädt",
+    nutzen: "Grenzt die Auswahl der Fertighaustypen ein, bevor der erste Grundriss auf dem Grundstück liegt." },
+  { name: "Kaufpreis pro Quadratmeter", gruppe: "anzeige", zitat: "Kaufpreis pro m²: 92,00 €", quelle: "Borna",
+    nutzen: "Konsistenzprobe: Preis geteilt durch Fläche muss das ergeben. Und zugleich die Falle, gegen die der Wortleser geschützt ist — ein Quadratmeterpreis ist kein Kaufpreis." },
+  { name: "Verfügbarkeit", gruppe: "anzeige", zitat: "Verfügbar ab: nach Kaufpreiszahlung", quelle: "Plagwitz",
+    nutzen: "Steht in der Attributliste, ist eine Zeile in der Übersicht wert und kostet nichts." },
+  { name: "Belastungen und Bestandsmiete", gruppe: "anzeige", zitat: "Garagen, pauschal EUR 130,-/Monat … Mietverträge … kurzfristig gekündigt", quelle: "Lobstädt",
+    nutzen: "Ein Grundstück mit laufendem Mietverhältnis ist ein anderes Angebot. Gehört neben den Preis, nicht in die Suche." },
+  { name: "Hinweis zu den Bildern", gruppe: "anzeige", zitat: "Die verwendeten Bilder wurden teilweise mit KI „aufgeräumt“", quelle: "Plagwitz",
+    nutzen: "Betrifft das Vertrauen in den Bildkanal unmittelbar: Was ein Bild zeigt, muss nicht mehr das Grundstück sein. Für die Texterkennung auf Katasterauszügen harmlos, für Fotos nicht." },
+  { name: "Anbieter-Objekt-ID", gruppe: "anzeige", zitat: "Anbieter-Objekt-ID: PI-1105_n", quelle: "Großbothen",
+    nutzen: "Erkennt dieselbe Immobilie über mehrere Portale hinweg wieder und ist kein Personenbezug — eine Objektnummer, kein Kontakt." }
+];
+
+const katalogRaum = document.getElementById("katalog");
+const GRUPPEN = { suche: "schärft die Suche", bewertung: "trägt die Bewertung", anzeige: "zeigen und prüfen" };
+const katalogFilter = new Set();
+
+function zeichneKatalog() {
+  katalogRaum.textContent = "";
+  const sichtbar = WERTE.filter(w => katalogFilter.size === 0 || katalogFilter.has(w.gruppe));
+  for (const w of sichtbar) {
+    const karte = el("article", "wert");
+    karte.append(el("h4", null, w.name));
+    const zitat = el("p", "zitat"); zitat.innerHTML = "„" + w.zitat + "“";
+    const nutzen = el("p", "nutzen"); nutzen.innerHTML = w.nutzen;
+    const fuss = el("div", "fuss");
+    fuss.append(el("span", "tag " + w.gruppe, GRUPPEN[w.gruppe]), el("span", "tag", w.quelle));
+    karte.append(zitat, nutzen, fuss);
+    katalogRaum.append(karte);
+  }
+}
+document.querySelectorAll(".chip[data-k]").forEach(k => k.addEventListener("click", () => {
+  const an = k.getAttribute("aria-pressed") === "true";
+  if (an) katalogFilter.delete(k.dataset.k); else katalogFilter.add(k.dataset.k);
+  k.setAttribute("aria-pressed", an ? "false" : "true");
+  zeichneKatalog();
+}));
+document.getElementById("katalog-aus").addEventListener("click", () => {
+  katalogFilter.clear();
+  document.querySelectorAll(".chip[data-k]").forEach(k => k.setAttribute("aria-pressed", "false"));
+  zeichneKatalog();
+});
+zeichneKatalog();
+
+/* ------------------------------------------------------------------ *
+ * Teil 8 — Beleg-Gate
+ * ------------------------------------------------------------------ */
+const GATE_TEXT =
+  "Zum Verkauf steht ein attraktives, ca. 748,50 m² großes Baugrundstück in der aufstrebenden " +
+  "Stadt Borna, südlich von Leipzig. Bei dem Grundstück handelt es sich derzeit um eine noch zu " +
+  "vermessende Teilfläche, die im Rahmen des Verkaufsprozesses exakt abgegrenzt und im Grundbuch " +
+  "eingetragen wird. […] Kaufpreis pro m²: 92,00 € […] Thräna ist mit seinen etwa 765 Einwohnern " +
+  "ein kleiner Ortsteil der Kreisstadt Borna.";
+
+const GATE_FELDER = [
+  { id: "gf-flaeche", name: "felder.grundstuecksflaeche_m2", wert: "748,5", zahl: true,
+    beleg: "ca. 748,50 m² großes Baugrundstück" },
+  { id: "gf-ort", name: "orte[0].name · Ebene Gemarkung", wert: "Thräna", zahl: false,
+    beleg: "Thräna ist mit seinen etwa 765 Einwohnern ein kleiner Ortsteil der Kreisstadt Borna" },
+  { id: "gf-preis", name: "felder.kaufpreis_eur", wert: "69000", zahl: true,
+    beleg: "Der Kaufpreis beträgt 69.000 €" }
+];
+
+const platt = s => s.toLowerCase()
+  .replace(/[„“”‚‘’"']/g, '"')
+  .replace(/[–—]/g, "-")
+  .replace(/\s+/g, " ")
+  .trim();
+
+const deutscheZahlen = s => {
+  const treffer = s.match(/\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:,\d+)?/g) || [];
+  return treffer.map(t => parseFloat(t.replace(/\./g, "").replace(",", ".")));
+};
+
+function pruefe(feld, beleg) {
+  if (!beleg.trim()) return { ok: false, grund: "Ohne Beleg kein Wert. Ein Feld ohne Fundstelle wird verworfen, nicht übernommen." };
+  if (!platt(GATE_TEXT).includes(platt(beleg)))
+    return { ok: false, grund: "Der Beleg steht so nicht im übergebenen Text — das Modell hat ihn geschrieben, nicht gelesen. Feld verworfen." };
+  if (feld.zahl) {
+    const wert = parseFloat(feld.wert.replace(/\./g, "").replace(",", "."));
+    if (!deutscheZahlen(beleg).some(z => Math.abs(z - wert) < 0.005))
+      return { ok: false, grund: "Der Beleg steht im Text, trägt den Wert aber nicht. Feld verworfen." };
+  } else if (!platt(beleg).includes(platt(feld.wert))) {
+    return { ok: false, grund: "Der Beleg steht im Text, nennt den Wert aber nicht. Feld verworfen." };
+  }
+  return { ok: true, grund: "Beleg wörtlich gefunden, Wert steht darin. Wird als Indiz mit quelle = „modell“ und Sicherheit 0,45 übernommen — ordnend, nie filternd." };
+}
+
+document.getElementById("gate-text").textContent = GATE_TEXT;
+document.getElementById("gate-stand").textContent = "Beleg-Gate, Prüfung 1 von 4";
+const gateListe = document.getElementById("gate-liste");
+
+for (const feld of GATE_FELDER) {
+  const zeile = el("div", "gf");
+  zeile.append(el("div", "gf-name", feld.name));
+  const urteil = el("span", "gf-urteil");
+  zeile.append(urteil);
+  const wert = el("div", "gf-wert", "Wert: " + feld.wert);
+  wert.style.gridColumn = "1/-1";
+  zeile.append(wert);
+  const eingabe = el("textarea", "gf-beleg");
+  eingabe.id = feld.id;
+  eingabe.value = feld.beleg;
+  eingabe.setAttribute("aria-label", "Beleg für " + feld.name);
+  zeile.append(eingabe);
+  const grund = el("p", "gf-grund");
+  zeile.append(grund);
+  const rechne = () => {
+    const ergebnis = pruefe(feld, eingabe.value);
+    urteil.className = "gf-urteil " + (ergebnis.ok ? "ok" : "weg");
+    urteil.textContent = ergebnis.ok ? "übernommen" : "verworfen";
+    grund.textContent = ergebnis.grund;
+  };
+  eingabe.addEventListener("input", rechne);
+  rechne();
+  gateListe.append(zeile);
+}
+})();
+</script>
