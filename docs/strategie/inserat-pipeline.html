@@ -299,7 +299,7 @@ pre i{color:var(--muted);font-style:normal}
   <p class="eyebrow">Strategiepapier · 10.09.2026 · nichts davon ist gebaut</p>
   <h1>Vom Inserat zum Flurstück</h1>
   <p class="lede col">Was heute aus einer Anzeige gelesen wird, wie der Suchlauf daraus ein
-  Flurstück macht, an welchen sechs Stellen er bricht, was Entfernungsangaben aus dem Inserat wirklich
+  Flurstück macht, an welchen acht Stellen er bricht, was Entfernungsangaben aus dem Inserat wirklich
   wert sind — und wie ein Modell als weiterer Kanal angebunden wird, ohne dass es je
   etwas entscheiden darf.</p>
   <div class="marken">
@@ -308,13 +308,14 @@ pre i{color:var(--muted);font-style:normal}
     <span class="marke stark">Entfernungsbänder</span>
     <span class="marke stark">Wertekatalog</span>
     <span class="marke stark">Modellanbindung</span>
-    <span class="marke">geprüft an 6 aufgezeichneten Inseraten</span>
+    <span class="marke">geprüft an 10 aufgezeichneten Inseraten</span>
   </div>
   <div class="kennzahlen">
     <div class="kz"><b>26</b><span>Angaben, die heute irgendwo gelesen werden</span></div>
     <div class="kz"><b>6</b><span>Felder im Extraktionsschema <code>InseratFelder</code></span></div>
     <div class="kz"><b>1</b><span>Wert aus dem Inserat, der im gespeicherten Grundstück landet</span></div>
     <div class="kz"><b>3</b><span>Rückwege, die der Suchlauf nicht hat</span></div>
+    <div class="kz"><b>1</b><span>falsch bestätigtes Flurstück, am 10.09.2026 live gemessen</span></div>
     <div class="kz"><b>19</b><span>Werte, die sich zusätzlich belegen ließen</span></div>
   </div>
 </header>
@@ -449,9 +450,11 @@ pre i{color:var(--muted);font-style:normal}
 
 <section id="bruchstellen">
   <p class="eyebrow">Teil 3</p>
-  <h2>Sechs Bruchstellen</h2>
-  <p class="lede col" style="margin-top:12px">Jede ist am Code oder an einem der sechs
-  aufgezeichneten Inserate nachgewiesen, nicht vermutet.</p>
+  <h2>Acht Bruchstellen</h2>
+  <p class="lede col" style="margin-top:12px">Jede ist am Code oder an einem der zehn
+  aufgezeichneten Inserate nachgewiesen, nicht vermutet. Die letzten beiden stammen aus
+  vier Läufen gegen das echte Kataster am 10.09.2026 — und die erste davon ist die
+  einzige Bruchstelle, die schon eine falsche Antwort erzeugt hat.</p>
 
   <div class="bruch">
     <article class="bs bs--hoch">
@@ -525,7 +528,7 @@ pre i{color:var(--muted);font-style:normal}
       <p>Gefiltert und bewertet wird ausschließlich über Attribute. Dabei liegt die Geometrie
       längst vor — jeder Kandidat kommt mit seinem Umring, Gebäudeumrisse liefert
       <code>ave:GebaeudeBauwerk</code> aus demselben Dienst.</p>
-      <p class="beleg">Ungenutzt in den sechs Inseraten: <q>Frontbreite ca. 26 m</q>,
+      <p class="beleg">Ungenutzt in den Inseraten: <q>Frontbreite ca. 26 m</q>,
       <q>am Ende eines Wendehammers</q>, <q>der direkt angrenzende Steingrundbach</q>,
       <q>verfügt lediglich über Garagen/Lagergebäude</q>.</p>
       <div class="fix"><b>Vorschlag</b>Vier weiche Merkmale, jedes aus vorhandenen Daten:
@@ -546,6 +549,51 @@ pre i{color:var(--muted);font-style:normal}
       <div class="fix"><b>Vorschlag</b>Ein Lauf führt Buch: jede Bedingung mit ihrer Antwort.
       Gleiche Bedingung wird nie zweimal gefragt, und eine Entscheidung nimmt nur den
       betroffenen Zweig wieder auf statt den ganzen Lauf.</div>
+    </article>
+
+    <article class="bs bs--hoch">
+      <div class="bs-kopf"><b>B7 · Bestätigung</b><span class="bs-grad">belegt</span></div>
+      <h3>Eine Bestätigung prüft nur die harten Filter — und hat schon danebengelegen</h3>
+      <p>Anzeige 3508042470, live gelaufen: Standortfeld „Leipzig – Knautkleeberg-Knauthain“,
+      Fließtext „Stadtteil Großzschocher“, 577 m² exakt. Der Lauf nimmt den Fließtext (0,60)
+      vor dem Standortfeld (0,35), findet in Gemarkung Großzschocher genau ein Flurstück
+      dieser Größe und sagt <b>bestätigt</b> — nach fünf Anfragen.</p>
+      <p class="beleg">Das bestätigte Flurstück 1538 misst <b>21,7 × 26,7 m</b>; das Inserat
+      nennt <q>etwa 14,00 Metern Breite und ca. 40,00 Metern Tiefe</q>. Seine Nutzung ist
+      <code>Weg;0.00|Landwirtschaft;577</code> und seine Lage „ohne Lage“ — bei einem
+      Grundstück mit massiver Garage und Einfriedung. In der Gemarkung, die das Standortfeld
+      nennt, liegt 436/2 Knautkleeberg: 17,3 × 34,1 m, <code>Wohnbaufläche;577</code>,
+      amtliche Lage „Wildentensteig 8, 10“.</p>
+      <p>Zwei Ursachen, beide klein: Die Ortszeile trägt keine Postleitzahl, also greift die
+      Ortsteil-Stelle nicht und „Knautkleeberg-Knauthain“ wird nicht in seine zwei
+      Gemarkungen zerlegt. Und weil die eine Lesung als <code>gemarkung</code> und die andere
+      als <code>gemeinde</code> ankommt, entsteht kein Konflikt — es gibt keine Frage,
+      obwohl es zwei Antworten gibt.</p>
+      <div class="fix"><b>Vorschlag</b>„Bestätigt“ verlangt, dass <em>nichts</em>
+      widerspricht, nicht nur dass die harten Filter genau einen übriglassen: Form gegen
+      genannte Maße, Nutzung gegen „Baugrundstück mit Garage“, Lage gegen die genannte
+      Straße. Jede dieser Proben ist gratis — die Werte kommen mit dem Flurstück. Und die
+      Ortszeile braucht eine Stelle für den Ortsteil auch ohne Postleitzahl.</div>
+    </article>
+
+    <article class="bs bs--hoch">
+      <div class="bs-kopf"><b>B8 · Verzeichnis</b><span class="bs-grad">belegt</span></div>
+      <h3>248 Gemarkungen sind unter ihrem eigenen Namen nicht auffindbar</h3>
+      <p>Das Verzeichnis führt 2 105 seiner 5 339 Einträge mit einem Flur-Zusatz:
+      „Kitzen Flur 1“ bis „Kitzen Flur 11“. Gesucht wird aber auf genaue Namensgleichheit —
+      aus gutem Grund, sonst findet „Grimma“ auch „Grimmaischer“. Also trifft „Kitzen“
+      keinen einzigen Eintrag, und der Ort wird als „steht nicht im sächsischen
+      Gemarkungsverzeichnis“ verworfen.</p>
+      <p class="beleg">Hinter den 2 105 Einträgen stehen 295 Grundnamen, und <b>248 davon
+      haben keinen gleichnamigen Eintrag ohne Zusatz</b> — Kitzen, Arzberg, Bad Düben,
+      Authausen. Gemessen an Anzeige 3495978117: Der Text sagt „Kitzen, ein idyllischer
+      Ortsteil der Stadt Pegau“, gesucht wurde in Gemarkung Pegau (dort: null), gefunden
+      wurde über den Umweg Gemeinde — sieben Anfragen für eine Antwort, die in der richtigen
+      Gemarkung zwei gekostet hätte.</p>
+      <div class="fix"><b>Vorschlag</b>Auf den Grundnamen abgleichen und alle Flure als
+      <em>eine</em> Ankermenge führen. Billiger noch, und am 10.09.2026 gegen den Dienst
+      geprüft: <code>PropertyIsLike(gemarkung, "Kitzen*")</code> wird angenommen — 2 062
+      Flurstücke, mit der exakten Fläche genau eines. Eine Anfrage statt elf.</div>
     </article>
   </div>
 </section>
@@ -724,6 +772,85 @@ pre i{color:var(--muted);font-style:normal}
     niemals filtern.</p>
   </div>
 
+  <h3 style="margin-top:34px">Was ist „die Stadt“?</h3>
+  <div class="col stack" style="margin-top:8px">
+    <p>„6 km bis Grimma“ kann den Stadtkern meinen oder das Ortsschild — und dazwischen
+    liegt mehr, als jede Toleranz abdeckt. Sechs Lesarten derselben Angabe, alle am
+    10.09.2026 gemessen, alle vom selben Flurstück aus:</p>
+  </div>
+  <div class="scroll" style="margin-top:14px">
+  <table>
+    <thead><tr><th>Lesart von „Grimma“</th><th class="n">Abstand 790/11 →</th><th>Woher</th></tr></thead>
+    <tbody>
+      <tr><td>Rand der Gemarkung Grimma</td><td class="n">1,22 km</td><td>ALKIS <code>ave:KatasterBezirk</code>, 21,50 km², 1 493 Stützpunkte</td></tr>
+      <tr><td>nächste Haltestelle mit „Grimma“ im Namen</td><td class="n">2,51 km</td><td>MOTIS <code>map/stops</code>, 65 Stück</td></tr>
+      <tr><td>Mitte der Gemarkung</td><td class="n">4,81 km</td><td>Schwerpunkt desselben Umrisses</td></tr>
+      <tr><td>Punkt des Geocoders (<code>PLACE</code>)</td><td class="n">5,34 km</td><td>Transitous</td></tr>
+      <tr class="gut"><td><b>Was das Inserat sagt</b></td><td class="n"><b>ca. 6 km</b></td><td>Fließtext</td></tr>
+      <tr><td>Fußweg zum Geocoder-Punkt</td><td class="n">6,54 km</td><td><code>one-to-many</code>, WALK</td></tr>
+      <tr><td>Autoroute zum Geocoder-Punkt</td><td class="n">7,37 km</td><td><code>one-to-many</code>, CAR</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="col stack" style="margin-top:16px">
+    <p><b>Faktor sechs zwischen der engsten und der weitesten Lesart.</b> Und die beiden
+    billigen Umrisse, die dieses Projekt ohne neue Datenquelle hätte, taugen beide nicht:</p>
+    <ul style="font-size:14px;color:var(--graphite)">
+      <li><b>Die Gemarkung ist keine Stadt.</b> Zu ihr gehören die Felder; ihr Rand reicht
+      bis auf 1,22 km an das Grundstück heran, während der Ort 5 km weit weg ist.</li>
+      <li><b>Die Haltestellenwolke auch nicht.</b> 65 Halte tragen „Grimma“ im Namen und
+      spannen 5,89 × 5,76 km auf — weil die Dörfer der Gemeinde nach ihr heißen. Großbothen
+      selbst gehört zu Grimma.</li>
+      <li><b>Die bebaute Ortslage wäre die richtige Fläche</b> (<code>landuse=residential</code>
+      aus OSM). Aus dieser Umgebung nicht messbar — Overpass hat dreimal die Verbindung
+      abgebrochen —, deshalb steht hier keine Zahl dafür.</li>
+    </ul>
+  </div>
+
+  <div class="zwei" style="margin-top:20px">
+    <div class="tafel stack-s">
+      <h4>Die Lesart wird nicht gewählt, sondern zugelassen</h4>
+      <pre>Ein Bezugsobjekt ist eine <b>Menge</b> S — ein Punkt, eine
+Punktwolke oder eine Fläche. dist(x, S) ist stets das
+<b>Minimum</b> über S.
+
+Ist unklar, ob Rand oder Mitte gemeint ist, wird nicht
+gewählt, sondern das ganze Intervall zugelassen:
+
+  Erfüllt(x)  ⟺  [ dist(x, ∂S) , dist(x, Mitte S) ]
+                 schneidet [ d/ϱ , d·(1+ε) ]
+
+Zeichnen: außen = Fläche um d·(1+ε) gepuffert,
+          innen = Kreis d/ϱ um die Mitte.
+Für einen Punkt fällt beides zusammen — der Ring von oben.</pre>
+      <p style="font-size:13px;color:var(--muted)">Die Breite kommt damit aus dem Umriss
+      und richtungsweise, statt aus einem pauschalen Aufschlag. Am Beispiel: Das Flurstück
+      hat zur Gemarkung Grimma das Intervall [1,22 · 4,81] km, die Angabe „6 km“ das Band
+      [4,62 · 7,50]. Sie überschneiden sich bei 4,62 bis 4,81 km — knapp, aber die Angabe
+      ist erfüllt. Auf den Rand allein gerechnet wäre das richtige Flurstück ausgeschieden.</p>
+    </div>
+    <div class="tafel stack-s">
+      <h4>Und welche Haltestelle?</h4>
+      <p style="font-size:13.5px;color:var(--graphite)">Meistens keine bestimmte, und das
+      ist kein Mangel, sondern eine andere Aussage: „Bus 0,3 km“ behauptet, <em>es gebe</em>
+      eine Haltestelle in 300 m. Sie gilt also für den nächstgelegenen Halt — und das ist
+      dieselbe Formel mit einer Punktwolke statt einem Punkt.</p>
+      <p style="font-size:13.5px;color:var(--graphite)">Gemessen um 790/11: nächste
+      Haltestelle 399 m (Wilhelm-Ostwald-Park, 950 m zu Fuß), zweitnächste 693 m. Die
+      Angabe trifft keine von beiden — was die Aussage nicht wertlos macht, aber ihre
+      Toleranz bestimmt.</p>
+      <p style="font-size:13.5px;color:var(--graphite)">Manchmal steht der Name aber da.
+      Anzeige 3495978117 nennt acht Entfernungen, drei davon zu <em>benannten</em> Punkten:
+      <q>Bushaltestelle „Kitzen“: ca. 300 m</q>, <q>Autobahnanschlussstelle A38
+      „Leipzig-Südwest“: ca. 3 km</q>, <q>Kita „Haus Sonnenschein“: ca. 1 km</q>. Dort ist
+      der Bezugspunkt eindeutig, und genau dort lohnt die Route.</p>
+      <p style="font-size:13px;color:var(--muted)">Die Klasse kommt aus dem Wort: „Bus“ →
+      alle Haltestellen, „EDEKA“ → Supermärkte, „Apotheke in Pegau“ → eine Klasse in einem
+      Ort. Je unbestimmter die Klasse, desto schwächer bindet die Angabe — und desto eher
+      ist sie nur etwas für die Karte.</p>
+    </div>
+  </div>
+
   <h3 style="margin-top:34px">Drei Unsicherheiten, ein Band</h3>
   <div class="zwei" style="margin-top:14px">
     <div class="tafel stack-s">
@@ -848,12 +975,14 @@ Richtung, in der eine Entfernungsangabe etwas beweist.</pre>
 
 <section id="gegenprobe">
   <p class="eyebrow">Teil 7</p>
-  <h2>Gegenprobe an sechs Inseraten</h2>
+  <h2>Gegenprobe an zehn Inseraten</h2>
   <div class="col stack" style="margin-top:14px">
-    <p>Dieselben sechs aufgezeichneten Anzeigen, gegen die auch die Tests laufen
+    <p>Zehn aufgezeichnete Anzeigen, gegen die auch die Tests laufen
     (<code>backend/tests/fixtures/inserate-sachsen.json</code>). Die Spalte „heute“ ist
-    kein Modell des Laufs, sondern der Leser, wie er heute ist: Die Indizien in ihr wurden
-    am 10.09.2026 mit <code>collect_indicia</code> auf genau diesen Texten erzeugt.</p>
+    kein Modell des Laufs: Bei den ersten sechs wurden die Indizien am 10.09.2026 mit
+    <code>collect_indicia</code> auf genau diesen Texten erzeugt, die letzten vier sind
+    am selben Tag vollständig gegen das <b>echte Kataster</b> gelaufen — mit dem Urteil
+    und der Anfragenzahl, die dabei herauskamen.</p>
   </div>
   <div class="scroll" style="margin-top:18px">
   <table>
@@ -918,15 +1047,62 @@ Richtung, in der eine Entfernungsangabe etwas beweist.</pre>
         <td>Nichts. Der Kontrollfall bleibt der Beweis, dass ein Lauf auch nichts finden
         können muss.</td>
       </tr>
+      <tr>
+        <td><b>Lützen · Kreischau</b><br><span class="mono" style="font-size:11.5px;color:var(--muted)">3407135600 · 829 m²</span></td>
+        <td>keines<br><small>Sachsen-Anhalt</small></td>
+        <td><b>erfolglos, 0 Anfragen.</b> Der Bundesland-Filter greift vor der ersten
+        Abfrage — richtig. Zwei Dinge liest der Leser trotzdem nicht: die vollständige
+        Adresse <q>Platz des 21. September 33, 06686 Lützen, Ortsteil Kreischau</q>, weil
+        das Gattungswort vorn steht, und den Preis — die Attributliste sagt 100 €, gemeint
+        ist das <q>Mindestgebot: 100,00 Euro/m²</q>, also 82 900 €.</td>
+        <td>Straßennamen mit vorangestelltem Typ (B4) und eine Preisprobe: 100 € auf 829 m²
+        sind 12 Cent je m², ein Wert, den kein Bodenrichtwert trägt.</td>
+      </tr>
+      <tr>
+        <td><b>Pegau · Kitzen</b><br><span class="mono" style="font-size:11.5px;color:var(--muted)">3495978117 · 1 112 m²</span></td>
+        <td>25/24<br>Kitzen Flur 2</td>
+        <td><b>bestätigt, 7 Anfragen</b> — über den Umweg Gemeinde. Der richtige Ort steht
+        im Text (<q>Kitzen, ein idyllischer Ortsteil der Stadt Pegau</q>), wird aber zweimal
+        verfehlt: die Beziehung steht hinter dem Namen (B3), und „Kitzen“ ist im Verzeichnis
+        nur als „Kitzen Flur 1…11“ geführt (B8). Dazu „Siedlungsstraße“ als Straßenname (B4).</td>
+        <td>Zwei Anfragen statt sieben. Und die reichhaltigste Entfernungsliste im Korpus —
+        acht Angaben, drei davon zu benannten Punkten — wird zeichenbar.</td>
+      </tr>
+      <tr>
+        <td><b>Leipzig · Großzschocher</b><br><span class="mono" style="font-size:11.5px;color:var(--muted)">3508042470 · 577 m²</span></td>
+        <td>unklar<br><small>siehe B7</small></td>
+        <td><b>bestätigt, 5 Anfragen — und vermutlich falsch.</b> Flurstück 1538 misst
+        21,7 × 26,7 m gegen die genannten 14 × 40 m, ist Landwirtschaft und „ohne Lage“.
+        436/2 in Knautkleeberg — der Gemarkung aus dem Standortfeld — ist 17,3 × 34,1 m,
+        Wohnbaufläche, „Wildentensteig 8, 10“.</td>
+        <td>Ortsteil-Stelle auch ohne Postleitzahl, damit die drei Gemarkungen alle
+        angefragt werden; Formprobe gegen die genannten Maße. Ergebnis wäre „mehrdeutig“
+        mit vier Kandidaten zur Auswahl — die richtige Antwort.</td>
+      </tr>
+      <tr>
+        <td><b>Neukieritzsch · Lobstädt</b><br><span class="mono" style="font-size:11.5px;color:var(--muted)">3508590896 · 1 000 m²</span></td>
+        <td>unbekannt</td>
+        <td><b>mehrdeutig, 13 Kandidaten, 6 Anfragen.</b> Der Text nennt nur „in Lobstädt“
+        und sonst nichts Prüfbares — keine Straße, keine Maße, keine Nummer. In der
+        Gemarkung Lobstädt gibt es kein Flurstück von 1 000 m², in der Gemeinde dreizehn.
+        Die zwölf Bilder tragen keine lesbare Katasterangabe: über die dreißig Bilder dieser
+        drei Anzeigen fand die Texterkennung in 85 s <b>keine einzige</b>.</td>
+        <td>Nichts, was die Suche ändern könnte — dieser Fall ist der Beleg dafür, dass ein
+        Modell und ein Blick ins Bild eigene Kanäle brauchen. Was hilft, ist die Nachfrage:
+        13 Kandidaten sind eine Liste, die ein Mensch in Sekunden entscheidet.</td>
+      </tr>
     </tbody>
   </table>
   </div>
   <div class="merk merk--gruen col" style="margin-top:20px">
-    <p><b>Ergebnis der Gegenprobe:</b> Vier von fünf sächsischen Inseraten löst der heutige
-    Lauf richtig, eines nur über die Texterkennung. Der Vorschlag verändert keines dieser
-    Ergebnisse — er nimmt zwei Sonderfälle in die Regel auf und macht die Fälle sicher, die
-    in dieser Stichprobe nicht vorkommen: eine falsche Nummer, zwei Nummern auf Bildern,
-    ein Ort, dessen Beziehung hinter dem Namen steht.</p>
+    <p><b>Ergebnis der Gegenprobe:</b> Von acht sächsischen Anzeigen löst der heutige Lauf
+    fünf richtig, eine nur über die Texterkennung, eine bleibt offen — und eine bestätigt
+    das falsche Flurstück. Beide Anzeigen außerhalb Sachsens werden korrekt abgewiesen.</p>
+    <p>Bemerkenswert ist, <em>wo</em> es gut geht: Zweimal rettet der Umweg über die
+    Gemeinde einen Lauf, dessen Ortsangabe im Text stand und nicht gelesen wurde. Die
+    Vorschläge aus Teil 3 verändern kein einziges richtiges Ergebnis — sie machen die
+    Umwege überflüssig, die eine Antwort und fünf Anfragen kosten, und sie ziehen die eine
+    falsche Bestätigung zurück auf „mehrdeutig mit vier Kandidaten“.</p>
   </div>
 </section>
 
@@ -934,7 +1110,7 @@ Richtung, in der eine Entfernungsangabe etwas beweist.</pre>
   <p class="eyebrow">Teil 8</p>
   <h2>Was sich zusätzlich belegen ließe</h2>
   <div class="col stack" style="margin-top:14px">
-    <p>Neunzehn Werte, jeder mit einem wörtlichen Beleg aus einem der sechs aufgezeichneten
+    <p>Neunzehn Werte, jeder mit einem wörtlichen Beleg aus einem der aufgezeichneten
     Inserate — nichts davon ist ausgedacht, und nichts davon wird heute erfasst. Getrennt
     danach, wozu sie taugen: die Suche schärfen, die Bewertung tragen, oder nur gezeigt und
     geprüft werden.</p>
@@ -1077,10 +1253,14 @@ Richtung, in der eine Entfernungsangabe etwas beweist.</pre>
   <div class="stufen">
     <div class="st">
       <span class="st-nr">Stufe 1</span>
-      <div class="st-was"><h4>Beziehung nach rechts lesen, Straßennamen gegen das Kataster</h4>
-        <p>Prädikative Muster („X ist ein Ortsteil von Y“) und Lagebezeichnungen ohne Suffix.
-        Behebt B3 und B4 und macht das Borna-Inserat unabhängig von der Bilderkennung.</p></div>
-      <span class="st-mass">klein · kein Risiko<br>Prüffall 2418686487</span>
+      <div class="st-was"><h4>Namen richtig lesen: Beziehung, Straße, Gemarkung</h4>
+        <p>Drei kleine Leserkorrekturen mit je einem Prüffall: prädikative Muster („X ist
+        ein Ortsteil von Y“, B3), Lagebezeichnungen mit vorangestelltem Gattungswort („Am
+        Kurpark“, „Platz des 21. September“, B4) und der Abgleich auf den Grundnamen einer
+        Gemarkung, damit die 248 Namen mit Flur-Zusatz auffindbar werden (B8). Macht das
+        Borna-Inserat unabhängig von der Bilderkennung und das Pegau-Inserat vom Umweg über
+        die Gemeinde.</p></div>
+      <span class="st-mass">klein · kein Risiko<br>Prüffälle 2418686487,<br>3495978117, 3407135600</span>
     </div>
     <div class="st">
       <span class="st-nr">Stufe 2</span>
@@ -1092,11 +1272,13 @@ Richtung, in der eine Entfernungsangabe etwas beweist.</pre>
     </div>
     <div class="st">
       <span class="st-nr">Stufe 3</span>
-      <div class="st-was"><h4>Widerspruch wird ein Zweig</h4>
+      <div class="st-was"><h4>Widerspruch wird ein Zweig, Bestätigung wird streng</h4>
         <p>Die Schwelle kommt aus der Toleranz-Treppe statt aus Faktor 2, und ein
-        widersprochener Nummerntreffer öffnet den Flächenweg, statt ihn zu blockieren.
-        Behebt B1 — die einzige Bruchstelle, die heute eine falsche Bestätigung erzeugen
-        kann.</p></div>
+        widersprochener Nummerntreffer öffnet den Flächenweg, statt ihn zu blockieren (B1).
+        Dazu die schärfere Regel für das Urteil: „bestätigt“ heißt, dass <em>nichts</em>
+        widerspricht — auch nicht die Form, die Nutzung oder die Lagebezeichnung (B7).
+        Zusammen sind das die beiden Stellen, an denen heute eine falsche Bestätigung
+        entstehen kann; eine davon ist gemessen.</p></div>
       <span class="st-mass">mittel · berührt <code>narrow()</code></span>
     </div>
     <div class="st">
@@ -1111,8 +1293,10 @@ Richtung, in der eine Entfernungsangabe etwas beweist.</pre>
     <div class="st st--spaeter">
       <span class="st-nr">Stufe 5</span>
       <div class="st-was"><h4>Geometrische Merkmale</h4>
-        <p>Frontbreite, Straßenberührung, Bebauung, Gewässergrenze — alle vier aus Daten,
-        die der Lauf ohnehin holt. Weiche Merkmale, die nur ordnen.</p></div>
+        <p>Frontbreite, genannte Maße, Straßenberührung, Bebauung, Gewässergrenze — alle
+        aus Daten, die der Lauf ohnehin holt. Weiche Merkmale, die ordnen; ihr Einspruch
+        gegen eine Bestätigung gehört zu Stufe 3. Das kleinste umschließende Rechteck ist
+        dafür schon implementiert — es beschreibt in der App bereits jedes Grundstück.</p></div>
       <span class="st-mass">mittel · neue Merkmale in <code>scoring.py</code></span>
     </div>
     <div class="st st--spaeter">
@@ -1133,10 +1317,13 @@ Richtung, in der eine Entfernungsangabe etwas beweist.</pre>
     </div>
   </div>
   <div class="merk col" style="margin-top:22px">
-    <p><b>Der Prüfkorpus ist die eigentliche Investition.</b> Sechs Anzeigen mit bekannter
-    Lösung sind wenig, und sie decken genau die Fälle nicht ab, gegen die hier gebaut wird:
-    eine falsch abgetippte Nummer, zwei Katasterauszüge, ein Ort ohne Gemarkung. Jede Stufe
-    sollte ihren Fall mitbringen — aufgezeichnet, nicht erfunden.</p>
+    <p><b>Der Prüfkorpus ist die eigentliche Investition.</b> Zehn Anzeigen sind wenig, und
+    von vier davon ist die Lösung nicht unabhängig bekannt — bei einer widerspricht sie sich
+    sogar selbst. Was fehlt, sind weiterhin: eine falsch abgetippte Nummer, zwei
+    Katasterauszüge in einer Anzeige, ein bestätigter Fehltreffer mit nachgeprüfter Wahrheit.
+    Jede Stufe sollte ihren Fall mitbringen — aufgezeichnet, nicht erfunden. Und die vier
+    neuen Anzeigen haben in einem Nachmittag drei Bruchstellen gefunden, die sechs alte nicht
+    gezeigt hatten.</p>
   </div>
 </section>
 
@@ -1145,7 +1332,8 @@ Richtung, in der eine Entfernungsangabe etwas beweist.</pre>
   heutige Lauf ist in Teil 2 und Teil 6 so beschrieben, wie er am 10.09.2026 im Code steht.
   Die Messwerte stammen aus <code>docs/research/flurstueck-identifikation.md</code> und den
   Notizen in <code>CLAUDE.md</code>; die Indizien in Teil 6 wurden für dieses Dokument mit
-  <code>collect_indicia</code> auf den sechs aufgezeichneten Anzeigen neu erzeugt.</p>
+  <code>collect_indicia</code> auf den zehn aufgezeichneten Anzeigen neu erzeugt, und die
+  vier neuen Anzeigen liefen vollständig gegen das echte Kataster.</p>
   <p style="margin-top:10px">Anschluss an die vier bestehenden Strategieseiten:
   <code>fall-grossbothen.html</code> (der Fall), <code>extraktion-prompting.html</code>
   (die Leiter bis zum Modell), <code>suche-triangulation.html</code> (Filter und Gewichte),
