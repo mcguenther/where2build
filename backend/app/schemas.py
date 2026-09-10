@@ -181,7 +181,13 @@ Extraktionsweg = Literal["meta-tags", "llm", "eingefuegter-text"]
 
 class ListingExtractRequest(BaseModel):
     url: HttpUrl | None = None
-    text: str | None = Field(default=None, max_length=400_000)
+    # A pasted page, or a whole document handed over by the bookmarklet. The
+    # cap was 400 000 while the clipboard was the only way in; a portal's
+    # `document.documentElement.outerHTML` runs past a megabyte, and there is
+    # no safe place to cut it -- JSON-LD is routinely the last thing in the
+    # body. `PASTE_LIMIT` in the wizard is the same number, and nginx needs a
+    # `client_max_body_size` above it.
+    text: str | None = Field(default=None, max_length=3_000_000)
 
     @model_validator(mode="after")
     def _url_or_text(self) -> "ListingExtractRequest":
@@ -1189,6 +1195,12 @@ class Indiz(BaseModel):
     # a reading has to be *chosen*, the image travels with it and the choice is
     # made against the sheet rather than against a transcription of it.
     bild_url: str | None = None
+    # The compound place name this district was taken out of, where it was one.
+    # „Burghausen-Rückmarsdorf“ is no Gemarkung and both its halves are, so the
+    # two readings are one statement admitting two districts -- not a
+    # contradiction, and never a question. Same rule as several parcel numbers
+    # from one source, which are a plot rather than a dispute.
+    teil_von: str | None = None
 
 
 class Konflikt(BaseModel):

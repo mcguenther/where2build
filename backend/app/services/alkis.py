@@ -704,6 +704,89 @@ class AlkisService:
         )
         return parse_feature_collection(await self._post(body))
 
+    async def districts_around(
+        self, lat: float, lon: float, radius_m: float
+    ) -> list[KatasterBezirk]:
+        """The cadastral districts whose outline meets a box around a point.
+
+        This is what turns a place a listing names into anchors the cadastre can
+        be asked about, and it closes the gap a Stadtteil leaves: a city
+        district is usually *not* a Gemarkung. „Grünau-Siedlung" in Leipzig is
+        none, and the two Saxon Gemarkungen called „Grünau" are 80 km away in
+        the Erzgebirge — so reading the name as a district anchors the search in
+        the wrong half of the state, which is why `collect_indicia` refuses a
+        bare place name at all.
+
+        Measured 09.09.2026, one request each:
+
+        * around Grünau-Siedlung — Lausen, Schönau, Großzschocher,
+          Kleinzschocher. Four anchors against Stadt Leipzig's 76, and with the
+          listing's exact 742 m² they leave 3 candidates where the Gemeinde
+          alone leaves 24.
+        * around the Kleinanzeigen pin of the Lobstädt advert, the one measured
+          6 235 m from the parcel actually offered: ±1500 m gives 8 districts
+          and Lobstädt is among them; ±3000 m gives 23; ±7000 m gives 69.
+
+        The trade is therefore reliability against set size, and it is safe in
+        one direction only — which is what makes it usable at all. A box too
+        small to contain the plot's district means every anchor counts zero and
+        the run reports that it found nothing. It cannot produce a *wrong*
+        parcel, only no parcel, so the radius may be chosen without a corpus.
+
+        `art` is filtered here rather than in the request: a WFS GET cannot
+        carry a BBOX and a filter at once. The outlines come back either way --
+        `ave:KatasterBezirk` will not drop its geometry, about 5 kB a district --
+        which is the reason this is asked around a point and never for a state.
+        """
+
+        easting, northing = geo.wgs84_to_utm33(lon, lat)
+        params = {
+            "SERVICE": "WFS",
+            "VERSION": self.settings.version,
+            "REQUEST": "GetFeature",
+            "TYPENAMES": "ave:KatasterBezirk",
+            "SRSNAME": self._crs_urn,
+            "BBOX": (
+                f"{easting - radius_m},{northing - radius_m},"
+                f"{easting + radius_m},{northing + radius_m},{self._crs_urn}"
+            ),
+            "COUNT": str(self.settings.max_features),
+        }
+        xml = await self._get(params)
+        try:
+            root = ElementTree.fromstring(xml)
+        except ElementTree.ParseError as exc:
+            raise UpstreamError(
+                f"{SERVICE_NAME} hat kein gültiges GML geliefert. {ADVICE}"
+            ) from exc
+        default_srs = root.get("srsName")
+        found: list[KatasterBezirk] = []
+        seen: set[str] = set()
+        for element in root.iter():
+            if _local(element.tag) != "KatasterBezirk":
+                continue
+            values = {
+                _local(child.tag): (child.text or "").strip()
+                for child in element
+                if child.text
+            }
+            # A Flur is a subdivision, not a container the search can filter by.
+            if values.get("art") != "Gemarkung":
+                continue
+            key = values.get("schluessel")
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            found.append(
+                KatasterBezirk(
+                    schluessel=key,
+                    name=values.get("name") or None,
+                    gemeinde=values.get("gemeinde") or None,
+                    geometry=_parse_geometry(element, default_srs),
+                )
+            )
+        return found
+
     async def district_outline(self, schluessel: str) -> KatasterBezirk | None:
         """One cadastral district with its boundary, for the map.
 

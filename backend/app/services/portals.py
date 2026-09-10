@@ -25,6 +25,12 @@ from ..errors import BadRequestError, UpstreamError
 from ..settings import AppSettings
 from ..upstream import request
 from .llm import domain_of
+from .portal_fields import (
+    location_line,
+    read_area_m2,
+    read_location,
+    read_price_eur,
+)
 
 SERVICE_NAME = "Die Anzeigenseite"
 ADVICE = (
@@ -37,9 +43,12 @@ ADVICE = (
 BLOCKED_DOMAINS = {"immobilienscout24.de"}
 
 PASTE_HINT = (
-    "immobilienscout24.de lässt keinen Serverabruf zu (HTTP 401, live bestätigt "
-    "am 29.08.2026). Bitte die Anzeige im Browser öffnen, den Seiteninhalt "
-    "kopieren und in das Einfügefeld einsetzen."
+    "immobilienscout24.de lässt keinen Serverabruf zu und antwortet mit „Ich bin "
+    "kein Roboter“ (HTTP 401, zuletzt bestätigt am 09.09.2026). Der Weg führt über "
+    "„Seite einfügen“: dort einmal das Lesezeichen einrichten, dann schickt ein "
+    "Klick auf der Anzeigenseite sie vollständig herüber. Ohne Lesezeichen die "
+    "Seite kopieren und einfügen — Fläche, Preis und Beschreibung kommen mit, die "
+    "Meta-Angaben nicht."
 )
 
 _META_PATTERN = re.compile(r"<meta\b[^>]*>", re.IGNORECASE)
@@ -218,6 +227,12 @@ def german_number(raw: str) -> float | None:
         return None
 
 
+def _area_of(angaben: dict[str, str]) -> str | None:
+    """Whether an area was already read, whatever it looks like."""
+
+    return angaben.get("Grundstücksfläche") or None
+
+
 def parse_price(html: str) -> int | None:
     """The asking price in euro, from whichever of the four spellings is there."""
 
@@ -306,6 +321,189 @@ class Seite:
         return self.lat is not None and self.lon is not None
 
 
+# ---------------------------------------------------------------------------
+# immobilienscout24.de
+#
+# Its own field names, kept together in one place so they can be re-derived
+# from a fresh recording without touching anything around them. Read off
+# `tests/fixtures/inserat-immoscout.html` (advert 167953918, Grünau-Siedlung
+# in Leipzig, 09.09.2026) and every one of them is asserted against that file
+# in `tests/test_portals.py`. When the portal renames something, the failing
+# test says which name, and only this block changes.
+#
+# Two shapes arrive and they are not the same page:
+#
+#   * **The whole document**, handed over by the bookmarklet. Its analytics
+#     block carries the plot area, the price, the Bundesland, the Kreis and the
+#     Ortsteil as *separate fields* — `obj_lotArea: "742"`, `geo_bln: "sachsen"`,
+#     `geo_krs: "leipzig"`, `obj_regio4: "Grünau_Siedlung"`. That is better than
+#     the same numbers read out of prose: the title hedges („ca. 742 m²") where
+#     the field states 742, and the Bundesland is the cheapest hard filter the
+#     search has. Same block twice, in `keyValues` and in `<s24-ad-targeting>`.
+#   * **The body alone**, out of the clipboard. The same numbers as rendered
+#     text in the portal's own `is24qa-*` elements, which survive a selection.
+#
+# What is deliberately *not* read: the coordinate. `exposeMap` carries one
+# (51.30595, 12.27605) next to `showFullAddress: false` and `isFullAddress:
+# false` — it is the *quarter's* point, not the plot's, the same class of thing
+# as Kleinanzeigen's municipality pin that measured 6 235 m from the parcel
+# actually offered. This app treats a coordinate as a locator and resolves the
+# parcel under it, so a quarter centroid is worse than no coordinate at all.
+# It is taken only when the portal says the address is complete.
+_IS24_MARKER = re.compile(r"IS24\.expose\s*=|is24qa-|immobilienscout24\.de/expose", re.IGNORECASE)
+
+# The analytics block: `"name":"value"`, present in the whole document only.
+def _is24_field(name: str) -> re.Pattern[str]:
+    return re.compile(rf'"{name}"\s*:\s*"([^"]*)"')
+
+_IS24_AREA = _is24_field("obj_lotArea")
+_IS24_PRICE = _is24_field("obj_purchasePrice")
+_IS24_STATE = _is24_field("obj_regio1")
+_IS24_ADDRESS = _is24_field("zipRegionAndCountry")
+_IS24_FULL_ADDRESS = re.compile(r'"?isFullAddress"?\s*:\s*(true|false)', re.IGNORECASE)
+_IS24_COORDINATE = re.compile(
+    r'"latitude"\s*:\s*(-?\d+(?:\.\d+)?)\s*,\s*"coordinateAvailable"\s*:\s*true'
+    r'[^}]*?"longitude"\s*:\s*(-?\d+(?:\.\d+)?)'
+)
+# The picture the gallery would show at full size, largest variant of each.
+_IS24_IMAGE = re.compile(r'"fullSizePictureUrl"\s*:\s*"([^"]+)"')
+
+# The rendered body, which is all a clipboard copy brings.
+# `(?![-\w])` is load-bearing: every value element has a `…-label` sibling
+# carrying the same class plus a suffix, and it comes first in the document.
+# Without the guard the label matched and `.*?</dd>` swallowed through to the
+# value, so the area read „Grundstücksfläche ca. 742 m²" — label and all.
+_IS24_BODY_AREA = re.compile(
+    r'class="[^"]*is24qa-grundstueck-ca(?![-\w])[^"]*"[^>]*>(.*?)</dd>',
+    re.IGNORECASE | re.DOTALL,
+)
+_IS24_BODY_PRICE = re.compile(
+    r'class="[^"]*is24qa-kaufpreis(?![-\w])[^"]*"[^>]*>(.*?)</dd>',
+    re.IGNORECASE | re.DOTALL,
+)
+_IS24_BODY_ADDRESS = re.compile(
+    r'class="[^"]*address-text[^"]*"[^>]*>(.*?)</span>', re.IGNORECASE | re.DOTALL
+)
+# Both description blocks: the object's own text and the one about the area.
+# The search reads the district, the street and the relation between the places
+# named out of exactly these two.
+_IS24_BODY_PROSE = re.compile(
+    r'class="[^"]*expose-(?:description-body|location-description)[^"]*"[^>]*>(.*?)</span>',
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def is_immoscout(html: str) -> bool:
+    """Whether this markup is an ImmoScout24 exposé, whole or body only."""
+
+    return bool(_IS24_MARKER.search(html))
+
+
+def _json_string(name: str, html: str) -> str | None:
+    """One JSON string value out of an inline script, escapes and all.
+
+    `objectDescription` carries its paragraph breaks as `\n` inside the JSON,
+    so the value has to be decoded rather than sliced out -- otherwise the
+    prose reaches the search as one line with literal backslash-n in it, and
+    the sentence boundaries the reader keys on are gone.
+    """
+
+    match = re.search(rf'"{name}"\s*:\s*"((?:[^"\\]|\\.)*)"', html)
+    if not match:
+        return None
+    try:
+        return json.loads(f'"{match.group(1)}"')
+    except ValueError:
+        return None
+
+
+def _clean(markup: str) -> str:
+    """The text of one element: tags, comments and runs of space removed.
+
+    React separates adjacent text nodes with an empty comment, so the address
+    line really is `<span> <!-- -->Grünau-Siedlung, 04207 Leipzig</span>`.
+    """
+
+    without_comments = re.sub(r"<!--.*?-->", "", markup, flags=re.DOTALL)
+    text = html_module.unescape(_TAG_PATTERN.sub(" ", without_comments))
+    return " ".join(text.split())
+
+
+def parse_immoscout(html: str) -> dict[str, Any]:
+    """What an ImmoScout24 exposé gives up, from whichever shape arrived.
+
+    The whole document first, because its fields are structured; the rendered
+    body second, because that is all a paste has. Only keys that were actually
+    found are returned, so a caller can overlay this on the generic pass.
+    """
+
+    found: dict[str, Any] = {}
+
+    # --- the whole document
+    area = _IS24_AREA.search(html)
+    price = _IS24_PRICE.search(html)
+    address = _IS24_ADDRESS.search(html)
+    state = _IS24_STATE.search(html)
+    if area:
+        found["flaeche"] = f"{area.group(1)} m²"
+    if price:
+        found["kaufpreis_eur"] = int(float(price.group(1)))
+    if address:
+        # The Bundesland is not in the page's own address line, and it is the
+        # cheapest hard filter the search has -- ALKIS is state-specific, so a
+        # plot in Sachsen-Anhalt has no Saxon Flurstück. Composed from the
+        # portal's two fields, not written.
+        parts = [address.group(1)] + ([state.group(1)] if state else [])
+        found["adresse"] = ", ".join(part for part in parts if part)
+
+    prose = [
+        text
+        for text in (_json_string("objectDescription", html), _json_string("locationDescription", html))
+        if text
+    ]
+    if prose:
+        found["beschreibung"] = "\n\n".join(prose)
+
+    pictures: list[str] = []
+    for url in _IS24_IMAGE.findall(html):
+        if url not in pictures:
+            pictures.append(url)
+    if pictures:
+        found["bilder"] = pictures[:_IMAGE_LIMIT]
+
+    complete = _IS24_FULL_ADDRESS.search(html)
+    coordinate = _IS24_COORDINATE.search(html)
+    if coordinate and complete and complete.group(1).lower() == "true":
+        found["lat"] = float(coordinate.group(1))
+        found["lon"] = float(coordinate.group(2))
+
+    # --- the body alone, for whatever the document did not answer
+    if "flaeche" not in found:
+        body_area = _IS24_BODY_AREA.search(html)
+        if body_area:
+            found["flaeche"] = _clean(body_area.group(1))
+    if "kaufpreis_eur" not in found:
+        body_price = _IS24_BODY_PRICE.search(html)
+        if body_price:
+            value = german_number(_clean(body_price.group(1)))
+            if value is not None and 0 < value < 100_000_000:
+                found["kaufpreis_eur"] = int(round(value))
+    if "adresse" not in found:
+        body_address = _IS24_BODY_ADDRESS.search(html)
+        if body_address:
+            found["adresse"] = _clean(body_address.group(1)) or None
+    if "beschreibung" not in found:
+        blocks = [_clean(block) for block in _IS24_BODY_PROSE.findall(html)]
+        # „Wir machen die obigen Angaben nach bestem Wissen …" is the agent's
+        # disclaimer, not a statement about the plot. Anything short is a
+        # heading or a legal note; the two texts the search wants are long.
+        long_enough = [block for block in blocks if len(block) > 120]
+        if long_enough:
+            found["beschreibung"] = "\n\n".join(long_enough)
+
+    return {name: value for name, value in found.items() if value not in (None, "", [])}
+
+
 def parse_page(url: str, html: str) -> Seite:
     """Deterministic pass over the HTML: meta tags first, then JSON-LD."""
 
@@ -322,7 +520,7 @@ def parse_page(url: str, html: str) -> Seite:
     postal = meta.get("og:postal-code")
     address_parts = [part for part in (street, postal, locality) if part]
 
-    return Seite(
+    seite = Seite(
         url=url,
         text=html_to_text(html),
         meta=meta,
@@ -336,6 +534,38 @@ def parse_page(url: str, html: str) -> Seite:
         bilder=parse_images(html),
         kaufpreis_eur=parse_price(html),
     )
+
+    # A portal that names its own fields beats every generic pattern, so its
+    # answers are laid over the pass above rather than merged into it. The
+    # generic ones stay underneath for whatever the portal block did not find.
+    if is_immoscout(html):
+        read = parse_immoscout(html)
+        if "flaeche" in read:
+            seite.angaben = {**seite.angaben, "Grundstücksfläche": read["flaeche"]}
+        for name in ("adresse", "beschreibung", "kaufpreis_eur", "lat", "lon", "bilder"):
+            if name in read:
+                setattr(seite, name, read[name])
+        # `og:description` is the portal's own summary line („742 qm -
+        # Grünau-Siedlung"), which is not prose the search can read a relation
+        # out of. Better nothing than that.
+        if "beschreibung" not in read and seite.beschreibung == meta.get("og:description"):
+            seite.beschreibung = None
+
+    # The floor: whatever nothing above answered is read without knowing the
+    # portal at all — the label and the value's unit, wherever on the page they
+    # stand. That is what makes an unrecorded portal usable instead of refused.
+    # Only gaps are filled, because a portal's own field or a meta tag is a
+    # statement while this is a reading.
+    if not _area_of(seite.angaben):
+        area = read_area_m2(html)
+        if area is not None:
+            seite.angaben = {**seite.angaben, "Grundstücksfläche": f"{area} m²"}
+    if seite.kaufpreis_eur is None:
+        seite.kaufpreis_eur = read_price_eur(html)
+    if not seite.adresse:
+        seite.adresse = location_line(read_location(html))
+
+    return seite
 
 
 async def fetch_page(url: str, app_settings: AppSettings) -> Seite:

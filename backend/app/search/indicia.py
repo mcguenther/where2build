@@ -120,6 +120,12 @@ _RELATION_PATTERNS: tuple[tuple[Ortsbeziehung, re.Pattern[str]], ...] = (
 # How much of the sentence before a name is searched for a relation trigger.
 _RELATION_WINDOW = 60
 
+# Which relations make a named place worth a request. „erwaehnt“ deliberately
+# does not: a place the text merely contains is not a statement about where the
+# plot is, and in German -- where every noun is capitalised -- it is as likely
+# to be the word „Wiesen“ as the Gemarkung of that name.
+ANCHORING = ("liegt_in", "liegt_an", None)
+
 # A place name, as German writes one.
 _NAME = r"[A-ZÄÖÜ][\wäöüßÄÖÜ\-]{2,}(?:[ -][A-ZÄÖÜ][\wäöüßÄÖÜ\-]+)?"
 
@@ -151,10 +157,33 @@ _OT_PLAIN_RE = re.compile(
     rf"(?P<municipality>{_NAME})",
 )
 
-# The platform's location field: „04827 Sachsen - Machern“, „04668 Sachsen –
-# Grimma“. The municipality is the tail, and it is the cheapest way there is to
-# tell two districts of the same name apart.
-_LOCALITY_RE = re.compile(rf"(?:^|[-–—])\s*(?P<municipality>{_NAME})\s*$")
+# The platform's location field, read around its postcode. Five digits are the
+# one unambiguous token in a German location line, and the three portals
+# recorded put everything else in three different orders around them:
+#
+#     Burghausen-Rückmarsdorf, 04178 Leipzig, Sachsen   ImmoScout
+#     04668 Sachsen – Grimma                            Kleinanzeigen
+#     Maschinenhausstraße, 01587 Riesa, Sachsen         ohne-makler
+#
+# Behind the postcode stands the municipality — unless that slot holds the
+# Bundesland, in which case the municipality is behind the dash. That is the
+# cheapest way there is to tell two districts of the same name apart, and the
+# field is reliable about it even though its coordinate is not: the pin sits
+# 6 235 m out *because* it is the municipality's geocode, so the name it was
+# geocoded from is exactly the part that holds.
+#
+# In front of the postcode stands the district the portal names, where it names
+# one — ImmoScout puts its Ortsteil there. ohne-makler puts a street there
+# instead, which is why the head only counts when the directory knows it.
+_LOCALITY_RE = re.compile(
+    rf"(?:(?P<district>{_NAME})\s*[,;]\s*)?"
+    rf"(?<!\d)(?P<plz>\d{{5}})(?!\d)[\s,]*(?P<tail>{_NAME})?"
+    rf"(?:\s*[-–—]\s*(?P<behind>{_NAME}))?"
+)
+# The same field without its postcode — „Sachsen - Machern“, which is the shape
+# the recorded adverts carry. Then the municipality is simply the tail, and
+# there is no slot a district could stand in.
+_LOCALITY_TAIL_RE = re.compile(rf"(?:^|[-–—])\s*(?P<tail>{_NAME})\s*$")
 
 # The same field names the *federal state*, and that is the one statement in a
 # listing this tool can be certain it cannot serve. ALKIS is state-specific, so
@@ -420,6 +449,7 @@ def _indiz(
     schluessel: str | None = None,
     beziehung: Ortsbeziehung | None = None,
     sicherheit: float | None = None,
+    teil_von: str | None = None,
 ) -> Indiz:
     counter[0] += 1
     return Indiz(
@@ -432,6 +462,7 @@ def _indiz(
         sicherheit=confidence(quelle) if sicherheit is None else sicherheit,
         schluessel=schluessel,
         beziehung=beziehung,
+        teil_von=teil_von,
     )
 
 
@@ -447,6 +478,41 @@ def _district_matches(
 
     needle = fold(name)
     return [entry for entry in directory.entries if fold(entry.name) == needle]
+
+
+def _districts_in_compound(
+    directory: GemarkungDirectory, name: str, municipality: str | None
+) -> list[GemarkungEntry]:
+    """The cadastral districts a compound place name is made of.
+
+    A city's Ortsteil is often two former villages joined with a hyphen, and
+    both halves are Gemarkungen while the compound is none: „Burghausen-
+    Rückmarsdorf“ is Burghausen 145507 and Rückmarsdorf 145614, both in Stadt
+    Leipzig. Reading the compound as one name finds nothing, which is how a
+    listing whose district is stated outright ended up searched across the
+    whole of Stadt Leipzig — 31 candidates where there is exactly one.
+
+    The municipality is what makes splitting safe, and without it nothing is
+    returned. A part is a *derived* reading, not a stated one, so it may only
+    stand when its own municipality is the one the listing names: „Grünau-
+    Siedlung“ splits to a Gemarkung Grünau that exists twice, in Großolbersdorf
+    and Langenweißbach, 80 km from the Leipzig plot — and that is the trap this
+    guard exists for. Measured against all 63 Leipzig Ortsteile: every compound
+    resolves to its own Gemarkungen, every namesake elsewhere is dropped, and
+    the five „Grünau-…“ names contribute nothing rather than anchoring wrong.
+    """
+
+    if not municipality or "-" not in name:
+        return []
+    needle = fold(municipality)
+    out: list[GemarkungEntry] = []
+    for part in name.split("-"):
+        if len(part) < 3:
+            continue
+        for entry in _district_matches(directory, part):
+            if entry.gemeinde and needle in fold(entry.gemeinde):
+                out.append(entry)
+    return out
 
 
 def _known_district_names(directory: GemarkungDirectory) -> dict[str, list[GemarkungEntry]]:
@@ -566,14 +632,19 @@ def collect_indicia(
             )
         )
 
-    # 4 · The body text: an explicit "Gemarkung X" first, then every directory
-    #     name in the text, each with the relation that ties it to the plot.
-    if body:
-        found.extend(_from_body(body, counter, directory))
-
-    # 5 · The location field, and last of all the pin.
+    # 4 · The location field. The pin derived from it is useless — measured
+    #     6 235 m out — but the *names* it was geocoded from are not: the
+    #     municipality is what separates the Plagwitz in Machern from the one in
+    #     Leipzig, and the district in front of the postcode is the portal's own
+    #     Ortsteil field. Both cost nothing.
+    #
+    #     Read before the body, because the body scan needs to know which name
+    #     is the municipality: „in Leipzig – Stadtteil Burghausen-Rückmarsdorf“
+    #     names the city and the district in one sentence, and Gemarkung Leipzig
+    #     is not a rival reading of the district — it is the level above.
+    location: list[Indiz] = []
     if adresse:
-        found.append(
+        location.append(
             _indiz(
                 counter,
                 art="ort",
@@ -584,24 +655,37 @@ def collect_indicia(
                 beziehung="liegt_in",
             )
         )
-        # The municipality out of it. The pin derived from this field is
-        # useless — measured 6 235 m out — but the *name* it was geocoded from
-        # is not: it is what separates the Plagwitz in Machern from the one in
-        # Leipzig, and it costs nothing.
-        municipality = _LOCALITY_RE.search(adresse.strip())
-        if municipality:
-            name = municipality.group("municipality")
-            found.append(
-                _indiz(
-                    counter,
-                    art="gemeinde",
-                    wert=name,
-                    text=f"Gemeinde {name} laut Standortfeld — grenzt gleichnamige Gemarkungen ein",
-                    quelle="standortfeld",
-                    beleg=adresse.strip(),
-                    beziehung="liegt_in",
-                )
-            )
+        location.extend(_from_location_field(adresse.strip(), counter, directory))
+
+    # 5 · The body text: an explicit "Gemarkung X" first, then every directory
+    #     name in the text, each with the relation that ties it to the plot.
+    municipality = next((i.wert for i in location if i.art == "gemeinde"), None)
+    if body:
+        found.extend(_from_body(body, counter, directory, municipality))
+    found.extend(location)
+
+    # A name the listing gives as the *municipality* is not a rival reading of
+    # which Gemarkung the plot sits in — „in Leipzig – Stadtteil Burghausen-
+    # Rückmarsdorf“ names the city and the district in one sentence, and
+    # Gemarkung Leipzig holds parcels of every size. Demoted only when another
+    # district is actually on the table: „Sachsen - Bad Lausick“ names one place
+    # that is a Gemarkung as well as a Gemeinde, and demoting it there leaves
+    # the run with no anchor at all.
+    if municipality:
+        needle = fold(municipality)
+        elsewhere = any(
+            i.art == "gemarkung" and i.beziehung in ANCHORING and fold(i.wert) != needle
+            for i in found
+        )
+        if elsewhere:
+            for indiz in found:
+                if indiz.art == "gemarkung" and fold(indiz.wert) == needle:
+                    indiz.beziehung = "erwaehnt"
+                    indiz.sicherheit = min(indiz.sicherheit, 0.2)
+                    indiz.text = (
+                        f"{indiz.wert} ist laut Standortfeld die Gemeinde — eine Ebene "
+                        "über der gesuchten Gemarkung"
+                    )
     if lat is not None and lon is not None:
         found.append(
             _indiz(
@@ -615,13 +699,128 @@ def collect_indicia(
         )
 
     found.sort(key=lambda indiz: -indiz.sicherheit)
-    return found
+
+    # One Indiz per district. „Burghausen-Rückmarsdorf“ stands in the location
+    # field and twice in the prose, and each occurrence names the same two
+    # Gemarkungen -- five rows in the Verlauf for two claims. The strongest
+    # reading survives, which is the sorted order above; the anchors were never
+    # affected (they are keyed by Gemarkungsschlüssel), the list the user checks
+    # was. Districts only: a municipality named both in the prose and in the
+    # location field is two readings with two different Belege, and the field's
+    # one is what says the pin's *name* holds even though its coordinate does
+    # not -- dropping it would drop that.
+    seen: set[str] = set()
+    out: list[Indiz] = []
+    compounds = {
+        fold(i.wert): i.teil_von for i in found if i.art == "gemarkung" and i.teil_von
+    }
+    for indiz in found:
+        if indiz.art == "gemarkung":
+            key = indiz.schluessel or fold(indiz.wert)
+            if key in seen:
+                continue
+            seen.add(key)
+            # „in Rückmarsdorf“ in the title and „Stadtteil Burghausen-
+            # Rückmarsdorf“ in the prose are the same place said two ways, and
+            # the stronger of the two wins the dedupe above -- so the compound
+            # has to survive on whichever reading is kept, or the two halves
+            # would be put to the user as rival readings.
+            if indiz.teil_von is None and fold(indiz.wert) in compounds:
+                indiz.teil_von = compounds[fold(indiz.wert)]
+        out.append(indiz)
+    return out
+
+
+def _from_location_field(
+    adresse: str, counter: list[int], directory: GemarkungDirectory | None
+) -> list[Indiz]:
+    """The municipality and the district a platform's location field states.
+
+    One string, read structurally rather than searched for names: the portals
+    write it in three orders and the postcode is the only fixed point in all
+    three. Reading it as one opaque line was what left a listing whose district
+    stands in the field with no cadastral anchor at all.
+    """
+
+    out: list[Indiz] = []
+    match = _LOCALITY_RE.search(adresse) or _LOCALITY_TAIL_RE.search(adresse)
+    if not match:
+        return out
+
+    groups = match.groupdict()
+    tail, behind = groups.get("tail"), groups.get("behind")
+    # „04668 Sachsen – Grimma“: the state stands where the municipality would,
+    # and the municipality is behind the dash.
+    if tail and federal_state(tail) == tail:
+        municipality = behind
+    else:
+        municipality = tail
+    if municipality:
+        out.append(
+            _indiz(
+                counter,
+                art="gemeinde",
+                wert=municipality,
+                text=(
+                    f"Gemeinde {municipality} laut Standortfeld — grenzt gleichnamige "
+                    "Gemarkungen ein"
+                ),
+                quelle="standortfeld",
+                beleg=adresse,
+                beziehung="liegt_in",
+            )
+        )
+
+    district = groups.get("district")
+    if not district or directory is None:
+        return out
+
+    # The name itself, when the directory knows it. Every entry of that name is
+    # offered, the way a name in the running text is — the municipality above
+    # sorts out which one afterwards. A street stands in this slot on one of the
+    # three portals, so a name the directory does not know contributes nothing.
+    entries = _district_matches(directory, district)
+    derived = False
+    if not entries:
+        entries = _districts_in_compound(directory, district, municipality)
+        derived = True
+    for entry in entries if derived else entries[:1]:
+        out.append(
+            _indiz(
+                counter,
+                art="gemarkung",
+                wert=entry.name if derived else district,
+                text=(
+                    f"{district} im Standortfeld ist keine Gemarkung — {entry.name} "
+                    f"{entry.schluessel} ist ein Teil davon"
+                    if derived
+                    else f"Das Standortfeld nennt {district} als Ortsteil"
+                ),
+                quelle="standortfeld",
+                beleg=adresse,
+                schluessel=entry.schluessel if derived or len(entries) == 1 else None,
+                beziehung="liegt_in",
+                # A stated name outranks one taken out of a compound, and both
+                # stay under an explicit „Gemarkung X“ in the text.
+                sicherheit=0.5 if derived else 0.62,
+                teil_von=district if derived else None,
+            )
+        )
+    return out
 
 
 def _from_body(
-    body: str, counter: list[int], directory: GemarkungDirectory | None
+    body: str,
+    counter: list[int],
+    directory: GemarkungDirectory | None,
+    municipality: str | None = None,
 ) -> list[Indiz]:
-    """Parcel numbers, districts and streets read out of running text."""
+    """Parcel numbers, districts and streets read out of running text.
+
+    ``municipality`` is the town the location field named. It is what makes a
+    compound place name in the prose safe to take apart — see
+    ``_districts_in_compound``.
+    """
 
     out: list[Indiz] = []
 
@@ -723,7 +922,37 @@ def _from_body(
         index = _known_district_names(directory)
         for word, start, end in _word_positions(body):
             key = fold(word)
-            if key in named or key not in index:
+            if key in named:
+                continue
+            if key not in index:
+                # A compound Ortsteil the directory does not carry, whose halves
+                # it does: „Stadtteil Burghausen-Rückmarsdorf“ is Burghausen and
+                # Rückmarsdorf, and reading it as one name finds neither. Only
+                # where the text places the plot, only one word (the pair
+                # „Stadtteil Burghausen-Rückmarsdorf“ is not a place name), and
+                # only with the municipality's consent -- the guard is in the
+                # helper.
+                if " " in word or _relation_before(body, start) != "liegt_in":
+                    continue
+                named.add(key)
+                for entry in _districts_in_compound(directory, word, municipality):
+                    out.append(
+                        _indiz(
+                            counter,
+                            art="gemarkung",
+                            wert=entry.name,
+                            text=(
+                                f"{word} ist keine Gemarkung — {entry.name} "
+                                f"{entry.schluessel} ist ein Teil davon"
+                            ),
+                            quelle="fliesstext",
+                            beleg=_excerpt(body, start, end),
+                            schluessel=entry.schluessel,
+                            beziehung="liegt_in",
+                            sicherheit=0.5,
+                            teil_von=word,
+                        )
+                    )
                 continue
             named.add(key)
             entries = index[key]

@@ -12,8 +12,8 @@ import { mount, flushPromises } from "@vue/test-utils";
 import STREAM from "./fixtures/suche-grossbothen.ndjson?raw";
 
 import {
-  MIN_HALF_WIDTH_M, StepQueue, boundsOf, contains, contextOpacity,
-  evidenceOpacity, frameFor, halfExtentsM, padBounds, unionBounds
+  MIN_HALF_WIDTH_M, QUICK_MS, StepQueue, boundsOf, contains, contextOpacity,
+  evidenceOpacity, frameFor, halfExtentsM, movesTheMap, padBounds, unionBounds
 } from "../src/lib/evidence.js";
 import { queryFromFields, runSearch, splitLines, verdictSentence } from "../src/lib/search.js";
 import { parseGermanNumber } from "../src/lib/format.js";
@@ -208,6 +208,47 @@ describe("Die Warteschlange", () => {
     vi.useRealTimers();
   });
 
+  it("hält nur die Schritte auf, die die Karte bewegen", () => {
+    // Zwei Sekunden pro Indiz war die Antwort auf eine hektische Karte, und sie
+    // hat den falschen Teil verlangsamt: eine Phasenzeile, eine Straße und eine
+    // Nutzungsart landen alle auf einer Karte, die stehen bleibt.
+    vi.useFakeTimers();
+    const camera = { art: "kandidaten" };
+    const quiet = { art: "phase" };
+    queue = new StepQueue({ dwell: 2000, quick: 250, moves: movesTheMap });
+    const shown = [];
+    queue.onStep = item => shown.push(item);
+
+    [quiet, quiet, camera, quiet].forEach(item => queue.push(item));
+
+    expect(shown.length).toBe(1);
+    vi.advanceTimersByTime(250);
+    expect(shown.length).toBe(2);
+    vi.advanceTimersByTime(250);
+    expect(shown.length).toBe(3);
+    // Der Kameraschritt bekommt seine Zeit -- 250 ms reichen nicht.
+    vi.advanceTimersByTime(250);
+    expect(shown.length).toBe(3);
+    vi.advanceTimersByTime(1750);
+    expect(shown.length).toBe(4);
+    vi.useRealTimers();
+  });
+
+  it("teilt das Zeitbudget unter den Kamerafahrten auf, nicht unter allen Zeilen", () => {
+    // Das Budget hält einen fertigen Lauf kurz. Lang macht ihn das Fliegen --
+    // also zählt nur, wie viele Fahrten noch warten.
+    vi.useFakeTimers();
+    queue = new StepQueue({ dwell: 2000, budget: 3000, moves: movesTheMap });
+    queue.onStep = () => {};
+
+    // Eine Fahrt und viele stille Zeilen: die Fahrt bekommt die volle Zeit.
+    queue.push({ art: "kandidaten" });
+    [1, 2, 3, 4, 5].forEach(() => queue.push({ art: "phase" }));
+    expect(queue.pace).toBe(2000);
+    expect(queue.step).toBe(2000);
+    vi.useRealTimers();
+  });
+
   it("wartet gar nicht, wenn der Browser um weniger Bewegung gebeten hat", () => {
     queue = new StepQueue({ reduced: true });
     const shown = [];
@@ -280,6 +321,30 @@ describe("Gelesene Werte als Suchanfrage", () => {
   });
 });
 
+describe("Was die Karte bewegt", () => {
+  it("sind die vier Zeilen, denen die Kamera folgt", () => {
+    expect(movesTheMap({ art: "gebiete" })).toBe(true);
+    expect(movesTheMap({ art: "kandidaten" })).toBe(true);
+    expect(movesTheMap({ art: "ergebnis" })).toBe(true);
+    expect(movesTheMap({ art: "indiz", indiz: { art: "pin" } })).toBe(true);
+  });
+
+  it("und nicht die Zeilen, die nur etwas behaupten", () => {
+    // Die Kamera folgt dem Kandidatensatz, nicht dem neuesten Indiz -- eine
+    // Straße, eine Fläche oder eine Gemarkung ändert die Liste und den Rahmen
+    // nicht.
+    expect(movesTheMap({ art: "phase" })).toBe(false);
+    expect(movesTheMap({ art: "konflikt" })).toBe(false);
+    expect(movesTheMap({ art: "indiz", indiz: { art: "strasse" } })).toBe(false);
+    expect(movesTheMap({ art: "indiz", indiz: { art: "gemarkung" } })).toBe(false);
+    expect(movesTheMap(null)).toBe(false);
+  });
+
+  it("ist die Zahl, aus der sich die kurze Wartezeit ergibt", () => {
+    expect(QUICK_MS).toBeLessThanOrEqual(400);
+  });
+});
+
 describe("Die Suchansicht", () => {
   beforeEach(() => { global.fetch = stubFetch(); });
 
@@ -328,6 +393,91 @@ describe("Die Suchansicht", () => {
     expect(conflict).toBeTruthy();
     expect(wrapper.text()).toContain(conflict.frage);
     expect(wrapper.findAll(".konflikt__option").length).toBe(conflict.optionen.length);
+  });
+
+  /** jsdom lays nothing out, so a scroll box has to be given its numbers.
+   *  Real ones: 560 px of panel over a list that outgrew it. */
+  const asScrollBox = (element, { scrollTop = 0, height = 2400 } = {}) => {
+    Object.defineProperty(element, "scrollHeight", { value: height, configurable: true });
+    Object.defineProperty(element, "clientHeight", { value: 560, configurable: true });
+    element.scrollTop = scrollTop;
+  };
+
+  it("setzt die wechselnde Phasenzeile nicht in die Überschrift", async () => {
+    // Sie lief von vier Wörtern bis zu vier Zeilen und stand in text-xl über
+    // der Karte: jede gewonnene Zeile hat die ganze Bühne nach unten geschoben,
+    // sechzehnmal pro Lauf.
+    const wrapper = mount(ParcelSearch, {
+      props: { query: { text: "x" }, paced: true },
+      global: { stubs: { EvidenceMap: true } }
+    });
+    await flushPromises();
+
+    const long = EVENTS.find(e => e.art === "phase" && (e.text || "").length > 80);
+    expect(long).toBeTruthy();
+    wrapper.vm.phaseText = long.text;
+    wrapper.vm.phaseKey = long.phase;
+    await wrapper.vm.$nextTick();
+
+    // Die Überschrift ist das Label der Phase — ein Wort, also feste Höhe.
+    expect(wrapper.get(".suche__urteil h2").text().split(/\s+/).length).toBeLessThan(3);
+    expect(wrapper.get(".suche__urteil .eyebrow").text()).toBe("Suche läuft");
+    expect(wrapper.get(".suche__satz").text()).toBe(long.text);
+    // Auf zwei Zeilen begrenzt, damit die Höhe des Kastens feststeht.
+    expect(wrapper.get(".suche__satz").classes()).toContain("suche__satz--laeuft");
+    wrapper.unmount();
+  });
+
+  it("hält den Platz für die Abfragezahl frei, bevor sie bekannt ist", async () => {
+    // Unter 700 px bricht sie auf eine eigene Zeile um. Erst mit der Antwort zu
+    // erscheinen wäre ein weiterer Schubs für die Karte.
+    const wrapper = mount(ParcelSearch, {
+      props: { query: { text: "x" }, paced: true },
+      global: { stubs: { EvidenceMap: true } }
+    });
+    await flushPromises();
+
+    expect(wrapper.vm.requests).toBe(0);
+    expect(wrapper.find(".suche__kosten").exists()).toBe(true);
+    expect(wrapper.get(".suche__kosten").text()).toBe("");
+    wrapper.unmount();
+  });
+
+  it("zeigt einen Puls, solange der Lauf läuft, und danach keinen", async () => {
+    const running = mount(ParcelSearch, {
+      props: { query: { text: "x" }, paced: true },
+      global: { stubs: { EvidenceMap: true } }
+    });
+    await flushPromises();
+    expect(running.find(".suche__puls").exists()).toBe(true);
+    running.unmount();
+
+    const done = await openSearch();
+    expect(done.find(".suche__puls").exists()).toBe(false);
+  });
+
+  it("rollt den Verlauf zum neuesten Eintrag mit", async () => {
+    const wrapper = await openSearch();
+    const box = wrapper.vm.$refs.protocol;
+    asScrollBox(box, { scrollTop: 2400 - 560 });
+
+    wrapper.vm.record({ kind: "phase", phase: "raum", text: "Noch ein Schritt" });
+    await flushPromises();
+
+    expect(box.scrollTop).toBe(box.scrollHeight);
+  });
+
+  it("reißt aber niemanden weg, der nach oben gescrollt hat", async () => {
+    // Wer ein früheres Indiz liest, liest es. Eine Liste, die darunter
+    // wegspringt, ist schlimmer als eine, die nicht mitläuft.
+    const wrapper = await openSearch();
+    const box = wrapper.vm.$refs.protocol;
+    asScrollBox(box, { scrollTop: 120 });
+
+    wrapper.vm.record({ kind: "phase", phase: "raum", text: "Noch ein Schritt" });
+    await flushPromises();
+
+    expect(box.scrollTop).toBe(120);
   });
 
   it("führt den Verlauf in der Reihenfolge, in der er passiert ist", async () => {

@@ -33,7 +33,7 @@
     <!-- 1 · Quelle. Also what a stage without its data falls back to, so the
          redirect in `checkStage` never renders a step that has nothing. -->
     <section v-if="stage === 'quelle' || !reachable" class="stack">
-      <p class="subtitle">Vier Wege hinein. Welcher passt zu dem, was vorliegt?</p>
+      <p class="subtitle">{{ sources.length }} Wege hinein. Welcher passt zu dem, was vorliegt?</p>
       <div class="sources">
         <label v-for="s in sources" :key="s.id" class="source" :class="{ 'source--selected': source === s.id }">
           <input type="radio" name="source" :value="s.id" v-model="source">
@@ -63,7 +63,10 @@
             </div>
             <p class="hint">
               Die Seite wird auf dem Server geholt und ausgelesen. ImmoScout24 lässt das
-              nicht zu — dort den Weg über „Seite einfügen“ nehmen.
+              nicht zu und antwortet jedem Server mit „Ich bin kein Roboter“ — dort führt
+              <button type="button" class="link-button" @click="source = 'paste'">„Seite einfügen“</button>
+              hinein: einmal das Lesezeichen einrichten, dann ist es ein Klick auf der
+              Anzeigenseite.
             </p>
           </template>
 
@@ -104,18 +107,56 @@
           </template>
 
           <template v-else>
-            <div class="field">
-              <label for="q-paste">Anzeige hier einfügen</label>
-              <textarea id="q-paste" v-model="pastedText" @paste="takePaste"
-                        placeholder="Strg+V — die kopierte Anzeigenseite"></textarea>
+            <!-- Handed over by the bookmarklet: the whole document, so there is
+                 nothing to paste, nothing to correct and nothing to confirm. -->
+            <div v-if="handover" class="uebergabe">
+              <p><b>Die Seite ist angekommen</b> — {{ Math.round(handover.html.length / 1024) }} kB,
+                 vollständig, mit Kopf und Skripten.</p>
+              <p v-if="handover.url" class="hint mono">{{ handover.url }}</p>
             </div>
-            <p class="hint">
-              Im Browser <span class="mono">Strg+A</span>, <span class="mono">Strg+C</span>,
-              hier <span class="mono">Strg+V</span>. Die Zwischenablage führt neben dem Text
-              auch das HTML mit — daraus kommen Preis, Fläche, Koordinate und die Bilder
-              ohne Modell.
-              <span v-if="pastedHtml"><b>Das HTML wurde übernommen</b> ({{ Math.round(pastedHtml.length / 1024) }} kB).</span>
+            <p v-else-if="handoverWaiting" class="hint">
+              Warten auf die Seite aus dem Tab, in dem das Lesezeichen geklickt wurde …
             </p>
+
+            <template v-else>
+              <div class="field">
+                <label for="q-paste">Anzeige hier einfügen</label>
+                <textarea id="q-paste" v-model="pastedText" @paste="takePaste"
+                          placeholder="Strg+V — die kopierte Anzeigenseite"></textarea>
+              </div>
+              <p class="hint">
+                Im Browser <span class="mono">Strg+A</span>, <span class="mono">Strg+C</span>,
+                hier <span class="mono">Strg+V</span>. Die Zwischenablage führt neben dem Text
+                auch das HTML mit — daraus kommen Preis, Fläche, Bilder und der
+                Beschreibungstext ohne Modell. Der <i>Kopf</i> der Seite kommt nicht mit:
+                <span class="mono">Strg+A</span> wählt nur den Rumpf aus, also fehlen die
+                Meta-Angaben und mit ihnen die Koordinate. Wer die auch haben will, richtet
+                einmal das Lesezeichen darunter ein.
+                <span v-if="pastedHtml"><b>Das HTML wurde übernommen</b> ({{ Math.round(pastedHtml.length / 1024) }} kB).</span>
+              </p>
+
+              <details class="gelesen">
+                <summary>
+                  <span class="gelesen__titel">Ein Klick statt Kopieren</span>
+                  <span class="gelesen__zahl">Lesezeichen, einmal einrichten</span>
+                </summary>
+                <p class="subtitle">
+                  Diesen Knopf in die Lesezeichenleiste ziehen — ist sie nicht zu sehen,
+                  holt <span class="mono">Strg+Umschalt+B</span> sie hervor. Auf der
+                  Anzeigenseite dann darauf klicken: der Browser schickt die Seite, die er
+                  ohnehin vor sich hat, hierher. Vollständig, also mit allem, was das
+                  Kopieren verliert.
+                </p>
+                <p class="row">
+                  <a class="btn" :href="bookmarkletLink" @click.prevent>Grundstück prüfen</a>
+                </p>
+                <p class="hint">
+                  Der Knopf tut hier nichts, er <i>ist</i> das Lesezeichen. Er öffnet
+                  <span class="mono">{{ appOrigin }}</span> in einem neuen Tab und übergibt
+                  die Seite dorthin; an das Portal geht dabei keine Anfrage.
+                </p>
+              </details>
+            </template>
           </template>
 
           <div v-if="source !== 'search'" class="row">
@@ -322,6 +363,9 @@ import { plotFromCadastre, parcelForAddress, outerRing } from "../lib/plots.js";
 import { polygonArea, polygonCentroid, pointInPolygon } from "../lib/geometry.js";
 import { toLocal } from "../lib/projection.js";
 import { area, euroPerSqm, num, parseGermanNumber as numberFrom } from "../lib/format.js";
+import {
+  HANDOVER_QUERY, HANDOVER_READY, HANDOVER_PAGE, bookmarkletHref
+} from "../lib/bookmarklet.js";
 
 /** The backend answers with {feld: {wert, quelle_url, bestaetigt}}. */
 function fieldsFromResponse(response) {
@@ -347,7 +391,16 @@ function fieldsFromResponse(response) {
 }
 
 /** What POST /api/listings/extract accepts in `text`. */
-const PASTE_LIMIT = 400000;
+/* How much page content travels to the reader.
+ *
+ * Raised from 400 000 with the bookmarklet: that hands over
+ * `document.documentElement.outerHTML`, and a portal exposé runs past a
+ * megabyte of it. The old cap came with the assumption that "everything the
+ * extraction wants sits in the first part of the document", which is not true
+ * of a whole document — JSON-LD is routinely the last thing in the body. The
+ * endpoint's own limit is the same number, and nginx needs a
+ * `client_max_body_size` above it. */
+const PASTE_LIMIT = 3000000;
 
 export default {
   name: "WizardView",
@@ -380,6 +433,18 @@ export default {
        * path work without a model, and they are the whole point of this field:
        * it exists for the portals that refuse a server-side fetch. */
       pastedHtml: "",
+      /* The document a bookmarklet handed over: `{ url, html }`. Deliberately
+       * not the paste field's own state — it is not a paste. The textarea
+       * would have to hold two megabytes of markup to show it, and there is
+       * nothing in it for anyone to correct. */
+      handover: null,
+      /* The nonce this tab was opened with, while the other tab has not
+       * answered yet. Two things are checked before a document is taken: the
+       * message comes from the window that opened this one, and it carries
+       * this nonce. The sender's origin cannot be checked — it is whichever
+       * portal the user was looking at — so the nonce stands in for it. */
+      handoverNonce: "",
+      handoverWaiting: false,
       listingText: "",
       busy: false,
       error: "",
@@ -444,7 +509,7 @@ export default {
         { id: "text", name: "Text durchsuchen",
           text: "Nur der Beschreibungstext. Daraus wird das Flurstück gesucht — ohne Modell, allein über Muster und das Gemarkungsverzeichnis." },
         { id: "paste", name: "Seite einfügen",
-          text: "Für Portale, die keinen Serverabruf zulassen. Die kopierte Anzeigenseite einfügen." }
+          text: "Für Portale, die keinen Serverabruf zulassen — ImmoScout24 ist der Fall. Die Anzeigenseite einfügen, oder einmal das Lesezeichen einrichten und sie mit einem Klick herüberschicken." }
       ]
     };
   },
@@ -474,8 +539,18 @@ export default {
       if (this.source === "url") return /^https?:\/\/\S{6,}/.test(this.url.trim());
       if (this.source === "parcel") return this.gemarkung.trim() && this.flurstuecksnummer.trim();
       if (this.source === "text") return this.listingText.trim().length > 20;
-      return this.pastedText.trim().length > 20;
+      return Boolean(this.handover) || this.pastedText.trim().length > 20;
     },
+    /** The app's own address, which is what the bookmarklet has to be told:
+     *  it runs on the portal's page and knows nothing else about us. */
+    appOrigin() { return window.location.origin; },
+    bookmarkletLink() { return bookmarkletHref(this.appOrigin); },
+    /** What travels to the reader for a page out of the browser.
+     *
+     *  A handed-over document first: it is the whole thing. Then the
+     *  clipboard's HTML flavour, which is the body only. Then the plain text,
+     *  which is what a textarea shows. */
+    pageContent() { return this.handover?.html || this.pastedHtml || this.pastedText; },
     readLabel() {
       return this.source === "parcel" ? "Nachschlagen" : "Lesen";
     },
@@ -489,8 +564,16 @@ export default {
     gemarkungQuery() { return this.gemarkungEntry?.schluessel || this.gemarkung.trim(); }
   },
   created() { this.checkStage(); },
+  beforeUnmount() { this.stopHandover(); },
   watch: {
     stage() { this.checkStage(); },
+    /* The handover starts from the address, and the address is not necessarily
+     * resolved when this component is created: mounted through `router-view`
+     * it is, mounted directly it is not. An immediate watcher covers both, and
+     * `startHandover` is written to survive being called twice. The key is
+     * composed from the constant so it cannot drift away from the bookmarklet
+     * that puts the parameter there. */
+    [`$route.query.${HANDOVER_QUERY}`]: { handler: "startHandover", immediate: true },
     // Emptying the field has to empty the clipboard HTML with it, or the next
     // read silently sends the page that was pasted before.
     pastedText(value) { if (!value.trim()) this.pastedHtml = ""; }
@@ -541,13 +624,58 @@ export default {
 
     /** Keep the clipboard's HTML flavour alongside the text the textarea shows.
      *
-     *  Capped at what the endpoint accepts: a whole portal page with its inline
-     *  scripts runs past 400 000 characters, and everything the extraction
-     *  wants — meta tags, JSON-LD, the price, the attribute list — sits in the
-     *  first part of the document. */
+     *  Worth having and not enough: measured in Chromium, this flavour carries
+     *  the price (`#viewad-price`), the attribute list, the image URLs and the
+     *  description — every one of them a body element — and no `<meta>` and no
+     *  JSON-LD, because `Strg+A` selects the body and a `<script>` is never
+     *  part of a selection. The coordinate lives in `og:latitude`, so a pasted
+     *  page has none. `startHandover` is the way round that. */
     takePaste(event) {
       const html = event.clipboardData?.getData("text/html");
       if (html && html.length > this.pastedHtml.length) this.pastedHtml = html.slice(0, PASTE_LIMIT);
+    },
+
+    /** Announce this tab to the bookmarklet that opened it.
+     *
+     *  The bookmarklet cannot send the document straight away: this app has to
+     *  be mounted and listening first, and nothing else tells it when that is.
+     *  So the tab it opened says so, and the nonce in its own address is what
+     *  it says it with. */
+    startHandover() {
+      const nonce = this.$route.query[HANDOVER_QUERY];
+      if (this.handoverNonce || this.handover) return;
+      if (typeof nonce !== "string" || !nonce) return;
+      this.source = "paste";
+      // Opened by hand, or the opener is gone: there is nobody to answer. The
+      // paste field below is then the right answer and says so itself.
+      if (!window.opener) return;
+      this.handoverNonce = nonce;
+      this.handoverWaiting = true;
+      window.addEventListener("message", this.takeHandover);
+      // `"*"`, because the portal's origin is not knowable from here — and
+      // there is nothing to keep: the nonce is in this tab's own address bar.
+      window.opener.postMessage({ w2b: HANDOVER_READY, [HANDOVER_QUERY]: nonce }, "*");
+    },
+
+    /** The document, once the other tab sends it. Then straight into reading:
+     *  the click on the bookmarklet was the instruction. */
+    takeHandover(event) {
+      const data = event.data;
+      if (!this.handoverNonce || event.source !== window.opener) return;
+      if (!data || data.w2b !== HANDOVER_PAGE || data[HANDOVER_QUERY] !== this.handoverNonce) return;
+      if (typeof data.html !== "string" || !data.html) return;
+      this.stopHandover();
+      this.handover = {
+        url: typeof data.url === "string" ? data.url : "",
+        html: data.html.slice(0, PASTE_LIMIT)
+      };
+      this.read();
+    },
+
+    stopHandover() {
+      this.handoverNonce = "";
+      this.handoverWaiting = false;
+      window.removeEventListener("message", this.takeHandover);
     },
 
     /** The one way in, for the Enter key and for the button alike. */
@@ -576,7 +704,7 @@ export default {
         // price) were never shown.
         const response = this.source === "url"
           ? await readListing(this.url.trim())
-          : await readPage(this.source === "text" ? this.listingText.trim() : (this.pastedHtml || this.pastedText));
+          : await readPage(this.source === "text" ? this.listingText.trim() : this.pageContent);
         this.readFields = fieldsFromResponse(response);
         this.description = response?.beschreibung
           || (this.source === "text" ? this.listingText.trim() : this.pastedText);
@@ -895,6 +1023,19 @@ export default {
 .gelesen .subtitle{ margin-top: 0; }
 .gelesen .suggestions{ margin-top: var(--w2b-space-3); }
 .gelesen .row{ margin-top: var(--w2b-space-3); }
+
+/* The handed-over page: a statement, not a field. The URL is set in the mono
+   face and has to be allowed to break — a portal's exposé address is longer
+   than the panel. */
+.uebergabe{
+  border: 1px solid var(--w2b-line); border-radius: var(--w2b-radius-m);
+  background: var(--w2b-surface-sunken); padding: var(--w2b-space-4);
+}
+.uebergabe p{ margin: 0; }
+.uebergabe p + p{ margin-top: var(--w2b-space-2); overflow-wrap: anywhere; }
+/* The bookmarklet is a link only because a bookmark has to be dragged from
+   one; it is a button to the eye, like every other action here. */
+details.gelesen a.btn{ text-decoration: none; }
 
 .check-grid{ display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: var(--w2b-space-4); align-items: start; }
 @media (max-width: 900px){ .check-grid{ grid-template-columns: 1fr; } }

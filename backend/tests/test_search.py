@@ -55,6 +55,14 @@ DIRECTORY = GemarkungDirectory(
         GemarkungEntry("Lobstädt", "141894", "Neukieritzsch"),
         GemarkungEntry("Neukieritzsch", "141896", "Neukieritzsch"),
         GemarkungEntry("Leipzig", "140415", "Stadt Leipzig"),
+        # The two halves of the Leipzig Ortsteil „Burghausen-Rückmarsdorf“,
+        # which is itself no Gemarkung — and the two Grünau, both 80 km away,
+        # which is why splitting a compound needs the municipality's consent.
+        GemarkungEntry("Burghausen", "145507", "Stadt Leipzig"),
+        GemarkungEntry("Rückmarsdorf", "145614", "Stadt Leipzig"),
+        GemarkungEntry("Lausen", "145611", "Stadt Leipzig"),
+        GemarkungEntry("Grünau", "148814", "Großolbersdorf"),
+        GemarkungEntry("Grünau", "148916", "Langenweißbach"),
         GemarkungEntry("Borna", "141810", "Stadt Borna"),
         GemarkungEntry("Bad Lausick", "143836", "Stadt Bad Lausick"),
         GemarkungEntry("Etzoldshain", "143840", "Stadt Bad Lausick"),
@@ -814,7 +822,7 @@ def _indicia_of(key: str):
     )
 
 
-def _anchor_names(key: str) -> list[str]:
+def _engine_of(key: str) -> SearchEngine:
     listing = LISTINGS[key]
     engine = SearchEngine(
         ParcelSearchRequest(
@@ -827,7 +835,11 @@ def _anchor_names(key: str) -> list[str]:
         DIRECTORY,
     )
     engine.state.indicia = _indicia_of(key)
-    return [f"{a.name}/{a.schluessel}" for a in engine.anchors()]
+    return engine
+
+
+def _anchor_names(key: str) -> list[str]:
+    return [f"{a.name}/{a.schluessel}" for a in _engine_of(key).anchors()]
 
 
 def test_ortsteil_names_the_district_and_the_municipality_in_one_breath():
@@ -1278,3 +1290,325 @@ def test_a_saxon_listing_that_merely_mentions_another_state_is_still_searched(
     final = events[-1]
     assert final["status"] == "bestaetigt"
     assert "Sachsen-Anhalt" not in (final.get("text") or "")
+
+
+# ---------------------------------------------------------------------------
+# The pin as a seed for the anchor set
+#
+# The gap this closes: a Stadtteil is usually not a Gemarkung. „Grünau-Siedlung"
+# in Leipzig is none, and the two Saxon Gemarkungen called „Grünau" are 80 km
+# away in the Erzgebirge, so the name cannot be looked up and Stadt Leipzig's
+# 76 districts are too many to ask one by one. The recording is the real answer
+# to one BBOX request around the advert's own point
+# (`alkis_katasterbezirke_gruenau.gml`, fetched 09.09.2026): seven districts,
+# Lausen and Kleinzschocher among them.
+
+
+@respx.mock
+def test_the_pin_says_which_districts_to_ask_when_the_listing_names_none(client: TestClient):
+    """One request turns a point into a set, and the area decides inside it.
+
+    Not „the plot is here": the point is the platform's geocode of a place name
+    and may sit kilometres off. It is only allowed to pick the districts that
+    get asked — and the safety of that is one-directional, which is what lets
+    the radius be chosen without a corpus: a box too small to contain the right
+    district makes every count zero and the run reports nothing found. It can
+    never turn a bad pin into a wrong parcel.
+    """
+
+    respx.get(ALKIS_URL).mock(
+        side_effect=lambda request: _gml("alkis_katasterbezirke_gruenau.gml")
+        if "KatasterBezirk" in request.url.query.decode()
+        else _gml("alkis_leer.gml")
+    )
+    respx.post(ALKIS_URL).mock(
+        side_effect=_cadastre(
+            # Only Gemarkung Lausen holds a parcel of exactly that size.
+            {"145573+742": 1},
+            {"145573": "alkis_grossbothen_790_11.gml"},
+        )
+    )
+
+    events = _stream(
+        client,
+        {
+            "adresse": "04207 Leipzig, Sachsen",
+            "text": "Wohnbaugrundstück im Leipziger Stadtteil Grünau-Siedlung.",
+            "lat": 51.30595,
+            "lon": 12.27605,
+            "flaeche_m2": 742,
+            "flaeche_text": "742 m²",
+        },
+    )
+
+    said = " ".join(event.get("text") or "" for event in events)
+    assert "Die Anzeige nennt keine Gemarkung" in said
+    assert "Gemarkungen" in said
+    # The sentence has to say what the point is worth, or the run reads as
+    # though the pin located the plot.
+    assert "nicht das Grundstück" in said
+
+    final = events[-1]
+    assert final["art"] == "ergebnis"
+    # Never „bestätigt" off a pin: the anchor is not an official statement
+    # about this plot, so one survivor is a single candidate, not a verdict.
+    assert final["status"] != "bestaetigt"
+
+
+@respx.mock
+def test_a_pin_is_not_asked_when_the_listing_names_a_district(client: TestClient):
+    """The cheap route stays the route. A district in the text is a statement;
+    the pin is a geocode, and asking it anyway would spend a request to make
+    the answer weaker."""
+
+    districts = respx.get(ALKIS_URL).mock(
+        side_effect=lambda request: _gml("alkis_katasterbezirke_gruenau.gml")
+    )
+    respx.post(ALKIS_URL).mock(
+        side_effect=_cadastre({}, {"KatasterBezirk": "alkis_katasterbezirk_grossbothen.gml",
+                                   "flstnrzae": "alkis_grossbothen_790_11.gml"})
+    )
+
+    _stream(
+        client,
+        {"gemarkung": "Großbothen", "flurstuecksnummer": "790/11", "flaeche_m2": 502,
+         "flaeche_text": "502 m²", "lat": 51.189265, "lon": 12.85},
+    )
+
+    assert districts.call_count == 0
+
+
+@respx.mock
+def test_a_pin_outside_saxony_asks_nothing(client: TestClient):
+    """A box around a point in Sachsen-Anhalt would return Saxon districts on
+    the border, and every one of them is a namesake trap. The run that already
+    knows the state is wrong must not spend a request to find that out again."""
+
+    districts = respx.get(ALKIS_URL).mock(
+        side_effect=lambda request: _gml("alkis_katasterbezirke_gruenau.gml")
+    )
+    respx.post(ALKIS_URL).mock(side_effect=_cadastre({}, {}))
+
+    _stream(
+        client,
+        {"adresse": "06796 Sachsen-Anhalt - Brehna", "text": "600 m² Baugrundstück in Brehna.",
+         "lat": 51.5852, "lon": 12.2478, "flaeche_m2": 600, "flaeche_text": "600 m²"},
+    )
+
+    assert districts.call_count == 0
+
+
+# --------------------------------------------------------------------------
+# A fifth advert: the location field states the Ortsteil, and it is a compound
+# --------------------------------------------------------------------------
+#
+# ImmoScout advert 170438443, read 09.09.2026: „Burghausen-Rückmarsdorf, 04178
+# Leipzig“ in the location field, 866 m² exactly, and prose that names the
+# Ortsteil twice more. The field was read as one opaque line, so the run had no
+# cadastral anchor at all and fell back to the whole of Stadt Leipzig: 31
+# candidates spread over the city, where the Ortsteil holds exactly two parcels
+# of that size.
+
+BURGHAUSEN = "Burghausen-Rückmarsdorf, 04178 Leipzig, Sachsen"
+
+
+def _field(adresse: str, text: str | None = None):
+    return collect_indicia(adresse=adresse, text=text, directory=DIRECTORY)
+
+
+def _places(indicia, art: str) -> list[str]:
+    return [i.wert for i in indicia if i.art == art]
+
+
+def test_the_location_field_names_the_district_in_front_of_the_postcode():
+    """Five digits are the only fixed point in a German location line.
+
+    Behind them stands the municipality, in front of them the Ortsteil — and
+    ImmoScout puts its own `obj_regio4` there. Reading the line as one string
+    threw both away.
+    """
+
+    found = _field(BURGHAUSEN)
+
+    assert _places(found, "gemeinde") == ["Leipzig"]
+    assert _places(found, "gemarkung") == ["Burghausen", "Rückmarsdorf"]
+
+
+def test_a_compound_ortsteil_is_taken_apart_into_its_gemarkungen():
+    """„Burghausen-Rückmarsdorf“ is no Gemarkung; both its halves are.
+
+    Measured against all 63 Leipzig Ortsteile: every compound resolves to its
+    own Gemarkungen and none to a namesake elsewhere.
+    """
+
+    keys = {i.wert: i.schluessel for i in _field(BURGHAUSEN) if i.art == "gemarkung"}
+
+    assert keys == {"Burghausen": "145507", "Rückmarsdorf": "145614"}
+
+
+def test_a_compound_only_gives_up_the_halves_of_its_own_municipality():
+    """„Grünau-Siedlung, 04207 Leipzig“ must contribute nothing.
+
+    Gemarkung Grünau exists exactly twice, in Großolbersdorf and in
+    Langenweißbach — both in the Erzgebirge or Vogtland, 80 km from the Leipzig
+    plot. The municipality is what makes splitting safe, and here it refuses:
+    „Lausen-Grünau“ keeps Lausen and drops Grünau in the same breath.
+    """
+
+    assert _places(_field("Grünau-Siedlung, 04207 Leipzig, Sachsen"), "gemarkung") == []
+    assert _places(_field("Lausen-Grünau, 04207 Leipzig, Sachsen"), "gemarkung") == ["Lausen"]
+
+
+def test_the_prose_names_the_compound_too_and_is_read_the_same_way():
+    """„in Leipzig – Stadtteil Burghausen-Rückmarsdorf“.
+
+    A clipboard copy of an ImmoScout page brings the two prose blocks and no
+    title, so the Ortsteil has to be readable out of the sentence as well as
+    out of the field.
+    """
+
+    found = _field(
+        "04178 Leipzig, Sachsen",
+        "Verkauf eines attraktiven Baugrundstücks in Leipzig – Stadtteil "
+        "Burghausen-Rückmarsdorf. Der Leipziger Ortsteil Burghausen-Rückmarsdorf "
+        "befindet sich im Westen der Stadt.",
+    )
+
+    assert set(_places(found, "gemarkung")) >= {"Burghausen", "Rückmarsdorf"}
+
+
+def test_one_indiz_per_district_however_often_the_name_stands_there():
+    """The compound stands in the field and twice in the prose.
+
+    Each occurrence names the same two Gemarkungen. The anchors were never
+    affected — they are keyed by Gemarkungsschlüssel — but the Verlauf the user
+    reads showed five rows for two claims.
+    """
+
+    found = _field(
+        BURGHAUSEN,
+        "Stadtteil Burghausen-Rückmarsdorf. Der Leipziger Ortsteil "
+        "Burghausen-Rückmarsdorf liegt im Westen.",
+    )
+    districts = _places(found, "gemarkung")
+
+    assert len(districts) == len(set(districts))
+
+
+def test_the_municipality_is_not_a_rival_reading_of_the_district():
+    """„in Leipzig – Stadtteil Burghausen-Rückmarsdorf“ names both levels.
+
+    Gemarkung Leipzig holds parcels of every size, so leaving it as an anchor
+    next to the two the Ortsteil names is what produced the 31.
+    """
+
+    found = _field(BURGHAUSEN, "Ein Baugrundstück in Leipzig, Stadtteil Burghausen-Rückmarsdorf.")
+    leipzig = next(i for i in found if i.art == "gemarkung" and i.wert == "Leipzig")
+
+    assert leipzig.beziehung == "erwaehnt"
+
+
+def test_a_municipality_that_is_also_the_gemarkung_stays_an_anchor():
+    """„Sachsen - Bad Lausick“ names one place, and it is both levels at once.
+
+    Demoting it there leaves the run with no anchor at all — and that advert's
+    area has no match in Gemarkung Bad Lausick and exactly one in the
+    municipality, so the anchor is what the widening step hangs off.
+    """
+
+    found = _field("Sachsen - Bad Lausick", "Ein Grundstück in Bad Lausick.")
+    district = next(i for i in found if i.art == "gemarkung" and i.wert == "Bad Lausick")
+
+    assert district.beziehung == "liegt_in"
+
+
+def test_a_street_in_front_of_the_postcode_is_not_a_district():
+    """ohne-makler writes „Maschinenhausstraße, 01587 Riesa, Sachsen“."""
+
+    found = _field("Maschinenhausstraße, 01587 Riesa, Sachsen")
+
+    assert _places(found, "gemeinde") == ["Riesa"]
+    assert _places(found, "gemarkung") == []
+
+
+def test_the_field_without_a_postcode_is_still_read():
+    """The recorded adverts carry „Sachsen - Machern“, with no postcode at all."""
+
+    assert _places(_field("Sachsen - Machern"), "gemeinde") == ["Machern"]
+    assert _places(_field("04668 Sachsen – Grimma"), "gemeinde") == ["Grimma"]
+    assert _places(_field("06796 Sachsen-Anhalt - Brehna"), "gemeinde") == ["Brehna"]
+
+
+def test_the_anchors_are_the_ortsteil_and_not_the_whole_city():
+    """The 31, at the point where they were made.
+
+    Without the Ortsteil the only anchor left was Gemarkung Leipzig, and with
+    an exact area that has no match — so the run widened to the whole of Stadt
+    Leipzig, where 112 589 Flurstücke hold 31 of exactly 866 m². The Ortsteil
+    holds two, and both of them are in the answer.
+    """
+
+    engine = SearchEngine(
+        ParcelSearchRequest(
+            adresse=BURGHAUSEN,
+            text="Verkauf eines Baugrundstücks in Leipzig – Stadtteil Burghausen-Rückmarsdorf.",
+            flaeche_text="866 m²",
+        ),
+        alkis_service(),
+        DIRECTORY,
+    )
+    engine.state.indicia = collect_indicia(
+        adresse=BURGHAUSEN,
+        text="Verkauf eines Baugrundstücks in Leipzig – Stadtteil Burghausen-Rückmarsdorf.",
+        flaeche_text="866 m²",
+        directory=DIRECTORY,
+    )
+
+    assert [f"{a.name}/{a.schluessel}" for a in engine.anchors()] == [
+        "Burghausen/145507",
+        "Rückmarsdorf/145614",
+    ]
+
+
+def test_the_halves_of_one_ortsteil_are_not_put_to_the_user_as_rivals():
+    """„Stadtteil Burghausen-Rückmarsdorf“ is one statement, not two readings.
+
+    Both Gemarkungen are searched and both survivors are in the answer, where
+    the user picks a *parcel*. Asking „welche Gemarkung ist gemeint?“ calls the
+    listing contradictory when nothing in it contradicts — the same rule as
+    several parcel numbers from one source, which are a plot and not a dispute.
+    """
+
+    payload = ParcelSearchRequest(
+        adresse=BURGHAUSEN,
+        text="Baugrund in Rückmarsdorf. Stadtteil Burghausen-Rückmarsdorf.",
+        flaeche_text="866 m²",
+    )
+    engine = SearchEngine(payload, alkis_service(), DIRECTORY)
+    engine.state.indicia = collect_indicia(
+        adresse=payload.adresse,
+        text=payload.text,
+        flaeche_text=payload.flaeche_text,
+        directory=DIRECTORY,
+    )
+
+    districts = [i.wert for i in engine.state.indicia if i.art == "gemarkung"]
+    assert set(districts) >= {"Burghausen", "Rückmarsdorf"}
+    assert [k.art for k in engine._conflicts()] == []
+
+
+def test_two_districts_that_came_from_two_names_still_disagree():
+    """Großbothen against Höfgen is a real contradiction and stays a question.
+
+    The suppression above turns on *one* compound having produced both readings.
+    Two names read separately have no compound in common, so the Grimma
+    advert's three districts are reported as a conflict exactly as before —
+    asserted end to end in `test_three_district_names_are_a_conflict…` and here
+    at the condition itself.
+    """
+
+    engine = _engine_of("3499632623")
+    districts = [i for i in engine.state.indicia if i.art == "gemarkung"]
+
+    assert len(districts) >= 2
+    assert not engine.halves_of_one_ortsteil(districts)

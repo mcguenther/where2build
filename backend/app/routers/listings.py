@@ -262,26 +262,32 @@ async def extract(
         return answer
 
     assert payload.text is not None
-    # Pasted content is parsed deterministically first, and that is usually the
-    # whole job: a page copied out of a browser carries its meta tags, its
-    # JSON-LD, its price and its attribute list, and the parcel search reads the
-    # prose itself. Requiring a model here was what turned a portal that refuses
-    # a server-side fetch -- the very case this field exists for -- into
-    # „nicht konfiguriert“.
-    seite = parse_page("", payload.text) if "<" in payload.text else None
-    text = seite.text if seite and seite.text else payload.text
-    deterministic = (
-        InseratFelder(
-            adresse=seite.adresse,
-            lat=seite.lat,
-            lon=seite.lon,
-            grundstuecksflaeche_m2=_area_from(seite.angaben),
-            kaufpreis_eur=seite.kaufpreis_eur,
-        )
-        if seite is not None
-        else InseratFelder()
+    # Pasted or handed-over content is parsed deterministically first, and that
+    # is usually the whole job. How much of it there is depends on how it got
+    # here: a document from the bookmarklet is complete, meta tags and JSON-LD
+    # included, while a clipboard copy is the body alone -- price, attribute
+    # list, images and prose, but nothing from `<head>`. Both go through the
+    # same parsers, which is the point. Requiring a model here was what turned a
+    # portal that refuses a server-side fetch -- the very case this way in
+    # exists for -- into „nicht konfiguriert“.
+    #
+    # Unconditionally, markup or not. This used to run only when the text
+    # contained a „<“, which was true of the parsers when it was written and is
+    # not true of them now: the reader in `portal_fields` goes by the German
+    # word and the value's unit, so it reads a *rendered* listing as well as a
+    # marked-up one. The gate therefore answered every field empty for the
+    # plainest paste there is -- „Grundstücksfläche ca. 866 m²“ and „199.000 €“
+    # standing in the text, and „Gelesene Werte“ showing nothing.
+    seite = parse_page("", payload.text)
+    text = seite.text or payload.text
+    deterministic = InseratFelder(
+        adresse=seite.adresse,
+        lat=seite.lat,
+        lon=seite.lon,
+        grundstuecksflaeche_m2=_area_from(seite.angaben),
+        kaufpreis_eur=seite.kaufpreis_eur,
     )
-    beschreibung = (seite.beschreibung if seite and seite.beschreibung else text)
+    beschreibung = seite.beschreibung or text
 
     extracted: InseratFelder | None = None
     hinweis: str | None = None
@@ -295,9 +301,11 @@ async def extract(
             "Aus dem eingefügten Text ließ sich weder eine Adresse noch eine Koordinate "
             "noch ein Flurstück lesen, und es steht auch kein Beschreibungstext darin, "
             "den die Flurstückssuche lesen könnte. Ein Modell ist auf diesem Server "
-            "nicht eingerichtet (LLM_API_KEY fehlt). Am zuverlässigsten ist die kopierte "
-            "Seite selbst: im Browser Strg+A, Strg+C — dann kommt das HTML mit "
-            "Meta-Angaben, Preis und Bildern mit, und es braucht kein Modell."
+            "nicht eingerichtet (LLM_API_KEY fehlt). Am zuverlässigsten ist das "
+            "Lesezeichen unter „Seite einfügen“: es schickt die Anzeigenseite "
+            "vollständig herüber, mit Meta-Angaben und Koordinate. Beim Kopieren mit "
+            "Strg+A, Strg+C kommt nur der Rumpf der Seite mit — Preis, Fläche und "
+            "Bilder also, aber keine Meta-Angaben."
         )
 
     return _answer(
@@ -306,5 +314,6 @@ async def extract(
         "eingefuegter-text",
         hinweis=hinweis,
         beschreibung=beschreibung,
-        bilder=seite.bilder if seite else None,
+        bilder=seite.bilder,
+        titel=seite.titel,
     )
