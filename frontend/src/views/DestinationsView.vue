@@ -5,7 +5,7 @@
         <p class="eyebrow">Für alle Grundstücke</p>
         <h1>Ziele</h1>
         <p class="page-head__sub">
-          Arbeit, Schule, Kita, Bahnhof — die Orte, zu denen von jedem Grundstück aus gerechnet
+          Arbeit, Schule, Kita, Bahnhof: die Orte, zu denen von jedem Grundstück aus gerechnet
           wird. Eine Änderung hier wirkt sich auf alle Kandidaten aus.
         </p>
       </div>
@@ -100,7 +100,7 @@
             </div>
 
             <p v-else-if="!isLocated(destination)" class="destination-row__status destination-row__status--open">
-              Noch nicht verortet — ohne Koordinate lässt sich kein Weg berechnen.
+              Noch nicht verortet. Ohne Koordinate lässt sich kein Weg berechnen.
             </p>
           </template>
 
@@ -118,7 +118,7 @@
               <template v-if="zubringerOf(destination) === 'automatic'">
                 Rad und Fußweg werden beide gerechnet; das Rad gewinnt ab zehn Minuten Fußweg
                 zur ersten Haltestelle oder wenn es die Reise deutlich verkürzt. Das Auto
-                kommt erst ab zehn Minuten Radweg dazu — und nur, wenn es schneller ist.
+                kommt erst ab zehn Minuten Radweg dazu, und nur, wenn es schneller ist.
               </template>
               <template v-else>
                 Fest eingestellt. „Wege berechnen“ auf der Grundstücksseite übernimmt es.
@@ -135,7 +135,7 @@
 
     <div class="callout">
       <h4>Im Prototyp läuft das gegen Transitous</h4>
-      <p>Öffentliche MOTIS-Instanz der Community — ideal, um diesen Bereich zu bauen, ohne
+      <p>Öffentliche MOTIS-Instanz der Community. Ideal, um diesen Bereich zu bauen, ohne
         vorher einen Server aufzusetzen. Für Produktionslast ungeeignet; die Betreiber weisen
         selbst auf begrenzte Ressourcen hin. Die Umstellung auf eine eigene Instanz ändert
         nur die Basis-Adresse.</p>

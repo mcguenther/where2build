@@ -14,7 +14,7 @@
         <h1>Was am Grundstück gilt</h1>
         <p class="page-head__sub">
           Lärm, Hochwasser, Radon, Trinkwasserschutz, Schutzgebiete, Hangneigung, Baugrund
-          und Luftqualität — gefragt mit dem Umriss des Flurstücks, nicht mit einem Punkt.
+          und Luftqualität, gefragt mit dem Umriss des Flurstücks, nicht mit einem Punkt.
           Ein Grundstück schneidet Isophonen und Zonengrenzen; sein Mittelpunkt antwortet
           nur für einen Quadratmeter davon.
         </p>
@@ -52,7 +52,7 @@
           <div class="panel__head"><h3>Bodenrichtwert</h3><div class="spacer"></div><span class="chip">BORIS</span></div>
           <p v-if="!Number.isFinite(plot.bodenrichtwert)" class="location-page__empty">
             Für dieses Grundstück liegt kein Bodenrichtwert vor. Ohne ihn bleibt die
-            Preiseinordnung leer — sie wird nicht geschätzt.
+            Preiseinordnung leer; sie wird nicht geschätzt.
           </p>
           <template v-else>
             <p class="location-page__value">
@@ -68,7 +68,7 @@
             <p v-if="conversionNeeded" class="location-page__note">
               Der Richtwert gilt für ein gedachtes Grundstück von
               {{ area(plot.brwReferencePlotArea) }}. Für {{ area(plot.officialArea) }} ist er
-              nach der Umrechnungstabelle des Gutachterausschusses anzupassen — das Produkt
+              nach der Umrechnungstabelle des Gutachterausschusses anzupassen. Das Produkt
               aus Wert und Fläche ist also nicht der Bodenwert dieses Grundstücks.
               <a v-if="plot.brwConversionUrl" :href="plot.brwConversionUrl"
                  target="_blank" rel="noopener noreferrer">Umrechnungstabelle</a>
@@ -107,7 +107,7 @@
           </ul>
           <p class="key__note">
             Die Karte zeichnet erst ab 50 dB(A). Das Band 45–49 dB(A) steckt in den Daten
-            und hat in der amtlichen Darstellung keine Farbe — die Prüfung oben liest die
+            und hat in der amtlichen Darstellung keine Farbe; die Prüfung oben liest die
             Daten, nicht das Bild.
           </p>
         </div>

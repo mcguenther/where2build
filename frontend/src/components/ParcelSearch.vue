@@ -39,7 +39,7 @@
           {{ conflict.aufgeloest_durch }}
         </span>
         <span v-else class="konflikt__offen">
-          Die Angaben widersprechen sich. Gesucht wird nach der zuverlässigsten —
+          Die Angaben widersprechen sich. Gesucht wird nach der zuverlässigsten;
           hier lässt sich das ändern.
         </span>
       </div>
@@ -60,7 +60,7 @@
       </div>
       <p v-if="optionsOf(conflict).some(o => o.bild_url)" class="konflikt__fussnote">
         Auf einem Katasterauszug stehen die Nummern der Nachbarflurstücke mit auf der
-        Karte. Gelesen wird nur die beschriftete Angabe im Kopf des Auszugs — steht dort
+        Karte. Gelesen wird nur die beschriftete Angabe im Kopf des Auszugs; steht dort
         mehr als eine, entscheidet das Bild.
       </p>
     </section>
@@ -99,7 +99,7 @@
                      :ground="ground" :highlighted="highlighted" @select="pick" />
         <p v-if="ground === 'site'" class="panel__footnote">
           Luftbild und Straßen vom GeoSN. Die amtlichen Flurstücksgrenzen zeichnet der
-          Dienst erst ab Zoomstufe {{ parcelOutlineZoom }} — darüber liefert er ein leeres Bild.
+          Dienst erst ab Zoomstufe {{ parcelOutlineZoom }}; darüber liefert er ein leeres Bild.
         </p>
       </div>
 
@@ -193,7 +193,7 @@
         </tbody>
       </table>
       <p v-if="candidates.length > 1" class="panel__footnote">
-        Die Reihenfolge ordnet nur — entschieden wird sie nicht. Ausgeschieden ist hier
+        Die Reihenfolge ordnet nur; entschieden wird sie nicht. Ausgeschieden ist hier
         niemand: Was übrig bleibt, hat jede amtliche Prüfung bestanden.
       </p>
     </div>

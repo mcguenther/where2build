@@ -337,7 +337,7 @@ describe("Grundstückskarte", () => {
 describe("Leere Zustände", () => {
   it("bietet die Aufnahme an, wenn noch nichts da ist", () => {
     state.data = { version: 2, plots: [], houseTypes: [], destinations: [], selection: [] };
-    const t = mountWithRouter(PlotsView).text();
+    const t = mountWithRouter(PlotsView, { path: "/grundstuecke" }).text();
     expect(t).toContain("Noch nichts in der Prüfung");
     expect(t).toContain("Grundstück hinzufügen");
   });
@@ -448,7 +448,7 @@ describe("Grundstücksseite", () => {
 
   it("benennt die Grenzen nach der Himmelsrichtung", () => {
     const t = mountWithRouter(PlotView, { props: { id: "plot-concave" } }).text();
-    expect(t).toMatch(/(Nord|Ost|Süd|West|Nordost|Nordwest|Südost|Südwest) — zur Straße/);
+    expect(t).toMatch(/(Nord|Ost|Süd|West|Nordost|Nordwest|Südost|Südwest) · zur Straße/);
     expect(t).not.toMatch(/Grenze \d/);
   });
 

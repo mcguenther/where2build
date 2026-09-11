@@ -11,7 +11,7 @@
 
     <div class="checks__body">
     <p v-if="!ring" class="checks__empty">
-      Ohne Flurstücksumriss gibt es nichts zu fragen — die Prüfungen werden mit der
+      Ohne Flurstücksumriss gibt es nichts zu fragen: die Prüfungen werden mit der
       Grundstücksfläche gestellt, nicht mit einem Punkt.
     </p>
     <p v-else-if="error" class="notice notice--error" role="alert">{{ error }}</p>
@@ -35,7 +35,7 @@
     </div>
     <p v-else-if="!result" class="checks__empty">
       Lärm, Hochwasser, Radon, Trinkwasserschutz, Schutzgebiete, Hangneigung, Baugrund
-      und Luftqualität — gefragt wird mit dem Umriss des Flurstücks.
+      und Luftqualität. Gefragt wird mit dem Umriss des Flurstücks.
     </p>
 
     <template v-else>

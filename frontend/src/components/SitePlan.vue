@@ -73,7 +73,7 @@
       <!-- The house: brass, because the user designed it -->
       <g v-if="houseVisible" :class="{ 'plan-handle': interactive }" :tabindex="interactive ? 0 : null"
          :role="interactive ? 'button' : null"
-         :aria-label="interactive ? 'Baukörper — ziehen oder mit den Pfeiltasten verschieben' : null"
+         :aria-label="interactive ? 'Baukörper: ziehen oder mit den Pfeiltasten verschieben' : null"
          data-house>
         <polygon :points="path(houseCorners)" fill="var(--w2b-map-design)" fill-opacity=".85"
                  :stroke="violation ? 'var(--w2b-map-violation)' : 'var(--w2b-map-design-edge)'"

@@ -94,8 +94,12 @@ console.log("App-Tab geöffnet:", await appTab.url());
 
 // The wizard should reach the search step on its own -- nothing is clicked.
 try {
-  await appTab.waitForSelector("details.gelesen", { timeout: 60000 });
-  await appTab.click("details.gelesen > summary");
+  /* The read-values fold of the *search* step. Spelled with the negation
+     because the entry step carries a fold of its own -- the bookmarklet's --
+     and matching that one would wait for a list that is one step away. */
+  const fold = "details.gelesen:not(.gelesen--lesezeichen)";
+  await appTab.waitForSelector(fold, { timeout: 60000 });
+  await appTab.click(`${fold} > summary`);
   await appTab.waitForSelector(".suggestions", { timeout: 10000 });
 } catch (error) {
   problems.push(`Die übergebene Seite wurde nicht gelesen: ${error.message}`);

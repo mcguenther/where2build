@@ -107,7 +107,7 @@ export default {
     subtitle() {
       return this.selectedPlots.length
         ? `${this.selectedPlots.length} von ${state.data.plots.length} Kandidaten. Über „Auswahl ändern“ kommen andere herein oder heraus.`
-        : "Nichts ausgewählt — auf der Übersicht Kandidaten ankreuzen.";
+        : "Nichts ausgewählt. Auf der Übersicht Kandidaten ankreuzen.";
     }
   },
   methods: {

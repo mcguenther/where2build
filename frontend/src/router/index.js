@@ -9,6 +9,7 @@
  * file writes a path by hand.
  */
 import { createRouter } from "vue-router";
+import HomeView from "../views/HomeView.vue";
 import PlotsView from "../views/PlotsView.vue";
 import PlotView from "../views/PlotView.vue";
 import WizardView from "../views/WizardView.vue";
@@ -17,13 +18,18 @@ import HouseTypesView from "../views/HouseTypesView.vue";
 import DestinationsView from "../views/DestinationsView.vue";
 import LocationView from "../views/LocationView.vue";
 import DataView from "../views/DataView.vue";
+import AccountView from "../views/AccountView.vue";
+import SharedPlotView from "../views/SharedPlotView.vue";
+import SignInDoneView from "../views/SignInDoneView.vue";
 import NotFoundView from "../views/NotFoundView.vue";
 import { WIZARD_STAGES, wizardStage } from "./stages.js";
 
 /* `meta.section` is what the header highlights: the detail page, the wizard and
- * the comparison all belong under "Grundstücke". */
+ * the comparison all belong under "Grundstücke". The start page is its own
+ * section — it is where a search begins, not where the list lives. */
 export const routes = [
-  { path: "/", name: "plots", component: PlotsView, meta: { section: "plots" } },
+  { path: "/", name: "home", component: HomeView, meta: { section: "home" } },
+  { path: "/grundstuecke", name: "plots", component: PlotsView, meta: { section: "plots" } },
   { path: "/aufnahme", redirect: () => wizardStage(0) },
   {
     // An unknown stage is a typo, not a stage: it falls through to the 404 route.
@@ -51,6 +57,31 @@ export const routes = [
   { path: "/haustypen", name: "houseTypes", component: HouseTypesView, meta: { section: "houseTypes" } },
   { path: "/ziele", name: "destinations", component: DestinationsView, meta: { section: "destinations" } },
   { path: "/daten", name: "data", component: DataView, meta: { section: "data" } },
+  /* Reached from the name in the header rather than from the sections: it is
+     about the person, not about a part of the work. */
+  { path: "/konto", name: "account", component: AccountView, meta: { section: "account" } },
+  /* A shared plot, open to anybody with the link.
+     The trailing segment is a readable slug and is never read: the token is
+     the whole address, so `/geteilt/AbC…` and
+     `/geteilt/AbC…/wiesenstrasse-grossbothen` are the same page. Cut this way
+     from the start so a slug can be added later without breaking the links
+     already sent. */
+  {
+    path: "/geteilt/:token/:slug*",
+    name: "shared",
+    component: SharedPlotView,
+    props: true,
+    meta: { section: null }
+  },
+  /* Where the sign-in exchange ends. Normally seen by nobody: it runs in a
+     window of its own, which closes here -- see lib/signIn.js. The path is
+     the `ziel` the backend is given, so it has to be a route. */
+  {
+    path: "/anmeldung-fertig",
+    name: "signInDone",
+    component: SignInDoneView,
+    meta: { section: null }
+  },
   { path: "/:pathMatch(.*)*", name: "notFound", component: NotFoundView }
 ];
 
