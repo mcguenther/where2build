@@ -647,7 +647,7 @@ const COMPASS = ["Nord", "Nordost", "Ost", "Südost", "Süd", "Südwest", "West"
 
 /**
  * Compass name of the outward side of an edge. `northOffset` is how far true
- * north is rotated against the drawing, so boundaries read "Ost — Nachbar"
+ * north is rotated against the drawing, so boundaries read "Ost · Nachbar"
  * rather than "Grenze 2".
  */
 export function edgeCompass(ring, edgeIndex, northOffset = 0) {

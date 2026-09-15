@@ -30,6 +30,7 @@ LUIS_URL = "https://luis.example.org/arcgis/rest/services"
 NOISE_EXPORT_URL = f"{LUIS_URL}/laerm/laermkartierung/MapServer/export"
 UBA_URL = "https://luftdaten.example.org/api/air-data/v3"
 BASEMAP_URL = "https://tiles.openfreemap.org"
+OIDC_ISSUER = "https://auth.example.org"
 
 
 def fixture_bytes(name: str) -> bytes:
@@ -73,6 +74,28 @@ def isolated_settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     # Overpass instance.
     monkeypatch.setenv("OVERPASS_ENABLED", "false")
     monkeypatch.setenv("OVERPASS_URL", OVERPASS_URL)
+    # The request budget as a fresh deployment has it, pinned for the same
+    # reason as the rest of this fixture: a developer who set a small ceiling in
+    # backend/.env would otherwise get 429s scattered through the suite, in
+    # tests that are about something else entirely. The limiters are rebuilt
+    # per test by the reset_services() below, so no test spends another's
+    # budget and these numbers only have to be larger than one test's traffic.
+    monkeypatch.setenv("RATELIMIT_ENABLED", "true")
+    monkeypatch.setenv("RATELIMIT_WINDOW_S", "3600")
+    monkeypatch.setenv("RATELIMIT_SERVICE_CALLS", "600")
+    monkeypatch.setenv("RATELIMIT_MAP_TILES", "6000")
+    monkeypatch.setenv("RATELIMIT_MAX_CLIENTS", "20000")
+    # No proxy in front, so X-Forwarded-For is not to be believed.
+    monkeypatch.setenv("APP_PROXY_HOPS", "0")
+    # No sign-in unless a test asks for it, and set to empty rather than left
+    # alone: a developer's own backend/.env would otherwise configure a real
+    # provider and every "nicht eingerichtet" test would stop testing anything.
+    for variable in ("OIDC_ISSUER", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET", "OIDC_SESSION_SECRET"):
+        monkeypatch.setenv(variable, "")
+    # And no server storage unless a test asks for it, for the same reason and
+    # with more at stake: a developer's own DATABASE_URL would otherwise let the
+    # suite write into a real database.
+    monkeypatch.setenv("DATABASE_URL", "")
     reset_services()
     yield
     reset_services()
@@ -120,5 +143,25 @@ def overpass(monkeypatch: pytest.MonkeyPatch):
     """
 
     monkeypatch.setenv("OVERPASS_ENABLED", "true")
+    reset_services()
+    yield
+
+
+@pytest.fixture
+def oidc(monkeypatch: pytest.MonkeyPatch):
+    """A deployment with an OpenID provider configured.
+
+    The provider is invented: no test may reach a real authorization server,
+    and a made-up issuer makes that impossible rather than merely unlikely.
+    ``OIDC_COOKIE_SECURE=false`` is what a plain-HTTP development server sets,
+    and the test client is one: a Secure cookie would be stored and then never
+    sent back over http://testserver.
+    """
+
+    monkeypatch.setenv("OIDC_ISSUER", OIDC_ISSUER)
+    monkeypatch.setenv("OIDC_CLIENT_ID", "where2build")
+    monkeypatch.setenv("OIDC_CLIENT_SECRET", "geheim")
+    monkeypatch.setenv("OIDC_SESSION_SECRET", "sitzungsschluessel-fuer-den-test")
+    monkeypatch.setenv("OIDC_COOKIE_SECURE", "false")
     reset_services()
     yield

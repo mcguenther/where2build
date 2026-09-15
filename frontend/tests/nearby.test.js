@@ -18,6 +18,10 @@ import recorded from "./fixtures/nearby-liebertwolkwitz.json";
 import routed from "./fixtures/reachability-umgebung-liebertwolkwitz.json";
 
 vi.mock("../src/lib/api.js", () => ({
+  // The cap the module exports next to the call that sends it. A factory
+  // that omits a named export makes every importer fail at *import* time,
+  // which shows up as unrelated component errors.
+  PAGE_LIMIT: 3000000,
   nearby: vi.fn(() => Promise.resolve(recorded)),
   reachability: vi.fn(() => Promise.resolve(routed))
 }));

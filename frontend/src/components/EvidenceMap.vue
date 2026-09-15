@@ -14,7 +14,7 @@
       </li>
       <li v-if="confirmed">
         <span class="indizienkarte__swatch indizienkarte__swatch--bestaetigt"></span>
-        Bestätigt — geprüft gegen das Kataster
+        Bestätigt: geprüft gegen das Kataster
       </li>
       <li v-if="areas.length">
         <span class="indizienkarte__swatch indizienkarte__swatch--gemarkung"></span>
@@ -22,7 +22,7 @@
       </li>
       <li v-if="refutedPin">
         <span class="indizienkarte__swatch indizienkarte__swatch--pin"></span>
-        Kartenpunkt der Anzeige — widerlegt
+        Kartenpunkt der Anzeige, widerlegt
       </li>
     </ul>
   </div>
@@ -431,7 +431,7 @@ export default {
       element.className = "indizienkarte__pin";
       // Text nodes, not markup: this comes from a listing page.
       element.textContent = "Anzeigenpunkt";
-      element.title = "Der Kartenpunkt der Anzeige — meist der geokodierte Ortsname, nicht das Grundstück";
+      element.title = "Der Kartenpunkt der Anzeige: meist der geokodierte Ortsname, nicht das Grundstück";
       this._markers = [
         new Marker({ element, anchor: "left" })
           .setLngLat([this.refutedPin.lon, this.refutedPin.lat])

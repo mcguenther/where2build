@@ -5,9 +5,10 @@
         <p class="eyebrow">Sicherung und Umzug</p>
         <h1>Daten</h1>
         <p class="page-head__sub">
-          Alles, was ihr hier eingebt, liegt im Speicher dieses Browsers — kein Konto, kein
-          Server. Zum Mitnehmen auf einen anderen Rechner oder als Sicherung gibt es den
-          Austausch als JSON.
+          Alles, was ihr hier eingebt, liegt im Speicher dieses Browsers. Mit Konto liegt
+          eine Kopie im Konto, siehe <RouterLink :to="{ name: 'account' }">Konto</RouterLink>.
+          Zum Mitnehmen auf einen anderen Rechner oder als Sicherung gibt es den Austausch
+          als JSON.
         </p>
       </div>
     </div>
@@ -33,7 +34,7 @@
         <div class="panel__head"><h3>Einlesen</h3></div>
         <div class="panel__body stack">
           <p class="hint">
-            JSON einfügen oder eine gesicherte Datei wählen. Der bisherige Stand wird ersetzt —
+            JSON einfügen oder eine gesicherte Datei wählen. Der bisherige Stand wird ersetzt;
             vorher ausgeben, wenn er noch gebraucht wird.
           </p>
           <textarea class="data-field" v-model="input"
@@ -87,7 +88,7 @@ export default {
         await navigator.clipboard.writeText(this.output);
         this.report("export", "In die Zwischenablage gelegt.");
       } catch {
-        this.report("export", "Der Browser lässt das Kopieren nicht zu — den Text im Feld markieren und Strg+C.", true);
+        this.report("export", "Der Browser lässt das Kopieren nicht zu. Den Text im Feld markieren und Strg+C.", true);
       }
     },
     downloadFile() {
@@ -102,7 +103,7 @@ export default {
         setTimeout(() => URL.revokeObjectURL(a.href), 4000);
         this.report("export", "Datei gesichert.");
       } catch {
-        this.report("export", "Sichern hier nicht möglich — bitte über die Zwischenablage.", true);
+        this.report("export", "Sichern hier nicht möglich, bitte über die Zwischenablage.", true);
       }
     },
     runImport() {

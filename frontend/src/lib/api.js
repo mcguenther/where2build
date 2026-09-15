@@ -10,12 +10,15 @@
 const BASE = "/api";
 const TIMEOUT_MS = 180000;   // the extraction model fetches a page first
 
-/** Error carrying the backend's own German explanation. */
+/** Error carrying the backend's own German explanation, and the body it came
+ *  with: a 409 from the store holds the stand that is on the server, and the
+ *  interface cannot show a conflict without it. */
 export class ServiceError extends Error {
-  constructor(message, status) {
+  constructor(message, status, body = null) {
     super(message);
     this.name = "ServiceError";
     this.status = status;
+    this.body = body;
   }
 }
 
@@ -44,9 +47,13 @@ async function request(path, options = {}) {
     const body = await response.json().catch(() => null);
     throw new ServiceError(
       body?.detail || `Der Dienst antwortete mit HTTP ${response.status}.`,
-      response.status
+      response.status,
+      body
     );
   }
+  // An endpoint that answers "done" and nothing else sends 204; asking that
+  // for JSON throws on an empty body.
+  if (response.status === 204) return null;
   return response.json();
 }
 
@@ -58,8 +65,76 @@ export async function backendHealth() {
   }
 }
 
+/**
+ * Who is signed in, and whether signing in exists here at all.
+ *
+ * Three states, not two: without a configured provider the backend answers
+ * `eingerichtet: false`, and then the app is what it has always been, a thing
+ * that keeps its work in this browser. An unreachable backend reads the same
+ * way, because that is what it means for the person in front of it.
+ */
+export async function authState() {
+  try {
+    return await request("/auth/me");
+  } catch {
+    return { eingerichtet: false, angemeldet: false, name: null, kennung: null };
+  }
+}
+
+/** Where to send the browser to sign in, coming back to where it started. */
+export const signInUrl = (target = "/") => `${BASE}/auth/login?ziel=${encodeURIComponent(target)}`;
+
+export const signOut = () => request("/auth/logout", { method: "POST" });
+
+/* ---------- The account's copy of the document ----------
+ * Only reachable while signed in; without a configured store the backend
+ * answers 503 and the app stays what it is, a thing that keeps its work in
+ * this browser. */
+/** Everything held about the signed-in account. 404 means nothing is stored
+ *  under this sign-in yet, which is a state and not a failure. */
+export const accountOnServer = () => request("/account");
+/** Erase the account and everything under it. The backend ends the session in
+ *  the same answer, so whoever calls this has to reload who is signed in. */
+export const deleteAccountOnServer = () => request("/account", { method: "DELETE" });
+
+/* ---------- Sharing a plot by link ----------
+ * Three of these need the account; `sharedPlot` deliberately does not, because
+ * the token in the link is the access. */
+export const createShare = (dokument, umfang) =>
+  request("/shares", { method: "POST", body: JSON.stringify({ dokument, umfang }) });
+export const sharesOnServer = () => request("/shares");
+export const deleteShare = token => request(`/shares/${encodeURIComponent(token)}`, { method: "DELETE" });
+export const sharedPlot = token => request(`/shares/${encodeURIComponent(token)}`);
+
+export const plotsOnServer = () => request("/plots");
+export const putPlot = (id, dokument, geaendert_am) =>
+  request(`/plots/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    body: JSON.stringify({ dokument, geaendert_am })
+  });
+export const deletePlotOnServer = id =>
+  request(`/plots/${encodeURIComponent(id)}`, { method: "DELETE" });
+export const settingsOnServer = () => request("/settings");
+export const putSettings = (dokument, geaendert_am) =>
+  request("/settings", { method: "PUT", body: JSON.stringify({ dokument, geaendert_am }) });
+
 export const readListing = url => request("/listings/extract", { method: "POST", body: JSON.stringify({ url }) });
-export const readPage = text => request("/listings/extract", { method: "POST", body: JSON.stringify({ text }) });
+/** How much page content travels to the reader, capped in one place.
+ *
+ *  Raised from 400 000 when the bookmarklet arrived: that hands over
+ *  `document.documentElement.outerHTML`, and a portal exposé runs past a
+ *  megabyte. The old cap came with the assumption that everything the
+ *  extraction wants sits in the first part of the document, which is not true
+ *  of a whole one -- JSON-LD is routinely the last thing in the body. The
+ *  endpoint's own `max_length` is the same number, and nginx needs a
+ *  `client_max_body_size` above it.
+ *
+ *  Cut here rather than at each caller: two callers hand a page over -- the
+ *  paste field and the bookmarklet -- and a cap one of them forgets is a 422
+ *  with a German sentence about a length nobody typed. */
+export const PAGE_LIMIT = 3000000;
+export const readPage = text =>
+  request("/listings/extract", { method: "POST", body: JSON.stringify({ text: String(text).slice(0, PAGE_LIMIT) }) });
 export const readHouseType = url => request("/housetypes/extract", { method: "POST", body: JSON.stringify({ url }) });
 
 /** Address, coordinate, or Gemarkung plus the parcel number as written (`85/1`). */

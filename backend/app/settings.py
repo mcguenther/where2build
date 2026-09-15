@@ -60,6 +60,15 @@ class AppSettings(BaseSettings):
         "(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
     )
     http_timeout_s: float = 30.0
+    # How many reverse proxies of our own stand in front of this process, and
+    # therefore how far from the right of ``X-Forwarded-For`` the real peer is.
+    # Zero means none, and then the header is not read at all -- a browser can
+    # write it, so believing it without a proxy having put it there lets anyone
+    # spend somebody else's request budget or dodge their own. The bundled
+    # docker compose deployment serves the API through nginx
+    # (``proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for``) and
+    # therefore sets this to 1; a plain ``uvicorn`` run leaves it at 0.
+    proxy_hops: int = Field(default=0, ge=0, le=8)
 
     @property
     def contact_user_agent(self) -> str:
@@ -420,6 +429,207 @@ class LLMSettings(BaseSettings):
         return self.api_key is not None and bool(self.api_key.get_secret_value())
 
 
+class StorageSettings(BaseSettings):
+    """Server-side storage for signed-in accounts (env prefix ``STORAGE_``).
+
+    ``DATABASE_URL`` is deliberately unprefixed: it is the name every hosting
+    platform and every Postgres client already uses, and a deployment that has
+    a database has it under that name.
+
+    Absent, this whole feature is absent. No pool is opened, no schema is
+    applied, ``/api/plots`` and ``/api/settings`` answer 503 with a German
+    sentence and the frontend keeps every plot in the browser, exactly as it
+    did before there was a database at all. Same shape as the sign-in: a
+    development machine must not need Postgres before it can resolve a parcel.
+
+    What is stored is the frontend's own document, verbatim, as ``jsonb``. The
+    backend does not read it, and the two limits below are the only thing it
+    says about it -- see ``app/services/storage.py``.
+    """
+
+    model_config = SettingsConfigDict(env_prefix="STORAGE_", env_file=_ENV_FILE, extra="ignore")
+
+    database_url: str = Field(default="", validation_alias="DATABASE_URL")
+    # Both numbers are picked, not derived: nobody has 200 plots under
+    # appraisal, and no plot document measured so far comes near two megabytes
+    # (the largest recorded one, with routes and site checks, is ~40 kB). They
+    # exist so one account cannot fill the disk, not because a measurement
+    # pointed here, and a deployment that wants other numbers sets them.
+    max_plots_per_account: int = 200
+    max_document_bytes: int = 2 * 1024 * 1024
+    # A shared link is a copy that outlives the sharing, so the table would
+    # grow for ever without an end date. Ninety days is long enough for a
+    # purchase to run its course and short enough that an abandoned link does
+    # not sit there indefinitely; the sweep job removes what is past it.
+    share_days: int = Field(default=90, ge=1)
+    # And a ceiling per account for the same reason as the one on plots: so one
+    # account cannot fill the table.
+    max_shares_per_account: int = 50
+    # A prototype's pool. Small on purpose: every request holds a connection
+    # for one or two statements, and Postgres' own default is 100 backends.
+    pool_min_size: int = 1
+    pool_max_size: int = 8
+    # Applies to opening a connection and to each statement. A database that
+    # does not answer in ten seconds is down, and saying so beats hanging the
+    # tab that is trying to save.
+    timeout_s: float = 10.0
+
+    @property
+    def configured(self) -> bool:
+        return bool(self.database_url.strip())
+
+    @property
+    def endpoint(self) -> str | None:
+        """The connection target without its password, for ``/api/health``.
+
+        A DSN carries credentials and the health answer is public, so the
+        password is replaced rather than shortened: a truncated secret is still
+        a secret.
+        """
+
+        url = self.database_url.strip()
+        if not url:
+            return None
+        head, separator, tail = url.rpartition("@")
+        if not separator:
+            return url
+        scheme, _, userinfo = head.rpartition("//")
+        user = userinfo.split(":", 1)[0]
+        return f"{scheme}//{user}@{tail}" if user else url
+
+
+class RateLimitSettings(BaseSettings):
+    """How many calls one account may send outward (env prefix ``RATELIMIT_``).
+
+    This backend answers nothing of its own: every request it serves becomes a
+    request to the cadastre, to BORIS, to the LUIS environmental server, to
+    Transitous or to a public Overpass instance. A single-seat prototype asking
+    those now and then is what their policies allow; a deployment with accounts
+    is what the Overpass manual means by "relying on the public instances as
+    backend". Hence a per-account ceiling, in the same step as the sign-in.
+
+    Both numbers are picked, not derived, and both are picked so that a single
+    person working normally never meets one. See ``app/ratelimit.py`` for how
+    they are counted and why the count lives in this process's memory.
+    """
+
+    model_config = SettingsConfigDict(env_prefix="RATELIMIT_", env_file=_ENV_FILE, extra="ignore")
+
+    # Off is the single-seat setting: one person on their own machine is the
+    # case the upstream policies already permit, and a limit there only gets in
+    # the way (the screenshot run alone is a few thousand requests).
+    enabled: bool = True
+    window_s: int = Field(default=3600, ge=1)
+    # Everything that asks an authority, the router or the model a question.
+    # Picked rather than derived, but with one measurement beside it:
+    # ``scripts/screenshots.mjs`` drives every view of the app in one pass --
+    # two themes, a narrow pass, three listing searches, one plot appraised end
+    # to end, both print sheets -- and spends 59 of these (measured 09.09.2026
+    # on a cold cache). A search over a listing counts as one however many WFS
+    # requests it makes inside, which is why the ceiling sits well below what
+    # the upstreams would tolerate. So 600 an hour is ten full drive-throughs
+    # of the whole application per hour: nothing a person does by hand comes
+    # near it, and a scan still meets it.
+    service_calls: int = Field(default=600, ge=1)
+    # Map tiles are a different order of magnitude -- one screen is dozens, a
+    # pan is dozens more -- and they are the one thing the shared disk cache
+    # really covers, so the second view of an area costs nothing upstream at
+    # all. The same screenshot run spends 1 007 of these against 59 of the
+    # above, which is the ratio the two numbers are set by. 6 000 an hour is a
+    # hundred a minute sustained for an hour: past any amount of looking at
+    # maps, and still a ceiling on a scan.
+    map_tiles: int = Field(default=6000, ge=1)
+    # How many clients are remembered at once. Each costs at most one timestamp
+    # per call in the window, so the worst case here is a few megabytes; the
+    # least recently seen is dropped first.
+    max_clients: int = Field(default=20000, ge=1)
+
+
+class OidcSettings(BaseSettings):
+    """Sign-in through an OpenID Connect provider (env prefix ``OIDC_``).
+
+    No provider is hard-wired, the same way none is for the LLM: issuer, client
+    id and secret decide whether this is Authentik, Keycloak or Google, and the
+    endpoints come from the issuer's discovery document rather than from a
+    guessed path.
+
+    Absent, the whole feature is absent: ``configured`` is false, ``/api/auth/me``
+    says so, and every other route works exactly as it did before. A development
+    machine must not need an identity provider before it can resolve a parcel.
+
+    This is a backend-for-frontend, so the browser never sees a token. What it
+    gets is a signed, HttpOnly cookie holding issuer, subject, display name and
+    an expiry; the access token lives no longer than the request that fetched it.
+    """
+
+    model_config = SettingsConfigDict(env_prefix="OIDC_", env_file=_ENV_FILE, extra="ignore")
+
+    issuer: str = ""
+    client_id: str = ""
+    client_secret: SecretStr | None = None
+    # "openid" alone would authenticate but hand out no name to greet anyone
+    # with. Deliberately no "email": the project stores no contact detail, so
+    # asking for one would collect what must not be kept.
+    scopes: str = "openid profile"
+    # Signs the session cookie and the short-lived login cookie. No default:
+    # a shipped one would be a public key everyone could forge sessions with.
+    session_secret: SecretStr | None = None
+    # Off only for a plain-HTTP development server. A session cookie without
+    # Secure travels over any http:// request to the same host.
+    cookie_secure: bool = True
+    cookie_name: str = "w2b_sitzung"
+    # The cookie that carries state, nonce and the PKCE verifier from /login to
+    # /callback. Separate from the session, and gone the moment it is used.
+    login_cookie_name: str = "w2b_anmeldung"
+    # Where this backend reaches the provider, when that is not where the
+    # browser reaches it. An *origin* -- scheme, host, port -- and no path.
+    #
+    # An issuer is one string doing two jobs: it is the address the browser is
+    # sent to, and it is the name an ID token is checked against. Inside a
+    # container network those two come apart -- the browser knows
+    # `http://localhost:9000`, and from in here that is this container itself.
+    # Set this to the origin that works from the server side
+    # (`http://authentik:9000`) and the discovery document, the token endpoint
+    # and userinfo are fetched there; the authorization URL and the `iss`
+    # check keep the public issuer, because those belong to the browser and to
+    # the token. Every provider deployed this way needs it -- Keycloak calls
+    # the same thing a "frontend URL".
+    internal_base_url: str = ""
+    # Origin the provider redirects back to, e.g. https://where2build.example.
+    # Empty derives it from the request, which is right for a local dev server
+    # and wrong behind a reverse proxy that terminates TLS: the request then
+    # says "http" and the redirect_uri stops matching the registered one.
+    public_base_url: str = ""
+    # How long a session lasts. There is no refresh token kept anywhere, so
+    # this is simply how long until the next sign-in.
+    session_ttl_s: int = 14 * 24 * 3600
+    # How long the handshake may take. Ten minutes is generous for typing a
+    # password and short enough that a stolen login cookie is worth little.
+    login_ttl_s: int = 600
+    # The discovery document changes when a provider is reconfigured, which is
+    # rare, but a key rotation must not need a restart to be noticed.
+    discovery_cache_ttl_s: int = 3600
+    timeout_s: float = 15.0
+
+    @property
+    def missing(self) -> list[str]:
+        """Which env variables a deployment still has to set, in order."""
+
+        secrets = {
+            "OIDC_CLIENT_SECRET": self.client_secret,
+            "OIDC_SESSION_SECRET": self.session_secret,
+        }
+        return [
+            *(["OIDC_ISSUER"] if not self.issuer else []),
+            *(["OIDC_CLIENT_ID"] if not self.client_id else []),
+            *(name for name, value in secrets.items() if not (value and value.get_secret_value())),
+        ]
+
+    @property
+    def configured(self) -> bool:
+        return not self.missing
+
+
 class Settings(BaseSettings):
     """Aggregate of all setting groups."""
 
@@ -437,6 +647,9 @@ class Settings(BaseSettings):
     tiles: TilesSettings = Field(default_factory=TilesSettings)
     basemap: BasemapSettings = Field(default_factory=BasemapSettings)
     llm: LLMSettings = Field(default_factory=LLMSettings)
+    rate_limit: RateLimitSettings = Field(default_factory=RateLimitSettings)
+    oidc: OidcSettings = Field(default_factory=OidcSettings)
+    storage: StorageSettings = Field(default_factory=StorageSettings)
 
 
 @lru_cache(maxsize=1)

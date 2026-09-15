@@ -1,8 +1,11 @@
 /**
  * Application state and its persistence.
  *
- * Everything lives in this browser: no account, no server round trip for the
- * user's own data. `localStorage` is the store; JSON is the way in and out.
+ * Everything lives in this browser: the user's own data makes no round trip to
+ * a server, whether or not this deployment has accounts. `localStorage` is the
+ * store; JSON is the way in and out. (Server-side storage is Etappe 4 of
+ * `docs/entscheidungen/startseite-und-konten.md`; signing in changes who the
+ * backend thinks you are, not yet where the plots live.)
  * Storage can throw (private windows, quota) — every access is guarded, and a
  * failure degrades to an in-memory session rather than breaking the app.
  */
@@ -13,6 +16,8 @@ import {
   alignmentToEdge, boundingBox
 } from "./geometry.js";
 import { coordinatesOf, zubringerOf } from "./routes.js";
+import { authState } from "./api.js";
+import * as server from "./serverStore.js";
 
 /** Centre of a ring in the shape a placement expects. The centroid returns
  *  {x, y}; spreading that into a placement silently yields cx/cy of undefined. */
@@ -36,10 +41,103 @@ export const state = reactive({
    * where it is needed, so anything that has to follow the palette — the map
    * backdrop, above all — can watch it like any other reactive value. */
   systemDark: false,
-  plan: { backdrop: "map", northUp: true, showDimensions: true, showSetbacks: true, measuring: false }
+  plan: { backdrop: "map", northUp: true, showDimensions: true, showSetbacks: true, measuring: false },
+  /* Who is signed in. Not part of the document and never stored: the backend
+   * is the only one who knows, and it says so on every load. `eingerichtet`
+   * false means this deployment has no accounts at all, which is the state the
+   * app shipped in and still works in. */
+  account: { eingerichtet: false, angemeldet: false, name: null, kennung: null },
+  /* The account's copy, and how it is doing. `active` false covers both a
+   * deployment without a store and a signed-out browser, which behave the
+   * same way from here: everything stays local. `adoption` is set once, when
+   * a signed-in account is empty and this browser is not. */
+  sync: { active: false, busy: false, error: "", conflicts: [], savedAt: null, adoption: null }
 });
 
 const DARK_QUERY = "(prefers-color-scheme: dark)";
+
+/** Ask the backend who is signed in. Called once when the app starts; the
+ *  answer is a fact about the server, so nothing caches it in storage. */
+export async function loadAccount() {
+  state.account = await authState();
+  return state.account;
+}
+
+/* Who was asked last, so the adoption question is asked once per account and
+ * not again on the next reload. The answer is worth remembering across
+ * reloads; the key carries the account so two people on one browser do not
+ * inherit each other's decision. */
+const ADOPTED_KEY = kennung => `where2build.uebernommen.${kennung}`;
+
+const remembered = key => {
+  try { return localStorage.getItem(key); } catch { return null; }
+};
+const remember = (key, value) => {
+  try { localStorage.setItem(key, value); } catch { /* not essential */ }
+};
+
+/**
+ * Bring the account's copy in, if there is an account and a store behind it.
+ *
+ * Three outcomes, and the third is the interesting one: the server answers
+ * with a document, or it has none and this browser does (then the user is
+ * asked whether to take it along), or there is no store at all and everything
+ * stays exactly as it was.
+ */
+export async function loadFromAccount() {
+  state.sync.adoption = null;
+  if (!state.account.angemeldet) {
+    state.sync.active = false;
+    server.forget();
+    return;
+  }
+  try {
+    const stored = await server.pull();
+    state.sync.active = true;
+    if (stored) {
+      state.data = validate({ ...stored.settings, plots: stored.plots });
+      saveLocal();
+      return;
+    }
+    // The account is empty. Offer to take this browser's work along, once.
+    const local = state.data.plots.length;
+    if (local && remembered(ADOPTED_KEY(state.account.kennung)) !== "nein") {
+      state.sync.adoption = { plots: local };
+    }
+  } catch (error) {
+    // 503 is "this deployment has no store" and 404 is a backend that predates
+    // one. Neither is a failure: the app was a thing that keeps its work in
+    // this browser long before it was anything else. Everything else is said
+    // out loud rather than swallowed into local mode.
+    state.sync.active = false;
+    state.sync.error = [404, 503].includes(error.status) ? "" : (error.message || "");
+  }
+}
+
+/** Take this browser's document into the account. */
+export async function adoptLocal() {
+  state.sync.busy = true;
+  try {
+    await server.push(state.data);
+    state.sync.active = true;
+    state.sync.adoption = null;
+    state.sync.error = "";
+  } catch (error) {
+    state.sync.error = error.message || "Der Stand konnte nicht übernommen werden.";
+  } finally {
+    state.sync.busy = false;
+  }
+}
+
+/** Leave it here. Asked once; the answer holds for this account. */
+export function declineAdoption() {
+  remember(ADOPTED_KEY(state.account.kennung), "nein");
+  state.sync.adoption = null;
+}
+
+server.onReport(report => {
+  Object.assign(state.sync, report);
+});
 
 /** Whether the interface is dark right now, choice and system setting folded
  *  into one answer. Reactive: reading it inside a computed tracks both. */
@@ -318,12 +416,31 @@ export function load() {
   watchSystemTheme();
 }
 
-export function save() {
+function saveLocal() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state.data));
   } catch {
     // Quota or a private window: keep running, the session is still usable.
   }
+}
+
+/**
+ * Keep the document.
+ *
+ * Still synchronous, and still writing to this browser first: thirty-odd call
+ * sites say `save()` and none of them should have to know whether an account
+ * exists. The account's copy follows when there is one, collected rather than
+ * per call, because dragging a building calls this per frame.
+ */
+export function save() {
+  saveLocal();
+  if (state.sync.active) server.schedule(state.data);
+}
+
+/** Write now, without waiting out the quiet period. For leaving the page. */
+export function flushSave() {
+  if (state.sync.active) return server.flush(state.data);
+  return Promise.resolve();
 }
 
 export function applyTheme(choice) {
@@ -362,6 +479,19 @@ export function importJson(text) {
  *  a double click on "Ziel hinzufügen" was enough. */
 export const newId = prefix =>
   `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+
+/** Nothing has been entered here yet -- the state somebody arrives in, and
+ *  the state they are back in once they clear everything out.
+ *
+ *  Deliberately all three lists and not only the plots: after deleting the
+ *  plots but keeping a destination, the app is still in use and the sections
+ *  still lead somewhere. Being signed in is a fourth reason to be past this
+ *  point, because an account is a stand of its own even while it is empty. */
+export const isFresh = () =>
+  !state.account.angemeldet &&
+  state.data.plots.length === 0 &&
+  state.data.houseTypes.length === 0 &&
+  state.data.destinations.length === 0;
 
 export const plotById = id => state.data.plots.find(p => p.id === id) || null;
 export const houseTypeById = id => state.data.houseTypes.find(h => h.id === id) || null;

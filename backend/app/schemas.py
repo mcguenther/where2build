@@ -1121,6 +1121,222 @@ class HealthResponse(BaseModel):
 
 
 # --------------------------------------------------------------------------
+# Sign-in (GET /api/auth/me)
+# --------------------------------------------------------------------------
+
+
+class AnmeldungStatus(BaseModel):
+    """Three states, not two.
+
+    A deployment with no provider configured is not "signed out" -- there is
+    nothing to sign in to, and the frontend then shows no account area at all
+    rather than a button that leads to a 503. Hence ``eingerichtet`` next to
+    ``angemeldet``.
+    """
+
+    eingerichtet: bool = Field(
+        description="Ob auf diesem Server überhaupt eine Anmeldung eingerichtet ist."
+    )
+    angemeldet: bool = Field(description="Ob diese Sitzung angemeldet ist.")
+    name: str | None = Field(
+        default=None,
+        description="Anzeigename, falls der Anmeldedienst einen liefert, sonst null.",
+    )
+    kennung: str | None = Field(
+        default=None,
+        description=(
+            "Stabile, nicht sprechende Kennung des Kontos; aus Issuer und Subject "
+            "gebildet, damit keine Kennung des Anmeldedienstes selbst nach außen geht."
+        ),
+    )
+
+
+# --------------------------------------------------------------------------
+# Server storage for an account (GET/PUT /api/plots, GET/PUT /api/settings)
+#
+# The field names are the frontend's own: `dokument` is its document, verbatim,
+# and `geaendert_am` the stand it was last written at. The backend does not look
+# inside `dokument` -- see app/services/storage.py for why that is a decision
+# and not an omission.
+# --------------------------------------------------------------------------
+
+
+def _aware(value: datetime | None) -> datetime | None:
+    """A moment with a time zone. A naive one is read as UTC.
+
+    The frontend echoes back exactly the string it was given, which always
+    carries an offset. A hand-written request may not, and comparing a naive
+    moment against a `timestamptz` is an error rather than a mismatch.
+    """
+
+    if value is None or value.tzinfo is not None:
+        return value
+    return value.replace(tzinfo=timezone.utc)
+
+
+class GespeichertesGrundstueck(BaseModel):
+    """One stored plot: what was written, under which id, at which stand."""
+
+    id: str
+    geaendert_am: datetime = Field(
+        description="Stand des gespeicherten Eintrags; wird beim Schreiben zurückgeschickt."
+    )
+    dokument: dict[str, Any] = Field(
+        description="Das Dokument des Frontends, unverändert."
+    )
+
+
+class GrundstueckeAntwort(BaseModel):
+    eintraege: list[GespeichertesGrundstueck] = Field(
+        description="Alle Grundstücke dieses Kontos, zuletzt geändertes zuerst."
+    )
+
+
+class KontoAntwort(BaseModel):
+    """What is held about the signed-in account, for the person it is about.
+
+    Deliberately the whole of it and not a summary: this is the answer to
+    "what do you have about me", so a field that exists in the database
+    appears here, and a person can check that the list is short.
+    """
+
+    anbieter: str = Field(
+        description="Der OpenID-Anbieter, der diese Anmeldung bestätigt hat (issuer)."
+    )
+    kennung: str = Field(
+        description="Die Kennung, unter der der Anbieter diese Person führt (subject). "
+        "Sie stammt vom Anbieter, nicht von uns."
+    )
+    anzeigename: str | None = Field(
+        default=None,
+        description="Der Name, den der Anbieter mitgegeben hat; null, wenn er keinen gab.",
+    )
+    angelegt: datetime = Field(
+        description="Wann hier zum ersten Mal etwas für dieses Konto gespeichert wurde."
+    )
+    grundstuecke: int = Field(description="Wie viele Grundstücke im Konto liegen.")
+    groesse_bytes: int = Field(
+        description="Wie viel Platz die gespeicherten Dokumente zusammen belegen."
+    )
+
+
+class FreigabeUmfang(BaseModel):
+    """What a link may carry beyond the plot itself.
+
+    Every switch defaults to *off*: a shared link is public, and the safe
+    default for a public thing is the least it can be. What is always in it --
+    the outline, the official area, the Gemarkung, the Bodenrichtwert -- are
+    facts about a piece of land that the registers publish anyway.
+    """
+
+    preis: bool = Field(default=False, description="Kaufpreis und der Vergleich damit.")
+    haus: bool = Field(default=False, description="Der geplante Baukörper und sein Haustyp.")
+    wege: bool = Field(
+        default=False,
+        description="Ziele und Wegezeiten. Die Ziele sind Arbeitsplatz, Schule und "
+        "Ähnliches, also die persönlichste Angabe am ganzen Grundstück.",
+    )
+    notiz: bool = Field(default=False, description="Die persönliche Notiz.")
+
+
+class FreigabeAnfrage(BaseModel):
+    """A plot to freeze under a link."""
+
+    dokument: dict[str, Any] = Field(
+        description="Das Grundstücksdokument. Was nicht im Umfang steht, wird beim "
+        "Anlegen entfernt und gar nicht erst gespeichert."
+    )
+    umfang: FreigabeUmfang = Field(
+        default_factory=FreigabeUmfang,
+        description="Was zusätzlich mitgeteilt wird. Fehlt es, wird nichts davon geteilt.",
+    )
+
+
+class FreigabeAngelegt(BaseModel):
+    """A link that exists, from its owner's side."""
+
+    id: str = Field(description="Der Schlüssel für den Link.")
+    angelegt: datetime
+    laeuft_ab: datetime = Field(
+        description="Ab hier antwortet der Link, als gäbe es ihn nicht."
+    )
+    name: str | None = Field(
+        default=None, description="Name des Grundstücks, damit die Liste lesbar ist."
+    )
+    grundstueck: str | None = Field(
+        default=None,
+        description="Die Kennung des geteilten Grundstücks, damit dessen Seite die "
+        "eigenen Links zeigen kann.",
+    )
+    umfang: FreigabeUmfang | None = Field(
+        default=None,
+        description="Was der Link tatsächlich trägt, gelesen am gespeicherten "
+        "Dokument statt an den damals gesetzten Schaltern.",
+    )
+
+
+class FreigabenAntwort(BaseModel):
+    eintraege: list[FreigabeAngelegt] = Field(
+        description="Alle offenen Freigaben dieses Kontos, neueste zuerst."
+    )
+
+
+class FreigabeAntwort(BaseModel):
+    """What somebody with the link gets: the snapshot, and until when."""
+
+    dokument: dict[str, Any] = Field(
+        description="Das Grundstück, wie es beim Teilen aussah, beschränkt auf den "
+        "gewählten Umfang."
+    )
+    angelegt: datetime = Field(description="Wann geteilt wurde; der Stand ist von da.")
+    laeuft_ab: datetime
+
+
+class SpeicherAnfrage(BaseModel):
+    """A write, with the stand it builds on."""
+
+    dokument: dict[str, Any] = Field(
+        description="Das zu speichernde Dokument. Muss ein Objekt sein; der Inhalt bleibt unangetastet."
+    )
+    geaendert_am: datetime | None = Field(
+        default=None,
+        description=(
+            "Der Stand, auf dem der Absender aufsetzt. null heißt „neu anlegen“. "
+            "Weicht er vom gespeicherten ab, antwortet der Server mit 409 und dem "
+            "aktuellen Stand, statt zu überschreiben."
+        ),
+    )
+
+    @field_validator("geaendert_am")
+    @classmethod
+    def _with_time_zone(cls, value: datetime | None) -> datetime | None:
+        return _aware(value)
+
+
+class GrundstueckGespeichert(BaseModel):
+    id: str
+    geaendert_am: datetime = Field(
+        description="Der neue Stand. Er gehört in die nächste Änderung dieses Eintrags."
+    )
+
+
+class EinstellungenAntwort(BaseModel):
+    """The rest of the document: house types, destinations, the selection."""
+
+    dokument: dict[str, Any] = Field(
+        description="Das gespeicherte Dokument; ein leeres Objekt, solange nichts abgelegt wurde."
+    )
+    geaendert_am: datetime | None = Field(
+        default=None,
+        description="null, solange für dieses Konto nichts gespeichert ist.",
+    )
+
+
+class EinstellungenGespeichert(BaseModel):
+    geaendert_am: datetime
+
+
+# --------------------------------------------------------------------------
 # Parcel search (POST /api/parcels/search)
 #
 # The search is a staircase that stops as early as it can, and it reports every

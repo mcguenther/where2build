@@ -22,9 +22,14 @@
         <button type="button" class="btn btn--quiet" :disabled="!hasNext" @click="step(1)">Nächstes ›</button>
         <RouterLink v-if="hasAnchor" class="btn btn--secondary"
                     :to="{ name: 'location', params: { id: plot.id } }">Standort prüfen</RouterLink>
+        <button type="button" class="btn btn--secondary" :aria-pressed="String(sharing)"
+                @click="sharing = !sharing">Teilen</button>
         <button type="button" class="btn btn--secondary" @click="print">Drucken</button>
       </div>
     </div>
+
+    <SharePanel v-if="sharing" :plot="plot" @close="sharing = false"
+                @created="$refs.links?.load()" />
 
     <div class="plan-grid print-sheet">
       <div class="plan-frame panel print-sheet__plan">
@@ -73,7 +78,7 @@
           <span v-else-if="neighboursError">{{ neighboursError }}</span>
           <span v-else-if="neighbourHint">
             <b>Schraffiert: hier reicht die Abstandsfläche des Nachbargebäudes herüber.</b>
-            § 6 SächsBO verlangt das nicht von uns — jedes Gebäude hält seine Abstandsfläche
+            § 6 SächsBO verlangt das nicht von uns: jedes Gebäude hält seine Abstandsfläche
             auf dem eigenen Grundstück. Wo beide sich überdecken würden, ist das eine Frage
             an die Bauaufsicht, keine Prüfung. Umrisse aus {{ neighbourSource }}, ohne
             Wandhöhen, gerechnet mit dem Mindestmaß von 3 m.
@@ -101,7 +106,7 @@
                   @move="moveHouse" />
 
         <div class="plan-foot">
-          <span>ETRS89 / UTM33N — EPSG:25833</span>
+          <span>ETRS89 / UTM33N · EPSG:25833</span>
           <span>© GeoSN, dl-de/by-2-0</span>
         </div>
       </div>
@@ -192,8 +197,8 @@
                  :value="plot.wallHeight" @input="setWallHeight($event.target.value)">
           <p class="slider__hint">
             0,4 · H = <b>{{ metres(plot.wallHeight * 0.4) }}</b>
-            <template v-if="plot.wallHeight * 0.4 < 3"> — unter dem Mindestmaß von 3 m, deshalb greift der Mindestwert.</template>
-            <template v-else> — maßgeblich, weil größer als das Mindestmaß von 3 m.</template>
+            <template v-if="plot.wallHeight * 0.4 < 3">. Unter dem Mindestmaß von 3 m, deshalb greift der Mindestwert.</template>
+            <template v-else>. Maßgeblich, weil größer als das Mindestmaß von 3 m.</template>
           </p>
         </div>
       </section>
@@ -204,7 +209,7 @@
           <label for="house-type">Haustyp</label>
           <select id="house-type" :value="plot.houseTypeId" @change="setHouseType($event.target.value)">
             <option v-for="h in state.data.houseTypes" :key="h.id" :value="h.id">
-              {{ h.manufacturer }} {{ h.name }} — {{ num(h.builtArea) }} m² bebaut
+              {{ h.manufacturer }} {{ h.name }} · {{ num(h.builtArea) }} m² bebaut
             </option>
             <option :value="CUSTOM_SIZE">Eigene Maße …</option>
           </select>
@@ -284,7 +289,7 @@
           <output class="mono">{{ num(plot.ratio) }}</output>
           <input id="ratio" type="range" min="1" max="2.2" step="0.01"
                  :value="plot.ratio" @input="setRatio($event.target.value)">
-          <p class="slider__hint">Aus der bebauten Fläche geschätzt — das Datenblatt liefert keine Außenmaße.</p>
+          <p class="slider__hint">Aus der bebauten Fläche geschätzt; das Datenblatt liefert keine Außenmaße.</p>
         </div>
 
         <div class="slider no-print">
@@ -301,7 +306,7 @@
           <p class="slider__hint">
             Der Baukörper lässt sich dann nicht über die Abstandsflächen hinausschieben:
             Ziehen und Pfeiltasten enden an der Grenze des Fensters, an der er entlanggleitet.
-            Passt er überhaupt nirgends hinein, greift die Begrenzung nicht — dann ist er frei
+            Passt er überhaupt nirgends hinein, greift die Begrenzung nicht: er ist dann frei
             verschiebbar, und die roten Ecken zeigen, wo er hinausragt.
           </p>
         </div>
@@ -313,7 +318,7 @@
           3 m sind der Mindestwert, nicht die Regel. Grenzgaragen sind privilegiert, ein
           Bebauungsplan kann abweichende Baugrenzen festsetzen.</p>
         <p>Nach § 15 Abs. 2 ImmoWertV kann ein einzelnes Grundstück innerhalb der
-          Richtwertzone eine abweichende Nutzungsart haben — dann gilt der Zonenwert nicht.</p>
+          Richtwertzone eine abweichende Nutzungsart haben; dann gilt der Zonenwert nicht.</p>
       </div>
     </div>
 
@@ -324,7 +329,7 @@
           <h2>Wege von hier</h2>
           <p class="page-head__sub">
             Für jedes hinterlegte Ziel Auto, Rad und ÖPNV, gerechnet vom Grundstück aus.
-            Beim ÖPNV wird der Weg zur ersten Haltestelle mitgewählt — zu Fuß, mit dem
+            Beim ÖPNV wird der Weg zur ersten Haltestelle mitgewählt: zu Fuß, mit dem
             Rad oder mit dem Auto bis Park-and-Ride. Ziele gelten für alle Grundstücke.
           </p>
         </div>
@@ -340,7 +345,7 @@
 
       <p v-if="routesError" class="notice notice--error">{{ routesError }}</p>
       <p v-else-if="!plot.anchor" class="notice">
-        Dieses Grundstück hat keine Koordinate — ohne sie gibt es keinen Startpunkt für eine Route.
+        Dieses Grundstück hat keine Koordinate. Ohne sie gibt es keinen Startpunkt für eine Route.
       </p>
       <p v-else-if="!locatedDestinations.length && state.data.destinations.length" class="notice">
         Keines der Ziele ist verortet. Unter „Ziele bearbeiten“ die Adressen nachschlagen lassen.
@@ -366,6 +371,11 @@
           Lärm, Hochwasser, Baugrund und Luft prüfen
         </RouterLink>
       </p>
+
+      <!-- At the foot of the page and absent while there is nothing: a link
+           already handed out is the one thing here somebody needs to be able
+           to take back. -->
+      <SharedLinks ref="links" :plot="plot" />
     </section>
   </div>
 
@@ -393,6 +403,8 @@
 
 <script>
 import SitePlan from "../components/SitePlan.vue";
+import SharePanel from "../components/SharePanel.vue";
+import SharedLinks from "../components/SharedLinks.vue";
 import RouteCards from "../components/RouteCards.vue";
 import NearbyPanel from "../components/NearbyPanel.vue";
 import SurroundingsMap from "../components/SurroundingsMap.vue";
@@ -416,7 +428,7 @@ const MAX_EDGE = 30;
 
 export default {
   name: "PlotView",
-  components: { SitePlan, RouteCards, NearbyPanel, SurroundingsMap },
+  components: { SitePlan, SharePanel, SharedLinks, RouteCards, NearbyPanel, SurroundingsMap },
   props: {
     /** The plot's id, straight out of the URL. */
     id: { type: String, required: true }
@@ -428,6 +440,7 @@ export default {
        *  in. `null` means nobody is editing, so the stored size is shown. */
       sizeDraft: { length: null, width: null },
       measurement: { points: [], length: 0 },
+      sharing: false,
       naming: false,
       typeName: "",
       /** Outlines are not stored with the plot: they are somebody else's data,
@@ -551,7 +564,7 @@ export default {
     priceRange() { return { lo: this.plot.bodenrichtwert * 0.7, hi: this.plot.bodenrichtwert * 1.45 }; },
     boundaries() {
       return polygonEdges(this.plot.polygon).map((edge, i) => ({
-        name: `${edgeCompass(this.plot.polygon, i, this.plot.northOffset)} — ${i === (this.plot.streetEdge ?? 0) ? "zur Straße" : "Nachbar"}`,
+        name: `${edgeCompass(this.plot.polygon, i, this.plot.northOffset)} · ${i === (this.plot.streetEdge ?? 0) ? "zur Straße" : "Nachbar"}`,
         length: edge.length
       }));
     },
@@ -649,6 +662,7 @@ export default {
       if (target) this.$router.push({ name: "plot", params: { id: target.id } });
     },
     print() { window.print(); },
+
     toggleMeasuring() {
       state.plan.measuring = !state.plan.measuring;
       if (!state.plan.measuring) this.measurement = { points: [], length: 0 };
@@ -799,6 +813,7 @@ export default {
 </script>
 
 <style scoped>
+
 
 .page-head__sub{ max-width: 64ch; }
 

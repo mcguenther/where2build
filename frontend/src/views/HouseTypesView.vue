@@ -6,7 +6,7 @@
         <h1>Haustypen</h1>
         <p class="page-head__sub">
           Der Katalog gilt für alle Grundstücke. Jede Karte prüft selbst, auf welche Kandidaten
-          der Baukörper überhaupt passt — geprüft wird, ob sich das Rechteck in irgendeiner
+          der Baukörper überhaupt passt: geprüft wird, ob sich das Rechteck in irgendeiner
           Drehung vollständig in das Bebauungsfenster legen lässt.
         </p>
       </div>
@@ -23,7 +23,7 @@
         <div class="panel__head"><h3>Vom Hersteller lesen</h3></div>
         <div class="panel__body stack">
           <p class="hint">
-            Link zu einem Haustyp — von jedem Hersteller, es gibt keine Liste
+            Link zu einem Haustyp, von jedem Hersteller: es gibt keine Liste
             erlaubter Anbieter. Gelesen wird nur die Seite, die hier steht; das
             Ergebnis je Adresse dauerhaft zwischengespeichert.
           </p>
@@ -62,10 +62,10 @@
       <div class="callout callout--caution">
         <h4>Wohnfläche ist nicht Grundfläche</h4>
         <p>Der häufigste Fehler beim Fertighaus. Beim ELK All in One 159 sind 159,21 m² die
-          Netto-Raumfläche über alle Geschosse — die <em>bebaute</em> Fläche beträgt 96,88 m².
+          Netto-Raumfläche über alle Geschosse; die <em>bebaute</em> Fläche beträgt 96,88 m².
           Wer die falsche Zahl auf die Karte legt, zeichnet ein Haus mit fast doppelter Grundfläche.</p>
         <p>Fehlen die Außenmaße, wird aus der bebauten Fläche ein Rechteck mit Seitenverhältnis
-          1,35 abgeleitet — im Lageplan per Regler korrigierbar.</p>
+          1,35 abgeleitet, im Lageplan per Regler korrigierbar.</p>
       </div>
     </section>
 

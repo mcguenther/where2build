@@ -25,151 +25,70 @@
     </ol>
 
     <p v-if="lost" class="notice notice--error" role="alert">
-      Der begonnene Entwurf ist nicht mehr vorhanden — beim Neuladen der Seite bleibt er
+      Der begonnene Entwurf ist nicht mehr vorhanden; beim Neuladen der Seite bleibt er
       nicht erhalten. Bitte noch einmal mit der Quelle beginnen.
     </p>
     <p v-if="error" class="notice notice--error" role="alert">{{ error }}</p>
 
     <!-- 1 · Quelle. Also what a stage without its data falls back to, so the
-         redirect in `checkStage` never renders a step that has nothing. -->
+         redirect in `checkStage` never renders a step that has nothing.
+         One field for all five ways in: the reading decides which of them is
+         happening, and the chips let it be overruled. -->
     <section v-if="stage === 'quelle' || !reachable" class="stack">
-      <p class="subtitle">{{ sources.length }} Wege hinein. Welcher passt zu dem, was vorliegt?</p>
-      <div class="sources">
-        <label v-for="s in sources" :key="s.id" class="source" :class="{ 'source--selected': source === s.id }">
-          <input type="radio" name="source" :value="s.id" v-model="source">
-          <span class="source__name">{{ s.name }}</span>
-          <span class="source__text">{{ s.text }}</span>
-        </label>
-      </div>
+      <p class="subtitle">
+        Adresse, Flurstück, Koordinate, der Link einer Anzeige oder die eingefügte
+        Anzeigenseite: alles in dasselbe Feld.
+      </p>
 
-      <!-- A form, so the Enter key does what it does everywhere else. Without
-           one the address field swallowed it and nothing happened. -->
-      <form class="panel" @submit.prevent="submit">
-        <div class="panel__body stack">
-          <template v-if="source === 'search'">
-            <PlotSearch @select="searchPicked" />
-            <p class="hint">
-              Was getippt wurde, wird zuerst gelesen und dann nachgeschlagen: eine deutsche
-              Adresse beginnt nie mit einer Ziffer, eine Koordinate sind zwei Zahlen, und ein
-              Nenner (<span class="mono">85/1</span>) kommt in keiner Adresse vor. Bleiben zwei
-              Lesarten möglich, werden beide Verzeichnisse gefragt statt eine geraten.
-            </p>
-          </template>
+      <!-- A document the bookmarklet handed over. Not the field's business:
+           nothing was typed, there is nothing to correct, and a textarea
+           holding two megabytes of markup would show nobody anything. -->
+      <p v-if="handoverWaiting" class="hint">
+        Warten auf die Seite aus dem Tab, in dem das Lesezeichen geklickt wurde …
+      </p>
 
-          <template v-else-if="source === 'url'">
-            <div class="field">
-              <label for="q-url">Adresse der Anzeige</label>
-              <input id="q-url" type="url" inputmode="url" v-model="url" placeholder="https://…">
-            </div>
-            <p class="hint">
-              Die Seite wird auf dem Server geholt und ausgelesen. ImmoScout24 lässt das
-              nicht zu und antwortet jedem Server mit „Ich bin kein Roboter“ — dort führt
-              <button type="button" class="link-button" @click="source = 'paste'">„Seite einfügen“</button>
-              hinein: einmal das Lesezeichen einrichten, dann ist es ein Klick auf der
-              Anzeigenseite.
-            </p>
-          </template>
+      <QueryBox v-else class="panel wizard__query" :busy="busy"
+                @resolve="searchPicked" @read="readPayload" />
 
-          <template v-else-if="source === 'parcel'">
-            <div class="field-pair">
-              <CadastralDistrictPicker v-model="gemarkung" @select="gemarkungEntry = $event" />
-              <div class="field">
-                <label for="q-parcel-number">Flurstücksnummer</label>
-                <input id="q-parcel-number" type="text" v-model="flurstuecksnummer" placeholder="85/1">
-              </div>
-            </div>
-            <p class="hint">
-              <b>Gemarkung:</b> tippen und aus dem Verzeichnis wählen — der Name
-              (<span class="mono">Moritzburg</span>) oder der Gemarkungsschlüssel, den die
-              Sachdatenabfrage je nach Kartenebene vierstellig (<span class="mono">3044</span>)
-              oder sechsstellig (<span class="mono">143044</span>) zeigt. Beides wird angenommen,
-              auch ohne Eintrag im Verzeichnis.
-              <br>
-              <b>Flurstücksnummer:</b> so, wie sie im Geoportal steht —
-              <span class="mono">85/1</span>, <span class="mono">476</span> oder
-              <span class="mono">41/e</span>. Der Nenner darf ein Buchstabe sein.
-            </p>
-          </template>
+      <p class="hint">
+        Was getippt wurde, wird zuerst gelesen und dann nachgeschlagen: eine deutsche
+        Adresse beginnt nie mit einer Ziffer, eine Koordinate sind zwei Zahlen, und ein
+        Nenner (<span class="mono">85/1</span>) kommt in keiner Adresse vor. Bleiben zwei
+        Lesarten möglich, werden beide Verzeichnisse gefragt statt eine geraten. Was
+        darunter steht, lässt sich anklicken, wenn es die falsche ist.
+        <br>
+        <b>Eine Anzeigenseite</b> im Browser mit <span class="mono">Strg+A</span>,
+        <span class="mono">Strg+C</span> kopieren und hier einfügen: die Zwischenablage
+        führt neben dem Text auch das HTML mit, und daraus kommen Preis, Fläche und die
+        Bilder ohne Modell. Der <i>Kopf</i> der Seite kommt dabei nicht mit —
+        <span class="mono">Strg+A</span> wählt nur den Rumpf aus, also fehlen die
+        Meta-Angaben und mit ihnen die Koordinate. ImmoScout24 lässt außerdem keinen
+        Serverabruf zu; dort ist das Einfügen der Weg.
+      </p>
 
-          <template v-else-if="source === 'text'">
-            <div class="field">
-              <label for="q-text">Beschreibung aus der Anzeige</label>
-              <textarea id="q-text" v-model="listingText"
-                        placeholder="Den Beschreibungstext der Anzeige einfügen — mit Ortsteil, Fläche und Straße"></textarea>
-            </div>
-            <p class="hint">
-              Dieser Weg braucht kein Modell. Gesucht wird über Muster und das
-              Gemarkungsverzeichnis: eine Flurstücksnummer im Text, ein Ortsteil mit
-              seiner Beziehung („OT von“, „am Ortsrand von“, „6 km entfernt“), die
-              Fläche so, wie sie dasteht, und die Straße. Was daraus folgt, steht
-              anschließend Zeile für Zeile im Protokoll.
-            </p>
-          </template>
-
-          <template v-else>
-            <!-- Handed over by the bookmarklet: the whole document, so there is
-                 nothing to paste, nothing to correct and nothing to confirm. -->
-            <div v-if="handover" class="uebergabe">
-              <p><b>Die Seite ist angekommen</b> — {{ Math.round(handover.html.length / 1024) }} kB,
-                 vollständig, mit Kopf und Skripten.</p>
-              <p v-if="handover.url" class="hint mono">{{ handover.url }}</p>
-            </div>
-            <p v-else-if="handoverWaiting" class="hint">
-              Warten auf die Seite aus dem Tab, in dem das Lesezeichen geklickt wurde …
-            </p>
-
-            <template v-else>
-              <div class="field">
-                <label for="q-paste">Anzeige hier einfügen</label>
-                <textarea id="q-paste" v-model="pastedText" @paste="takePaste"
-                          placeholder="Strg+V — die kopierte Anzeigenseite"></textarea>
-              </div>
-              <p class="hint">
-                Im Browser <span class="mono">Strg+A</span>, <span class="mono">Strg+C</span>,
-                hier <span class="mono">Strg+V</span>. Die Zwischenablage führt neben dem Text
-                auch das HTML mit — daraus kommen Preis, Fläche, Bilder und der
-                Beschreibungstext ohne Modell. Der <i>Kopf</i> der Seite kommt nicht mit:
-                <span class="mono">Strg+A</span> wählt nur den Rumpf aus, also fehlen die
-                Meta-Angaben und mit ihnen die Koordinate. Wer die auch haben will, richtet
-                einmal das Lesezeichen darunter ein.
-                <span v-if="pastedHtml"><b>Das HTML wurde übernommen</b> ({{ Math.round(pastedHtml.length / 1024) }} kB).</span>
-              </p>
-
-              <details class="gelesen">
-                <summary>
-                  <span class="gelesen__titel">Ein Klick statt Kopieren</span>
-                  <span class="gelesen__zahl">Lesezeichen, einmal einrichten</span>
-                </summary>
-                <p class="subtitle">
-                  Diesen Knopf in die Lesezeichenleiste ziehen — ist sie nicht zu sehen,
-                  holt <span class="mono">Strg+Umschalt+B</span> sie hervor. Auf der
-                  Anzeigenseite dann darauf klicken: der Browser schickt die Seite, die er
-                  ohnehin vor sich hat, hierher. Vollständig, also mit allem, was das
-                  Kopieren verliert.
-                </p>
-                <p class="row">
-                  <a class="btn" :href="bookmarkletLink" @click.prevent>Grundstück prüfen</a>
-                </p>
-                <p class="hint">
-                  Der Knopf tut hier nichts, er <i>ist</i> das Lesezeichen. Er öffnet
-                  <span class="mono">{{ appOrigin }}</span> in einem neuen Tab und übergibt
-                  die Seite dorthin; an das Portal geht dabei keine Anfrage.
-                </p>
-              </details>
-            </template>
-          </template>
-
-          <div v-if="source !== 'search'" class="row">
-            <!-- The click carries `.prevent`, so the button's own activation
-                 does not submit the form a second time. -->
-            <button type="submit" class="btn" :disabled="busy || !ready" @click.prevent="submit">
-              {{ busy ? "Wird gelesen …" : readLabel }}
-            </button>
-            <span v-if="busy" class="hint">Der Abruf kann eine Minute dauern.</span>
-          </div>
-          <p v-else-if="busy" class="hint">Das Kataster wird gefragt …</p>
-        </div>
-      </form>
+      <!-- Its own modifier, and that is not decoration: the search step has a
+           `details.gelesen` too, so a script waiting for one would match this
+           one on the step before and then wait for a list that never comes. -->
+      <details class="gelesen gelesen--lesezeichen no-print">
+        <summary>
+          <span class="gelesen__titel">Ein Klick statt Kopieren</span>
+          <span class="gelesen__zahl">Lesezeichen, einmal einrichten</span>
+        </summary>
+        <p class="subtitle">
+          Diesen Knopf in die Lesezeichenleiste ziehen — ist sie nicht zu sehen, holt
+          <span class="mono">Strg+Umschalt+B</span> sie hervor. Auf der Anzeigenseite dann
+          darauf klicken: der Browser schickt die Seite, die er ohnehin vor sich hat,
+          hierher. Vollständig, also mit allem, was das Kopieren verliert.
+        </p>
+        <p class="row">
+          <a class="btn" :href="bookmarkletLink" @click.prevent>Grundstück prüfen</a>
+        </p>
+        <p class="hint">
+          Der Knopf tut hier nichts, er <i>ist</i> das Lesezeichen. Er öffnet
+          <span class="mono">{{ appOrigin }}</span> in einem neuen Tab und übergibt die
+          Seite dorthin; an das Portal geht dabei keine Anfrage.
+        </p>
+      </details>
     </section>
 
     <!-- 2 · Gelesene Werte -->
@@ -181,7 +100,7 @@
     <section v-else-if="stage === 'suche'" class="stack">
       <p class="subtitle">
         Ein Inserat nennt fast nie sein Flurstück. Gesucht wird deshalb über das, was
-        dasteht — Ortsteil, Fläche, Straße —, und die Karte zeigt dabei durchgehend, was
+        dasteht (Ortsteil, Fläche, Straße), und die Karte zeigt dabei durchgehend, was
         noch möglich ist. Reicht es nicht für ein einzelnes Flurstück, sagt die Antwort,
         worauf sich die Lage eingrenzen lässt.
       </p>
@@ -226,7 +145,7 @@
     <!-- 3 · Grundstück: die Flurstücke und die Angaben dazu -->
     <section v-else-if="stage === 'flurstueck'" class="stack">
       <p class="subtitle">
-        So liegen die Flurstücke im Kataster. Ein Klick wählt ein anderes — zum
+        So liegen die Flurstücke im Kataster. Ein Klick wählt ein anderes; zum
         Zusammensetzen mehrerer umschalten. Den Ausschnitt bewegt die gedrückte
         Maustaste, das Mausrad zoomt, ein Doppelklick setzt ihn zurück.
       </p>
@@ -244,7 +163,7 @@
            the neighbours are on the map and the choice is the user's. -->
       <p v-if="corrected" class="notice" role="status">
         <b>Zur gesuchten Adresse gehört ein anderes Flurstück als das unter der Koordinate.</b>
-        Gewählt ist {{ corrected }} — die Lagebezeichnung im Kataster nennt genau diese
+        Gewählt ist {{ corrected }}: die Lagebezeichnung im Kataster nennt genau diese
         Adresse. Ein Klick auf ein anderes Flurstück ändert das.
       </p>
 
@@ -286,7 +205,7 @@
              role="status">{{ selectionNote }}</p>
           <p class="panel__footnote">
             <template v-if="choices.length > 1">
-              {{ choices.length }} Flurstücke im Umkreis — die Katasterlinien beschriften
+              {{ choices.length }} Flurstücke im Umkreis; die Katasterlinien beschriften
               jedes mit seiner Nummer.
               {{ composing ? "Ein Klick nimmt eines dazu oder heraus." : "Ein Klick wählt ein anderes." }}
             </template>
@@ -326,7 +245,7 @@
           </div>
           <div class="field">
             <label for="q-note">Notiz</label>
-            <input id="q-note" type="text" v-model="draft.note" placeholder="Optional — was auffiel">
+            <input id="q-note" type="text" v-model="draft.note" placeholder="Optional: was auffiel">
           </div>
           <p v-if="!draft.bodenrichtwert" class="notice">
             Für dieses Grundstück ließ sich kein Bodenrichtwert abrufen. Die Preiseinordnung
@@ -352,12 +271,14 @@
 
 <script>
 import SitePlan from "../components/SitePlan.vue";
-import CadastralDistrictPicker from "../components/CadastralDistrictPicker.vue";
-import PlotSearch from "../components/PlotSearch.vue";
 import ParcelSearch from "../components/ParcelSearch.vue";
+import QueryBox from "../components/QueryBox.vue";
 import { state, addPlot, autoSeatHouse } from "../lib/store.js";
 import { WIZARD_STAGES, wizardStage } from "../router/stages.js";
-import { readListing, readPage, resolveParcel, landValue, nearbyParcels } from "../lib/api.js";
+import { takeHandoff } from "../lib/handoff.js";
+import {
+  readListing, readPage, resolveParcel, landValue, nearbyParcels, PAGE_LIMIT
+} from "../lib/api.js";
 import { queryFromFields } from "../lib/search.js";
 import { plotFromCadastre, parcelForAddress, outerRing } from "../lib/plots.js";
 import { polygonArea, polygonCentroid, pointInPolygon } from "../lib/geometry.js";
@@ -390,21 +311,10 @@ function fieldsFromResponse(response) {
   }));
 }
 
-/** What POST /api/listings/extract accepts in `text`. */
-/* How much page content travels to the reader.
- *
- * Raised from 400 000 with the bookmarklet: that hands over
- * `document.documentElement.outerHTML`, and a portal exposé runs past a
- * megabyte of it. The old cap came with the assumption that "everything the
- * extraction wants sits in the first part of the document", which is not true
- * of a whole document — JSON-LD is routinely the last thing in the body. The
- * endpoint's own limit is the same number, and nginx needs a
- * `client_max_body_size` above it. */
-const PASTE_LIMIT = 3000000;
 
 export default {
   name: "WizardView",
-  components: { SitePlan, CadastralDistrictPicker, PlotSearch, ParcelSearch },
+  components: { SitePlan, ParcelSearch, QueryBox },
   props: {
     /** The stage's URL segment; the route only matches the four known ones. */
     stage: { type: String, required: true }
@@ -418,34 +328,19 @@ export default {
       lost: false,
       // How many history entries this wizard pushed; see `stepBack`.
       ownEntries: 0,
-      source: "search",
-      url: "",
-      gemarkung: "",
-      // The directory entry the text stands for, once one does. Null while
-      // the text is free-hand — which stays a valid way to look one up.
-      gemarkungEntry: null,
-      flurstuecksnummer: "",
-      pastedText: "",
-      /* What the clipboard carried as `text/html`. A Ctrl+A copy out of a
-       * browser puts both flavours on the clipboard, and a textarea only ever
-       * receives the plain one — which loses the meta tags, the price, the
-       * coordinate and every image URL. Those are exactly what makes the paste
-       * path work without a model, and they are the whole point of this field:
-       * it exists for the portals that refuse a server-side fetch. */
-      pastedHtml: "",
-      /* The document a bookmarklet handed over: `{ url, html }`. Deliberately
-       * not the paste field's own state — it is not a paste. The textarea
-       * would have to hold two megabytes of markup to show it, and there is
-       * nothing in it for anyone to correct. */
+      /* The document a bookmarklet handed over: `{ url, html }`.
+       *
+       * Not the field's state and not a paste. `handoff` (one f, lib/handoff.js)
+       * is a different thing entirely -- what the start page leaves behind for
+       * this view; this is a whole page arriving from another tab. */
       handover: null,
       /* The nonce this tab was opened with, while the other tab has not
        * answered yet. Two things are checked before a document is taken: the
        * message comes from the window that opened this one, and it carries
-       * this nonce. The sender's origin cannot be checked — it is whichever
-       * portal the user was looking at — so the nonce stands in for it. */
+       * this nonce. The sender's origin cannot be checked -- it is whichever
+       * portal the user was looking at -- so the nonce stands in for it. */
       handoverNonce: "",
       handoverWaiting: false,
-      listingText: "",
       busy: false,
       error: "",
       readFields: [],
@@ -499,18 +394,6 @@ export default {
         { id: "suche", name: "Flurstück suchen" },
         { id: "flurstueck", name: "Flurstück und Angaben" }
       ],
-      sources: [
-        { id: "search", name: "Suchen",
-          text: "Adresse, Flurstück oder Koordinate. Vorschläge kommen aus den amtlichen Hauskoordinaten und dem Gemarkungsverzeichnis." },
-        { id: "url", name: "Link einwerfen",
-          text: "Adresse einer Anzeige. Der Server holt die Seite und liest Adresse, Flurstück, Kaufpreis und Fläche heraus." },
-        { id: "parcel", name: "Flurstück direkt",
-          text: "Gemarkung und Flurstücksnummer, so wie sie im Geoportal stehen." },
-        { id: "text", name: "Text durchsuchen",
-          text: "Nur der Beschreibungstext. Daraus wird das Flurstück gesucht — ohne Modell, allein über Muster und das Gemarkungsverzeichnis." },
-        { id: "paste", name: "Seite einfügen",
-          text: "Für Portale, die keinen Serverabruf zulassen — ImmoScout24 ist der Fall. Die Anzeigenseite einfügen, oder einmal das Lesezeichen einrichten und sie mit einem Klick herüberschicken." }
-      ]
     };
   },
   computed: {
@@ -533,53 +416,77 @@ export default {
       const filled = this.readFields.filter(f => f.value).length;
       return filled ? `${filled} von ${this.readFields.length} Feldern belegt` : "";
     },
-    ready() {
-      // The search has no button: picking a suggestion is the action.
-      if (this.source === "search") return false;
-      if (this.source === "url") return /^https?:\/\/\S{6,}/.test(this.url.trim());
-      if (this.source === "parcel") return this.gemarkung.trim() && this.flurstuecksnummer.trim();
-      if (this.source === "text") return this.listingText.trim().length > 20;
-      return Boolean(this.handover) || this.pastedText.trim().length > 20;
-    },
+    computedArea() { return this.draft ? polygonArea(this.draft.polygon) : 0; },
     /** The app's own address, which is what the bookmarklet has to be told:
      *  it runs on the portal's page and knows nothing else about us. */
     appOrigin() { return window.location.origin; },
     bookmarkletLink() { return bookmarkletHref(this.appOrigin); },
-    /** What travels to the reader for a page out of the browser.
-     *
-     *  A handed-over document first: it is the whole thing. Then the
-     *  clipboard's HTML flavour, which is the body only. Then the plain text,
-     *  which is what a textarea shows. */
-    pageContent() { return this.handover?.html || this.pastedHtml || this.pastedText; },
-    readLabel() {
-      return this.source === "parcel" ? "Nachschlagen" : "Lesen";
-    },
-    computedArea() { return this.draft ? polygonArea(this.draft.polygon) : 0; },
-    /** The footprint the seating tried to place, for the sentence that says it
-     *  found no room. The template has always named this and nothing ever
-     *  defined it: the branch only runs for a parcel too small for the default
-     *  body, so the page it crashed was one nobody had reached. */
-    /** What the cadastre is asked for: the key of the chosen entry, which is
-     *  unambiguous where two districts share a name, else the plain text. */
-    gemarkungQuery() { return this.gemarkungEntry?.schluessel || this.gemarkung.trim(); }
   },
-  created() { this.checkStage(); },
-  beforeUnmount() { this.stopHandover(); },
+  created() {
+    this.checkStage();
+    this.takeHandoff();
+    this.startHandover();
+  },
+  beforeUnmount() {
+    this.stopHandover();
+  },
   watch: {
-    stage() { this.checkStage(); },
-    /* The handover starts from the address, and the address is not necessarily
-     * resolved when this component is created: mounted through `router-view`
-     * it is, mounted directly it is not. An immediate watcher covers both, and
-     * `startHandover` is written to survive being called twice. The key is
-     * composed from the constant so it cannot drift away from the bookmarklet
-     * that puts the parameter there. */
-    [`$route.query.${HANDOVER_QUERY}`]: { handler: "startHandover", immediate: true },
-    // Emptying the field has to empty the clipboard HTML with it, or the next
-    // read silently sends the page that was pasted before.
-    pastedText(value) { if (!value.trim()) this.pastedHtml = ""; }
+    stage() { this.checkStage(); }
   },
   methods: {
     area, euroPerSqm, num,
+
+    /** An input the start page left behind. It is the same input the first
+     *  step takes, so it runs through the same two methods — the field is
+     *  somewhere else, the work is here. */
+    takeHandoff() {
+      const input = takeHandoff();
+      if (!input) return;
+      if (input.resolve) return this.searchPicked(input.resolve);
+      if (input.read) return this.readPayload(input.read);
+    },
+
+    /** Announce this tab to the bookmarklet that opened it.
+     *
+     *  The bookmarklet cannot send the document straight away: this app has to
+     *  be mounted and listening first, and nothing else tells it when that is.
+     *  So the tab it opened says so, and the nonce in its own address is what
+     *  it says it with. */
+    startHandover() {
+      const nonce = this.$route.query[HANDOVER_QUERY];
+      if (this.handoverNonce || this.handover) return;
+      if (typeof nonce !== "string" || !nonce) return;
+      // Opened by hand, or the opener is gone: there is nobody to answer, and
+      // the field below is then the right answer without saying anything.
+      if (!window.opener) return;
+      this.handoverNonce = nonce;
+      this.handoverWaiting = true;
+      window.addEventListener("message", this.takeHandover);
+      // `"*"`, because the portal's origin is not knowable from here — and
+      // there is nothing to keep: the nonce is in this tab's own address bar.
+      window.opener.postMessage({ w2b: HANDOVER_READY, [HANDOVER_QUERY]: nonce }, "*");
+    },
+
+    /** The document, once the other tab sends it. Then straight into reading:
+     *  the click on the bookmarklet was the instruction. */
+    takeHandover(event) {
+      const data = event.data;
+      if (!this.handoverNonce || event.source !== window.opener) return;
+      if (!data || data.w2b !== HANDOVER_PAGE || data[HANDOVER_QUERY] !== this.handoverNonce) return;
+      if (typeof data.html !== "string" || !data.html) return;
+      this.stopHandover();
+      this.handover = {
+        url: typeof data.url === "string" ? data.url : "",
+        html: data.html.slice(0, PAGE_LIMIT)
+      };
+      this.readPayload({ kind: "paste", text: "", html: this.handover.html });
+    },
+
+    stopHandover() {
+      this.handoverNonce = "";
+      this.handoverWaiting = false;
+      window.removeEventListener("message", this.takeHandover);
+    },
 
     /** A stage reached without the data behind it — a reload, or the back
      *  button after the plot was created — sends the user back to the start
@@ -622,92 +529,21 @@ export default {
       }
     },
 
-    /** Keep the clipboard's HTML flavour alongside the text the textarea shows.
-     *
-     *  Worth having and not enough: measured in Chromium, this flavour carries
-     *  the price (`#viewad-price`), the attribute list, the image URLs and the
-     *  description — every one of them a body element — and no `<meta>` and no
-     *  JSON-LD, because `Strg+A` selects the body and a `<script>` is never
-     *  part of a selection. The coordinate lives in `og:latitude`, so a pasted
-     *  page has none. `startHandover` is the way round that. */
-    takePaste(event) {
-      const html = event.clipboardData?.getData("text/html");
-      if (html && html.length > this.pastedHtml.length) this.pastedHtml = html.slice(0, PASTE_LIMIT);
-    },
 
-    /** Announce this tab to the bookmarklet that opened it.
-     *
-     *  The bookmarklet cannot send the document straight away: this app has to
-     *  be mounted and listening first, and nothing else tells it when that is.
-     *  So the tab it opened says so, and the nonce in its own address is what
-     *  it says it with. */
-    startHandover() {
-      const nonce = this.$route.query[HANDOVER_QUERY];
-      if (this.handoverNonce || this.handover) return;
-      if (typeof nonce !== "string" || !nonce) return;
-      this.source = "paste";
-      // Opened by hand, or the opener is gone: there is nobody to answer. The
-      // paste field below is then the right answer and says so itself.
-      if (!window.opener) return;
-      this.handoverNonce = nonce;
-      this.handoverWaiting = true;
-      window.addEventListener("message", this.takeHandover);
-      // `"*"`, because the portal's origin is not knowable from here — and
-      // there is nothing to keep: the nonce is in this tab's own address bar.
-      window.opener.postMessage({ w2b: HANDOVER_READY, [HANDOVER_QUERY]: nonce }, "*");
-    },
 
-    /** The document, once the other tab sends it. Then straight into reading:
-     *  the click on the bookmarklet was the instruction. */
-    takeHandover(event) {
-      const data = event.data;
-      if (!this.handoverNonce || event.source !== window.opener) return;
-      if (!data || data.w2b !== HANDOVER_PAGE || data[HANDOVER_QUERY] !== this.handoverNonce) return;
-      if (typeof data.html !== "string" || !data.html) return;
-      this.stopHandover();
-      this.handover = {
-        url: typeof data.url === "string" ? data.url : "",
-        html: data.html.slice(0, PASTE_LIMIT)
-      };
-      this.read();
-    },
-
-    stopHandover() {
-      this.handoverNonce = "";
-      this.handoverWaiting = false;
-      window.removeEventListener("message", this.takeHandover);
-    },
-
-    /** The one way in, for the Enter key and for the button alike. */
-    submit() {
-      if (this.busy || !this.ready) return;
-      this.read();
-    },
-
-    async read() {
+    /** A listing to read: a link the server fetches, or text and markup that
+     *  came out of the clipboard. Everything lands on the same step — typed
+     *  prose used to jump straight into the search, so the same page arrived
+     *  at two different places depending on which box it went into, and the
+     *  values it *did* carry (area, price) were never shown. */
+    async readPayload({ kind, text, html }) {
       this.busy = true;
       this.error = "";
       try {
-        if (this.source === "parcel") {
-          // Nothing to search for: the district and the number are the answer.
-          this.returnStage = "quelle";
-          await this.queryCadastre({
-            gemarkung: this.gemarkungQuery,
-            flurstuecksnummer: this.flurstuecksnummer.trim()
-          });
-          return;
-        }
-        // Everything that is not a parcel key goes through the same reader and
-        // lands on the same step. Typed prose used to jump straight into the
-        // search, so the same page arrived at two different places depending on
-        // which box it was pasted into — and the values it *did* carry (area,
-        // price) were never shown.
-        const response = this.source === "url"
-          ? await readListing(this.url.trim())
-          : await readPage(this.source === "text" ? this.listingText.trim() : this.pageContent);
+        this.returnStage = "quelle";
+        const response = kind === "url" ? await readListing(text) : await readPage(html || text);
         this.readFields = fieldsFromResponse(response);
-        this.description = response?.beschreibung
-          || (this.source === "text" ? this.listingText.trim() : this.pastedText);
+        this.description = response?.beschreibung || text;
         this.images = response?.bilder || [];
         // Straight on. The read values were a step of their own and answered a
         // question nobody had asked yet — they are what the search runs on, so
@@ -733,8 +569,7 @@ export default {
       const read = name => this.readFields.find(f => f.key === name)?.value;
       this.searchQuery = queryFromFields(this.readFields, {
         ...(this.description ? { text: this.description } : {}),
-        ...(this.images.length ? { bilder: this.images } : {}),
-        ...(this.gemarkungQuery ? { gemarkung: this.gemarkungQuery } : {})
+        ...(this.images.length ? { bilder: this.images } : {})
       });
       this.listingExtras = {
         askingPrice: numberFrom(read("kaufpreis_eur")),
@@ -875,7 +710,7 @@ export default {
         this.detached = this.detachedParcels(plot, answer.features ?? []);
         this.selectionNote = this.detached.length
           ? "Die rot markierten Flurstücke hängen nicht mit dem übrigen Grundstück "
-            + "zusammen. Gezeichnet ist nur der zusammenhängende Teil — entweder die "
+            + "zusammen. Gezeichnet ist nur der zusammenhängende Teil: entweder die "
             + "markierten wieder abwählen oder das Flurstück dazwischen dazunehmen."
           : null;
         this.corrected = null;
@@ -952,6 +787,9 @@ export default {
 .subtitle{ color: var(--w2b-graphite); font-size: var(--w2b-text-s); max-width: 70ch; }
 .hint{ color: var(--w2b-muted); font-size: var(--w2b-text-s); }
 
+/* The field is a panel of its own inside the step. */
+.wizard__query{ padding: var(--w2b-space-4); }
+
 .steps{ display: flex; gap: var(--w2b-space-2); flex-wrap: wrap; list-style: none; margin: 0; padding: 0; }
 .steps li{
   display: flex; align-items: center; gap: var(--w2b-space-2);
@@ -969,16 +807,6 @@ export default {
 .steps .is-done{ color: var(--w2b-primary); border-color: var(--w2b-primary-veil); }
 .steps .is-done .steps__number{ background: var(--w2b-primary-veil); color: var(--w2b-primary); }
 
-.sources{ display: grid; grid-template-columns: repeat(auto-fit, minmax(272px, 1fr)); gap: var(--w2b-space-3); }
-.source{
-  display: flex; flex-direction: column; gap: var(--w2b-space-2); cursor: pointer;
-  padding: var(--w2b-space-4); border: 1.5px solid var(--w2b-line); border-radius: var(--w2b-radius-m);
-  background: var(--w2b-surface);
-}
-.source input{ position: absolute; opacity: 0; pointer-events: none; }
-.source--selected{ border-color: var(--w2b-primary); background: var(--w2b-primary-veil); }
-.source__name{ font-family: var(--w2b-font-display); font-weight: 600; font-size: var(--w2b-text-l); }
-.source__text{ font-size: var(--w2b-text-s); color: var(--w2b-graphite); }
 
 .field-pair{ display: grid; grid-template-columns: 1fr 1fr; gap: var(--w2b-space-3); }
 @media (max-width: 560px){ .field-pair{ grid-template-columns: 1fr; } }
@@ -1023,19 +851,6 @@ export default {
 .gelesen .subtitle{ margin-top: 0; }
 .gelesen .suggestions{ margin-top: var(--w2b-space-3); }
 .gelesen .row{ margin-top: var(--w2b-space-3); }
-
-/* The handed-over page: a statement, not a field. The URL is set in the mono
-   face and has to be allowed to break — a portal's exposé address is longer
-   than the panel. */
-.uebergabe{
-  border: 1px solid var(--w2b-line); border-radius: var(--w2b-radius-m);
-  background: var(--w2b-surface-sunken); padding: var(--w2b-space-4);
-}
-.uebergabe p{ margin: 0; }
-.uebergabe p + p{ margin-top: var(--w2b-space-2); overflow-wrap: anywhere; }
-/* The bookmarklet is a link only because a bookmark has to be dragged from
-   one; it is a button to the eye, like every other action here. */
-details.gelesen a.btn{ text-decoration: none; }
 
 .check-grid{ display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: var(--w2b-space-4); align-items: start; }
 @media (max-width: 900px){ .check-grid{ grid-template-columns: 1fr; } }

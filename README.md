@@ -81,13 +81,51 @@ and imports it as JSON.
 
 ## Deploying it
 
-Two containers, no database. The backend is a proxy and a disk cache in front
-of the official services; everything a user enters stays in their browser.
+Four containers: nginx with the built app, the backend, Postgres, and a local
+identity provider. Without an account everything a user enters stays in their
+browser; with one it is stored server-side and a plot can be shared by link.
 
 ```bash
 cp backend/.env.example backend/.env    # optional — only LLM_API_KEY matters
-docker compose up --build               # then open http://localhost:8080
+docker compose up --build --remove-orphans   # then open http://localhost:8080
 ```
+
+`--remove-orphans` is worth typing every time: a service that was renamed or
+dropped between two versions of this file leaves its container running, and
+Compose only says so in a line that scrolls past. Two more, for when the stack
+is not wanted:
+
+```bash
+docker compose down --remove-orphans    # stop; the volumes stay, so does the work
+docker compose down -v                  # and throw the volumes away with it
+docker image prune                      # images nothing points at any more
+```
+
+`docker compose down` on its own keeps four volumes: the backend's cache of
+official answers, the scheduler's state, Postgres, and authentik's media. That
+is the point of them — `up` again and the plots are still there. `-v` is what
+empties the database, and `docker system df` says what any of it costs.
+
+There is no demo account: „Anmelden" leads to a sign-in page with a
+„Konto anlegen" link that works, and the account it creates is a real one in
+the local provider. The administrator is `akadmin` with the password in
+`docker-compose.yml`, at <http://localhost:9000/if/admin/>.
+
+The database and the provider are part of the default stack because without
+them a third of the app is unreachable — no account, no server storage, no
+shared link. Both are deliberately local: the credentials are in
+`docker-compose.yml`, the provider is published only on this machine, and
+everything names `localhost`. A deployment replaces them; see
+[Signing in](#signing-in).
+
+The provider is [authentik](https://goauthentik.io), configured entirely by
+`ops/authentik/where2build.yaml` — the OIDC provider and application, an
+enrollment flow so registering works, and German as the interface language.
+It is a real identity provider, so give it about a minute on the first start;
+until then „Anmelden" leads to a page that is not up yet. It listens on
+**9000** of its own, not behind the nginx below: authentik serves from the
+root of its origin, including an `/api/` of its own, and has no setting for a
+sub-path.
 
 nginx serves the built frontend and proxies `/api` to the backend, so the
 browser only ever sees one origin and CORS never enters into it. The backend
@@ -102,6 +140,7 @@ if you want it separately.
 | **Extraction** | Without `LLM_API_KEY` in `backend/.env`, reading a listing page stays switched off. Everything else works. |
 | **Contact address** | Set `APP_CONTACT` before any real use: the Transitous usage policy requires one. |
 | **Own router** | `docker compose -f docker-compose.yml -f docker-compose.local-routing.yml up` runs MOTIS here instead of asking Transitous. See below. |
+| **Accounts** | `docker compose down -v` throws the database away with the volume `db-data`. Point `DATABASE_URL` at your own Postgres and the `OIDC_*` variables at your own provider to deploy this for real, and drop the `db` and `auth` services. |
 
 `backend/.env` is read if it exists and skipped if it does not, so the stack
 comes up either way.
@@ -261,6 +300,15 @@ nothing else.
 | `POST` | `/api/neighbours` | one coordinate → the neighbouring buildings from `ave:GebaeudeBauwerk`, the same ALKIS WFS the parcels come from — for showing where a setback area would reach onto the plot. Overpass is the fallback where one is configured; nothing has to be |
 | `GET` | `/api/basemap/style.json`, `/api/basemap/{path}` | the vector basemap, rewritten so MapLibre never reaches the internet itself |
 | `GET` | `/api/health` | which services are configured |
+| `GET` | `/api/auth/me` | who is signed in, and whether signing in exists here at all |
+| `GET` | `/api/auth/login`, `/api/auth/callback` | the OIDC round trip, run by the backend; `?ziel=` comes back to the page it started on |
+| `POST` | `/api/auth/logout` | drops the session cookie |
+| `GET`, `DELETE` | `/api/account` | what is held for the signed-in person, and deleting all of it — the browser's own copy stays |
+| `GET`, `PUT` | `/api/plots`, `/api/plots/{id}`, `/api/settings` | the account's copy of the document, one row per plot; 200 plots and 2 MiB per document |
+| `POST`, `GET` | `/api/shares` | share a plot by link, and list one's own. What travels beyond the plot's registered facts is switched on per link and defaults to off |
+| `GET`, `DELETE` | `/api/shares/{token}` | the shared snapshot, and withdrawing it. The `GET` has no session: the token is the access |
+| `GET` | `/api/shares/{token}/vorschau.jpg` | the 1200 × 630 card a chat shows for that link, drawn server-side and kept for the life of the share |
+| `GET` | `/api/shares/{token}/vorschau-kopf` | the plot's `og:` tags as an HTML fragment; nginx splices it into the head of `index.html` on `/geteilt/…`, so a preview bot gets them without the app having to run |
 
 ## Configuration
 
@@ -278,10 +326,147 @@ No provider is wired in. The client is OpenAI-compatible, so switching is a
 change to `LLM_BASE_URL` and nothing else. `APP_USER_AGENT` must carry a real
 contact address before any real use of Transitous.
 
+### Signing in
+
+Optional, and off until an issuer is named. Without `OIDC_ISSUER` the app is
+what it has always been: everything stays in the browser, the header shows no
+account, and `/api/health` says the same.
+
+```
+OIDC_ISSUER=https://auth.example.org
+OIDC_CLIENT_ID=where2build
+OIDC_CLIENT_SECRET=...
+OIDC_SESSION_SECRET=...          # openssl rand -base64 32
+OIDC_PUBLIC_BASE_URL=https://where2build.example.org
+OIDC_COOKIE_SECURE=true          # false only for a plain-http localhost run
+OIDC_INTERNAL_BASE_URL=          # only where the issuer is not reachable from the backend
+```
+
+`OIDC_INTERNAL_BASE_URL` is for one situation and it is the compose stack's:
+an issuer is a single string that the *browser* is redirected to and that an
+ID token is checked against, and inside a container network those two come
+apart. The provider there is `http://localhost:9000` for the browser and
+`http://authentik:9000` from the backend, which is the same provider by two
+routes. Set this to that **origin** — scheme, host, port, no path — and the
+discovery document, the token endpoint and userinfo are fetched there.
+
+Two details make it work, and both are load-bearing:
+
+* What is swapped is the origin, not the issuer as a prefix. A provider's
+  endpoints need not live under its issuer: authentik's issuer is
+  `/application/o/where2build/` while its token endpoint is
+  `/application/o/token/`, one path up.
+* The rerouted request still carries the public `Host`. A provider builds
+  every absolute URL it hands out — the endpoints in its discovery document
+  and the `iss` of an ID token — from the host it was asked as, so asked as
+  `authentik:9000` it answers with an authorization URL naming a host the
+  browser has never heard of. This is exactly what a reverse proxy in front
+  of such a provider does.
+
+Keycloak calls the same thing a "frontend URL". Leave it empty anywhere the
+issuer is reachable from both sides — which is every ordinary deployment.
+
+Any OpenID Connect provider will do; nothing about one is wired in. The
+backend reads `<issuer>/.well-known/openid-configuration` and takes the
+endpoints from there. It runs the whole exchange itself, so no token ever
+reaches the browser: what the browser gets is a signed, HttpOnly session
+cookie. `OIDC_PUBLIC_BASE_URL` is the origin the redirect URI is built from,
+and the provider has to allow `<that origin>/api/auth/callback`.
+
+The flow was run end to end once against a throwaway provider on `127.0.0.1`,
+with `OIDC_COOKIE_SECURE=false` because the run was plain http: redirect,
+return, `w2b_sitzung` cookie (HttpOnly, SameSite=Lax), the name in the header,
+and signing out removing it again. Storage is still local either way; the
+server side of it is the next step, not this one.
+
 The basemap follows the interface: `BASEMAP_STYLE_PATH` (default
 `styles/liberty`) is the light map, `BASEMAP_DARK_STYLE_PATH` (default
 `styles/dark`) the dark one, and the browser asks for the variant that matches
 the resolved theme. Clearing the dark path serves the light style to everyone.
+
+### Sharing a plot
+
+A signed-in person can hand out a link to one plot. It is a **snapshot**: the
+document is copied when the link is made, so a link sent weeks ago cannot start
+showing a corrected price, and withdrawing it takes effect at once. Every link
+has an end — `STORAGE_SHARE_DAYS`, 90 by default — and `scripts/sweep_shares.py`
+removes what is past it, so an abandoned share does not sit in the table for
+ever.
+
+What travels is switched on switch by switch, and **every switch starts off**:
+the asking price, the planned building, the destinations with their travel
+times, and the note. Without one, a link carries what the registers publish
+anyway — location, outline, official area, land value. The browser only
+resolves the extras it was told to share, and `Storage.for_sharing` cuts again
+on the way in; a promise only the frontend keeps is one a frontend bug can
+break.
+
+The links one plot has out are listed at the foot of its own page — with the
+date, the expiry and what each one actually carries, read off the stored row
+rather than remembered — and each can be withdrawn there, which takes effect at
+once. The section is absent while the plot has no open link.
+
+Pasting the link into a chat shows a card: the plot's outline on the
+orthophoto, its name, district and area. That is drawn on the server with
+Pillow and kept for the life of the share, so a link doing the rounds costs one
+file read.
+
+A preview bot runs no JavaScript, so the built app would hand it the same title
+for every plot ever shared. `index.html` therefore carries one server-side
+include, and `frontend/nginx.conf` switches SSI on for `/geteilt/…` alone:
+nginx fetches the plot's `og:` tags from the backend and splices them into the
+head before the file goes out. Bot or browser, both get the same page and the
+same tags — there is nothing to recognise and nothing to keep a list of. Every
+other page ships the include as an inert HTML comment and costs no request.
+
+### Request budget
+
+This backend owns no data. Every answer it gives is a request to somebody
+else's server — the cadastre, BORIS, the Saxon environmental server, the UBA,
+Transitous, and where it is switched on a public Overpass instance. As a
+single-seat prototype that was uncontested; the Overpass manual says occasional
+manual requests are fine. A deployment with accounts is exactly what the same
+manual calls "relying on the public instances as backend", and Transitous is
+run by volunteers. So each account gets a ceiling on the calls it can send
+outward.
+
+```
+RATELIMIT_ENABLED=true           # false for a single-seat run
+RATELIMIT_SERVICE_CALLS=600      # per account and window
+RATELIMIT_MAP_TILES=6000         # tiles and basemap, per account and window
+RATELIMIT_WINDOW_S=3600
+APP_PROXY_HOPS=1                 # only when a reverse proxy of yours is in front
+```
+
+Signed in, the budget belongs to the account; signed out, to the peer.
+`APP_PROXY_HOPS` is what makes the second one worth anything:
+`X-Forwarded-For` is a header and a header is whatever the sender typed, so it
+is read only when this says how many proxies of *yours* stand in front, and
+then from the right — nginx appends the peer it saw, so with one hop the last
+entry is the one it vouched for and everything left of it is the caller's text.
+The bundled `docker-compose.yml` serves `/api` through nginx and therefore sets
+`APP_PROXY_HOPS=1` itself; a plain `uvicorn` run leaves it at 0, where the
+header is ignored entirely. Getting that wrong in a compose deployment does not
+fail loudly — it counts every signed-out caller against nginx's own container
+address, which is one shared budget for all of them.
+
+Past the line the answer is `429` with a German `detail` that says what applies
+and when it continues, plus `Retry-After`. Map tiles have a budget of their own
+because one screen is dozens of them and the shared disk cache covers every
+repeat view; `/api/gemarkungen`, `/api/plots`, `/api/settings` and the sign-in
+ask nobody outside and pay nothing at all. The count lives in this process's
+memory — no Redis, deliberately — so with more than one worker the effective
+ceiling is that many times the number. `/api/health` reports all of that under
+`kontingent`, including that caveat.
+
+Both numbers are picked rather than derived, but there is one measurement to
+put next to them. `node scripts/screenshots.mjs` drives every view of the app
+in one pass — two themes, a narrow pass, three listing searches, one plot
+appraised end to end and both print sheets — and it costs **59 service calls
+and 1 007 map tiles** (measured 09.09.2026, cold cache). So a full
+drive-through of the whole application is a tenth of the hourly service budget
+and a sixth of the tile budget, and the screenshot run needs no exemption. What
+the ceiling actually stops is a scan, not a session.
 
 ## Things that already cost time
 

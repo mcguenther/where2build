@@ -15,6 +15,12 @@ dependencies = [
     # optional any more: without it the cadastral overlay would go to the
     # browser at up to half a megabyte per tile.
     "pillow>=10.0",
+    # Server storage for signed-in accounts, and deliberately not an ORM:
+    # three tables and a handful of statements, written out in
+    # app/services/storage.py. The driver is a plain dependency while the
+    # database is not a requirement -- without DATABASE_URL no connection is
+    # ever opened and every account route answers 503.
+    "asyncpg>=0.29",
 ]
 
 [project.optional-dependencies]
@@ -45,6 +51,11 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = ["app*"]
+
+# The schema is applied from the installed package, not from a checkout, and
+# the preview card is drawn from fonts that ship with it.
+[tool.setuptools.package-data]
+app = ["schema.sql", "assets/fonts/*.woff"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

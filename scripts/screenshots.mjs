@@ -89,14 +89,22 @@ async function pickDistrict(page, name) {
   await page.locator(".gemarkung__treffer").first().click();
 }
 
+/* The one field everything goes into. Named rather than repeated: it is the
+ * way in on the start page and in every step of the wizard, and the old
+ * per-source ids (#q-text, #q-paste) are gone with the sources. */
+const QUERY_FIELD = ".query-box input[role=\"combobox\"]";
+
 /* There is no example data any more: every screenshot needs a plot that was
- * really resolved through ALKIS first. This is the app's own add flow. */
+ * really resolved through ALKIS first. This is the app's own way in, from the
+ * start page: a bare parcel number is read as one, which unfolds the district
+ * beside it, and the start page hands the pair to the wizard. Starting here
+ * rather than at „Grundstück hinzufügen" is not only shorter -- it is the
+ * route a person takes, and it exercises the hand-off. */
 async function addPlot(page) {
-  await page.click(".page-head .btn");
-  await page.getByText("Flurstück direkt").click();
+  await page.fill(QUERY_FIELD, "85/1");
+  await page.waitForSelector("#q-parcel-number", { timeout: 10000 });
   await pickDistrict(page, "Liebertwolkwitz");
-  await page.fill("#q-parcel-number", "85/1");
-  await page.getByRole("button", { name: "Nachschlagen" }).click();
+  await page.getByRole("button", { name: "Grundstück finden" }).click();
   await page.waitForSelector(".wizard__preview, .site-plan", { timeout: 60000 });
 }
 
@@ -165,6 +173,14 @@ async function pasteInto(page, selector, text) {
   }, text);
 }
 
+/** Click a section by its name. Positional selectors break the moment the
+ *  navigation grows an entry -- which is exactly what happened when the start
+ *  page arrived. */
+async function nav(page, name) {
+  await page.locator(".main-nav a").filter({ hasText: name }).first().click();
+  await page.waitForTimeout(150);
+}
+
 async function shot(page, name, mode, zusatz = "") {
   await page.waitForTimeout(340);
   // A layout that pushes the page sideways is a defect, and no screenshot shows it.
@@ -176,7 +192,10 @@ async function shot(page, name, mode, zusatz = "") {
   taken.push(file);
 }
 
-for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunkel", 1440, 1000, false], ["dunkel", 402, 900, true]]) {
+// The narrow pass runs in the light theme like the wide one: it is the
+// default a phone arrives in, and having the only phone-width pictures be dark
+// meant nobody ever looked at the layout most people see.
+for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunkel", 1440, 1000, false], ["hell", 402, 900, true]]) {
   const ctx = await browser.newContext({ viewport: { width: width, height: height }, deviceScaleFactor: 2 });
   const page = await ctx.newPage();
   countTiles(page);
@@ -188,8 +207,18 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
   await page.click(`.theme-switch button:nth-child(${mode === "hell" ? 1 : 2})`);
   await page.waitForTimeout(200);
 
-  // The empty state is a real state and worth a picture: this is what the app
-  // looks like before anything has been resolved.
+  // The start page before anything has been resolved: the field, and what the
+  // thing is for. This is the first thing anybody sees.
+  await shot(page, "start-leer", mode, narrow ? "-schmal" : "");
+
+  /* The overview, still empty. A real state and worth its own picture.
+     Reached by its route rather than by the navigation: with nothing entered
+     the start page carries no sections at all -- every one of them would lead
+     to an empty page with a zero beside it -- so there is no link here to
+     click. Every later `nav()` in this run has a stand behind it and finds
+     the sections where they belong. */
+  await page.goto(`${address}grundstuecke`, { waitUntil: "load" });
+  await page.waitForTimeout(300);
   await shot(page, "uebersicht-leer", mode, narrow ? "-schmal" : "");
 
   await page.click(".page-head .btn");                      // Grundstück hinzufügen
@@ -199,11 +228,12 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
      parcel, and the only one whose whole point is showing its working. It
      needs no model — the text is read with patterns and the Gemarkung
      register — so it runs here even without an LLM key. */
-  await page.getByText("Text durchsuchen").click();
-  await page.fill("#q-text", LISTING);
-  // Typed prose goes through the same reader as a pasted page, and straight on
-  // into the search: what was read rides along folded shut inside that step.
-  await page.getByRole("button", { name: "Lesen" }).click();
+  // Nothing is switched on first: a few sentences are read as a description
+  // text by themselves, and the chip says so. Typed prose goes through the
+  // same reader as a pasted page, and straight on into the search: what was
+  // read rides along folded shut inside that step.
+  await page.fill(QUERY_FIELD, LISTING);
+  await page.getByRole("button", { name: "Grundstück finden" }).click();
   await page.waitForSelector(".suche", { timeout: 30000 });
   await page.waitForTimeout(1500);
   await shot(page, "suche-laeuft", mode, narrow ? "-schmal" : "");
@@ -228,9 +258,8 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
      somebody else's parcel. */
   await page.click(".breadcrumb a");
   await page.click(".page-head .btn");
-  await page.getByText("Text durchsuchen").click();
-  await page.fill("#q-text", FOREIGN_LISTING);
-  await page.getByRole("button", { name: "Lesen" }).click();
+  await page.fill(QUERY_FIELD, FOREIGN_LISTING);
+  await page.getByRole("button", { name: "Grundstück finden" }).click();
   try {
     await page.waitForSelector(".suche__urteil--erfolglos", { timeout: 60000 });
     await page.waitForTimeout(4000);
@@ -245,16 +274,15 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
      away inside the search now, so the picture is of it opened. */
   await page.click(".breadcrumb a");
   await page.click(".page-head .btn");
-  await page.getByText("Seite einfügen", { exact: true }).click();
-  /* The bookmarklet, with its fold opened. That is what this step is now
-     mostly about: `Strg+A` selects the body alone, so a pasted page has no
-     meta tags and therefore no coordinate, while the bookmarklet hands over
-     the whole document. The knob is the bookmark — it does nothing here. */
-  await page.click("details.gelesen > summary");
-  await page.waitForSelector("details.gelesen a.btn");
+  /* The bookmarklet, with its fold opened. `Strg+A` selects the body alone,
+     so a pasted page carries no meta tags and therefore no coordinate, while
+     the bookmarklet hands over the whole document. The knob in there is the
+     bookmark itself and does nothing when clicked here. */
+  await page.click("details.gelesen--lesezeichen > summary");
+  await page.waitForSelector("details.gelesen--lesezeichen a.btn");
   await shot(page, "assistent-einfuegen", mode, narrow ? "-schmal" : "");
-  await pasteInto(page, "#q-paste", PASTED_PAGE);
-  await page.getByRole("button", { name: "Lesen" }).click();
+  await pasteInto(page, QUERY_FIELD, PASTED_PAGE);
+  await page.getByRole("button", { name: "Grundstück finden" }).click();
   try {
     await page.waitForSelector("details.gelesen", { timeout: 30000 });
     await page.click("details.gelesen > summary");
@@ -266,11 +294,13 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
 
   await page.click(".breadcrumb a");
   await page.click(".page-head .btn");
-  await page.getByText("Flurstück direkt").click();
+  // A bare number is read as a parcel number, which is the one reading that
+  // unfolds a second field: without a district the number is not unique.
+  await page.fill(QUERY_FIELD, "85/1");
+  await page.waitForSelector("#q-parcel-number", { timeout: 10000 });
   await pickDistrict(page, "Liebertwolkwitz");
-  await page.fill("#q-parcel-number", "85/1");
   await shot(page, "assistent-2", mode, narrow ? "-schmal" : "");
-  await page.getByRole("button", { name: "Nachschlagen" }).click();
+  await page.getByRole("button", { name: "Grundstück finden" }).click();
   await page.waitForSelector(".site-plan", { timeout: 60000 });
   /* The last step: the outline, what is being taken over, and the three fields
      that used to be a page of their own. It is a picture of the ground, so
@@ -296,6 +326,16 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
 
   await page.waitForTimeout(6000);                             // Kacheln laden lassen
   await shot(page, "grundstueck", mode, narrow ? "-schmal" : "");
+
+  /* Teilen, abgemeldet. There is no identity provider in this run, so what the
+   * panel shows is the invitation into an account — which is the state most
+   * visitors meet, and the one worth checking reads as an offer rather than as
+   * a broken button. The switches themselves need a session; they are covered
+   * by the unit tests and by a walk against a throwaway provider. */
+  await page.getByRole("button", { name: "Teilen" }).click();
+  await page.waitForSelector(".share", { timeout: 10000 });
+  await shot(page, "teilen", mode, narrow ? "-schmal" : "");
+  await page.getByRole("button", { name: "Schließen" }).click();
 
   if (!narrow) {
     await page.getByRole("button", { name: "Luftbild" }).click();
@@ -338,12 +378,12 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
 
   await page.click(".breadcrumb a");
 
-  await page.click('.main-nav a:nth-child(2)');               // Haustypen
+  await nav(page, "Haustypen");
   await shot(page, "haustypen", mode, narrow ? "-schmal" : "");
   if (!narrow) {
     // A destination, looked up for real: the picker is the point here, because
     // this geocoder answers "Am Kirschberg" with Bavaria as readily as Saxony.
-    await page.click('.main-nav a:nth-child(3)');             // Ziele
+    await nav(page, "Ziele");
     await page.getByRole("button", { name: /Ziel hinzufügen|Erstes Ziel anlegen/ }).first().click();
     const fields = await page.locator("input[type=text]").all();
     await fields[0].fill("Bahnhof");
@@ -354,9 +394,15 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
     await page.locator(".match-list__option").first().click();
     await shot(page, "ziele", mode);
 
+    // The start page with a stand behind it: the greeting changes and the
+    // last plots stand under the field.
+    await nav(page, "Start");
+    await page.waitForSelector(".plot-card");
+    await shot(page, "start", mode);
+
     // The overview with something on it, and the comparison mode that has to be
     // asked for. "uebersicht-leer" is the empty state and shows neither.
-    await page.click('.main-nav a:nth-child(1)');
+    await nav(page, "Grundstücke");
     await page.waitForSelector(".plot-card");
     await shot(page, "uebersicht", mode);
     await page.getByRole("button", { name: "Vergleichen" }).click();
@@ -402,7 +448,7 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
     }
     await page.click(".breadcrumb a");
 
-    await page.click('.main-nav a:nth-child(4)');             // Daten
+    await nav(page, "Daten");
     await shot(page, "daten", mode);
   }
   await ctx.close();

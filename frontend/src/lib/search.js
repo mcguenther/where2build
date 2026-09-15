@@ -97,7 +97,7 @@ export async function runSearch(query, onEvent, { signal } = {}) {
 
   if (!last) {
     throw new ServiceError(
-      "Die Suche hat kein Ergebnis geliefert — die Verbindung brach ab, bevor sie fertig war.",
+      "Die Suche hat kein Ergebnis geliefert: die Verbindung brach ab, bevor sie fertig war.",
       502
     );
   }
@@ -153,7 +153,7 @@ export function verdictSentence(status, count, huelle, hinweis) {
   }
   if (status === "mehrdeutig") {
     const plural = count === 1 ? "ein mögliches Flurstück" : `${count} mögliche Flurstücke`;
-    return `Kein eindeutiges Ergebnis — ${plural}. ${huelle?.text ?? ""}`.trim();
+    return `Kein eindeutiges Ergebnis: ${plural}. ${huelle?.text ?? ""}`.trim();
   }
   if (huelle?.text && huelle.art !== "offen") {
     return `Kein Flurstück gefunden. Feststeht bisher: ${huelle.text}`;

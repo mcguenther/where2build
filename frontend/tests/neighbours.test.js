@@ -10,6 +10,10 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { nextTick } from "vue";
 
 vi.mock("../src/lib/api.js", () => ({
+  // The cap the module exports next to the call that sends it. A factory
+  // that omits a named export makes every importer fail at *import* time,
+  // which shows up as unrelated component errors.
+  PAGE_LIMIT: 3000000,
   neighbourBuildings: vi.fn(),
   reachability: vi.fn()
 }));

@@ -19,12 +19,16 @@ beforeEach(() => {
   state.plan = { backdrop: "none", northUp: true, showDimensions: true, showSetbacks: true, measuring: false };
 });
 
+/** The list has its own address now — "/" is the start page. Mounting the
+ *  view anywhere else would draw its links against the wrong route. */
+const LIST = "/grundstuecke";
+
 const compareToggle = view => view.find(".compare-toggle");
 const checkboxes = view => view.findAll(".plot-card__select input");
 
 describe("Vergleichsmodus", () => {
   it("zeigt ohne ihn weder Haken noch Auswahl-Leiste", () => {
-    const w = mountWithRouter(PlotsView);
+    const w = mountWithRouter(PlotsView, { path: LIST });
     expect(checkboxes(w)).toHaveLength(0);
     expect(w.find(".selection-bar").exists()).toBe(false);
     expect(w.text()).not.toContain("ausgewählt");
@@ -32,7 +36,7 @@ describe("Vergleichsmodus", () => {
   });
 
   it("holt sie mit „Vergleichen“ hervor und räumt sie wieder weg", async () => {
-    const w = mountWithRouter(PlotsView);
+    const w = mountWithRouter(PlotsView, { path: LIST });
 
     await compareToggle(w).trigger("click");
     expect(checkboxes(w)).toHaveLength(state.data.plots.length);
@@ -46,7 +50,7 @@ describe("Vergleichsmodus", () => {
   });
 
   it("öffnet den Lageplan, wenn eine Karte im Normalmodus angeklickt wird", async () => {
-    const router = testRouter("/");
+    const router = testRouter(LIST);
     await router.isReady();
     const w = mountWithRouter(PlotsView, { router });
 
@@ -59,7 +63,7 @@ describe("Vergleichsmodus", () => {
   });
 
   it("schreibt einen gesetzten Haken in die Auswahl des Dokuments", async () => {
-    const w = mountWithRouter(PlotsView);
+    const w = mountWithRouter(PlotsView, { path: LIST });
     await compareToggle(w).trigger("click");
 
     await checkboxes(w)[1].setValue(true);
@@ -70,7 +74,7 @@ describe("Vergleichsmodus", () => {
   });
 
   it("sagt beim Einschalten, was als Nächstes zu tun ist", async () => {
-    const w = mountWithRouter(PlotsView);
+    const w = mountWithRouter(PlotsView, { path: LIST });
     await compareToggle(w).trigger("click");
 
     const bar = w.find(".selection-bar");
@@ -82,7 +86,7 @@ describe("Vergleichsmodus", () => {
   });
 
   it("behält die Auswahl, wenn der Modus verlassen wird", async () => {
-    const w = mountWithRouter(PlotsView);
+    const w = mountWithRouter(PlotsView, { path: LIST });
     await compareToggle(w).trigger("click");
     await checkboxes(w)[0].setValue(true);
     await checkboxes(w)[1].setValue(true);
@@ -99,7 +103,7 @@ describe("Vergleichsmodus", () => {
     // The way back from /vergleich: the ticks are still there, they are just
     // not shown until asked for.
     state.data.selection = ["plot-convex", "plot-concave"];
-    const w = mountWithRouter(PlotsView);
+    const w = mountWithRouter(PlotsView, { path: LIST });
 
     return compareToggle(w).trigger("click").then(() => {
       expect(w.find(".selection-bar").text()).toContain("2 Grundstücke ausgewählt");
@@ -110,7 +114,7 @@ describe("Vergleichsmodus", () => {
 
   it("bietet den Vergleich gar nicht an, solange die Liste leer ist", () => {
     state.data.plots = [];
-    const w = mountWithRouter(PlotsView);
+    const w = mountWithRouter(PlotsView, { path: LIST });
     expect(compareToggle(w).exists()).toBe(false);
     expect(w.find(".selection-bar").exists()).toBe(false);
   });
@@ -123,7 +127,7 @@ describe("Was den Modus nicht anschaltet", () => {
   it("bleibt aus, obwohl die Auswahl des Dokuments gefüllt ist", () => {
     // What `addPlot` leaves behind after two plots have been added.
     state.data.selection = ["plot-convex", "plot-concave"];
-    const w = mountWithRouter(PlotsView);
+    const w = mountWithRouter(PlotsView, { path: LIST });
     expect(w.findAll("input[type=checkbox]")).toHaveLength(0);
     expect(w.find(".selection-bar").exists()).toBe(false);
   });
