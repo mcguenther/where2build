@@ -308,6 +308,7 @@ pre i{color:var(--muted);font-style:normal}
     <span class="marke stark">Entfernungsbänder</span>
     <span class="marke stark">Wertekatalog</span>
     <span class="marke stark">Modellanbindung</span>
+    <span class="marke stark">Offene Fragen</span>
     <span class="marke">geprüft an 10 aufgezeichneten Inseraten</span>
   </div>
   <div class="kennzahlen">
@@ -354,6 +355,19 @@ pre i{color:var(--muted);font-style:normal}
 
   <div class="inv" id="inventar-liste"></div>
   <p class="inv-zaehler eyebrow" id="inv-zaehler" style="margin-top:10px"></p>
+
+  <div class="merk col" style="margin-top:24px">
+    <p><b>Zwei von vier Portalen sind serverseitig zu — und das ist keine Kopfzeilenfrage.</b>
+    Am 15.09.2026 gegen ein immowelt-Exposé gemessen: 403 vom CloudFront-Rand mit
+    <code>x-datadome: protected</code> und einer 771 Byte großen JavaScript-Aufgabe
+    („Please enable JS and disable any ad blocker“) — mit dem Projekt-Agenten ebenso wie mit
+    einem vollständigen Browser-Kopfsatz. Die <code>robots.txt</code> erlaubt
+    <code>/expose/</code> ausdrücklich und nennt ClaudeBot beim Namen; abgewiesen wird
+    trotzdem, und zwar vor dem Server. Dieselbe Form wie ImmobilienScout24, andere
+    Aufgabenstellung. Der Weg hinein ist derselbe: der Browser des Nutzers, also das
+    Lesezeichen — und <code>immowelt.de</code> gehört in <code>BLOCKED_DOMAINS</code>, damit
+    die App den Hinweis sofort gibt, statt eine Anfrage dafür auszugeben.</p>
+  </div>
 
   <div class="merk merk--rot col" style="margin-top:24px">
     <p><b>Von 26 gelesenen Angaben erreicht genau eine das gespeicherte Grundstück.</b>
@@ -919,6 +933,59 @@ Richtung, in der eine Entfernungsangabe etwas beweist.</pre>
     <p class="kw-fuss" id="kw-fuss"></p>
   </div>
 
+  <h3 style="margin-top:34px">Die Lösung: alle Lesarten in einem Objekt</h3>
+  <div class="col stack" style="margin-top:10px">
+    <p>Zusammengefasst, weil es der Kern ist: Ein genannter Bezug wird nicht auf einen Punkt
+    reduziert, sondern zu einem <b>Bezugsobjekt</b> aufgelöst — der Menge aller Lesarten,
+    die der Satz zulässt. Die Angabe ist dann kein Radius, sondern ebenfalls ein Intervall,
+    und die Prüfung ist eine Überschneidung zweier Intervalle. Nichts wird gewählt.</p>
+  </div>
+  <div class="zwei" style="margin-top:16px">
+    <div class="tafel stack-s">
+      <h4>Auflösen, nicht auswählen</h4>
+      <pre><b>Bezugsobjekt</b> B = alle Lesarten des genannten Bezugs
+  · Geocoder-Punkte (PLACE, ADDRESS, STOP)
+  · alle Halte / alle Filialen, wenn unbenannt
+  · Umriss der Ortslage, wo vorhanden
+  · Schwerpunkt dieses Umrisses
+
+<b>Lesartenintervall</b> für einen Kandidaten x:
+  I(x) = [ min über alle Punkte und Ränder ,
+           max über die „Mitte“-Lesarten ]
+
+<b>Angabenintervall</b> aus dem Satz:
+  A = [ d / ϱ , d · (1+ε) ]
+
+<b>Erfüllt</b>, wenn I(x) ∩ A ≠ ∅.
+<b>Punkte</b> nach der Güte der Überschneidung — Trapez,
+wie jedes andere weiche Merkmal.
+<b>Einspruch</b> nur, wenn selbst min I(x) &gt; max A:
+  dann ist die Angabe für x unerfüllbar, in jeder
+  Lesart und mit jeder Route. Das ist die einzige
+  Richtung, in der eine Maklerangabe etwas beweist.</pre>
+    </div>
+    <div class="tafel stack-s">
+      <h4>Was das für die vier Sorten heißt</h4>
+      <ul style="font-size:13.5px;color:var(--graphite)">
+        <li><b>Benannter Punkt</b> („Bushaltestelle ‚Kitzen‘“, „A38 Leipzig-Südwest“):
+        I(x) schrumpft auf einen Wert, das Band ist der klassische Ring — und hier lohnt
+        die Route, denn die 4 % Abweichung beim Fernbahnhof sind messbar.</li>
+        <li><b>Unbenannte Klasse</b> („Bus 0,3 km“, „EDEKA ca. 5 km“): B ist die ganze
+        Klasse, dist ist das Minimum darüber. Schwächer, aber prüfbar — und ehrlich, weil
+        genau das behauptet wurde.</li>
+        <li><b>Ortschaft</b> („6 km bis Grimma“): I(x) spannt vom Ortsrand bis zur Mitte.
+        Gemessen sind das 1,22 bis 4,81 km — ein Intervall, das die meisten Kandidaten
+        durchlässt und wenige ausschließt. Genau so soll es sein.</li>
+        <li><b>Region oder Großstadt</b> („20 Minuten nach Leipzig“): I(x) wird so breit,
+        dass die Angabe nichts mehr trennt. Sie wird gezeigt und nicht gerechnet.</li>
+      </ul>
+      <p style="font-size:13px;color:var(--muted)">Der Gewinn dieser Fassung ist nicht
+      Genauigkeit, sondern Ehrlichkeit: Die Breite des Bandes kommt aus der Streuung der
+      Lesarten, die wir tatsächlich auflösen konnten — und nicht aus einem Zuschlag, den
+      jemand gewählt hat.</p>
+    </div>
+  </div>
+
   <h3 style="margin-top:34px">Wie es in den Lauf eingebaut wird</h3>
   <div class="col stack" style="margin-top:12px">
     <p>Als <b>Indiz</b>, wie alles andere auch — eine neue Art <code>entfernung</code> neben
@@ -1244,13 +1311,195 @@ Richtung, in der eine Entfernungsangabe etwas beweist.</pre>
   </div>
 </section>
 
-<section id="reihenfolge">
+<section id="parser">
   <p class="eyebrow">Teil 10</p>
+  <h2>Ein Parser statt eines Modells?</h2>
+  <div class="col stack" style="margin-top:14px">
+    <p>Die Beziehung zwischen zwei Ortsnamen ist das, woran der reguläre Ausdruck scheitert
+    (B3, zweimal belegt). Ein Sprachmodell kann sie lesen — kostet aber je Anzeige Geld und
+    braucht das Beleg-Gate. Ein Dependenzparser könnte dasselbe deterministisch, offline und
+    nachprüfbar. Also gemessen: <code>spaCy 3.8.16</code> mit
+    <code>de_core_news_md</code>, am 15.09.2026 über alle zehn aufgezeichneten Anzeigen.</p>
+  </div>
+
+  <div class="zwei" style="margin-top:20px">
+    <div class="tafel stack-s">
+      <h4>Auf einem Satz: tadellos</h4>
+      <pre>„Thräna ist … ein Ortsteil der Kreisstadt Borna.“
+
+  Thräna      PROPN  <b>sb</b> → ist
+  Ortsteil    NOUN   <b>pd</b> → ist
+  Kreisstadt  NOUN   <b>ag</b> → Ortsteil
+  Borna       PROPN  <b>nk</b> → Kreisstadt
+
+Eine Regel liest daraus (Thräna ⊂ Borna) — der Satz,
+an dem der reguläre Ausdruck scheitert, weil der
+Auslöser hinter dem Namen steht.
+
+„die ca. 6 km entfernte Kreisstadt Grimma“
+
+  km      NOUN  <b>ams</b> → entfernte   <i>(Maßangabe!)</i>
+  Grimma  PROPN <b>nk</b>  → Kreisstadt
+
+Entfernung und Ort hängen zusammen, unabhängig von
+der Wortstellung — genau das, was die Bänder aus
+Teil 6 brauchen.</pre>
+      <p style="font-size:13px;color:var(--muted)">Vier Regeln decken alle sieben
+      Formulierungen ab, die in den zehn Anzeigen vorkommen. Als reguläre Ausdrücke wären
+      das vier Muster mit Fenstern nach links <em>und</em> rechts, und das nächste Inserat
+      bringt das fünfte.</p>
+    </div>
+    <div class="tafel stack-s">
+      <h4>Auf dem echten Text: fällt es auseinander</h4>
+      <pre>Dieselben Regeln über die echten Anzeigentexte:
+
+ ✓ Großbothen ⊂ Grimma          <i>richtig</i>
+ ✓ ca. 6 km → Grimma            <i>richtig</i>
+ ~ Plagwitz ⊂ ?                 <i>Ort ja, Gemeinde nein</i>
+ ✗ <b>Lagebeschreibung</b> ⊂ ?         <i>Thräna-Anzeige</i>
+ ✗ ca. 300 m → <b>Leipzig</b>          <i>gemeint: Kitzen</i>
+ ✗ ca. 5 km → <b>EDEKA</b>             <i>viermal in Folge</i>
+ ✗ fußläufig → Physiotherapien</pre>
+      <p style="font-size:13.5px;color:var(--graphite)">Die Ursache ist nicht das Modell,
+      sondern der Text: <code># Lagebeschreibung</code> als Überschrift ohne Punkt macht
+      das Wort zum Subjekt des folgenden Satzes, und die Entfernungen stehen in
+      Aufzählungen — <q>- Bushaltestelle „Kitzen“: ca. 300 m entfernt (Linie 120, Fahrzeit
+      nach Leipzig: ca. 25 Minuten)</q>. Ohne Satzbau bindet der Parser an das
+      nächstbeste Substantiv, und das ist hier Leipzig.</p>
+      <p style="font-size:13px;color:var(--muted)">Ausgerechnet die beiden Anzeigen, für die
+      der Parser geholt wurde, sind die mit den Aufzählungen.</p>
+    </div>
+  </div>
+
+  <div class="scroll" style="margin-top:20px">
+  <table>
+    <thead><tr><th>Was spaCy bringt</th><th>Was es kostet</th><th>Was es <em>nicht</em> bringt</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>Die Beziehung</b>, unabhängig von der Wortstellung — vier Regeln statt eines
+        wachsenden Musterzoos. Und die Bindung <b>Entfernung ↔ Ort</b> für die Bänder.</td>
+        <td><b>190 MB</b> im Image (126 MB spaCy, 60 MB Modell), <b>422 MB</b> Arbeitsspeicher,
+        <b>68 ms</b> je Anzeige. Ein Modell mehr, das versioniert und angeheftet werden muss.</td>
+        <td><b>Ortsnamen.</b> Die Entitätserkennung findet Kitzen und Kreischau, die uns
+        fehlen — <em>und übersieht Thräna</em>, das wir haben. Sie ersetzt das Verzeichnis
+        nicht; das Verzeichnis ist ohnehin der schärfere Filter.</td>
+      </tr>
+      <tr>
+        <td><b>Punkte für die Bänder</b>, die kein Muster liefern kann: „Cospudener See“,
+        „Kloster Nimbschen“, „Hainer Seeufer“, „Allee Center“, „EDEKA“, „Leipzig-Südwest“,
+        „A38“, „Haus Sonnenschein“.</td>
+        <td>Rauschen: „Glückwunsch!“, „Wendehammers“, „Doppelhaushälfte“, „Ver – und
+        Entsorgung notwendigen Medien“ kommen als Orte zurück. Harmlos, weil das
+        Verzeichnis filtert — aber nichts, worauf man bauen kann.</td>
+        <td><b>Straßennamen.</b> „Am Kurpark“ und „Platz des 21. September“ bleiben auch für
+        spaCy keine Adressen. Dafür hilft nur der Abgleich mit der amtlichen
+        Lagebezeichnung.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="merk merk--gruen col" style="margin-top:22px">
+    <p><b>Urteil: noch nicht — und die Vorarbeit lohnt sich unabhängig davon.</b> Was
+    spaCy hier scheitern lässt, ist kein Sprachproblem, sondern ein Formatproblem: Eine
+    Anzeige ist zur Hälfte keine Prosa, sondern Überschriften, Aufzählungen und
+    Wertepaare. Wer den Text zuerst in Blöcke zerlegt — Überschrift, Absatz, Aufzählung,
+    „Label: Wert“ —, hilft <em>jedem</em> Leser: dem regulären Ausdruck, dem Parser und dem
+    Modell. Und ein Aufzählungspunkt wie <q>Bushaltestelle „Kitzen“: ca. 300 m entfernt</q>
+    ist danach ein Wertepaar, für das es keinen Parser braucht.</p>
+    <p>Also: erst segmentieren (klein, deterministisch, hilft allen drei Kanälen), dann
+    messen, wie viel von B3 überhaupt übrig bleibt. Bleibt dann noch etwas, ist spaCy mit
+    190 MB der billigere Weg dorthin als ein Modellaufruf je Anzeige — deterministisch,
+    offline, und ohne Beleg-Gate, weil ein Parse keine Aussage erfindet.</p>
+  </div>
+</section>
+
+<section id="offen">
+  <p class="eyebrow">Teil 11</p>
+  <h2>Was offen bleibt</h2>
+  <p class="lede col" style="margin-top:12px">Sechs Fragen, die dieser Plan nicht
+  beantwortet — jede mit dem, was man messen müsste, um sie zu schließen.</p>
+  <div class="bruch" style="margin-top:22px">
+    <article class="bs bs--mittel">
+      <div class="bs-kopf"><b>F1 · Ortslage</b><span class="bs-grad">offen</span></div>
+      <h3>Woher kommt der Umriss einer Ortschaft?</h3>
+      <p>Die Lesart „bis zum Ortsrand“ braucht die bebaute Ortslage, und beide billigen
+      Umrisse sind widerlegt: Die Gemarkung ist Feld (Rand 1,22 km statt 5 km), die
+      Haltestellenwolke trägt die Dörfer der ganzen Gemeinde (5,89 km Spannweite).</p>
+      <div class="fix"><b>Zu messen</b><code>landuse=residential</code> aus dem
+      OSM-Auszug, einmalig gebaut wie der POI-Index — aus dieser Umgebung nicht prüfbar,
+      Overpass brach dreimal ab. Eine Sitzung mit dem lokalen Extrakt genügt.</div>
+    </article>
+    <article class="bs bs--mittel">
+      <div class="bs-kopf"><b>F2 · Bandbreite</b><span class="bs-grad">offen</span></div>
+      <h3>Wie weit dürfen ϱ und ε gehen?</h3>
+      <p>Gemessen an sieben Strecken: Umweg zu Fuß 1,17–1,30×, mit dem Auto 1,20–2,91×;
+      Fehler der Angabe selbst −57 % bis +13 %. Aus zehn Anzeigen lässt sich keine
+      Verteilung schätzen.</p>
+      <div class="fix"><b>Vorschlag</b>Feste, großzügige Werte — und weil ein Band
+      niemals filtert, können sie unkalibriert ausgeliefert werden. Dasselbe Argument wie
+      bei den Gewichten.</div>
+    </article>
+    <article class="bs bs--mittel">
+      <div class="bs-kopf"><b>F3 · Typologie</b><span class="bs-grad">offen</span></div>
+      <h3>Welche Entfernungsangabe ist überhaupt verwertbar?</h3>
+      <p>„Bushaltestelle ‚Kitzen‘: ca. 300 m“ ist ein Punkt, „EDEKA: ca. 5 km“ eine Klasse,
+      „20 Minuten nach Leipzig“ eine Großstadtfahrzeit ohne Aussagewert. In einer Anzeige
+      stehen acht Angaben, drei davon mit benanntem Punkt.</p>
+      <div class="fix"><b>Zu klären</b>Vier Sorten (benannter Punkt · Klasse · Ortschaft ·
+      Region) mit je eigener Bandbreite — und die Regel, ab wann eine Angabe gar nicht
+      erst gezeichnet wird.</div>
+    </article>
+    <article class="bs bs--mittel">
+      <div class="bs-kopf"><b>F4 · Fahrzeit</b><span class="bs-grad">offen</span></div>
+      <h3>Was ist mit Minuten statt Kilometern?</h3>
+      <p>„ca. 7 min mit dem Auto“ — <code>one-to-many</code> liefert die Dauer mit, die
+      Maschinerie ist also dieselbe. Ungeprüft ist, wie stark Tageszeit und Verkehrsmodell
+      streuen und ob ein Zeitband dadurch breiter wird als ein Streckenband.</p>
+      <div class="fix"><b>Zu messen</b>Dieselben sieben Strecken zu vier Tageszeiten.
+      Kostet nichts außer Anfragen.</div>
+    </article>
+    <article class="bs bs--mittel">
+      <div class="bs-kopf"><b>F5 · Ankerwahl</b><span class="bs-grad">offen</span></div>
+      <h3>Wie viele Gemarkungen darf ein Schnitt beisteuern?</h3>
+      <p>Der Schnitt der Bänder mit den Gemarkungsumrissen ist in einer Richtung sicher —
+      zu eng heißt „nichts gefunden“, nie „falsch gefunden“. Aber ein zu weites Band
+      liefert zwanzig Anker und damit zwanzig Zählanfragen.</p>
+      <div class="fix"><b>Vorbild</b><code>PIN_RADIUS_M</code> und
+      <code>MAX_MUNICIPALITY_DISTRICTS</code> haben dieselbe Frage schon beantwortet
+      bekommen — mit einer Messung, nicht mit einer Meinung.</div>
+    </article>
+    <article class="bs bs--hoch">
+      <div class="bs-kopf"><b>F6 · Darstellung</b><span class="bs-grad">offen</span></div>
+      <h3>Wie sagt eine Karte, dass sie nichts beweist?</h3>
+      <p>Ein Schnitt zweier Bänder sieht aus wie ein Ergebnis. Er ist aber die
+      Zusammenfassung zweier Maklerangaben, von denen eine gemessen 57 % danebenlag. Die
+      weiche Kante ist ein Anfang und reicht vermutlich nicht.</p>
+      <div class="fix"><b>Offen</b>Die stärkste Idee aus dem Bestand: Ein Band wird nur
+      gezeichnet, solange es <em>keinen</em> bestätigten Treffer gibt — und verschwindet in
+      dem Moment, in dem eine amtliche Aussage die Frage beantwortet.</div>
+    </article>
+  </div>
+</section>
+
+<section id="reihenfolge">
+  <p class="eyebrow">Teil 12</p>
   <h2>Reihenfolge</h2>
   <p class="lede col" style="margin-top:12px">Nach Nutzen je Aufwand, und so geschnitten,
   dass jede Stufe für sich ausgeliefert werden kann. Die ersten beiden ändern die Steuerung
   des Laufs nicht — sie machen nur den Leser richtig.</p>
   <div class="stufen">
+    <div class="st">
+      <span class="st-nr">Stufe 0</span>
+      <div class="st-was"><h4>Den Text in Blöcke zerlegen</h4>
+        <p>Überschrift, Absatz, Aufzählung, „Label: Wert“. Eine Anzeige ist zur Hälfte keine
+        Prosa, und daran scheitern alle drei Leser gleichzeitig: der reguläre Ausdruck
+        liest über Blockgrenzen hinweg, der Parser macht aus einer Überschrift ein Subjekt,
+        und das Modell bekommt einen Text ohne Struktur. Danach ist
+        <q>Bushaltestelle „Kitzen“: ca. 300 m entfernt</q> ein Wertepaar und braucht
+        niemanden, der Sprache versteht.</p></div>
+      <span class="st-mass">klein · deterministisch<br>hilft allen Kanälen</span>
+    </div>
     <div class="st">
       <span class="st-nr">Stufe 1</span>
       <div class="st-was"><h4>Namen richtig lesen: Beziehung, Straße, Gemarkung</h4>
@@ -1312,7 +1561,9 @@ Richtung, in der eine Entfernungsangabe etwas beweist.</pre>
       <span class="st-nr">Stufe 7</span>
       <div class="st-was"><h4>Modellkanal mit Befund-Vorlage und Beleg-Gate</h4>
         <p>Unabhängig von Stufe 4 und jederzeit einschaltbar. Wirkt am stärksten zusammen
-        mit Stufe 1: Was das Modell besser kann als jedes Muster, ist die Ortsbeziehung.</p></div>
+        mit Stufe 0 und 1: Was das Modell besser kann als jedes Muster, ist die
+        Ortsbeziehung in einem Text, der keine Prosa ist. Ob danach noch genug übrig bleibt,
+        um dafür einen Parser mitzuliefern, ist die Messung aus Teil 10.</p></div>
       <span class="st-mass">mittel · neues Schema, zwei Aufrufe</span>
     </div>
   </div>
@@ -1329,7 +1580,8 @@ Richtung, in der eine Entfernungsangabe etwas beweist.</pre>
 
 <footer class="fuss col">
   <p><b>Was dieses Dokument ist:</b> ein Plan. Nichts davon ist implementiert, und der
-  heutige Lauf ist in Teil 2 und Teil 6 so beschrieben, wie er am 10.09.2026 im Code steht.
+  heutige Lauf ist in Teil 2 und Teil 7 so beschrieben, wie er am 10.09.2026 im Code steht;
+  die Messungen zu spaCy und zum Portalzugang stammen vom 15.09.2026.
   Die Messwerte stammen aus <code>docs/research/flurstueck-identifikation.md</code> und den
   Notizen in <code>CLAUDE.md</code>; die Indizien in Teil 6 wurden für dieses Dokument mit
   <code>collect_indicia</code> auf den zehn aufgezeichneten Anzeigen neu erzeugt, und die
