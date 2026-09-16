@@ -65,12 +65,14 @@ from .indicia import (
     ANCHORING,
     district_matches,
     AreaStatement,
+    Dimensions,
     collect_indicia,
     describes_part_area,
     federal_state,
     normalise_parcel_number,
     outside_saxony,
     read_area,
+    read_dimensions,
 )
 from .ladder import Rung, confirmation_rung, tolerance_ladder
 from .scoring import clean_use, parcel_number, score
@@ -133,6 +135,22 @@ MAX_DRAWN_AREAS = 4
 # and the area the listing states. Wider than the plausibility check's factor
 # of four on purpose: this only decides whether one more phase runs.
 SHORT_CIRCUIT_AREA_FACTOR = 2.0
+
+# How far the smallest rectangle around a parcel may differ from the measures a
+# listing states before the two describe different plots. Generous on purpose:
+# a seller measures the frontage and the depth to the back fence, the cadastre
+# records a polygon, and the rectangle around an irregular one is bigger than
+# either. Measured on advert 3508042470, which states 14 x 40 m: the parcel the
+# run confirmed is 21,7 x 26,7 (1,55 times too wide, caught), and the parcel in
+# the district its own location field names is 17,3 x 34,1 (1,24 and 0,85,
+# passed).
+SHAPE_TOLERANCE = 0.25
+
+# How much bigger the rectangle around a parcel may be than the parcel itself
+# before it stops describing it. A wedge of 1 489 m² sits in 2 845 m² of
+# rectangle (1,91) and its stated frontage cannot be checked against that; a
+# parcel of 577 m² in a 579 m² rectangle (1,004) can.
+SHAPE_RECTANGULARITY = 1.3
 
 
 @dataclass
@@ -208,6 +226,8 @@ class SearchEngine:
         self._part_area: str | None = None
         # The federal state the listing names, when it is not Saxony.
         self._outside: str | None = None
+        # What the listing says the plot measures, where it says so.
+        self._dimensions: Dimensions | None = None
         # District outlines already fetched, by key. Drawn once for the map and
         # reused for the wash under a confirmed parcel.
         self._district_outlines: dict[str, KatasterBezirk] = {}
@@ -317,6 +337,9 @@ class SearchEngine:
 
         street_indiz = next(iter(self.active("strasse")), None)
         self._street = street_indiz.wert if street_indiz else None
+        self._dimensions = read_dimensions(
+            " ".join(part for part in (self.payload.titel, self.payload.text) if part)
+        )
 
         # The frame before the narration. The clues play out one at a time so a
         # run can be followed, and the districts used to be emitted *after* all
@@ -793,6 +816,10 @@ class SearchEngine:
                     "sich — bitte die Flurstücksnummer prüfen."
                 )
 
+        shape = self._shape_objection(parcel)
+        if shape:
+            return shape
+
         place = next(iter(self.active("ort")), None)
         municipality = (parcel.attributes.get("gemeinde") or "").strip()
         if place and municipality:
@@ -808,6 +835,63 @@ class SearchEngine:
                     "geokodiert ihr eigenes Ortsfeld —, ist aber ungeprüft."
                 )
         return None
+
+    def _shape_objection(self, parcel: Flurstueck) -> str | None:
+        """Whether the parcel is shaped like the plot the listing describes.
+
+        „Bestätigt" has to mean that nothing contradicts, not merely that the
+        hard filters left one candidate -- and this is the contradiction the
+        area cannot see: two parcels of 577 m² can be 14 by 40 metres and 22 by
+        27, and only one of them is the plot with the 14 m frontage.
+
+        It objects; it never removes. The smallest rectangle around a polygon
+        is not what a seller measured, so the tolerance is wide and the
+        sentence says what was compared.
+        """
+
+        stated = self._dimensions
+        geometry = getattr(parcel, "geometry", None)
+        if stated is None or geometry is None or geometry.is_empty:
+            return None
+        try:
+            corners = list(geometry.minimum_rotated_rectangle.exterior.coords)[:4]
+        except (AttributeError, IndexError, ValueError):
+            return None
+        if len(corners) < 4:
+            return None
+        edges = sorted(
+            ((corners[i][0] - corners[(i + 1) % 4][0]) ** 2
+             + (corners[i][1] - corners[(i + 1) % 4][1]) ** 2) ** 0.5
+            for i in range(4)
+        )
+        short, long = edges[0], edges[3]
+        if short < 1:
+            return None
+
+        def apart(one: float, other: float) -> bool:
+            return abs(one - other) / other > SHAPE_TOLERANCE
+
+        sides = stated.sides
+        if sides is None:
+            # A frontage on its own says nothing here, and measuring showed why:
+            # advert 3375124391 states „Frontbreite ca. 26 m" and its parcel
+            # (1 489 m², correct) sits in a 39,8 x 71,5 m rectangle, because the
+            # plot is a wedge. The width may rank one day; it may not object.
+            return None
+        if geometry.area and short * long > geometry.area * SHAPE_RECTANGULARITY:
+            # The rectangle around a wedge says more about the wedge than about
+            # the plot, so it is not evidence either way. Measured: 1 489 m² in
+            # a 2 845 m² rectangle is 1,91 -- refused; 577 m² in 579 m² is
+            # 1,004, and that is the case this check is for.
+            return None
+        if not (apart(short, sides[0]) or apart(long, sides[1])):
+            return None
+        return (
+            f"Das Inserat nennt {sides[0]:g} × {sides[1]:g} m; das gefundene Flurstück "
+            f"passt in ein Rechteck von {short:.0f} × {long:.0f} m. Fläche und Nummer "
+            "stimmen, die Form nicht — das kann an einem anderen Zuschnitt liegen oder "
+            "daran, dass es das falsche Flurstück ist."
+        )
 
     # ------------------------------------------------------------------
     # Phases 2 and 3 -- the haystack, then the staircase

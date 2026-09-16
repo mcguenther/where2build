@@ -372,6 +372,63 @@ _PART_AREA_RE = re.compile(
 )
 
 
+# „Die Abmessungen von etwa 14,00 Metern Breite und ca. 40,00 Metern Tiefe",
+# „Frontbreite ca. 26 m". A measurement with a word beside it saying what was
+# measured -- without the word it is a setback, a street width or a distance to
+# a lake, and those are in the same sentences.
+_MEASURE_RE = re.compile(r"(\d{1,3}(?:[.,]\d+)?)\s*(?:m\b|Metern?\b)", re.IGNORECASE)
+_WIDTH_WORDS = ("breit", "front")
+_DEPTH_WORDS = ("tief", "läng", "laeng", "lang")
+_MEASURE_WINDOW = 34
+
+
+@dataclass(frozen=True, slots=True)
+class Dimensions:
+    """What a listing says the plot measures, and the sentence it said it in.
+
+    Never a filter. A seller measures the frontage along the street and the
+    depth to the back fence; the cadastre records a polygon, and the smallest
+    rectangle around it is a different number whenever the plot is not a
+    rectangle. It is good enough to *contradict* a candidate that is nothing
+    like the shape described, and that is all it is used for.
+    """
+
+    width: float
+    depth: float | None
+    beleg: str
+
+    @property
+    def sides(self) -> tuple[float, float] | None:
+        return (min(self.width, self.depth), max(self.width, self.depth)) if self.depth else None
+
+
+def read_dimensions(text: str | None) -> Dimensions | None:
+    """The stated width and depth of the plot, where a word says which is which."""
+
+    if not text:
+        return None
+    width = depth = None
+    beleg = ""
+    for match in _MEASURE_RE.finditer(text):
+        try:
+            value = float(match.group(1).replace(",", "."))
+        except ValueError:
+            continue
+        if not 2 <= value <= 400:
+            continue
+        around = text[
+            max(0, match.start() - _MEASURE_WINDOW) : match.end() + _MEASURE_WINDOW
+        ].lower()
+        if width is None and any(word in around for word in _WIDTH_WORDS):
+            width, beleg = value, _excerpt(text, match.start(), match.end())
+        elif depth is None and any(word in around for word in _DEPTH_WORDS):
+            depth = value
+            beleg = beleg or _excerpt(text, match.start(), match.end())
+    if width is None:
+        return None
+    return Dimensions(width=width, depth=depth, beleg=beleg)
+
+
 def describes_part_area(text: str | None) -> str | None:
     """The sentence saying the plot is still to be surveyed out of a parcel.
 

@@ -12,6 +12,7 @@ import json
 
 import httpx
 import pytest
+from shapely.geometry import Polygon, box
 import respx
 from fastapi.testclient import TestClient
 
@@ -26,11 +27,12 @@ from app.search.indicia import (
     normalise_parcel_number,
     outside_saxony,
     read_area,
+    read_dimensions,
 )
 from app.search.ladder import tolerance_ladder
 from app.search.scoring import land_use, score, street_match
 from app.services import ocr
-from app.services.alkis import parse_feature_collection
+from app.services.alkis import Flurstueck, parse_feature_collection
 
 from app.deps import alkis_service
 from app.search.engine import SearchEngine
@@ -1612,3 +1614,61 @@ def test_two_districts_that_came_from_two_names_still_disagree():
 
     assert len(districts) >= 2
     assert not engine.halves_of_one_ortsteil(districts)
+
+
+# --------------------------------------------------------------------------
+# „Bestätigt" means nothing contradicts, not merely that one candidate is left
+# --------------------------------------------------------------------------
+
+
+def test_stated_measures_are_read_only_where_a_word_says_what_was_measured():
+    """A metre with no word beside it is a setback, a street or a lake."""
+
+    assert read_dimensions("Der Bebauungsplan sieht einen Abstand von 15 m vor") is None
+
+    both = read_dimensions(
+        "Die Abmessungen von etwa 14,00 Metern Breite und ca. 40,00 Metern Tiefe"
+    )
+    assert both is not None and both.sides == (14.0, 40.0)
+
+    front = read_dimensions("1.489 m² pure Freiheit (Frontbreite ca. 26 m) am Rand")
+    assert front is not None and front.width == 26.0 and front.depth is None
+    # And a frontage alone is not a shape: it may not object to anything.
+    assert front.sides is None
+
+
+def test_a_parcel_shaped_unlike_the_listing_is_an_objection_not_a_confirmation():
+    """Advert 3508042470: 577 m² is 14 x 40 or 22 x 27, and only one is the plot."""
+
+    engine = SearchEngine(
+        ParcelSearchRequest(text="Die Abmessungen von etwa 14,00 Metern Breite und "
+                                 "ca. 40,00 Metern Tiefe bieten Platz."),
+        alkis_service(),
+        DIRECTORY,
+    )
+    engine._dimensions = read_dimensions(engine.payload.text)
+
+    # 21,7 x 26,7 m -- the parcel the run confirmed before this check existed.
+    wrong = Flurstueck(gml_id="a", attributes={"flaeche": "577"},
+                       geometry=box(0, 0, 21.7, 26.7))
+    # 17,3 x 34,1 m -- the one in the district the location field names.
+    right = Flurstueck(gml_id="b", attributes={"flaeche": "577"},
+                       geometry=box(0, 0, 17.3, 34.1))
+
+    engine.state.candidates = [wrong]
+    objection = engine.cross_check()
+    assert objection is not None and "14 × 40" in objection
+    assert engine.verdict() == "mehrdeutig"
+
+    engine.state.candidates = [right]
+    assert engine.cross_check() is None
+
+    # A plot that is not a rectangle cannot be checked against one. Measured on
+    # advert 3375124391: 1 489 m² of wedge inside 39,8 x 71,5 m of rectangle.
+    wedge = Flurstueck(
+        gml_id="c",
+        attributes={"flaeche": "1489"},
+        geometry=Polygon([(0, 0), (39.8, 0), (39.8, 71.5), (0, 0)]),
+    )
+    engine.state.candidates = [wedge]
+    assert engine.cross_check() is None
