@@ -66,6 +66,7 @@ DIRECTORY = GemarkungDirectory(
         GemarkungEntry("Grünau", "148814", "Großolbersdorf"),
         GemarkungEntry("Grünau", "148916", "Langenweißbach"),
         GemarkungEntry("Borna", "141810", "Stadt Borna"),
+        GemarkungEntry("Thräna", "141922", "Stadt Borna"),
         GemarkungEntry("Bad Lausick", "143836", "Stadt Bad Lausick"),
         GemarkungEntry("Etzoldshain", "143840", "Stadt Bad Lausick"),
         # A common German noun that is also a real Gemarkung. The Machern
@@ -1672,3 +1673,29 @@ def test_a_parcel_shaped_unlike_the_listing_is_an_objection_not_a_confirmation()
     )
     engine.state.candidates = [wedge]
     assert engine.cross_check() is None
+
+
+def test_the_relation_is_read_when_the_trigger_stands_behind_the_name():
+    """„Thräna ist … ein Ortsteil der Kreisstadt Borna" — every window that
+    looks to the left of the name misses it, and it is the one advert in the
+    corpus whose answer is Thräna."""
+
+    indicia = collect_indicia(
+        text="Thräna ist mit seinen etwa 765 Einwohnern ein kleiner Ortsteil "
+             "der Kreisstadt Borna.",
+        directory=DIRECTORY,
+    )
+    district = next(i for i in indicia if i.art == "gemarkung" and i.wert == "Thräna")
+    assert district.beziehung == "liegt_in"
+    assert any(i.art == "gemeinde" and "Borna" in i.wert for i in indicia)
+
+
+def test_a_capitalised_noun_is_not_a_district_however_the_sentence_reads():
+    """German capitalises every noun, so the same shape carries things that are
+    not places — and only the directory can tell."""
+
+    indicia = collect_indicia(
+        text="Das Grundstück ist ein ruhiger Ortsteil von Machern.",
+        directory=DIRECTORY,
+    )
+    assert not any(i.art == "gemarkung" and "Grundstück" in i.wert for i in indicia)

@@ -149,8 +149,21 @@ _OT_NAMED_RE = re.compile(
     rf"(?:von|bei|in|der\s+Gemeinde|der\s+Stadt|des\s+Marktes)\s+(?P<municipality>{_NAME})",
 )
 _OT_BEFORE_RE = re.compile(
-    rf"(?P<district>{_NAME})\s*,\s*(?:einem?\s+|ein\s+)?"
-    rf"(?:OT|Ortsteil|Stadtteil|Gemeindeteil)\s+(?:von|der|des)\s+(?P<municipality>{_NAME})",
+    # „Kitzen, ein idyllischer Ortsteil der Stadt Pegau": the adjective between
+    # the article and the noun is not optional in German prose, it is the norm.
+    rf"(?P<district>{_NAME})\s*,\s*(?:ein(?:em|er|es)?\s+)?(?:[a-zäöüß]+\s+){{0,2}}"
+    rf"(?:OT|Ortsteil|Stadtteil|Gemeindeteil)\s+(?:von|der|des|bei)\s+(?P<municipality>{_NAME})",
+)
+# „Thräna ist mit seinen etwa 765 Einwohnern ein kleiner Ortsteil der
+# Kreisstadt Borna." The trigger stands *behind* the name, which every window
+# that looks to the left misses -- and it cost the one advert in the corpus
+# whose answer is Thräna its anchor. Only taken when the directory knows the
+# name, because „Das Grundstück ist … ein Ortsteil von X" reads the same way to
+# a pattern and German capitalises every noun.
+_OT_IS_RE = re.compile(
+    rf"(?P<district>{_NAME})\s+ist\s+(?:[^.;]{{0,80}}?\s)?ein(?:em|er|es)?\s+"
+    rf"(?:[a-zäöüß]+\s+){{0,2}}(?:OT|Ortsteil|Stadtteil|Gemeindeteil)\s+"
+    rf"(?:von|der|des|bei)\s+(?P<municipality>{_NAME})",
 )
 _OT_PLAIN_RE = re.compile(
     rf"(?:einem?\s+|ein\s+)?(?:OT|Ortsteil|Stadtteil|Gemeindeteil)\s+(?:von|der|des)\s+"
@@ -989,15 +1002,22 @@ def _from_body(
     # district scan below knows which names are already spoken for.
     municipalities: dict[str, tuple[int, int]] = {}
     stated_districts: dict[str, tuple[int, int]] = {}
-    for pattern in (_OT_NAMED_RE, _OT_BEFORE_RE, _OT_PLAIN_RE):
+    for pattern in (_OT_NAMED_RE, _OT_BEFORE_RE, _OT_IS_RE, _OT_PLAIN_RE):
         for match in pattern.finditer(body):
             groups = match.groupdict()
+            district = groups.get("district")
+            if (
+                pattern is _OT_IS_RE
+                and district
+                and not (directory and district_matches(directory, district))
+            ):
+                # „Das Grundstück ist … ein Ortsteil von X" -- the shape is the
+                # same and the subject is not a place.
+                continue
             name = groups["municipality"]
             municipalities.setdefault(fold(name), match.span("municipality"))
-            if groups.get("district"):
-                stated_districts.setdefault(
-                    fold(groups["district"]), match.span("district")
-                )
+            if district:
+                stated_districts.setdefault(fold(district), match.span("district"))
 
     for _, (start, end) in municipalities.items():
         name = body[start:end]
