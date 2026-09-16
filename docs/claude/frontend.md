@@ -237,3 +237,18 @@ that collapsed at 390 px. None of them threw.
   a tall window moves the type down over a street that stayed put: the route
   ran through the sentence under the headline. The street now crosses where the
   search panel is, which is opaque at every height the reception takes.
+
+- **Two rows of parcels between two streets cannot be drawn independently.**
+  The first version gave the row on the kerb a depth from one set and the row
+  behind it a depth from another, which is how the drawing it was read out of
+  had done it — and in a 1360 px window the mismatch mostly fell outside the
+  frame. Full width it is everywhere: the block is 469 units kerb to kerb, the
+  two depths summed to anything between 420 and 550, so the rows overlapped by
+  up to 80 units in one place and left a strip of bare paper in the next. The
+  block is now cut into superblocks along the street first; a superblock has
+  one rear boundary at one depth, and each row subdivides that same run with
+  widths of its own. Both rows then share their outer edges and the boundary
+  between them, and nothing else can happen. The generator asserts it — it
+  walks every rectangle a block emits and fails the build on a cell covered
+  twice or not at all — because neither a 40-unit overlap nor a 40-unit gap
+  announces itself in a backdrop; it just looks slightly wrong.
