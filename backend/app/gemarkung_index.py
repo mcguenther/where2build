@@ -22,6 +22,7 @@ had it.
 from __future__ import annotations
 
 import json
+import re
 import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
@@ -37,6 +38,19 @@ GEMARKUNG_ART = "Gemarkung"
 SOURCE_FIELDS = ("art", "name", "schluessel", "gemeinde")
 
 _UMLAUT_EXPANSIONS = str.maketrans({"ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss"})
+
+
+# „Kitzen Flur 1" to „Kitzen Flur 11" are eleven entries of one district. The
+# directory files 2 105 of its 5 339 entries that way, behind them stand 295
+# base names, and 248 of those have no entry without the suffix -- so a listing
+# that says „Kitzen" matches nothing at all unless the suffix is stripped.
+_FLUR_SUFFIX = re.compile(r"\s+Flur\s+\d+\s*$", re.IGNORECASE)
+
+
+def base_name(name: str) -> str:
+    """A district's name without its Flur suffix: „Kitzen Flur 2" -> „Kitzen"."""
+
+    return _FLUR_SUFFIX.sub("", name).strip()
 
 
 def fold(text: str) -> str:

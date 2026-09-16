@@ -882,6 +882,56 @@ class AlkisService:
             )
         return found
 
+    async def district_outlines(self, schluessel: Sequence[str]) -> list[KatasterBezirk]:
+        """Several districts in one request, for a place filed as many Flure.
+
+        „Kitzen" is eleven entries in the directory and one place on the map, so
+        drawing it must not cost eleven requests. An ``fes:Or`` over the keys
+        answers all of them at once -- the same move the parcel search makes to
+        count them.
+        """
+
+        keys = [expand_gemarkung_key(key) for key in schluessel]
+        if not keys:
+            return []
+        matches = (
+            equals("schluessel", keys[0])
+            if len(keys) == 1
+            else "<fes:Or>" + "".join(equals("schluessel", key) for key in keys) + "</fes:Or>"
+        )
+        body = self._envelope(
+            [matches, equals("art", "Gemarkung")],
+            result_type="results",
+            count=len(keys),
+            type_names="ave:KatasterBezirk",
+        )
+        xml = await self._post(body)
+        try:
+            root = ElementTree.fromstring(xml)
+        except ElementTree.ParseError as exc:
+            raise UpstreamError(
+                f"{SERVICE_NAME} hat kein gültiges GML geliefert. {ADVICE}"
+            ) from exc
+        default_srs = root.get("srsName")
+        out: list[KatasterBezirk] = []
+        for element in root.iter():
+            if _local(element.tag) != "KatasterBezirk":
+                continue
+            values = {
+                _local(child.tag): (child.text or "").strip()
+                for child in element
+                if child.text
+            }
+            out.append(
+                KatasterBezirk(
+                    schluessel=values.get("schluessel", ""),
+                    name=values.get("name") or None,
+                    gemeinde=values.get("gemeinde") or None,
+                    geometry=_parse_geometry(element, default_srs),
+                )
+            )
+        return out
+
     async def district_outline(self, schluessel: str) -> KatasterBezirk | None:
         """One cadastral district with its boundary, for the map.
 

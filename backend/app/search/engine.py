@@ -38,7 +38,7 @@ from dataclasses import dataclass, field, replace
 from typing import AsyncIterator, Sequence
 
 from ..errors import AppError, UpstreamError
-from ..gemarkung_index import GemarkungDirectory, GemarkungEntry, fold
+from ..gemarkung_index import GemarkungDirectory, GemarkungEntry, base_name, fold
 from ..schemas import (
     Indiz,
     Kandidat,
@@ -63,6 +63,7 @@ from ..services.alkis import (
 from .envelope import _geojson, common_envelope, next_question
 from .indicia import (
     ANCHORING,
+    district_matches,
     AreaStatement,
     collect_indicia,
     describes_part_area,
@@ -107,6 +108,10 @@ MAX_MUNICIPALITY_DISTRICTS = 12
 # only, which is what allows a number to be chosen without a corpus: a box too
 # small to contain the plot's district makes every anchor count zero and the run
 # reports that it found nothing. It cannot name a wrong parcel, only no parcel.
+# How many of a district's Flure are drawn. Eilenburg has 48, and a map that
+# fetches all of them to shade one town is spending 240 kB on a backdrop.
+MAX_FLUR_OUTLINES = 12
+
 PIN_RADIUS_M = 1500.0
 
 # How many districts are worth widening to their municipality when the exact
@@ -149,10 +154,23 @@ class Anchor:
     # The municipality this district belongs to, as the directory spells it.
     # Not decoration: it is what separates the two Gemarkungen called Plagwitz.
     gemeinde: str | None = None
+    # Every key this anchor stands for. One district is often filed as several
+    # Flure -- Kitzen as eleven, Eilenburg as forty-eight -- and they are one
+    # place, not eleven candidates. Asking them together is one request where
+    # asking them apart was eleven, and it is why a listing that names such a
+    # place costs two requests instead of the thirty the pin fallback cost.
+    keys: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not self.keys:
+            object.__setattr__(self, "keys", (self.schluessel,))
 
     @property
     def condition(self) -> str:
-        return equals("gemaschl" if self.art == "gemarkung" else "gmdschl", self.schluessel)
+        name = "gemaschl" if self.art == "gemarkung" else "gmdschl"
+        if len(self.keys) == 1:
+            return equals(name, self.keys[0])
+        return "<fes:Or>" + "".join(equals(name, key) for key in self.keys) + "</fes:Or>"
 
 
 @dataclass
@@ -540,23 +558,11 @@ class SearchEngine:
             active = decided or active
 
         out: list[Anchor] = []
-        seen: set[str] = set()
         for indiz in active:
-            for entry in self._district_entries(indiz):
-                key = expand_gemarkung_key(entry.schluessel)
-                if key in seen:
-                    continue
-                seen.add(key)
-                out.append(
-                    Anchor(
-                        art="gemarkung",
-                        schluessel=key,
-                        name=entry.name if entry.name != "?" else indiz.wert,
-                        indiz_id=indiz.id,
-                        confidence=indiz.sicherheit,
-                        gemeinde=entry.gemeinde,
-                    )
-                )
+            out.extend(
+                _group_into_anchors(self._district_entries(indiz), indiz, indiz.sicherheit)
+            )
+        out = _without_repeats(out)
         return (
             self._filter_by_municipality(out)
             or self._municipality_anchors()
@@ -605,19 +611,15 @@ class SearchEngine:
                 for entry in self.directory.entries
                 if entry.gemeinde and needle in fold(entry.gemeinde)
             ]
-            if not districts or len(districts) > MAX_MUNICIPALITY_DISTRICTS:
+            # Counted as places, not as entries. Gemeinde Krostitz is fourteen
+            # directory rows and six districts, and refusing it for having
+            # fourteen while the pin then offers the same fourteen was the
+            # wrong way round -- measured on advert 3495973954.
+            grouped = _group_into_anchors(districts, indiz, indiz.sicherheit * 0.6)
+            if not grouped or len(grouped) > MAX_MUNICIPALITY_DISTRICTS:
                 continue
-            out.extend(
-                Anchor(
-                    art="gemarkung",
-                    schluessel=expand_gemarkung_key(entry.schluessel),
-                    name=entry.name,
-                    indiz_id=indiz.id,
-                    confidence=indiz.sicherheit * 0.6,
-                )
-                for entry in districts
-            )
-        return out
+            out.extend(grouped)
+        return _without_repeats(out)
 
     def _district_entries(self, indiz: Indiz) -> list[GemarkungEntry]:
         """Every cadastral district this Indiz could mean.
@@ -638,8 +640,9 @@ class SearchEngine:
             return known or [GemarkungEntry(name=indiz.wert, schluessel=key)]
         if not self.directory:
             return []
-        needle = fold(indiz.wert)
-        entries = [entry for entry in self.directory.entries if fold(entry.name) == needle]
+        # Through the same reader the Indizien came from, so a place filed only
+        # as „<name> Flur n" resolves here exactly as it did there.
+        entries = district_matches(self.directory, indiz.wert)
         return self._within_municipality(entries) or entries
 
     def municipalities(self) -> list[str]:
@@ -950,27 +953,33 @@ class SearchEngine:
 
         self.state.requests += len(anchors)
         results = await asyncio.gather(
-            *(self.alkis.district_outline(anchor.schluessel) for anchor in anchors),
+            *(self.alkis.district_outlines(anchor.keys[:MAX_FLUR_OUTLINES]) for anchor in anchors),
             return_exceptions=True,
         )
         # Padded rather than zipped short: `frame` has no counts yet, and a
         # bare zip would silently return no outlines at all.
         padded = list(counts) + [None] * (len(anchors) - len(counts))
         out: list[Suchgebiet] = []
-        for anchor, count, outline in zip(anchors, padded, results):
-            if not isinstance(outline, KatasterBezirk) or outline is None:
+        for anchor, count, outlines in zip(anchors, padded, results):
+            if isinstance(outlines, BaseException) or not outlines:
                 continue
-            # Kept whole, not just as GeoJSON: the wash under a confirmed parcel
-            # is this same document, and the common envelope needs its geometry.
-            self._district_outlines[anchor.schluessel] = outline
-            out.append(
-                Suchgebiet(
-                    schluessel=anchor.schluessel,
-                    name=outline.name or anchor.name,
-                    anzahl=count if isinstance(count, int) else None,
-                    geometry=_geojson(outline.geometry),
+            for outline in outlines:
+                # Kept whole, not just as GeoJSON: the wash under a confirmed
+                # parcel is this same document, and the common envelope needs
+                # its geometry.
+                self._district_outlines[outline.schluessel or anchor.schluessel] = outline
+            # One place, one area on the map: the Flure of a district are drawn
+            # as themselves, because a union of eleven of them is a shape the
+            # cadastre never records and nobody can look up.
+            for outline in outlines:
+                out.append(
+                    Suchgebiet(
+                        schluessel=outline.schluessel or anchor.schluessel,
+                        name=anchor.name if len(outlines) > 1 else (outline.name or anchor.name),
+                        anzahl=count if isinstance(count, int) and len(outlines) == 1 else None,
+                        geometry=_geojson(outline.geometry),
+                    )
                 )
-            )
         return out
 
     async def _widen_the_place(
@@ -1552,6 +1561,54 @@ async def run_search(
     engine = SearchEngine(payload, alkis, directory, app_settings)
     async for event in engine.run():
         yield event
+
+
+def _group_into_anchors(
+    entries: Sequence[GemarkungEntry], indiz: Indiz, confidence: float
+) -> list[Anchor]:
+    """One anchor per *place*, however many Flure the directory files it as.
+
+    „Kitzen Flur 1" to „Flur 11" are one district and one request; two
+    districts that merely share a base name in different municipalities stay
+    two, because the municipality is what tells them apart.
+    """
+
+    grouped: dict[tuple[str, str | None], list[GemarkungEntry]] = {}
+    for entry in entries:
+        key = expand_gemarkung_key(entry.schluessel)
+        group = (fold(base_name(entry.name)), entry.gemeinde)
+        rows = grouped.setdefault(group, [])
+        if all(row.schluessel != key for row in rows):
+            rows.append(replace(entry, schluessel=key))
+
+    out: list[Anchor] = []
+    for rows in grouped.values():
+        printed = base_name(rows[0].name)
+        out.append(
+            Anchor(
+                art="gemarkung",
+                schluessel=rows[0].schluessel,
+                name=printed if printed and printed != "?" else indiz.wert,
+                indiz_id=indiz.id,
+                confidence=confidence,
+                gemeinde=rows[0].gemeinde,
+                keys=tuple(row.schluessel for row in rows),
+            )
+        )
+    return out
+
+
+def _without_repeats(anchors: list[Anchor]) -> list[Anchor]:
+    """The same district named twice is one anchor, and the first wins."""
+
+    seen: set[str] = set()
+    out: list[Anchor] = []
+    for anchor in anchors:
+        if any(key in seen for key in anchor.keys):
+            continue
+        seen.update(anchor.keys)
+        out.append(anchor)
+    return out
 
 
 def _thousands(value: int) -> str:

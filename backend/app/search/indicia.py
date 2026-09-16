@@ -24,7 +24,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from ..gemarkung_index import GemarkungDirectory, GemarkungEntry, fold
+from ..gemarkung_index import GemarkungDirectory, GemarkungEntry, base_name, fold
 from ..schemas import Indiz, IndizQuelle, Ortsbeziehung
 
 # How far each source is trusted, and thereby which one wins a contradiction:
@@ -466,7 +466,7 @@ def _indiz(
     )
 
 
-def _district_matches(
+def district_matches(
     directory: GemarkungDirectory, name: str
 ) -> list[GemarkungEntry]:
     """Directory entries whose name is exactly this word.
@@ -477,7 +477,15 @@ def _district_matches(
     """
 
     needle = fold(name)
-    return [entry for entry in directory.entries if fold(entry.name) == needle]
+    exact = [entry for entry in directory.entries if fold(entry.name) == needle]
+    if exact:
+        return exact
+    # The Flur suffix, and only as a fallback: an entry that carries the name
+    # outright is the better answer, and „Kitzen" must not also collect
+    # „Kitzenhausen". Measured 16.09.2026: 248 of the directory's base names
+    # exist *only* with the suffix -- Kitzen, Pehritzsch, Krostitz, Eilenburg
+    # with 48 of them -- and five of six freshly recorded adverts named one.
+    return [entry for entry in directory.entries if fold(base_name(entry.name)) == needle]
 
 
 def _districts_in_compound(
@@ -509,7 +517,7 @@ def _districts_in_compound(
     for part in name.split("-"):
         if len(part) < 3:
             continue
-        for entry in _district_matches(directory, part):
+        for entry in district_matches(directory, part):
             if entry.gemeinde and needle in fold(entry.gemeinde):
                 out.append(entry)
     return out
@@ -571,7 +579,7 @@ def collect_indicia(
     # 1 · What the caller states outright. A district and a number typed by a
     #     person, or read off an official extract, are the strongest thing here.
     if gemarkung:
-        entries = _district_matches(directory, gemarkung) if directory else []
+        entries = district_matches(directory, gemarkung) if directory else []
         key = entries[0].schluessel if len(entries) == 1 else None
         if key is None and gemarkung.strip().isdigit():
             key = gemarkung.strip()
@@ -779,7 +787,7 @@ def _from_location_field(
     # offered, the way a name in the running text is — the municipality above
     # sorts out which one afterwards. A street stands in this slot on one of the
     # three portals, so a name the directory does not know contributes nothing.
-    entries = _district_matches(directory, district)
+    entries = district_matches(directory, district)
     derived = False
     if not entries:
         entries = _districts_in_compound(directory, district, municipality)
@@ -900,7 +908,7 @@ def _from_body(
     named: set[str] = set(stated_districts)
     for match in _DISTRICT_RE.finditer(body):
         name = match.group(1).strip(" .:-")
-        entries = _district_matches(directory, name) if directory else []
+        entries = district_matches(directory, name) if directory else []
         named.add(fold(name))
         out.append(
             _indiz(
