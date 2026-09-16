@@ -26,6 +26,30 @@ also "Decisions that are settled" in `CLAUDE.md`.
   leaves 15. Two requests, no model call. Only use the exact value when the
   listing's number is exact — "ca. 500 m²" has to widen into a band.
 
+- **A location field with no postcode carries two levels in one slot, and the
+  directory can tell them apart.** „Leipzig - Knautkleeberg-Knauthain": the
+  half in front of the dash is usually the federal state, but a city writes its
+  own name there. „Sachsen - Schönwölkau-Hohenroda": the state is in front and
+  the municipality behind it has its Ortsteil hyphenated on. Both are read only
+  when the directory confirms them — the head as a municipality it knows, the
+  tail's right half as a district inside that municipality — which is what
+  keeps „Sandersdorf-Brehna" in one piece. Fixing this is what ended the one
+  false confirmation in the corpus: advert 3508042470 now searches all three
+  districts and answers „mehrdeutig" instead of confirming a parcel its own
+  location field contradicts.
+
+- **„Bestätigt" means nothing contradicts, not that one candidate is left.**
+  The shape is the contradiction the area cannot see: two parcels of 577 m²
+  can be 14 x 40 m and 22 x 27, and only one is the plot with the 14 m
+  frontage. `read_dimensions` takes the measures out of the text where a word
+  says what was measured, and over sixteen adverts it finds exactly the two
+  that state any — „einen Abstand von 15 m" out of a Bebauungsplan is not one.
+  Two guards, both measured: a **frontage on its own may not object** (advert
+  3375124391 states 26 m and its correct parcel sits in a 39,8 x 71,5 m
+  rectangle, because the plot is a wedge), and a parcel whose rectangle is more
+  than **1,3 times its own area** is not rectangular enough to be checked
+  against one at all.
+
 - **248 districts cannot be found under their own name.** The directory files
   2 105 of its 5 339 entries with a Flur suffix — „Kitzen Flur 1" to „Kitzen
   Flur 11" — and `_district_matches` compares names for equality, which it has

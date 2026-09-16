@@ -566,7 +566,7 @@ pre i{color:var(--muted);font-style:normal}
     </article>
 
     <article class="bs bs--hoch">
-      <div class="bs-kopf"><b>B7 · Bestätigung</b><span class="bs-grad">belegt</span></div>
+      <div class="bs-kopf"><b>B7 · Bestätigung</b><span class="bs-grad">behoben</span></div>
       <h3>Eine Bestätigung prüft nur die harten Filter — und hat schon danebengelegen</h3>
       <p>Anzeige 3508042470, live gelaufen: Standortfeld „Leipzig – Knautkleeberg-Knauthain“,
       Fließtext „Stadtteil Großzschocher“, 577 m² exakt. Der Lauf nimmt den Fließtext (0,60)
@@ -583,15 +583,17 @@ pre i{color:var(--muted);font-style:normal}
       Gemarkungen zerlegt. Und weil die eine Lesung als <code>gemarkung</code> und die andere
       als <code>gemeinde</code> ankommt, entsteht kein Konflikt — es gibt keine Frage,
       obwohl es zwei Antworten gibt.</p>
-      <div class="fix"><b>Vorschlag</b>„Bestätigt“ verlangt, dass <em>nichts</em>
-      widerspricht, nicht nur dass die harten Filter genau einen übriglassen: Form gegen
-      genannte Maße, Nutzung gegen „Baugrundstück mit Garage“, Lage gegen die genannte
-      Straße. Jede dieser Proben ist gratis — die Werte kommen mit dem Flurstück. Und die
-      Ortszeile braucht eine Stelle für den Ortsteil auch ohne Postleitzahl.</div>
+      <div class="fix"><b>Gebaut am 16.09.2026</b>Beides. Die Ortszeile hat jetzt eine
+      Stelle für den Ortsteil auch ohne Postleitzahl — „Leipzig - Knautkleeberg-Knauthain“
+      wird in Gemeinde und zwei Gemarkungen zerlegt, sobald das Verzeichnis beide Hälften
+      bestätigt. Und „bestätigt“ verlangt, dass nichts widerspricht: <code>read_dimensions</code>
+      liest die genannten Maße, und ein Flurstück, das in ein deutlich anderes Rechteck
+      passt, erzeugt einen Einspruch statt einer Bestätigung. Der Lauf antwortet jetzt
+      „mehrdeutig“ mit vier Kandidaten und 436/2 Knautkleeberg an erster Stelle.</div>
     </article>
 
     <article class="bs bs--hoch">
-      <div class="bs-kopf"><b>B8 · Verzeichnis</b><span class="bs-grad">belegt</span></div>
+      <div class="bs-kopf"><b>B8 · Verzeichnis</b><span class="bs-grad">behoben</span></div>
       <h3>248 Gemarkungen sind unter ihrem eigenen Namen nicht auffindbar</h3>
       <p>Das Verzeichnis führt 2 105 seiner 5 339 Einträge mit einem Flur-Zusatz:
       „Kitzen Flur 1“ bis „Kitzen Flur 11“. Gesucht wird aber auf genaue Namensgleichheit —
@@ -606,12 +608,12 @@ pre i{color:var(--muted);font-style:normal}
       Gemarkung“, fielen auf den Kartenpunkt mit 12 bis 14 Gemarkungen zurück und kosteten
       <b>24 bis 40 Anfragen</b> — für eine Antwort, die mit dem richtigen Anker zwei
       gekostet hätte.</p>
-      <div class="fix"><b>Vorschlag, gegen den Dienst geprüft</b>Auf den Grundnamen
-      abgleichen und alle Flure als <em>eine</em> Ankermenge führen — als
-      <code>fes:Or</code> über ihre Schlüssel, also eine Anfrage statt elf. Gemessen
-      16.09.2026: Kitzen → 2 062 Flurstücke, mit der exakten Fläche genau eines; Krostitz →
-      2 680 und vier; Pehritzsch → 1 113 und <em>keines</em>, was bei einem Neubaugebiet
-      mit „Baustart ab 09/26“ die richtige Antwort sein dürfte.</div>
+      <div class="fix"><b>Gebaut am 16.09.2026</b>Der Grundname wird abgeglichen — als
+      Rückfall, nie vor einer genauen Namensgleichheit — und die Flure werden zu
+      <em>einem</em> Anker mit mehreren Schlüsseln gebündelt, dessen Bedingung ein
+      <code>fes:Or</code> ist. Dieselbe Bündelung zählt jetzt auch die Gemeinde-Rückfallebene
+      in Orten statt in Zeilen. Gemessen über alle sechzehn Anzeigen:
+      <b>246 → 142 Anfragen</b>, sechs Läufe verändert, keiner zum Schlechteren.</div>
     </article>
   </div>
 </section>
@@ -1519,8 +1521,11 @@ Teil 6 brauchen.</pre>
       <span class="st-mass">klein · deterministisch<br>hilft allen Kanälen</span>
     </div>
     <div class="st">
-      <span class="st-nr">Stufe 1</span>
+      <span class="st-nr">Stufe 1 ✓</span>
       <div class="st-was"><h4>Namen richtig lesen: Beziehung, Straße, Gemarkung</h4>
+        <p style="color:var(--primary)"><b>Teilweise gebaut (16.09.2026):</b> der Grundname
+        einer Gemarkung mit Flur-Zusatz und die zweite Hälfte der Ortszeile. Offen bleiben
+        die prädikativen Beziehungsmuster und die Straßennamen ohne Suffix.</p>
         <p>Drei kleine Leserkorrekturen mit je einem Prüffall: prädikative Muster („X ist
         ein Ortsteil von Y“, B3), Lagebezeichnungen mit vorangestelltem Gattungswort („Am
         Kurpark“, „Platz des 21. September“, B4) und der Abgleich auf den Grundnamen einer
@@ -1538,8 +1543,11 @@ Teil 6 brauchen.</pre>
       <span class="st-mass">klein · berührt <code>named_as_a_set</code></span>
     </div>
     <div class="st">
-      <span class="st-nr">Stufe 3</span>
+      <span class="st-nr">Stufe 3 ◐</span>
       <div class="st-was"><h4>Widerspruch wird ein Zweig, Bestätigung wird streng</h4>
+        <p style="color:var(--primary)"><b>Zur Hälfte gebaut (16.09.2026):</b> Die Bestätigung
+        ist streng — die Form widerspricht. Der Zweig nach einem widersprochenen
+        Nummerntreffer (B1) fehlt noch.</p>
         <p>Die Schwelle kommt aus der Toleranz-Treppe statt aus Faktor 2, und ein
         widersprochener Nummerntreffer öffnet den Flächenweg, statt ihn zu blockieren (B1).
         Dazu die schärfere Regel für das Urteil: „bestätigt“ heißt, dass <em>nichts</em>
