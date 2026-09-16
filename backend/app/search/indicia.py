@@ -184,6 +184,10 @@ _LOCALITY_RE = re.compile(
 # the recorded adverts carry. Then the municipality is simply the tail, and
 # there is no slot a district could stand in.
 _LOCALITY_TAIL_RE = re.compile(rf"(?:^|[-–—])\s*(?P<tail>{_NAME})\s*$")
+# The same line with both halves kept. The separator is a dash *with spaces*,
+# which is what tells „Sachsen - Schönwölkau-Hohenroda" from the hyphen inside
+# „Sachsen-Anhalt": one is a separator, the other is part of a name.
+_LOCALITY_PAIR_RE = re.compile(rf"^\s*(?P<head>{_NAME})\s+[-–—]\s+(?P<tail>{_NAME})\s*$")
 
 # The same field names the *federal state*, and that is the one statement in a
 # listing this tool can be certain it cannot serve. ALKIS is state-specific, so
@@ -488,6 +492,57 @@ def district_matches(
     return [entry for entry in directory.entries if fold(base_name(entry.name)) == needle]
 
 
+def municipality_spelling(directory: GemarkungDirectory, name: str) -> str | None:
+    """The directory's own spelling of a municipality, if it knows this name.
+
+    Compared without „Stadt" and „Kreisstadt", which the column carries and a
+    location field does not, and exactly rather than by substring: „Borna" must
+    not match „Bornaer Land".
+    """
+
+    needle = fold(name)
+    for entry in directory.entries:
+        if not entry.gemeinde:
+            continue
+        spelled = fold(entry.gemeinde)
+        for prefix in ("stadt ", "kreisstadt ", "gemeinde "):
+            if spelled.startswith(prefix):
+                spelled = spelled[len(prefix):]
+        if spelled == needle:
+            return entry.gemeinde
+    return None
+
+
+def split_municipality_and_district(
+    name: str, directory: GemarkungDirectory
+) -> tuple[str, str] | None:
+    """„Schönwölkau-Hohenroda" -> („Schönwölkau", „Hohenroda").
+
+    A platform's location field has one slot for a place, and a municipality
+    writes its Ortsteil into it with a hyphen. Splitting is only safe when the
+    directory confirms *both* halves -- the left one as a municipality, the
+    right one as a district inside it -- which is what keeps „Sandersdorf-
+    Brehna" (a municipality whose name simply contains a hyphen, and not a
+    Saxon one) in one piece. A name the directory already knows as a
+    municipality is never split at all.
+    """
+
+    if "-" not in name or municipality_spelling(directory, name):
+        return None
+    left, right = (part.strip() for part in name.split("-", 1))
+    if len(left) < 3 or len(right) < 3:
+        return None
+    spelled = municipality_spelling(directory, left)
+    if not spelled:
+        return None
+    inside = [
+        entry
+        for entry in district_matches(directory, right)
+        if entry.gemeinde and fold(spelled) == fold(entry.gemeinde)
+    ]
+    return (left, right) if inside else None
+
+
 def _districts_in_compound(
     directory: GemarkungDirectory, name: str, municipality: str | None
 ) -> list[GemarkungEntry]:
@@ -751,7 +806,11 @@ def _from_location_field(
     """
 
     out: list[Indiz] = []
-    match = _LOCALITY_RE.search(adresse) or _LOCALITY_TAIL_RE.search(adresse)
+    match = (
+        _LOCALITY_RE.search(adresse)
+        or _LOCALITY_PAIR_RE.match(adresse)
+        or _LOCALITY_TAIL_RE.search(adresse)
+    )
     if not match:
         return out
 
@@ -763,6 +822,22 @@ def _from_location_field(
         municipality = behind
     else:
         municipality = tail
+
+    district = groups.get("district")
+    head = groups.get("head")
+    if head and directory is not None and federal_state(head) != head:
+        # „Leipzig - Knautkleeberg-Knauthain": the half in front of the dash is
+        # usually the federal state, but a city writes its own name there and
+        # the Ortsteil behind it. Only taken when the directory knows the head
+        # as a municipality, so a state and a stray word both fall through.
+        if municipality_spelling(directory, head):
+            municipality, district = head, district or tail
+    if municipality and directory is not None and not district:
+        # „Sachsen - Schönwölkau-Hohenroda": one slot, two levels, and the
+        # directory can tell them apart.
+        halves = split_municipality_and_district(municipality, directory)
+        if halves:
+            municipality, district = halves
     if municipality:
         out.append(
             _indiz(
@@ -779,7 +854,6 @@ def _from_location_field(
             )
         )
 
-    district = groups.get("district")
     if not district or directory is None:
         return out
 
