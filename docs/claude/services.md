@@ -44,6 +44,38 @@ of Overpass or a local extract, the listing portals, and the extraction model.
   says otherwise. The proxy still earns its place — disk cache, one contract,
   no key in the browser — but not for the reason stated there.
 
+- **`ave:Nutzung` is where the built-up area of a town comes from, and a POST
+  can carry a BBOX and a filter at once.** Measured 16.09.2026: a 2 km box
+  around Grimma holds 486 `Wohnbaufläche` polygons, 674 kB in 1.8 s; union them
+  with a 25 m closing and the largest connected piece is the town, 1.91 km²,
+  2.9 x 2.3 km. That is what „6 km bis Grimma" is measured *from* when the
+  reading is "to the edge": 5.32 km from Flurstück 790/11, against 6.25 km to
+  its middle — and the advert's „ca. 6 km" sits between them. Three parameters,
+  all measured: **Wohnbaufläche alone** (adding mixed and industrial use drags
+  the outline along the works and moves the near edge to 3.16 km, outside the
+  advert's own figure), a **25 m closing** (without one the union is 484
+  fragments; at 50 m neighbouring hamlets start merging and the edge jumps
+  0.7 km) and a **2 km radius** (Grimma 2.9 x 2.3 km, Borna 3.0 x 2.6 km, Bad
+  Lausick 3.2 x 2.3 km). `AlkisService.built_up_area`. The response puts its
+  features in the *default* namespace, so `nutzart` arrives without the `ave:`
+  prefix the filter needs — which is why it has its own parser.
+
+- **The cadastral district is not the town.** Measured on the same parcel:
+  Gemarkung Grimma is 21.50 km² of which most is field, and its boundary
+  reaches to within **1.22 km** of a plot that is 5 km from the town. Neither
+  is the stop cloud: 65 stops carry „Grimma" in their name and span 5.89 km,
+  because the municipality's villages are named after it. Both were candidates
+  for "the edge of the town" and both are refuted.
+
+- **immowelt.de answers server-side fetches with 403,** and it is DataDome at
+  the CloudFront edge: `x-datadome: protected`, a 771-byte JavaScript challenge
+  („Please enable JS and disable any ad blocker"), `x-cache:
+  LambdaGeneratedResponse from cloudfront`. Measured 15.09.2026 with the
+  project agent and with a full browser header set — identical. `robots.txt`
+  allows `/expose/` and names ClaudeBot explicitly; the refusal happens before
+  the server. Same shape as immobilienscout24.de, different vendor, same way
+  in: the user's own browser, so the bookmarklet.
+
 - **`ave:KatasterBezirk` will not drop its geometry.** `PROPERTYNAME` without the
   `ave:` prefix is rejected outright (`ErrorInPropertyName`); with the prefix the
   request is accepted and the outline comes back anyway — about 5 kB per

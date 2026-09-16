@@ -309,7 +309,7 @@ pre i{color:var(--muted);font-style:normal}
     <span class="marke stark">Wertekatalog</span>
     <span class="marke stark">Modellanbindung</span>
     <span class="marke stark">Offene Fragen</span>
-    <span class="marke">geprüft an 10 aufgezeichneten Inseraten</span>
+    <span class="marke">geprüft an 16 aufgezeichneten Inseraten</span>
   </div>
   <div class="kennzahlen">
     <div class="kz"><b>26</b><span>Angaben, die heute irgendwo gelesen werden</span></div>
@@ -599,15 +599,19 @@ pre i{color:var(--muted);font-style:normal}
       keinen einzigen Eintrag, und der Ort wird als „steht nicht im sächsischen
       Gemarkungsverzeichnis“ verworfen.</p>
       <p class="beleg">Hinter den 2 105 Einträgen stehen 295 Grundnamen, und <b>248 davon
-      haben keinen gleichnamigen Eintrag ohne Zusatz</b> — Kitzen, Arzberg, Bad Düben,
-      Authausen. Gemessen an Anzeige 3495978117: Der Text sagt „Kitzen, ein idyllischer
-      Ortsteil der Stadt Pegau“, gesucht wurde in Gemarkung Pegau (dort: null), gefunden
-      wurde über den Umweg Gemeinde — sieben Anfragen für eine Antwort, die in der richtigen
-      Gemarkung zwei gekostet hätte.</p>
-      <div class="fix"><b>Vorschlag</b>Auf den Grundnamen abgleichen und alle Flure als
-      <em>eine</em> Ankermenge führen. Billiger noch, und am 10.09.2026 gegen den Dienst
-      geprüft: <code>PropertyIsLike(gemarkung, "Kitzen*")</code> wird angenommen — 2 062
-      Flurstücke, mit der exakten Fläche genau eines. Eine Anfrage statt elf.</div>
+      haben keinen gleichnamigen Eintrag ohne Zusatz</b>. Das ist kein Randfall: Von sechs
+      am 16.09.2026 neu aufgezeichneten Anzeigen scheiterten <b>fünf</b> genau daran —
+      Pehritzsch (7 Flure), Hohenroda (3), Krostitz (8), Doberschütz (5), Sprotta (6),
+      Jesewitz (6), Eilenburg (<b>48</b>). Die Läufe meldeten „die Anzeige nennt keine
+      Gemarkung“, fielen auf den Kartenpunkt mit 12 bis 14 Gemarkungen zurück und kosteten
+      <b>24 bis 40 Anfragen</b> — für eine Antwort, die mit dem richtigen Anker zwei
+      gekostet hätte.</p>
+      <div class="fix"><b>Vorschlag, gegen den Dienst geprüft</b>Auf den Grundnamen
+      abgleichen und alle Flure als <em>eine</em> Ankermenge führen — als
+      <code>fes:Or</code> über ihre Schlüssel, also eine Anfrage statt elf. Gemessen
+      16.09.2026: Kitzen → 2 062 Flurstücke, mit der exakten Fläche genau eines; Krostitz →
+      2 680 und vier; Pehritzsch → 1 113 und <em>keines</em>, was bei einem Neubaugebiet
+      mit „Baustart ab 09/26“ die richtige Antwort sein dürfte.</div>
     </article>
   </div>
 </section>
@@ -796,29 +800,30 @@ pre i{color:var(--muted);font-style:normal}
   <table>
     <thead><tr><th>Lesart von „Grimma“</th><th class="n">Abstand 790/11 →</th><th>Woher</th></tr></thead>
     <tbody>
-      <tr><td>Rand der Gemarkung Grimma</td><td class="n">1,22 km</td><td>ALKIS <code>ave:KatasterBezirk</code>, 21,50 km², 1 493 Stützpunkte</td></tr>
-      <tr><td>nächste Haltestelle mit „Grimma“ im Namen</td><td class="n">2,51 km</td><td>MOTIS <code>map/stops</code>, 65 Stück</td></tr>
+      <tr><td><s>Rand der Gemarkung Grimma</s> — widerlegt</td><td class="n">1,22 km</td><td>ALKIS <code>ave:KatasterBezirk</code>, 21,50 km², überwiegend Feld</td></tr>
+      <tr><td><s>nächste Haltestelle mit „Grimma“ im Namen</s> — widerlegt</td><td class="n">2,51 km</td><td>MOTIS <code>map/stops</code>, 65 Stück, über die ganze Gemeinde verteilt</td></tr>
       <tr><td>Mitte der Gemarkung</td><td class="n">4,81 km</td><td>Schwerpunkt desselben Umrisses</td></tr>
+      <tr class="gut"><td><b>Rand der bebauten Ortslage</b></td><td class="n"><b>5,32 km</b></td><td>ALKIS <code>ave:Nutzung</code>, 486 Wohnbauflächen, 25 m geschlossen</td></tr>
       <tr><td>Punkt des Geocoders (<code>PLACE</code>)</td><td class="n">5,34 km</td><td>Transitous</td></tr>
       <tr class="gut"><td><b>Was das Inserat sagt</b></td><td class="n"><b>ca. 6 km</b></td><td>Fließtext</td></tr>
       <tr><td>Fußweg zum Geocoder-Punkt</td><td class="n">6,54 km</td><td><code>one-to-many</code>, WALK</td></tr>
+      <tr class="gut"><td><b>Mitte der bebauten Ortslage</b></td><td class="n"><b>6,25 km</b></td><td>Schwerpunkt derselben Vereinigung</td></tr>
       <tr><td>Autoroute zum Geocoder-Punkt</td><td class="n">7,37 km</td><td><code>one-to-many</code>, CAR</td></tr>
     </tbody>
   </table>
   </div>
   <div class="col stack" style="margin-top:16px">
-    <p><b>Faktor sechs zwischen der engsten und der weitesten Lesart.</b> Und die beiden
-    billigen Umrisse, die dieses Projekt ohne neue Datenquelle hätte, taugen beide nicht:</p>
-    <ul style="font-size:14px;color:var(--graphite)">
-      <li><b>Die Gemarkung ist keine Stadt.</b> Zu ihr gehören die Felder; ihr Rand reicht
-      bis auf 1,22 km an das Grundstück heran, während der Ort 5 km weit weg ist.</li>
-      <li><b>Die Haltestellenwolke auch nicht.</b> 65 Halte tragen „Grimma“ im Namen und
-      spannen 5,89 × 5,76 km auf — weil die Dörfer der Gemeinde nach ihr heißen. Großbothen
-      selbst gehört zu Grimma.</li>
-      <li><b>Die bebaute Ortslage wäre die richtige Fläche</b> (<code>landuse=residential</code>
-      aus OSM). Aus dieser Umgebung nicht messbar — Overpass hat dreimal die Verbindung
-      abgebrochen —, deshalb steht hier keine Zahl dafür.</li>
-    </ul>
+    <p><b>Zwei der Lesarten sind inzwischen widerlegt, und die richtige Quelle war die
+    ganze Zeit da.</b> Die Gemarkung ist keine Stadt — zu ihr gehören die Felder, ihr Rand
+    reicht bis auf 1,22 km an das Grundstück heran. Die Haltestellenwolke auch nicht: 65
+    Halte tragen „Grimma“ im Namen und spannen 5,89 km auf, weil die Dörfer der Gemeinde
+    nach ihr heißen. Die bebaute Ortslage dagegen liefert <code>ave:Nutzung</code> —
+    derselbe Dienst, der die Flurstücke liefert.</p>
+    <p><b>Und damit wird das Band eng statt weit.</b> Aus den beiden Lesarten der echten
+    Ortslage — Rand 5,32 km, Mitte 6,25 km — entsteht ein Intervall von <b>0,93 km
+    Breite</b>, und die Angabe des Inserats („ca. 6 km“) liegt mittendrin. Kein einziger
+    Einzelpunkt hätte das geleistet: Der Geocoder-Punkt sagt 5,34 km, die Autoroute
+    7,37 km.</p>
   </div>
 
   <div class="zwei" style="margin-top:20px">
@@ -1417,28 +1422,38 @@ Teil 6 brauchen.</pre>
 <section id="offen">
   <p class="eyebrow">Teil 11</p>
   <h2>Was offen bleibt</h2>
-  <p class="lede col" style="margin-top:12px">Sechs Fragen, die dieser Plan nicht
-  beantwortet — jede mit dem, was man messen müsste, um sie zu schließen.</p>
+  <p class="lede col" style="margin-top:12px">Sechs Fragen, die dieser Plan aufwarf. Eine
+  ist seit dem 16.09.2026 beantwortet und gebaut, drei sind entschieden, zwei stehen noch
+  offen — jede mit dem, was man messen müsste, um sie zu schließen.</p>
   <div class="bruch" style="margin-top:22px">
-    <article class="bs bs--mittel">
-      <div class="bs-kopf"><b>F1 · Ortslage</b><span class="bs-grad">offen</span></div>
-      <h3>Woher kommt der Umriss einer Ortschaft?</h3>
-      <p>Die Lesart „bis zum Ortsrand“ braucht die bebaute Ortslage, und beide billigen
-      Umrisse sind widerlegt: Die Gemarkung ist Feld (Rand 1,22 km statt 5 km), die
-      Haltestellenwolke trägt die Dörfer der ganzen Gemeinde (5,89 km Spannweite).</p>
-      <div class="fix"><b>Zu messen</b><code>landuse=residential</code> aus dem
-      OSM-Auszug, einmalig gebaut wie der POI-Index — aus dieser Umgebung nicht prüfbar,
-      Overpass brach dreimal ab. Eine Sitzung mit dem lokalen Extrakt genügt.</div>
+    <article class="bs bs--klein">
+      <div class="bs-kopf"><b>F1 · Ortslage</b><span class="bs-grad">beantwortet</span></div>
+      <h3>Der Umriss kommt aus dem Kataster selbst</h3>
+      <p><code>ave:Nutzung</code> führt die tatsächliche Nutzung als Flächen, mit
+      <code>nutzart</code> im Klartext — und ein POST kann Kasten und Filter zugleich
+      tragen. Wohnbauflächen im 2-km-Kasten, jede um 25 m gepuffert, vereinigt, wieder
+      zurückgepuffert: das größte zusammenhängende Stück ist der Ort.</p>
+      <p class="beleg">Gemessen 16.09.2026: Grimma 486 Flächen, 674 kB, 1,8 s → Kern
+      1,91 km² (2,9 × 2,3 km). Rand 5,32 km vom Flurstück, Mitte 6,25 km, Inserat
+      „ca. 6 km“ — mittendrin. Bad Lausick: das Etzoldshainer Flurstück liegt <b>50 m</b>
+      vor dem Ortsrand, was „in Bad Lausick“ bestätigt, obwohl die Gemarkung eine andere
+      ist.</p>
+      <div class="fix"><b>Gebaut</b><code>AlkisService.built_up_area()</code> mit vier
+      Tests und einer Aufzeichnung (Kitzen, 25 Polygone). Die drei Parameter sind
+      gemessen, nicht gewählt: nur Wohnbaufläche (die weite Fassung zieht den Rand auf
+      3,16 km und schließt die Angabe des Inserats aus), 25 m Schließweite (ohne sie 484
+      Bruchstücke, bei 50 m wachsen Nachbardörfer an), 2 km Kasten.</div>
     </article>
     <article class="bs bs--mittel">
-      <div class="bs-kopf"><b>F2 · Bandbreite</b><span class="bs-grad">offen</span></div>
+      <div class="bs-kopf"><b>F2 · Bandbreite</b><span class="bs-grad">entschieden</span></div>
       <h3>Wie weit dürfen ϱ und ε gehen?</h3>
       <p>Gemessen an sieben Strecken: Umweg zu Fuß 1,17–1,30×, mit dem Auto 1,20–2,91×;
       Fehler der Angabe selbst −57 % bis +13 %. Aus zehn Anzeigen lässt sich keine
       Verteilung schätzen.</p>
-      <div class="fix"><b>Vorschlag</b>Feste, großzügige Werte — und weil ein Band
-      niemals filtert, können sie unkalibriert ausgeliefert werden. Dasselbe Argument wie
-      bei den Gewichten.</div>
+      <div class="fix"><b>Entschieden</b>Feste, großzügige Werte. Weil ein Band niemals
+      filtert, dürfen sie unkalibriert ausgeliefert werden — dasselbe Argument wie bei den
+      Gewichten. Was die Ortslage aus F1 beiträgt, ist ohnehin die schärfere Hälfte: Sie
+      ersetzt einen geschätzten Zuschlag durch ein gemessenes Intervall.</div>
     </article>
     <article class="bs bs--mittel">
       <div class="bs-kopf"><b>F3 · Typologie</b><span class="bs-grad">offen</span></div>
@@ -1451,13 +1466,14 @@ Teil 6 brauchen.</pre>
       erst gezeichnet wird.</div>
     </article>
     <article class="bs bs--mittel">
-      <div class="bs-kopf"><b>F4 · Fahrzeit</b><span class="bs-grad">offen</span></div>
+      <div class="bs-kopf"><b>F4 · Fahrzeit</b><span class="bs-grad">eingeplant</span></div>
       <h3>Was ist mit Minuten statt Kilometern?</h3>
       <p>„ca. 7 min mit dem Auto“ — <code>one-to-many</code> liefert die Dauer mit, die
       Maschinerie ist also dieselbe. Ungeprüft ist, wie stark Tageszeit und Verkehrsmodell
       streuen und ob ein Zeitband dadurch breiter wird als ein Streckenband.</p>
-      <div class="fix"><b>Zu messen</b>Dieselben sieben Strecken zu vier Tageszeiten.
-      Kostet nichts außer Anfragen.</div>
+      <div class="fix"><b>Eingeplant</b>Dieselben sieben Strecken zu drei Tageszeiten —
+      Berufsverkehr, Vormittag, Abend. Die Nacht bleibt außen vor: Sie ist der Fall, den
+      niemand meint, wenn er „12 Minuten bis Leipzig“ schreibt.</div>
     </article>
     <article class="bs bs--mittel">
       <div class="bs-kopf"><b>F5 · Ankerwahl</b><span class="bs-grad">offen</span></div>
@@ -1475,9 +1491,11 @@ Teil 6 brauchen.</pre>
       <p>Ein Schnitt zweier Bänder sieht aus wie ein Ergebnis. Er ist aber die
       Zusammenfassung zweier Maklerangaben, von denen eine gemessen 57 % danebenlag. Die
       weiche Kante ist ein Anfang und reicht vermutlich nicht.</p>
-      <div class="fix"><b>Offen</b>Die stärkste Idee aus dem Bestand: Ein Band wird nur
-      gezeichnet, solange es <em>keinen</em> bestätigten Treffer gibt — und verschwindet in
-      dem Moment, in dem eine amtliche Aussage die Frage beantwortet.</div>
+      <div class="fix"><b>Entschieden, vorerst</b>Gestrichelte Grenzen — so ist am Rand
+      sichtbar, dass dort eine Annahme aufhört und keine Messung. Weiche Kanten wären
+      hübscher und verstecken genau das; sie kommen später, wenn überhaupt. Die zweite
+      Regel bleibt: Ein Band wird nur gezeichnet, solange es keinen bestätigten Treffer
+      gibt.</div>
     </article>
   </div>
 </section>

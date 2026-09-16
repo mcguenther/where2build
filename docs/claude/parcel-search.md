@@ -26,6 +26,20 @@ also "Decisions that are settled" in `CLAUDE.md`.
   leaves 15. Two requests, no model call. Only use the exact value when the
   listing's number is exact — "ca. 500 m²" has to widen into a band.
 
+- **248 districts cannot be found under their own name.** The directory files
+  2 105 of its 5 339 entries with a Flur suffix — „Kitzen Flur 1" to „Kitzen
+  Flur 11" — and `_district_matches` compares names for equality, which it has
+  to: a substring search turns „Grimma" into a match for „Grimmaischer".
+  Behind those entries stand 295 base names and **248 have no plain twin**.
+  Measured 16.09.2026 over six freshly recorded adverts: Pehritzsch (7 Flure),
+  Hohenroda (3), Krostitz (8), Doberschütz (5), Sprotta (6), Jesewitz (6) and
+  Eilenburg (**48**) are all unreachable by name, so five of those six runs
+  reported „die Anzeige nennt keine Gemarkung", fell back on the platform's pin
+  with 12 to 14 districts, and cost **24 to 40 requests** each where the right
+  anchor costs two. The fix is measured and cheap: match on the base name and
+  send the Flur keys as one `fes:Or` — „Kitzen" then resolves to 2 062 parcels
+  in a single request, and with the advert's exact area exactly one remains.
+
 - **`ave:lagebeztxt` is often `"ohne Lage"`**, so a street name cannot be matched
   against ALKIS as an attribute. Take the way from OSM and buffer it instead: a
   40 m buffer around Wiesenstraße catches 790/11 at 3 m, and an 80 m buffer cuts
@@ -74,6 +88,17 @@ also "Decisions that are settled" in `CLAUDE.md`.
   minimum half-width, so even a confirmed parcel is never shown without its
   neighbours. And a layer whose extent dwarfs the frame stops informing and
   starts tinting: the district wash and the street buffer fade out on the way in.
+
+- **A dependency parser reads the relation a regular expression cannot — on a
+  sentence.** spaCy's German model takes „Thräna ist … ein Ortsteil der
+  Kreisstadt Borna" apart correctly, and four rules cover every phrasing in the
+  corpus, the distance-to-place binding included. On the real text it falls
+  apart: a markdown heading without a full stop becomes the subject of the next
+  sentence, and the bullet lists bind „ca. 300 m" to Leipzig instead of Kitzen,
+  four times in one advert. The cause is format, not language, so the first
+  step is splitting a listing into headings, paragraphs, bullets and „Label:
+  Wert" lines — which helps the regular expressions and the model just as much.
+  Measured 15.09.2026, with what it would cost: `docs/research/nlp-spacy.md`.
 
 - **Counting place-name mentions picks the wrong place.** Against the 5 339
   names in `gemarkungen-sachsen.json`, this ad scores Grimma 3× and Großbothen

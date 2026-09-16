@@ -444,6 +444,101 @@ def like(name: str, pattern: str) -> str:
     )
 
 
+# The built-up area of a settlement -- what „6 km bis Grimma" is measured from
+# when the reading is "to the edge of the town" rather than "to its middle".
+#
+# Measured 16.09.2026 against the live service. `ave:Nutzung` carries the
+# recorded land use as polygons with `nutzart` in plain text, and a POST can
+# carry a BBOX and a property filter at once. Around Grimma a 2 km box holds
+# 486 `Wohnbaufläche` polygons, 674 kB in 1.8 s.
+#
+# Three numbers behind the constants, all measured on that box:
+#
+# * **Wohnbaufläche alone, not the wider settlement classes.** Adding mixed and
+#   industrial use stretches the outline along the works and moves the near
+#   edge from 5.32 km to 3.16 km -- and the advert's own „ca. 6 km" then falls
+#   *outside* the interval the readings span. The narrow set is the better
+#   model of what a seller calls "the town".
+# * **A 25 m closing.** The polygons stop at the street, so without one the
+#   union is 484 fragments whose largest is 0.07 km². At 15 m it is 78
+#   fragments, at 25 m 55 around a 1.91 km² core, and at 50 m the gaps between
+#   neighbouring hamlets start closing too and the near edge jumps 0.7 km.
+# * **A 2 km radius** holds a small town whole: Grimma's core measures
+#   2.9 x 2.3 km, Borna's 3.0 x 2.6 km, Bad Lausick's 3.2 x 2.3 km.
+BUILT_UP_RADIUS_M = 2000.0
+BUILT_UP_CLOSING_M = 25.0
+BUILT_UP_KIND = "Wohnbau*"
+
+
+@dataclass(frozen=True, slots=True)
+class BuiltUpArea:
+    """One settlement's built-up outline, assembled from its land-use polygons.
+
+    Not an ALKIS object -- the cadastre records land use surface by surface and
+    knows nothing of "a town". The union is ours, which is why this name is
+    English while ``Flurstueck`` and ``KatasterBezirk`` keep the service's own.
+    """
+
+    geometry: Any
+    parts: int
+    pieces: int
+
+    @property
+    def area_m2(self) -> float:
+        return float(self.geometry.area)
+
+
+def _bbox_filter(easting: float, northing: float, radius_m: float, crs: str) -> str:
+    """A square box as a filter condition, for the POSTs that need both.
+
+    A WFS GET cannot carry a BBOX and a property filter at once; ``fes:BBOX``
+    on ``ave:geometrie`` in a POST body can, and that is what keeps the
+    land-use query from returning every kind of surface in the box.
+    """
+
+    return (
+        "<fes:BBOX>"
+        "<fes:ValueReference>ave:geometrie</fes:ValueReference>"
+        f'<gml:Envelope srsName="{crs}">'
+        f"<gml:lowerCorner>{easting - radius_m:.0f} {northing - radius_m:.0f}</gml:lowerCorner>"
+        f"<gml:upperCorner>{easting + radius_m:.0f} {northing + radius_m:.0f}</gml:upperCorner>"
+        "</gml:Envelope>"
+        "</fes:BBOX>"
+    )
+
+
+def parse_land_use(xml: bytes | str) -> list[Polygon]:
+    """The polygons of an ``ave:Nutzung`` response.
+
+    The response puts its feature elements in the *default* namespace, so
+    ``nutzart`` arrives without the ``ave:`` prefix the filter needs -- which
+    is why this does not go through ``parse_feature_collection``.
+    """
+
+    try:
+        root = ElementTree.fromstring(xml if isinstance(xml, bytes) else xml.encode("utf-8"))
+    except ElementTree.ParseError as exc:
+        raise UpstreamError(f"{SERVICE_NAME} hat kein gültiges GML geliefert. {ADVICE}") from exc
+
+    default_srs = root.get("srsName")
+    out: list[Polygon] = []
+    for element in root.iter():
+        if _local(element.tag) != "Nutzung":
+            continue
+        srs_name = next(
+            (child.get("srsName") for child in element.iter() if child.get("srsName")),
+            default_srs,
+        )
+        swap = _axis_swapped(srs_name)
+        for polygon_element in element.iter():
+            if _local(polygon_element.tag) != "Polygon":
+                continue
+            polygon = _parse_polygon(polygon_element, swap)
+            if polygon is not None and not polygon.is_empty:
+                out.append(polygon)
+    return out
+
+
 @dataclass(frozen=True, slots=True)
 class KatasterBezirk:
     """One cadastral district with its outline.
@@ -824,3 +919,62 @@ class AlkisService:
                 geometry=_parse_geometry(element, default_srs),
             )
         return None
+
+    async def built_up_area(
+        self,
+        lat: float,
+        lon: float,
+        *,
+        radius_m: float = BUILT_UP_RADIUS_M,
+        closing_m: float = BUILT_UP_CLOSING_M,
+    ) -> BuiltUpArea | None:
+        """The built-up outline of the settlement at a coordinate.
+
+        What a distance in a listing is measured *from* is not one point.
+        „6 km bis Grimma" can mean the middle of the town or its edge, and the
+        two are kilometres apart -- so the search wants both, and the edge is
+        what this answers. Measured 16.09.2026 from Flurstück 790/11: 5.32 km
+        to the edge of Grimma's built-up area, 6.25 km to its middle, and the
+        advert says „ca. 6 km" -- inside that interval and outside every
+        single-point reading.
+
+        The cadastral district is not a substitute, and measuring refuted it:
+        Gemarkung Grimma reaches to within 1.22 km of that same parcel, because
+        a district is farmland too.
+
+        Answers the connected piece the coordinate falls in -- or the largest
+        one, when the point sits just outside, which is what a village edge
+        does.
+        """
+
+        easting, northing = geo.wgs84_to_utm33(lon, lat)
+        body = self._envelope(
+            [
+                _bbox_filter(easting, northing, radius_m, self._crs_urn),
+                like("nutzart", BUILT_UP_KIND),
+            ],
+            result_type="results",
+            count=self.settings.max_features,
+            type_names="ave:Nutzung",
+        )
+        polygons = parse_land_use(await self._post(body))
+        if not polygons:
+            return None
+
+        # Assembled here rather than in the browser for the same reason the
+        # common envelope is: one datum about the world, made of many the
+        # service returns, and the search ranks with it. The drawing geometry
+        # still belongs to the frontend.
+        closed = unary_union([polygon.buffer(closing_m) for polygon in polygons])
+        closed = closed.buffer(-closing_m)
+        parts = [
+            part
+            for part in (closed.geoms if isinstance(closed, MultiPolygon) else [closed])
+            if not part.is_empty
+        ]
+        if not parts:
+            return None
+        parts.sort(key=lambda part: -part.area)
+        point = Point(easting, northing)
+        core = next((part for part in parts if part.covers(point)), parts[0])
+        return BuiltUpArea(geometry=core, parts=len(parts), pieces=len(polygons))
