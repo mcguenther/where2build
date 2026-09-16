@@ -163,7 +163,12 @@ export default {
 </script>
 
 <style scoped>
-.shell{ min-height: 100vh; display: flex; flex-direction: column; }
+/* `overflow-x: clip` and not `hidden`: the start page's reception is a
+   `100vw` breakout out of the 1360 px container, and on a window with a
+   classic scrollbar `100vw` is wider than the page by exactly that scrollbar.
+   Clipping swallows the overshoot without making this a scroll container, so
+   nothing inside loses `position: sticky`. */
+.shell{ min-height: 100vh; display: flex; flex-direction: column; overflow-x: clip; }
 main{ flex: 1; padding-top: var(--w2b-space-5); }
 
 .site-header{ background: var(--w2b-surface); border-bottom: 1px solid var(--w2b-line); }
