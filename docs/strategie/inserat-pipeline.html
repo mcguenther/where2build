@@ -472,7 +472,7 @@ pre i{color:var(--muted);font-style:normal}
 
   <div class="bruch">
     <article class="bs bs--hoch">
-      <div class="bs-kopf"><b>B1 · Kurzschluss</b><span class="bs-grad">hoch</span></div>
+      <div class="bs-kopf"><b>B1 · Kurzschluss</b><span class="bs-grad">behoben</span></div>
       <h3>Eine Nummer, die nicht passt, blockiert den Flächenweg</h3>
       <p><code>narrow()</code> startet die Toleranz-Treppe nur, solange die Kandidatenliste
       leer ist. Findet die Flurstücksnummer irgendein Flurstück, ist der Flächenweg zu.
@@ -483,10 +483,12 @@ pre i{color:var(--muted);font-style:normal}
       <p>Und weil die Bilder nur gelesen werden, wenn der Text es <em>nicht</em> entschieden
       hat, wird der angehängte Katasterauszug, der die Nummer widerlegt hätte, in genau
       diesem Fall nie geöffnet.</p>
-      <div class="fix"><b>Vorschlag</b>Der Widerspruch wird ein Zweig, keine Fußnote: Der
-      Nummerntreffer bleibt stehen, der Flächenweg läuft zusätzlich, beide stehen mit Grund
-      im Verlauf. Die Schwelle kommt aus der Toleranz-Treppe des Inserats (0–5 %), nicht aus
-      einem Faktor 2.</div>
+      <div class="fix"><b>Gebaut am 16.09.2026</b>Der Widerspruch ist ein Zweig: Der
+      Nummerntreffer behält sein Flurstück, seine Indiz-Zeile trägt den Grund, der Flächenweg
+      läuft zusätzlich — und findet der nichts, kommt das markierte Flurstück zurück, weil
+      ein prüfbarer Kandidat besser ist als gar keiner. Die Schwelle kommt jetzt aus der
+      Toleranz-Treppe (5 % exakt, 10 % gerundet) statt aus dem Faktor 2, der 700 m² für
+      angegebene 502 durchgehen ließ.</div>
     </article>
 
     <article class="bs bs--hoch">
@@ -507,7 +509,7 @@ pre i{color:var(--muted);font-style:normal}
     </article>
 
     <article class="bs bs--hoch">
-      <div class="bs-kopf"><b>B3 · Ortsbeziehung</b><span class="bs-grad">hoch</span></div>
+      <div class="bs-kopf"><b>B3 · Ortsbeziehung</b><span class="bs-grad">behoben</span></div>
       <h3>Die Beziehung wird nur nach links gelesen</h3>
       <p><code>_relation_before()</code> sucht den Auslöser in den 60 Zeichen <em>vor</em>
       dem Namen. Steht er dahinter, fällt die Aussage auf <code>erwaehnt</code> (0,20) zurück
@@ -515,10 +517,13 @@ pre i{color:var(--muted);font-style:normal}
       <p class="beleg">Inserat 2418686487: <q>Thräna ist mit seinen etwa 765 Einwohnern ein
       kleiner Ortsteil der Kreisstadt Borna.</q> — und Thräna ist die Lösung. Gemessen am
       heutigen Leser: <code>gemarkung Thräna · erwaehnt · 0,20</code>, also kein Anker.</p>
-      <div class="fix"><b>Vorschlag</b>Prädikative Muster als eigene Regel („X ist ein
-      Ortsteil von Y“, „X gehört zu Y“, „X, ein Ortsteil der Kreisstadt Y“). Dieselbe Klasse
-      Satz ist auch der erste Fall, in dem ein Sprachmodell echten Mehrwert bringt: es liest
-      die Richtung, ohne dass jemand ein Muster dafür pflegen muss.</div>
+      <div class="fix"><b>Gebaut am 16.09.2026</b>Zwei Muster: das prädikative („X ist …
+      ein Ortsteil der Kreisstadt Y“) und das appositive mit Adjektiv („Kitzen, ein
+      idyllischer Ortsteil der Stadt Pegau“) — das alte erlaubte „ein OT“ und nicht „ein
+      idyllischer Ortsteil“. Das prädikative zählt nur, wenn das Verzeichnis den Namen kennt,
+      denn „Das Grundstück ist … ein Ortsteil von Machern“ hat dieselbe Form. Gemessen: Borna
+      von 29 Kandidaten in 34 Anfragen auf <b>5 in 8</b>, mit Gemarkung Thräna an erster
+      Stelle und ohne ein einziges gelesenes Bild.</div>
     </article>
 
     <article class="bs bs--mittel">
@@ -1523,9 +1528,9 @@ Teil 6 brauchen.</pre>
     <div class="st">
       <span class="st-nr">Stufe 1 ✓</span>
       <div class="st-was"><h4>Namen richtig lesen: Beziehung, Straße, Gemarkung</h4>
-        <p style="color:var(--primary)"><b>Teilweise gebaut (16.09.2026):</b> der Grundname
-        einer Gemarkung mit Flur-Zusatz und die zweite Hälfte der Ortszeile. Offen bleiben
-        die prädikativen Beziehungsmuster und die Straßennamen ohne Suffix.</p>
+        <p style="color:var(--primary)"><b>Gebaut (16.09.2026):</b> der Grundname einer
+        Gemarkung mit Flur-Zusatz, die zweite Hälfte der Ortszeile und die prädikativen
+        Beziehungsmuster. Offen bleiben nur die Straßennamen ohne Suffix.</p>
         <p>Drei kleine Leserkorrekturen mit je einem Prüffall: prädikative Muster („X ist
         ein Ortsteil von Y“, B3), Lagebezeichnungen mit vorangestelltem Gattungswort („Am
         Kurpark“, „Platz des 21. September“, B4) und der Abgleich auf den Grundnamen einer
@@ -1545,9 +1550,9 @@ Teil 6 brauchen.</pre>
     <div class="st">
       <span class="st-nr">Stufe 3 ◐</span>
       <div class="st-was"><h4>Widerspruch wird ein Zweig, Bestätigung wird streng</h4>
-        <p style="color:var(--primary)"><b>Zur Hälfte gebaut (16.09.2026):</b> Die Bestätigung
-        ist streng — die Form widerspricht. Der Zweig nach einem widersprochenen
-        Nummerntreffer (B1) fehlt noch.</p>
+        <p style="color:var(--primary)"><b>Gebaut (16.09.2026):</b> beides — die Form
+        widerspricht einer Bestätigung, und ein widersprochener Nummerntreffer öffnet den
+        Flächenweg, statt ihn zu schließen.</p>
         <p>Die Schwelle kommt aus der Toleranz-Treppe statt aus Faktor 2, und ein
         widersprochener Nummerntreffer öffnet den Flächenweg, statt ihn zu blockieren (B1).
         Dazu die schärfere Regel für das Urteil: „bestätigt“ heißt, dass <em>nichts</em>

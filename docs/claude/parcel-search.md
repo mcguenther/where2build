@@ -26,6 +26,28 @@ also "Decisions that are settled" in `CLAUDE.md`.
   leaves 15. Two requests, no model call. Only use the exact value when the
   listing's number is exact — "ca. 500 m²" has to widen into a band.
 
+- **The relation can stand behind the name, and every window that looks left
+  misses it.** „Thräna ist mit seinen etwa 765 Einwohnern ein kleiner Ortsteil
+  der Kreisstadt Borna" — the one advert in the corpus whose answer is Thräna,
+  and its district was read as a bare mention until the predicative pattern
+  existed. The appositive one needs its adjective too: „Kitzen, ein
+  idyllischer Ortsteil der Stadt Pegau" did not match a pattern that allowed
+  „ein OT" and not „ein idyllischer Ortsteil". Measured: Borna went from 29
+  candidates in 34 requests to 5 in 8, with the first in Gemarkung Thräna and
+  no image read. The predicative form only counts when the directory knows the
+  name — „Das Grundstück ist … ein Ortsteil von Machern" has the same shape,
+  and German capitalises every noun.
+
+- **A parcel number that resolves to the wrong parcel used to close the
+  search.** The staircase runs only while the candidate list is empty, so a
+  number that found *some* parcel stopped the area route that would have found
+  the right one, and the contradiction was reported and dropped. Both stand
+  now: the number keeps its parcel with the objection attached, the area is
+  searched as well, and an empty area route gives the marked parcel back. The
+  threshold comes from the tolerance staircase — as far as the wording
+  justifies, 5 % exact and 10 % rounded — because the old factor of two let
+  700 m² pass for a stated 502.
+
 - **A location field with no postcode carries two levels in one slot, and the
   directory can tell them apart.** „Leipzig - Knautkleeberg-Knauthain": the
   half in front of the dash is usually the federal state, but a city writes its
