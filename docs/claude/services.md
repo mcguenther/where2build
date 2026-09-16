@@ -60,6 +60,22 @@ of Overpass or a local extract, the listing portals, and the extraction model.
   features in the *default* namespace, so `nutzart` arrives without the `ave:`
   prefix the filter needs — which is why it has its own parser.
 
+- **That query needs a count of its own, and the largest piece rather than the
+  one under the seed.** Two things the note above got right by measuring
+  outside the service and wrong inside it, both found on 16.09.2026 when the
+  band was built on top of it. The service-wide `max_features` of 200
+  **truncates** the land-use query and nothing says so: 200 of Grimma's 431
+  polygons close into a 0.35 km² fragment instead of the town, and the near
+  edge then reads 5.4 km — a plausible number out of a tenth of the place.
+  Hence `BUILT_UP_MAX_FEATURES = 1500`. And seeded from Grimma's market square,
+  the piece *covering* the seed is a 0.48 km² island of housing inside a centre
+  the cadastre records as mixed use, while the town is the 1.65 km² belt around
+  it; the island reads 4.6–5.1 km from Flurstück 790/11 and the belt 5.3–6.0,
+  and it is the belt „ca. 6 km" is about. So a named reference asks for
+  `largest=True`. Taking *every* piece in the box instead pulls the near edge
+  to 2.9 km, because the box also holds the hamlets — the same failure as the
+  stop cloud below.
+
 - **The cadastral district is not the town.** Measured on the same parcel:
   Gemarkung Grimma is 21.50 km² of which most is field, and its boundary
   reaches to within **1.22 km** of a plot that is 5 km from the town. Neither

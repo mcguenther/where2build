@@ -212,18 +212,18 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 642 passed, 49 skipped. With `TEST_DATABASE_URL` pointed at a real
-  Postgres it is 683 passed, 8 skipped — the extra 41 are the account store,
-  and they are skipped rather than mocked because what they check is the
-  database's own behaviour. Of the remaining 8, one needs pyosmium, which only
-  the index builder wants; the other seven need Tesseract.
-- `vitest`: 638 passed — plus the integration file, excluded by `npm run test`
-  and 8 passed / 2 skipped when a backend is up on :8000
+- `pytest`: 668 passed, 42 skipped. All but eight of the skips are the account
+  store waiting for `TEST_DATABASE_URL` to point at a real Postgres; they are
+  skipped rather than mocked because what they check is the database's own
+  behaviour. Of the eight, seven need Tesseract and one needs pyosmium, which
+  only the index builder wants.
+- `vitest`: 645 passed — plus the integration file, excluded by `npm run test`
+  and 8 passed when a backend is up on :8000
 - `scripts/bookmarklet.mjs`: the handover across two origins, against the built
   app and a backend on :8000. It asserts the coordinate, which is the field
   that separates a handed-over document from a pasted one, and it writes
   `assistent-uebergabe.png`.
-- `scripts/screenshots.mjs`: 69 images plus two print PDFs. The narrow pass
+- `scripts/screenshots.mjs`: 72 images plus two print PDFs. The narrow pass
   runs in the **light** theme like the wide one, so the phone-width pictures
   are named `*-hell-schmal.png`. It fails on console errors, on horizontal
   overflow, and if not a single vector tile arrived. It
@@ -238,4 +238,7 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
   `/api/listings/extract`, which needs the same backend and no LLM key, and
   then open the „Gelesene Werte" fold inside the search step — that list is no
   longer a step of its own. The `assistent-einfuegen-*` images are the same
-  step with the bookmarklet's fold open.
+  step with the bookmarklet's fold open. The `suche-band-*` images run the
+  reference advert a second time with its area rounded to „ca. 1.100 m²", which
+  is what keeps the run ambiguous — an exact area settles it in five requests
+  and no distance band is ever resolved.

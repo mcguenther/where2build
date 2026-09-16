@@ -546,12 +546,10 @@ class SearchEngine:
                 indiz.band = band.model_copy(
                     update={
                         "aufgeloest": True,
-                        "umriss": _geojson(
-                            geo.reproject_geometry(reference.area, "EPSG:25833", "EPSG:4326")
-                        ),
-                        "mitte": _geojson(
-                            geo.reproject_geometry(reference.centre, "EPSG:25833", "EPSG:4326")
-                        ),
+                        # `_geojson` projects out of UTM 33 itself, like every
+                        # other geometry that leaves this module.
+                        "umriss": _geojson(reference.area),
+                        "mitte": _geojson(reference.centre),
                     }
                 )
             yield SuchEreignis(art="indiz", indiz=indiz)

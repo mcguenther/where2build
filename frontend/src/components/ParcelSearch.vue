@@ -71,7 +71,7 @@
         </div>
         <EvidenceMap ref="karte" :candidates="candidates" :district-outline="districtOutline"
                      :areas="areas" :huelle="huelle" :refuted-pin="refutedPin" :pin="pin"
-                     :status="status" :flight="flight" :height="mapHeight"
+                     :status="status" :flight="flight" :height="mapHeight" :indicia="indicia"
                      :ground="ground" :highlighted="highlighted" @select="pick" />
         <p v-if="ground === 'site'" class="panel__footnote">
           Luftbild und Straßen vom GeoSN. Die amtlichen Flurstücksgrenzen zeichnet der
@@ -235,6 +235,7 @@
  * runs the search again — it is cheap enough for that.
  */
 import EvidenceMap from "./EvidenceMap.vue";
+import { bandPolygon } from "../lib/bands.js";
 import {
   DWELL_MS, FLIGHT_MS, StepQueue, movesTheMap, prefersReducedMotion
 } from "../lib/evidence.js";
@@ -247,10 +248,14 @@ import { area } from "../lib/format.js";
 const PHASE_LABELS = {
   ernten: "Gelesen",
   raum: "Raum",
+  kurzschluss: "Kurzschluss",
   treppe: "Toleranz",
   gegenprobe: "Gegenprobe",
+  gemeinde: "Gemeinde",
+  bewertung: "Bewertung",
   bilder: "Bilder",
   nummer: "Nummer",
+  "nummer-sachsenweit": "Nummer",
   strasse: "Straße"
 };
 
@@ -595,6 +600,12 @@ export default {
         const area = this.areas.find(entry => entry.name === indiz.wert);
         if (area?.geometry) return area.geometry;
         return this.districtOutline;
+      }
+      if (indiz.art === "entfernung") {
+        // The band itself, where one could be drawn. Focusing on what survived
+        // it instead would frame the candidates and say nothing about the
+        // statement — and this is the one clue whose whole point is its shape.
+        return bandPolygon(indiz.band) || null;
       }
       if (indiz.art === "pin") {
         const [lat, lon] = String(indiz.wert).split(",").map(Number);

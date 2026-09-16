@@ -20,6 +20,11 @@
         <span class="indizienkarte__swatch indizienkarte__swatch--gemarkung"></span>
         {{ areas.length === 1 ? "Gemarkung" : `${areas.length} Gemarkungen kommen in Frage` }}
       </li>
+      <li v-if="bands.length">
+        <span class="indizienkarte__swatch indizienkarte__swatch--band"></span>
+        {{ bands.length === 1 ? "Entfernungsband" : `${bands.length} Entfernungsbänder` }}
+        aus dem Inserat — gestrichelt, weil es nur ordnet
+      </li>
       <li v-if="refutedPin">
         <span class="indizienkarte__swatch indizienkarte__swatch--pin"></span>
         Kartenpunkt der Anzeige, widerlegt
@@ -46,6 +51,7 @@
 import { Map as MapLibreMap, Marker, NavigationControl } from "maplibre-gl";
 import { aerialCadastreStyle, canRenderMap, vectorStyle } from "../lib/basemap.js";
 import { darkTheme } from "../lib/store.js";
+import { bandFeatures } from "../lib/bands.js";
 import {
   FLIGHT_MS, boundsOf, contextOpacity, frameFor, isEmptyBounds, prefersReducedMotion
 } from "../lib/evidence.js";
@@ -80,6 +86,11 @@ export default {
     candidates: { type: Array, default: () => [] },
     /** The cadastral district outline under them, as GeoJSON. */
     districtOutline: { type: Object, default: null },
+    /** Every Indiz the run has produced. Only the distance bands are drawn from
+     *  it: a stated distance is the one clue that says *why* the search is
+     *  looking where it is looking, and the only one with a shape of its own
+     *  that is not a parcel or a district. */
+    indicia: { type: Array, default: () => [] },
     /** The districts the search is prepared to look in: `{name, anzahl, geometry}`.
      *  Drawn before any candidate exists, because "where could this be" is a
      *  real answer and the map should give it from the first seconds. */
@@ -115,6 +126,8 @@ export default {
     darkGround() { return darkTheme(); },
     candidateGeometries() { return this.candidates.map(c => c.geometry).filter(Boolean); },
     areaGeometries() { return this.areas.map(a => a.geometry).filter(Boolean); },
+    /** The distance bands, as features. Empty until a reference resolved. */
+    bands() { return bandFeatures(this.indicia); },
     /** The wash: whichever districts are still in play. Falls back to the one
      *  the answer settled on, for a run that had no space step. */
     districtGeometries() {
@@ -145,6 +158,7 @@ export default {
     pin() { this.moveCamera(); },
     highlighted() { this.drawHighlight(); },
     huelle() { this.draw(); },
+    indicia() { this.draw(); },
     status() { this.draw(); }
   },
   methods: {
@@ -214,7 +228,7 @@ export default {
       const halo = token(element, "--w2b-map-halo");
       const envelope = token(element, "--w2b-map-envelope");
 
-      for (const id of ["gemarkung", "huelle", "kandidaten", "punkte", "bestaetigt", "gezeigt"]) {
+      for (const id of ["baender", "gemarkung", "huelle", "kandidaten", "punkte", "bestaetigt", "gezeigt"]) {
         this._map.addSource(id, { type: "geojson", data: collection([]) });
       }
 
@@ -229,6 +243,34 @@ export default {
       const hullWash = photo ? 0.26 : 0.14;
       const lineWidth = photo ? 2.2 : 1.4;
       const haloWidth = photo ? 5 : 0;
+
+      /* The distance bands sit under everything, because they are the widest
+       * thing on the map and the least binding. Both borders dashed, on
+       * purpose: a solid line is what this map draws around a finding, and a
+       * band is not one — it orders candidates, it may object, and it can
+       * never confirm. The fill is barely there; what is worth seeing is where
+       * the ring lies, not how much of the county it covers. */
+      this._map.addLayer({
+        id: "baender-fill", type: "fill", source: "baender",
+        paint: { "fill-color": envelope, "fill-opacity": photo ? 0.12 : 0.07 }
+      });
+      if (haloWidth) {
+        this._map.addLayer({
+          id: "baender-halo", type: "line", source: "baender",
+          layout: { "line-join": "round" },
+          paint: { "line-color": halo, "line-width": 4, "line-opacity": 0.5 }
+        });
+      }
+      this._map.addLayer({
+        id: "baender-line", type: "line", source: "baender",
+        layout: { "line-join": "round" },
+        paint: {
+          "line-color": envelope,
+          "line-width": photo ? 2 : 1.4,
+          "line-dasharray": [6, 4],
+          "line-opacity": photo ? 0.9 : 0.6
+        }
+      });
 
       // The district wash sits furthest down and fades as the camera goes in:
       // a layer whose extent dwarfs the frame has stopped informing and only
@@ -392,6 +434,7 @@ export default {
             geometry: { type: "Point", coordinates: point }
           }))
       );
+      this._map.getSource("baender")?.setData(collection(this.bands));
       this.set(
         "gemarkung",
         this.districtGeometries.flatMap((geometry, index) =>
@@ -515,6 +558,10 @@ export default {
 .indizienkarte__swatch--bestaetigt{ background: var(--w2b-map-halo); border: 2px solid var(--w2b-map-boundary); }
 .indizienkarte__swatch--gemarkung{ background: transparent; border: 1px dashed var(--w2b-map-envelope); }
 .indizienkarte__swatch--pin{ background: var(--w2b-map-violation); opacity: .5; }
+.indizienkarte__swatch--band{
+  background: color-mix(in srgb, var(--w2b-map-envelope) 14%, transparent);
+  border: 1px dashed var(--w2b-map-envelope);
+}
 </style>
 
 <style>

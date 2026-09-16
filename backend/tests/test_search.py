@@ -7,6 +7,7 @@ are the same figures ``docs/research/flurstueck-identifikation.md`` reports.
 
 from __future__ import annotations
 
+import asyncio
 import io
 import json
 
@@ -41,6 +42,15 @@ from app.deps import alkis_service
 from app.search.engine import Reference, SearchEngine
 
 from .conftest import ALKIS_URL, fixture_bytes, fixture_json, fixture_text
+
+def _drain(events):
+    """Every event of an async generator, as a list."""
+
+    async def collect():
+        return [event async for event in events]
+
+    return asyncio.run(collect())
+
 
 # The three district names the reference listing contains, plus the second
 # Höfgen -- a name is not a key, and two of these share one.
@@ -1907,3 +1917,35 @@ def test_thirteen_unresolvable_distances_are_one_row():
     # collapsed and says why nothing is computed from it.
     assert "Kindergarten 2 km" in rows[1].text and "und 5 weitere" in rows[1].text
     assert rows[1].band is None
+
+
+def test_the_band_travels_in_degrees_and_only_once():
+    """The reference outline is UTM 33 in the engine and WGS 84 on the wire.
+
+    It went out through `_geojson`, which projects out of UTM 33 itself, after
+    being projected once already — and a band 6 km around Grimma arrived at
+    10,51° E, 0,0005° N, in the Gulf of Guinea. Nothing threw, the legend
+    counted one band, and the map drew it where nobody was looking.
+    """
+
+    engine = SearchEngine(
+        ParcelSearchRequest(text="Die ca. 6 km entfernte Kreisstadt Grimma ist nah."),
+        alkis_service(),
+        DIRECTORY,
+    )
+    engine._read_distances()
+    # Grimma's own outline, in the coordinates the cadastre answers in.
+    town = box(320_000, 5_675_000, 322_000, 5_677_000)
+
+    async def resolved(name):
+        return Reference(name="Grimma", area=town, centre=town.centroid)
+
+    engine._resolve_reference = resolved
+    events = _drain(engine.resolve_bands())
+    band = next(e.indiz.band for e in events if e.art == "indiz")
+    assert band.aufgeloest
+    lon, lat = band.mitte["coordinates"]
+    assert 11.8 < lon < 15.1 and 50.1 < lat < 51.7, (lon, lat)
+    for ring in band.umriss["coordinates"]:
+        for point in ring:
+            assert 11.8 < point[0] < 15.1 and 50.1 < point[1] < 51.7

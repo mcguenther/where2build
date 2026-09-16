@@ -707,3 +707,54 @@ also "Decisions that are settled" in `CLAUDE.md`.
   — a scoreable set — and adding Gemarkung Lausen leaves exactly **one**,
   Flurstück 8/a, 742 m², „Staffelsteinstraße 4", `Wohnbaufläche;742`. So a
   Stadtteil is worth resolving to the Gemarkungen under it; it is never one.
+
+- **A stated distance is a band, and everything about it is measured as an
+  interval.** Advert 3499632623 says „die ca. 6 km entfernte Kreisstadt
+  Grimma". Measured 16.09.2026 from the parcel actually offered, 790/11: the
+  geocoder's point for Grimma is 5,34 km away, the car route 7,37 km, the edge
+  of the built-up area 5,3 km, its middle 6,0 km. Every single-point reading
+  misses the stated figure; the interval between the last two contains it. So
+  `search/distance.py` reduces nothing: the reference resolves to an outline,
+  the candidate carries `[dist(x, Ortslage), dist(x, Mitte)]`, the sentence
+  carries `[d/1,30 · d·1,25]`, and the test is whether they overlap.
+
+  The three roles this may play, and the one it may not:
+
+  - **Order.** One feature for all of a listing's distances together, averaged
+    — station, bus stop and school sit in the same village, so their errors are
+    one error, and a product would count it three times.
+  - **Object, outwards only.** A route is never shorter than the straight line,
+    measured without exception, so a candidate whose straight line already
+    exceeds the outer bound cannot satisfy the statement under any reading.
+    Measured: 1538 Großzschocher reads 29,9 km against Grimma's „6 km". It
+    still deletes nobody; it sinks the candidate and writes the sentence.
+  - **Never confirm.** No intersection of bands makes a verdict. That stays
+    with official statements.
+
+- **Most distances in a listing name a kind of place, and those are a single
+  row.** Measured over the 16 recorded adverts: 62 statements, 8 naming a
+  place, 4 of those a place the Gemarkungsverzeichnis carries (Grimma, Machern,
+  Leipzig, Groitzsch); „Penny 500 m" and „Nahkauf 700 m" read exactly like
+  place names and the directory is what says they are shops. Advert 3375124391
+  alone lists thirteen — „Kindergarten 2 km", „Gymnasium 6,8 km", „Flughafen
+  35 km" — and is settled by its exact area in five requests. Thirteen rows
+  that cannot contribute would push the five that did out of view, so the
+  unresolvable ones are collapsed into one Indiz that names what it collapsed.
+
+- **Two regex traps, both of which produced a plausible wrong reference.** A
+  greedy optional qualifier („Kreisstadt" in „6 km entfernte Kreisstadt
+  Grimma") swallows the name and takes the next capitalised word instead — and
+  with `\s` it crosses a paragraph break, so „im 3 km entfernten Machern\n\nDie
+  verwendeten Bilder" read as a distance to a place called „Die". The
+  separators in these patterns are `[ \t]`, not `\s`. And a class word is a
+  whole word or a German compound ending, never a substring: „see" and „wald"
+  sit inside „Seelitz" and „Waldheim", and as substrings they turn two towns
+  into a lake and a forest that nothing can resolve.
+
+- **A band never pays for itself on a run the cadastre can settle.** Resolving
+  one costs two ALKIS requests — the district boundary for a seed point, then
+  the built-up area around it — so it runs only once there is more than one
+  candidate to order. Measured on the reference advert with its area rounded to
+  „ca. 500 m²": 5 requests without the band, 7 with, 11 candidates all inside
+  the band. Within one Gemarkung a 6 km statement separates nothing, which is
+  the expected outcome and the reason this may only ever rank.

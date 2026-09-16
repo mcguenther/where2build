@@ -288,8 +288,11 @@ pre i{color:var(--muted);font-style:normal}
 .st-nr{font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .st-was h4{margin-bottom:4px}
 .st-was p{font-size:13.5px;color:var(--graphite)}
+.st-was p.beleg{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);font-size:12.5px;color:var(--muted)}
 .st-mass{font-family:var(--font-mono);font-size:11.5px;color:var(--muted);line-height:1.5}
 .st--spaeter{border-left-color:var(--line);opacity:.92}
+.st-stand{display:inline-block;margin-left:8px;padding:1px 8px;border-radius:999px;font:600 11px/1.6 var(--font-body);letter-spacing:.04em;text-transform:uppercase;background:var(--line-faint);color:var(--muted);vertical-align:middle}
+.st-stand--gebaut{background:var(--good-surface);color:var(--good)}
 .fuss{margin-top:44px;padding-top:22px;border-top:1px solid var(--line);font-size:13px;color:var(--muted)}
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
@@ -810,11 +813,11 @@ pre i{color:var(--muted);font-style:normal}
       <tr><td><s>Rand der Gemarkung Grimma</s> — widerlegt</td><td class="n">1,22 km</td><td>ALKIS <code>ave:KatasterBezirk</code>, 21,50 km², überwiegend Feld</td></tr>
       <tr><td><s>nächste Haltestelle mit „Grimma“ im Namen</s> — widerlegt</td><td class="n">2,51 km</td><td>MOTIS <code>map/stops</code>, 65 Stück, über die ganze Gemeinde verteilt</td></tr>
       <tr><td>Mitte der Gemarkung</td><td class="n">4,81 km</td><td>Schwerpunkt desselben Umrisses</td></tr>
-      <tr class="gut"><td><b>Rand der bebauten Ortslage</b></td><td class="n"><b>5,32 km</b></td><td>ALKIS <code>ave:Nutzung</code>, 486 Wohnbauflächen, 25 m geschlossen</td></tr>
+      <tr class="gut"><td><b>Rand der bebauten Ortslage</b></td><td class="n"><b>5,3 km</b></td><td>ALKIS <code>ave:Nutzung</code>, 431 Wohnbauflächen, 25 m geschlossen</td></tr>
       <tr><td>Punkt des Geocoders (<code>PLACE</code>)</td><td class="n">5,34 km</td><td>Transitous</td></tr>
       <tr class="gut"><td><b>Was das Inserat sagt</b></td><td class="n"><b>ca. 6 km</b></td><td>Fließtext</td></tr>
       <tr><td>Fußweg zum Geocoder-Punkt</td><td class="n">6,54 km</td><td><code>one-to-many</code>, WALK</td></tr>
-      <tr class="gut"><td><b>Mitte der bebauten Ortslage</b></td><td class="n"><b>6,25 km</b></td><td>Schwerpunkt derselben Vereinigung</td></tr>
+      <tr class="gut"><td><b>Mitte der bebauten Ortslage</b></td><td class="n"><b>6,0 km</b></td><td>Schwerpunkt derselben Vereinigung</td></tr>
       <tr><td>Autoroute zum Geocoder-Punkt</td><td class="n">7,37 km</td><td><code>one-to-many</code>, CAR</td></tr>
     </tbody>
   </table>
@@ -827,10 +830,17 @@ pre i{color:var(--muted);font-style:normal}
     nach ihr heißen. Die bebaute Ortslage dagegen liefert <code>ave:Nutzung</code> —
     derselbe Dienst, der die Flurstücke liefert.</p>
     <p><b>Und damit wird das Band eng statt weit.</b> Aus den beiden Lesarten der echten
-    Ortslage — Rand 5,32 km, Mitte 6,25 km — entsteht ein Intervall von <b>0,93 km
-    Breite</b>, und die Angabe des Inserats („ca. 6 km“) liegt mittendrin. Kein einziger
-    Einzelpunkt hätte das geleistet: Der Geocoder-Punkt sagt 5,34 km, die Autoroute
-    7,37 km.</p>
+    Ortslage — Rand 5,3 km, Mitte 6,0 km — entsteht ein schmales Intervall, und die Angabe
+    des Inserats („ca. 6 km“) liegt darin. Kein einziger Einzelpunkt hätte das geleistet:
+    Der Geocoder-Punkt sagt 5,34 km, die Autoroute 7,37 km.</p>
+    <p class="beleg"><b>Zwei Zahlen dieser Tabelle sind Korrekturen.</b> Sie standen hier
+    zuerst als 5,32 und 6,25 km, gemessen mit einer Anfrage von Hand. Der Dienst im
+    Programm kappt dieselbe Anfrage bei 200 Flächen — aus 431 wird ein Bruchstück von
+    0,35 km² statt des Ortes — und er nahm das Stück <i>unter</i> dem Startpunkt statt des
+    größten: Grimmas Markt liegt in einer 0,48 km² großen Wohninsel innerhalb einer Mitte,
+    die das Kataster als gemischte Nutzung führt. Beides gab plausible Zahlen aus einem
+    Zehntel des Ortes. Gemessen wurde außerhalb des Programms, gebaut wurde im Programm —
+    und erst der Bau hat es gezeigt.</p>
   </div>
 
   <div class="zwei" style="margin-top:20px">
@@ -1009,30 +1019,46 @@ wie jedes andere weiche Merkmal.
   <div class="stufen" style="margin-top:16px">
     <div class="st">
       <span class="st-nr">Rolle 1</span>
-      <div class="st-was"><h4>Anker vorauswählen — der einzige produktive Einsatz</h4>
+      <div class="st-was"><h4>Anker vorauswählen<span class="st-stand">nicht gebaut</span></h4>
         <p>Der Schnitt der Bänder wird mit den Gemarkungsumrissen verschnitten; was ihn
         berührt, kommt in die Ankermenge. Derselbe Zug wie beim Pin und in derselben
         Richtung sicher: Ist das Band falsch, zählt jeder Anker null und der Lauf meldet,
-        dass er nichts gefunden hat. Ein falsches Flurstück kann daraus nicht entstehen.</p></div>
+        dass er nichts gefunden hat. Ein falsches Flurstück kann daraus nicht entstehen.</p>
+        <p class="beleg">Hier „der einzige produktive Einsatz“ genannt und beim Bau
+        zurückgestellt, weil die Messung ihm nichts zu tun gibt: In den 16 aufgezeichneten
+        Anzeigen nennen genau vier eine Entfernung zu einem Ort, den das Verzeichnis kennt
+        — und alle vier haben längst einen Anker. Ein Außenband von 7,5 km um Grimma
+        umfasst zudem Dutzende Gemarkungen, also wäre die Vorauswahl keine. Steht bereit,
+        wenn eine Anzeige auftaucht, die nur eine Entfernung nennt.</p></div>
       <span class="st-mass">1 BBOX-Anfrage<br>nur wenn kein Ort genannt ist</span>
     </div>
     <div class="st">
       <span class="st-nr">Rolle 2</span>
-      <div class="st-was"><h4>Kandidaten ordnen — mit Route, wo sie etwas bringt</h4>
+      <div class="st-was"><h4>Kandidaten ordnen<span class="st-stand st-stand--gebaut">gebaut</span></h4>
         <p>Ein Trapez über der gemessenen Entfernung, wie die übrigen weichen Merkmale, und
         wie diese in die gewichtete Summe — <em>nicht</em> ins Produkt. Hier ist der Grund
         greifbar: Die drei Orte des Großbothen-Inserats liegen alle im selben Dorf, ihre
-        Fehler sind derselbe Fehler, und ein Produkt zählte ihn dreimal.</p></div>
-      <span class="st-mass">1 POST je Ort und Modus<br>≤ 128 Kandidaten</span>
+        Fehler sind derselbe Fehler, und ein Produkt zählte ihn dreimal.</p>
+        <p class="beleg">Gebaut ohne Route: <code>search/distance.py</code> mit dem
+        Intervallschnitt, ein Merkmal für alle Entfernungen einer Anzeige zusammen, Gewicht
+        0,4. Zwei ALKIS-Anfragen je Bezug — Gemarkungsumriss als Startpunkt, dann die
+        Ortslage — und nur, sobald mehr als ein Kandidat zu ordnen ist. Gemessen am
+        Referenzinserat mit gerundeter Fläche: 5 Anfragen ohne, 7 mit, 11 Kandidaten alle
+        innerhalb des Bandes. Innerhalb <em>einer</em> Gemarkung trennt „6 km“ nichts —
+        genau deshalb darf es nur ordnen.</p></div>
+      <span class="st-mass">2 ALKIS-Anfragen je Ort<br>höchstens 2 Orte</span>
     </div>
     <div class="st">
       <span class="st-nr">Rolle 3</span>
-      <div class="st-was"><h4>Widersprechen — aber nur nach außen und nur laut</h4>
+      <div class="st-was"><h4>Widersprechen, nur nach außen<span class="st-stand st-stand--gebaut">gebaut</span></h4>
         <p>Liegt ein Kandidat schon nach Luftlinie weiter weg als das Außenband erlaubt, ist
         die Angabe für ihn unerfüllbar. Das ist mathematisch sauber, denn die Route ist nie
         kürzer als die Luftlinie — und trotzdem löscht es nichts: Es setzt den Kandidaten
         nach hinten und schreibt den Satz dazu. Die Angabe, an der das zuerst auffiele,
-        wäre „Bus 0,3 km“, und sie ist die falsche.</p></div>
+        wäre „Bus 0,3 km“, und sie ist die falsche.</p>
+        <p class="beleg">Gemessen: Flurstück 1538 in Großzschocher — dasjenige, das ein
+        früherer Lauf fälschlich bestätigte — liest 29,9 km gegen das Band [4,6 · 7,5] und
+        wird dadurch ein zweites Mal widerlegt, unabhängig vom Zuschnitt.</p></div>
       <span class="st-mass">0 Anfragen<br>rein geometrisch</span>
     </div>
     <div class="st st--spaeter">
@@ -1049,6 +1075,12 @@ wie jedes andere weiche Merkmal.
     Indiz, das zeigt, <em>warum</em> die Suche dort sucht, wo sie sucht — auch dann, wenn
     sie nichts ausschließen. Auf der Indizienkarte gehören sie deshalb sichtbar unter die
     Kandidaten, mit weichem Rand, weil die Unschärfe der Inhalt ist.</p>
+    <p class="beleg" style="margin-top:8px"><b>Gezeichnet ist es vorerst gestrichelt, nicht
+    weich.</b> Beide Ränder — der Kreis nach innen, der versetzte Umriss nach außen —
+    laufen als Strichlinie, damit sichtbar bleibt, <em>wo</em> die Grenze liegt und wie sie
+    in den Lauf eingeht. Das Loch in der Mitte ist dabei kein Schmuck: Ein Kandidat, der
+    näher an der Ortsmitte liegt als <code>d/ϱ</code>, erfüllt die Angabe genauso wenig wie
+    einer jenseits des Außenrandes, und eine gefüllte Scheibe behauptete das Gegenteil.</p>
   </div>
 </section>
 
@@ -1440,9 +1472,8 @@ Teil 6 brauchen.</pre>
       <code>nutzart</code> im Klartext — und ein POST kann Kasten und Filter zugleich
       tragen. Wohnbauflächen im 2-km-Kasten, jede um 25 m gepuffert, vereinigt, wieder
       zurückgepuffert: das größte zusammenhängende Stück ist der Ort.</p>
-      <p class="beleg">Gemessen 16.09.2026: Grimma 486 Flächen, 674 kB, 1,8 s → Kern
-      1,91 km² (2,9 × 2,3 km). Rand 5,32 km vom Flurstück, Mitte 6,25 km, Inserat
-      „ca. 6 km“ — mittendrin. Bad Lausick: das Etzoldshainer Flurstück liegt <b>50 m</b>
+      <p class="beleg">Gemessen 16.09.2026: Grimma 431 Flächen → größtes Stück 1,65 km².
+      Rand 5,3 km vom Flurstück, Mitte 6,0 km, Inserat „ca. 6 km“ — mittendrin. Bad Lausick: das Etzoldshainer Flurstück liegt <b>50 m</b>
       vor dem Ortsrand, was „in Bad Lausick“ bestätigt, obwohl die Gemarkung eine andere
       ist.</p>
       <div class="fix"><b>Gebaut</b><code>AlkisService.built_up_area()</code> mit vier

@@ -120,6 +120,18 @@ const LISTING =
   + "Über die B107 erreichen Sie die ca. 6 km entfernte Kreisstadt Grimma. "
   + "Sehenswert sind das Kloster Nimbschen und die Schiffsmühle in Höfgen.";
 
+/* The same advert with a rounded area, which is what it takes for a distance
+ * band to matter. An exact figure settles the parcel in five requests and no
+ * band is ever resolved; „ca. 1.100 m²" leaves two candidates standing, and an
+ * ambiguous run is the only kind a band can contribute to. Rounded rather than
+ * removed: with no area at all the whole Gemarkung survives, and 200 rows of
+ * table under the map make the picture of the band a thumbnail. */
+const BAND_LISTING =
+  "Baugrundstück in ruhiger Lage am Ortsrand von Großbothen, einem OT von Grimma. "
+  + "Das Grundstück ist ca. 1.100 m² groß und liegt an der Wiesenstraße. "
+  + "Über die B107 erreichen Sie die ca. 6 km entfernte Kreisstadt Grimma. "
+  + "Bushaltestelle ca. 300 m, Fernbahnhof 1,6 km.";
+
 /* An advert this tool cannot serve, and the picture of it saying so. Advert
  * 3381469778, shortened: the location field names Sachsen-Anhalt, „Brehna" is
  * in no Saxon Gemarkung, and „Schulen in Roitzsch" names one that is — 100 km
@@ -252,6 +264,27 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
     problems.push(`${mode}/${width}: die Suche kam zu keinem Ergebnis`);
   }
   await shot(page, "suche-ergebnis", mode, narrow ? "-schmal" : "");
+
+  /* The same advert without its exact area, which is what it takes for the
+     distance band to matter. With the 502 m² the cadastre settles it in five
+     requests and no band is ever resolved; without it the run stays ambiguous,
+     „ca. 6 km bis Grimma" is resolved to the town's built-up outline, and the
+     ring it admits is drawn — dashed on both borders, because a band orders
+     candidates and may object but can never confirm. Clicking its row in the
+     Verlauf is what pulls the camera out to it. */
+  await page.click(".breadcrumb a");
+  await page.click(".page-head .btn");
+  await page.fill(QUERY_FIELD, BAND_LISTING);
+  await page.getByRole("button", { name: "Grundstück finden" }).click();
+  try {
+    await page.waitForSelector(".suche__urteil--mehrdeutig", { timeout: 90000 });
+    await page.waitForTimeout(15000);
+    await page.locator(".verlauf__zeile", { hasText: "bis Grimma" }).first().click();
+    await page.waitForTimeout(3000);
+  } catch {
+    problems.push(`${mode}/${width}: das Entfernungsband wurde nicht gezeichnet`);
+  }
+  await shot(page, "suche-band", mode, narrow ? "-schmal" : "");
 
   /* And a listing this tool cannot serve. It costs no cadastre request at all:
      the location field names the state, and every Saxon answer would be
