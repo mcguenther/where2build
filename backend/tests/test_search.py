@@ -22,6 +22,7 @@ from app.search.envelope import common_envelope
 from app.search.indicia import (
     AreaStatement,
     collect_indicia,
+    district_matches,
     describes_part_area,
     federal_state,
     normalise_parcel_number,
@@ -29,13 +30,15 @@ from app.search.indicia import (
     read_area,
     read_dimensions,
 )
+from app.search import distance
+from app.search.distance import read_distances
 from app.search.ladder import tolerance_ladder
 from app.search.scoring import land_use, score, street_match
 from app.services import ocr
 from app.services.alkis import Flurstueck, parse_feature_collection
 
 from app.deps import alkis_service
-from app.search.engine import SearchEngine
+from app.search.engine import Reference, SearchEngine
 
 from .conftest import ALKIS_URL, fixture_bytes, fixture_json, fixture_text
 
@@ -1744,3 +1747,163 @@ def test_a_contradicted_parcel_number_opens_the_area_route(client):
         and e["indiz"]["verworfen"]
     )
     assert "verlässlichere" in number["verworfen_grund"]
+
+
+# ----------------------------------------------------------------------
+# Distance bands
+# ----------------------------------------------------------------------
+
+
+def test_a_stated_distance_is_read_with_the_place_it_names():
+    """Advert 3499632623: „die ca. 6 km entfernte Kreisstadt Grimma“."""
+
+    statements = read_distances(
+        "Großbothen liegt an der B107, die ca. 6 km entfernte Kreisstadt Grimma "
+        "ist gut erreichbar.\nFernbahnhof 1,6 km\nBus 300 m"
+    )
+    by_metres = {round(s.meters): s for s in statements}
+    assert by_metres[6000].target == "Grimma"
+    assert by_metres[6000].named
+    # A kind of place is not a place. „Fernbahnhof" and „Bus" are read, kept
+    # and shown -- and never resolved to an outline, because there is none.
+    assert by_metres[1600].target is None and by_metres[1600].label == "Fernbahnhof"
+    assert by_metres[300].target is None
+
+
+def test_a_dimension_is_not_a_distance():
+    """„14 x 40 m“ and „15 m Abstand“ are about the plot, not about where it is."""
+
+    assert read_distances("Die Abmessungen betragen 14 x 40 m.") == []
+    assert read_distances("Der Bebauungsplan sieht einen Abstand von 15 m vor.") == []
+    assert read_distances("Das Grundstück ist ca. 20 m breit.") == []
+
+
+def test_a_name_across_a_paragraph_break_is_not_the_reference():
+    """„im 3 km entfernten Machern\n\nDie verwendeten Bilder …“ — the greedy
+    qualifier swallowed Machern and read the next capital word instead, which
+    made „Die“ a place three kilometres away."""
+
+    statements = read_distances(
+        "Einkaufsmöglichkeiten im 3 km entfernten Machern\n\nDie verwendeten Bilder "
+        "wurden teilweise nachbearbeitet."
+    )
+    assert [s.target for s in statements] == ["Machern"]
+
+
+def test_a_class_word_is_never_read_as_a_place_and_a_place_never_as_a_class():
+    """Whole words and German compound endings — never a substring, or
+    „Waldheim“ becomes a forest and „Seelitz“ a lake."""
+
+    assert read_distances("Bushaltestelle: ca. 300 m")[0].target is None
+    assert read_distances("Autobahnanschlussstelle A38: ca. 3 km")[0].target is None
+    assert read_distances("ca. 4 km bis Waldheim")[0].target == "Waldheim"
+    assert read_distances("ca. 2 km bis zur A14")[0].target is None
+
+
+def test_the_band_is_an_interval_and_so_is_the_candidate():
+    """The whole design in one assertion: nothing is reduced to a number.
+
+    Measured 16.09.2026 from Flurstück 790/11 against Grimma's built-up
+    outline: 5,3 km to the edge, 6,0 km to the middle. The advert says
+    „ca. 6 km“, which is the band 4,6 to 7,5 km. Read as the edge alone, or as
+    the middle alone, neither is the stated figure — as an interval they
+    overlap, and the right parcel survives.
+    """
+
+    reading = (5300.0, 6000.0)
+    band = (6000 / distance.DETOUR, 6000 * (1 + distance.SLACK))
+    assert distance.overlaps(reading, band)
+    assert distance.membership(reading, band) == 1.0
+    assert not distance.refuted(reading, band)
+
+
+def test_a_distance_objects_outwards_and_only_outwards():
+    """A route is never shorter than the straight line, so that is the one
+    direction in which a broker's figure proves anything."""
+
+    band = (6000 / distance.DETOUR, 6000 * (1 + distance.SLACK))
+    # 29,9 km from Grimma — advert 3508042470's parcel in Leipzig.
+    assert distance.refuted((29900.0, 30900.0), band)
+    # Far too close is not a refutation: the seller may have measured a detour,
+    # and the straight line says nothing about how long that was.
+    assert not distance.refuted((200.0, 900.0), band)
+    assert distance.membership((200.0, 900.0), band) < 1.0
+
+
+def test_a_band_orders_the_candidates_and_never_confirms():
+    """Role 2 and role 3 of the plan, and the rule that bounds both."""
+
+    engine = SearchEngine(
+        ParcelSearchRequest(text="Die ca. 6 km entfernte Kreisstadt Grimma ist nah."),
+        alkis_service(),
+        DIRECTORY,
+    )
+    engine._read_distances()
+    indiz = next(i for i in engine.state.indicia if i.art == "entfernung")
+    assert indiz.band is not None and indiz.band.bezug == "Grimma"
+    assert round(indiz.band.innen_m) == round(6000 / distance.DETOUR)
+    assert round(indiz.band.aussen_m) == 7500
+    # Never near the threshold that separates „bestätigt“ from „mehrdeutig“.
+    assert indiz.sicherheit <= 0.25
+
+    # A resolved reference 6 km from the near candidate and 30 km from the far
+    # one, stood in for here so the test asks nothing of the live service.
+    town = box(0, 0, 1000, 1000)
+    engine._references = [
+        (
+            next(s for s in read_distances(engine.payload.text)),
+            Reference(name="Grimma", area=town, centre=town.centroid),
+        )
+    ]
+    near = Flurstueck(gml_id="a", attributes={"flaeche": "502"},
+                      geometry=box(6000, 0, 6020, 1000))
+    far = Flurstueck(gml_id="b", attributes={"flaeche": "502"},
+                     geometry=box(30000, 0, 30020, 1000))
+
+    assert engine._distance_fit(near)[0] == 1.0
+    assert engine._distance_fit(far)[0] == 0.0
+    assert engine._distance_objection(near) is None
+    assert "zu weit" in (engine._distance_objection(far) or "")
+
+    # And it may not decide. One candidate, a band that fits perfectly, and the
+    # verdict still comes from the hard filters alone.
+    engine.state.candidates = [near]
+    assert engine.verdict() == "mehrdeutig"
+
+
+def test_an_unresolvable_reference_is_shown_and_not_computed():
+    """„Penny 500 m“ reads exactly like a place name, and the cadastral
+    directory is what says it is a shop."""
+
+    engine = SearchEngine(
+        ParcelSearchRequest(text="Penny und Nahkauf sind 500 m entfernt."),
+        alkis_service(),
+        DIRECTORY,
+    )
+    engine._read_distances()
+    assert [i.wert for i in engine.state.indicia if i.art == "entfernung"] == ["500 m"]
+    assert not district_matches(DIRECTORY, "Penny")
+
+
+def test_thirteen_unresolvable_distances_are_one_row():
+    """Advert 3375124391 lists thirteen of them and is settled by its exact
+    area in five requests. One row per statement would push every finding that
+    did contribute out of view."""
+
+    engine = SearchEngine(
+        ParcelSearchRequest(
+            text="Einkaufsmöglichkeiten im 3 km entfernten Machern.\n"
+                 "Kindergarten 2 km\nGrundschule 2 km\nRealschule 6 km\n"
+                 "Gymnasium 6,8 km\nFlughafen 35 km\nFernbahnhof 3,8 km\n"
+                 "Autobahn 9,7 km\nBus 500 m\nZentrum 3 km"
+        ),
+        alkis_service(),
+        DIRECTORY,
+    )
+    engine._read_distances()
+    rows = [i for i in engine.state.indicia if i.art == "entfernung"]
+    assert [i.wert for i in rows] == ["3 km", "9 Angaben"]
+    # Which is not the same as dropping them: the collapsed row names what it
+    # collapsed and says why nothing is computed from it.
+    assert "Kindergarten 2 km" in rows[1].text and "und 5 weitere" in rows[1].text
+    assert rows[1].band is None

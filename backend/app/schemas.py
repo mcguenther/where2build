@@ -1356,6 +1356,7 @@ IndizArt = Literal[
     "gemeinde",
     "ort",
     "nutzung",
+    "entfernung",
     "pin",
 ]
 
@@ -1379,6 +1380,37 @@ IndizQuelle = Literal[
 Ortsbeziehung = Literal["liegt_in", "liegt_an", "entfernt_von", "erwaehnt"]
 
 SuchStatus = Literal["bestaetigt", "mehrdeutig", "erfolglos"]
+
+
+class Entfernungsband(BaseModel):
+    """The ring a stated distance admits, around a reference that is a *set*.
+
+    „ca. 6 km bis Grimma" is not a radius. Measured from the parcel actually
+    offered: the geocoder's point for Grimma lies 5.32 km away, the edge of the
+    built-up area 5.32 km, its middle 6.25 km and the car route 7.37 km. So the
+    reference is resolved to an outline rather than a point, the candidate
+    carries the whole interval that outline admits, and the two are tested for
+    overlap. ``innen_m`` and ``aussen_m`` are the statement's own interval.
+
+    ``umriss`` is the built-up area the distance is measured from, in WGS 84.
+    It travels because the band is only honest if it can be seen: the drawing
+    -- the buffer outwards and the circle inwards -- belongs to the browser,
+    like every other piece of geometry in this project.
+    """
+
+    meter: float
+    innen_m: float
+    aussen_m: float
+    bezug: str
+    # „strecke" for a plain kilometre figure, „auto", „fuss", „rad" or „zeit"
+    # where the wording said how it was measured.
+    modus: str
+    # False when the reference could not be resolved to an outline -- a class
+    # („Bushaltestelle"), a shop, or a name the cadastral directory does not
+    # carry. Then the band is shown and nothing is computed from it.
+    aufgeloest: bool = False
+    umriss: dict[str, Any] | None = None
+    mitte: dict[str, Any] | None = None
 
 
 class Indiz(BaseModel):
@@ -1417,6 +1449,9 @@ class Indiz(BaseModel):
     # contradiction, and never a question. Same rule as several parcel numbers
     # from one source, which are a plot rather than a dispute.
     teil_von: str | None = None
+    # The ring a stated distance admits, for an Indiz of art „entfernung“. It
+    # may order the candidates and it may object; it may never confirm.
+    band: Entfernungsband | None = None
 
 
 class Konflikt(BaseModel):

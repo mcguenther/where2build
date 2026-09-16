@@ -35,11 +35,12 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field, replace
-from typing import AsyncIterator, Sequence
+from typing import Any, AsyncIterator, Sequence
 
 from ..errors import AppError, UpstreamError
 from ..gemarkung_index import GemarkungDirectory, GemarkungEntry, base_name, fold
 from ..schemas import (
+    Entfernungsband,
     Indiz,
     Kandidat,
     KandidatProperties,
@@ -60,6 +61,9 @@ from ..services.alkis import (
     expand_gemarkung_key,
     like,
 )
+from .. import geo
+from . import distance
+from .distance import DistanceStatement
 from .envelope import _geojson, common_envelope, next_question
 from .indicia import (
     ANCHORING,
@@ -142,6 +146,18 @@ MAX_DRAWN_AREAS = 4
 # run confirmed is 21,7 x 26,7 (1,55 times too wide, caught), and the parcel in
 # the district its own location field names is 17,3 x 34,1 (1,24 and 0,85,
 # passed).
+# How many of a listing's distance statements are resolved to an outline. Two
+# ALKIS requests each -- the district boundary for a seed point, then the
+# built-up area around it -- and the corpus of 16 adverts offers at most one
+# resolvable reference per listing anyway: 62 statements, 8 naming a place, 3
+# of those a place the cadastral directory carries.
+MAX_DISTANCE_REFERENCES = 2
+
+# How many distance statements are read at all, and how many of the
+# unresolvable ones the collapsed row names before it says "and n more".
+MAX_DISTANCE_STATEMENTS = 20
+MAX_DISTANCE_LISTED = 4
+
 SHAPE_TOLERANCE = 0.25
 
 # How much bigger the rectangle around a parcel may be than the parcel itself
@@ -187,6 +203,33 @@ class Anchor:
         if len(self.keys) == 1:
             return equals(name, self.keys[0])
         return "<fes:Or>" + "".join(equals(name, key) for key in self.keys) + "</fes:Or>"
+
+
+@dataclass(frozen=True, slots=True)
+class Reference:
+    """A place a distance was measured to, resolved to everything it may mean.
+
+    Never a point. „6 km bis Grimma" is a statement about a town, and a town
+    has an edge and a middle that lie kilometres apart -- so both are kept and
+    a candidate is tested against the whole interval between them. ``area`` is
+    the built-up outline in UTM 33; ``centre`` its centroid.
+    """
+
+    name: str
+    area: Any
+    centre: Any
+
+    def readings(self, point: Any) -> tuple[float, float]:
+        """What this reference admits as "the distance" from one point.
+
+        The near end is the distance to the built-up area itself -- zero inside
+        it -- and the far end the distance to its middle. Nothing in between is
+        chosen.
+        """
+
+        near = float(self.area.distance(point))
+        far = float(self.centre.distance(point))
+        return (near, far) if near <= far else (far, near)
 
 
 @dataclass
@@ -235,6 +278,12 @@ class SearchEngine:
         # The districts the platform's pin lands among. `None` until asked,
         # a list -- possibly empty -- afterwards, so it is asked exactly once.
         self._pin_anchors: list[Anchor] | None = None
+        # What the listing says about distance, and the band each statement
+        # admits. Read in phase 0, resolved only when there is something to
+        # order -- a band never decides, so it never needs to run earlier.
+        self._distances: list[tuple[Indiz, DistanceStatement]] = []
+        self._references: list[tuple[DistanceStatement, Reference]] = []
+        self._bands_resolved = False
 
     # ------------------------------------------------------------------
     # Small helpers over the Indiz list
@@ -338,6 +387,7 @@ class SearchEngine:
 
         street_indiz = next(iter(self.active("strasse")), None)
         self._street = street_indiz.wert if street_indiz else None
+        self._read_distances()
         self._dimensions = read_dimensions(
             " ".join(part for part in (self.payload.titel, self.payload.text) if part)
         )
@@ -357,6 +407,251 @@ class SearchEngine:
         for conflict in self._conflicts():
             self.state.conflicts.append(conflict)
             yield SuchEreignis(art="konflikt", konflikt=conflict)
+
+    # ------------------------------------------------------------------
+    # Distance bands -- they order, they may object, they never confirm
+    # ------------------------------------------------------------------
+
+    def _read_distances(self) -> None:
+        """Turn the distances the prose states into Indizien.
+
+        A *named* reference gets a row of its own, because it is the only kind
+        the cadastre can resolve and therefore the only kind that can order
+        anything. Everything else is collapsed into one row.
+
+        That split is measured, not tidiness. Over the 16 recorded adverts the
+        prose states 62 distances and 8 of them name a place; advert 3375124391
+        alone lists thirteen — „Kindergarten 2 km", „Gymnasium 6,8 km",
+        „Flughafen 35 km" — and it is settled by its exact area in five
+        requests. Thirteen rows that cannot contribute would push the five that
+        did out of view, which is the same reason one district is one Indiz
+        however often the text names it.
+        """
+
+        body = " ".join(part for part in (self.payload.titel, self.payload.text) if part)
+        statements = distance.read_distances(body)
+        if not statements:
+            return
+        counter = 0
+        for statement in statements[:MAX_DISTANCE_STATEMENTS]:
+            if not statement.named:
+                continue
+            counter += 1
+            inner, outer = statement.band
+            indiz = self._distance_indiz(
+                f"e{counter}",
+                wert=distance.kilometres(statement.meters),
+                text=distance.band_sentence(statement),
+                beleg=statement.beleg,
+                sicherheit=0.25,
+                band=Entfernungsband(
+                    meter=statement.meters,
+                    innen_m=inner,
+                    aussen_m=outer,
+                    bezug=statement.label,
+                    modus=statement.mode,
+                ),
+            )
+            self.state.indicia.append(indiz)
+            self._distances.append((indiz, statement))
+
+        rest = [s for s in statements if not s.named]
+        if not rest:
+            return
+        listed = ", ".join(
+            f"{s.label} {distance.kilometres(s.meters)}" for s in rest[:MAX_DISTANCE_LISTED]
+        )
+        more = "" if len(rest) <= MAX_DISTANCE_LISTED else f" und {len(rest) - MAX_DISTANCE_LISTED} weitere"
+        self.state.indicia.append(
+            self._distance_indiz(
+                "e0",
+                wert=f"{len(rest)} Angaben",
+                text=(
+                    f"{listed}{more}. Jede nennt eine Art von Ort statt eines bestimmten, "
+                    "also gibt es nichts, wogegen sich messen ließe — sie stehen hier, "
+                    "gerechnet wird mit ihnen nicht."
+                ),
+                beleg=rest[0].beleg,
+                sicherheit=0.1,
+                band=None,
+            )
+        )
+
+    def _distance_indiz(
+        self,
+        id: str,
+        *,
+        wert: str,
+        text: str,
+        beleg: str,
+        sicherheit: float,
+        band: Entfernungsband | None,
+    ) -> Indiz:
+        indiz = Indiz(
+            id=id,
+            art="entfernung",
+            wert=wert,
+            text=text,
+            beleg=beleg,
+            quelle="fliesstext",
+            # Weak on purpose and by rule, not by taste: a band may order the
+            # list and may object, so its number is never allowed near the
+            # threshold that separates „bestätigt“ from „mehrdeutig“.
+            sicherheit=sicherheit,
+            beziehung="entfernt_von",
+            band=band,
+        )
+        if indiz.id in self.payload.verworfen:
+            indiz.verworfen = True
+            indiz.verworfen_grund = "Von Hand abgewählt."
+        return indiz
+
+    async def resolve_bands(self) -> AsyncIterator[SuchEreignis]:
+        """Resolve the named references to the built-up areas they mean.
+
+        Two requests per reference and at most ``MAX_DISTANCE_REFERENCES`` of
+        them, and only once there is more than one candidate to order — a band
+        cannot confirm, so on a run the cadastre already settled it would buy
+        nothing at all.
+
+        A name the directory does not carry is not resolved and not guessed.
+        „Penny 500 m" and „Nahkauf 700 m" read as place names and are shops;
+        the directory is what tells them from Machern, and an unresolved
+        reference stays in the protocol as a statement nobody could look up.
+        """
+
+        if self._bands_resolved:
+            return
+        self._bands_resolved = True
+        named = [
+            (indiz, statement)
+            for indiz, statement in self._distances
+            if statement.named and not indiz.verworfen
+        ]
+        if not named or not self.directory:
+            return
+
+        for indiz, statement in named[:MAX_DISTANCE_REFERENCES]:
+            reference = await self._resolve_reference(statement.target or "")
+            if reference is None:
+                indiz.text = (
+                    f"{indiz.text} Der genannte Bezug „{statement.label}“ steht nicht im "
+                    "Gemarkungsverzeichnis — das Band wird gezeigt und nicht gerechnet."
+                )
+                yield SuchEreignis(art="indiz", indiz=indiz)
+                continue
+            self._references.append((statement, reference))
+            band = indiz.band
+            if band is not None:
+                indiz.band = band.model_copy(
+                    update={
+                        "aufgeloest": True,
+                        "umriss": _geojson(
+                            geo.reproject_geometry(reference.area, "EPSG:25833", "EPSG:4326")
+                        ),
+                        "mitte": _geojson(
+                            geo.reproject_geometry(reference.centre, "EPSG:25833", "EPSG:4326")
+                        ),
+                    }
+                )
+            yield SuchEreignis(art="indiz", indiz=indiz)
+
+        if self._references:
+            names = ", ".join(reference.name for _, reference in self._references)
+            yield SuchEreignis(
+                art="phase",
+                phase="bewertung",
+                text=(
+                    f"Die bebaute Ortslage von {names} als Bezug — der Abstand dorthin ist "
+                    "kein Wert, sondern ein Bereich vom Ortsrand bis zur Ortsmitte. Das "
+                    "ordnet die Kandidaten, ausschließen kann es nur nach außen."
+                ),
+            )
+
+    async def _resolve_reference(self, name: str) -> Reference | None:
+        """The built-up outline of a named place, or nothing.
+
+        Seeded from the cadastral district of that name, which is *not* the
+        town — Gemarkung Grimma reaches to within 1.22 km of a parcel 5.32 km
+        from the town's edge, because a district is farmland too. It is only
+        ever used here as a point to put the land-use box around, and the
+        outline that comes back is the settlement itself.
+        """
+
+        entries = district_matches(self.directory, name) if self.directory else []
+        if not entries:
+            return None
+        key = expand_gemarkung_key(entries[0].schluessel)
+        try:
+            outline = self._district_outlines.get(key)
+            if outline is None or outline.geometry is None:
+                self.state.requests += 1
+                found = await self.alkis.district_outlines([key])
+                outline = next((o for o in found if o.geometry is not None), None)
+            if outline is None or outline.geometry is None:
+                return None
+            seed = outline.geometry.centroid
+            lon, lat = geo.utm33_to_wgs84(seed.x, seed.y)
+            self.state.requests += 1
+            built_up = await self.alkis.built_up_area(lat, lon, largest=True)
+        except AppError:
+            # A band is an ornament on the answer, never the answer. An
+            # upstream that cannot draw it is not a reason to end the run.
+            return None
+        if built_up is None:
+            return None
+        return Reference(
+            name=entries[0].name or name,
+            area=built_up.geometry,
+            centre=built_up.geometry.centroid,
+        )
+
+    def _distance_fit(self, parcel: Flurstueck) -> tuple[float, str] | None:
+        """How well one candidate fits every resolved distance statement, as one number.
+
+        One feature, not one per statement. The three distances the reference
+        listing states all point into the same village, so their errors are one
+        error — averaging them says that, and multiplying them would count it
+        three times over.
+        """
+
+        if not self._references or parcel.geometry is None:
+            return None
+        point = parcel.geometry.centroid
+        fits: list[float] = []
+        phrases: list[str] = []
+        for statement, reference in self._references:
+            reading = reference.readings(point)
+            fits.append(distance.membership(reading, statement.band))
+            phrases.append(
+                f"{distance.kilometres(reading[0])}–{distance.kilometres(reading[1])} "
+                f"bis {reference.name} gegen „{distance.kilometres(statement.meters)}“ "
+                "im Inserat"
+            )
+        return sum(fits) / len(fits), "; ".join(phrases)
+
+    def _distance_objection(self, parcel: Flurstueck) -> str | None:
+        """The one thing a stated distance can prove, and only outwards.
+
+        A route is never shorter than the straight line, so a candidate whose
+        straight line already exceeds the outer bound cannot satisfy the
+        statement in any reading, by any means of travel. It still deletes
+        nobody — the sentence goes next to the candidate and the candidate
+        sinks.
+        """
+
+        if not self._references or parcel.geometry is None:
+            return None
+        point = parcel.geometry.centroid
+        for statement, reference in self._references:
+            reading = reference.readings(point)
+            if distance.refuted(reading, statement.band):
+                return (
+                    f"liegt {distance.kilometres(reading[0])} von {reference.name} entfernt, "
+                    f"das Inserat nennt „{distance.kilometres(statement.meters)}“ — auch als "
+                    "Luftlinie zu weit"
+                )
+        return None
 
     async def read_images(self) -> AsyncIterator[SuchEreignis]:
         """Read the listing's images for a cadastral reference, and stop at one.
@@ -1297,7 +1592,11 @@ class SearchEngine:
                 parcel,
                 stated_area=self._area.value if self._area else None,
                 street=self._street,
+                distance_fit=self._distance_fit(parcel),
             )
+            objection = self._distance_objection(parcel)
+            if objection:
+                reasons = [*reasons, objection]
             out.append(
                 Kandidat(
                     id=parcel.attributes.get("flstkennz") or parcel.gml_id or "",
@@ -1682,12 +1981,15 @@ class SearchEngine:
 
         if len(self.state.candidates) < 2:
             return
+        async for event in self.resolve_bands():
+            yield event
         features = [
             name
             for name, present in (
                 ("Straße", bool(self._street)),
                 ("Nutzungsart", True),
                 ("Fläche", self._area is not None),
+                ("Entfernung", bool(self._references)),
             )
             if present
         ]

@@ -465,9 +465,16 @@ def like(name: str, pattern: str) -> str:
 #   neighbouring hamlets start closing too and the near edge jumps 0.7 km.
 # * **A 2 km radius** holds a small town whole: Grimma's core measures
 #   2.9 x 2.3 km, Borna's 3.0 x 2.6 km, Bad Lausick's 3.2 x 2.3 km.
+# * **A count of its own.** The service-wide `max_features` of 200 truncates
+#   this query and nothing says so: 200 of Grimma's 431 polygons close into a
+#   0.35 km² fragment instead of the 1.65 km² town, and the near edge reads
+#   5.4 km where the whole town reads 5.3 km -- a plausible number from an
+#   outline that is a tenth of the place. Measured 16.09.2026; 1 500 is well
+#   above what a 2 km box has returned anywhere.
 BUILT_UP_RADIUS_M = 2000.0
 BUILT_UP_CLOSING_M = 25.0
 BUILT_UP_KIND = "Wohnbau*"
+BUILT_UP_MAX_FEATURES = 1500
 
 
 @dataclass(frozen=True, slots=True)
@@ -977,6 +984,7 @@ class AlkisService:
         *,
         radius_m: float = BUILT_UP_RADIUS_M,
         closing_m: float = BUILT_UP_CLOSING_M,
+        largest: bool = False,
     ) -> BuiltUpArea | None:
         """The built-up outline of the settlement at a coordinate.
 
@@ -994,7 +1002,18 @@ class AlkisService:
 
         Answers the connected piece the coordinate falls in -- or the largest
         one, when the point sits just outside, which is what a village edge
-        does.
+        does. ``largest`` asks for the biggest piece regardless, which is what
+        a *named* reference wants: seeded from Grimma's market square, the
+        piece under the seed is a 0.48 km² island of housing inside a centre
+        the cadastre records as mixed use, while the town is the 1.65 km² belt
+        around it. Measured from Flurstück 790/11, the island reads 4.6 to
+        5.1 km and the belt 5.3 to 6.1 km -- and it is the belt the advert's
+        „ca. 6 km" is about.
+
+        The union stops at the largest piece either way. Taking every piece in
+        the box instead pulls the near edge from 5.3 km to 2.9 km, because the
+        box also holds the hamlets around the town -- the same failure that
+        made the cloud of stops named after a town useless as a proxy for it.
         """
 
         easting, northing = geo.wgs84_to_utm33(lon, lat)
@@ -1004,7 +1023,7 @@ class AlkisService:
                 like("nutzart", BUILT_UP_KIND),
             ],
             result_type="results",
-            count=self.settings.max_features,
+            count=BUILT_UP_MAX_FEATURES,
             type_names="ave:Nutzung",
         )
         polygons = parse_land_use(await self._post(body))
@@ -1026,5 +1045,9 @@ class AlkisService:
             return None
         parts.sort(key=lambda part: -part.area)
         point = Point(easting, northing)
-        core = next((part for part in parts if part.covers(point)), parts[0])
+        core = (
+            parts[0]
+            if largest
+            else next((part for part in parts if part.covers(point)), parts[0])
+        )
         return BuiltUpArea(geometry=core, parts=len(parts), pieces=len(polygons))

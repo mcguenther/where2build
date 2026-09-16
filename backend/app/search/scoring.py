@@ -14,9 +14,12 @@ Two rules are measured, not chosen:
   three times.
 * **Never cut hard on a claim.** The reference listing's own distances were
   12 % and 32 % out. Read as an equation they delete the right candidate; read
-  as a membership with a floor they merely push it down the list. The distance
-  rings themselves are not built -- they need walking times, and ranking by air
-  distance is a rule this project already refused.
+  as a membership with a floor they merely push it down the list. That is
+  exactly how the distance bands enter: ``search.distance`` turns a stated
+  figure into an interval and a candidate into an interval, and what arrives
+  here is how well the two overlap -- one number for all of a listing's
+  distances together, because station, bus stop and school sit in the same
+  village and their errors are one error.
 """
 
 from __future__ import annotations
@@ -39,6 +42,10 @@ WEIGHTS = {
     # Official value, inferred conclusion. 25 down to 16, and it would
     # occasionally delete the right answer, so it only ever ranks.
     "nutzung": 0.5,
+    # A broker's sentence about a drive, measured against an outline this
+    # search resolved itself. Below the official values on purpose: it is the
+    # only feature here whose *input* is somebody's estimate.
+    "entfernung": 0.4,
 }
 
 # What a building plot is normally recorded as. The inference
@@ -123,6 +130,7 @@ def score(
     *,
     stated_area: float | None = None,
     street: str | None = None,
+    distance_fit: tuple[float, str] | None = None,
 ) -> tuple[float, list[str]]:
     """Points and reasons for one candidate.
 
@@ -150,6 +158,10 @@ def score(
     fit, kind = land_use(parcel.attributes.get("tntxt"))
     if kind:
         contributions.append(Contribution("nutzung", fit, f"Nutzung: {kind}"))
+
+    if distance_fit is not None:
+        value, phrase = distance_fit
+        contributions.append(Contribution("entfernung", max(FLOOR, value), phrase))
 
     if not contributions:
         return 0.0, []
