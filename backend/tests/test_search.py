@@ -1699,3 +1699,48 @@ def test_a_capitalised_noun_is_not_a_district_however_the_sentence_reads():
         directory=DIRECTORY,
     )
     assert not any(i.art == "gemarkung" and "Grundstück" in i.wert for i in indicia)
+
+
+# --------------------------------------------------------------------------
+# A parcel number that resolves to the wrong parcel used to close the search
+# --------------------------------------------------------------------------
+
+
+@respx.mock
+def test_a_contradicted_parcel_number_opens_the_area_route(client):
+    """The short circuit found *a* parcel, so the staircase never ran — and the
+    parcel was 2 994 m² against the 502 the listing states."""
+
+    respx.post(ALKIS_URL).mock(
+        side_effect=_cadastre(
+            # The number resolves inside Großbothen, and the exact area finds
+            # the right parcel there.
+            {"144241+502": 1, "144241": 1131},
+            {
+                "flstnrzae": "alkis_thraena_107_60.gml",   # 2 994 m², the wrong one
+                "502": "alkis_grossbothen_790_11.gml",     # the right one
+            },
+        )
+    )
+
+    events = _stream(
+        client,
+        {
+            "gemarkung": "Großbothen",
+            "flurstuecksnummer": "107/60",
+            "flaeche_m2": 502,
+            "flaeche_text": "502 m²",
+        },
+    )
+
+    said = " ".join(e.get("text") or "" for e in events if e.get("art") == "phase")
+    assert "widersprechen sich" in said
+    # The staircase ran after the contradiction, and it is what answered.
+    result = next(e for e in events if e["art"] == "ergebnis")
+    assert result["anzahl"] >= 1
+    number = next(
+        e["indiz"] for e in events
+        if e.get("art") == "indiz" and e["indiz"]["art"] == "flurstueck"
+        and e["indiz"]["verworfen"]
+    )
+    assert "verlässlichere" in number["verworfen_grund"]

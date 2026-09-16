@@ -134,8 +134,6 @@ MAX_DRAWN_AREAS = 4
 # What the short circuit accepts as agreement between the parcel it resolved
 # and the area the listing states. Wider than the plausibility check's factor
 # of four on purpose: this only decides whether one more phase runs.
-SHORT_CIRCUIT_AREA_FACTOR = 2.0
-
 # How far the smallest rectangle around a parcel may differ from the measures a
 # listing states before the two describe different plots. Generous on purpose:
 # a seller measures the frontage and the depth to the back fence, the cadastre
@@ -228,6 +226,9 @@ class SearchEngine:
         self._outside: str | None = None
         # What the listing says the plot measures, where it says so.
         self._dimensions: Dimensions | None = None
+        # The parcel a contradicted number resolved to. Kept, not dropped: if
+        # the area route finds nothing, it is the only answer there is.
+        self._refuted: list[Flurstueck] = []
         # District outlines already fetched, by key. Drawn once for the map and
         # reused for the wash under a confirmed parcel.
         self._district_outlines: dict[str, KatasterBezirk] = {}
@@ -807,14 +808,12 @@ class SearchEngine:
         # rather than an objection to it. `_part_area_note` says what is going
         # on; repeating it as „bitte die Nummer prüfen“ would send someone
         # looking for a mistake that is not there.
-        if self._area is not None and official and not self._part_area:
-            factor = official / self._area.value
-            if factor >= SHORT_CIRCUIT_AREA_FACTOR or factor <= 1 / SHORT_CIRCUIT_AREA_FACTOR:
-                return (
-                    f"Das gefundene Flurstück misst amtlich {official:g} m², das Inserat "
-                    f"nennt {self._area.value:g} m². Nummer und Fläche widersprechen "
-                    "sich — bitte die Flurstücksnummer prüfen."
-                )
+        if self._area_contradicts(parcel):
+            return (
+                f"Das gefundene Flurstück misst amtlich {official:g} m², das Inserat "
+                f"nennt {self._area.value:g} m². Nummer und Fläche widersprechen "
+                "sich — bitte die Flurstücksnummer prüfen."
+            )
 
         shape = self._shape_objection(parcel)
         if shape:
@@ -835,6 +834,28 @@ class SearchEngine:
                     "geokodiert ihr eigenes Ortsfeld —, ist aber ungeprüft."
                 )
         return None
+
+    def _area_contradicts(self, parcel: Flurstueck) -> bool:
+        """Whether the parcel's official area is outside anything the wording allows.
+
+        The threshold used to be a factor of two, which let 700 m² pass for a
+        stated 502 -- 39 % out and confirmed. It comes from the tolerance
+        staircase now: the widest rung the listing's own wording justifies is
+        as far as an official area may be from the stated one, which is 5 % for
+        a figure written exactly and 10 % for a rounded one.
+
+        Never for a part-area: a plot to be surveyed out of a bigger parcel is
+        *expected* to be smaller than it.
+        """
+
+        official = parcel.flaeche_amtlich_m2
+        if self._area is None or not official or self._part_area:
+            return False
+        rungs = tolerance_ladder(self._area)
+        if not rungs:
+            return False
+        widest = rungs[-1]
+        return not (widest.lower <= official <= widest.upper)
 
     def _shape_objection(self, parcel: Flurstueck) -> str | None:
         """Whether the parcel is shaped like the plot the listing describes.
@@ -1476,6 +1497,9 @@ class SearchEngine:
         async for event in self.short_circuit():
             yield event
 
+        async for event in self._branch_on_contradiction():
+            yield event
+
         if not self.state.candidates and anchors:
             async for event in self.measure_space(anchors):
                 yield event
@@ -1483,8 +1507,54 @@ class SearchEngine:
                 yield event
 
         if not self.state.candidates:
+            # The area route found nothing either, so the contradicted parcel
+            # is all there is. It comes back with its objection attached --
+            # a candidate somebody can look at beats no answer at all.
+            self.state.candidates = self._refuted
+            self._refuted = []
+
+        if not self.state.candidates:
             async for event in self.by_number_alone():
                 yield event
+
+    async def _branch_on_contradiction(self) -> AsyncIterator[SuchEreignis]:
+        """A parcel number whose parcel is the wrong size opens the area route.
+
+        The short circuit used to close it: the staircase runs only while the
+        candidate list is empty, so a number that resolved to *some* parcel
+        stopped the search that would have found the right one. The
+        contradiction was reported and never followed.
+
+        Both readings now stand. The number keeps its parcel, marked with what
+        contradicts it, and the area is searched as well -- and if that finds
+        nothing, the marked parcel is what the answer carries.
+        """
+
+        if len(self.state.candidates) != 1 or not self.active("flurstueck"):
+            return
+        parcel = self.state.candidates[0]
+        if not self._area_contradicts(parcel):
+            return
+
+        official = parcel.flaeche_amtlich_m2 or 0.0
+        for number in self.active("flurstueck"):
+            number.verworfen = True
+            number.verworfen_grund = (
+                f"Das Flurstück dieser Nummer misst amtlich {official:g} m², das Inserat "
+                f"nennt {self._area.value:g} m². Die Fläche ist die verlässlichere Angabe, "
+                "deshalb wird auch ohne die Nummer gesucht."
+            )
+            yield SuchEreignis(art="indiz", indiz=number)
+        yield SuchEreignis(
+            art="phase",
+            phase="kurzschluss",
+            text=(
+                f"Nummer und Fläche widersprechen sich ({official:g} gegen "
+                f"{self._area.value:g} m²) — es wird zusätzlich über die Fläche gesucht"
+            ),
+        )
+        self._refuted = self.state.candidates
+        self.state.candidates = []
 
     def _outside_note(self) -> str | None:
         """What to say about a listing that places itself outside Saxony.
