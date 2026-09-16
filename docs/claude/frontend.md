@@ -204,3 +204,36 @@ that collapsed at 390 px. None of them threw.
   `:not(.gelesen--lesezeichen)`; a test asserts the entry step has no plain
   one.
 
+
+- **A full-bleed section inside `.container` bleeds to 1360 px, not to the
+  window.** The reception's negative margins only took back the container's own
+  padding, so on anything wider than about 1440 px the drawing sat as a panel
+  in the middle of bare `--w2b-paper` — while the header and the footer, which
+  are outside the container, went edge to edge. Nothing failed; it simply read
+  as a card on the one screen that is supposed to read as a place. Reaching the
+  window needs `width: 100vw; margin-inline: calc(50% - 50vw)`, and `100vw`
+  counts the classic scrollbar the page does not have, so `.shell` carries
+  `overflow-x: clip` to swallow those few pixels. **`clip`, never `hidden`:**
+  `hidden` makes the shell a scroll container and every `position: sticky`
+  inside it — the site plan, the two maps, the parcel list's header — silently
+  stops sticking.
+
+- **The backdrop's box decides how big a parcel looks, and `slice` is what
+  couples them.** The drawing is a lattice rotated by the street's gradient in
+  a `0 0 3840 1200` box with `xMidYMin slice`, so the scale is
+  `max(width/3840, 1300/1200)`: below 4160 px the height wins, a parcel is the
+  same size on every monitor, and a wider window shows more fabric instead of a
+  magnified piece of it. Two things follow from the box being centred. The plot
+  keeps a fixed offset from the middle, which is a fixed offset on screen — and
+  the quiet core in the middle must be a fixed size too, because it exists to
+  back an 860 px column of type and to stop short of that plot. Left as a bare
+  `34%` it grew with the window until it washed the plot out.
+
+- **Widening the box moves the street up, because the street is not level.**
+  Its gradient is about −0.105, so translating the plot 1200 units right along
+  it lifts it 126 units out of the frame; the fabric has to come down by the
+  same amount for the composition to survive. And the reception is
+  `clamp(600px, 82vh, 940px)` tall while the drawing is anchored to its top, so
+  a tall window moves the type down over a street that stayed put: the route
+  ran through the sentence under the headline. The street now crosses where the
+  search panel is, which is opaque at every height the reception takes.
