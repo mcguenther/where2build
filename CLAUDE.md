@@ -193,6 +193,15 @@ node scripts/screenshots.mjs
 
 # the bookmarklet's handover, across two real origins (needs the build and :8000)
 node scripts/bookmarklet.mjs
+
+# reading a listing here, for a fixture or a link dropped into a chat. A
+# development tool, never the product's way in -- and it stops at a CAPTCHA.
+# The CA import is what gives this sandbox's Chromium the internet at all;
+# a fresh container needs it again.
+scripts/sandbox-browser-ca.sh
+node scripts/fetch-listing.mjs <url> --text
+node scripts/fetch-listing.mjs <immowelt-expose-url> \
+     --liste https://www.immowelt.de/suche/<ort>/grundstuecke/kaufen --text
 ```
 
 ## Before calling a change done

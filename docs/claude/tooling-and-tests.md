@@ -133,11 +133,17 @@ line looks right and does not match.
   while the same request from `curl` returned 200. Restarting uvicorn fixed it;
   do not go looking for the bug in the code first.
 
-- **The sandbox browser has no route to the internet**, only the shell has.
-  Basemap tiles therefore cannot be verified by screenshot here; the camera
-  maths is covered by `tests/projection.test.js` instead. Tiles that come
-  through *our own* backend are a different matter — the browser reaches those,
-  so the route cards' raster ground can be photographed here.
+- **The sandbox browser reaches the internet — after one import.** This note
+  said for months that it does not, and the symptom fits: every navigation to
+  an https address dies with `net::ERR_CERT_AUTHORITY_INVALID`. It is a missing
+  certificate, not a missing route. Outbound traffic goes through the agent
+  proxy, which re-terminates TLS with its own CA; the shell trusts it through
+  `SSL_CERT_FILE`, and Chromium reads only the NSS store at `~/.pki/nssdb`,
+  which exists and is empty (`select count(*) from nssPublic` → 0).
+  `scripts/sandbox-browser-ca.sh` imports the bundle there — idempotent, a
+  no-op without a proxy, and needed again in every fresh container. After it,
+  `page.goto("https://example.com/")` answers 200.
+  See `docs/research/inserate-im-sandbox-lesen.md`.
 
 - **An optional dependency has to be optional in one place only.** The backend
   image installed `.[poi]` and never `tesseract-ocr`, so every Compose

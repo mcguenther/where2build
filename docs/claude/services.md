@@ -35,6 +35,19 @@ of Overpass or a local extract, the listing portals, and the extraction model.
   at 24 hours — so it is not a gate we could pass with paperwork, it is the
   wrong shape. The way in is the user's own browser.
   See `docs/research/immobilienscout24-zugang.md`.
+- **immowelt.de serves its result lists and protects its exposés.** Measured
+  17.09.2026: `…/suche/<ort>/grundstuecke/kaufen` answers 200 with 890 kB of
+  server-rendered cards, while `…/expose/<uuid>` answers 403 from DataDome to
+  everything — `curl`, headless Chromium, `WebFetch`, a reader proxy — and
+  answers a headful browser with a CAPTCHA, which is a human check and where
+  reading stops. The list is the way in: the exposé's own card is in it, with
+  the price, the exact area, the Ortsteil, the postcode and the first ~170
+  characters of the description. It is one page (`?sp=2` returns the same
+  bytes, no `rel="next"`), so narrow the place rather than paginate, and note
+  that `…/suche/sachsen/grundstuecke/kaufen` is **410** — only the
+  place-shaped URLs are alive. For the product this changes nothing: the way
+  in stays the user's own browser.
+  See `docs/research/inserate-im-sandbox-lesen.md`.
 - **kleinanzeigen.de carries `og:latitude`/`og:longitude`** in its meta tags —
   parse those instead of geocoding, and skip the model call entirely.
 

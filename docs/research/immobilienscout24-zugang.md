@@ -328,8 +328,19 @@ build:
 * It buys nothing over § 5.1, which gets *more* data with no legal surface at
   all.
 
-Untestable here in any case: the sandbox browser has no route to the internet,
-only the shell has.
+**Measured 17.09.2026, and the last line of this section was wrong.** The
+sandbox browser does reach the internet once the proxy's CA is in its NSS store
+(`scripts/sandbox-browser-ca.sh`), and a **headful** Chromium under `xvfb-run`
+passes the challenge by itself: 401 first, then the whole 3.4 MB exposé, no
+CAPTCHA anywhere. A **headless** one never does — it sits on „Ich bin kein
+Roboter" for thirty seconds, so what it fails is the WAF's device check, not
+the proof-of-work. So "this would probably work" is now "this works", and every
+argument above against putting it in the product is untouched by that: still
+one server IP, still a silently-failing 401, still a technical protection
+measure, and still strictly less than a handover gets. It lives in
+`scripts/fetch-listing.mjs`, a development tool for recording fixtures and for
+reading a link dropped into a chat, and it stops at a human check.
+See `docs/research/inserate-im-sandbox-lesen.md`.
 
 ## 6. The second URL is a second problem
 
