@@ -32,6 +32,7 @@ from app.search.indicia import (
     read_dimensions,
 )
 from app.search import distance
+from app.search.blocks import split_blocks
 from app.search.distance import read_distances
 from app.search.ladder import tolerance_ladder
 from app.search.scoring import land_use, score, street_match
@@ -1949,3 +1950,154 @@ def test_the_band_travels_in_degrees_and_only_once():
     for ring in band.umriss["coordinates"]:
         for point in ring:
             assert 11.8 < point[0] < 15.1 and 50.1 < point[1] < 51.7
+
+
+# ----------------------------------------------------------------------
+# Stufe 0 -- the blocks a listing is written in
+# ----------------------------------------------------------------------
+
+
+def test_a_listing_is_cut_into_the_blocks_it_was_written_in():
+    """Heading, pair, bullet, paragraph — the four shapes the recordings use."""
+
+    pieces = split_blocks(
+        "Willkommen in Eilenburg\n"
+        "\n"
+        "Hier bieten wir Ihnen eines der letzten Baugrundstücke an.\n"
+        "\n"
+        "# Eckdaten\n"
+        "Objektart: Baugrundstück\n"
+        "Grundstücksfläche: ca. 711 m²\n"
+        "\n"
+        "- Voll erschlossen\n"
+    )
+    assert [(b.kind, b.label) for b in pieces] == [
+        ("ueberschrift", None),
+        ("absatz", None),
+        ("ueberschrift", None),
+        ("paar", "Objektart"),
+        ("paar", "Grundstücksfläche"),
+        ("punkt", None),
+    ]
+    assert pieces[4].text == "ca. 711 m²"
+
+
+def test_a_sentence_with_a_colon_in_it_is_not_a_label():
+    """Three shapes out of advert 3441433250, each of which produced a label
+    for half a paragraph or for a URL."""
+
+    def labels(line):
+        return [b.label for b in split_blocks(line) if b.is_pair]
+
+    assert labels("- https://www.ohne-makler.net/immobilie/file/1611841.pdf (Überblick)") == []
+    assert labels("Die Verkehrsanbindung ist hervorragend: Über den S-Bahn-Anschluss …") == []
+    assert labels("Familien profitieren von der nahen Infrastruktur: Die Grundschule …") == []
+    assert labels("Stellen Sie sich vor: Ihr Haus auf diesem Grundstück") == []
+    # And the ones that are labels still are.
+    assert labels("Autobahnanschlussstelle A38 „Leipzig-Südwest“: ca. 3 km") == [
+        "Autobahnanschlussstelle A38 „Leipzig-Südwest“"
+    ]
+
+
+def test_the_area_of_the_plot_is_not_whichever_number_comes_first():
+    """Three figures in m², one plot. Which one the cadastre gets filtered on
+    is the difference between an answer and a confidently wrong one."""
+
+    # A labelled pair wins outright -- advert 3464790207.
+    assert read_area(
+        "In diesem Neubaugebiet bietet Ihnen das ca. 711 m² große Grundstück …\n"
+        "\n"
+        "Grundstücksfläche: ca. 680 m²\n"
+    ).value == 680.0
+
+    # A building footprint is not a plot area -- advert 3381469778 states both.
+    assert read_area("Die zulässige Grundfläche beträgt insgesamt ca. 240 m².") is None
+    assert read_area("Mit einer bebaubaren Fläche von ca. 240 m²") is None
+    assert read_area("Wohnfläche: 140 m²") is None
+
+    # And a sentence about the other plots in the estate is not about this one.
+    # Advert 3441433250 writes this and states 590 m² in its attribute list;
+    # the reader used to answer 360.
+    assert read_area(
+        "Die Grundstücke variieren in ihrer Größe zwischen ca. 360 m² und 800 m²."
+    ) is None
+
+
+def test_a_beleg_and_a_relation_stop_at_the_block_they_were_read_in():
+    """„# Lagebeschreibung“ glued to the sentence under it is a Beleg whose
+    first two words belong to another line."""
+
+    indicia = collect_indicia(
+        text="Kaufpreis pro m²: 92,00 €\n# Lagebeschreibung\nThräna ist ein kleiner "
+             "Ortsteil der Kreisstadt Borna.",
+        directory=DIRECTORY,
+    )
+    district = next(i for i in indicia if i.art == "gemarkung" and i.wert == "Thräna")
+    assert "Lagebeschreibung" not in (district.beleg or "")
+    assert "Kaufpreis" not in (district.beleg or "")
+    assert district.beziehung == "liegt_in"
+
+
+# ----------------------------------------------------------------------
+# B2 -- a source is a document, not a channel
+# ----------------------------------------------------------------------
+
+
+def _numbers(*indicia):
+    engine = SearchEngine(ParcelSearchRequest(text="x"), alkis_service(), DIRECTORY)
+    engine.state.indicia = list(indicia)
+    return engine
+
+
+def _number(id, wert, quelle, fundort):
+    return Indiz(id=id, art="flurstueck", wert=wert, text=wert, quelle=quelle,
+                 sicherheit=0.9, fundort=fundort)
+
+
+def test_two_numbers_off_two_sheets_are_two_readings_not_one_plot():
+    """B2. Every OCR find carries `quelle="bild"`, so the channel could not tell
+    one Geoportal print from another — and two numbers from one source are a
+    plot made of several parcels, which is never put to the user as a question.
+    A print carries dozens of numbers in its map image, so two prints in one
+    listing is not a rare shape."""
+
+    one_sheet = _numbers(
+        _number("a", "790/11", "bild", "bild:https://example.org/1.jpg"),
+        _number("b", "238/3", "bild", "bild:https://example.org/1.jpg"),
+    )
+    assert one_sheet.named_as_a_set()
+    assert not [k for k in one_sheet._conflicts() if k.art == "flurstueck"]
+
+    two_sheets = _numbers(
+        _number("a", "790/11", "bild", "bild:https://example.org/1.jpg"),
+        _number("b", "238/3", "bild", "bild:https://example.org/2.jpg"),
+    )
+    assert not two_sheets.named_as_a_set()
+    question = next(k for k in two_sheets._conflicts() if k.art == "flurstueck")
+    assert question.optionen == ["a", "b"]
+
+
+def test_two_numbers_in_one_text_are_still_one_plot():
+    """„790/11 sowie 238/3“ is the normal case, not a dispute — and the body
+    text is one document however many paragraphs it has."""
+
+    indicia = collect_indicia(
+        text="Verkauft werden Flurstück 790/11 sowie Flurstück 238/3 der Gemarkung "
+             "Großbothen.",
+        directory=DIRECTORY,
+    )
+    numbers = [i for i in indicia if i.art == "flurstueck"]
+    assert {i.wert for i in numbers} == {"790/11", "238/3"}
+    assert {i.fundort for i in numbers} == {"anzeigentext"}
+    engine = _numbers(*numbers)
+    assert engine.named_as_a_set()
+
+
+def test_an_indiz_without_a_fundort_behaves_as_it_did():
+    """A caller may hand in an Indiz of its own, and the channel is the fallback."""
+
+    engine = _numbers(
+        _number("a", "790/11", "bild", None),
+        _number("b", "238/3", "bild", None),
+    )
+    assert engine.named_as_a_set()

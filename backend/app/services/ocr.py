@@ -321,6 +321,7 @@ def as_indicia(readings: list[ImageReading], start: int = 0) -> list[Indiz]:
                     quelle="bild",
                     sicherheit=0.95,
                     bild_url=reading.url,
+                    fundort=f"bild:{reading.url}",
                 )
             )
         for district in reading.districts:
@@ -336,6 +337,10 @@ def as_indicia(readings: list[ImageReading], start: int = 0) -> list[Indiz]:
                     sicherheit=0.95,
                     beziehung="liegt_in",
                     bild_url=reading.url,
+                    # One sheet is one document. Two numbers off *this* extract
+                    # are the plot it describes; a number off another extract is
+                    # a rival reading, and only that is a question.
+                    fundort=f"bild:{reading.url}",
                 )
             )
     return out

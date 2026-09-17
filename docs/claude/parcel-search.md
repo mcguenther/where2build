@@ -758,3 +758,64 @@ also "Decisions that are settled" in `CLAUDE.md`.
   „ca. 500 m²": 5 requests without the band, 7 with, 11 candidates all inside
   the band. Within one Gemarkung a 6 km statement separates nothing, which is
   the expected outcome and the reason this may only ever rank.
+
+- **Half an advert is not prose, and reading it as one string costs a hard
+  filter.** `search/blocks.py` cuts the text once — heading, `Label: Wert`
+  pair, bullet, paragraph — and the readers work inside a block. Measured over
+  the 16 recorded adverts: 148 paragraphs, 78 pairs, 76 headings, 55 bullets.
+  What it buys is not tidiness:
+
+  - **A labelled pair outranks prose.** Advert 3464790207 writes
+    „Grundstücksfläche: ca. 711 m²" as a pair and „das ca. 711 m² große
+    Grundstück" as prose; when the two disagree the pair is the answer.
+  - **A figure whose label or lead-in names something else is refused.**
+    Advert 3381469778 writes „die zulässige Grundfläche beträgt insgesamt ca.
+    240 m²" three sentences after its „ca. 600 m²", and a reader that takes
+    whichever comes first is one paragraph away from filtering the cadastre on
+    a building footprint.
+  - **A sentence about the development is not about the plot.** Advert
+    3441433250 writes „Die Grundstücke variieren in ihrer Größe zwischen ca.
+    360 m² und 800 m²" and states 590 m² in its attribute list. The reader
+    answered **360**; it now answers nothing and the attribute field wins.
+    Measured against the whole corpus, that is the *only* run whose area
+    reading changed.
+  - **A Beleg stops at its block.** The excerpt padding used to reach over a
+    line break and glue „# Lagebeschreibung" to the sentence under it. 13 of
+    the corpus's Belege crossed a line; 7 remain, and all seven are inside a
+    paragraph written on several lines, which is one statement.
+
+  The plural is the window, not a character count: „Die Grundstücke variieren …
+  zwischen ca. 360 m² und 800 m²" puts the plural 64 characters in front of the
+  second figure, and any window narrow enough to be safe misses it. A block is
+  one statement, so the block is the window.
+
+- **Three shapes that are not a `Label: Wert` pair, all from one advert.**
+  Measured on 3441433250: a URL („https://www.ohne-makler.net/…" read as the
+  pair `https` = `//www…`), a sentence with a colon in it („Die
+  Verkehrsanbindung ist hervorragend: Über den …"), and advertising copy
+  („Stellen Sie sich vor: …"). Three conditions remove all three — whitespace
+  after the colon, at most five words not beginning with an article, and no
+  finite verb — and the pronoun is what catches the imperative, because German
+  puts one in every one of them.
+
+- **A source is a *document*, not a channel.** `named_as_a_set()` asked
+  `quelle`, and every OCR find carries `quelle="bild"` — so two numbers off two
+  different Geoportal prints looked exactly like „Flurstück 790/11 sowie
+  Flurstück 238/3" in one sentence: one plot of two parcels, no question asked,
+  and `_narrow_by_area` deliberately declining to tell them apart. A print
+  carries dozens of numbers in its map image, so two prints in one listing is
+  not a rare shape. `Indiz.fundort` now names the document (`bild:<url>`,
+  `anzeigentext`, `attributliste`), the body text is one document however many
+  paragraphs it has, and the Konflikt machinery that follows was already there.
+
+- **A parcel number needs its label on every occurrence.** „Flurstück 790/11
+  sowie Flurstück 238/3" reads as two; „Flurstücke 790/11 und 238/3" reads as
+  none, because `_PARCEL_RE` does not carry the plural and the second number
+  has no label of its own. Not fixed — noted, because the shape occurs and the
+  fix is a widening of the pattern that wants its own measurement.
+
+- **Never run two pytest processes at once here.** Three Tesseract tests failed
+  on a run that shared the machine with two other suites, and they failed
+  exactly as a photograph of a lawn does: an empty reading. `TIMEOUT_S = 30`
+  and Tesseract is CPU-bound, which the module docstring already says about
+  reading images concurrently — it is just as true of the test runner.

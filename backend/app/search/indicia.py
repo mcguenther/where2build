@@ -26,6 +26,7 @@ from dataclasses import dataclass
 
 from ..gemarkung_index import GemarkungDirectory, GemarkungEntry, base_name, fold
 from ..schemas import Indiz, IndizQuelle, Ortsbeziehung
+from . import blocks
 
 # How far each source is trusted, and thereby which one wins a contradiction:
 # an official extract outranks the platform's attribute list, which outranks
@@ -41,6 +42,23 @@ SOURCE_CONFIDENCE: dict[IndizQuelle, float] = {
     # Measured at 6 235 m from the parcel actually offered. It may refute a
     # candidate; it may never narrow the search.
     "pin": 0.15,
+}
+
+# Which *document* each channel reads. The channel alone cannot serve as the
+# identity of a source, and that is the whole of B2: every text find carries
+# „fliesstext" and every OCR find „bild", so two numbers off two different
+# sheets looked exactly like two numbers in one sentence -- and two numbers
+# from one source are a plot made of several parcels, which this project treats
+# as the normal case and never puts to the user as a question. The body text is
+# one document however many paragraphs it has; each image is one of its own,
+# and `ocr.as_indicia` names it by URL.
+DOCUMENT_OF: dict[IndizQuelle, str] = {
+    "nutzer": "eingabe",
+    "attribut": "attributliste",
+    "fliesstext": "anzeigentext",
+    "modell": "modell",
+    "standortfeld": "standortfeld",
+    "pin": "kartenpunkt",
 }
 
 # The AdV parcel key is 20 characters: six for the district, three for the
@@ -347,12 +365,98 @@ class AreaStatement:
         return not self.wording and self.upper is None and self.part_of is None
 
 
+# What a label or a lead-in has to say for a figure in m² to be *this plot's*
+# area. Folded and unspaced, so „Grundstücks-Fläche" and „Grundstücksgröße"
+# both match.
+_PLOT_AREA_WORDS = (
+    "grundstuecksflaeche", "grundstuecksgroesse", "grundstueck",
+    "gesamtflaeche", "flurstuecksflaeche", "parzellenflaeche", "flaeche",
+)
+
+# And what says it is a figure about something else. Every one of these stands
+# in a recorded advert next to a number in m²: advert 3381469778 writes „die
+# zulässige Grundfläche beträgt insgesamt ca. 240 m²" three sentences after its
+# „ca. 600 m²", and a reader that takes whichever comes first is one paragraph
+# away from filtering the cadastre on a building footprint.
+_OTHER_AREA_WORDS = (
+    "wohnflaeche", "nutzflaeche", "grundflaeche", "geschossflaeche",
+    "bebaubar", "ueberbaubar", "dachflaeche", "gewerbeflaeche",
+    "verkaufsflaeche", "kellerflaeche", "terrasse", "garage",
+)
+
+# „20 voll erschlossene Grundstücke zwischen 360 und 800 m²" is a sentence
+# about a development, not about the plot on offer — and advert 3441433250,
+# which writes exactly that, states 590 m² in its attribute list. A plural or a
+# „weitere" anywhere in the block is what separates the two: the same advert
+# writes „Die Grundstücke variieren in ihrer Größe zwischen ca. 360 m² und
+# 800 m²", where the plural stands 64 characters in front of the second figure
+# and any window narrow enough to be safe misses it. A block is one statement,
+# so the whole block is the window.
+_SEVERAL_PLOTS = re.compile(
+    r"(?:grundst(?:ü|ue)cke|parzellen|bauplätze|bauplaetze|weitere|"
+    r"je(?:weils)?\s+\w+\s+grundst)",
+    re.IGNORECASE,
+)
+
+# How far in front of a figure its lead-in is looked for. One clause: „Mit
+# einer bebaubaren Fläche von ca. 240 m²" is 34 characters.
+_AREA_LEAD_IN = 60
+
+
 def read_area(text: str) -> AreaStatement | None:
-    """The first plot area in a piece of text, with how it was written."""
+    """The plot area a piece of text states, with how it was written.
+
+    Block-aware, and that is what makes it more than "the first number followed
+    by m²". A listing states three or four areas and only one of them is the
+    thing the cadastre can be filtered on:
+
+        Grundstücksfläche: ca. 711 m²          a labelled pair — the answer
+        bebaubare Fläche von ca. 240 m²        the building footprint
+        Grundstücke zwischen 360 und 800 m²    the other plots in the estate
+
+    So a labelled pair wins outright, a figure whose label or lead-in names
+    something else is refused, and only then does the first remaining figure
+    count. Measured over the 16 recorded adverts: advert 3441433250 stops
+    answering 360 m² where its attribute list says 590, and no other run
+    changes.
+
+    A short string with no structure — „502 m²“, the portal's own field — is
+    one block and reads exactly as it did before.
+    """
+
+    pieces = blocks.split_blocks(text)
+    labelled = [
+        block
+        for block in blocks.labelled(pieces, *_PLOT_AREA_WORDS)
+        if not any(word in blocks.fold(block.label or "") for word in _OTHER_AREA_WORDS)
+    ]
+    for block in labelled:
+        statement = _area_in(block.text, lead_in="")
+        if statement is not None:
+            return statement
+
+    for block in pieces or [None]:
+        body = block.text if block is not None else text
+        lead = blocks.fold(block.label or "") if block is not None else ""
+        if any(word in lead for word in _OTHER_AREA_WORDS):
+            continue
+        statement = _area_in(body, lead_in=lead)
+        if statement is not None:
+            return statement
+    return None
+
+
+def _area_in(text: str, *, lead_in: str) -> AreaStatement | None:
+    """The first usable figure in one block, or nothing."""
 
     for match in _AREA_RE.finditer(text):
         value = german_number(match.group("from"))
         if value is None or value < 10 or value > 10_000_000:
+            continue
+        before = lead_in + blocks.fold(text[max(0, match.start() - _AREA_LEAD_IN) : match.start()])
+        if any(word in before for word in _OTHER_AREA_WORDS):
+            continue
+        if _SEVERAL_PLOTS.search(text):
             continue
         upper = german_number(match.group("to")) if match.group("to") else None
         wording = (match.group("wording") or "").strip().lower()
@@ -455,19 +559,35 @@ def describes_part_area(text: str | None) -> str | None:
     return " ".join(match.group(0).split()) if match else None
 
 
-def _excerpt(text: str, start: int, end: int, pad: int = 45) -> str:
-    """The sentence around a match, for the user to look up."""
+def _excerpt(
+    text: str, start: int, end: int, pad: int = 45, pieces: list[blocks.Block] | None = None
+) -> str:
+    """The sentence around a match, for the user to look up.
 
-    left = max(0, start - pad)
-    right = min(len(text), end + pad)
+    Clamped to the block the match sits in, where the blocks are known. Without
+    that, the padding reaches over a line break and glues a heading to the
+    statement under it — „# Lagebeschreibung Thräna ist …“ is a Beleg the user
+    is asked to check, and the first two words of it belong to another line.
+    """
+
+    low, high = blocks.bounds_at(pieces or [], start, (0, len(text)))
+    left = max(low, start - pad)
+    right = min(high, end + pad)
     snippet = " ".join(text[left:right].split())
-    return f"{'…' if left else ''}{snippet}{'…' if right < len(text) else ''}"
+    return f"{'…' if left > low else ''}{snippet}{'…' if right < high else ''}"
 
 
-def _relation_before(text: str, start: int) -> Ortsbeziehung | None:
-    """Which relation the words just before a place name express, if any."""
+def _relation_before(
+    text: str, start: int, pieces: list[blocks.Block] | None = None
+) -> Ortsbeziehung | None:
+    """Which relation the words just before a place name express, if any.
 
-    window = text[max(0, start - _RELATION_WINDOW) : start]
+    The window stops at the block boundary. A trigger on the line above is not
+    a trigger for this name, however close the two are in characters.
+    """
+
+    low, _ = blocks.bounds_at(pieces or [], start, (0, len(text)))
+    window = text[max(low, start - _RELATION_WINDOW) : start]
     best: tuple[int, Ortsbeziehung] | None = None
     for relation, pattern in _RELATION_PATTERNS:
         for match in pattern.finditer(window):
@@ -537,6 +657,7 @@ def _indiz(
         schluessel=schluessel,
         beziehung=beziehung,
         teil_von=teil_von,
+        fundort=DOCUMENT_OF.get(quelle, quelle),
     )
 
 
@@ -699,7 +820,7 @@ def collect_indicia(
 
     counter = [0]
     found: list[Indiz] = []
-    body = " ".join(part for part in (titel, text) if part)
+    body = blocks.joined(titel, text)
 
     # 1 · What the caller states outright. A district and a number typed by a
     #     person, or read off an official extract, are the strongest thing here.
@@ -975,6 +1096,7 @@ def _from_body(
     """
 
     out: list[Indiz] = []
+    pieces = blocks.split_blocks(body)
 
     for match in _PARCEL_RE.finditer(body):
         parsed = normalise_parcel_number(
@@ -992,7 +1114,7 @@ def _from_body(
                 wert=label,
                 text=f"Flurstück {label} im Text",
                 quelle="fliesstext",
-                beleg=_excerpt(body, match.start(), match.end()),
+                beleg=_excerpt(body, match.start(), match.end(), pieces=pieces),
             )
         )
 
@@ -1032,7 +1154,7 @@ def _from_body(
                     "Gemarkungen auseinanderhält"
                 ),
                 quelle="fliesstext",
-                beleg=_excerpt(body, start, end),
+                beleg=_excerpt(body, start, end, pieces=pieces),
                 beziehung="liegt_in",
                 sicherheit=0.5,
             )
@@ -1050,7 +1172,7 @@ def _from_body(
                 wert=name,
                 text=f"Der Text nennt {name} ausdrücklich als Ortsteil",
                 quelle="fliesstext",
-                beleg=_excerpt(body, start, end),
+                beleg=_excerpt(body, start, end, pieces=pieces),
                 beziehung="liegt_in",
                 sicherheit=0.68,
             )
@@ -1068,7 +1190,7 @@ def _from_body(
                 wert=name,
                 text=f"Der Text nennt die Gemarkung {name}",
                 quelle="fliesstext",
-                beleg=_excerpt(body, match.start(), match.end()),
+                beleg=_excerpt(body, match.start(), match.end(), pieces=pieces),
                 schluessel=entries[0].schluessel if len(entries) == 1 else None,
                 beziehung="liegt_in",
                 # An explicit "Gemarkung X" is a cadastral statement, not a
@@ -1091,7 +1213,7 @@ def _from_body(
                 # „Stadtteil Burghausen-Rückmarsdorf“ is not a place name), and
                 # only with the municipality's consent -- the guard is in the
                 # helper.
-                if " " in word or _relation_before(body, start) != "liegt_in":
+                if " " in word or _relation_before(body, start, pieces) != "liegt_in":
                     continue
                 named.add(key)
                 for entry in _districts_in_compound(directory, word, municipality):
@@ -1105,7 +1227,7 @@ def _from_body(
                                 f"{entry.schluessel} ist ein Teil davon"
                             ),
                             quelle="fliesstext",
-                            beleg=_excerpt(body, start, end),
+                            beleg=_excerpt(body, start, end, pieces=pieces),
                             schluessel=entry.schluessel,
                             beziehung="liegt_in",
                             sicherheit=0.5,
@@ -1115,12 +1237,12 @@ def _from_body(
                 continue
             named.add(key)
             entries = index[key]
-            relation = _relation_before(body, start)
+            relation = _relation_before(body, start, pieces)
             # Every occurrence, not the first: „Grimma" appears once as the
             # municipality Großbothen belongs to and once as „die ca. 6 km
             # entfernte Kreisstadt". Reading only the first turns a place the
             # text puts at a distance into the anchor.
-            if _named_as_distant(body, key):
+            if _named_as_distant(body, key, pieces):
                 relation = "entfernt_von"
             elif key in municipalities:
                 relation = "erwaehnt"
@@ -1131,7 +1253,7 @@ def _from_body(
                     wert=word,
                     text=_place_sentence(word, relation, len(entries)),
                     quelle="fliesstext",
-                    beleg=_excerpt(body, start, end),
+                    beleg=_excerpt(body, start, end, pieces=pieces),
                     schluessel=entries[0].schluessel if len(entries) == 1 else None,
                     beziehung=relation or "erwaehnt",
                     # A place the text places the plot *in* is worth far more
@@ -1154,7 +1276,7 @@ def _from_body(
                 wert=name,
                 text=f"Straße {name} — innerhalb einer Gemarkung nahezu eindeutig, allein wertlos",
                 quelle="fliesstext",
-                beleg=_excerpt(body, match.start(), match.end()),
+                beleg=_excerpt(body, match.start(), match.end(), pieces=pieces),
                 sicherheit=0.4,
             )
         )
@@ -1162,7 +1284,9 @@ def _from_body(
     return out
 
 
-def _named_as_distant(body: str, folded_name: str) -> bool:
+def _named_as_distant(
+    body: str, folded_name: str, pieces: list[blocks.Block] | None = None
+) -> bool:
     """Whether any occurrence of a name is preceded by a distance.
 
     One statement of distance outweighs any number of neutral mentions: „die
@@ -1174,7 +1298,8 @@ def _named_as_distant(body: str, folded_name: str) -> bool:
     for word, start, _ in _word_positions(body):
         if fold(word) != folded_name:
             continue
-        window = body[max(0, start - _RELATION_WINDOW) : start]
+        low, _high = blocks.bounds_at(pieces or [], start, (0, len(body)))
+        window = body[max(low, start - _RELATION_WINDOW) : start]
         if any(m.end() >= len(window) - 2 for m in pattern.finditer(window)):
             return True
     return False
@@ -1230,6 +1355,7 @@ def _place_sentence(name: str, relation: Ortsbeziehung | None, count: int) -> st
 
 __all__ = [
     "AreaStatement",
+    "DOCUMENT_OF",
     "federal_state",
     "outside_saxony",
     "SOURCE_CONFIDENCE",

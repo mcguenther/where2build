@@ -62,7 +62,7 @@ from ..services.alkis import (
     like,
 )
 from .. import geo
-from . import distance
+from . import blocks, distance
 from .distance import DistanceStatement
 from .envelope import _geojson, common_envelope, next_question
 from .indicia import (
@@ -375,7 +375,7 @@ class SearchEngine:
             # finds some other parcel of that size and confirms it — exactly the
             # confidently wrong answer this search exists to refuse.
             self._part_area = describes_part_area(
-                " ".join(part for part in (self.payload.titel, self.payload.text) if part)
+                blocks.joined(self.payload.titel, self.payload.text)
             )
             if self._part_area:
                 self._area = replace(self._area, part_of=self._part_area)
@@ -389,7 +389,7 @@ class SearchEngine:
         self._street = street_indiz.wert if street_indiz else None
         self._read_distances()
         self._dimensions = read_dimensions(
-            " ".join(part for part in (self.payload.titel, self.payload.text) if part)
+            blocks.joined(self.payload.titel, self.payload.text)
         )
 
         # The frame before the narration. The clues play out one at a time so a
@@ -428,7 +428,7 @@ class SearchEngine:
         however often the text names it.
         """
 
-        body = " ".join(part for part in (self.payload.titel, self.payload.text) if part)
+        body = blocks.joined(self.payload.titel, self.payload.text)
         statements = distance.read_distances(body)
         if not statements:
             return
@@ -830,13 +830,25 @@ class SearchEngine:
         """Whether the parcel numbers were listed together rather than in dispute.
 
         A plot is a set of parcels -- the normal case. Numbers that all come
-        from *one* source are that set; numbers from different sources (an
-        image against the body text) are rival readings, and only those are a
-        contradiction worth putting to the user.
+        from *one document* are that set; numbers from different documents are
+        rival readings, and only those are a contradiction worth putting to the
+        user.
+
+        The document, not the *channel*. That distinction is the whole of this
+        method: every OCR find carries ``quelle="bild"``, so asking the channel
+        made two numbers off two different sheets look exactly like „790/11
+        sowie 238/3" in one sentence -- one plot of two parcels, no question
+        asked, and `_narrow_by_area` deliberately declining to tell them apart.
+        A Geoportal print carries dozens of numbers in its map image, so two
+        prints in one listing is not a rare shape.
+
+        ``fundort`` falls back to ``quelle`` for an Indiz a caller handed in
+        without one, which is exactly the old behaviour for the old inputs.
         """
 
         numbers = self.active("flurstueck")
-        return len(numbers) > 1 and len({indiz.quelle for indiz in numbers}) == 1
+        places = {indiz.fundort or indiz.quelle for indiz in numbers}
+        return len(numbers) > 1 and len(places) == 1
 
     @staticmethod
     def _conflict_key(indiz: Indiz) -> str:

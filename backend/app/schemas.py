@@ -1443,6 +1443,13 @@ class Indiz(BaseModel):
     # a reading has to be *chosen*, the image travels with it and the choice is
     # made against the sheet rather than against a transcription of it.
     bild_url: str | None = None
+    # Which *document* this was read out of -- the body text, one particular
+    # image, the attribute list. Not the same thing as ``quelle``, which is the
+    # channel: every OCR find carries ``quelle="bild"``, so the channel cannot
+    # tell one picture from another, and two numbers off two different sheets
+    # were being read as one plot made of two parcels. See
+    # ``SearchEngine.named_as_a_set``.
+    fundort: str | None = None
     # The compound place name this district was taken out of, where it was one.
     # „Burghausen-Rückmarsdorf“ is no Gemarkung and both its halves are, so the
     # two readings are one statement admitting two districts -- not a
