@@ -8,7 +8,7 @@ would agree with us and the divergence log would measure nothing at all.
 from __future__ import annotations
 
 import json
-import pathlib
+from typing import get_args
 
 import httpx
 import pytest
@@ -16,14 +16,15 @@ import respx
 
 from app.deps import llm_client
 from app.routers.listings import _known_districts
-from app.schemas import InseratBefund, InseratFelder
-from app.search import blocks
-from app.services import befund as befund_service
+from app.schemas import (
+    BEFUND_VORLAGE,
+    InseratBefund,
+    Ortsbeziehung,
+    Ortsebene,
+)
 from app.services import prompts
 
 from .test_listings import CHAT_URL, completion
-
-FIXTURES = pathlib.Path(__file__).parent / "fixtures"
 
 # Advert 3499632623, the part every reader in this project has been measured on.
 INSERAT = (
@@ -129,34 +130,16 @@ def test_the_fence_grows_until_the_listing_cannot_contain_it():
     assert prompts.user_message(tricky, []).count(fence) == 2
 
 
-def test_the_example_answer_is_a_real_befund_and_passes_our_own_gate():
-    """Invented example data would show the shape and none of the hard parts.
-    This one is advert 2418686487, so every Beleg in it is a sentence that
-    really stands in a real listing — and the gate the model's answer has to
-    pass accepts it."""
+def test_the_shape_carries_exactly_the_fields_the_schema_has():
+    """A skeleton in a prompt is a second statement of the schema, and two
+    statements drift. Strip the comments and what is left has to parse, with
+    the key set `InseratBefund` actually has — no field missing, none invented.
+    """
 
-    befund = InseratBefund.model_validate(prompts.EXAMPLE)
-    listing = json.loads(
-        (FIXTURES / "inserate-sachsen.json").read_text(encoding="utf-8")
-    )["2418686487"]
-    text = blocks.joined(listing["titel"], listing["beschreibung"])
-
-    fields, field_verdicts = befund_service.fields_from(befund, text, InseratFelder())
-    indicia, indiz_verdicts = befund_service.indicia_from(befund, text, 0)
-
-    assert [verdict for verdict in (*field_verdicts, *indiz_verdicts) if verdict.grund] == []
-    assert fields.grundstuecksflaeche_m2 == 748
-    assert [(indiz.art, indiz.wert) for indiz in indicia] == [
-        ("gemarkung", "Thräna"),
-        ("gemeinde", "Borna"),
-        ("gemeinde", "Leipzig"),
-    ]
-
-
-def test_the_return_section_names_every_field_the_schema_has():
-    """A strict schema rejects a wrong shape; it does not say that an absent
-    value is null rather than an omission. Whatever the schema carries, the
-    prompt has to explain — so a field added there cannot stay unmentioned."""
+    naked = "\n".join(
+        line for line in prompts.SHAPE.splitlines() if not line.lstrip().startswith("//")
+    )
+    skeleton = json.loads(naked)
 
     schema = InseratBefund.model_json_schema()
     properties = set(schema.get("properties", {}))
@@ -174,14 +157,28 @@ def test_the_return_section_names_every_field_the_schema_has():
             for value in node:
                 keys(value)
 
-    keys(prompts.EXAMPLE)
-    for field in properties:
-        assert field in shown or field in prompts.SYSTEM, field
+    keys(skeleton)
+    assert shown == properties
+    assert skeleton["vorlage"] == BEFUND_VORLAGE
 
-    # And the three things the schema itself cannot state.
+    # And the two enumerations, whose values the skeleton spells out.
+    place = skeleton["orte"][0]
+    assert set(place["ebene"].split(" | ")) == set(get_args(Ortsebene))
+    assert set(place["beziehung"].split(" | ")) == set(get_args(Ortsbeziehung))
+
+
+def test_the_shape_says_what_a_strict_schema_cannot():
+    """A JSON schema rejects a wrong shape and states nothing: not that an
+    absent value is null rather than an omitted key, not that `wortlaut` keeps
+    the rounding `wert` drops, not that a denominator can be a letter."""
+
+    assert "ausschließlich mit einem JSON-Objekt" in prompts.SYSTEM
     assert "bekommt null" in prompts.SYSTEM
-    assert "ohne Tausenderpunkt" in prompts.SYSTEM
-    assert "übernimm keinen ihrer Werte" in prompts.SYSTEM
+    assert "ohne Einheit und Tausenderpunkt" in prompts.SYSTEM
+    assert "kann ein Buchstabe sein" in prompts.SYSTEM
+    # A skeleton, not a worked example — nothing in it can be copied as a value.
+    assert "Kommentarzeilen" in prompts.SYSTEM
+    assert "748" not in prompts.SHAPE
 
 
 def test_the_fetch_prompt_asks_for_the_page_and_not_for_fields():

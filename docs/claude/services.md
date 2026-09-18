@@ -474,19 +474,22 @@ of Overpass or a local extract, the listing portals, and the extraction model.
   no descriptions at all. It does not say that a value the advert lacks is
   `null` rather than an omitted key, that `wortlaut` keeps the rounding while
   `wert` drops the unit and the thousands separator, or that a denominator can
-  be a letter. `RÜCKGABE` says those, and `prompts.EXAMPLE` shows one complete
-  answer. That example is advert 2418686487, not an invention: every Beleg in
-  it is a sentence that really stands in a real listing, so `test_prompts` can
-  put it through the same `services/beleg.py` gate the model's own answer has
-  to pass — it comes back with the area, three places and no refusal. It also
-  carries the three things that are hard to say in the abstract: the advert
-  names only a price per square metre, so `kaufpreis_eur` stays null and
-  748,50 × 92 is exactly the fabrication the gate caught once; it names no
-  parcel, so the list stays empty rather than guessed; and „circa 25 Minuten"
-  is not kilometres, so `entfernung_km` stays null. A second test asserts that
-  every property name in the schema occurs either in the example or in the
-  prompt's own text, so a field added to `InseratBefund` cannot stay
-  unmentioned.
+  be a letter. `RÜCKGABE` demands a JSON object and nothing else — no sentence
+  before, none after, no code fences, no extra fields — and `prompts.SHAPE`
+  states the rest.
+
+- **The shape is a commented skeleton, not a worked example.** The first draft
+  of that section carried a filled Befund from a real advert. It read well and
+  it brings what a worked example always brings: values to copy, out of a
+  listing that is not the one being read, in the one channel whose whole point
+  is that it read *this* text. The skeleton has nothing to copy. Each field
+  instead carries the one line the schema cannot: what it means, and when it is
+  `null` — a price per square metre is not a purchase price, minutes are not
+  kilometres, a parcel is never derived from an address. `test_prompts` strips
+  the `//` lines, parses what is left, and holds its key set against
+  `InseratBefund` plus the two enumerations against `Ortsebene` and
+  `Ortsbeziehung`, so a field added to the schema — or invented in the prompt —
+  fails a test rather than travelling unexplained.
 
   One field is asked for that nothing reads yet: `vorbehalte`. It is in the
   schema and in the prompt, and neither `services/befund.py` nor the search

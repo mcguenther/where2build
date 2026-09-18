@@ -28,9 +28,11 @@ Grimma" is the opposite of it. The same goes for the shape of the answer. Both
 wire formats carry the JSON schema — `response_format` there, `output_config`
 here — but a strict schema only rejects a wrong shape; it does not say that an
 absent value is null rather than an omission, that `wortlaut` keeps the
-rounding, or that a denominator can be a letter. `RÜCKGABE` says it, and
-`EXAMPLE` shows it. Every distinction below is one this project measured and
-got wrong first.
+rounding, or that a denominator can be a letter. `RÜCKGABE` demands JSON and
+nothing else, and `SHAPE` states the rest as a commented skeleton — not a
+worked example, which offers values to copy from a listing that is not the
+one being read. Every distinction below is one this project measured and got
+wrong first.
 
 **The model never learns what our own readers concluded.** This is the one rule
 worth stating twice. Handing it our findings would make it agree with us, and
@@ -41,8 +43,6 @@ exist is data about Saxony, not an answer about this advert.
 """
 
 from __future__ import annotations
-
-import json
 
 from ..schemas import BEFUND_VORLAGE
 
@@ -72,53 +72,60 @@ def fence_for(text: str) -> str:
     return fence
 
 
-# One complete answer, and a real one: advert 2418686487, the Borna listing
-# this project has measured every reader on. It is the example because its
-# truths are the ones that are hard to state -- an area with its rounding kept,
-# a place named on two levels in one sentence, a price that is *not* there, a
-# reservation that changes what the area means. Invented example data would
-# have none of that, and `test_prompts` puts this one through the same Beleg
-# gate the model's own answer has to pass.
-EXAMPLE = {
-    "vorlage": BEFUND_VORLAGE,
-    "felder": {
-        "adresse": {"wert": None, "beleg": None},
-        "kaufpreis_eur": {"wert": None, "wortlaut": None, "beleg": None},
-        "grundstuecksflaeche_m2": {
-            "wert": 748.5,
-            "wortlaut": "ca. 748,50 m²",
-            "beleg": "ein attraktives, ca. 748,50 m² großes Baugrundstück in der "
-            "aufstrebenden Stadt Borna",
-        },
-    },
-    "orte": [
-        {
-            "name": "Thräna",
-            "ebene": "gemarkung",
-            "beziehung": "liegt_in",
-            "entfernung_km": None,
-            "beleg": "Thräna ist mit seinen etwa 765 Einwohnern ein kleiner "
-            "Ortsteil der Kreisstadt Borna.",
-        },
-        {
-            "name": "Borna",
-            "ebene": "gemeinde",
-            "beziehung": "liegt_in",
-            "entfernung_km": None,
-            "beleg": "ein kleiner Ortsteil der Kreisstadt Borna",
-        },
-        {
-            "name": "Leipzig",
-            "ebene": "gemeinde",
-            "beziehung": "erwaehnt",
-            "entfernung_km": None,
-            "beleg": "Über die Bundesstraße 2 erreicht man die Großstadt Leipzig "
-            "in circa 25 Minuten.",
-        },
-    ],
-    "flurstuecke": [],
-    "vorbehalte": ["teilflaeche"],
-}
+# The answer's shape, as a commented skeleton rather than a filled example.
+# A worked example is read as material: the first draft of this section carried
+# a real Befund and the risk it brings -- values to copy, a listing that is not
+# the one being read. The skeleton cannot be copied from, and each line can say
+# the one thing the JSON schema cannot: what the field means, and when it is
+# null. The comments are stripped in `test_prompts`, which then parses what is
+# left and holds its key set against `InseratBefund` -- so a field added to the
+# schema, or invented here, fails a test rather than travelling unexplained.
+SHAPE = """\
+{
+  // Immer genau diese Zeichenkette.
+  "vorlage": "%(vorlage)s",
+
+  "felder": {
+    // Straße und Hausnummer; ein Ortsname allein ist keine Adresse.
+    "adresse": {"wert": "Text | null", "beleg": "Textstelle | null"},
+
+    // Gesamtpreis in Euro. Ein Preis je Quadratmeter ist keiner: dann null.
+    // wert: Zahl ohne Einheit und Tausenderpunkt (69000). wortlaut: „69.000 €".
+    "kaufpreis_eur": {"wert": "Zahl | null", "wortlaut": "Text | null", "beleg": "Textstelle | null"},
+
+    // Die Fläche des Grundstücks, siehe oben. wortlaut behält das „ca.".
+    "grundstuecksflaeche_m2": {"wert": "Zahl | null", "wortlaut": "Text | null", "beleg": "Textstelle | null"}
+  },
+
+  // Ein Eintrag je Aussage — derselbe Name mehrfach, wenn der Text
+  // Verschiedenes über ihn sagt. Sonst leer.
+  "orte": [
+    {
+      "name": "Text",
+      "ebene": "gemarkung | ortsteil | gemeinde | strasse | unbekannt",
+      "beziehung": "liegt_in | liegt_an | entfernt_von | erwaehnt",
+      // Nur, wenn der Text Kilometer nennt; Minuten sind keine.
+      "entfernung_km": "Zahl | null",
+      "beleg": "Textstelle | null"
+    }
+  ],
+
+  // Nur ausdrücklich genannte, nie aus einer Adresse abgeleitete. Sonst leer.
+  "flurstuecke": [
+    {
+      "gemarkung": "Text | null",
+      "flur": "Text | null",
+      // Zähler Zahl, Nenner Zeichenkette — er kann ein Buchstabe sein (41/e).
+      "zaehler": "Zahl",
+      "nenner": "Text | null",
+      "beleg": "Textstelle | null"
+    }
+  ],
+
+  // Aus der Liste oben, sonst leer.
+  "vorbehalte": ["teilflaeche | mehrere-grundstuecke | ausserhalb-sachsens"]
+}\
+""" % {"vorlage": BEFUND_VORLAGE}
 
 
 _INSTRUCTIONS = """\
@@ -224,27 +231,15 @@ Trage in `vorbehalte` ein, was die Zahlen relativiert, wenn es im Text steht:
 _RETURN = """\
 RÜCKGABE
 
-Antworte mit einem einzigen JSON-Objekt und mit nichts sonst: kein Satz davor, \
-keiner danach, keine Code-Zäune. Jedes Feld wird gesetzt. Was das Inserat nicht \
-hergibt, bekommt null; Listen, für die es nichts hergibt, bleiben leer. Lass \
-nichts weg und erfinde nichts, um ein Feld zu füllen.
+Antworte ausschließlich mit einem JSON-Objekt genau dieser Struktur: kein Satz \
+davor, keiner danach, keine Code-Zäune, keine zusätzlichen Felder. Jedes Feld \
+wird gesetzt — was das Inserat nicht hergibt, bekommt null, Listen bleiben leer. \
+Lass nichts weg und erfinde nichts, um ein Feld zu füllen.
 
-`wert` ist die Zahl selbst, ohne Einheit und ohne Tausenderpunkt; `wortlaut` ist \
-dieselbe Zahl, wie sie im Text dasteht. Aus „ca. 748,50 m²" wird also \
-"wert": 748.5 und "wortlaut": "ca. 748,50 m²". `zaehler` ist eine Zahl, `flur` und \
-`nenner` sind Zeichenketten, weil ein Nenner ein Buchstabe sein kann.
+Die Kommentarzeilen erklären die Felder und gehören nicht in deine Antwort.
 
-So sieht eine vollständige Antwort aus. Sie gehört zu einem anderen Inserat als \
-dem, das du gleich liest — übernimm keinen ihrer Werte:
-
-%(example)s
-
-Drei Dinge daran: das Inserat nennt nur einen Preis je Quadratmeter, also bleibt \
-`kaufpreis_eur` null — 748,50 × 92 auszurechnen ergäbe eine Zahl, die nirgends im \
-Text steht und deren Beleg es deshalb nicht gibt. Es nennt kein Flurstück, also \
-bleibt die Liste leer statt geraten. Und die 25 Minuten nach Leipzig sind keine \
-Kilometer, also bleibt `entfernung_km` dort null.\
-""" % {"example": json.dumps(EXAMPLE, ensure_ascii=False, indent=2)}
+%(shape)s\
+""" % {"shape": SHAPE}
 
 
 SYSTEM = f"{_INSTRUCTIONS}\n\n{_RETURN}"
@@ -291,10 +286,10 @@ FETCH = (
 
 
 __all__ = [
-    "EXAMPLE",
     "FENCE",
     "FETCH",
     "MAX_DISTRICT_HINTS",
+    "SHAPE",
     "SYSTEM",
     "fence_for",
     "user_message",
