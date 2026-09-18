@@ -648,7 +648,13 @@ def test_the_account_page_answers_with_everything_that_is_held(account: TestClie
     assert held.status_code == 200
     body = held.json()
     assert body["anbieter"] == OIDC_ISSUER
-    assert body["kennung"] == "8f1c-4711"
+    # Two identifiers, each under its own name: what this application calls the
+    # account (and what goes into ADMIN_ACCOUNTS), and what the provider calls
+    # the person. They used to share the name „kennung", which is how somebody
+    # comes to paste the wrong one into the configuration.
+    assert body["anbieter_kennung"] == "8f1c-4711"
+    assert body["kennung"] == Identity(issuer=OIDC_ISSUER, subject="8f1c-4711", name=None).account_key
+    assert body["kennung"] != body["anbieter_kennung"]
     assert body["anzeigename"] == "Erika Musterfrau"
     assert body["grundstuecke"] == 1
     assert body["groesse_bytes"] > 0
@@ -656,7 +662,8 @@ def test_the_account_page_answers_with_everything_that_is_held(account: TestClie
     # Nothing beyond those, or the page would be claiming a completeness it
     # does not have.
     assert set(body) == {
-        "anbieter", "kennung", "anzeigename", "angelegt", "grundstuecke", "groesse_bytes"
+        "anbieter", "kennung", "anbieter_kennung", "anzeigename", "angelegt",
+        "grundstuecke", "groesse_bytes"
     }
 
 

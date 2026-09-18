@@ -1212,8 +1212,19 @@ class KontoAntwort(BaseModel):
         description="Der OpenID-Anbieter, der diese Anmeldung bestätigt hat (issuer)."
     )
     kennung: str = Field(
-        description="Die Kennung, unter der der Anbieter diese Person führt (subject). "
-        "Sie stammt vom Anbieter, nicht von uns."
+        description=(
+            "Die Kennung dieses Kontos in dieser Anwendung — dieselbe, die "
+            "/api/auth/me meldet und die in ADMIN_ACCOUNTS eingetragen wird. "
+            "Aus Anbieter und Anbieter-Kennung gebildet, damit die Kennung des "
+            "Anmeldedienstes selbst nirgends nach außen geht."
+        )
+    )
+    anbieter_kennung: str = Field(
+        description=(
+            "Die Kennung, unter der der Anbieter diese Person führt (subject). "
+            "Sie stammt vom Anbieter, nicht von uns, und ist nicht die, die der "
+            "Betreiber einträgt."
+        )
     )
     anzeigename: str | None = Field(
         default=None,

@@ -543,6 +543,13 @@ if (!adminCookie) {
       await page.waitForTimeout(500);
       await shot(page, `verwaltung-${area}`, mode, narrow ? "-schmal" : "");
     }
+    /* The account page belongs in this pass rather than in the one without a
+       session: signed out it is an invitation to sign in, and what is worth
+       looking at -- what is held about somebody, and the two identifiers --
+       only exists once somebody is. */
+    await page.goto(`${address}konto`, { waitUntil: "load" });
+    await page.waitForTimeout(500);
+    await shot(page, "konto", mode, narrow ? "-schmal" : "");
     await ctx.close();
   }
 }
