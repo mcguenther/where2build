@@ -819,3 +819,54 @@ also "Decisions that are settled" in `CLAUDE.md`.
   exactly as a photograph of a lawn does: an empty reading. `TIMEOUT_S = 30`
   and Tesseract is CPU-bound, which the module docstring already says about
   reading images concurrently — it is just as true of the test runner.
+
+- **A model is the last reader in this chain, not the first — and the gate is a
+  string comparison, not a promise in the prompt.** `services/beleg.py` runs
+  four tests before a model value becomes anything, in this order: the Beleg
+  stands verbatim in the page (normalised over whitespace, quotes and case, and
+  nothing else); the value stands in the Beleg (German notation, so „1.076" and
+  „1076" are one number); the value is within bounds; and it agrees with what
+  was read deterministically — where it does not, the page wins and the
+  difference is shown.
+
+  The first test is the one that earns the module. Advert 2418686487 states
+  748,50 m² and „92,00 € pro m²“ and never states a price; 748,5 × 92 is
+  68 862 €, which a model rounds to 69 000 € and writes a Beleg for that stands
+  nowhere on the page. **Rechnen ist nicht Lesen**, and a price nobody wrote is
+  not a statement in a listing. The same test catches „rund 30 km bis Leipzig“
+  under an advert that never mentions Leipzig.
+
+- **The model answers a Befund, not `InseratFelder` with more fields.** Every
+  value travels in the same envelope as the sentence it was read from, and
+  without that sentence there is no value. Two things are absent from the
+  schema on purpose, and the absence is the enforcement: **contact details**,
+  so no personal data can arrive however the prompt is worded, and a
+  **coordinate**, because a coordinate has no sentence it could be quoted from
+  — the meta tags give it or nothing does.
+
+- **Where a model actually earns its keep is the level, not the number.** Area
+  and price the deterministic reader gets better and for free. „Thräna ist ein
+  kleiner Ortsteil der Kreisstadt Borna" names a district *and* the
+  municipality above it, and telling those two apart is what the patterns in
+  `indicia.py` are maintained for and where they measurably fail (B3, twice).
+  So `orte` carries `ebene` and `beziehung`, and `services/befund.py` turns
+  them into Indizien at `quelle="modell"` — 0.45, below the body text. That
+  bound is the whole safety argument: a model Indiz may rank and may open a
+  branch an official filter then checks; it can never filter and never produce
+  „bestätigt“, and no special case is needed to say so.
+
+- **A cache with no expiry has to name what answered it, and this one has
+  broken that rule twice.** An extraction cached before the price parser
+  existed outlived the parser and kept the field empty on exactly the listings
+  the fix was written for; a page text cached under a bare URL outlived a
+  change of prompt. `llm.fingerprint()` now puts the model, the prompt and the
+  JSON schema into every key, and `structure()` caches its answer at all, which
+  it did not before — every re-run of a listing was paid for twice.
+
+- **Open, and measurable the moment there is an API key.** The model is handed
+  the *raw* page text today, not the blocks — so whether the structure that
+  helps the deterministic readers also helps the model is untested in both
+  directions. The measurement is the same advert twice, raw against
+  block-rendered, counting fields filled and Belege refused by test 1. Nothing
+  in this sandbox has `LLM_API_KEY`, so every model answer here is a recorded
+  one and the live call is untested.

@@ -23,6 +23,7 @@ fetched at all.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from typing import Any, Iterable, TypeVar
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -72,6 +73,22 @@ def normalize_url(url: str) -> str:
     )
     path = parts.path.rstrip("/") or "/"
     return urlunsplit((parts.scheme.lower(), host.lower(), path, urlencode(query), ""))
+
+
+def fingerprint(*parts: str) -> str:
+    """A short, stable name for everything that shaped an answer.
+
+    A cache entry outlives the code that produced it -- this one has no expiry
+    at all -- so its key has to name what answered, not only what was asked.
+    The rule has been broken twice here: an extraction cached before the price
+    parser existed survived the parser and kept the field empty on exactly the
+    listings the fix was written for, and a page text cached under a bare URL
+    survived a change of prompt. Model, template and prompt therefore ride in
+    the key, and a changed one simply never asks the old entry again.
+    """
+
+    digest = hashlib.sha256("\x1f".join(parts).encode("utf-8")).hexdigest()
+    return digest[:16]
 
 
 def domain_of(url: str) -> str:
@@ -197,7 +214,9 @@ class LLMClient:
     async def fetch_page_text(self, url: str, auftrag: str) -> str:
         """Call 1 -- tools only, no response_format."""
 
-        cache_key = f"seitentext:{normalize_url(url)}"
+        cache_key = (
+            f"seitentext:{fingerprint(self.settings.model, auftrag)}:{normalize_url(url)}"
+        )
         cached = self.cache.get_json(cache_key)
         if isinstance(cached, str):
             return cached
@@ -249,6 +268,22 @@ class LLMClient:
     ) -> M:
         """Call 2 -- response_format only, no tools."""
 
+        schema = strict_json_schema(model, name, exclude)
+        # Everything that shaped the answer: the model, the prompt, the schema
+        # this exact call asks for, and the text itself.
+        cache_key = "befund:" + fingerprint(
+            self.settings.model, name, auftrag, json.dumps(schema, sort_keys=True), text
+        )
+        cached = self.cache.get_json(cache_key)
+        if isinstance(cached, dict):
+            try:
+                return model.model_validate(cached)
+            except ValidationError:
+                # A cached answer from an older shape of the same schema. Ask
+                # again rather than fail -- the key should have caught it, and
+                # if it did not, the entry is simply worthless.
+                pass
+
         payload = {
             "model": self.settings.model,
             "messages": [
@@ -257,10 +292,7 @@ class LLMClient:
                     "content": f"{auftrag}\n\nSeitentext:\n\n{text}",
                 }
             ],
-            "response_format": {
-                "type": "json_schema",
-                "json_schema": strict_json_schema(model, name, exclude),
-            },
+            "response_format": {"type": "json_schema", "json_schema": schema},
         }
         answer = await self._chat(payload)
         content = self._message_content(answer)
@@ -271,7 +303,7 @@ class LLMClient:
                 f"{SERVICE_NAME} hat kein auswertbares JSON geliefert. {ADVICE}"
             ) from exc
         try:
-            return model.model_validate(data)
+            structured = model.model_validate(data)
         except ValidationError as exc:
             # A value outside the plausibility bounds is an extraction error,
             # not a house -- say so instead of passing it on.
@@ -279,3 +311,5 @@ class LLMClient:
                 "Die ausgelesenen Werte sind nicht plausibel. "
                 "Bitte die Angaben von Hand eintragen."
             ) from exc
+        self.cache.set_json(cache_key, structured.model_dump(mode="json"))
+        return structured

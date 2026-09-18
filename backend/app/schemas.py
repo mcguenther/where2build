@@ -210,6 +210,100 @@ class ListingExtractResponse(BaseModel):
     # places named -- all of which live in the prose and in no attribute.
     # Capped, because a whole page of it is of no use to anything downstream.
     beschreibung: str | None = Field(default=None, max_length=20_000)
+    # What a model contributed, as Indizien the search can weigh — every one of
+    # them with the sentence the Beleg gate found in the page. Empty when no
+    # model ran, which is the normal case for a listing the deterministic
+    # readers settled.
+    indizien: list["Indiz"] = Field(default_factory=list)
+
+
+# --------------------------------------------------------------------------
+# What a model is allowed to answer: a Befund, not a set of fields
+#
+# A language model is the last reader in this chain, not the first. The portal's
+# own fields are statements, the word reader is a reading, and a model is a
+# guess -- `SOURCE_CONFIDENCE` already says so, at 0.45, below the body text.
+# One hard rule follows: a model value may never filter and may never produce
+# „bestätigt“. It may rank, it may fill a gap, and it may open a branch that an
+# official filter then checks.
+#
+# So it does not answer `InseratFelder` with more fields in it. It answers a
+# *Befund*, in which every value travels in the same envelope as the sentence it
+# was read from -- and without that sentence there is no value. The check is in
+# `services.beleg`, and the first of its four tests costs nothing and catches
+# the case the whole thing exists for: 748,5 m² x 92,00 €/m² is 68 862 €, a
+# model rounds that to 69 000 € and writes a Beleg for it that stands nowhere.
+# A price nobody wrote is not a statement in a listing.
+#
+# Two things are deliberately absent from this schema, and the absence is the
+# enforcement: **contact details**, so no personal data can arrive however the
+# prompt is worded, and a **coordinate**, because a coordinate has no sentence
+# it could be quoted from -- the meta tags give it or nothing does.
+# --------------------------------------------------------------------------
+
+BEFUND_VORLAGE = "inserat-befund/1"
+
+
+class BelegteZahl(BaseModel):
+    """A number a model read, with the sentence it stood in.
+
+    ``wortlaut`` is not decoration: „ca. 748,50 m²“ is rounded and „748,50 m²“
+    is exact, and the tolerance staircase starts where the wording says -- the
+    same distinction the deterministic reader makes in ``AreaStatement``.
+    """
+
+    wert: float | None = None
+    wortlaut: str | None = None
+    beleg: str | None = None
+
+
+class BelegterText(BaseModel):
+    wert: str | None = None
+    beleg: str | None = None
+
+
+class BefundFelder(BaseModel):
+    adresse: BelegterText = Field(default_factory=BelegterText)
+    kaufpreis_eur: BelegteZahl = Field(default_factory=BelegteZahl)
+    grundstuecksflaeche_m2: BelegteZahl = Field(default_factory=BelegteZahl)
+
+
+# What level a named place sits on. This is the part a model earns its keep
+# with: „Thräna ist ein kleiner Ortsteil der Kreisstadt Borna“ names a district
+# and the municipality above it, and telling the two apart is what the patterns
+# in `search.indicia` are maintained for and where they fail.
+Ortsebene = Literal["gemarkung", "gemeinde", "ortsteil", "strasse", "unbekannt"]
+
+
+class BefundOrt(BaseModel):
+    """One place a listing names, with the level and the relation."""
+
+    name: str
+    ebene: Ortsebene = "unbekannt"
+    beziehung: Ortsbeziehung = "erwaehnt"
+    entfernung_km: float | None = None
+    beleg: str | None = None
+
+
+class BefundFlurstueck(Flurstueckskennung):
+    beleg: str | None = None
+
+
+class InseratBefund(BaseModel):
+    """Everything a model may answer about a listing.
+
+    The shape the search already accepts: the places and the parcel numbers
+    become ``Indiz`` objects on ``ParcelSearchRequest.indizien``, with
+    ``quelle="modell"`` and the Beleg the gate verified.
+    """
+
+    vorlage: Literal["inserat-befund/1"] = BEFUND_VORLAGE
+    felder: BefundFelder = Field(default_factory=BefundFelder)
+    orte: list[BefundOrt] = Field(default_factory=list)
+    flurstuecke: list[BefundFlurstueck] = Field(default_factory=list)
+    # „teilflaeche“, „mehrere-grundstuecke“ — what the model noticed that makes
+    # a figure mean something other than it looks like.
+    vorbehalte: list[str] = Field(default_factory=list)
 
 
 class HousetypeExtractRequest(BaseModel):

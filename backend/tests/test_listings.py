@@ -19,16 +19,41 @@ KLEINANZEIGEN_URL = (
 )
 IMMOSCOUT_URL = "https://www.immobilienscout24.de/expose/110185322"
 
+# What a model answers now: a Befund, in which every value travels with the
+# sentence it was read from. The Belege here stand verbatim in the fixture
+# page, because that is the first thing `services.beleg` checks — a Beleg the
+# page does not carry is a value the gate refuses, however right it looks.
 INSERAT_JSON = {
-    "adresse": "Muldentalstraße, 01589 Riesa",
-    "lat": None,
-    "lon": None,
-    "flurstuecke": [
-        {"gemarkung": None, "flur": None, "zaehler": 790, "nenner": None},
-        {"gemarkung": None, "flur": None, "zaehler": 706, "nenner": None},
+    "vorlage": "inserat-befund/1",
+    "felder": {
+        "adresse": {
+            "wert": "Muldentalstraße, 01589 Riesa",
+            "beleg": "Lage: Muldentalstraße, 01589 Riesa.",
+        },
+        "kaufpreis_eur": {
+            "wert": 89000,
+            "wortlaut": "89.000 €",
+            "beleg": "Preis: 89.000 €",
+        },
+        "grundstuecksflaeche_m2": {
+            "wert": 688,
+            "wortlaut": "ca. 688 m²",
+            "beleg": "Gesamtfläche von ca. 688 m²",
+        },
+    },
+    "orte": [
+        {
+            "name": "Riesa",
+            "ebene": "gemeinde",
+            "beziehung": "liegt_in",
+            "beleg": "Lage: Muldentalstraße, 01589 Riesa.",
+        }
     ],
-    "kaufpreis_eur": 89000,
-    "grundstuecksflaeche_m2": 688,
+    "flurstuecke": [
+        {"zaehler": 790, "beleg": "(Flurstück 790 sowie 706)"},
+        {"zaehler": 706, "beleg": "(Flurstück 790 sowie 706)"},
+    ],
+    "vorbehalte": [],
 }
 
 
@@ -93,9 +118,17 @@ def test_kleinanzeigen_description_is_structured_by_the_model(client: TestClient
     assert body["weg"] == "meta-tags"
     assert body["felder"]["kaufpreis_eur"]["wert"] == 89000
     assert body["felder"]["grundstuecksflaeche_m2"]["wert"] == 688
-    assert [p["wert"] for p in [body["felder"]["flurstuecke"]]][0][0]["zaehler"] == 790
-    # The deterministic coordinate wins over anything the model produces.
+    # The deterministic coordinate wins over anything the model produces — and a
+    # coordinate is not in the model's schema at all, so it cannot produce one.
     assert body["felder"]["lat"]["wert"] == 51.39235087498254
+    # The parcel numbers and the place arrive as Indizien, not as fields: a
+    # model value may rank the search and never filter it.
+    assert [(i["art"], i["wert"]) for i in body["indizien"]] == [
+        ("gemeinde", "Riesa"),
+        ("flurstueck", "790"),
+        ("flurstueck", "706"),
+    ]
+    assert all(i["quelle"] == "modell" and i["beleg"] for i in body["indizien"])
 
 
 @respx.mock

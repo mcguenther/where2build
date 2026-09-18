@@ -10,8 +10,8 @@ import respx
 
 from app.deps import llm_client
 from app.errors import NotConfiguredError, UpstreamError
-from app.schemas import HaustypFelder, InseratFelder
-from app.services.llm import domain_of, normalize_url, strict_json_schema
+from app.schemas import HaustypFelder, InseratBefund, InseratFelder
+from app.services.llm import domain_of, fingerprint, normalize_url, strict_json_schema
 
 from .conftest import LLM_URL, fixture_text
 
@@ -174,3 +174,40 @@ async def test_non_json_answer_is_an_upstream_error():
 async def test_without_an_api_key_nothing_is_requested(without_llm):
     with pytest.raises(NotConfiguredError):
         await llm_client().fetch_page_text(PAGE_URL, "Fertighaus")
+
+
+@respx.mock
+async def test_a_cached_answer_names_what_answered_it():
+    """The rule this cache has broken twice. It has no expiry, so an entry
+    written by one model, prompt or schema outlives all three — and an
+    extraction cached before the price parser existed survived the parser and
+    kept the field empty on exactly the listings the fix was written for.
+
+    Model, prompt and schema therefore ride in the key, and a change to any of
+    them simply never asks the old entry again.
+    """
+
+    route = respx.post(CHAT_URL).mock(
+        return_value=httpx.Response(
+            200, json=completion(json.dumps({"vorlage": "inserat-befund/1"}))
+        )
+    )
+    client = llm_client()
+
+    await client.structure("ein Text", InseratBefund, "befund", "Lies das aus.")
+    await client.structure("ein Text", InseratBefund, "befund", "Lies das aus.")
+    assert route.call_count == 1, "derselbe Auftrag fragt nicht zweimal"
+
+    await client.structure("ein Text", InseratBefund, "befund", "Lies etwas anderes aus.")
+    assert route.call_count == 2, "ein anderer Auftrag ist eine andere Antwort"
+
+    client.settings.model = "ein/anderes-modell"
+    await client.structure("ein Text", InseratBefund, "befund", "Lies das aus.")
+    assert route.call_count == 3, "ein anderes Modell ist eine andere Antwort"
+
+
+def test_the_fingerprint_separates_its_parts():
+    """„ab“ + „c“ and „a“ + „bc“ are two different keys, or a prompt ending in
+    a word the text begins with would collide with it."""
+
+    assert fingerprint("ab", "c") != fingerprint("a", "bc")

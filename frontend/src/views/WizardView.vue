@@ -355,6 +355,10 @@ export default {
        * answered the question, and one who has not costs three seconds an
        * image to learn nothing. */
       images: [],
+      /* What a model read out of the listing, already through the Beleg gate on
+       * the server. Empty for every listing the deterministic readers settled,
+       * which is most of them. */
+      modelIndicia: [],
       // Bumped to remount the search rather than reuse a finished one.
       searchRun: 0,
       draft: null,
@@ -545,6 +549,10 @@ export default {
         this.readFields = fieldsFromResponse(response);
         this.description = response?.beschreibung || text;
         this.images = response?.bilder || [];
+        // What a model read, already through the Beleg gate on the server: each
+        // one carries the sentence it was read from, and the search weighs it
+        // like any other clue — below the body text, and never as a filter.
+        this.modelIndicia = response?.indizien || [];
         // Straight on. The read values were a step of their own and answered a
         // question nobody had asked yet — they are what the search runs on, so
         // they now travel with it, folded shut.
@@ -569,7 +577,8 @@ export default {
       const read = name => this.readFields.find(f => f.key === name)?.value;
       this.searchQuery = queryFromFields(this.readFields, {
         ...(this.description ? { text: this.description } : {}),
-        ...(this.images.length ? { bilder: this.images } : {})
+        ...(this.images.length ? { bilder: this.images } : {}),
+        ...(this.modelIndicia.length ? { indizien: this.modelIndicia } : {})
       });
       this.listingExtras = {
         askingPrice: numberFrom(read("kaufpreis_eur")),

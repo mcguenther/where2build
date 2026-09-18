@@ -11,7 +11,9 @@ from ..deps import gemarkung_directory, llm_client, settings_dep
 from ..errors import BadRequestError, NotConfiguredError, UpstreamError
 from ..schemas import (
     Extraktionsweg,
+    Indiz,
     Inserat,
+    InseratBefund,
     InseratFelder,
     InseratVorschlaege,
     ListingExtractRequest,
@@ -19,7 +21,9 @@ from ..schemas import (
     as_vorschlaege,
 )
 from ..search.indicia import collect_indicia
-from ..services.llm import LLMClient, normalize_url
+from ..services import befund as befund_service
+from ..services.beleg import refusal_note
+from ..services.llm import LLMClient, fingerprint, normalize_url
 from ..services.portals import PASTE_HINT, fetch_page, is_blocked, is_kleinanzeigen, parse_page
 from ..settings import Settings
 
@@ -29,12 +33,24 @@ _FETCH_TASK = (
     "Es geht um ein Grundstücksinserat: Adresse, Flurstücksnummern, Kaufpreis "
     "und Grundstücksfläche."
 )
+# What the model is asked for, and the rule it is asked under. The rule is not
+# enforced here -- `services.beleg` enforces it, and it does so by comparing
+# strings rather than by trusting this paragraph. Saying it anyway costs
+# nothing and makes the refusals rarer.
 _STRUCTURE_TASK = (
-    "Lies aus dem folgenden Text eines Grundstücksinserats aus: Adresse, "
-    "Koordinaten, Flurstückskennungen (etwa „Flurstück 790 sowie 706“), Kaufpreis "
-    "in Euro und Grundstücksfläche in Quadratmetern. Trage nur ein, was im Text "
-    "tatsächlich steht, sonst null. Namen, Telefonnummern und andere Kontaktdaten "
-    "werden nicht erfasst."
+    "Lies aus dem folgenden Text eines Grundstücksinserats aus, was darin steht: "
+    "Adresse, Kaufpreis in Euro, Grundstücksfläche in Quadratmetern, die genannten "
+    "Orte mit ihrer Ebene (Gemarkung, Ortsteil, Gemeinde, Straße) und ihrer "
+    "Beziehung zum Grundstück (liegt_in, liegt_an, entfernt_von, erwaehnt) sowie "
+    "Flurstückskennungen (etwa „Flurstück 790 sowie 706“).\n\n"
+    "Zu jedem Wert gehört ein Beleg: der Satz oder Satzteil aus dem Text, in dem "
+    "der Wert wörtlich steht. Der Beleg wird gegen den Text geprüft und muss "
+    "deshalb Zeichen für Zeichen aus ihm stammen — nicht umformuliert, nicht "
+    "zusammengefasst, nicht gekürzt um die Zahl herum.\n\n"
+    "Rechne nichts aus. Ein Kaufpreis, der sich aus Fläche mal Preis pro "
+    "Quadratmeter ergibt, steht nicht im Inserat und wird nicht eingetragen. "
+    "Ohne Beleg bleibt das Feld null. Namen, Telefonnummern und andere "
+    "Kontaktdaten werden nicht erfasst."
 )
 
 # What the reader produces, as a number. It rides in the cache key, because the
@@ -47,7 +63,9 @@ _STRUCTURE_TASK = (
 #
 #   1  the original reader
 #   2  asking price, plot area from the attribute list, description and images
-EXTRACTION_VERSION = 2
+#   3  the model answers a Befund with a Beleg per value, and what passes the
+#      gate arrives as Indizien beside the fields
+EXTRACTION_VERSION = 3
 
 _NO_LOCATOR = (
     "Aus dieser Seite ließ sich weder eine Adresse noch eine Koordinate noch ein "
@@ -83,6 +101,22 @@ def _area_from(angaben: dict[str, str]) -> int | None:
         return int(float(match.group(0).replace(".", "").replace(" ", "")))
     except ValueError:
         return None
+
+
+async def _ask_the_model(
+    llm: LLMClient, text: str, known: InseratFelder, start: int = 0
+) -> tuple[InseratFelder, list[Indiz], str | None]:
+    """One model call, gated: the fields it may fill, the Indizien, the refusals.
+
+    Every value comes back with the sentence it was read from, and every one of
+    them is checked against `text` before it is used — which is why this is the
+    only place the model's answer is ever unpacked.
+    """
+
+    befund = await llm.structure(text, InseratBefund, "inserat-befund", _STRUCTURE_TASK)
+    fields, field_verdicts = befund_service.fields_from(befund, text, known)
+    indicia, indiz_verdicts = befund_service.indicia_from(befund, text, start)
+    return fields, indicia, refusal_note([*field_verdicts, *indiz_verdicts])
 
 
 def _merge(deterministic: InseratFelder, extracted: InseratFelder | None) -> InseratFelder:
@@ -139,6 +173,7 @@ def _answer(
     titel: str | None = None,
     beschreibung: str | None = None,
     bilder: list[str] | None = None,
+    indizien: list[Indiz] | None = None,
 ) -> ListingExtractResponse:
     text = " ".join(part for part in (titel, beschreibung) if part).strip()
     try:
@@ -158,6 +193,7 @@ def _answer(
         hinweis=hinweis or titel,
         beschreibung=text[:_DESCRIPTION_LIMIT] or None,
         bilder=bilder or [],
+        indizien=indizien or [],
     )
 
 
@@ -176,10 +212,11 @@ async def _from_url(url: str, llm: LLMClient, settings: Settings) -> ListingExtr
         weg: Extraktionsweg = "meta-tags" if seite.has_coordinates else "llm"
         hinweis = None
         extracted: InseratFelder | None = None
+        indizien: list[Indiz] = []
         if llm.settings.configured and seite.text:
             try:
-                extracted = await llm.structure(
-                    seite.text, InseratFelder, "inserat", _STRUCTURE_TASK
+                extracted, indizien, hinweis = await _ask_the_model(
+                    llm, seite.text, deterministic
                 )
             except UpstreamError as exc:
                 if not seite.has_coordinates:
@@ -200,6 +237,7 @@ async def _from_url(url: str, llm: LLMClient, settings: Settings) -> ListingExtr
             # reads a portal's navigation and cookie banner as evidence.
             seite.beschreibung or seite.text,
             seite.bilder,
+            indizien,
         )
 
     # Unknown domain: the spec's chain is web_fetch first, then meta tags and
@@ -229,19 +267,21 @@ async def _from_url(url: str, llm: LLMClient, settings: Settings) -> ListingExtr
                 "Bitte den Seiteninhalt einfügen."
             )
 
-    extracted = await llm.structure(text, InseratFelder, "inserat", _STRUCTURE_TASK)
     deterministic = (
         InseratFelder(adresse=seite.adresse, lat=seite.lat, lon=seite.lon)
         if seite is not None
         else InseratFelder()
     )
+    extracted, indizien, hinweis = await _ask_the_model(llm, text, deterministic)
     return _answer(
         _merge(deterministic, extracted),
         url,
         "llm",
+        hinweis,
         titel=seite.titel if seite else None,
         beschreibung=(seite.beschreibung if seite and seite.beschreibung else text),
         bilder=seite.bilder if seite else None,
+        indizien=indizien,
     )
 
 
@@ -253,7 +293,12 @@ async def extract(
 ) -> ListingExtractResponse:
     if payload.url is not None:
         url = str(payload.url)
-        cache_key = f"inserat:v{EXTRACTION_VERSION}:{normalize_url(url)}"
+        # The model rides in the key too: a different one gives a different
+        # answer, and this cache has no expiry.
+        cache_key = (
+            f"inserat:v{EXTRACTION_VERSION}:{fingerprint(llm.settings.model)}"
+            f":{normalize_url(url)}"
+        )
         cached = llm.cache.get_json(cache_key)
         if cached is not None:
             return ListingExtractResponse.model_validate(cached)
@@ -291,9 +336,10 @@ async def extract(
 
     extracted: InseratFelder | None = None
     hinweis: str | None = None
+    indizien: list[Indiz] = []
     if llm.settings.configured:
         try:
-            extracted = await llm.structure(text, InseratFelder, "inserat", _STRUCTURE_TASK)
+            extracted, indizien, hinweis = await _ask_the_model(llm, text, deterministic)
         except UpstreamError as exc:
             hinweis = f"Nur die Angaben der Seite konnten gelesen werden: {exc.message}"
     elif not _has_locator(deterministic) and not _is_searchable(beschreibung):
@@ -316,4 +362,5 @@ async def extract(
         beschreibung=beschreibung,
         bilder=seite.bilder,
         titel=seite.titel,
+        indizien=indizien,
     )
