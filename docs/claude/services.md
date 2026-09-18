@@ -393,3 +393,46 @@ of Overpass or a local extract, the listing portals, and the extraction model.
   abstract says „keine Flaechen sondern nur Konturen“ — that is the one for an
   orthophoto. Streets and their names come from the WebAtlas as
   `Verkehr,Beschriftung`, transparent at every zoom from 13 to 19.
+
+- **Four providers, two wire formats — and the second one is not a variant of
+  the first.** OpenRouter, OpenAI, Ollama and any other OpenAI-compatible host
+  answer `POST /chat/completions`, take `Authorization: Bearer` and put the
+  schema in `response_format`. Anthropic answers `POST /v1/messages`, takes
+  `x-api-key` plus a dated `anthropic-version` header, puts the schema in
+  `output_config.format`, **requires** `max_tokens`, and returns `content` as a
+  list of blocks rather than one message string — so `content[0]` reads
+  whichever block came first, and a thinking block can be that one. It gets its
+  own adapter in `services/llm.py`, never a translation layer: a shim that
+  pretends one API is the other is exactly the shape that answers wrongly but
+  successfully the first time either side changes.
+
+- **A refusal is HTTP 200 with no text.** `stop_reason: "refusal"` and an empty
+  or text-free `content`. Read as „leere Antwort" it is true and useless; the
+  client says „hat die Anfrage abgelehnt" instead.
+
+- **The fetch tool is per provider, and two of the four have none.** OpenRouter
+  has `openrouter:web_fetch` with its `parameters` block; Anthropic has
+  `web_fetch_20260209` (dated types are that API's own versioning — an older
+  model wants `web_fetch_20250910` and answers 400 to the newer one) declared
+  flat on the tool. OpenAI's endpoint, a local Ollama and an unknown compatible
+  host have none, and `can_fetch_pages` says so *before* spending a request —
+  the paste field is this app's own way in anyway, and it is what the two
+  blocked portals need regardless. Neither provider reports a failed fetch as
+  an HTTP error: OpenRouter says so in `usage.server_tool_use_details`,
+  Anthropic by whether a `web_fetch_tool_result` block is in the answer at all.
+
+- **`localhost:11434` carries the word „ollama" nowhere.** The provider is read
+  off the endpoint when it is not named, and Ollama's own default URL is the
+  one case where the host name gives nothing — the port is the only signal. A
+  compose file that names the service `ollama` is caught by the name.
+
+- **A local Ollama needs no key, and demanding one would make the only free
+  provider the only one nobody can try.** `needs_key` is false there, and
+  `configured` then asks for an endpoint instead.
+
+- **The official `anthropic` SDK is deliberately not used.** Every outbound
+  call in this backend goes through `upstream.request`, which owns the user
+  agent, the timeout, the single retry, the content-type check and the German
+  sentence a failure turns into. The SDK would be the one call that bypasses
+  all of it. This is not an OpenAI shim — it is a first-class Messages adapter
+  written against the documented wire shape.

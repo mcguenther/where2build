@@ -323,9 +323,22 @@ class AbweichungZeile(BaseModel):
 
 
 class Abweichungen(BaseModel):
+    """The divergence log: the findings as rows, everything as counts.
+
+    ``zeilen`` leaves „einig" out unless it is asked for by name — a listing of
+    the cases where the pipeline was already right is one nobody reads. The
+    counts keep it, because it is the denominator every other number needs:
+    „six gaps" means nothing without „out of how many".
+    """
+
+    # How many rows the listing holds, which is not how many were counted.
     anzahl: int
     # „postgres" or „datei" — which of the two this deployment is keeping.
     speicher: str
+    # Per art, over everything the log has ever held.
+    statistik: dict[str, int] = Field(default_factory=dict)
+    # The same, split by field — which reader is missing what.
+    je_feld: dict[str, dict[str, int]] = Field(default_factory=dict)
     zeilen: list[AbweichungZeile] = Field(default_factory=list)
 
 

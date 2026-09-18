@@ -248,3 +248,35 @@ line looks right and does not match.
   is worth typing on every `up` and `down`: a service renamed between two
   versions of the file leaves its container running, and Compose mentions it
   in one line that scrolls past.
+
+## `docker compose` works here now, without a wrapper
+
+**The CA lives in the build context, which is what the proxy's own
+documentation says to do.** `/root/.ccr/README.md`, section *docker build /
+docker run*: „copy /root/.ccr/ca-bundle.crt into the build context and install
+it in an early layer". A build container cannot reach the host's proxy on
+127.0.0.1 and does not trust its certificate, so this is the only route.
+
+```bash
+scripts/setup-build-ca.sh     # once per session; does nothing where there is no such CA
+docker compose up --build     # plain, no wrapper
+```
+
+Three details, each of which was the difference between working and not:
+
+- **`COPY ca/ …`, never `COPY ca/*.crt`.** A glob that matches nothing fails
+  the build outright, and *empty is the normal case* — on a machine with direct
+  internet access the directory holds only its README. Copying the directory is
+  what makes the whole mechanism a no-op there.
+- **The `ca/` directories are committed, the certificates are not.**
+  `.gitignore` carries `backend/ca/*.crt` and `frontend/ca/*.crt`; the
+  directories themselves have to exist or the `COPY` fails on a fresh clone.
+- **pip and Node each ignore the system trust store, differently.** pip needs
+  `PIP_CERT`; Node needs `NODE_EXTRA_CA_CERTS` and ignores
+  `update-ca-certificates` entirely. Both are set only when a certificate is
+  actually present, and the bundle is deleted in the same layer that used it,
+  so it never reaches the final image.
+
+`scripts/docker-build-sandbox.sh` still works and still does the same thing by
+patching the Dockerfiles at build time. It is no longer needed and is kept only
+so an existing habit does not break.

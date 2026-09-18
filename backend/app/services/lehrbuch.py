@@ -7,7 +7,7 @@ disagree, is a sentence somebody could write a pattern against — and the Beleg
 gate has already proved that sentence stands verbatim in the page. So the
 disagreement is not noise to be smoothed over. It is the corpus.
 
-Three kinds, and each says something different:
+Four kinds, and each says something different:
 
 * **Lücke** — the deterministic reader found nothing and the model found
   something the gate accepted. The pattern that is missing, with the sentence
@@ -19,6 +19,12 @@ Three kinds, and each says something different:
   being wrong, and worth as much as the other two: it is the measurement that
   says how far a model may be trusted here, and it is the only one that can
   show the gate earning its keep.
+* **Einig** — both read the same thing. Nothing to learn from one row of it,
+  and everything to learn from how many there are: „the model found six things
+  the patterns missed" means nothing without the denominator. Kept as
+  statistics and kept *out* of the listing, because a log that lists the cases
+  where the pipeline was already right is a log nobody reads — the read view
+  counts them and shows the rest.
 
 Where it goes. Postgres when the deployment has one (`DATABASE_URL`), a JSONL
 file under the cache directory otherwise — a development machine must not need
@@ -48,7 +54,11 @@ logger = logging.getLogger(__name__)
 
 # What a divergence can be. German, like every other value that crosses the
 # wire or lands in the database.
-ARTEN = ("luecke", "widerspruch", "verworfen")
+ARTEN = ("luecke", "widerspruch", "verworfen", "einig")
+
+# The kinds worth reading row by row. „einig" is the denominator, not a
+# finding, so the listing leaves it out unless it is asked for by name.
+BEFUNDE = ("luecke", "widerspruch", "verworfen")
 
 # How much of a sentence is kept. Long enough for the clause a pattern would be
 # written against, short enough that a whole paragraph cannot arrive by way of
@@ -123,8 +133,9 @@ def compare(
     ``accepted`` is ``(feld, wert, beleg)`` from the model after the gate, and
     ``refused`` is ``(feld, wert, beleg, grund)`` from the model before it.
 
-    An agreement produces nothing. That is the point: a log that also holds the
-    cases where the pipeline was already right is a log nobody reads.
+    An agreement produces an „einig" row: it is the denominator every other
+    number here needs — „six gaps" says nothing without „out of how many" — and
+    the read view counts it rather than listing it.
     """
 
     known: dict[str, set[str]] = {}
@@ -141,11 +152,10 @@ def compare(
         if not value:
             continue
         seen = known.get(name)
-        if seen and _key(value) in seen:
-            continue  # both readers agree; nothing to learn
+        agreed = bool(seen) and _key(value) in seen
         out.append(
             Abweichung(
-                art="widerspruch" if seen else "luecke",
+                art="einig" if agreed else ("widerspruch" if seen else "luecke"),
                 feld=name,
                 regulaer=", ".join(sorted(seen)) if seen else None,
                 modell=value,
@@ -240,7 +250,11 @@ class Lehrbuch:
     async def rows(
         self, *, art: str | None = None, feld: str | None = None, limit: int = 100
     ) -> list[dict[str, Any]]:
-        """The log, newest first, wherever it is kept."""
+        """The log, newest first, wherever it is kept.
+
+        Without an ``art`` this answers the findings and leaves the agreements
+        out — they are the denominator, and ``tally`` is where they are read.
+        """
 
         pool = self.pool()
         if pool is not None:
@@ -248,22 +262,58 @@ class Lehrbuch:
         rows = sorted(
             self.read_file(), key=lambda row: str(row.get("gesehen_am")), reverse=True
         )
-        if art:
-            rows = [row for row in rows if row.get("art") == art]
+        wanted = (art,) if art else BEFUNDE
+        rows = [row for row in rows if row.get("art") in wanted]
         if feld:
             rows = [row for row in rows if row.get("feld") == feld]
         return rows[:limit]
+
+    async def tally(self) -> dict[str, dict[str, int]]:
+        """How many of each kind, per field. The statistics, including „einig".
+
+        Two numbers make every other one readable: how often the model agreed,
+        and how often it was refused. Without them „six gaps" is a count with
+        no denominator, and „the gate refused four" is a rate with no base.
+        """
+
+        pool = self.pool()
+        if pool is not None:
+            async with pool.acquire() as connection:
+                found = await connection.fetch(
+                    "select art, feld, count(*) as anzahl from abweichungen "
+                    "group by art, feld"
+                )
+            rows = [dict(row) for row in found]
+        else:
+            counted: dict[tuple[str, str], int] = {}
+            for row in self.read_file():
+                key = (str(row.get("art")), str(row.get("feld")))
+                counted[key] = counted.get(key, 0) + 1
+            rows = [
+                {"art": art, "feld": feld, "anzahl": anzahl}
+                for (art, feld), anzahl in counted.items()
+            ]
+
+        out: dict[str, dict[str, int]] = {}
+        for row in rows:
+            out.setdefault(str(row["art"]), {})[str(row["feld"])] = int(row["anzahl"])
+        return out
 
     async def _from_postgres(
         self, art: str | None, feld: str | None, limit: int
     ) -> list[dict[str, Any]]:
         pool = self.pool()
         conditions, values = [], []
-        for column, value in (("art", art), ("feld", feld)):
-            if value:
-                values.append(value)
-                conditions.append(f"{column} = ${len(values)}")
-        where = f"where {' and '.join(conditions)}" if conditions else ""
+        if art:
+            values.append(art)
+            conditions.append(f"art = ${len(values)}")
+        else:
+            values.append(list(BEFUNDE))
+            conditions.append(f"art = any(${len(values)})")
+        if feld:
+            values.append(feld)
+            conditions.append(f"feld = ${len(values)}")
+        where = f"where {' and '.join(conditions)}"
         values.append(limit)
         async with pool.acquire() as connection:
             found = await connection.fetch(
@@ -307,4 +357,4 @@ class Lehrbuch:
         return list(seen.values())
 
 
-__all__ = ["ARTEN", "Abweichung", "Lehrbuch", "MAX_BELEG_CHARS", "compare", "fingerprint", "scrub"]
+__all__ = ["ARTEN", "BEFUNDE", "Abweichung", "Lehrbuch", "MAX_BELEG_CHARS", "compare", "fingerprint", "scrub"]

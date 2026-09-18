@@ -412,20 +412,112 @@ class BasemapSettings(BaseSettings):
     timeout_s: float = 30.0
 
 
+# Which extraction provider a deployment points at. Four names and one escape
+# hatch, because three of the four speak the same wire protocol and one does
+# not:
+#
+# * **openrouter**, **openai**, **ollama** and anything else OpenAI-compatible
+#   answer ``POST /chat/completions`` with a ``response_format`` of
+#   ``json_schema``. One transport serves all of them; only the base URL and
+#   the model id differ, and Ollama additionally needs no key at all.
+# * **anthropic** answers ``POST /v1/messages``. Different path, different auth
+#   header (``x-api-key`` plus ``anthropic-version``, not ``Authorization:
+#   Bearer``), different place for the schema (``output_config.format``) and a
+#   different answer shape. It gets its own adapter rather than a shim: a
+#   translation layer that pretends one API is the other is exactly the thing
+#   that breaks silently the first time either side changes.
+#
+# „auto" reads the provider off the base URL, which is what a person who only
+# pastes a key and an endpoint expects.
+LLMAnbieter = Literal["auto", "openai", "anthropic", "openrouter", "ollama", "kompatibel"]
+
+# What each provider answers at, and what it wants to be called with, when the
+# deployment gives nothing but a key. A base URL set by hand always wins.
+LLM_DEFAULTS: dict[str, tuple[str, str]] = {
+    "openai": ("https://api.openai.com/v1", "gpt-4o-mini"),
+    "anthropic": ("https://api.anthropic.com/v1", "claude-opus-5"),
+    "openrouter": ("https://openrouter.ai/api/v1", "openai/gpt-4o-mini"),
+    # A local Ollama needs no key and is the one provider where the default
+    # endpoint is on this machine.
+    "ollama": ("http://127.0.0.1:11434/v1", "llama3.1"),
+}
+
+
 class LLMSettings(BaseSettings):
-    """OpenAI-compatible extraction provider (env prefix ``LLM_``)."""
+    """The extraction provider (env prefix ``LLM_``).
+
+    A deployment sets three things at most: ``LLM_ANBIETER``, ``LLM_API_KEY``
+    and — where it is not one of the four known hosts — ``LLM_BASE_URL``. The
+    model has a default per provider and is worth setting; everything else has
+    one that works.
+    """
 
     model_config = SettingsConfigDict(env_prefix="LLM_", env_file=_ENV_FILE, extra="ignore")
 
-    base_url: str = "https://openrouter.ai/api/v1"
+    anbieter: LLMAnbieter = "auto"
+    base_url: str = ""
     api_key: SecretStr | None = None
-    model: str = "openai/gpt-4o-mini"
+    model: str = ""
     fetch_engine: Literal["openrouter", "exa", "parallel", "native", "auto"] = "openrouter"
     timeout_s: int = 120
     max_content_tokens: int = 50000
+    # The dated contract the Anthropic API requires on every request. Pinned
+    # rather than left to the server's default: an API that versions itself by
+    # header is one whose answer shape can change under an unpinned client.
+    anthropic_version: str = "2023-06-01"
+
+    @property
+    def provider(self) -> str:
+        """The provider actually in play, with „auto" resolved from the host.
+
+        Reading it off the URL is what somebody who pasted an endpoint and a
+        key expects to happen — and it is only ever a default: naming the
+        provider outright always wins.
+        """
+
+        if self.anbieter != "auto":
+            return self.anbieter
+        host = self.base_url.lower()
+        for name in ("anthropic", "openrouter", "ollama"):
+            if name in host:
+                return name
+        if "openai.com" in host:
+            return "openai"
+        # Ollama's own default endpoint is „localhost:11434" and carries its
+        # name nowhere; the port is the only signal a pasted URL gives. Named
+        # as a host it is caught above, which is the shape a compose file uses.
+        if ":11434" in host:
+            return "ollama"
+        return "kompatibel" if self.base_url else "openrouter"
+
+    @property
+    def endpoint(self) -> str:
+        """Where to send a request, with the provider's own default filled in."""
+
+        if self.base_url:
+            return self.base_url.rstrip("/")
+        return LLM_DEFAULTS.get(self.provider, LLM_DEFAULTS["openrouter"])[0]
+
+    @property
+    def model_id(self) -> str:
+        if self.model:
+            return self.model
+        return LLM_DEFAULTS.get(self.provider, LLM_DEFAULTS["openrouter"])[1]
+
+    @property
+    def needs_key(self) -> bool:
+        """Whether this provider needs one at all.
+
+        A local Ollama does not, and demanding one would make the one provider
+        that costs nothing the only one a person cannot try.
+        """
+
+        return self.provider != "ollama"
 
     @property
     def configured(self) -> bool:
+        if not self.needs_key:
+            return bool(self.endpoint)
         return self.api_key is not None and bool(self.api_key.get_secret_value())
 
 

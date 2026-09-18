@@ -8,9 +8,10 @@ import httpx
 import pytest
 import respx
 
-from app.deps import llm_client
+from app.deps import llm_client, reset_services
 from app.errors import NotConfiguredError, UpstreamError
 from app.schemas import HaustypFelder, InseratBefund, InseratFelder
+from app.settings import LLMSettings
 from app.services.llm import domain_of, fingerprint, normalize_url, strict_json_schema
 
 from .conftest import LLM_URL, fixture_text
@@ -211,3 +212,181 @@ def test_the_fingerprint_separates_its_parts():
     a word the text begins with would collide with it."""
 
     assert fingerprint("ab", "c") != fingerprint("a", "bc")
+
+
+# ----------------------------------------------------------------------
+# The providers a deployment may point this at
+# ----------------------------------------------------------------------
+
+ANTHROPIC_URL = "https://anthropic.example.org/v1/messages"
+
+
+@pytest.fixture
+def anthropic(monkeypatch):
+    """A deployment pointed at the Anthropic API."""
+
+    monkeypatch.setenv("LLM_ANBIETER", "anthropic")
+    monkeypatch.setenv("LLM_BASE_URL", "https://anthropic.example.org/v1")
+    monkeypatch.setenv("LLM_MODEL", "claude-opus-5")
+    reset_services()
+    yield
+    reset_services()
+
+
+def _anthropic_answer(text: str, **extra) -> httpx.Response:
+    return httpx.Response(
+        200,
+        json={
+            "content": [{"type": "text", "text": text}],
+            "stop_reason": "end_turn",
+            **extra,
+        },
+    )
+
+
+def _settings(**fields) -> LLMSettings:
+    """Settings built from these fields alone.
+
+    The suite's autouse fixture sets `LLM_*` in the environment for every test,
+    and these assertions are about the resolution rules rather than about which
+    of the two wins.
+    """
+
+    return LLMSettings(
+        _env_file=None, **{"anbieter": "auto", "base_url": "", "model": "", **fields}
+    )
+
+
+def test_the_provider_is_read_off_the_endpoint_when_it_is_not_named(monkeypatch):
+    """Somebody who pastes a key and an endpoint expects it to work out."""
+
+    for name in ("LLM_ANBIETER", "LLM_BASE_URL", "LLM_MODEL"):
+        monkeypatch.delenv(name, raising=False)
+    assert _settings(base_url="https://api.anthropic.com/v1").provider == "anthropic"
+    assert _settings(base_url="https://api.openai.com/v1").provider == "openai"
+    assert _settings(base_url="http://localhost:11434/v1").provider == "ollama"
+    assert _settings(base_url="https://mein-server/v1").provider == "kompatibel"
+    # And naming it always wins over the host.
+    assert _settings(anbieter="openai", base_url="https://openrouter.ai/api/v1").provider == "openai"
+
+
+def test_a_local_ollama_needs_no_key(monkeypatch):
+    """The one provider that costs nothing must not be the one nobody can try."""
+
+    for name in ("LLM_ANBIETER", "LLM_BASE_URL", "LLM_MODEL", "LLM_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+    settings = _settings(anbieter="ollama")
+    assert settings.configured and not settings.needs_key
+    assert settings.endpoint == "http://127.0.0.1:11434/v1"
+    assert settings.model_id == "llama3.1"
+    # Everybody else still does.
+    assert not _settings(anbieter="openai").configured
+
+
+@respx.mock
+async def test_anthropic_speaks_its_own_api_and_not_a_translation_of_another(anthropic):
+    """Different path, different auth header, different place for the schema.
+    A shim that pretended otherwise would break the first time either side
+    changed — and would break silently."""
+
+    route = respx.post(ANTHROPIC_URL).mock(
+        return_value=_anthropic_answer(json.dumps({"vorlage": "inserat-befund/1"}))
+    )
+
+    await llm_client().structure("ein Text", InseratBefund, "befund", "Lies das aus.")
+
+    assert route.call_count == 1
+    request = route.calls[0].request
+    assert request.headers["x-api-key"] == "test-key"
+    assert request.headers["anthropic-version"]
+    assert "authorization" not in request.headers
+    payload = json.loads(request.content)
+    # The schema goes in output_config.format, and max_tokens is required here.
+    assert payload["output_config"]["format"]["type"] == "json_schema"
+    assert "response_format" not in payload
+    assert payload["max_tokens"] > 0
+    assert payload["model"] == "claude-opus-5"
+
+
+@respx.mock
+async def test_an_anthropic_answer_is_a_list_of_blocks(anthropic):
+    """Taking content[0] would read whichever block happened to come first —
+    and a thinking block can be one of them."""
+
+    respx.post(ANTHROPIC_URL).mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "content": [
+                    {"type": "thinking", "thinking": ""},
+                    {"type": "text", "text": json.dumps({"vorlage": "inserat-befund/1"})},
+                ],
+                "stop_reason": "end_turn",
+            },
+        )
+    )
+
+    answer = await llm_client().structure("x", InseratBefund, "befund", "Lies das aus.")
+    assert answer.vorlage == "inserat-befund/1"
+
+
+@respx.mock
+async def test_a_refusal_is_said_out_loud_and_not_read_as_an_empty_answer(anthropic):
+    """HTTP 200 with no text. „Leere Antwort" would be true and useless."""
+
+    respx.post(ANTHROPIC_URL).mock(
+        return_value=httpx.Response(200, json={"content": [], "stop_reason": "refusal"})
+    )
+
+    with pytest.raises(UpstreamError) as failure:
+        await llm_client().structure("x", InseratBefund, "befund", "Lies das aus.")
+    assert "abgelehnt" in failure.value.message
+
+
+@respx.mock
+async def test_a_provider_that_cannot_fetch_pages_says_so_before_it_asks(anthropic, monkeypatch):
+    """OpenAI's endpoint, a local Ollama and an unknown host have no server-side
+    fetch tool. The app's own way in is the paste field, and saying that costs
+    no request at all."""
+
+    monkeypatch.setenv("LLM_ANBIETER", "ollama")
+    reset_services()
+    route = respx.post(url__startswith="http").mock(return_value=httpx.Response(200, json={}))
+
+    with pytest.raises(UpstreamError) as failure:
+        await llm_client().fetch_page_text("https://beispiel.de/x", "Grundstück")
+    assert "einfügen" in failure.value.message
+    assert route.call_count == 0
+
+
+@respx.mock
+async def test_anthropic_fetches_with_its_own_tool_and_notices_when_it_did_not(anthropic):
+    """A failed fetch stays HTTP 200 on both providers — what differs is where
+    they say so."""
+
+    route = respx.post(ANTHROPIC_URL).mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "content": [
+                    {"type": "web_fetch_tool_result", "content": {}},
+                    {"type": "text", "text": "Der Seitentext."},
+                ],
+                "stop_reason": "end_turn",
+            },
+        )
+    )
+
+    text = await llm_client().fetch_page_text("https://beispiel.de/x", "Grundstück")
+    assert text == "Der Seitentext."
+    tool = json.loads(route.calls[0].request.content)["tools"][0]
+    assert tool["name"] == "web_fetch"
+    assert tool["allowed_domains"] == ["beispiel.de"]
+
+    # And the same answer without the result block is a failure, not a text.
+    reset_services()
+    respx.post(ANTHROPIC_URL).mock(
+        return_value=_anthropic_answer("Ich konnte die Seite nicht abrufen.")
+    )
+    with pytest.raises(UpstreamError):
+        await llm_client().fetch_page_text("https://beispiel.de/y", "Grundstück")

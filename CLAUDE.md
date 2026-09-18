@@ -63,7 +63,14 @@ from the user directly. Reopen only if the user asks.
   and are never put to the user as a question, while numbers from *different*
   sources — an image against the body text — are rival readings and are.
 - **No contact details are stored.** The extraction schema does not carry
-  agent names or phone numbers, so no personal data reaches the database.
+  agent names or phone numbers, so no personal data reaches the database. A
+  *Beleg* is free text out of an advert, though, so the divergence log scrubs
+  telephone numbers and mail addresses out of every one it keeps.
+- **The extraction provider is the deployment's choice.** OpenRouter, OpenAI,
+  Anthropic, a local Ollama or any other OpenAI-compatible host: `LLM_ANBIETER`
+  names it, `LLM_BASE_URL` overrides where it lives, and „auto" reads it off
+  the endpoint. Anthropic speaks a different API and has an adapter of its own
+  — never a translation layer. See `docs/claude/services.md`.
 - **Fonts come from npm (Fontsource)**, never from a CDN.
 - **No separate print view.** `print.css` restyles the live page.
 - **There is no "6 m between buildings" rule in Saxony.** § 6 Abs. 5 SächsBO
@@ -163,12 +170,13 @@ backend/.venv/bin/python -m uvicorn app.main:app --reload --app-dir backend
 # in a window of its own so this page keeps whatever is half-entered on it.
 # authentik needs about a minute on the first start.
 # --remove-orphans every time: a renamed service leaves its container behind.
+# Behind a TLS-reterminating proxy (the cloud sandbox, a corporate network),
+# run this once first: it copies that CA into the two build contexts, which is
+# what the proxy's own documentation says to do. It does nothing where there is
+# no such CA, so it is safe to run always.
+scripts/setup-build-ca.sh
 docker compose up --build --remove-orphans     # http://localhost:8080
 docker compose down --remove-orphans           # volumes stay; -v throws them away
-# the same thing in the Claude Code cloud sandbox, where a plain build fails
-# on the proxy's own CA -- see docs/claude/tooling-and-tests.md for why.
-# No --build here: it reaches the plain `docker compose` behind the script.
-scripts/docker-build-sandbox.sh up -d
 
 # routing on this machine instead of Transitous -- opt-in, off by default.
 # fetch-data.sh pulls the OSM extract and the DELFI GTFS; the first start
@@ -212,7 +220,7 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 697 passed, 42 skipped — 41 of them the account store, waiting for
+- `pytest`: 705 passed, 42 skipped — 41 of them the account store, waiting for
   `TEST_DATABASE_URL` to point at a real Postgres, and one that needs pyosmium,
   which only the index builder wants. The account store is skipped rather than
   mocked because what it checks is the database's own behaviour. Without

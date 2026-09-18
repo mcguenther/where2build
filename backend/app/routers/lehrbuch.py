@@ -28,14 +28,23 @@ MAX_ROWS = 500
 
 @router.get("", response_model=Abweichungen, summary="Abweichungen zwischen Modell und Mustern")
 async def divergences(
-    art: str | None = Query(default=None, description=f"Eine von {', '.join(ARTEN)}"),
+    art: str | None = Query(
+        default=None,
+        description=(
+            f"Eine von {', '.join(ARTEN)}. Ohne Angabe zeigt die Liste die Befunde "
+            "und lässt „einig“ weg — das steht in der Statistik."
+        ),
+    ),
     feld: str | None = Query(default=None),
     limit: int = Query(default=100, ge=1, le=MAX_ROWS),
     book: Lehrbuch = Depends(lehrbuch),
 ) -> Abweichungen:
     rows = await book.rows(art=art, feld=feld, limit=limit)
+    tally = await book.tally()
     return Abweichungen(
         anzahl=len(rows),
         speicher="postgres" if book.pool() is not None else "datei",
+        statistik={art: sum(felder.values()) for art, felder in tally.items()},
+        je_feld=tally,
         zeilen=[AbweichungZeile.model_validate(row) for row in rows],
     )

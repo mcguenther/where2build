@@ -47,16 +47,45 @@ def test_a_gap_is_the_pattern_that_is_missing():
     ]
 
 
-def test_an_agreement_produces_nothing():
-    """A log that also holds the cases where the pipeline was right is a log
-    nobody reads."""
+def test_an_agreement_is_counted_and_not_listed():
+    """It is the denominator every other number needs — „six gaps" means
+    nothing without „out of how many" — and a listing of the cases where the
+    pipeline was already right is one nobody reads."""
 
-    assert compare(
+    found = compare(
         deterministic=[("gemarkung", "Thräna")],
         accepted=[("gemarkung", "Thräna", "… Ortsteil …")],
         refused=[],
         text_hash=fingerprint("x"),
-    ) == []
+    )
+    assert [a.art for a in found] == ["einig"]
+    assert "einig" not in lehrbuch_service.BEFUNDE
+
+
+@pytest.mark.anyio
+async def test_the_statistics_hold_the_denominator_and_the_listing_does_not(book):
+    """Both halves of the same answer: the findings row by row, the agreements
+    as a number."""
+
+    await book.record(
+        compare(
+            deterministic=[("gemarkung", "Thräna"), ("flaeche", "700")],
+            accepted=[
+                ("gemarkung", "Thräna", "… Ortsteil der Kreisstadt Borna"),
+                ("gemeinde", "Borna", "… Ortsteil der Kreisstadt Borna"),
+            ],
+            refused=[],
+            text_hash="abc123",
+        )
+    )
+    assert {row["art"] for row in await book.rows()} == {"luecke"}
+    assert await book.tally() == {
+        "einig": {"gemarkung": 1},
+        "luecke": {"gemeinde": 1},
+    }
+    # Asked for by name it is there, because sometimes the question is „what
+    # did both readers get right".
+    assert [row["art"] for row in await book.rows(art="einig")] == ["einig"]
 
 
 def test_a_contradiction_keeps_both_readings():

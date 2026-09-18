@@ -251,6 +251,29 @@ def _adressen_hinweis(index: AddressIndex | None) -> str:
     )
 
 
+def _llm_hinweis(current: Settings) -> str:
+    """Which provider answered, and what is missing where nothing can.
+
+    The provider is named because it is now a choice: „auto" resolves it off
+    the endpoint, and somebody who pasted a URL should be able to see which of
+    the two wire formats their server is about to speak.
+    """
+
+    llm = current.llm
+    if not llm.configured:
+        return (
+            f"Anbieter {llm.provider}, aber kein LLM_API_KEY gesetzt — "
+            "Seiten können nicht ausgelesen werden."
+        )
+    fetch = (
+        "kann Seiten selbst abrufen"
+        if llm.provider in ("openrouter", "anthropic")
+        else "kann Seiten nicht selbst abrufen — dafür das Einfügen-Feld"
+    )
+    key = "" if llm.needs_key else ", ohne Schlüssel"
+    return f"Anbieter {llm.provider}{key}, Modell {llm.model_id}; {fetch}."
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     """Open the server storage, or do nothing at all.
@@ -460,12 +483,12 @@ def create_app() -> FastAPI:
                 DienstStatus(
                     name="llm",
                     konfiguriert=current.llm.configured,
-                    endpunkt=current.llm.base_url,
-                    hinweis=(
-                        f"Modell {current.llm.model}, Fetch-Engine {current.llm.fetch_engine}."
-                        if current.llm.configured
-                        else "Kein LLM_API_KEY gesetzt — Seiten können nicht ausgelesen werden."
-                    ),
+                    # The endpoint actually in play, with the provider's own
+                    # default filled in — a deployment that named only a
+                    # provider would otherwise see an empty field and think
+                    # nothing was set.
+                    endpunkt=current.llm.endpoint,
+                    hinweis=_llm_hinweis(current),
                 ),
             ],
         )

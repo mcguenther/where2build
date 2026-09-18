@@ -13,6 +13,20 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# Extra certificate authorities for the build, and nothing on a normal machine:
+# `ca/` holds a README and whatever `scripts/setup-build-ca.sh` put next to it.
+# An environment that re-terminates outbound TLS through its own CA — the cloud
+# sandbox this is developed in, a corporate proxy — otherwise fails every
+# `pip install` here with "self-signed certificate in certificate chain", and
+# pip does not read the system trust store, so pointing it at the bundle is the
+# only thing that works. Copying the directory rather than a file is what makes
+# it a no-op when it is empty; `COPY ca/*.crt` fails the build outright when
+# there is nothing to match.
+#
+# It never reaches the final image: this is a single-stage build, so the bundle
+# is removed in the same layer that used it.
+COPY ca/ /usr/local/share/ca-certificates/extra/
+
 # Dependencies first: the sources change far more often than pyproject.toml, so
 # this layer survives most rebuilds.
 COPY pyproject.toml ./
@@ -40,7 +54,25 @@ RUN apt-get update \
 # runs that build from this image, so leaving it out makes that job fail on an
 # import nobody can fix from outside the container. "ocr" brings Pillow, which
 # does the upscale that the measurements say buys the most.
-RUN pip install --no-cache-dir ".[poi,ocr]" && pip uninstall -y where2build-backend
+# The certificates, where there are any: into the system store for everything
+# that reads it, and into `PIP_CERT` for pip, which does not.
+RUN set -eu; \
+    if ls /usr/local/share/ca-certificates/extra/*.crt >/dev/null 2>&1; then \
+      apt-get update && apt-get install -y --no-install-recommends ca-certificates \
+        && update-ca-certificates \
+        && rm -rf /var/lib/apt/lists/*; \
+      cat /usr/local/share/ca-certificates/extra/*.crt > /tmp/build-ca.crt; \
+    else \
+      : > /tmp/build-ca.crt; \
+    fi
+
+RUN set -eu; \
+    if [ -s /tmp/build-ca.crt ]; then \
+      export PIP_CERT=/tmp/build-ca.crt REQUESTS_CA_BUNDLE=/tmp/build-ca.crt \
+             SSL_CERT_FILE=/tmp/build-ca.crt; \
+    fi; \
+    pip install --no-cache-dir ".[poi,ocr]" && pip uninstall -y where2build-backend; \
+    rm -f /tmp/build-ca.crt
 
 COPY app ./app
 # The scheduler runs these, and it runs from this same image — the jobs are
