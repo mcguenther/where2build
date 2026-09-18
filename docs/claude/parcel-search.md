@@ -910,3 +910,42 @@ also "Decisions that are settled" in `CLAUDE.md`.
   whether or not the note about it could be written, and an extraction that
   answered 502 because a diagnostic table was missing would be the tail wagging
   the dog.
+
+
+## What the model channel found in our own readers
+
+All of it measured 18.09.2026, the 16 recorded adverts through
+`_ask_the_model`, and all of it the point of the exercise: a teacher whose
+answer is checked is worth having because of where it disagrees.
+
+- **A rate per square metre read as the purchase price.** Advert 2418686487
+  names no price, only „Kaufpreis pro m²: 92,00 €", and `read_price_eur`
+  answered 92. Every one of the five working models left the field null. The
+  guard for it, `_PER_UNIT`, had never fired: `pattern.match(text, pos)`
+  anchors the match at `pos`, but „^" inside the pattern still means the start
+  of the *string*. Its two tests passed the whole time, because on both
+  recordings the real price stands nearer its label than the rate does and
+  `_nearest` wins without the guard being consulted — a rate *near* a price is
+  not the same test as a rate *instead of* one. Now two patterns, one per side
+  of the number, asked about the value rather than about a value-and-label
+  pair: a rate does not become a price because another word stands nearer.
+
+- **The generic word travelled as part of the municipality's name.** „ein
+  kleiner Ortsteil der Kreisstadt Borna" yielded `gemeinde = "Kreisstadt
+  Borna"`, and „Stadt Sandersdorf-Brehna" likewise; neither can match anything
+  in ALKIS. The article's noun is grammar, not a name — but a name can *be*
+  one, and the directory proves it itself: Stadt Wehlen is listed as „Stadt
+  Stadt Wehlen", the column's word in front of a name that begins with the same
+  word. So `without_appellative` removes exactly one, `municipality_spelling`
+  compares both sides in both forms, and `municipality_name` lets the register
+  decide where it can. Strip greedily and Wehlen is lost; do not strip at all
+  and Borna never resolves.
+
+- **A city name is read as a Gemarkung.** Still open, and the one shape every
+  remaining contradiction in the log now has: the patterns answer `gemarkung
+  Leipzig` where the model answers `gemeinde Leipzig`, fourteen times over the
+  corpus, plus Groitzsch, Borna, Bad Lausick, Chemnitz and Taucha once each.
+  „Anbindung an Leipzig" is a sentence about transport, and the register does
+  carry a Gemarkung Leipzig, so the name resolves and the Indiz is emitted at
+  the wrong level. Nothing is broken by it — a model Indiz only ever orders —
+  but it is the next pattern worth fixing.

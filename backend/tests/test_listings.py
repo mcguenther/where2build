@@ -53,7 +53,6 @@ INSERAT_JSON = {
         {"zaehler": 790, "beleg": "(Flurstück 790 sowie 706)"},
         {"zaehler": 706, "beleg": "(Flurstück 790 sowie 706)"},
     ],
-    "vorbehalte": [],
 }
 
 

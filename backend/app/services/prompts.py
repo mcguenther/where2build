@@ -120,10 +120,7 @@ SHAPE = """\
       "nenner": "Text | null",
       "beleg": "Textstelle | null"
     }
-  ],
-
-  // Aus der Liste oben, sonst leer.
-  "vorbehalte": ["teilflaeche | mehrere-grundstuecke | ausserhalb-sachsens"]
+  ]
 }\
 """ % {"vorlage": BEFUND_VORLAGE}
 
@@ -218,13 +215,7 @@ bebaubare Fläche, nicht die Grundfläche, nicht die Wohnfläche, und nicht die 
 anderer Grundstücke im selben Baugebiet („Grundstücke zwischen 360 und 800 m²"). \
 Schreibe in `wortlaut`, wie die Zahl dasteht, mit „ca." wenn es dort steht: gerundet \
 und exakt werden von der Suche verschieden behandelt.
-
-VORBEHALTE
-
-Trage in `vorbehalte` ein, was die Zahlen relativiert, wenn es im Text steht:
-  teilflaeche          — eine noch zu vermessende Teilfläche eines größeren Flurstücks
-  mehrere-grundstuecke — das Inserat bewirbt mehrere Grundstücke zugleich
-  ausserhalb-sachsens  — das Grundstück liegt nicht in Sachsen\
+\
 """
 
 
@@ -242,7 +233,7 @@ Die Kommentarzeilen erklären die Felder und gehören nicht in deine Antwort.
 """ % {"shape": SHAPE}
 
 
-SYSTEM = f"{_INSTRUCTIONS}\n\n{_RETURN}"
+SYSTEM = f"{_INSTRUCTIONS.rstrip()}\n\n{_RETURN}"
 
 
 def user_message(text: str, districts: list[str] | None = None) -> str:

@@ -26,6 +26,8 @@ from app.search.indicia import (
     district_matches,
     describes_part_area,
     federal_state,
+    municipality_name,
+    municipality_spelling,
     normalise_parcel_number,
     outside_saxony,
     read_area,
@@ -91,6 +93,9 @@ DIRECTORY = GemarkungDirectory(
         GemarkungEntry("Roitzsch", "143027", "Stadt Dresden"),
         GemarkungEntry("Roitzsch", "146088", "Stadt Lommatzsch"),
         GemarkungEntry("Roitzsch", "148654", "Stadt Wurzen"),
+        # A name that begins with the word the column also puts in front of
+        # it. The real register spells this one „Stadt Stadt Wehlen".
+        GemarkungEntry("Wehlen", "122015", "Stadt Stadt Wehlen"),
     ],
     stand="2026-09-05",
 )
@@ -868,6 +873,47 @@ def test_ortsteil_names_the_district_and_the_municipality_in_one_breath():
 
     assert [i.wert for i in districts] == ["Plagwitz"]
     assert "Machern" in municipalities
+
+
+def test_the_generic_word_in_front_of_a_municipality_is_not_part_of_its_name():
+    """„ein kleiner Ortsteil der Kreisstadt Borna" names Borna.
+
+    Measured 18.09.2026: the Gemeinde Indizien carried „Kreisstadt Borna" and
+    „Stadt Sandersdorf-Brehna", and neither can match anything in ALKIS. It was
+    the model channel that showed it — the same sentences came back from a
+    model as „Borna" and „Brehna", which is exactly what the divergence log is
+    for.
+    """
+
+    indicia = _indicia_of("2418686487")
+    # A set: the location field and the sentence both name it, which is two
+    # Indizien of one value and a separate question.
+    assert {i.wert for i in indicia if i.art == "gemeinde"} == {"Borna"}
+
+
+def test_a_name_that_is_a_generic_word_keeps_it():
+    """Stadt Wehlen is a town called Stadt Wehlen, and the directory says so
+    itself: it lists the place as „Stadt Stadt Wehlen", the column's word in
+    front of a name that begins with the same word. Strip one and the name is
+    left; strip greedily and it is not."""
+
+    assert municipality_spelling(DIRECTORY, "Stadt Stadt Wehlen") == "Stadt Wehlen"
+    assert municipality_spelling(DIRECTORY, "Stadt Wehlen") == "Stadt Wehlen"
+    assert municipality_name(DIRECTORY, "Stadt Wehlen") == "Stadt Wehlen"
+    # And the ordinary case, from both directions.
+    assert municipality_name(DIRECTORY, "Kreisstadt Borna") == "Borna"
+    assert municipality_name(DIRECTORY, "Stadt Borna") == "Borna"
+    assert municipality_name(DIRECTORY, "Borna") == "Borna"
+    # „Borna" must not match „Bornaer Land".
+    assert municipality_spelling(DIRECTORY, "Bornaer Land") is None
+
+
+def test_a_municipality_outside_saxony_still_loses_the_generic_word():
+    """The directory cannot confirm Sandersdorf-Brehna, and „Stadt
+    Sandersdorf-Brehna" is not a name any register carries either."""
+
+    assert municipality_name(DIRECTORY, "Stadt Sandersdorf-Brehna") == "Sandersdorf-Brehna"
+    assert municipality_name(None, "Kreisstadt Borna") == "Borna"
 
 
 def test_the_municipality_tells_two_districts_of_one_name_apart():

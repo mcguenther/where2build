@@ -29,6 +29,7 @@ from ..schemas import (
     InseratBefund,
     InseratFelder,
 )
+from ..search.blocks import fold
 from ..search.indicia import normalise_parcel_number, parcel_label
 from . import beleg
 
@@ -98,6 +99,7 @@ def indicia_from(
 
     out: list[Indiz] = []
     verdicts: list[beleg.Urteil] = []
+    seen: set[tuple[str, str, str]] = set()
     count = start
 
     for place in befund.orte:
@@ -105,8 +107,11 @@ def indicia_from(
         verdicts.append(verdict)
         if not verdict.angenommen:
             continue
+        indiz = _place_indiz(place, f"m{count + 1}")
+        if _repeated(indiz.art, indiz.wert, indiz.beziehung, seen):
+            continue
         count += 1
-        out.append(_place_indiz(place, f"m{count}"))
+        out.append(indiz)
 
     for parcel in befund.flurstuecke:
         label = _parcel_label(parcel)
@@ -115,6 +120,8 @@ def indicia_from(
         verdict = beleg.check(f"flurstueck:{label}", label, parcel.beleg, text)
         verdicts.append(verdict)
         if not verdict.angenommen:
+            continue
+        if _repeated("flurstueck", label, None, seen):
             continue
         count += 1
         out.append(
@@ -130,6 +137,31 @@ def indicia_from(
             )
         )
     return out, verdicts
+
+
+def _repeated(art: str, value: str, relation: str | None, seen: set) -> bool:
+    """Whether this claim has already been made *in this answer*.
+
+    The prompt asks for one entry per statement, so an advert that says three
+    things about Borna yields Borna three times. That is one claim stated
+    thrice, not three findings: it must not become three Indizien, three rows
+    in the divergence log, or three lines under the map.
+
+    Only within the one answer. The same name from the location field, from the
+    body text and from a model is *corroboration*, and those stay apart — each
+    carries its own `SOURCE_CONFIDENCE`, and which source said what is the
+    whole basis of the trust order and of every Konflikt the user is shown.
+
+    The relation belongs in the key. „Grimma" as the municipality the plot lies
+    in and „Grimma" as the town 6 km away are two different statements about
+    one name, and the prompt goes out of its way to ask for both.
+    """
+
+    key = (art, fold(value), relation or "")
+    if key in seen:
+        return True
+    seen.add(key)
+    return False
 
 
 def _parcel_label(parcel: BefundFlurstueck) -> str | None:

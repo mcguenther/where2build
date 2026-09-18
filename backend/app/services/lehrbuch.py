@@ -117,6 +117,32 @@ class Abweichung:
         return data
 
 
+# The fields a plot has exactly one of. Two different values there are two
+# claims about one slot, so they contradict. Everywhere else — places, parcel
+# numbers — there is no slot: an advert may legitimately name Großbothen *and*
+# Grimma, and treating the second as a contradiction of the first is how one
+# model answer and one pattern run turned into a cross product of rows.
+SINGLE_VALUED = ("adresse", "kaufpreis_eur", "grundstuecksflaeche_m2")
+
+# The kinds of Indiz that are all statements about one thing — a named place —
+# and therefore share a slot. A Gemarkung and a Gemeinde of the same name are
+# two readings of it; a Flurstück and a Fläche are not, however equal their
+# digits happen to be. Measured 18.09.2026: without this, „flaeche 577" and
+# „flurstueck 577" keyed alike and contradicted each other.
+_PLACE_ARTEN = ("gemarkung", "gemeinde", "ortsteil", "ort", "strasse")
+
+# „ort" is what a model reports when it will not say which level. It is a
+# weaker claim about the same name, not a rival one, so it agrees with any
+# level the patterns gave rather than disputing it.
+_ANY_LEVEL = "ort"
+
+
+def _slot(art: str) -> str:
+    """Which slot a kind of Indiz speaks about."""
+
+    return "ort" if art in _PLACE_ARTEN else art
+
+
 def compare(
     *,
     deterministic: Iterable[tuple[str, str | None]],
@@ -133,15 +159,51 @@ def compare(
     ``accepted`` is ``(feld, wert, beleg)`` from the model after the gate, and
     ``refused`` is ``(feld, wert, beleg, grund)`` from the model before it.
 
+    **A contradiction needs a slot**, and that is what decides how a pair is
+    compared. The address, the price and the area are one each, so a second
+    value is a rival reading of the same thing. A place is not: the slot there
+    is the *name*, and what the two readers may disagree about is the level
+    they put it on. Keyed the other way round — every model place against every
+    pattern place of the same kind — „Großbothen" came back as a contradiction
+    of „Grimma" although the advert names both, and 16 adverts produced 25
+    contradictions of which almost none were one (measured 18.09.2026).
+
+    So for a place: the same name on the same level is „einig", the same name
+    on a different level is „widerspruch" and carries both, and a name only the
+    model has is „luecke" — the row that improves the pipeline. A name only the
+    patterns have is not recorded; it is the pipeline working, and this log
+    exists to find what it misses.
+
     An agreement produces an „einig" row: it is the denominator every other
     number here needs — „six gaps" says nothing without „out of how many" — and
     the read view counts it rather than listing it.
     """
 
-    known: dict[str, set[str]] = {}
+    # feld -> {key: spelling}, for the three that have one value each.
+    fields: dict[str, dict[str, str]] = {}
+    # (slot, value key) -> {art: spelling}, for everything that is a set.
+    places: dict[tuple[str, str], dict[str, str]] = {}
     for name, value in deterministic:
-        if value:
-            known.setdefault(name, set()).add(_key(value))
+        if not value:
+            continue
+        if name in SINGLE_VALUED:
+            fields.setdefault(name, {})[_key(value)] = value
+        else:
+            places.setdefault((_slot(name), _key(value)), {})[name] = value
+
+    def stated(name: str, value: str) -> dict[str, str]:
+        """What the patterns said about this slot, as {label: spelling}."""
+
+        if name in SINGLE_VALUED:
+            return fields.get(name, {})
+        return places.get((_slot(name), _key(value)), {})
+
+    def reading(claims: dict[str, str], name: str) -> str | None:
+        if not claims:
+            return None
+        if name in SINGLE_VALUED:
+            return ", ".join(sorted(claims.values()))
+        return ", ".join(f"{level} {spelling}" for level, spelling in sorted(claims.items()))
 
     out: list[Abweichung] = []
     common = dict(
@@ -151,13 +213,21 @@ def compare(
     for name, value, beleg in accepted:
         if not value:
             continue
-        seen = known.get(name)
-        agreed = bool(seen) and _key(value) in seen
+        claims = stated(name, value)
+        if not claims:
+            art = "luecke"
+        elif name in SINGLE_VALUED:
+            art = "einig" if _key(value) in claims else "widerspruch"
+        elif name == _ANY_LEVEL or _ANY_LEVEL in claims:
+            # One side would not say which level. That is not a dispute.
+            art = "einig"
+        else:
+            art = "einig" if name in claims else "widerspruch"
         out.append(
             Abweichung(
-                art="einig" if agreed else ("widerspruch" if seen else "luecke"),
+                art=art,
                 feld=name,
-                regulaer=", ".join(sorted(seen)) if seen else None,
+                regulaer=reading(claims, name),
                 modell=value,
                 beleg=scrub(beleg),
                 grund=None,
@@ -170,7 +240,7 @@ def compare(
             Abweichung(
                 art="verworfen",
                 feld=name,
-                regulaer=", ".join(sorted(known.get(name, ()))) or None,
+                regulaer=reading(stated(name, value or ""), name),
                 modell=value,
                 beleg=scrub(beleg),
                 grund=reason,

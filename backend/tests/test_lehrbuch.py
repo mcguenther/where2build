@@ -88,15 +88,71 @@ async def test_the_statistics_hold_the_denominator_and_the_listing_does_not(book
     assert [row["art"] for row in await book.rows(art="einig")] == ["einig"]
 
 
-def test_a_contradiction_keeps_both_readings():
+def test_a_contradiction_about_a_place_is_one_name_on_two_levels():
+    """Not two names of one kind. Großbothen is the Gemarkung and Grimma the
+    Gemeinde above it — an advert naming both is an advert being clear, and
+    reading the second as a rival of the first is what made 16 adverts produce
+    25 contradictions of which almost none were one."""
+
     found = compare(
         deterministic=[("gemarkung", "Grimma")],
-        accepted=[("gemarkung", "Großbothen", "am Ortsrand von Großbothen")],
+        accepted=[
+            # A name the patterns never had: the row that improves the pipeline.
+            ("gemarkung", "Großbothen", "am Ortsrand von Großbothen"),
+            # The same name, one level apart: the row that needs a person.
+            ("gemeinde", "Grimma", "einem OT von Grimma"),
+        ],
         refused=[],
         text_hash=fingerprint("x"),
     )
-    assert found[0].art == "widerspruch"
-    assert found[0].regulaer == "grimma" and found[0].modell == "Großbothen"
+    assert [(a.art, a.feld, a.regulaer, a.modell) for a in found] == [
+        ("luecke", "gemarkung", None, "Großbothen"),
+        ("widerspruch", "gemeinde", "gemarkung Grimma", "Grimma"),
+    ]
+
+
+def test_equal_digits_of_different_kinds_do_not_contradict():
+    """A Flurstück and a Fläche share no slot, however equal their digits.
+
+    Measured 18.09.2026 over the recorded adverts: „flaeche 577" and
+    „flurstueck 577" keyed alike and were logged as a contradiction.
+    """
+
+    found = compare(
+        deterministic=[("flaeche", "577")],
+        accepted=[("flurstueck", "577", "Flurstück 577")],
+        refused=[],
+        text_hash=fingerprint("x"),
+    )
+    assert [(a.art, a.regulaer) for a in found] == [("luecke", None)]
+
+
+def test_a_level_the_model_would_not_state_is_not_a_dispute():
+    """„ort" is what a model reports when it will not say which level. That is
+    a weaker claim about the same name, not a rival one."""
+
+    found = compare(
+        deterministic=[("gemarkung", "Höfgen")],
+        accepted=[("ort", "Höfgen", "der Schiffsmühle Höfgen")],
+        refused=[],
+        text_hash=fingerprint("x"),
+    )
+    assert [a.art for a in found] == ["einig"]
+
+
+def test_a_second_value_for_a_field_that_has_one_still_contradicts():
+    """The plot has exactly one asking price, so a second reading of it is a
+    rival reading — that is the slot a place has not got."""
+
+    found = compare(
+        deterministic=[("kaufpreis_eur", "92")],
+        accepted=[("kaufpreis_eur", "199000", "Kaufpreis: 199.000 €")],
+        refused=[],
+        text_hash=fingerprint("x"),
+    )
+    assert [(a.art, a.regulaer, a.modell) for a in found] == [
+        ("widerspruch", "92", "199000")
+    ]
 
 
 def test_the_teacher_being_wrong_is_kept_too():
@@ -193,7 +249,6 @@ def test_what_the_model_read_and_the_patterns_did_not_lands_in_the_log(
                             }
                         ],
                         "flurstuecke": [],
-                        "vorbehalte": [],
                     }
                 )
             ),

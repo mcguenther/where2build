@@ -520,11 +520,11 @@ of Overpass or a local extract, the listing portals, and the extraction model.
   `Ortsbeziehung`, so a field added to the schema — or invented in the prompt —
   fails a test rather than travelling unexplained.
 
-  One field is asked for that nothing reads yet: `vorbehalte`. It is in the
-  schema and in the prompt, and neither `services/befund.py` nor the search
-  looks at it — „teilflaeche" should suppress the area's tolerance staircase
-  and „mehrere-grundstuecke" should say so on the result, and both are still
-  to be built.
+  `vorbehalte` used to be asked for here and is gone. It was in the schema and
+  in the prompt and read by nothing — „teilflaeche" should suppress the area's
+  tolerance staircase and „mehrere-grundstuecke" should say so on the result,
+  and until one of them is built, asking for it is tokens spent on a promise
+  nobody keeps.
 
 - **The model gets our material and never our findings.** The Saxon district
   register is data about Saxony and travels: the names in this text that the

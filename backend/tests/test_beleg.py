@@ -153,6 +153,73 @@ def test_the_level_and_the_relation_are_what_a_model_earns_its_keep_with():
     assert indicia[0].text.startswith("Gemarkung Thräna —")
 
 
+def test_one_claim_stated_three_times_is_one_indiz():
+    """The prompt asks for one entry per statement, so an advert that says
+    three things about Borna yields Borna three times.
+
+    Measured 18.09.2026 over the recorded adverts: deepseek-v4-flash returned
+    Borna three times on 2418686487. That is one claim stated thrice, and it
+    must not become three Indizien, three rows in the divergence log or three
+    lines under the map.
+    """
+
+    indicia, verdicts = befund_service.indicia_from(
+        _befund(
+            orte=[
+                {
+                    "name": "Borna",
+                    "ebene": "gemeinde",
+                    "beziehung": "liegt_in",
+                    "beleg": "ein kleiner Ortsteil der Kreisstadt Borna",
+                },
+                {
+                    "name": "Borna",
+                    "ebene": "gemeinde",
+                    "beziehung": "liegt_in",
+                    "beleg": "Thräna ist mit seinen etwa 765 Einwohnern ein kleiner "
+                             "Ortsteil der Kreisstadt Borna",
+                },
+            ]
+        ),
+        TEXT,
+    )
+    assert [(i.id, i.wert) for i in indicia] == [("m1", "Borna")]
+    # Both passed the gate; the gate ran twice and said so twice.
+    assert len(verdicts) == 2 and all(v.angenommen for v in verdicts)
+
+
+def test_the_same_name_with_two_relations_is_two_claims():
+    """„Grimma" as the municipality the plot lies in and „Grimma" as the town
+    6 km away are different statements about one name, and the prompt goes out
+    of its way to ask for both."""
+
+    text = (
+        "Baugrundstück in Großbothen, einem OT von Grimma.\n"
+        "Über die B107 erreichen Sie die ca. 6 km entfernte Kreisstadt Grimma."
+    )
+    indicia, _ = befund_service.indicia_from(
+        _befund(
+            orte=[
+                {
+                    "name": "Grimma",
+                    "ebene": "gemeinde",
+                    "beziehung": "liegt_in",
+                    "beleg": "Baugrundstück in Großbothen, einem OT von Grimma",
+                },
+                {
+                    "name": "Grimma",
+                    "ebene": "gemeinde",
+                    "beziehung": "entfernt_von",
+                    "entfernung_km": 6,
+                    "beleg": "die ca. 6 km entfernte Kreisstadt Grimma",
+                },
+            ]
+        ),
+        text,
+    )
+    assert [i.beziehung for i in indicia] == ["liegt_in", "entfernt_von"]
+
+
 def test_a_place_the_page_does_not_mention_never_arrives():
     indicia, verdicts = befund_service.indicia_from(
         _befund(

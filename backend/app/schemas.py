@@ -301,9 +301,6 @@ class InseratBefund(BaseModel):
     felder: BefundFelder = Field(default_factory=BefundFelder)
     orte: list[BefundOrt] = Field(default_factory=list)
     flurstuecke: list[BefundFlurstueck] = Field(default_factory=list)
-    # „teilflaeche“, „mehrere-grundstuecke“ — what the model noticed that makes
-    # a figure mean something other than it looks like.
-    vorbehalte: list[str] = Field(default_factory=list)
 
 
 class AbweichungZeile(BaseModel):

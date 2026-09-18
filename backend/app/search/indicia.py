@@ -683,25 +683,61 @@ def district_matches(
     return [entry for entry in directory.entries if fold(base_name(entry.name)) == needle]
 
 
-def municipality_spelling(directory: GemarkungDirectory, name: str) -> str | None:
-    """The directory's own spelling of a municipality, if it knows this name.
+# What a German sentence and the directory's own column both put in front of a
+# municipality: „der Kreisstadt Borna", „Stadt Borna". It states a role, not a
+# name — but a name can *be* one, so exactly one is ever removed. The directory
+# proves the distinction itself: Stadt Wehlen is listed as „Stadt Stadt
+# Wehlen", the column's word in front of a name that begins with the same word.
+# Strip one and the official name is left; strip greedily and it is not.
+#
+# Measured 18.09.2026 over the recorded adverts: „Kreisstadt Borna" and „Stadt
+# Sandersdorf-Brehna" travelled as Gemeinde values, and neither can match
+# anything in ALKIS. It was the model channel that showed it — the same
+# sentences came back from a model as „Borna" and „Brehna".
+_APPELLATIVE_RE = re.compile(
+    r"^\s*(?:gro(?:ß|ss)e\s+)?"
+    r"(?:kreisstadt|landeshauptstadt|universit(?:ä|ae)tsstadt|bergstadt|stadt|"
+    r"gemeinde|marktes|markt)\s+",
+    re.IGNORECASE,
+)
 
-    Compared without „Stadt" and „Kreisstadt", which the column carries and a
-    location field does not, and exactly rather than by substring: „Borna" must
-    not match „Bornaer Land".
+
+def without_appellative(name: str) -> str:
+    """„Kreisstadt Borna" -> „Borna", „Stadt Stadt Wehlen" -> „Stadt Wehlen"."""
+
+    return _APPELLATIVE_RE.sub("", name, count=1).strip() or name
+
+
+def municipality_spelling(directory: GemarkungDirectory, name: str) -> str | None:
+    """The directory's own name for a municipality, if it knows this one.
+
+    Both sides are compared in both forms, as written and with one appellative
+    removed, because either side may carry one and „Stadt Wehlen" is a name
+    that survives only when the written form is tried too. Exactly rather than
+    by substring: „Borna" must not match „Bornaer Land".
     """
 
-    needle = fold(name)
+    wanted = {fold(name), fold(without_appellative(name))}
     for entry in directory.entries:
         if not entry.gemeinde:
             continue
-        spelled = fold(entry.gemeinde)
-        for prefix in ("stadt ", "kreisstadt ", "gemeinde "):
-            if spelled.startswith(prefix):
-                spelled = spelled[len(prefix):]
-        if spelled == needle:
-            return entry.gemeinde
+        bare = without_appellative(entry.gemeinde)
+        if wanted & {fold(entry.gemeinde), fold(bare)}:
+            return bare
     return None
+
+
+def municipality_name(directory: GemarkungDirectory | None, name: str) -> str:
+    """The municipality's own name, out of what a sentence called it.
+
+    The directory decides where it can: a name it knows comes back in its own
+    spelling. Where it cannot — a municipality outside Saxony — the appellative
+    is dropped anyway, because „Stadt Sandersdorf-Brehna" is not a name any
+    register carries either.
+    """
+
+    spelled = municipality_spelling(directory, name) if directory is not None else None
+    return spelled or without_appellative(name)
 
 
 def split_municipality_and_district(
@@ -729,7 +765,7 @@ def split_municipality_and_district(
     inside = [
         entry
         for entry in district_matches(directory, right)
-        if entry.gemeinde and fold(spelled) == fold(entry.gemeinde)
+        if entry.gemeinde and fold(spelled) == fold(without_appellative(entry.gemeinde))
     ]
     return (left, right) if inside else None
 
@@ -1030,6 +1066,7 @@ def _from_location_field(
         if halves:
             municipality, district = halves
     if municipality:
+        municipality = municipality_name(directory, municipality)
         out.append(
             _indiz(
                 counter,
@@ -1122,7 +1159,7 @@ def _from_body(
     # reading of where the plot is -- it is the level above, and it is what
     # tells two districts of the same name apart. Collected first so the
     # district scan below knows which names are already spoken for.
-    municipalities: dict[str, tuple[int, int]] = {}
+    municipalities: dict[str, tuple[str, tuple[int, int]]] = {}
     stated_districts: dict[str, tuple[int, int]] = {}
     for pattern in (_OT_NAMED_RE, _OT_BEFORE_RE, _OT_IS_RE, _OT_PLAIN_RE):
         for match in pattern.finditer(body):
@@ -1136,13 +1173,15 @@ def _from_body(
                 # „Das Grundstück ist … ein Ortsteil von X" -- the shape is the
                 # same and the subject is not a place.
                 continue
-            name = groups["municipality"]
-            municipalities.setdefault(fold(name), match.span("municipality"))
+            # „der Kreisstadt Borna" names Borna. The span stays the one the
+            # sentence has, because that is what the Beleg quotes; only the
+            # value is the name.
+            name = municipality_name(directory, groups["municipality"])
+            municipalities.setdefault(fold(name), (name, match.span("municipality")))
             if district:
                 stated_districts.setdefault(fold(district), match.span("district"))
 
-    for _, (start, end) in municipalities.items():
-        name = body[start:end]
+    for name, (start, end) in municipalities.values():
         out.append(
             _indiz(
                 counter,
