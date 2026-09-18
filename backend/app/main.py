@@ -36,6 +36,7 @@ from .routers import (
     search,
     sitechecks,
     shares,
+    lehrbuch,
     storage,
     tiles,
 )
@@ -514,7 +515,9 @@ def create_app() -> FastAPI:
     # our own database. Worth knowing that one of its routes has no session at
     # all -- a shared link is meant to be opened by whoever was sent it, so the
     # token is the access. See the module docstring.
-    for module in (auth, gemarkungen, storage, shares):
+    # `lehrbuch` is in here too: it reads our own divergence log, which is
+    # either our own Postgres or a file on this machine.
+    for module in (auth, gemarkungen, storage, shares, lehrbuch):
         app.include_router(module.router)
 
     return app

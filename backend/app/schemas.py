@@ -306,6 +306,29 @@ class InseratBefund(BaseModel):
     vorbehalte: list[str] = Field(default_factory=list)
 
 
+class AbweichungZeile(BaseModel):
+    """One row of the divergence log, as the diagnostic view answers it."""
+
+    art: str
+    feld: str
+    regulaer: str | None = None
+    modell: str | None = None
+    beleg: str | None = None
+    grund: str | None = None
+    text_hash: str
+    quelle_url: str | None = None
+    modell_id: str | None = None
+    vorlage: str | None = None
+    gesehen_am: str
+
+
+class Abweichungen(BaseModel):
+    anzahl: int
+    # „postgres" or „datei" — which of the two this deployment is keeping.
+    speicher: str
+    zeilen: list[AbweichungZeile] = Field(default_factory=list)
+
+
 class HousetypeExtractRequest(BaseModel):
     url: HttpUrl
 

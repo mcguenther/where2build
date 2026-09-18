@@ -25,6 +25,7 @@ from .services.nearby import NearbyService
 from .services.oidc import Identity, OidcService
 from .services.overpass import OverpassService
 from .services.preview import PreviewService
+from .services.lehrbuch import Lehrbuch
 from .services.storage import Storage
 from .services.tiles import TileService
 from .settings import Settings, get_settings
@@ -127,6 +128,22 @@ def storage_service() -> Storage:
     return Storage(get_settings().storage)
 
 
+@lru_cache(maxsize=1)
+def lehrbuch() -> Lehrbuch:
+    """The log of where a model and the patterns disagreed.
+
+    Postgres when the deployment has one, a file under the cache directory
+    otherwise. The pool is read at call time rather than captured, because the
+    storage opens in the lifespan and this is built before it.
+    """
+
+    settings = get_settings()
+    return Lehrbuch(
+        settings.app.cache_dir / "abweichungen.jsonl",
+        lambda: getattr(storage_service(), "_pool", None),
+    )
+
+
 NOT_SIGNED_IN = (
     "Für diesen Bereich ist eine Anmeldung nötig. Ohne Konto bleiben die "
     "Grundstücke in diesem Browser und lassen sich dort unverändert weiter "
@@ -226,6 +243,7 @@ def reset_services() -> None:
         llm_client,
         oidc_service,
         storage_service,
+        lehrbuch,
         service_limiter,
         map_limiter,
     ):

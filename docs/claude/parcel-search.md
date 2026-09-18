@@ -870,3 +870,43 @@ also "Decisions that are settled" in `CLAUDE.md`.
   block-rendered, counting fields filled and Belege refused by test 1. Nothing
   in this sandbox has `LLM_API_KEY`, so every model answer here is a recorded
   one and the live call is untested.
+
+- **Where the model and the patterns disagree is the corpus, so it is written
+  down.** `services/lehrbuch.py` files three kinds, and each says something
+  different: a **Lücke** (the patterns found nothing, the model found something
+  the gate accepted — the pattern that is missing, with the sentence it is
+  missing on), a **Widerspruch** (both found something and they differ), and a
+  **Verworfen** (the gate refused the model — the teacher being wrong, and the
+  only kind that can show the gate earning its keep). An *agreement* produces
+  nothing: a log that also holds the cases where the pipeline was right is a
+  log nobody reads.
+
+  Both sides read the same text. The deterministic side is asked at extraction
+  time with `collect_indicia` — the reader the search itself uses — rather than
+  taken from whatever a portal's attribute list happened to carry, or the
+  comparison would be measuring the portal rather than the patterns.
+
+- **The Beleg is what makes the log worth keeping.** It is already proved
+  verbatim against the page by the gate, so it is exactly the sentence a new
+  pattern would be written against and exactly the test case that new pattern
+  needs. Which is also why the listing itself is never stored: `text_hash`
+  names it, so a listing read three times is one row, and re-reading is the
+  normal case — the extraction cache has no expiry and a changed prompt makes
+  every listing new again.
+
+- **Postgres when there is one, a JSONL file otherwise.** A development machine
+  must not need Postgres before it can resolve a parcel, and this sandbox has
+  none — so the file is what makes the log readable here at all. Same writer,
+  same reader, and `GET /api/lehrbuch` says which of the two answered.
+
+- **A Beleg is a whole sentence, and a sentence can carry what the schema
+  cannot.** The extraction schema has no contact fields, so no *value* can be
+  one; a Beleg is free text out of the advert. Telephone numbers and mail
+  addresses are therefore cut out of every Beleg before it is written anywhere,
+  and it is capped at 300 characters. „No contact details are stored" holds for
+  a diagnostic log too.
+
+- **Filing a note never fails a reading.** A listing that was read is read
+  whether or not the note about it could be written, and an extraction that
+  answered 502 because a diagnostic table was missing would be the tail wagging
+  the dog.

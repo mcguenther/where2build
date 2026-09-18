@@ -7,9 +7,10 @@ import re
 from fastapi import APIRouter, Depends
 from pydantic import ValidationError
 
-from ..deps import gemarkung_directory, llm_client, settings_dep
+from ..deps import gemarkung_directory, lehrbuch, llm_client, settings_dep
 from ..errors import BadRequestError, NotConfiguredError, UpstreamError
 from ..schemas import (
+    BEFUND_VORLAGE,
     Extraktionsweg,
     Indiz,
     Inserat,
@@ -22,7 +23,8 @@ from ..schemas import (
 )
 from ..search.indicia import collect_indicia
 from ..services import befund as befund_service
-from ..services.beleg import refusal_note
+from ..services import lehrbuch as lehrbuch_service
+from ..services.beleg import Urteil, refusal_note
 from ..services.llm import LLMClient, fingerprint, normalize_url
 from ..services.portals import PASTE_HINT, fetch_page, is_blocked, is_kleinanzeigen, parse_page
 from ..settings import Settings
@@ -104,19 +106,86 @@ def _area_from(angaben: dict[str, str]) -> int | None:
 
 
 async def _ask_the_model(
-    llm: LLMClient, text: str, known: InseratFelder, start: int = 0
+    llm: LLMClient,
+    text: str,
+    known: InseratFelder,
+    start: int = 0,
+    quelle_url: str | None = None,
 ) -> tuple[InseratFelder, list[Indiz], str | None]:
     """One model call, gated: the fields it may fill, the Indizien, the refusals.
 
     Every value comes back with the sentence it was read from, and every one of
     them is checked against `text` before it is used — which is why this is the
     only place the model's answer is ever unpacked.
+
+    And every disagreement between the two readers is written down on the way
+    past. A model here is a teacher whose answer is never trusted: where it
+    reads something the patterns did not, that is the pattern that is missing,
+    with the sentence it is missing on — and the gate has already proved the
+    sentence stands in the page. See `services/lehrbuch.py`.
     """
 
     befund = await llm.structure(text, InseratBefund, "inserat-befund", _STRUCTURE_TASK)
     fields, field_verdicts = befund_service.fields_from(befund, text, known)
     indicia, indiz_verdicts = befund_service.indicia_from(befund, text, start)
-    return fields, indicia, refusal_note([*field_verdicts, *indiz_verdicts])
+    verdicts = [*field_verdicts, *indiz_verdicts]
+    await _note_divergences(text, known, indicia, verdicts, llm, quelle_url)
+    return fields, indicia, refusal_note(verdicts)
+
+
+async def _note_divergences(
+    text: str,
+    known: InseratFelder,
+    indicia: list[Indiz],
+    verdicts: list[Urteil],
+    llm: LLMClient,
+    quelle_url: str | None,
+) -> None:
+    """File what the two readers disagreed about. Never fails the request.
+
+    The comparison is fair because both sides read the *same* text: the
+    deterministic side is asked here, with the reader the search itself uses,
+    rather than taken from whatever a portal's attribute list happened to
+    carry.
+    """
+
+    patterns = [
+        (indiz.art, indiz.wert)
+        for indiz in collect_indicia(text=text, directory=gemarkung_directory())
+    ]
+    patterns += [
+        ("adresse", known.adresse),
+        ("kaufpreis_eur", _as_text(known.kaufpreis_eur)),
+        ("grundstuecksflaeche_m2", _as_text(known.grundstuecksflaeche_m2)),
+    ]
+    accepted = [(indiz.art, indiz.wert, indiz.beleg) for indiz in indicia]
+    accepted += [
+        (verdict.feld, _as_text(verdict.wert), verdict.beleg)
+        for verdict in verdicts
+        if verdict.angenommen and ":" not in verdict.feld
+    ]
+    refused = [
+        (verdict.feld.split(":")[0], _as_text(verdict.wert), verdict.beleg, verdict.grund)
+        for verdict in verdicts
+        if verdict.verworfen and verdict.wert is not None
+    ]
+    await lehrbuch().record(
+        lehrbuch_service.compare(
+            deterministic=patterns,
+            accepted=accepted,
+            refused=refused,
+            text_hash=lehrbuch_service.fingerprint(text),
+            quelle_url=quelle_url,
+            modell_id=llm.settings.model,
+            vorlage=BEFUND_VORLAGE,
+        )
+    )
+
+
+def _as_text(value: object) -> str | None:
+    if value is None:
+        return None
+    return f"{value:g}" if isinstance(value, float) else str(value)
 
 
 def _merge(deterministic: InseratFelder, extracted: InseratFelder | None) -> InseratFelder:
@@ -216,7 +285,7 @@ async def _from_url(url: str, llm: LLMClient, settings: Settings) -> ListingExtr
         if llm.settings.configured and seite.text:
             try:
                 extracted, indizien, hinweis = await _ask_the_model(
-                    llm, seite.text, deterministic
+                    llm, seite.text, deterministic, quelle_url=url
                 )
             except UpstreamError as exc:
                 if not seite.has_coordinates:
@@ -272,7 +341,9 @@ async def _from_url(url: str, llm: LLMClient, settings: Settings) -> ListingExtr
         if seite is not None
         else InseratFelder()
     )
-    extracted, indizien, hinweis = await _ask_the_model(llm, text, deterministic)
+    extracted, indizien, hinweis = await _ask_the_model(
+        llm, text, deterministic, quelle_url=url
+    )
     return _answer(
         _merge(deterministic, extracted),
         url,
