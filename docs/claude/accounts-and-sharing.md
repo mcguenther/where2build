@@ -267,3 +267,101 @@ server.
   posts nothing and a window that posts and then closes is a race. A sign-in
   that breaks off still lands on the start page with „Die Anmeldung kam nicht
   zustande" — in the small window, which is where it happened.
+
+---
+
+## The administration area
+
+- **A counter that only counts hours cannot stop anything.** The request budget
+  in `app/ratelimit.py` is a sliding hour, and the statistics are hourly rows;
+  both are the right shape for reading and useless for defending. An account
+  that starts scanning is visible at the end of the hour, by which time the
+  hour has happened. So `app/telemetry.py` keeps a *second*, short window per
+  account — 300 calls in 5 minutes by default — and an account that crosses it
+  is blocked in the process that saw it, before the answer is sent. The
+  database is the durable and shared copy: the flush writes local blocks out
+  and reads every block back, so a second worker follows within one flush
+  interval rather than instantly. That is the accepted seam, and it is in the
+  harmless direction: a worker is late to block, never late to unblock.
+
+- **Lifting a block does nothing while the window that caused it is still
+  full.** Measured here: a screenshot run spent 347 calls in an hour, the guard
+  fired, the block was lifted through the API — and the very next request
+  crossed the same line again and was blocked, with nothing on screen saying
+  why. `Recorder.clear_block` drops the account's short window as well now.
+  Lifting a block means the counting starts over; anything else is a button
+  that appears not to work.
+
+- **Map tiles must not be in the burst window.** One screen of a map is dozens
+  of them and a pan is dozens more — a window sized for calls to the cadastre
+  fires on somebody looking at a map. They are counted for the account (they do
+  go outward) and kept out of the window; what bounds them is their own, far
+  wider ceiling in `app/ratelimit.py`. The distinction is one flag at the
+  counting site in `main.py`, and getting it wrong would block ordinary use
+  while looking like a working defence.
+
+- **A blocked administrator must still reach the area that lifts blocks.**
+  `current_account` refuses a blocked account, and `/api/verwaltung/…` takes
+  `signed_in` instead — deliberately, and the only route in the application
+  that does. The first version had `current_admin` depend on `current_account`
+  and the guard could lock the operator out of its own off switch. The pictures
+  in `docs/screenshots/verwaltung-konten-*.png` were taken in exactly that
+  state: the administration area open, the plot list refused with 403.
+
+- **`users` is keyed by issuer and subject, and nothing else in the app speaks
+  that.** Session cookie, API and request budget all carry the *account key* —
+  `sha256(issuer + "\n" + subject)`, first 32 hex characters — so no statement
+  could be joined to a row. The migration adds `kennung` and backfills it in
+  SQL; Postgres would not take it as a generated column, because `convert_to`
+  is stable rather than immutable, so `not null` is the guard instead: an
+  insert that forgets the column fails rather than leaving a row nobody can
+  find.
+
+- **A block cannot hang off `users`.** That row appears on first *write*, and
+  an account worth blocking is exactly one that is spending the upstream budget
+  without necessarily having stored anything. `sperren` is therefore keyed by
+  the account key and references nothing. The same fact shapes the account
+  list: it is a **full outer join** of `users` against `nutzung_konto`, because
+  neither set contains the other, and the row an operator is looking for is
+  usually the one that stored nothing.
+
+- **Promotion needs a row, blocking does not.** So promoting an account that
+  has never stored anything answers 404 with a sentence saying why, rather than
+  reporting success and writing nothing. And demoting the last administrator is
+  refused unless `ADMIN_ACCOUNTS` names one — otherwise the area becomes
+  reachable by nobody, from inside the area itself.
+
+- **The red button that empties the audit trail is not an audit trail.** The
+  wipe takes a scope („konten", „statistik", „sperren") and `pruefprotokoll` is
+  in none of them. The entry is also written *before* the `truncate`, so a wipe
+  that fails half-way still leaves the record that somebody pressed it.
+
+- **Two confirmations that only the browser knows about are one confirmation.**
+  `/datenbank/vorbereiten` hands out a single-use key with a two-minute life
+  tied to the administrator who asked, and `/datenbank/leeren` needs that key
+  *and* the sentence typed back, both checked on the server. Worth knowing
+  behind several workers: the second request has to reach the worker that
+  handed out the key, and otherwise gets a fresh dialog — a wipe that has to be
+  started twice is the harmless direction.
+
+- **503 is not an error, and an error log full of it is one nobody reads.** In
+  this API 503 means „this deployment has no server storage", which is a
+  complete state. The first version logged every failure from 400 up and the
+  list filled with the deployment's own configuration; it records from 500 up
+  now, minus that one. The counterpart: the error list falls back to this
+  process's own ring when there is no database at all, because a page that goes
+  blank exactly when something is wrong is worse than one that says where its
+  numbers come from.
+
+- **A flush that fails must not cost the minute.** `Recorder.put_back` returns
+  the snapshot the database refused, and it is not theoretical: the 502 rows in
+  `docs/screenshots/verwaltung-fehler-hell.png` were recorded while Postgres
+  was stopped and written when it came back.
+
+- **The chart needs the buckets the server has no rows for.** The API answers
+  only hours that were counted; drawn straight, a quiet night closes up and
+  yesterday's bar stands next to this morning's, showing a busy stretch that
+  never happened. `lib/period.js:fillSeries` pads the period out, and an hour
+  with no row is a bar of height zero — which for a counter is what "no
+  request" looks like. A period with nothing in it at all still says so in
+  words rather than drawing a flat line.

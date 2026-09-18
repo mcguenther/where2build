@@ -77,7 +77,7 @@ export async function authState() {
   try {
     return await request("/auth/me");
   } catch {
-    return { eingerichtet: false, angemeldet: false, name: null, kennung: null };
+    return { eingerichtet: false, angemeldet: false, name: null, kennung: null, verwalter: false };
   }
 }
 
@@ -105,6 +105,56 @@ export const createShare = (dokument, umfang) =>
 export const sharesOnServer = () => request("/shares");
 export const deleteShare = token => request(`/shares/${encodeURIComponent(token)}`, { method: "DELETE" });
 export const sharedPlot = token => request(`/shares/${encodeURIComponent(token)}`);
+
+/* ---------- The administration area ----------
+ * Every one of these answers 403 for somebody who is not an administrator, so
+ * the interface may draw the way in from `authState().verwalter` and still not
+ * be what grants anything. 503 means this deployment has no database: the
+ * statistics need one, the error list deliberately does not.
+ *
+ * The period is passed as two ISO moments rather than as "last week", because
+ * the picker offers a free range and a server that parsed „letzte Woche" would
+ * have to agree with the browser about where the week starts. */
+const period = (von, bis) =>
+  `?von=${encodeURIComponent(von.toISOString())}&bis=${encodeURIComponent(bis.toISOString())}`;
+
+export const adminOverview = () => request("/verwaltung/uebersicht");
+export const adminStatistics = (von, bis, raster = "stunde") =>
+  request(`/verwaltung/statistik${period(von, bis)}&raster=${raster}`);
+export const adminAccounts = (von, bis) => request(`/verwaltung/konten${period(von, bis)}`);
+export const adminSetRole = (kennung, ist_admin) =>
+  request(`/verwaltung/konten/${encodeURIComponent(kennung)}/rolle`, {
+    method: "POST",
+    body: JSON.stringify({ ist_admin })
+  });
+export const adminBlock = (kennung, minuten, grund) =>
+  request(`/verwaltung/konten/${encodeURIComponent(kennung)}/sperre`, {
+    method: "POST",
+    body: JSON.stringify({ minuten, grund })
+  });
+export const adminUnblock = kennung =>
+  request(`/verwaltung/konten/${encodeURIComponent(kennung)}/sperre`, { method: "DELETE" });
+export const adminDeleteAccount = kennung =>
+  request(`/verwaltung/konten/${encodeURIComponent(kennung)}`, { method: "DELETE" });
+export const adminErrors = (von, bis, anzahl = 200) =>
+  request(`/verwaltung/fehler${period(von, bis)}&anzahl=${anzahl}`);
+/** The download is a plain link, not a fetch: the browser saves it under the
+ *  name the Content-Disposition carries, and a blob built here would not. */
+export const adminErrorDownloadUrl = (von, bis) => `${BASE}/verwaltung/fehler.ndjson${period(von, bis)}`;
+export const adminShares = () => request("/verwaltung/freigaben");
+export const adminDeleteShare = token =>
+  request(`/verwaltung/freigaben/${encodeURIComponent(token)}`, { method: "DELETE" });
+export const adminSweepShares = () => request("/verwaltung/freigaben/aufraeumen", { method: "POST" });
+export const adminServices = () => request("/verwaltung/dienste");
+export const adminClearCache = name =>
+  request("/verwaltung/cache/leeren", { method: "POST", body: JSON.stringify({ name }) });
+export const adminAudit = () => request("/verwaltung/protokoll");
+export const adminPrepareWipe = () => request("/verwaltung/datenbank/vorbereiten", { method: "POST" });
+export const adminWipe = (schluessel, bestaetigung, umfang) =>
+  request("/verwaltung/datenbank/leeren", {
+    method: "POST",
+    body: JSON.stringify({ schluessel, bestaetigung, umfang })
+  });
 
 export const plotsOnServer = () => request("/plots");
 export const putPlot = (id, dokument, geaendert_am) =>

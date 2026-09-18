@@ -308,6 +308,7 @@ nothing else.
 | `POST`, `GET` | `/api/shares` | share a plot by link, and list one's own. What travels beyond the plot's registered facts is switched on per link and defaults to off |
 | `GET`, `DELETE` | `/api/shares/{token}` | the shared snapshot, and withdrawing it. The `GET` has no session: the token is the access |
 | `GET` | `/api/shares/{token}/vorschau.jpg` | the 1200 × 630 card a chat shows for that link, drawn server-side and kept for the life of the share |
+| `GET`, `POST`, `DELETE` | `/api/verwaltung/…` | the administration area: figures, statistics over a chosen period, accounts and what they used, blocking, the error log (also as NDJSON), the shared links, the caches, the audit trail and the wipe. Every route needs an administrator |
 | `GET` | `/api/shares/{token}/vorschau-kopf` | the plot's `og:` tags as an HTML fragment; nginx splices it into the head of `index.html` on `/geteilt/…`, so a preview bot gets them without the app having to run |
 
 ## Configuration
@@ -418,6 +419,50 @@ nginx fetches the plot's `og:` tags from the backend and splices them into the
 head before the file goes out. Bot or browser, both get the same page and the
 same tags — there is nothing to recognise and nothing to keep a list of. Every
 other page ships the include as an inert HTML comment and costs no request.
+
+### Administration
+
+Optional like the rest of the account half, and configured in one line:
+
+```
+ADMIN_ACCOUNTS=88bcdb29…,f3d01e1d…   # account keys, comma separated
+ADMIN_FLUSH_S=30                     # how often the counters are written out
+ADMIN_RETENTION_DAYS=90              # how long counters and errors are kept
+ADMIN_BURST_CALLS=300                # calls in the window before an automatic block
+ADMIN_BURST_WINDOW_S=300
+ADMIN_AUTO_BLOCK_MINUTES=60
+```
+
+`ADMIN_ACCOUNTS` holds **account keys** — the same non-speaking identifier
+`/api/auth/me` reports and the account page shows, never a mail address, which
+this application does not collect. It is the bootstrap and nothing else:
+everybody else is promoted in the interface, where the flag lives in the
+database. An account key identifies, it does not authenticate, so a list of
+them in the environment grants nothing to anybody who cannot already sign in as
+that person — and it is what survives an empty `users` table, including the one
+the red button leaves behind.
+
+Signed in as one of them, the header carries **„Verwaltung"** and
+`/verwaltung` opens: figures and the service lights, statistics over a period
+(24 hours, 7 days, 30 days or a free range, by hour or by day), the accounts
+with what each spent, the error log with an NDJSON download, the shared links,
+the caches, the audit trail, and — behind two confirmations, one of them a
+sentence typed back and checked on the server — emptying the database.
+
+Nothing was counted before this. The counters are aggregates: one row per hour,
+area and outcome with nobody in them, and one per hour and account for the
+question "who". No row per request, so nothing records when a single call
+happened. They are swept after `ADMIN_RETENTION_DAYS`.
+
+The **burst guard** is the part that acts inside the hour. The request budget
+below counts a whole hour, and by the time an hour is visible it has happened;
+an account that crosses `ADMIN_BURST_CALLS` inside `ADMIN_BURST_WINDOW_S` is
+therefore blocked on the spot — in the worker that saw it immediately, in the
+database on the next flush, and for `ADMIN_AUTO_BLOCK_MINUTES`. Map tiles are
+counted for the account but kept out of that window: one screen of a map is
+dozens of them. A blocked account still reaches the administration area if it
+has it, because a guard that locks the operator out of the page that lifts
+blocks is a guard with no way back.
 
 ### Request budget
 

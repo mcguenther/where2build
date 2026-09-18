@@ -46,7 +46,7 @@ export const state = reactive({
    * is the only one who knows, and it says so on every load. `eingerichtet`
    * false means this deployment has no accounts at all, which is the state the
    * app shipped in and still works in. */
-  account: { eingerichtet: false, angemeldet: false, name: null, kennung: null },
+  account: { eingerichtet: false, angemeldet: false, name: null, kennung: null, verwalter: false },
   /* The account's copy, and how it is doing. `active` false covers both a
    * deployment without a store and a signed-out browser, which behave the
    * same way from here: everything stays local. `adoption` is set once, when

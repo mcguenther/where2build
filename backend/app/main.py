@@ -8,7 +8,9 @@ their answers in a cache, and turning pages into structured suggestions.
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import time
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator
 
@@ -22,6 +24,7 @@ from . import __version__
 from .address_index import AddressIndex
 from .errors import AppError
 from .routers import (
+    admin,
     auth,
     basemap,
     gemarkungen,
@@ -41,6 +44,8 @@ from .routers import (
 )
 from .deps import (
     address_index,
+    admin_store,
+    oidc_service,
     gemarkung_directory,
     map_budget,
     nearby_service,
@@ -48,6 +53,7 @@ from .deps import (
     storage_service,
 )
 from .ratelimit import allowance_text, tile_allowance_text, window_text
+from .telemetry import AREA_REQUEST, RESULT_ERROR, RESULT_LIMIT, RESULT_OK, recorder
 from .services import ocr
 from .services.storage import mib
 from .schemas import DienstStatus, HealthResponse
@@ -250,6 +256,68 @@ def _adressen_hinweis(index: AddressIndex | None) -> str:
     )
 
 
+# Routes whose calls are counted for the account but kept out of the burst
+# window: one screen of a map is dozens of tiles and a pan is dozens more, so a
+# window sized for calls to the cadastre would fire on somebody looking at a
+# map. Their own, far wider ceiling is in ``app/ratelimit.py``.
+TILE_PREFIXES = ("/api/tiles", "/api/basemap")
+
+# What is not counted at all. The health endpoint is what a container probe
+# calls every few seconds, and counting it would bury every real number under
+# it.
+UNCOUNTED = ("/api/health",)
+
+
+def _outcome(status: int) -> str:
+    """How one answer is counted.
+
+    A refused budget is its own outcome rather than an error: it is the ceiling
+    working, and counting it as a failure would make a healthy deployment look
+    broken. Everything from 400 up otherwise is a failure -- including a 404,
+    which on this API means a request nobody should have sent.
+    """
+
+    if status == 429:
+        return RESULT_LIMIT
+    return RESULT_OK if status < 400 else RESULT_ERROR
+
+
+async def flush_once(store: Any, *, sweep: bool = False) -> None:
+    """Write one round of counters out, and read the blocks back.
+
+    Put back rather than dropped when the database refuses: without that, a
+    minute of Postgres being down is a minute missing from the statistics, and
+    an automatic block placed in that minute would never reach the other
+    workers.
+    """
+
+    tally = recorder()
+    snapshot = tally.drain()
+    try:
+        await store.flush(snapshot)
+        tally.adopt_blocks(await store.blocks())
+        if sweep:
+            await store.sweep(get_settings().admin.retention_days)
+    except Exception as exc:  # noqa: BLE001 -- the flush may never take a request down
+        tally.put_back(snapshot)
+        logger.warning("Could not write the usage counters: %s", exc)
+
+
+async def _flush_loop() -> None:
+    """The background writer. One task per process, started by the lifespan."""
+
+    settings = get_settings().admin
+    store = admin_store()
+    # An hour's worth of flushes between sweeps: the retention is in days, so
+    # anything more often is work for nothing.
+    per_sweep = max(1, 3600 // max(1, settings.flush_s))
+    rounds = 0
+    while True:
+        await asyncio.sleep(settings.flush_s)
+        rounds += 1
+        await flush_once(store, sweep=rounds % per_sweep == 0)
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     """Open the server storage, or do nothing at all.
@@ -272,10 +340,47 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         await store.start()
     except AppError as exc:
         logger.warning("Server storage did not open at start-up: %s", exc.message)
+    # The counters are written by one task per process, and only where there is
+    # somewhere to write them. Without a database they stay in memory, which is
+    # what the administration area then reads and says so about.
+    writer = asyncio.create_task(_flush_loop()) if store.configured else None
     try:
         yield
     finally:
+        if writer is not None:
+            writer.cancel()
+            # One last round, so a shutdown does not throw away the minute that
+            # was still in memory.
+            await flush_once(admin_store())
         await store.close()
+
+
+def _note_error(request: Request, status: int, message: str) -> None:
+    """Keep a failure where an operator can read it -- if it is one.
+
+    Only from 500 up, and 503 is the exception inside that: in this API it
+    means "this deployment has no server storage", which is a complete state
+    and not a fault -- every deployment without a database would otherwise
+    write itself an error log full of the fact. Everything below 500 is the
+    request being wrong rather than the server: a 404, a 422 and a refused
+    budget are answers, and a log full of them is one nobody reads. 502 and
+    504 are in, and they are the whole point -- an authority that is down is
+    the failure this deployment has most often and can do least about.
+    """
+
+    if status < 500 or status == 503:
+        return
+    route = request.scope.get("route")
+    identity = oidc_service().session_identity(
+        request.cookies.get(oidc_service().settings.cookie_name)
+    )
+    recorder().error(
+        AREA_REQUEST,
+        message,
+        status=status,
+        route=getattr(route, "path", None) or request.url.path,
+        kennung=identity.account_key if identity else None,
+    )
 
 
 def create_app() -> FastAPI:
@@ -297,10 +402,55 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    @app.middleware("http")
+    async def _count_request(request: Request, call_next: Any) -> Any:
+        """Count every call to this API, for the deployment and for the account.
+
+        Here rather than in each router: this is the one place every route
+        passes through, and a counter somebody has to remember to add is one
+        that is missing from the route added next.
+
+        What is counted is the route *template* -- „/api/parcels/{id}" and not
+        the id -- so the table holds one row per endpoint rather than one per
+        parcel anybody looked at, and so a scanner cannot grow it by inventing
+        paths.
+        """
+
+        path = request.url.path
+        if not path.startswith("/api/") or path in UNCOUNTED:
+            return await call_next(request)
+        started = time.perf_counter()
+        status = 500
+        try:
+            response = await call_next(request)
+            status = response.status_code
+            return response
+        finally:
+            route = request.scope.get("route")
+            name = getattr(route, "path", None) or "unbekannt"
+            result = _outcome(status)
+            tally = recorder()
+            tally.count(
+                AREA_REQUEST,
+                name,
+                result,
+                duration_ms=int((time.perf_counter() - started) * 1000),
+            )
+            identity = oidc_service().session_identity(
+                request.cookies.get(oidc_service().settings.cookie_name)
+            )
+            if identity is not None:
+                tally.spend(
+                    identity.account_key,
+                    failed=result == RESULT_ERROR,
+                    burst=not path.startswith(TILE_PREFIXES),
+                )
+
     @app.exception_handler(AppError)
-    async def _app_error(_: Request, exc: AppError) -> JSONResponse:
+    async def _app_error(request: Request, exc: AppError) -> JSONResponse:
         # `body` is the sentence for almost every error and a little more for
         # a write conflict, which has to carry what is stored.
+        _note_error(request, exc.status_code, exc.message)
         return JSONResponse(
             status_code=exc.status_code, content=exc.body, headers=exc.headers
         )
@@ -322,9 +472,12 @@ def create_app() -> FastAPI:
         return JSONResponse(status_code=422, content=readable_validation_error(exc.errors()))
 
     @app.exception_handler(Exception)
-    async def _unhandled(_: Request, exc: Exception) -> JSONResponse:
-        # Never let a stack trace reach the browser.
+    async def _unhandled(request: Request, exc: Exception) -> JSONResponse:
+        # Never let a stack trace reach the browser. The operations page gets
+        # the exception's own line, which is more than „Unerwarteter Fehler"
+        # and still not a trace.
         logger.exception("Unhandled error", exc_info=exc)
+        _note_error(request, 500, f"{type(exc).__name__}: {exc}")
         return JSONResponse(
             status_code=500,
             content={"detail": "Unerwarteter Fehler im Server."},
@@ -514,7 +667,11 @@ def create_app() -> FastAPI:
     # our own database. Worth knowing that one of its routes has no session at
     # all -- a shared link is meant to be opened by whoever was sent it, so the
     # token is the access. See the module docstring.
-    for module in (auth, gemarkungen, storage, shares):
+    # `admin` belongs with them: it speaks only to our own database and to the
+    # cache directory. Its own budget is the one that matters -- every route in
+    # it is behind `current_admin`, and an administrator who is blocked by the
+    # burst guard would be blocked out of the page that lifts the block.
+    for module in (auth, gemarkungen, storage, shares, admin):
         app.include_router(module.router)
 
     return app

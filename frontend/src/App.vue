@@ -37,6 +37,12 @@
              but the start page then says so in words instead of the app being
              silent about it, which is what made this look broken. -->
         <div v-if="state.account.angemeldet" class="account">
+          <!-- Only for whoever administers this instance. Beside the account
+               rather than among the sections: it is about the deployment, not
+               about a part of somebody's work. -->
+          <RouterLink v-if="state.account.verwalter" class="account__admin"
+                      :to="{ name: 'admin' }"
+                      :aria-current="$route.meta.section === 'admin' ? 'page' : null">Verwaltung</RouterLink>
           <!-- The name is the way to the account page: what is stored, and how
                to get rid of it. A section of its own would put it beside the
                work, which is not what it is about. -->
@@ -229,6 +235,18 @@ main{ flex: 1; padding-top: var(--w2b-space-5); }
 .sync-error{ padding-top: var(--w2b-space-3); font-size: var(--w2b-text-s); color: var(--w2b-error); }
 
 .account{ display: flex; align-items: center; gap: var(--w2b-space-2); }
+/* A link, not a button: it goes to a page like the name beside it does. */
+.account__admin{
+  font-size: var(--w2b-text-xs);
+  color: var(--w2b-primary);
+  text-decoration: none;
+  border: 1px solid var(--w2b-line);
+  border-radius: var(--w2b-radius-full);
+  padding: 2px var(--w2b-space-2);
+  white-space: nowrap;
+}
+.account__admin:hover{ border-color: var(--w2b-primary); }
+.account__admin[aria-current="page"]{ background: var(--w2b-primary-veil); border-color: var(--w2b-primary); }
 .account__initials{
   display: grid; place-items: center; width: 28px; height: 28px; border-radius: var(--w2b-radius-full);
   background: var(--w2b-primary); color: var(--w2b-primary-on);
