@@ -426,6 +426,35 @@ of Overpass or a local extract, the listing portals, and the extraction model.
   one case where the host name gives nothing — the port is the only signal. A
   compose file that names the service `ollama` is caught by the name.
 
+- **The OpenRouter default is `google/gemini-2.5-flash-lite`, and it was
+  measured.** 18.09.2026, the 16 recorded adverts through the real extraction
+  path — `_ask_the_model`, the Beleg gate, the divergence log — against six
+  models with `structured_outputs` in OpenRouter's own model list. $0,28 for
+  the whole exercise.
+
+  | Modell | s/Inserat | $/Inserat | ok | einig | lücke | verworfen |
+  |---|---|---|---|---|---|---|
+  | `mistralai/mistral-small-24b` | 6,1 | 0,00015 | 16/16 | 26 | 19 | 8 |
+  | `google/gemini-2.5-flash-lite` | 2,5 | 0,00054 | 16/16 | 25 | 22 | 6 |
+  | `deepseek/deepseek-v4-flash` | 84 | 0,0011 | 16/16 | 26 | 39 | 3 |
+  | `z-ai/glm-4.7-flash` | 67 | 0,0014 | 13/16 | 21 | 30 | 9 |
+  | `openai/gpt-5-nano` | 53 | 0,0028 | 16/16 | 28 | 23 | 6 |
+  | `qwen/qwen3.5-flash` | — | — | 1/16 | — | — | — |
+
+  Three things the table is: **`qwen/qwen3.5-flash` is broken, not weak** — to a
+  `response_format` request it answers `"-0.5749816320421072"`, a bare number,
+  and fails 15 of 16. `z-ai/glm-4.7-flash` returns an empty or unparseable
+  answer three times. And the three slow ones are *reasoning* models: deepseek
+  emits 5 232 output tokens per advert, gpt-5-nano 6 546, glm 3 187, against
+  Flash Lite's 706. That is where both the seconds and the dollars go, and
+  `/api/listings/extract` is a call the assistant makes while somebody waits.
+
+  What the table is not is a quality verdict. It says every working model got
+  the hard case right — advert 2418686487 names only „Kaufpreis pro m²:
+  92,00 €", and all five left `kaufpreis_eur` null while the pattern reader
+  returns 92. `mistralai/mistral-small-24b` is the one that found no area
+  there, which is why the cheapest option is not the default.
+
 - **A local Ollama needs no key, and demanding one would make the only free
   provider the only one nobody can try.** `needs_key` is false there, and
   `configured` then asks for an endpoint instead.

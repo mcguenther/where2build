@@ -436,7 +436,13 @@ LLMAnbieter = Literal["auto", "openai", "anthropic", "openrouter", "ollama", "ko
 LLM_DEFAULTS: dict[str, tuple[str, str]] = {
     "openai": ("https://api.openai.com/v1", "gpt-4o-mini"),
     "anthropic": ("https://api.anthropic.com/v1", "claude-opus-5"),
-    "openrouter": ("https://openrouter.ai/api/v1", "openai/gpt-4o-mini"),
+    # Measured 18.09.2026 over the 16 recorded adverts, through the real
+    # extraction path: 16/16 schema-conformant, 2,5 s and $0,0005 per advert.
+    # The alternatives lose on one of the three -- `mistral-small-24b` is
+    # cheaper and misses areas, and every reasoning model (deepseek-v4-flash,
+    # gpt-5-nano, glm-4.7-flash) spends 50 to 85 seconds per advert in a call
+    # the assistant makes while the user waits. See `docs/claude/services.md`.
+    "openrouter": ("https://openrouter.ai/api/v1", "google/gemini-2.5-flash-lite"),
     # A local Ollama needs no key and is the one provider where the default
     # endpoint is on this machine.
     "ollama": ("http://127.0.0.1:11434/v1", "llama3.1"),
