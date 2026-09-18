@@ -21,6 +21,8 @@ import { flushPromises } from "@vue/test-utils";
 import App from "../src/App.vue";
 import AdminView from "../src/views/AdminView.vue";
 import AdminStats from "../src/components/admin/AdminStats.vue";
+import AdminAccounts from "../src/components/admin/AdminAccounts.vue";
+import AdminOperations from "../src/components/admin/AdminOperations.vue";
 import AdminDanger from "../src/components/admin/AdminDanger.vue";
 import UsageChart from "../src/components/admin/UsageChart.vue";
 import { state } from "../src/lib/store.js";
@@ -42,10 +44,26 @@ const STATISTICS = {
     { zeit: "2026-09-18T07:00:00Z", anfragen: 8, fehler: 3, limitiert: 1, dauer_ms: 3200, tokens_ein: 0, tokens_aus: 0 }
   ],
   nach_dienst: [
-    { bereich: "dienst", dienst: "ALKIS", anfragen: 15, fehler: 3, limitiert: 0, dauer_ms: 4500, tokens_ein: 0, tokens_aus: 0 },
-    { bereich: "modell", dienst: "test/model", anfragen: 5, fehler: 0, limitiert: 1, dauer_ms: 1100, tokens_ein: 900, tokens_aus: 300 }
+    { bereich: "dienst", dienst: "ALKIS", anfragen: 15, fehler: 3, limitiert: 0, dauer_ms: 4500, tokens_ein: 0, tokens_aus: 0, kosten_eur: null },
+    { bereich: "modell", dienst: "test/model", anfragen: 5, fehler: 0, limitiert: 1, dauer_ms: 1100, tokens_ein: 900, tokens_aus: 300, kosten_eur: 0.0012 },
+    { bereich: "suche", dienst: "bestaetigt", anfragen: 6, fehler: 0, limitiert: 0, dauer_ms: 0, tokens_ein: 0, tokens_aus: 0, kosten_eur: null },
+    { bereich: "suche", dienst: "erfolglos", anfragen: 2, fehler: 0, limitiert: 0, dauer_ms: 0, tokens_ein: 0, tokens_aus: 0, kosten_eur: null }
   ],
-  summe: { anfragen: 20, fehler: 3, limitiert: 1, dauer_ms: 5600, tokens_ein: 900, tokens_aus: 300 }
+  summe: {
+    anfragen: 20, fehler: 3, limitiert: 1, dauer_ms: 5600,
+    tokens_ein: 900, tokens_aus: 300, kosten_eur: 0.0012
+  },
+  vergleich: null,
+  vergleich_summe: null,
+  preise: {
+    vorhanden: true,
+    stand: "2026-09-18T07:00:00Z",
+    usd_je_eur: 1.1481,
+    kurs_stand: "2026-09-17",
+    quellen: {},
+    modelle: 445,
+    hinweis: null
+  }
 };
 
 /** Answer by path, so a test says what the server holds rather than what the
@@ -190,6 +208,201 @@ describe("the statistics", () => {
     expect(calls[1]).toContain("raster=tag");
     expect(calls[1]).toContain("von=");
     expect(calls[1]).toContain("bis=");
+  });
+});
+
+describe("what the numbers must not claim", () => {
+  it("shows a dash where no price is known, never 0,00 €", async () => {
+    globalThis.fetch = serve({ "/verwaltung/statistik": ok(STATISTICS) });
+
+    const view = mountWithRouter(AdminStats);
+    await flushPromises();
+
+    const rows = view.findAll("tbody tr").map(row => row.text());
+    const cadastre = rows.find(row => row.includes("ALKIS"));
+    const model = rows.find(row => row.includes("test/model"));
+    expect(cadastre).toContain("—");
+    expect(cadastre).not.toContain("0,00 €");
+    expect(model).toContain("€");
+  });
+
+  it("reads the search outcomes out of the same numbers", async () => {
+    globalThis.fetch = serve({ "/verwaltung/statistik": ok(STATISTICS) });
+
+    const view = mountWithRouter(AdminStats);
+    await flushPromises();
+
+    // Six of eight searches were settled by an official statement.
+    expect(view.text()).toContain("Suchergebnisse");
+    expect(view.text()).toContain("Bestätigt");
+    expect(view.text()).toContain("75 %");
+  });
+
+  it("asks for the earlier period only when the switch is on", async () => {
+    const calls = [];
+    globalThis.fetch = vi.fn(path => {
+      calls.push(String(path));
+      return Promise.resolve(ok(STATISTICS));
+    });
+
+    const view = mountWithRouter(AdminStats);
+    await flushPromises();
+    expect(calls[0]).toContain("vergleich=false");
+
+    await view.find("input[type=checkbox]").setValue(true);
+    await flushPromises();
+    expect(calls[calls.length - 1]).toContain("vergleich=true");
+  });
+
+  it("lays the earlier period over the bars on one scale", async () => {
+    const points = [
+      { zeit: "2026-09-18T06:00:00Z", anfragen: 4, fehler: 0 },
+      { zeit: "2026-09-18T07:00:00Z", anfragen: 6, fehler: 0 }
+    ];
+    const before = [
+      { zeit: "2026-09-17T06:00:00Z", anfragen: 40, fehler: 0 },
+      { zeit: "2026-09-17T07:00:00Z", anfragen: 20, fehler: 0 }
+    ];
+
+    const chart = mountWithRouter(UsageChart, { props: { points, vergleich: before } });
+
+    expect(chart.find("polyline.chart__before").exists()).toBe(true);
+    // One scale for both: the taller of the two sets the maximum, so today's
+    // four calls do not look like a busy day.
+    expect(chart.vm.max).toBe(40);
+  });
+});
+
+describe("a deployment with many accounts", () => {
+  const PAGE = {
+    von: "2026-09-17T08:00:00Z",
+    bis: "2026-09-18T08:00:00Z",
+    gesamt: 431,
+    offset: 0,
+    limit: 25,
+    konten: [
+      {
+        kennung: "8f1c47110000000000000000000000ab",
+        anzeigename: "Erika Musterfrau",
+        angelegt: "2026-09-01T10:00:00Z",
+        ist_admin: false,
+        grundstuecke: 2,
+        freigaben: 0,
+        bytes: 4096,
+        anfragen: 120,
+        fehler: 1,
+        tokens_ein: 0,
+        tokens_aus: 0,
+        zuletzt_aktiv: "2026-09-18T07:00:00Z",
+        gesperrt_bis: null,
+        gesperrt_grund: null,
+        gesperrt_automatisch: false
+      }
+    ]
+  };
+
+  it("asks for one page and says where in the list it is", async () => {
+    const calls = [];
+    globalThis.fetch = vi.fn(path => {
+      calls.push(String(path));
+      return Promise.resolve(ok(PAGE));
+    });
+
+    const view = mountWithRouter(AdminAccounts);
+    await flushPromises();
+
+    expect(calls[0]).toContain("limit=25");
+    expect(view.text()).toContain("1–25 von 431");
+
+    await view.findAll("button").find(button => button.text() === "Weiter").trigger("click");
+    await flushPromises();
+    expect(calls[calls.length - 1]).toContain("offset=25");
+  });
+
+  it("starts a new search at the top of the list", async () => {
+    const calls = [];
+    globalThis.fetch = vi.fn(path => {
+      calls.push(String(path));
+      return Promise.resolve(ok({ ...PAGE, offset: 25 }));
+    });
+
+    const view = mountWithRouter(AdminAccounts);
+    await flushPromises();
+    view.vm.offset = 50;
+    await view.find("input[type=search]").setValue("Musterfrau");
+    await view.findAll("button").find(button => button.text() === "Suchen").trigger("click");
+    await flushPromises();
+
+    const last = calls[calls.length - 1];
+    expect(last).toContain("offset=0");
+    expect(last).toContain("suche=Musterfrau");
+  });
+});
+
+describe("the announcement", () => {
+  it("stands over every page while it is switched on", async () => {
+    state.account = { ...state.account, verwalter: false };
+    globalThis.fetch = serve({
+      "/ansage": ok({ text: "Wartung heute ab 18 Uhr.", art: "warnung", sichtbar: true }),
+      "/auth/me": ok({ ...state.account })
+    });
+
+    const app = mountWithRouter(App);
+    await flushPromises();
+
+    expect(app.text()).toContain("Wartung heute ab 18 Uhr.");
+    expect(app.find(".ansage--warnung").exists()).toBe(true);
+  });
+
+  it("shows nothing at all when there is nothing to say", async () => {
+    globalThis.fetch = serve({ "/ansage": ok({ text: "", art: "hinweis", sichtbar: false }) });
+
+    const app = mountWithRouter(App);
+    await flushPromises();
+
+    expect(app.find(".ansage").exists()).toBe(false);
+  });
+});
+
+describe("the recurring jobs", () => {
+  it("says when nothing is there to pick a run up", async () => {
+    globalThis.fetch = serve({
+      "/verwaltung/jobs": ok({
+        jobs: [
+          {
+            name: "poi-index",
+            zeitplan: "20 4 1 */3 *",
+            warum: "Die Orte hinter /api/nearby.",
+            befehl: ["python", "scripts/build_poi_index.py"],
+            zuletzt: null,
+            exit_code: null,
+            dauer_s: null,
+            laeuft: false,
+            angefordert: null
+          }
+        ],
+        scheduler_zuletzt: null,
+        scheduler_laeuft: false,
+        hinweis: "Zurzeit läuft kein Scheduler. Angeforderte Läufe bleiben liegen."
+      }),
+      "/verwaltung/dienste": ok({
+        caches: [], cache_bytes: 0, cache_grenze_bytes: 100, kontingent_dienste: 600,
+        kontingent_kacheln: 6000, kontingent_fenster_s: 3600, kontingent_aktiv: true,
+        sperre_ab: 300, sperre_fenster_s: 300, sperre_dauer_min: 60, aufbewahrung_tage: 90
+      }),
+      "/verwaltung/ansage": ok({ text: "", art: "hinweis", sichtbar: false, bis: null }),
+      "/health": ok({
+        version: "0.1.0",
+        dienste: [{ name: "alkis", konfiguriert: true, endpunkt: "https://…", hinweis: "Flurstücke." }]
+      })
+    });
+
+    const view = mountWithRouter(AdminOperations);
+    await flushPromises();
+
+    expect(view.text()).toContain("kein Scheduler");
+    expect(view.text()).toContain("poi-index");
+    expect(view.text()).toContain("noch nie gelaufen");
   });
 });
 

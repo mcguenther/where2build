@@ -365,3 +365,32 @@ server.
   with no row is a bar of height zero — which for a counter is what "no
   request" looks like. A period with nothing in it at all still says so in
   words rather than drawing a flat line.
+
+- **A price is not a measurement, and the two must not share a code path.**
+  Tokens are counted here; what they cost is a claim about somebody else's
+  price list. So the prices are a committed file with a date on it
+  (`ops/llm-preise.json`) and `app/prices.py` answers `None` for everything it
+  cannot say — a model the file does not list, a file that will not parse, a
+  missing exchange rate. The one thing it must never return is 0,00 €, which is
+  the same mistake as computing a figure from `null`. Written by
+  `scripts/update_llm_prices.py` from OpenRouter's own `/api/v1/models` and the
+  ECB's daily rate rather than by asking a model: the provider *publishes* the
+  numbers, and a model asked the same question is reciting a page at best.
+
+- **The button that starts a job must not be the thing that runs it.** The
+  index rebuilds write into `backend/data`, which the API mounts read-only, and
+  they take minutes. So „Jetzt starten" writes a request file into the state
+  directory both containers already share and the scheduler claims it on its
+  next tick — in the container that has the writable mount and the lock against
+  a second copy. Two consequences worth keeping: the request is *removed* when
+  claimed, so a failing job is not restarted every twenty seconds; and a
+  deployment without the `scheduled-jobs` profile has nothing to claim it, so
+  the scheduler writes a heartbeat and the page says „kein Scheduler" instead
+  of offering a button whose effect never arrives.
+
+- **Every list in the area is paged from the first version.** Not when it
+  hurts: the account list is a full outer join over `users` and
+  `nutzung_konto`, and the deployment where somebody needs to look an account
+  up is exactly the one with a thousand of them. The order in every paged query
+  ends in a unique column, because a paged list whose rows can swap places
+  between pages shows some of them twice and others never.

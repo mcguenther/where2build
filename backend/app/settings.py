@@ -421,6 +421,13 @@ class LLMSettings(BaseSettings):
     api_key: SecretStr | None = None
     model: str = "openai/gpt-4o-mini"
     fetch_engine: Literal["openrouter", "exa", "parallel", "native", "auto"] = "openrouter"
+    # The price list behind the cost column in the administration area. A file
+    # rather than a constant, because a price is a claim about somebody else's
+    # price list and goes stale; ``scripts/update_llm_prices.py`` writes it
+    # from the provider's own endpoint and it is committed, so every change is
+    # a diff. Absent, the tokens are still counted and the money column says
+    # so -- never 0,00 €.
+    prices_path: Path = Path("ops/llm-preise.json")
     timeout_s: int = 120
     max_content_tokens: int = 50000
 
@@ -601,6 +608,12 @@ class AdminSettings(BaseSettings):
     # process as well so a deployment without a database is not silent about
     # its own failures. Bounded: an outage produces one of these per request.
     error_buffer: int = Field(default=500, ge=1)
+    # The recurring jobs, as the administration area shows them. The list is
+    # the same file the scheduler reads and the records are the same directory
+    # it writes -- see ``app/jobs.py`` for why a "run now" here writes a
+    # request instead of running anything itself.
+    jobs_file: Path = Field(default=Path("ops/jobs.json"), validation_alias="JOBS_FILE")
+    state_dir: Path = Field(default=Path("/state"), validation_alias="JOBS_STATE_DIR")
 
     @property
     def bootstrap_accounts(self) -> tuple[str, ...]:

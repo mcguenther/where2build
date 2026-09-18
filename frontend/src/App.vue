@@ -58,6 +58,17 @@
       </div>
     </header>
 
+    <!-- What the operator has to say, if anything. Above the work and below
+         the header: a maintenance window is not a section of the application,
+         and a banner nobody sees is not a banner. -->
+    <div v-if="notice.sichtbar && notice.text" class="ansage no-print"
+         :class="{ 'ansage--warnung': notice.art === 'warnung' }" role="status">
+      <div class="container ansage__inner">
+        <span class="ansage__mark" aria-hidden="true">{{ notice.art === "warnung" ? "!" : "i" }}</span>
+        <p>{{ notice.text }}</p>
+      </div>
+    </div>
+
     <div v-if="state.sync.adoption" class="adoption no-print">
       <div class="container adoption__inner">
         <p>
@@ -96,7 +107,7 @@
 
 <script>
 import { state, applyTheme, loadAccount, loadFromAccount, adoptLocal, declineAdoption, isFresh } from "./lib/store.js";
-import { signInUrl, signOut } from "./lib/api.js";
+import { announcement, signInUrl, signOut } from "./lib/api.js";
 import { beginSignIn } from "./lib/signIn.js";
 
 export default {
@@ -108,10 +119,17 @@ export default {
         { id: "light", name: "Hell" },
         { id: "dark", name: "Dunkel" },
         { id: "system", name: "System" }
-      ]
+      ],
+      /* The operator's announcement. Empty and invisible is the normal state,
+         which is why it starts that way rather than as null: nothing on the
+         page moves while the answer is on its way. */
+      notice: { text: "", art: "hinweis", sichtbar: false }
     };
   },
   async created() {
+    // Not awaited before the account: the banner is the least urgent thing on
+    // the page, and nothing else waits for it.
+    announcement().then(answer => { this.notice = answer; });
     await loadAccount();
     // Only after the answer: which document is in force depends on whether
     // there is an account behind this browser at all.
@@ -236,6 +254,17 @@ main{ flex: 1; padding-top: var(--w2b-space-5); }
 
 .account{ display: flex; align-items: center; gap: var(--w2b-space-2); }
 /* A link, not a button: it goes to a page like the name beside it does. */
+.ansage{ background: var(--w2b-secondary-veil); border-bottom: 1px solid var(--w2b-line); }
+.ansage--warnung{ background: var(--w2b-error-surface); }
+.ansage__inner{ display: flex; gap: var(--w2b-space-3); align-items: baseline; padding: var(--w2b-space-2) 0; }
+.ansage__inner p{ margin: 0; }
+.ansage__mark{
+  display: grid; place-items: center; width: 20px; height: 20px; flex: 0 0 auto;
+  border-radius: var(--w2b-radius-full); font-family: var(--w2b-font-display); font-size: var(--w2b-text-xs);
+  background: var(--w2b-secondary); color: var(--w2b-white);
+}
+.ansage--warnung .ansage__mark{ background: var(--w2b-error); }
+
 .account__admin{
   font-size: var(--w2b-text-xs);
   color: var(--w2b-primary);

@@ -8,6 +8,9 @@
            the one thing a colour-blind reader cannot read. -->
       <span class="chart__key"><i class="chart__swatch chart__swatch--ok"></i>Beantwortet</span>
       <span class="chart__key"><i class="chart__swatch chart__swatch--fail"></i>Fehler</span>
+      <span v-if="hasComparison" class="chart__key">
+        <i class="chart__swatch chart__swatch--before"></i>Zeitraum davor
+      </span>
     </figcaption>
 
     <p v-if="!hasAnything" class="hint">
@@ -22,6 +25,10 @@
         <!-- One recessive rule at the top of the scale; no grid behind the bars. -->
         <line class="chart__axis" :x1="0" :y1="PLOT_TOP" :x2="WIDTH" :y2="PLOT_TOP" />
         <line class="chart__axis" :x1="0" :y1="baseline" :x2="WIDTH" :y2="baseline" />
+        <!-- The period before, as a line over the bars: one scale, so the two
+             are comparable by eye, and a line rather than a second set of bars
+             because it is the background against which this period is read. -->
+        <polyline v-if="hasComparison" class="chart__before" :points="beforePoints" />
         <!-- Three labels, not one per bar: seventy-two of them is a smear, and
              none at all leaves a shape with no time in it. -->
         <text v-for="tick in ticks" :key="`t-${tick.x}`" class="chart__tick"
@@ -90,6 +97,8 @@ export default {
   name: "UsageChart",
   props: {
     points: { type: Array, default: () => [] },
+    /** The same period before this one, already padded. Empty means none. */
+    vergleich: { type: Array, default: () => [] },
     raster: { type: String, default: "stunde" },
     title: { type: String, default: "Anfragen" }
   },
@@ -101,7 +110,24 @@ export default {
     total() { return this.points.reduce((sum, point) => sum + point.anfragen, 0); },
     failures() { return this.points.reduce((sum, point) => sum + point.fehler, 0); },
     hasAnything() { return this.points.length > 0 && this.total > 0; },
-    max() { return Math.max(1, ...this.points.map(point => point.anfragen)); },
+    hasComparison() { return this.vergleich.length > 1; },
+    /* One scale for both, or the comparison would be a picture of nothing:
+       a line drawn against its own maximum always fills the chart. */
+    max() {
+      return Math.max(
+        1,
+        ...this.points.map(point => point.anfragen),
+        ...this.vergleich.map(point => point.anfragen)
+      );
+    },
+    beforePoints() {
+      if (!this.hasComparison) return "";
+      const step = WIDTH / Math.max(1, this.vergleich.length);
+      const scale = (BASELINE - PLOT_TOP) / this.max;
+      return this.vergleich
+        .map((point, index) => `${index * step + step / 2},${BASELINE - point.anfragen * scale}`)
+        .join(" ");
+    },
     bars() {
       const step = WIDTH / Math.max(1, this.points.length);
       const width = Math.max(1, step - GAP);
@@ -170,6 +196,8 @@ export default {
 .chart__swatch{ width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
 .chart__swatch--ok{ background: var(--w2b-primary-light); }
 .chart__swatch--fail{ background: var(--w2b-error); }
+.chart__swatch--before{ background: var(--w2b-graphite); height: 3px; border-radius: 2px; }
+.chart__before{ fill: none; stroke: var(--w2b-graphite); stroke-width: 2; stroke-linejoin: round; opacity: .75; }
 .chart__plot{ width: 100%; height: auto; display: block; margin: var(--w2b-space-2) 0; }
 .chart__axis{ stroke: var(--w2b-line); stroke-width: 1; }
 .chart__bar--ok{ fill: var(--w2b-primary-light); }

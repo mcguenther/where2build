@@ -55,6 +55,16 @@
         "--download"
       ],
       "why": "The official Saxon address coordinates. The GeoSN republishes quarterly. The API reads its index at startup, so the backend has to be restarted after a rebuild for the new one to take effect."
+    },
+    {
+      "name": "llm-preise",
+      "schedule": "10 5 1 * *",
+      "command": [
+        "python",
+        "scripts/update_llm_prices.py",
+        "--json"
+      ],
+      "why": "Die Preisliste hinter der Kostenspalte der Verwaltung: Preise je Modell vom Anbieter selbst und der Tageskurs der EZB. Monatlich, weil Preise sich selten und der Kurs sich täglich ändert -- und weil die Datei im Git steht, ist jede Änderung ein Diff, den jemand sieht. Ohne diesen Lauf altert nur die Umrechnung, gezählt wird weiter."
     }
   ]
 }

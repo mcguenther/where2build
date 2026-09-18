@@ -68,6 +68,9 @@ services:
       # for. With it, the rightmost entry is the peer nginx actually saw and
       # everything left of it is text the caller wrote.
       - APP_PROXY_HOPS=1
+      # The job list and the price list both live in ops/, mounted below.
+      - JOBS_FILE=/ops/jobs.json
+      - LLM_PRICES_PATH=/ops/llm-preise.json
     volumes:
       # Answers from the official services, kept between restarts. Losing it
       # costs time and other people's bandwidth, not correctness.
@@ -76,6 +79,16 @@ services:
       # backend only ever reads it. Absent, /api/nearby says so for those
       # categories instead of answering with an empty list.
       - ./backend/data:/app/data:ro
+      # The job list and the model price list, read-only: the backend shows
+      # them and never writes them. Refreshing the prices is a job, and jobs
+      # run in the scheduler.
+      - ./ops:/ops:ro
+      # The scheduler's records, shared. The administration area reads them to
+      # say when a job last ran, and writes a request into the same directory
+      # when somebody presses „Jetzt starten" -- which is why this one is not
+      # read-only. Without the scheduler profile the directory is simply empty
+      # and the page says nothing is there to pick a request up.
+      - scheduler-state:/state
     depends_on:
       db:
         condition: service_healthy

@@ -38,12 +38,18 @@ from fastapi import APIRouter, Body, Depends, Path as PathParam, Query, Response
 from fastapi.responses import StreamingResponse
 
 from .. import telemetry
-from ..deps import admin_store, current_admin, storage_service
-from ..errors import BadRequestError, ConflictError, NotFoundError
+from .. import jobs as jobslib
+from ..deps import admin_store, current_admin, llm_prices, storage_service
+from ..errors import AppError, BadRequestError, ConflictError, NotFoundError
+from ..prices import Prices
 from ..schemas import (
+    Ansage,
+    AnsageAnfrage,
     Dienstlage,
     Fehlereintrag,
     Fehlerliste,
+    JobZeile,
+    Jobs,
     Freigabenliste,
     FreigabeZeile,
     Konten,
@@ -51,6 +57,7 @@ from ..schemas import (
     LoeschAnfrage,
     LoeschErgebnis,
     LoeschVorbereitung,
+    Preisstand,
     Protokoll,
     Protokolleintrag,
     RollenAenderung,
@@ -183,30 +190,100 @@ async def statistics(
     von: datetime | None = Query(default=None, description="Anfang des Zeitraums."),
     bis: datetime | None = Query(default=None, description="Ende des Zeitraums."),
     raster: str = Query(default="stunde", pattern="^(stunde|tag)$"),
-    bereich: str | None = Query(default=None, pattern="^(anfrage|dienst|modell)$"),
+    bereich: str | None = Query(default=None, pattern="^(anfrage|dienst|modell|suche)$"),
+    vergleich: bool = Query(
+        default=False, description="Denselben, gleich langen Zeitraum davor mitliefern."
+    ),
     _: Identity = Depends(current_admin),
     store: AdminStore = Depends(admin_store),
+    prices: Prices = Depends(llm_prices),
 ) -> Statistik:
+    """The numbers for one period -- and, if asked, the one before it.
+
+    The comparison is a *choice* rather than always-on: it doubles the work and
+    it is only meaningful where the two periods are comparable. It is the same
+    length, immediately before, so „diese Woche gegen letzte" is exactly what
+    it says.
+
+    Cost is attached to the per-service rows and to the total, never to the
+    points of the series: a bucket holds the tokens of every model at once, and
+    a price belongs to one model. Splitting the series by model would be a
+    second series per model, which is a different chart.
+    """
+
     response.headers.update(_NO_STORE)
     store.require_configured()
     start, end = _window(von, bis)
     series = await store.series(start, end, grid=raster, area=bereich)
     per_service = await store.by_service(start, end)
+    rows = [Zeitpunktwerte(**row) for row in per_service]
     total = Zeitpunktwerte()
-    for row in per_service:
-        total.anfragen += row["anfragen"]
-        total.fehler += row["fehler"]
-        total.limitiert += row["limitiert"]
-        total.dauer_ms += row["dauer_ms"]
-        total.tokens_ein += row["tokens_ein"]
-        total.tokens_aus += row["tokens_aus"]
+    for row in rows:
+        row.kosten_eur = _cost(prices, row)
+        total.anfragen += row.anfragen
+        total.fehler += row.fehler
+        total.limitiert += row.limitiert
+        total.dauer_ms += row.dauer_ms
+        total.tokens_ein += row.tokens_ein
+        total.tokens_aus += row.tokens_aus
+        if row.kosten_eur is not None:
+            total.kosten_eur = (total.kosten_eur or 0.0) + row.kosten_eur
+
+    before: list[Zeitpunktwerte] | None = None
+    before_total: Zeitpunktwerte | None = None
+    if vergleich:
+        span = end - start
+        earlier = await store.series(start - span, start, grid=raster, area=bereich)
+        before = [Zeitpunktwerte(**point) for point in earlier]
+        before_rows = await store.by_service(start - span, start)
+        before_total = Zeitpunktwerte()
+        for row_before in before_rows:
+            before_total.anfragen += row_before["anfragen"]
+            before_total.fehler += row_before["fehler"]
+            before_total.limitiert += row_before["limitiert"]
+            before_total.dauer_ms += row_before["dauer_ms"]
+            before_total.tokens_ein += row_before["tokens_ein"]
+            before_total.tokens_aus += row_before["tokens_aus"]
+
     return Statistik(
         von=start,
         bis=end,
         raster=raster,
         zeitreihe=[Zeitpunktwerte(**point) for point in series],
-        nach_dienst=[Zeitpunktwerte(**row) for row in per_service],
+        nach_dienst=rows,
         summe=total,
+        vergleich=before,
+        vergleich_summe=before_total,
+        preise=_price_state(prices),
+    )
+
+
+def _cost(prices: Prices, row: Zeitpunktwerte) -> float | None:
+    """What one service row cost, or nothing at all.
+
+    Only the model area has a price: a call to the cadastre costs nothing per
+    request, and putting 0,00 € next to it would read as a measurement.
+    """
+
+    if row.bereich != "modell" or not row.dienst:
+        return None
+    return prices.euro(row.dienst, row.tokens_ein, row.tokens_aus)
+
+
+def _price_state(prices: Prices) -> Preisstand:
+    return Preisstand(
+        vorhanden=prices.usable,
+        stand=prices.stand,
+        usd_je_eur=prices.usd_per_euro,
+        kurs_stand=prices.rate_day,
+        quellen=prices.sources,
+        modelle=len(prices.models),
+        hinweis=prices.problem
+        or (
+            None
+            if prices.usable
+            else "Die Preisliste enthält keinen Kurs; ohne ihn lässt sich nicht umrechnen."
+        ),
     )
 
 
@@ -215,14 +292,76 @@ async def accounts(
     response: Response,
     von: datetime | None = Query(default=None),
     bis: datetime | None = Query(default=None),
+    suche: str = Query(default="", max_length=120, description="Teil eines Namens oder einer Kennung."),
+    sortierung: str = Query(default="anfragen", pattern="^(anfragen|neu|umfang|name)$"),
+    limit: int = Query(default=25, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
     _: Identity = Depends(current_admin),
     store: AdminStore = Depends(admin_store),
 ) -> Konten:
+    """One page of the accounts.
+
+    Paged from the first version rather than when it hurts: this is the table
+    that grows with the deployment, and „alle Konten" at a thousand of them is
+    a page nobody can read and a megabyte nobody needs.
+    """
+
     response.headers.update(_NO_STORE)
     store.require_configured()
     start, end = _window(von, bis)
-    rows = await store.accounts(start, end)
-    return Konten(von=start, bis=end, konten=[Konto(**vars(row)) for row in rows])
+    rows, total = await store.accounts(
+        start, end, limit=limit, offset=offset, search=suche, order=sortierung
+    )
+    return Konten(
+        von=start,
+        bis=end,
+        konten=[Konto(**vars(row)) for row in rows],
+        gesamt=total,
+        offset=offset,
+        limit=limit,
+    )
+
+
+@router.get(
+    "/konten/{kennung}/auskunft",
+    summary="Alles, was über ein Konto gespeichert ist (Art. 15 DSGVO)",
+    responses={404: {"description": "Für diese Kennung ist hier nichts gespeichert"}},
+)
+async def account_record(
+    kennung: str = PathParam(min_length=8, max_length=64, pattern="^[0-9a-f]+$"),
+    admin: Identity = Depends(current_admin),
+    store: AdminStore = Depends(admin_store),
+) -> Response:
+    """The whole record of one account, as a file.
+
+    For the request a person is entitled to make and the operator has to
+    answer. Complete rather than summarised -- the plot documents and the
+    settings go in verbatim, because an Auskunft that abridged what is held
+    would be one more thing to take on trust. It is an administrative act on
+    somebody else's data, so it lands in the audit trail like every other.
+    """
+
+    store.require_configured()
+    record = await store.account_record(kennung)
+    if record is None:
+        raise NotFoundError(
+            "Für diese Kennung ist hier nichts gespeichert. Ein Konto entsteht erst mit "
+            "dem ersten gesicherten Grundstück."
+        )
+    await store.note(
+        kennung=admin.account_key, name=admin.name, action="auskunft-erteilt", target=kennung
+    )
+    import json as _json
+
+    body = _json.dumps(record, ensure_ascii=False, indent=2, default=str)
+    return Response(
+        content=body,
+        media_type="application/json",
+        headers={
+            "Content-Disposition": f'attachment; filename="auskunft-{kennung}.json"',
+            **_NO_STORE,
+        },
+    )
 
 
 @router.post(
@@ -361,8 +500,9 @@ async def errors(
     response: Response,
     von: datetime | None = Query(default=None),
     bis: datetime | None = Query(default=None),
-    anzahl: int = Query(default=200, ge=1, le=2000),
-    dienst: str | None = Query(default=None, max_length=120),
+    suche: str = Query(default="", max_length=200, description="Teil eines Dienstes, einer Route oder einer Meldung."),
+    limit: int = Query(default=25, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
     _: Identity = Depends(current_admin),
     store: AdminStore = Depends(admin_store),
 ) -> Fehlerliste:
@@ -376,15 +516,46 @@ async def errors(
     response.headers.update(_NO_STORE)
     start, end = _window(von, bis)
     if not store.configured:
-        entries = [
-            Fehlereintrag(**entry.as_row())
-            for entry in telemetry.recorder().recent_errors(anzahl)
-            if start <= entry.zeit < end and (dienst is None or entry.dienst == dienst)
+        held = [
+            entry
+            for entry in telemetry.recorder().recent_errors(10000)
+            if start <= entry.zeit < end and _matches(entry, suche)
         ]
-        return Fehlerliste(von=start, bis=end, quelle="speicher", eintraege=entries)
-    rows = await store.errors(start, end, limit=anzahl, service=dienst)
+        page = held[offset : offset + limit]
+        return Fehlerliste(
+            von=start,
+            bis=end,
+            quelle="speicher",
+            eintraege=[Fehlereintrag(**entry.as_row()) for entry in page],
+            gesamt=len(held),
+            offset=offset,
+            limit=limit,
+        )
+    rows, total = await store.errors(start, end, limit=limit, offset=offset, search=suche)
     return Fehlerliste(
-        von=start, bis=end, quelle="datenbank", eintraege=[Fehlereintrag(**row) for row in rows]
+        von=start,
+        bis=end,
+        quelle="datenbank",
+        eintraege=[Fehlereintrag(**row) for row in rows],
+        gesamt=total,
+        offset=offset,
+        limit=limit,
+    )
+
+
+def _matches(entry: telemetry.ErrorEntry, search: str) -> bool:
+    """The same search the SQL does, over the ring this process keeps.
+
+    Two implementations of one filter is a thing to be uneasy about; the
+    alternative is a page whose search box works only on deployments that have
+    a database, which is worse.
+    """
+
+    needle = search.strip().lower()
+    if not needle:
+        return True
+    return any(
+        needle in (value or "").lower() for value in (entry.dienst, entry.route, entry.meldung)
     )
 
 
@@ -410,7 +581,7 @@ async def errors_download(
 
     start, end = _window(von, bis)
     if store.configured:
-        rows: list[dict[str, Any]] = await store.errors(start, end, limit=anzahl)
+        rows, _total = await store.errors(start, end, limit=anzahl)
     else:
         rows = [
             entry.as_row()
@@ -438,13 +609,18 @@ async def errors_download(
 @router.get("/freigaben", response_model=Freigabenliste, summary="Offene Freigabe-Links")
 async def shares(
     response: Response,
+    limit: int = Query(default=25, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
     _: Identity = Depends(current_admin),
     store: AdminStore = Depends(admin_store),
 ) -> Freigabenliste:
     response.headers.update(_NO_STORE)
     store.require_configured()
-    rows = await store.shares()
+    rows, total = await store.shares(limit=limit, offset=offset)
     return Freigabenliste(
+        gesamt=total,
+        offset=offset,
+        limit=limit,
         freigaben=[
             FreigabeZeile(
                 token=row["id"],
@@ -542,17 +718,176 @@ async def clear_cache(
     return {"geleert": name}
 
 
+@router.get("/jobs", response_model=Jobs, summary="Wiederkehrende Läufe und ihr Zustand")
+async def job_list(
+    response: Response, _: Identity = Depends(current_admin)
+) -> Jobs:
+    """What is scheduled, when it last ran, and whether anybody is there to run it.
+
+    The list and the records are the scheduler's own files -- see
+    ``app/jobs.py``. Reading them here rather than keeping a second copy means
+    the page cannot disagree with ``run_jobs.py list``.
+    """
+
+    response.headers.update(_NO_STORE)
+    settings = get_settings().admin
+    try:
+        found = jobslib.describe(settings.jobs_file, settings.state_dir)
+    except (OSError, ValueError, KeyError) as error:
+        return Jobs(jobs=[], hinweis=f"Die Job-Liste ist nicht lesbar ({settings.jobs_file}): {error}")
+    seen = jobslib.scheduler_seen(settings.state_dir)
+    alive = jobslib.scheduler_alive(settings.state_dir)
+    return Jobs(
+        jobs=[
+            JobZeile(
+                name=job.name,
+                zeitplan=job.schedule,
+                warum=job.why,
+                befehl=job.command,
+                zuletzt=_moment(job.last_start),
+                exit_code=job.last_exit_code,
+                dauer_s=job.last_duration_s,
+                laeuft=job.running,
+                angefordert=job.requested,
+            )
+            for job in found
+        ],
+        scheduler_zuletzt=_moment(seen),
+        scheduler_laeuft=alive,
+        hinweis=None
+        if alive
+        else (
+            "Zurzeit läuft kein Scheduler. Angeforderte Läufe bleiben liegen, bis einer "
+            "startet — mit „docker compose --profile scheduled-jobs up -d“."
+        ),
+    )
+
+
+@router.post("/jobs/{name}/starten", response_model=JobZeile, summary="Einen Lauf anfordern")
+async def start_job(
+    name: str = PathParam(min_length=1, max_length=64, pattern="^[a-z0-9-]+$"),
+    admin: Identity = Depends(current_admin),
+    store: AdminStore = Depends(admin_store),
+) -> JobZeile:
+    """Ask the scheduler to run this job on its next tick.
+
+    Not run here: the heavy jobs write into a directory this process mounts
+    read-only and take minutes, so the request goes into the directory both
+    containers share and the scheduler picks it up -- where the privileges, the
+    writable mount and the lock against a second copy already are.
+    """
+
+    settings = get_settings().admin
+    try:
+        found = {job.name: job for job in jobslib.describe(settings.jobs_file, settings.state_dir)}
+    except (OSError, ValueError, KeyError) as error:
+        raise NotFoundError(f"Die Job-Liste ist nicht lesbar: {error}") from error
+    if name not in found:
+        raise NotFoundError("Einen Lauf dieses Namens gibt es auf diesem Server nicht.")
+    try:
+        jobslib.request_run(settings.state_dir, name, by=admin.account_key)
+    except OSError as error:
+        raise ConflictError(
+            f"Der Lauf konnte nicht angefordert werden ({error}). Ist das Verzeichnis "
+            f"{settings.state_dir} eingebunden und beschreibbar?"
+        ) from error
+    if store.configured:
+        await store.note(
+            kennung=admin.account_key, name=admin.name, action="lauf-angefordert", target=name
+        )
+    job = jobslib.describe(settings.jobs_file, settings.state_dir)
+    entry = next(one for one in job if one.name == name)
+    return JobZeile(
+        name=entry.name,
+        zeitplan=entry.schedule,
+        warum=entry.why,
+        befehl=entry.command,
+        zuletzt=_moment(entry.last_start),
+        exit_code=entry.last_exit_code,
+        dauer_s=entry.last_duration_s,
+        laeuft=entry.running,
+        angefordert=entry.requested,
+    )
+
+
+@router.put("/ansage", response_model=Ansage, summary="Betriebsansage setzen")
+async def set_announcement(
+    request: AnsageAnfrage = Body(),
+    admin: Identity = Depends(current_admin),
+    store: AdminStore = Depends(admin_store),
+) -> Ansage:
+    """The banner every visitor sees, in the operator's own words.
+
+    Composed here rather than generated: this is the one text in the
+    application a person writes, because it is the one thing no template can
+    know -- „die Kataster-Schnittstelle antwortet seit heute früh nicht".
+    """
+
+    store.require_configured()
+    saved = await store.set_announcement(
+        text=request.text.strip(),
+        art=request.art,
+        sichtbar=request.sichtbar and bool(request.text.strip()),
+        bis=request.bis,
+        von=admin.account_key,
+    )
+    await store.note(
+        kennung=admin.account_key,
+        name=admin.name,
+        action="ansage",
+        details={"sichtbar": saved["sichtbar"], "art": saved["art"]},
+    )
+    return Ansage(**{key: saved[key] for key in ("text", "art", "sichtbar", "bis", "geaendert_am")})
+
+
+@router.get("/ansage", response_model=Ansage, summary="Betriebsansage, auch wenn sie aus ist")
+async def announcement_for_admin(
+    response: Response,
+    _: Identity = Depends(current_admin),
+    store: AdminStore = Depends(admin_store),
+) -> Ansage:
+    response.headers.update(_NO_STORE)
+    store.require_configured()
+    saved = await store.announcement()
+    if saved is None:
+        return Ansage()
+    return Ansage(**{key: saved[key] for key in ("text", "art", "sichtbar", "bis", "geaendert_am")})
+
+
+def _moment(value: str | None) -> datetime | None:
+    """An ISO moment out of a job record, or nothing.
+
+    The records are written by a separate process, so a field that is missing,
+    empty or not a date at all is a state this has to survive rather than a
+    reason to fail the page.
+    """
+
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
 @router.get("/protokoll", response_model=Protokoll, summary="Was Verwalter geändert haben")
 async def audit(
     response: Response,
-    anzahl: int = Query(default=200, ge=1, le=2000),
+    limit: int = Query(default=25, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
     _: Identity = Depends(current_admin),
     store: AdminStore = Depends(admin_store),
 ) -> Protokoll:
     response.headers.update(_NO_STORE)
     store.require_configured()
-    rows = await store.audit(limit=anzahl)
-    return Protokoll(eintraege=[Protokolleintrag(**row) for row in rows])
+    rows, total = await store.audit(limit=limit, offset=offset)
+    return Protokoll(
+        eintraege=[Protokolleintrag(**row) for row in rows],
+        gesamt=total,
+        offset=offset,
+        limit=limit,
+    )
 
 
 @router.post(
@@ -627,6 +962,43 @@ async def wipe(
     return LoeschErgebnis(geleert=removed)
 
 
+# The one route in this file that is not behind an administrator. It is the
+# banner, and a banner nobody can read is not a banner -- so it answers
+# everybody, signed in or not, and carries nothing that was not written to be
+# public. Its own router because a prefix is one per router.
+public = APIRouter(prefix="/api", tags=["Betrieb"])
+
+
+@public.get("/ansage", response_model=Ansage, summary="Betriebsansage")
+async def announcement(
+    response: Response, store: AdminStore = Depends(admin_store)
+) -> Ansage:
+    """What the deployment currently says to everybody.
+
+    An empty, invisible announcement is the normal state and answers 200 with
+    ``sichtbar: false`` rather than 404: the frontend asks once per page load,
+    and a 404 in the console on every load of a perfectly healthy deployment is
+    noise that hides the real ones.
+    """
+
+    response.headers.update({"Cache-Control": "no-cache"})
+    if not store.configured:
+        return Ansage()
+    try:
+        saved = await store.announcement()
+    except AppError:
+        # The database is down. That is worth an error on the routes that need
+        # it, and not worth a broken page for everybody else.
+        return Ansage()
+    if saved is None or not saved["sichtbar"]:
+        return Ansage()
+    if saved["bis"] is not None and saved["bis"] <= datetime.now(timezone.utc):
+        # Past its end. Left in the table on purpose -- an announcement that
+        # deleted itself could not be switched back on with one click.
+        return Ansage()
+    return Ansage(**{key: saved[key] for key in ("text", "art", "sichtbar", "bis", "geaendert_am")})
+
+
 def _forget_expired_keys() -> None:
     now = time.monotonic()
     for key, (expiry, _) in list(_wipe_keys.items()):
@@ -638,7 +1010,7 @@ async def _one_account(store: AdminStore, kennung: str) -> Konto:
     """The row that was just changed, so the interface can redraw one line."""
 
     end = datetime.now(timezone.utc)
-    rows = await store.accounts(end - _DEFAULT_WINDOW, end)
+    rows, _total = await store.accounts(end - _DEFAULT_WINDOW, end, search=kennung, limit=5)
     for row in rows:
         if row.kennung == kennung:
             return Konto(**vars(row))

@@ -631,3 +631,262 @@ def test_the_sweep_drops_what_is_past_its_retention(database):
 
     assert removed["nutzung"] == 1
     assert _run(lambda connection: connection.fetchval("select count(*) from nutzung")) == 0
+
+
+# --------------------------------------------------------------------------
+# What a model call cost, and what it must never claim to have cost
+# --------------------------------------------------------------------------
+
+
+def test_a_model_without_a_price_costs_nothing_that_can_be_said():
+    """The one mistake this must not make is „0,00 €“ for an unknown model."""
+
+    from app.prices import Prices
+
+    prices = Prices(
+        usd_per_euro=1.25,
+        models={"openai/gpt-4o-mini": {"ein_je_mio_usd": 0.15, "aus_je_mio_usd": 0.60}},
+    )
+
+    assert prices.euro("openai/gpt-4o-mini", 1_000_000, 0) == pytest.approx(0.12)
+    assert prices.euro("gibt/es-nicht", 1_000_000, 1_000_000) is None
+    # And without a rate there is nothing to convert with, so still not zero.
+    assert Prices(models=prices.models).euro("openai/gpt-4o-mini", 1_000_000, 0) is None
+
+
+def test_a_missing_price_list_is_a_state_and_not_a_crash(tmp_path):
+    from app.prices import load_prices
+
+    prices = load_prices(tmp_path / "gibt-es-nicht.json")
+
+    assert prices.usable is False
+    assert "Keine Preisliste" in (prices.problem or "")
+
+
+def test_the_shipped_price_list_prices_the_model_this_project_defaults_to():
+    """The file is committed, so this is checkable rather than assumed.
+
+    Against the *default* model rather than the configured one: the test suite
+    points LLM_MODEL at an invented endpoint, and what is worth pinning is that
+    the price list a fresh deployment gets covers the model a fresh deployment
+    uses.
+    """
+
+    from pathlib import Path
+
+    from app.prices import load_prices
+    from app.settings import LLMSettings
+
+    shipped = LLMSettings.model_fields["model"].default
+    prices = load_prices(Path(__file__).resolve().parents[2] / "ops" / "llm-preise.json")
+
+    assert prices.usable
+    assert prices.euro(shipped, 1_000, 1_000) is not None
+
+
+@needs_database
+def test_the_statistics_carry_the_cost_of_the_model_and_only_of_the_model(admin: TestClient):
+    now = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
+    _run(
+        lambda connection: connection.executemany(
+            """
+            insert into nutzung (stunde, bereich, dienst, ergebnis, anzahl, dauer_ms,
+                                 tokens_ein, tokens_aus)
+            values ($1, $2, $3, 'ok', 1, 10, $4, $5)
+            """,
+            [
+                (now, "modell", "openai/gpt-4o-mini", 1_000_000, 1_000_000),
+                (now, "dienst", "ALKIS", 0, 0),
+            ],
+        )
+    )
+
+    body = admin.get("/api/verwaltung/statistik").json()
+
+    rows = {row["dienst"]: row for row in body["nach_dienst"]}
+    assert rows["openai/gpt-4o-mini"]["kosten_eur"] > 0
+    # A call to the cadastre has no price per request, and a 0,00 € beside it
+    # would read as a measurement.
+    assert rows["ALKIS"]["kosten_eur"] is None
+    assert body["preise"]["vorhanden"] is True
+    assert body["preise"]["usd_je_eur"] > 0
+
+
+@needs_database
+def test_the_comparison_is_asked_for_and_is_the_period_before(admin: TestClient):
+    now = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
+    _run(
+        lambda connection: connection.executemany(
+            """
+            insert into nutzung (stunde, bereich, dienst, ergebnis, anzahl)
+            values ($1, 'dienst', 'ALKIS', 'ok', $2)
+            """,
+            [(now - timedelta(hours=1), 5), (now - timedelta(hours=30), 11)],
+        )
+    )
+    window = {
+        "von": (now - timedelta(hours=24)).isoformat(),
+        "bis": (now + timedelta(hours=1)).isoformat(),
+    }
+
+    plain = admin.get("/api/verwaltung/statistik", params=window).json()
+    assert plain["vergleich"] is None
+
+    compared = admin.get("/api/verwaltung/statistik", params={**window, "vergleich": "true"}).json()
+    assert compared["summe"]["anfragen"] == 5
+    # The 25 hours before hold the other row.
+    assert compared["vergleich_summe"]["anfragen"] == 11
+
+
+# --------------------------------------------------------------------------
+# Many accounts: a page, a search, and a total
+# --------------------------------------------------------------------------
+
+
+@needs_database
+def test_the_account_list_is_paged_and_searchable(admin: TestClient):
+    now = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
+    _run(
+        lambda connection: connection.executemany(
+            "insert into nutzung_konto (stunde, kennung, anzahl) values ($1, $2, $3)",
+            [(now, f"{index:032x}", 100 - index) for index in range(40)],
+        )
+    )
+
+    first = admin.get("/api/verwaltung/konten", params={"limit": 10}).json()
+    assert len(first["konten"]) == 10
+    assert first["gesamt"] == 40
+    assert first["konten"][0]["anfragen"] == 100
+
+    second = admin.get("/api/verwaltung/konten", params={"limit": 10, "offset": 10}).json()
+    # A total order, so no row appears on two pages.
+    assert not {row["kennung"] for row in first["konten"]} & {
+        row["kennung"] for row in second["konten"]
+    }
+
+    found = admin.get("/api/verwaltung/konten", params={"suche": f"{7:032x}"}).json()
+    assert [row["kennung"] for row in found["konten"]] == [f"{7:032x}"]
+    assert found["gesamt"] == 1
+
+
+@needs_database
+def test_the_auskunft_holds_everything_stored_about_one_account(admin: TestClient):
+    admin.put(
+        "/api/plots/plot-1",
+        json={"dokument": {"id": "plot-1", "name": "Wiesenstraße"}, "geaendert_am": None},
+    )
+
+    answer = admin.get(f"/api/verwaltung/konten/{CHIEF.account_key}/auskunft")
+
+    assert answer.status_code == 200
+    assert "auskunft-" in answer.headers["content-disposition"]
+    record = answer.json()
+    assert record["konto"]["kennung"] == CHIEF.account_key
+    # Verbatim, not summarised.
+    assert record["grundstuecke"][0]["dokument"]["name"] == "Wiesenstraße"
+    # And the act itself is in the audit trail, like every other.
+    assert admin.get("/api/verwaltung/protokoll").json()["eintraege"][0]["aktion"] == "auskunft-erteilt"
+
+
+# --------------------------------------------------------------------------
+# The announcement, which is the one text a person writes
+# --------------------------------------------------------------------------
+
+
+@needs_database
+def test_the_announcement_is_public_only_while_it_is_switched_on(admin: TestClient):
+    # Nothing set: a normal deployment, answering 200 with an empty banner
+    # rather than 404 on every page load.
+    assert admin.get("/api/ansage").json()["sichtbar"] is False
+
+    admin.put(
+        "/api/verwaltung/ansage",
+        json={"text": "Wartung heute ab 18 Uhr.", "art": "warnung", "sichtbar": True},
+    )
+
+    public = admin.get("/api/ansage").json()
+    assert public["text"] == "Wartung heute ab 18 Uhr."
+    assert public["art"] == "warnung"
+
+    # Switched off, and the text is still there for the next time.
+    admin.put(
+        "/api/verwaltung/ansage",
+        json={"text": "Wartung heute ab 18 Uhr.", "art": "warnung", "sichtbar": False},
+    )
+    assert admin.get("/api/ansage").json()["sichtbar"] is False
+    assert admin.get("/api/verwaltung/ansage").json()["text"] == "Wartung heute ab 18 Uhr."
+
+
+@needs_database
+def test_an_announcement_past_its_end_stops_showing_itself(admin: TestClient):
+    admin.put(
+        "/api/verwaltung/ansage",
+        json={
+            "text": "Gestern war Wartung.",
+            "sichtbar": True,
+            "bis": (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat(),
+        },
+    )
+
+    assert admin.get("/api/ansage").json()["sichtbar"] is False
+    # Left in the table, so switching it back on is one click.
+    assert admin.get("/api/verwaltung/ansage").json()["text"] == "Gestern war Wartung."
+
+
+# --------------------------------------------------------------------------
+# The recurring jobs
+# --------------------------------------------------------------------------
+
+
+def test_the_job_list_is_the_schedulers_own(
+    oidc, client: TestClient, monkeypatch: pytest.MonkeyPatch, tmp_path
+):
+    monkeypatch.setenv("ADMIN_ACCOUNTS", CHIEF.account_key)
+    monkeypatch.setenv("JOBS_STATE_DIR", str(tmp_path / "state"))
+    reset_services()
+    _sign_in(client, CHIEF)
+
+    body = client.get("/api/verwaltung/jobs").json()
+
+    assert {job["name"] for job in body["jobs"]} >= {"cache-sweep", "llm-preise"}
+    # No scheduler in a test, and the page says so rather than showing a button
+    # whose request nothing would pick up.
+    assert body["scheduler_laeuft"] is False
+    assert "kein Scheduler" in body["hinweis"]
+
+
+def test_a_requested_run_is_a_file_the_scheduler_picks_up(
+    oidc, client: TestClient, monkeypatch: pytest.MonkeyPatch, tmp_path
+):
+    """The whole handover, both halves, without a container in sight."""
+
+    from app import jobs as jobslib
+
+    state = tmp_path / "state"
+    monkeypatch.setenv("ADMIN_ACCOUNTS", CHIEF.account_key)
+    monkeypatch.setenv("JOBS_STATE_DIR", str(state))
+    reset_services()
+    _sign_in(client, CHIEF)
+
+    answer = client.post("/api/verwaltung/jobs/cache-sweep/starten")
+
+    assert answer.status_code == 200
+    assert answer.json()["angefordert"]
+    # And the scheduler's side of it: claimed once, and gone afterwards, so a
+    # job that fails is not started again on every tick.
+    assert jobslib.take_request(state, "cache-sweep") is not None
+    assert jobslib.take_request(state, "cache-sweep") is None
+
+
+def test_an_unknown_job_is_refused_rather_than_written(
+    oidc, client: TestClient, monkeypatch: pytest.MonkeyPatch, tmp_path
+):
+    monkeypatch.setenv("ADMIN_ACCOUNTS", CHIEF.account_key)
+    monkeypatch.setenv("JOBS_STATE_DIR", str(tmp_path / "state"))
+    reset_services()
+    _sign_in(client, CHIEF)
+
+    answer = client.post("/api/verwaltung/jobs/erfundener-lauf/starten")
+
+    assert answer.status_code == 404
+    assert not (tmp_path / "state" / "erfundener-lauf.angefordert").exists()

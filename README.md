@@ -454,6 +454,36 @@ area and outcome with nobody in them, and one per hour and account for the
 question "who". No row per request, so nothing records when a single call
 happened. They are swept after `ADMIN_RETENTION_DAYS`.
 
+Four of the areas are worth naming, because they answer different questions.
+`anfrage` is a call to this API, `dienst` a call that went out to somebody
+else's, `modell` the tokens, and **`suche` how a parcel search ended** —
+`bestaetigt`, `mehrdeutig` or `erfolglos`. That last one is the only number
+here about the product rather than the machine: nothing fails when a listing
+does not say enough, so no error log would ever show it.
+
+**Money.** The tokens are counted; the price comes from
+[`ops/llm-preise.json`](ops/llm-preise.json), which
+`backend/scripts/update_llm_prices.py` writes from OpenRouter's own
+`/api/v1/models` and the ECB's daily reference rate. It is committed, so a
+price that moves is a diff somebody sees, and it is also a monthly job. A model
+the file does not list shows dashes, never 0,00 €: a figure computed from a
+missing input is exactly the mistake this project already paid for once.
+
+**An announcement.** `PUT /api/verwaltung/ansage` sets one sentence — a
+maintenance window, a known outage — and `GET /api/ansage` answers it to
+everybody, signed in or not. It is the one text in this application a person
+writes rather than a template composes, because it is the one thing no template
+can know.
+
+**The recurring jobs**, as the scheduler has them
+([`ops/jobs.json`](ops/jobs.json)), are listed with their last run and their
+exit code, and „Jetzt starten" asks for one. The backend does not run it: the
+heavy jobs rebuild an index into a directory it mounts read-only and take
+minutes, so the button writes a request into the state directory both
+containers share and the scheduler picks it up on its next tick. Without a
+scheduler the page says so — it leaves a heartbeat next to the records — rather
+than offering a button that does nothing.
+
 The **burst guard** is the part that acts inside the hour. The request budget
 below counts a whole hour, and by the time an hour is visible it has happened;
 an account that crosses `ADMIN_BURST_CALLS` inside `ADMIN_BURST_WINDOW_S` is

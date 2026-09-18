@@ -18,13 +18,26 @@
         </a>
       </div>
       <div class="panel__body stack">
+        <div class="row row--wrap">
+          <label class="field">
+            <span>Suchen</span>
+            <input type="search" v-model="search" placeholder="Dienst, Route oder Wortlaut"
+                   @keyup.enter="find" @search="find" />
+          </label>
+          <div class="spacer"></div>
+          <button type="button" class="btn btn--quiet btn--small" @click="find">Suchen</button>
+        </div>
+
         <p v-if="busy" class="hint">Wird geladen …</p>
         <template v-else-if="held">
           <p v-if="held.quelle === 'speicher'" class="notice">
             Auf diesem Server ist kein Speicher für Konten eingerichtet, deshalb steht hier
             nur, was dieser Prozess seit seinem Start gesehen hat. Beim Neustart ist es weg.
           </p>
-          <p v-if="held.eintraege.length === 0" class="hint">
+          <p v-if="held.eintraege.length === 0 && search" class="hint">
+            Zu dieser Suche gibt es in diesem Zeitraum keinen Eintrag.
+          </p>
+          <p v-else-if="held.eintraege.length === 0" class="hint">
             In diesem Zeitraum ist nichts schiefgegangen — jedenfalls nichts, was der Server
             als seinen Fehler verbucht. Antworten wie „nicht gefunden“ oder „Kontingent
             erreicht“ stehen bewusst nicht hier, sondern in der Statistik.
@@ -45,6 +58,7 @@
               </tbody>
             </table>
           </div>
+          <AdminPager :total="held.gesamt" :offset="offset" :limit="limit" @move="turn" />
         </template>
       </div>
     </section>
@@ -64,15 +78,16 @@
  * it under the name the server sends, and the file is the same bytes the page
  * is showing.
  */
+import AdminPager from "./AdminPager.vue";
 import PeriodPicker from "./PeriodPicker.vue";
 import { adminErrorDownloadUrl, adminErrors } from "../../lib/api.js";
 import { moment } from "../../lib/format.js";
 
 export default {
   name: "AdminErrors",
-  components: { PeriodPicker },
+  components: { AdminPager, PeriodPicker },
   data() {
-    return { held: null, period: null, busy: false, failure: "" };
+    return { held: null, period: null, offset: 0, limit: 25, search: "", busy: false, failure: "" };
   },
   computed: {
     downloadHref() {
@@ -81,12 +96,27 @@ export default {
   },
   methods: {
     moment,
+    find() {
+      this.offset = 0;
+      return this.load();
+    },
+
+    turn(offset) {
+      this.offset = offset;
+      return this.load();
+    },
+
     async load(period) {
-      this.period = period;
+      this.period = period || this.period;
+      if (!this.period) return;
       this.busy = true;
       this.failure = "";
       try {
-        this.held = await adminErrors(period.from, period.to);
+        this.held = await adminErrors(this.period.from, this.period.to, {
+          limit: this.limit,
+          offset: this.offset,
+          suche: this.search
+        });
       } catch (error) {
         this.held = null;
         this.failure = error.message;
@@ -99,6 +129,8 @@ export default {
 </script>
 
 <style scoped>
+.field{ display: flex; flex-direction: column; gap: var(--w2b-space-1); font-size: var(--w2b-text-s); }
+.row--wrap{ flex-wrap: wrap; align-items: end; }
 .kennung, .where{ font-family: var(--w2b-font-mono); font-size: var(--w2b-text-xs); color: var(--w2b-muted); }
 /* The route is read as a path, so it breaks only where it has to -- „/api/
    setting s" was break-all doing what it was told. The account key has no

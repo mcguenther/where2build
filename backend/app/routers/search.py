@@ -25,6 +25,7 @@ from ..gemarkung_index import GemarkungDirectory
 from ..schemas import ParcelSearchRequest, ParcelSearchResponse, SuchEreignis
 from ..search import run_search
 from ..services.alkis import AlkisService
+from ..telemetry import AREA_SEARCH, RESULT_OK, recorder
 from ..settings import Settings
 
 router = APIRouter(prefix="/api/parcels", tags=["Flurstücke"])
@@ -40,9 +41,13 @@ async def _stream(
     directory: GemarkungDirectory | None,
     settings: Settings,
 ) -> AsyncIterator[bytes]:
+    outcome = "erfolglos"
     try:
         async for event in run_search(payload, alkis, directory, settings.app):
+            if event.status:
+                outcome = event.status
             yield _line(event)
+        _count_outcome(outcome)
     except Exception as exc:  # noqa: BLE001 - the stream has to carry its own failure
         # Headers are long gone by the time an upstream fails, so an error can
         # only travel as one more line. A stream that simply stops leaves the
@@ -50,7 +55,22 @@ async def _stream(
         message = getattr(exc, "message", None) or (
             "Die Suche ist unterwegs abgebrochen. Bitte noch einmal versuchen."
         )
+        _count_outcome("abgebrochen")
         yield _line(SuchEreignis(art="fehler", text=message, status="erfolglos"))
+
+
+def _count_outcome(status: str) -> None:
+    """How the search ended, counted for the statistics page.
+
+    The one number in this application that is about the product rather than
+    about the machine: „bestätigt" means an official statement left exactly one
+    parcel standing, „mehrdeutig" that only a chosen tolerance got there, and
+    „erfolglos" that the listing did not say enough. A deployment where the
+    third is rising has a problem no error log will show, because nothing
+    failed.
+    """
+
+    recorder().count(AREA_SEARCH, status, RESULT_OK)
 
 
 @router.post(
@@ -107,6 +127,7 @@ async def search_complete(
     conflicts = {
         event.konflikt.art: event.konflikt for event in events if event.konflikt is not None
     }
+    _count_outcome(final.status if final and final.status else "erfolglos")
     return ParcelSearchResponse(
         status=(final.status if final and final.status else "erfolglos"),
         indizien=indicia,

@@ -13,6 +13,7 @@ from fastapi import Depends, Request
 from .address_index import AddressIndex, load_index as load_address_index
 from .errors import AppError, ForbiddenError, RateLimitedError, UnauthorizedError
 from .gemarkung_index import GemarkungDirectory, load_directory
+from .prices import Prices, load_prices
 from .ratelimit import RateLimiter, client_key, denied_message
 from .telemetry import recorder, reset_recorder
 from .services.admin import AdminStore
@@ -166,6 +167,18 @@ def current_account(identity: Identity = Depends(signed_in)) -> Identity:
 
 
 @lru_cache(maxsize=1)
+def llm_prices() -> Prices:
+    """The model price list, read from disk once per process.
+
+    Cached like the indexes: it changes when a job rewrites the file, and the
+    backend is restarted or the cache cleared for a new one to take effect --
+    which is the same rule the Gemarkung and address indexes already follow.
+    """
+
+    return load_prices(get_settings().llm.prices_path)
+
+
+@lru_cache(maxsize=1)
 def admin_store() -> AdminStore:
     """The administration statements, over the storage pool."""
 
@@ -308,6 +321,7 @@ def reset_services() -> None:
         service_limiter,
         map_limiter,
         admin_store,
+        llm_prices,
     ):
         factory.cache_clear()
     reset_recorder()

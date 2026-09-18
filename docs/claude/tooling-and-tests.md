@@ -288,3 +288,22 @@ line looks right and does not match.
   is worth typing on every `up` and `down`: a service renamed between two
   versions of the file leaves its container running, and Compose mentions it
   in one line that scrolls past.
+
+- **An export that is *read* at module level breaks five test files; one that
+  is only called does not.** Five files mock `lib/api.js` by listing its
+  surface, and `methods: { recordUrl: adminRecordUrl }` reads that binding the
+  moment the component module is evaluated — so vitest throws
+  „No `adminRecordUrl` export is defined on the mock", at *import* time, in
+  components that have nothing to do with it (`destinations`, `nearby`,
+  `neighbours`, `plot-tools`, `wizard` all failed at once). Wrapping it —
+  `recordUrl(kennung) { return adminRecordUrl(kennung); }` — defers the read to
+  the call and the five factories stay as they are. The earlier note about
+  adding an export to the factories still holds; this is the cheaper half of
+  the same trap.
+
+- **The database tests empty the database the screenshots are being taken
+  from.** The fixture drops every table in `public`, which is right for a test
+  and fatal for a half-prepared picture run: an administration area
+  photographed after it shows zeroes everywhere with nothing having failed.
+  Seed, photograph, then run `pytest` — or point `TEST_DATABASE_URL` somewhere
+  else.

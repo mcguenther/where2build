@@ -1637,6 +1637,31 @@ class Zeitpunktwerte(BaseModel):
     dauer_ms: int = Field(default=0, description="Summe der Antwortzeiten, nicht der Mittelwert.")
     tokens_ein: int = 0
     tokens_aus: int = 0
+    kosten_eur: float | None = Field(
+        default=None,
+        description=(
+            "Was die Tokens gekostet haben, umgerechnet über den Kurs aus der "
+            "Preisliste. null heißt „kein Preis für dieses Modell hinterlegt“ — "
+            "niemals 0,00 €."
+        ),
+    )
+
+
+class Preisstand(BaseModel):
+    """Where the money column comes from, so it can be checked.
+
+    Every field is nullable on purpose: without a price list there is no cost
+    column at all, and the interface says which of the two states it is in
+    rather than showing 0,00 €.
+    """
+
+    vorhanden: bool = False
+    stand: str | None = Field(default=None, description="Wann die Preisliste geschrieben wurde.")
+    usd_je_eur: float | None = None
+    kurs_stand: str | None = Field(default=None, description="Tag des EZB-Referenzkurses.")
+    quellen: dict[str, str] = Field(default_factory=dict)
+    modelle: int = 0
+    hinweis: str | None = Field(default=None, description="Warum keine Preise vorliegen.")
 
 
 class Statistik(BaseModel):
@@ -1646,6 +1671,15 @@ class Statistik(BaseModel):
     zeitreihe: list[Zeitpunktwerte]
     nach_dienst: list[Zeitpunktwerte]
     summe: Zeitpunktwerte
+    vergleich: list[Zeitpunktwerte] | None = Field(
+        default=None,
+        description=(
+            "Derselbe Zeitraum davor, gleich lang — nur wenn danach gefragt wurde. "
+            "Die Punkte tragen die Zeiten des Vergleichszeitraums."
+        ),
+    )
+    vergleich_summe: Zeitpunktwerte | None = None
+    preise: Preisstand = Field(default_factory=Preisstand)
 
 
 class Konto(BaseModel):
@@ -1672,6 +1706,9 @@ class Konten(BaseModel):
     von: datetime
     bis: datetime
     konten: list[Konto]
+    gesamt: int = Field(default=0, description="Wie viele Zeilen es insgesamt gibt.")
+    offset: int = 0
+    limit: int = 50
 
 
 class RollenAenderung(BaseModel):
@@ -1703,6 +1740,9 @@ class Fehlereintrag(BaseModel):
 class Fehlerliste(BaseModel):
     von: datetime
     bis: datetime
+    gesamt: int = 0
+    offset: int = 0
+    limit: int = 50
     quelle: str = Field(
         description=(
             "„datenbank“, oder „speicher“, wenn ohne Serverspeicher nur die "
@@ -1725,6 +1765,9 @@ class FreigabeZeile(BaseModel):
 
 class Freigabenliste(BaseModel):
     freigaben: list[FreigabeZeile]
+    gesamt: int = 0
+    offset: int = 0
+    limit: int = 50
 
 
 class Zwischenspeicher(BaseModel):
@@ -1760,6 +1803,60 @@ class Protokolleintrag(BaseModel):
 
 class Protokoll(BaseModel):
     eintraege: list[Protokolleintrag]
+    gesamt: int = 0
+    offset: int = 0
+    limit: int = 50
+
+
+class Ansage(BaseModel):
+    """The announcement every visitor sees. Public on the way out."""
+
+    text: str = Field(default="", max_length=1000)
+    art: Literal["hinweis", "warnung"] = "hinweis"
+    sichtbar: bool = False
+    bis: datetime | None = Field(
+        default=None,
+        description="Ab wann sie von selbst verschwindet; null heißt „bis jemand sie abschaltet“.",
+    )
+    geaendert_am: datetime | None = None
+
+
+class AnsageAnfrage(BaseModel):
+    text: str = Field(default="", max_length=1000)
+    art: Literal["hinweis", "warnung"] = "hinweis"
+    sichtbar: bool = False
+    bis: datetime | None = None
+
+
+class JobZeile(BaseModel):
+    """One recurring job, and what is known about its last run."""
+
+    name: str
+    zeitplan: str
+    warum: str
+    befehl: list[str]
+    zuletzt: datetime | None = None
+    exit_code: int | None = None
+    dauer_s: float | None = None
+    laeuft: bool = False
+    angefordert: str | None = Field(
+        default=None, description="Wann und von wem ein Lauf angefordert wurde, falls offen."
+    )
+
+
+class Jobs(BaseModel):
+    jobs: list[JobZeile]
+    scheduler_zuletzt: datetime | None = Field(
+        default=None, description="Wann sich der Scheduler zuletzt gemeldet hat."
+    )
+    scheduler_laeuft: bool = Field(
+        default=False,
+        description=(
+            "Ob gerade einer läuft. Ist er aus, bleibt ein angeforderter Lauf "
+            "liegen — die Oberfläche sagt das, statt einen Knopf ohne Wirkung zu zeigen."
+        ),
+    )
+    hinweis: str | None = None
 
 
 class LoeschVorbereitung(BaseModel):

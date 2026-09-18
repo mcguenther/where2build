@@ -674,6 +674,10 @@ def create_app() -> FastAPI:
     for module in (auth, gemarkungen, storage, shares, admin):
         app.include_router(module.router)
 
+    # The operator's announcement, and the one route of that module that is not
+    # behind an administrator: every visitor has to be able to read it.
+    app.include_router(admin.public)
+
     return app
 
 

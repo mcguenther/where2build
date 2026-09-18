@@ -73,7 +73,7 @@ import { beginSignIn } from "../lib/signIn.js";
 import AdminOverview from "../components/admin/AdminOverview.vue";
 import AdminStats from "../components/admin/AdminStats.vue";
 import AdminAccounts from "../components/admin/AdminAccounts.vue";
-import AdminServices from "../components/admin/AdminServices.vue";
+import AdminOperations from "../components/admin/AdminOperations.vue";
 import AdminShares from "../components/admin/AdminShares.vue";
 import AdminErrors from "../components/admin/AdminErrors.vue";
 import AdminAudit from "../components/admin/AdminAudit.vue";
@@ -85,7 +85,7 @@ export const AREAS = [
   { id: "uebersicht", label: "Übersicht", component: AdminOverview },
   { id: "statistik", label: "Statistik", component: AdminStats },
   { id: "konten", label: "Konten", component: AdminAccounts },
-  { id: "dienste", label: "Dienste", component: AdminServices },
+  { id: "betrieb", label: "Betrieb", component: AdminOperations },
   { id: "freigaben", label: "Freigaben", component: AdminShares },
   { id: "fehler", label: "Fehler", component: AdminErrors },
   { id: "protokoll", label: "Protokoll", component: AdminAudit },

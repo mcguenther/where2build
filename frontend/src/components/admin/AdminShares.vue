@@ -7,6 +7,7 @@
       <div class="panel__head">
         <h3>Offene Links</h3>
         <div class="spacer"></div>
+        <span v-if="total" class="chip">{{ num(total, 0) }} offen</span>
         <button type="button" class="btn btn--quiet btn--small" :disabled="busy" @click="sweep">
           Abgelaufene entfernen
         </button>
@@ -37,6 +38,7 @@
             </tbody>
           </table>
         </div>
+        <AdminPager :total="total" :offset="offset" :limit="limit" @move="turn" />
         <p class="hint">
           Was in einem Link steht, ist hier nicht zu sehen und soll es auch nicht sein:
           ein geteiltes Grundstück ist die Sache dessen, der es geteilt hat. Zurückziehen
@@ -55,23 +57,32 @@
  * withdraw a link — because it was reported, or because it is expired and the
  * sweep has not run — does not have to read what is in it to do that.
  */
+import AdminPager from "./AdminPager.vue";
 import { adminDeleteShare, adminShares, adminSweepShares } from "../../lib/api.js";
-import { bytes, moment } from "../../lib/format.js";
+import { bytes, moment, num } from "../../lib/format.js";
 
 export default {
   name: "AdminShares",
+  components: { AdminPager },
   data() {
-    return { rows: [], busy: false, failure: "", done: "", working: "" };
+    return { rows: [], total: 0, offset: 0, limit: 25, busy: false, failure: "", done: "", working: "" };
   },
   created() { this.load(); },
   methods: {
     bytes,
     moment,
+    num,
+    turn(offset) {
+      this.offset = offset;
+      return this.load();
+    },
     async load() {
       this.busy = true;
       this.failure = "";
       try {
-        this.rows = (await adminShares()).freigaben;
+        const answer = await adminShares({ limit: this.limit, offset: this.offset });
+        this.rows = answer.freigaben;
+        this.total = answer.gesamt;
       } catch (error) {
         this.failure = error.message;
       } finally {

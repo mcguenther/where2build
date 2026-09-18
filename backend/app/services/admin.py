@@ -46,6 +46,17 @@ ZONE = "Europe/Berlin"
 # the value ends up inside date_trunc, and date_trunc takes a field name.
 GRIDS = {"stunde": "hour", "tag": "day"}
 
+# And what the account list may be sorted by. A whitelist for the same reason:
+# an ORDER BY cannot be a bound parameter, so the only safe form is a value
+# this file wrote. Every one ends in a total order, because a paged list whose
+# rows can swap places between pages shows some of them twice and others never.
+_ORDERS = {
+    "anfragen": "coalesce(v.anfragen, 0) desc, coalesce(u.kennung, v.kennung)",
+    "neu": "u.angelegt desc nulls last, coalesce(u.kennung, v.kennung)",
+    "umfang": "coalesce((select sum(pg_column_size(p.dokument)) from plots p where p.user_id = u.id), 0) desc, coalesce(u.kennung, v.kennung)",
+    "name": "coalesce(u.anzeigename, '') asc, coalesce(u.kennung, v.kennung)",
+}
+
 # What the red button may empty. The audit trail is deliberately not here.
 SCOPES = {
     # Everything an account is: the documents, the shared links, the settings
@@ -244,20 +255,36 @@ class AdminStore:
 
     # -- the account list --------------------------------------------------
 
-    async def accounts(self, start: datetime, end: datetime, *, limit: int = 500) -> list[AccountRow]:
-        """Everybody this deployment knows, with what they used in the window.
+    async def accounts(
+        self,
+        start: datetime,
+        end: datetime,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+        search: str = "",
+        order: str = "anfragen",
+    ) -> tuple[list[AccountRow], int]:
+        """A page of the accounts, with what they used in the window, and the total.
 
         A full outer join, and that is the point: ``users`` holds whoever
         stored something, ``nutzung_konto`` whoever called something, and the
         two sets overlap without either containing the other. Somebody who has
         never saved a plot but is spending the upstream budget appears here --
         that is precisely the row an operator is looking for.
+
+        Paged rather than complete, because this is the table that grows with
+        the deployment: at a thousand accounts "the whole list" is a megabyte
+        of JSON and a page nobody can read. The search matches the display name
+        and the account key, which are the two things an operator has in hand --
+        a support mail says a name, a log line says a key.
         """
 
+        pattern = f"%{search.strip()}%" if search.strip() else None
         pool = await self.storage.open_pool()
         async with _translated(), pool.acquire() as connection:
             rows = await connection.fetch(
-                """
+                f"""
                 with verbrauch as (
                     select kennung,
                            sum(anzahl)     as anfragen,
@@ -293,12 +320,34 @@ class AdminStore:
                 full outer join verbrauch v on v.kennung = u.kennung
                 left join sperren s
                        on s.kennung = coalesce(u.kennung, v.kennung) and s.bis > now()
-                order by coalesce(v.anfragen, 0) desc, u.angelegt desc nulls last
-                limit $3
+                where $3::text is null
+                   or coalesce(u.anzeigename, '') ilike $3
+                   or coalesce(u.kennung, v.kennung) ilike $3
+                order by {_ORDERS.get(order, _ORDERS["anfragen"])}
+                limit $4 offset $5
                 """,
                 start,
                 end,
+                pattern,
                 limit,
+                offset,
+            )
+            total = await connection.fetchval(
+                """
+                with verbrauch as (
+                    select distinct kennung from nutzung_konto
+                    where stunde >= $1 and stunde < $2
+                )
+                select count(*)
+                from users u
+                full outer join verbrauch v on v.kennung = u.kennung
+                where $3::text is null
+                   or coalesce(u.anzeigename, '') ilike $3
+                   or coalesce(u.kennung, v.kennung) ilike $3
+                """,
+                start,
+                end,
+                pattern,
             )
         return [
             AccountRow(
@@ -319,7 +368,7 @@ class AdminStore:
                 gesperrt_automatisch=row["gesperrt_automatisch"],
             )
             for row in rows
-        ]
+        ], int(total or 0)
 
     async def delete_account(self, kennung: str) -> bool:
         """Erase one account and everything hanging off it."""
@@ -398,25 +447,48 @@ class AdminStore:
     # -- the failures ------------------------------------------------------
 
     async def errors(
-        self, start: datetime, end: datetime, *, limit: int = 200, service: str | None = None
-    ) -> list[dict[str, Any]]:
+        self,
+        start: datetime,
+        end: datetime,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+        search: str = "",
+    ) -> tuple[list[dict[str, Any]], int]:
+        """A page of the failures, newest first, and how many there are.
+
+        The search runs over the service, the route and the message at once:
+        an operator looking into an outage has a word, not a column.
+        """
+
+        pattern = f"%{search.strip()}%" if search.strip() else None
         pool = await self.storage.open_pool()
         async with _translated(), pool.acquire() as connection:
+            where = """
+                where zeit >= $1 and zeit < $2
+                  and ($3::text is null
+                       or coalesce(dienst, '') ilike $3
+                       or coalesce(route, '') ilike $3
+                       or meldung ilike $3)
+            """
             rows = await connection.fetch(
-                """
+                f"""
                 select zeit, bereich, dienst, status, route, kennung, meldung
                 from fehler
-                where zeit >= $1 and zeit < $2
-                  and ($3::text is null or dienst = $3)
+                {where}
                 order by zeit desc
-                limit $4
+                limit $4 offset $5
                 """,
                 start,
                 end,
-                service,
+                pattern,
                 limit,
+                offset,
             )
-        return [dict(row) for row in rows]
+            total = await connection.fetchval(
+                f"select count(*) from fehler {where}", start, end, pattern
+            )
+        return [dict(row) for row in rows], int(total or 0)
 
     # -- the audit trail ---------------------------------------------------
 
@@ -453,29 +525,31 @@ class AdminStore:
         except Exception:  # noqa: BLE001 -- see the docstring
             logger.exception("Could not write the audit entry for %s", action)
 
-    async def audit(self, *, limit: int = 200) -> list[dict[str, Any]]:
+    async def audit(self, *, limit: int = 50, offset: int = 0) -> tuple[list[dict[str, Any]], int]:
         pool = await self.storage.open_pool()
         async with _translated(), pool.acquire() as connection:
             rows = await connection.fetch(
                 """
                 select zeit, kennung, name, aktion, ziel, details
                 from pruefprotokoll
-                order by zeit desc
-                limit $1
+                order by zeit desc, id desc
+                limit $1 offset $2
                 """,
                 limit,
+                offset,
             )
+            total = await connection.fetchval("select count(*) from pruefprotokoll")
         return [
             {
                 **dict(row),
                 "details": json.loads(row["details"]) if isinstance(row["details"], str) else row["details"],
             }
             for row in rows
-        ]
+        ], int(total or 0)
 
     # -- shared links, seen by the operator --------------------------------
 
-    async def shares(self, *, limit: int = 200) -> list[dict[str, Any]]:
+    async def shares(self, *, limit: int = 50, offset: int = 0) -> tuple[list[dict[str, Any]], int]:
         """Every link that is still open, without what is inside it.
 
         The token, the owner, the dates and the size -- enough to see how many
@@ -492,12 +566,16 @@ class AdminStore:
                 from freigaben f
                 join users u on u.id = f.user_id
                 where f.laeuft_ab > now()
-                order by f.angelegt desc
-                limit $1
+                order by f.angelegt desc, f.id
+                limit $1 offset $2
                 """,
                 limit,
+                offset,
             )
-        return [dict(row) for row in rows]
+            total = await connection.fetchval(
+                "select count(*) from freigaben where laeuft_ab > now()"
+            )
+        return [dict(row) for row in rows], int(total or 0)
 
     async def delete_share(self, token: str) -> bool:
         pool = await self.storage.open_pool()
@@ -506,6 +584,97 @@ class AdminStore:
                 "delete from freigaben where id = $1 returning id", token
             )
         return deleted is not None
+
+    # -- the announcement --------------------------------------------------
+
+    async def announcement(self) -> dict[str, Any] | None:
+        """What the banner says, or ``None`` where the table is still empty."""
+
+        pool = await self.storage.open_pool()
+        async with _translated(), pool.acquire() as connection:
+            row = await connection.fetchrow(
+                "select text, art, sichtbar, bis, geaendert_am, von from betriebsansage where id = 1"
+            )
+        return dict(row) if row else None
+
+    async def set_announcement(
+        self, *, text: str, art: str, sichtbar: bool, bis: datetime | None, von: str
+    ) -> dict[str, Any]:
+        pool = await self.storage.open_pool()
+        async with _translated(), pool.acquire() as connection:
+            row = await connection.fetchrow(
+                """
+                insert into betriebsansage (id, text, art, sichtbar, bis, geaendert_am, von)
+                values (1, $1, $2, $3, $4, now(), $5)
+                on conflict (id) do update set
+                    text = excluded.text,
+                    art = excluded.art,
+                    sichtbar = excluded.sichtbar,
+                    bis = excluded.bis,
+                    geaendert_am = now(),
+                    von = excluded.von
+                returning text, art, sichtbar, bis, geaendert_am, von
+                """,
+                text,
+                art,
+                sichtbar,
+                bis,
+                von,
+            )
+        return dict(row)
+
+    # -- one account's whole record ----------------------------------------
+
+    async def account_record(self, kennung: str) -> dict[str, Any] | None:
+        """Everything stored under one account, for an Auskunft under Art. 15.
+
+        The plots and the settings document go in verbatim -- an Auskunft that
+        summarised what is held would be a second thing to trust. The shares
+        are listed by token and date and *not* by content: what a share holds
+        is a copy of a plot that is already in the same file, and printing it
+        twice would say there is more here than there is.
+        """
+
+        pool = await self.storage.open_pool()
+        async with _translated(), pool.acquire() as connection:
+            account = await connection.fetchrow(
+                "select id, issuer, subject, anzeigename, angelegt, ist_admin, kennung "
+                "from users where kennung = $1",
+                kennung,
+            )
+            if account is None:
+                return None
+            plots = await connection.fetch(
+                "select id, dokument, geaendert_am from plots where user_id = $1 order by geaendert_am desc",
+                account["id"],
+            )
+            settings = await connection.fetchrow(
+                "select dokument, geaendert_am from settings where user_id = $1", account["id"]
+            )
+            shares = await connection.fetch(
+                "select id, angelegt, laeuft_ab from freigaben where user_id = $1 order by angelegt desc",
+                account["id"],
+            )
+            usage = await connection.fetch(
+                """
+                select stunde, anzahl, fehler, tokens_ein, tokens_aus
+                from nutzung_konto where kennung = $1 order by stunde desc
+                """,
+                kennung,
+            )
+        return {
+            "konto": {
+                "kennung": account["kennung"],
+                "anbieter": account["issuer"],
+                "anzeigename": account["anzeigename"],
+                "angelegt": account["angelegt"],
+                "ist_admin": account["ist_admin"],
+            },
+            "grundstuecke": [dict(row) for row in plots],
+            "einstellungen": dict(settings) if settings else None,
+            "freigaben": [dict(row) for row in shares],
+            "nutzung": [dict(row) for row in usage],
+        }
 
     # -- housekeeping ------------------------------------------------------
 

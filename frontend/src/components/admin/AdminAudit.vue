@@ -3,7 +3,11 @@
     <p v-if="failure" class="notice notice--error" role="alert">{{ failure }}</p>
 
     <section class="panel">
-      <div class="panel__head"><h3>Prüfprotokoll</h3></div>
+      <div class="panel__head">
+        <h3>Prüfprotokoll</h3>
+        <div class="spacer"></div>
+        <span v-if="total" class="chip">{{ num(total, 0) }} Einträge</span>
+      </div>
       <div class="panel__body stack">
         <p v-if="busy" class="hint">Wird geladen …</p>
         <p v-else-if="rows.length === 0" class="hint">Bisher hat niemand hier etwas geändert.</p>
@@ -26,6 +30,7 @@
             </tbody>
           </table>
         </div>
+        <AdminPager :total="total" :offset="offset" :limit="limit" @move="turn" />
         <p class="hint">
           Dieses Protokoll bleibt auch dann stehen, wenn die Datenbank geleert wird —
           sonst wäre der Eintrag über das Leeren das Erste, was das Leeren löscht.
@@ -43,8 +48,9 @@
  * having before that for the one case nobody plans for: an action nobody
  * remembers taking. The entries are written by the backend, not by this page.
  */
+import AdminPager from "./AdminPager.vue";
 import { adminAudit } from "../../lib/api.js";
-import { moment } from "../../lib/format.js";
+import { moment, num } from "../../lib/format.js";
 
 const ACTIONS = {
   rolle: "Verwaltungsrecht gegeben",
@@ -60,12 +66,18 @@ const ACTIONS = {
 
 export default {
   name: "AdminAudit",
+  components: { AdminPager },
   data() {
-    return { rows: [], busy: false, failure: "" };
+    return { rows: [], total: 0, offset: 0, limit: 25, busy: false, failure: "" };
   },
   created() { this.load(); },
   methods: {
     moment,
+    num,
+    turn(offset) {
+      this.offset = offset;
+      return this.load();
+    },
     /** The stored value is code; what is read is German. An unknown action is
      *  shown as it is rather than hidden — a new one must not vanish here. */
     actionName(key) { return ACTIONS[key] || key; },
@@ -73,7 +85,9 @@ export default {
       this.busy = true;
       this.failure = "";
       try {
-        this.rows = (await adminAudit()).eintraege;
+        const answer = await adminAudit({ limit: this.limit, offset: this.offset });
+        this.rows = answer.eintraege;
+        this.total = answer.gesamt;
       } catch (error) {
         this.failure = error.message;
       } finally {

@@ -50,6 +50,11 @@ logger = logging.getLogger(__name__)
 AREA_REQUEST = "anfrage"
 AREA_SERVICE = "dienst"
 AREA_MODEL = "modell"
+# How a parcel search ended -- „bestaetigt", „mehrdeutig", „erfolglos" or
+# „abgebrochen" in place of the service name. The one area here that is about
+# the product rather than the machine: nothing failed when a search comes back
+# empty, and no error log would ever show it.
+AREA_SEARCH = "suche"
 
 # And the three outcomes. "limit" is its own rather than an error: a refused
 # call is the budget working, and counting it as a failure would make a healthy
