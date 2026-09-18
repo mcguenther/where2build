@@ -220,7 +220,7 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 711 passed, 42 skipped — 41 of them the account store, waiting for
+- `pytest`: 715 passed, 42 skipped — 41 of them the account store, waiting for
   `TEST_DATABASE_URL` to point at a real Postgres, and one that needs pyosmium,
   which only the index builder wants. The account store is skipped rather than
   mocked because what it checks is the database's own behaviour. Without

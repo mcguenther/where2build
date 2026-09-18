@@ -6,19 +6,31 @@ property adverts and about this search to produce something the Beleg gate will
 accept. They are German, because the text they are about is German and because
 a mixed-language instruction is one more thing for a model to resolve.
 
-Three decisions shape them.
+Four decisions shape them.
 
 **A system prompt and a user message, not one blob.** The instructions are the
 same on every listing and the listing is not, so they belong in the stable half
 — which is also the half both APIs cache. Sent as one string, every listing
 re-sent the whole instruction as fresh tokens.
 
+**The listing is fenced, and the fence is announced.** An advert is prose with
+headings, colons and its own „Hinweis:" lines, and it arrives after a hint of
+ours; without a delimiter the boundary between our sentences and the seller's
+is a matter of interpretation. The fence is a line of percent signs because no
+German advert has one, and it grows a character at a time until the text
+provably does not contain it — the delimiter is derived from the text, never
+assumed about it.
+
 **The vocabulary is ours, so it is stated.** `Ortsebene` and `Ortsbeziehung`
 are enumerated in the schema, and a name in an enum conveys nothing: the schema
 says „liegt_in" is allowed and not that „die ca. 6 km entfernte Kreisstadt
-Grimma" is the opposite of it. Every distinction below is one this project
-measured and got wrong first — they are the same traps the patterns in
-`search.indicia` carry, written as examples instead of as regular expressions.
+Grimma" is the opposite of it. The same goes for the shape of the answer. Both
+wire formats carry the JSON schema — `response_format` there, `output_config`
+here — but a strict schema only rejects a wrong shape; it does not say that an
+absent value is null rather than an omission, that `wortlaut` keeps the
+rounding, or that a denominator can be a letter. `RÜCKGABE` says it, and
+`EXAMPLE` shows it. Every distinction below is one this project measured and
+got wrong first.
 
 **The model never learns what our own readers concluded.** This is the one rule
 worth stating twice. Handing it our findings would make it agree with us, and
@@ -30,17 +42,97 @@ exist is data about Saxony, not an answer about this advert.
 
 from __future__ import annotations
 
+import json
+
+from ..schemas import BEFUND_VORLAGE
+
 # How many known district names travel with a listing. Enough for every
 # candidate an advert's prose can plausibly raise, short enough that the list
 # cannot become the bulk of the request.
 MAX_DISTRICT_HINTS = 40
 
+# The delimiter around the listing. Percent signs because a German advert has
+# prices with „%" in them but never a run of four, and `fence_for` proves that
+# for the text at hand rather than trusting it.
+FENCE = "%%%%"
 
-SYSTEM = """\
+
+def fence_for(text: str) -> str:
+    """A delimiter the listing provably does not contain.
+
+    A fence that occurs inside the advert would let the text end early, which
+    is the one failure mode a delimiter is supposed to remove. Growing it by
+    one character terminates: a text of *n* characters cannot contain a fence
+    of *n* + 1.
+    """
+
+    fence = FENCE
+    while fence in text:
+        fence += "%"
+    return fence
+
+
+# One complete answer, and a real one: advert 2418686487, the Borna listing
+# this project has measured every reader on. It is the example because its
+# truths are the ones that are hard to state -- an area with its rounding kept,
+# a place named on two levels in one sentence, a price that is *not* there, a
+# reservation that changes what the area means. Invented example data would
+# have none of that, and `test_prompts` puts this one through the same Beleg
+# gate the model's own answer has to pass.
+EXAMPLE = {
+    "vorlage": BEFUND_VORLAGE,
+    "felder": {
+        "adresse": {"wert": None, "beleg": None},
+        "kaufpreis_eur": {"wert": None, "wortlaut": None, "beleg": None},
+        "grundstuecksflaeche_m2": {
+            "wert": 748.5,
+            "wortlaut": "ca. 748,50 m²",
+            "beleg": "ein attraktives, ca. 748,50 m² großes Baugrundstück in der "
+            "aufstrebenden Stadt Borna",
+        },
+    },
+    "orte": [
+        {
+            "name": "Thräna",
+            "ebene": "gemarkung",
+            "beziehung": "liegt_in",
+            "entfernung_km": None,
+            "beleg": "Thräna ist mit seinen etwa 765 Einwohnern ein kleiner "
+            "Ortsteil der Kreisstadt Borna.",
+        },
+        {
+            "name": "Borna",
+            "ebene": "gemeinde",
+            "beziehung": "liegt_in",
+            "entfernung_km": None,
+            "beleg": "ein kleiner Ortsteil der Kreisstadt Borna",
+        },
+        {
+            "name": "Leipzig",
+            "ebene": "gemeinde",
+            "beziehung": "erwaehnt",
+            "entfernung_km": None,
+            "beleg": "Über die Bundesstraße 2 erreicht man die Großstadt Leipzig "
+            "in circa 25 Minuten.",
+        },
+    ],
+    "flurstuecke": [],
+    "vorbehalte": ["teilflaeche"],
+}
+
+
+_INSTRUCTIONS = """\
 Du liest Immobilieninserate für Grundstücke in Sachsen und gibst wieder, was \
 darin steht. Du bist der letzte von mehreren Lesern; vor dir haben Mustererkenner \
 denselben Text gelesen. Deine Aufgabe ist nicht, ihnen zuzustimmen, sondern den \
 Text unabhängig zu lesen.
+
+DAS INSERAT
+
+Der Inseratstext steht in der Nachricht zwischen zwei Zeilen, die nur aus \
+Prozentzeichen bestehen. Alles vor der ersten dieser Zeilen ist ein Hinweis von \
+uns und gehört nicht zum Inserat. Die Begrenzungszeilen selbst sind kein Text \
+des Inserats und dürfen in keinem Beleg vorkommen.
 
 Zu jedem Wert gehört ein Beleg: eine zusammenhängende Textstelle aus dem Inserat, \
 in der der Wert wörtlich steht. Der Beleg wird Zeichen für Zeichen gegen den Text \
@@ -129,8 +221,37 @@ Trage in `vorbehalte` ein, was die Zahlen relativiert, wenn es im Text steht:
 """
 
 
+_RETURN = """\
+RÜCKGABE
+
+Antworte mit einem einzigen JSON-Objekt und mit nichts sonst: kein Satz davor, \
+keiner danach, keine Code-Zäune. Jedes Feld wird gesetzt. Was das Inserat nicht \
+hergibt, bekommt null; Listen, für die es nichts hergibt, bleiben leer. Lass \
+nichts weg und erfinde nichts, um ein Feld zu füllen.
+
+`wert` ist die Zahl selbst, ohne Einheit und ohne Tausenderpunkt; `wortlaut` ist \
+dieselbe Zahl, wie sie im Text dasteht. Aus „ca. 748,50 m²" wird also \
+"wert": 748.5 und "wortlaut": "ca. 748,50 m²". `zaehler` ist eine Zahl, `flur` und \
+`nenner` sind Zeichenketten, weil ein Nenner ein Buchstabe sein kann.
+
+So sieht eine vollständige Antwort aus. Sie gehört zu einem anderen Inserat als \
+dem, das du gleich liest — übernimm keinen ihrer Werte:
+
+%(example)s
+
+Drei Dinge daran: das Inserat nennt nur einen Preis je Quadratmeter, also bleibt \
+`kaufpreis_eur` null — 748,50 × 92 auszurechnen ergäbe eine Zahl, die nirgends im \
+Text steht und deren Beleg es deshalb nicht gibt. Es nennt kein Flurstück, also \
+bleibt die Liste leer statt geraten. Und die 25 Minuten nach Leipzig sind keine \
+Kilometer, also bleibt `entfernung_km` dort null.\
+""" % {"example": json.dumps(EXAMPLE, ensure_ascii=False, indent=2)}
+
+
+SYSTEM = f"{_INSTRUCTIONS}\n\n{_RETURN}"
+
+
 def user_message(text: str, districts: list[str] | None = None) -> str:
-    """The listing, and the reference material that goes with it.
+    """The listing, fenced, and the reference material that goes with it.
 
     ``districts`` are names from the Saxon cadastral district register that
     occur in this text. They are *material*, not an answer: which of them the
@@ -152,7 +273,9 @@ def user_message(text: str, districts: list[str] | None = None) -> str:
             "meint, steht im Text. Namen, die nicht in der Liste stehen, sind "
             "trotzdem anzugeben, wenn der Text sie als Ort nennt."
         )
-    parts.append(f"Inserat:\n\n{text}")
+    fence = fence_for(text)
+    parts.append("Das Inserat steht zwischen den Zeilen aus Prozentzeichen.")
+    parts.append(f"{fence}\n{text}\n{fence}")
     return "\n\n".join(parts)
 
 
@@ -167,4 +290,12 @@ FETCH = (
 )
 
 
-__all__ = ["FETCH", "MAX_DISTRICT_HINTS", "SYSTEM", "user_message"]
+__all__ = [
+    "EXAMPLE",
+    "FENCE",
+    "FETCH",
+    "MAX_DISTRICT_HINTS",
+    "SYSTEM",
+    "fence_for",
+    "user_message",
+]

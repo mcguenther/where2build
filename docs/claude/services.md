@@ -454,6 +454,46 @@ of Overpass or a local extract, the listing portals, and the extraction model.
   in one sentence (Großbothen/Grimma), „Anbindung an Leipzig" as a statement
   about transport, „Schulen in Roitzsch" as a statement about schools.
 
+- **The listing is fenced, and the fence is derived from the listing.** An
+  advert is prose with headings, colons and its own „Hinweis:" lines, and it
+  arrives after a hint of ours in the same message; without a delimiter the
+  boundary between our sentences and the seller's is a matter of
+  interpretation. `prompts.fence_for` returns a line of percent signs — four,
+  and one more for as long as the text still contains it, which terminates
+  because a text of *n* characters cannot contain a fence of *n* + 1. The rule
+  („zwischen zwei Zeilen, die nur aus Prozentzeichen bestehen") goes in the
+  system prompt, so it stays cacheable while the fence itself varies; the
+  announcement sentence goes with the text. The fence is *added* around the
+  text and never written into it: the Beleg gate checks against the raw
+  listing, so a model that quotes a fence line fails that check rather than
+  smuggling our own words in as evidence.
+
+- **A strict schema rejects a wrong shape and states nothing.** Both wire
+  formats carry the JSON schema — `response_format` there, `output_config.
+  format` here — and Pydantic's dump of `InseratBefund` is names and types with
+  no descriptions at all. It does not say that a value the advert lacks is
+  `null` rather than an omitted key, that `wortlaut` keeps the rounding while
+  `wert` drops the unit and the thousands separator, or that a denominator can
+  be a letter. `RÜCKGABE` says those, and `prompts.EXAMPLE` shows one complete
+  answer. That example is advert 2418686487, not an invention: every Beleg in
+  it is a sentence that really stands in a real listing, so `test_prompts` can
+  put it through the same `services/beleg.py` gate the model's own answer has
+  to pass — it comes back with the area, three places and no refusal. It also
+  carries the three things that are hard to say in the abstract: the advert
+  names only a price per square metre, so `kaufpreis_eur` stays null and
+  748,50 × 92 is exactly the fabrication the gate caught once; it names no
+  parcel, so the list stays empty rather than guessed; and „circa 25 Minuten"
+  is not kilometres, so `entfernung_km` stays null. A second test asserts that
+  every property name in the schema occurs either in the example or in the
+  prompt's own text, so a field added to `InseratBefund` cannot stay
+  unmentioned.
+
+  One field is asked for that nothing reads yet: `vorbehalte`. It is in the
+  schema and in the prompt, and neither `services/befund.py` nor the search
+  looks at it — „teilflaeche" should suppress the area's tolerance staircase
+  and „mehrere-grundstuecke" should say so on the result, and both are still
+  to be built.
+
 - **The model gets our material and never our findings.** The Saxon district
   register is data about Saxony and travels: the names in this text that the
   register actually carries, as a closed list, so a model can say which of them
