@@ -941,11 +941,37 @@ answer is checked is worth having because of where it disagrees.
   decide where it can. Strip greedily and Wehlen is lost; do not strip at all
   and Borna never resolves.
 
-- **A city name is read as a Gemarkung.** Still open, and the one shape every
-  remaining contradiction in the log now has: the patterns answer `gemarkung
-  Leipzig` where the model answers `gemeinde Leipzig`, fourteen times over the
-  corpus, plus Groitzsch, Borna, Bad Lausick, Chemnitz and Taucha once each.
-  „Anbindung an Leipzig" is a sentence about transport, and the register does
-  carry a Gemarkung Leipzig, so the name resolves and the Indiz is emitted at
-  the wrong level. Nothing is broken by it — a model Indiz only ever orders —
-  but it is the next pattern worth fixing.
+- **A city name was read as a Gemarkung.** „Anbindung an Leipzig" is a
+  sentence about transport, but the register does carry a Gemarkung Leipzig, so
+  the name resolved and the Indiz was emitted at that level — fourteen times
+  over the corpus, plus Groitzsch, Borna, Bad Lausick, Chemnitz and Taucha once
+  each, and a model read every one of them as the municipality. Where the
+  relation does not place the plot, the level is not the lookup's to decide:
+  `municipality_spelling` is asked, and a name the register knows as a
+  municipality is emitted as one. Only there — „Ihr neues Wohngrundstück in
+  Bad Lausick" places the plot, and Bad Lausick is a municipality *and* the
+  district meant, so the rule asks about the relation before it asks the
+  register.
+
+- **A municipality nobody placed the plot in still filtered the anchors.**
+  Found while fixing the one above, and the more serious of the two. `anchors`
+  has filtered Gemarkung Indizien on the relation since „Anbindung an Leipzig"
+  put Gemarkung Leipzig up next to Lobstädt; `municipalities` never did, so a
+  Gemeinde Indiz with any relation at all narrowed the anchor set to itself and
+  could raise anchors of its own through `_municipality_anchors`. Nothing in
+  the deterministic reader produced one — it only ever emits `liegt_in` — but
+  the model channel can, and „Leipzig, entfernt_von" is the one thing the
+  relation exists to say. Both now go through `placing()`, which is `active()`
+  plus the relation test the anchors already used.
+
+Over the corpus, the divergence log before any of this and after all of it:
+
+| | einig | lücke | widerspruch | verworfen |
+|---|---|---|---|---|
+| vorher | 25 | 22 | 24 | 6 |
+| nachher | 42 | 25 | **2** | 9 |
+
+The two that remain are real: the patterns place the plot in Gemarkung Bad
+Lausick and in Gemarkung Groitzsch, the model calls both the Gemeinde, and
+which is meant is a question for a person — which is what a row in this log is
+supposed to be.

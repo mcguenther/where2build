@@ -1285,16 +1285,39 @@ def _from_body(
                 relation = "entfernt_von"
             elif key in municipalities:
                 relation = "erwaehnt"
+            # „südlich von Leipzig" names the city, not the cadastral district
+            # that happens to share its name. Where the sentence does not place
+            # the plot, the level is not the lookup's to decide, and the
+            # register knows which of the two the name is. Only there: „Ihr
+            # neues Wohngrundstück in Groitzsch" places the plot, and Groitzsch
+            # is a municipality *and* the district meant.
+            #
+            # Measured 18.09.2026: the patterns answered „Gemarkung Leipzig"
+            # fourteen times over the corpus, with Groitzsch, Borna, Bad
+            # Lausick, Chemnitz and Taucha once each, and a model read every
+            # one of them as the municipality.
+            # The relation as the Indiz will carry it: an unread one becomes
+            # „erwaehnt" below, and that is the value this has to judge.
+            beziehung = relation or "erwaehnt"
+            named_level = "gemarkung"
+            if beziehung not in ANCHORING and municipality_spelling(directory, word):
+                named_level = "gemeinde"
             out.append(
                 _indiz(
                     counter,
-                    art="gemarkung",
+                    art=named_level,
                     wert=word,
-                    text=_place_sentence(word, relation, len(entries)),
+                    text=_place_sentence(
+                        word, relation, 1 if named_level == "gemeinde" else len(entries)
+                    ),
                     quelle="fliesstext",
                     beleg=_excerpt(body, start, end, pieces=pieces),
-                    schluessel=entries[0].schluessel if len(entries) == 1 else None,
-                    beziehung=relation or "erwaehnt",
+                    schluessel=(
+                        entries[0].schluessel
+                        if named_level == "gemarkung" and len(entries) == 1
+                        else None
+                    ),
+                    beziehung=beziehung,
                     # A place the text places the plot *in* is worth far more
                     # than one it merely names -- and one it names as being
                     # kilometres away is worth less than nothing as an anchor.

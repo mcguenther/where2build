@@ -289,6 +289,22 @@ class SearchEngine:
     # Small helpers over the Indiz list
     # ------------------------------------------------------------------
 
+    def placing(self, art: str) -> list[Indiz]:
+        """Indicia of one kind that actually place the plot somewhere.
+
+        German capitalises every noun and a listing names half a county, so a
+        mention is not a location: „Anbindung an Leipzig" put Gemarkung Leipzig
+        up as an anchor next to Lobstädt, and Leipzig holds two parcels of
+        exactly the stated size. `anchors` has filtered on the relation since
+        that measurement; the municipality did not, and a Gemeinde Indiz
+        without a placing relation therefore still narrowed the anchors to
+        itself and could produce anchors of its own. A model may report
+        „Leipzig, entfernt_von" — the one thing the relation exists to say —
+        and that must no more filter than it may anchor.
+        """
+
+        return [indiz for indiz in self.active(art) if indiz.beziehung in ANCHORING]
+
     def active(self, art: str) -> list[Indiz]:
         """Indicia of one kind the user has not switched off, strongest first."""
 
@@ -878,7 +894,7 @@ class SearchEngine:
         # „geprägt von Wiesen und Feldern“ — a real Gemarkung name and an
         # entirely accidental one. A mention without a positional relation
         # stays in the protocol as weak evidence and is never searched.
-        active = [i for i in self.active("gemarkung") if i.beziehung in ANCHORING]
+        active = self.placing("gemarkung")
         chosen_id = self.payload.entscheidungen.get("gemarkung")
         if chosen_id:
             # A person who picked one has settled it; searching the rejected
@@ -933,7 +949,7 @@ class SearchEngine:
         if not self.directory:
             return []
         out: list[Anchor] = []
-        for indiz in self.active("gemeinde"):
+        for indiz in self.placing("gemeinde"):
             needle = fold(indiz.wert)
             districts = [
                 entry
@@ -975,9 +991,9 @@ class SearchEngine:
         return self._within_municipality(entries) or entries
 
     def municipalities(self) -> list[str]:
-        """The municipalities the listing names, folded, strongest first."""
+        """The municipalities the listing puts the plot *in*, folded, strongest first."""
 
-        return [fold(indiz.wert) for indiz in self.active("gemeinde")]
+        return [fold(indiz.wert) for indiz in self.placing("gemeinde")]
 
     def _within_municipality(self, entries: list[GemarkungEntry]) -> list[GemarkungEntry]:
         """The entries whose municipality the listing also names.

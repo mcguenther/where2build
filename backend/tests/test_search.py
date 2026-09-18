@@ -194,11 +194,16 @@ def test_a_place_is_read_by_its_relation_and_not_by_how_often_it_is_named():
 
     indicia = collect_indicia(text=LISTING, directory=DIRECTORY)
     districts = {i.wert: i for i in indicia if i.art == "gemarkung"}
+    grimma = [i for i in indicia if i.wert == "Grimma"]
 
     assert districts["Großbothen"].beziehung == "liegt_in"
     assert districts["Höfgen"].beziehung == "liegt_in"
     # The one the text places the plot *in* outranks the one it merely mentions.
-    assert districts["Großbothen"].sicherheit > districts["Grimma"].sicherheit
+    distant = next(i for i in grimma if i.beziehung == "entfernt_von")
+    assert districts["Großbothen"].sicherheit > distant.sicherheit
+    # And the distant one is not offered as a cadastral district at all: the
+    # sentence names the town, and the register knows Grimma as one.
+    assert {i.art for i in grimma} == {"gemeinde"}
 
 
 def test_an_ambiguous_name_says_so_rather_than_picking_one():
@@ -886,9 +891,83 @@ def test_the_generic_word_in_front_of_a_municipality_is_not_part_of_its_name():
     """
 
     indicia = _indicia_of("2418686487")
+    placing = {i.wert for i in indicia if i.art == "gemeinde" and i.beziehung == "liegt_in"}
     # A set: the location field and the sentence both name it, which is two
     # Indizien of one value and a separate question.
-    assert {i.wert for i in indicia if i.art == "gemeinde"} == {"Borna"}
+    assert placing == {"Borna"}
+    # And nothing anywhere still carries the article's noun.
+    assert not [i for i in indicia if i.wert.lower().startswith(("stadt ", "kreisstadt "))]
+
+
+def test_a_municipality_only_mentioned_neither_filters_nor_anchors():
+    """`anchors` has filtered Gemarkung Indizien on the relation since „Anbindung
+    an Leipzig" put Gemarkung Leipzig up next to Lobstädt. The municipality did
+    not, so a Gemeinde Indiz without a placing relation still narrowed the
+    anchors to itself — and a model may report exactly that: „Leipzig,
+    entfernt_von"."""
+
+    engine = SearchEngine(
+        ParcelSearchRequest(text="Baugrundstück in Lobstädt."), alkis_service(), DIRECTORY
+    )
+    engine.state.indicia = [
+        Indiz(
+            id="a",
+            art="gemarkung",
+            wert="Lobstädt",
+            text="…",
+            quelle="fliesstext",
+            beziehung="liegt_in",
+            sicherheit=0.6,
+        ),
+        Indiz(
+            id="b",
+            art="gemeinde",
+            wert="Leipzig",
+            text="…",
+            quelle="modell",
+            beziehung="entfernt_von",
+            sicherheit=0.2,
+        ),
+    ]
+
+    assert engine.municipalities() == []
+    assert [a.name for a in engine.anchors()] == ["Lobstädt"]
+
+
+def test_a_city_the_text_only_mentions_is_not_offered_as_a_gemarkung():
+    """„Anbindung an Leipzig" is a sentence about transport.
+
+    There *is* a Gemarkung Leipzig, so the name resolves and the Indiz used to
+    be emitted at that level — fourteen times over the recorded corpus, with
+    Groitzsch, Borna, Bad Lausick, Chemnitz and Taucha once each, and a model
+    read every one of them as the municipality. Where the sentence does not
+    place the plot, the level is not the lookup's to decide.
+    """
+
+    indicia = collect_indicia(
+        text="Baugrundstück in Lobstädt. Gute Anbindung an Leipzig.",
+        directory=DIRECTORY,
+    )
+    by_name = {i.wert: i for i in indicia}
+    assert by_name["Leipzig"].art == "gemeinde"
+    assert by_name["Leipzig"].beziehung == "erwaehnt"
+    # The district it does place the plot in is untouched.
+    assert (by_name["Lobstädt"].art, by_name["Lobstädt"].beziehung) == (
+        "gemarkung",
+        "liegt_in",
+    )
+
+
+def test_a_municipality_that_is_also_the_district_survives_being_named():
+    """„Ihr neues Wohngrundstück in Groitzsch" places the plot, and Groitzsch is
+    a municipality *and* the cadastral district meant. The rule above must not
+    reach it — which is why it asks about the relation first."""
+
+    indicia = collect_indicia(
+        text="Ihr neues Wohngrundstück in Bad Lausick", directory=DIRECTORY
+    )
+    lausick = next(i for i in indicia if i.wert == "Bad Lausick")
+    assert (lausick.art, lausick.beziehung) == ("gemarkung", "liegt_in")
 
 
 def test_a_name_that_is_a_generic_word_keeps_it():
