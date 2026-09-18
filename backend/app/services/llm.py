@@ -427,8 +427,15 @@ class LLMClient:
         name: str,
         auftrag: str,
         exclude: Iterable[str] = (),
+        system: str | None = None,
     ) -> M:
-        """Call 2 -- response_format only, no tools."""
+        """Call 2 -- schema only, no tools.
+
+        ``system`` is the half that is the same on every listing, and it is
+        sent as the system prompt rather than glued to the front of the text:
+        both APIs take one, both cache the stable prefix, and one blob re-sent
+        per advert pays for the instructions again every time.
+        """
 
         schema = strict_json_schema(model, name, exclude)
         # Everything that shaped the answer: the model, the prompt, the schema
@@ -437,6 +444,7 @@ class LLMClient:
             self.provider,
             self.settings.model_id,
             name,
+            system or "",
             auftrag,
             json.dumps(schema, sort_keys=True),
             text,
@@ -451,29 +459,36 @@ class LLMClient:
                 # if it did not, the entry is simply worthless.
                 pass
 
-        prompt = f"{auftrag}\n\nSeitentext:\n\n{text}"
+        prompt = f"{auftrag}\n\n{text}" if auftrag else text
         if self.speaks_anthropic:
-            answer = await self._messages(
-                {
-                    "model": self.settings.model_id,
-                    # Required by this API, and not by the other one. Generous:
-                    # a Befund with its Belege is longer than the fields alone.
-                    "max_tokens": ANTHROPIC_MAX_TOKENS,
-                    "messages": [{"role": "user", "content": prompt}],
-                    "output_config": {
-                        "format": {
-                            "type": "json_schema",
-                            "schema": schema["schema"],
-                            "name": schema["name"],
-                        }
-                    },
-                }
-            )
+            payload: dict[str, Any] = {
+                "model": self.settings.model_id,
+                # Required by this API, and not by the other one. Generous: a
+                # Befund with its Belege is longer than the fields alone.
+                "max_tokens": ANTHROPIC_MAX_TOKENS,
+                "messages": [{"role": "user", "content": prompt}],
+                "output_config": {
+                    "format": {
+                        "type": "json_schema",
+                        "schema": schema["schema"],
+                        "name": schema["name"],
+                    }
+                },
+            }
+            # A top-level field here, a message with role „system" there. Same
+            # idea, two spellings — which is the whole reason this method knows
+            # which provider it is talking to.
+            if system:
+                payload["system"] = system
+            answer = await self._messages(payload)
         else:
+            messages = [{"role": "user", "content": prompt}]
+            if system:
+                messages.insert(0, {"role": "system", "content": system})
             answer = await self._chat(
                 {
                     "model": self.settings.model_id,
-                    "messages": [{"role": "user", "content": prompt}],
+                    "messages": messages,
                     "response_format": {"type": "json_schema", "json_schema": schema},
                 }
             )

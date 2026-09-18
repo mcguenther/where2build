@@ -436,3 +436,33 @@ of Overpass or a local extract, the listing portals, and the extraction model.
   sentence a failure turns into. The SDK would be the one call that bypasses
   all of it. This is not an OpenAI shim — it is a first-class Messages adapter
   written against the documented wire shape.
+
+- **A system prompt and a user message, not one blob.** The instructions are
+  the same on every listing and the listing is not, so the stable half goes in
+  the field both APIs have for it — a top-level `system` on Anthropic, a
+  message with `role: "system"` on the OpenAI-compatible side. Sent as one
+  string, as it was, every advert paid for the instructions again and neither
+  API could cache the prefix.
+
+- **The prompt names the vocabulary, because an enum conveys nothing.** The
+  schema says `liegt_in` is an allowed value; it does not say that „die ca.
+  6 km entfernte Kreisstadt Grimma" is the *opposite* of it. So
+  `services/prompts.py` states the five levels and the four relations with the
+  traps this project measured and got wrong first — the same ones the patterns
+  in `search/indicia.py` carry, written as examples instead of as regular
+  expressions: the relation standing behind the name (Thräna), the two levels
+  in one sentence (Großbothen/Grimma), „Anbindung an Leipzig" as a statement
+  about transport, „Schulen in Roitzsch" as a statement about schools.
+
+- **The model gets our material and never our findings.** The Saxon district
+  register is data about Saxony and travels: the names in this text that the
+  register actually carries, as a closed list, so a model can say which of them
+  the advert means rather than invent one. What our own readers *concluded*
+  does not travel, and that is the rule worth stating twice — a teacher shown
+  the student's answers is not a teacher, and the divergence log in
+  `services/lehrbuch.py` would then measure nothing at all. `_known_districts`
+  therefore reads the register and never `collect_indicia`.
+
+- **The fetch prompt is told about the page and not about the fields.** Naming
+  a field there is an invitation to summarise instead of quote — and a
+  summarised page is one whose every Beleg the gate then refuses.

@@ -21,8 +21,9 @@ from ..schemas import (
     ListingExtractResponse,
     as_vorschlaege,
 )
-from ..search.indicia import collect_indicia
+from ..search.indicia import collect_indicia, district_matches
 from ..services import befund as befund_service
+from ..services import prompts
 from ..services import lehrbuch as lehrbuch_service
 from ..services.beleg import Urteil, refusal_note
 from ..services.llm import LLMClient, fingerprint, normalize_url
@@ -31,29 +32,14 @@ from ..settings import Settings
 
 router = APIRouter(prefix="/api/listings", tags=["Inserate"])
 
-_FETCH_TASK = (
-    "Es geht um ein Grundstücksinserat: Adresse, Flurstücksnummern, Kaufpreis "
-    "und Grundstücksfläche."
-)
-# What the model is asked for, and the rule it is asked under. The rule is not
-# enforced here -- `services.beleg` enforces it, and it does so by comparing
-# strings rather than by trusting this paragraph. Saying it anyway costs
-# nothing and makes the refusals rarer.
-_STRUCTURE_TASK = (
-    "Lies aus dem folgenden Text eines Grundstücksinserats aus, was darin steht: "
-    "Adresse, Kaufpreis in Euro, Grundstücksfläche in Quadratmetern, die genannten "
-    "Orte mit ihrer Ebene (Gemarkung, Ortsteil, Gemeinde, Straße) und ihrer "
-    "Beziehung zum Grundstück (liegt_in, liegt_an, entfernt_von, erwaehnt) sowie "
-    "Flurstückskennungen (etwa „Flurstück 790 sowie 706“).\n\n"
-    "Zu jedem Wert gehört ein Beleg: der Satz oder Satzteil aus dem Text, in dem "
-    "der Wert wörtlich steht. Der Beleg wird gegen den Text geprüft und muss "
-    "deshalb Zeichen für Zeichen aus ihm stammen — nicht umformuliert, nicht "
-    "zusammengefasst, nicht gekürzt um die Zahl herum.\n\n"
-    "Rechne nichts aus. Ein Kaufpreis, der sich aus Fläche mal Preis pro "
-    "Quadratmeter ergibt, steht nicht im Inserat und wird nicht eingetragen. "
-    "Ohne Beleg bleibt das Feld null. Namen, Telefonnummern und andere "
-    "Kontaktdaten werden nicht erfasst."
-)
+# A capitalised word, which in German is every noun — the register is what
+# decides whether one of them is a place.
+_WORDS = re.compile(r"\b[A-ZÄÖÜ][\wäöüßÄÖÜ-]{2,}\b")
+
+# What the model is told lives in `services/prompts.py`: it is content rather
+# than plumbing, and it is the one part of this channel that has to know what a
+# German property advert looks like.
+_FETCH_TASK = prompts.FETCH
 
 # What the reader produces, as a number. It rides in the cache key, because the
 # cache that holds an extracted listing has no expiry (`ttl_s=None`) and is
@@ -125,7 +111,13 @@ async def _ask_the_model(
     sentence stands in the page. See `services/lehrbuch.py`.
     """
 
-    befund = await llm.structure(text, InseratBefund, "inserat-befund", _STRUCTURE_TASK)
+    befund = await llm.structure(
+        text=prompts.user_message(text, _known_districts(text)),
+        model=InseratBefund,
+        name="inserat-befund",
+        auftrag="",
+        system=prompts.SYSTEM,
+    )
     fields, field_verdicts = befund_service.fields_from(befund, text, known)
     indicia, indiz_verdicts = befund_service.indicia_from(befund, text, start)
     verdicts = [*field_verdicts, *indiz_verdicts]
@@ -180,6 +172,32 @@ async def _note_divergences(
             vorlage=BEFUND_VORLAGE,
         )
     )
+
+
+def _known_districts(text: str) -> list[str]:
+    """The names in this text that the Saxon district register actually carries.
+
+    Reference material, not an answer: which of them the advert means, and on
+    which level, is precisely what the model is being asked. A closed list of
+    names that exist is worth sending — it is data about Saxony — and it costs
+    one pass over a file that is already in memory.
+
+    What is *not* sent is anything our own readers concluded. Handing the model
+    our findings would make it agree with us, and the divergence log in
+    `services/lehrbuch.py` would then measure nothing at all. This function
+    therefore reads the register, never `collect_indicia`.
+    """
+
+    directory = gemarkung_directory()
+    if directory is None:
+        return []
+    found: list[str] = []
+    for word in dict.fromkeys(_WORDS.findall(text)):
+        if district_matches(directory, word):
+            found.append(word)
+        if len(found) >= prompts.MAX_DISTRICT_HINTS:
+            break
+    return found
 
 
 def _as_text(value: object) -> str | None:

@@ -280,3 +280,33 @@ Three details, each of which was the difference between working and not:
 `scripts/docker-build-sandbox.sh` still works and still does the same thing by
 patching the Dockerfiles at build time. It is no longer needed and is kept only
 so an existing habit does not break.
+
+**A Docker build can exit 0 with nothing in the image.** Measured 18.09.2026,
+and it is the plainest example of this project's own rule that an exit code is
+not a check. The install step was written as
+
+```dockerfile
+RUN set -eu; …; pip install ".[poi,ocr]" && pip uninstall -y where2build-backend; \
+    rm -rf /build-ca
+```
+
+With no CA reachable, `pip install` failed, the `&&` short-circuited, and the
+trailing `rm -rf` succeeded — so the layer's exit status was `rm`'s. BuildKit
+reported **DONE**, `docker build` exited 0, and the result was a 350 MB image
+with no fastapi in it. `set -e` did not save it: the failing command was not
+the last of the list.
+
+Three statements instead of one chain, and an import as the last line:
+
+```dockerfile
+RUN set -eux; …; \
+    pip install --no-cache-dir ".[poi,ocr]"; \
+    pip uninstall -y where2build-backend; \
+    rm -rf /build-ca /tmp/build-ca.crt; \
+    python -c "import fastapi, shapely, pyproj, PIL"
+```
+
+Both directions were then measured: without a CA the build fails with exit 1 at
+that step; with one it exits 0 and the image imports. **Check the image, not
+the exit code** — `docker run --rm <image> python -c "import fastapi"` is the
+whole test.
