@@ -1527,14 +1527,20 @@ Teil 6 brauchen.</pre>
       versenkt.</div>
     </article>
     <article class="bs bs--mittel">
-      <div class="bs-kopf"><b>F4 · Fahrzeit</b><span class="bs-grad">eingeplant</span></div>
+      <div class="bs-kopf"><b>F4 · Fahrzeit</b><span class="bs-grad">gemessen</span></div>
       <h3>Was ist mit Minuten statt Kilometern?</h3>
       <p>„ca. 7 min mit dem Auto“ — <code>one-to-many</code> liefert die Dauer mit, die
       Maschinerie ist also dieselbe. Ungeprüft ist, wie stark Tageszeit und Verkehrsmodell
       streuen und ob ein Zeitband dadurch breiter wird als ein Streckenband.</p>
-      <div class="fix"><b>Eingeplant</b>Dieselben sieben Strecken zu drei Tageszeiten —
-      Berufsverkehr, Vormittag, Abend. Die Nacht bleibt außen vor: Sie ist der Fall, den
-      niemand meint, wenn er „12 Minuten bis Leipzig“ schreibt.</div>
+      <div class="fix"><b>Gemessen am 19.09.2026</b>Die Tageszeit geht gar nicht ein:
+      <code>one-to-many</code> nimmt laut Schnittstellenbeschreibung <code>one</code>,
+      <code>many</code>, <code>mode</code>, <code>max</code>,
+      <code>maxMatchingDistance</code> und Fahrzeugmaße — keinen Zeitparameter, und ein
+      trotzdem gesendetes <code>time</code> ändert die Antwort nicht. Drei Tageszeiten
+      wären dreimal dieselbe Zahl gewesen. Verwertbar war die andere Hälfte: drei Strecken
+      je Modus ergaben zu Fuß 70/71/70, Rad 245/244/243 und Auto 908/924 m/min — die
+      geratenen Konstanten lagen bei 75, 250 und <b>700</b>. Beim Auto 31 % daneben; die
+      gemessenen Werte stehen jetzt in <code>distance.py</code>.</div>
     </article>
     <article class="bs bs--mittel">
       <div class="bs-kopf"><b>F5 · Ankerwahl</b><span class="bs-grad">offen</span></div>

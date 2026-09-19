@@ -70,9 +70,20 @@ SLACK_OF_KIND = {"punkt": 0.10, "klasse": 0.20, "ortschaft": SLACK}
 MAX_USEFUL_WIDTH_M = 5_000.0
 
 # A walking or driving *time* says even less than a distance: it carries the
-# speed of whoever measured it as a third unknown. These are deliberately crude
-# -- what they buy is that a stated time still draws a band rather than nothing.
-SPEED_M_PER_MIN = {"fuss": 75.0, "auto": 700.0, "rad": 250.0}
+# speed of whoever measured it as a third unknown. Measured 19.09.2026 against
+# Transitous, three routes per mode out of the recorded parcels -- Großbothen
+# 790/11 to Grimma, Etzoldshain 502/47 to Bad Lausick, Thräna 107/60 to Borna:
+#
+#   zu Fuß   70, 71, 70 m/min     (guessed 75)
+#   Rad      245, 244, 243        (guessed 250)
+#   Auto     908, 924             (guessed 700)
+#
+# The spread between routes is tiny -- MOTIS routes on the network at fixed
+# speeds -- so these are now the measured figures. The car was out by 31 %:
+# „ca. 7 min mit dem Auto" drew a band around 4,9 km where the service says
+# 6,4 km. They stay a *widening* device all the same, because what the numbers
+# describe is how a service routes and not how the seller drove.
+SPEED_M_PER_MIN = {"fuss": 70.0, "auto": 915.0, "rad": 244.0}
 
 # Below this a statement is about the plot itself rather than about where it is
 # („20 m Straßenfront"), and above it the reference is a region rather than a

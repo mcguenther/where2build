@@ -538,3 +538,36 @@ of Overpass or a local extract, the listing portals, and the extraction model.
 - **The fetch prompt is told about the page and not about the fields.** Naming
   a field there is an invitation to summarise instead of quote — and a
   summarised page is one whose every Beleg the gate then refuses.
+
+
+## Transitous antwortet 403 ohne Kontakt im User-Agent
+
+Gemessen 19.09.2026, und es sah aus wie eine Sperre: dreißig
+`one-to-many`-Anfragen in Folge kamen als `403 Forbidden` zurück, dieselbe
+Anfrage mit
+`User-Agent: GrundstuecksCheckSachsen/0.1 (+https://github.com/…)` sofort mit
+`200`. Die Nutzungsregeln des Dienstes verlangen genau das („Name of the
+application / Version of the client / A way of contact"), und
+`AppSettings.contact_user_agent` setzt es für jeden Aufruf aus der App. Ein
+Skript, das für eine Messung schnell `urllib` nimmt, umgeht das — und belastet
+dabei einen ehrenamtlich betriebenen Dienst.
+
+## `one-to-many` kennt keine Tageszeit
+
+Das war die offene Frage F4: wie stark streuen Fahrzeit und Verkehrsmodell
+über den Tag. Die Antwort steht in der Schnittstellenbeschreibung
+(`motis-project/motis`, `openapi.yaml`): die Operation nimmt `one`, `many`,
+`mode`, `max`, `maxMatchingDistance` und die Fahrzeugmaße — **keinen
+Zeitparameter**. Ein trotzdem mitgeschicktes `time` ändert die Antwort nicht;
+verifiziert an zwei identischen Antworten für dieselbe Strecke. Es ist eine
+Berechnung auf dem Straßennetz ohne Fahrplan und ohne Verkehrsmodell, also
+kann die Tageszeit nicht streuen. Die geplante Messung zu drei Tageszeiten
+wäre dreimal dieselbe Zahl gewesen.
+
+Verwertbar war die andere Hälfte: **die Geschwindigkeiten selbst.** Drei
+Strecken je Modus, aus den aufgezeichneten Flurstücken heraus — zu Fuß 70, 71,
+70 m/min, Rad 245, 244, 243, Auto 908 und 924 (eine Strecke war für CAR nicht
+routbar). Die Streuung zwischen Strecken ist winzig, die geratenen Konstanten
+in `search/distance.py` lagen bei Fuß und Rad um 7 % und 2 % daneben und beim
+Auto um **31 %**: 700 gegen 915 m/min. „ca. 7 min mit dem Auto" zog damit ein
+Band um 4,9 km, wo der Dienst 6,4 km sagt.
