@@ -307,3 +307,11 @@ line looks right and does not match.
   photographed after it shows zeroes everywhere with nothing having failed.
   Seed, photograph, then run `pytest` — or point `TEST_DATABASE_URL` somewhere
   else.
+
+- **Ein Test, der den Namen eines Bereichs prüft, kann ihn aus dem falschen
+  Grund finden.** „öffnet den angefragten Bereich" mountete
+  `/verwaltung/dienste` und suchte „Zwischenspeicher" — ein Wort, das auch in
+  der Übersicht stand, auf die die Weiche bei einem unbekannten Bereich
+  zurückfällt. Der Bereich hieß längst „betrieb", der Test bestand trotzdem,
+  und er hätte auch bestanden, wenn die Weiche kaputt gewesen wäre. Prüfe auf
+  etwas, das es *nur* im gesuchten Bereich gibt.

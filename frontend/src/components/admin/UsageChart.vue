@@ -19,7 +19,7 @@
     </p>
 
     <template v-else>
-      <svg class="chart__plot" :viewBox="`0 0 ${WIDTH} ${HEIGHT}`" role="img"
+      <svg class="chart__plot" :viewBox="`0 0 ${WIDTH} ${height}`" role="img"
            :aria-label="`${title}: ${total} Anfragen, davon ${failures} mit Fehler`"
            @mouseleave="hovered = null">
         <!-- One recessive rule at the top of the scale; no grid behind the bars. -->
@@ -32,7 +32,7 @@
         <!-- Three labels, not one per bar: seventy-two of them is a smear, and
              none at all leaves a shape with no time in it. -->
         <text v-for="tick in ticks" :key="`t-${tick.x}`" class="chart__tick"
-              :x="tick.x" :y="HEIGHT - 2" :text-anchor="tick.anchor">{{ tick.text }}</text>
+              :x="tick.x" :y="height - 2" :text-anchor="tick.anchor">{{ tick.text }}</text>
         <g v-for="(bar, index) in bars" :key="index" @mouseenter="hovered = index">
           <title>{{ label(bar.point) }}: {{ bar.point.anfragen }} Anfragen, {{ bar.point.fehler }} Fehler</title>
           <!-- A hit area the whole height of the plot: a bar two pixels tall is
@@ -70,10 +70,14 @@
 import { date } from "../../lib/format.js";
 
 const WIDTH = 720;
+// Two heights, because the same chart does two jobs: the statistics page has a
+// screen for it, and the first page shows it next to four other panels, where
+// a chart as tall as this one is a chart nobody scrolls past.
 const HEIGHT = 216;
+const FLAT_HEIGHT = 96;
 const PLOT_TOP = 12;
 // Room under the baseline for the three time labels.
-const BASELINE = HEIGHT - 20;
+const LABEL_ROOM = 20;
 // The gap between two bars, in the same units as the viewBox. Two pixels of
 // surface is what keeps adjacent fills from reading as one block.
 const GAP = 2;
@@ -99,14 +103,17 @@ export default {
     points: { type: Array, default: () => [] },
     /** The same period before this one, already padded. Empty means none. */
     vergleich: { type: Array, default: () => [] },
+    /** Flach, für eine Seite, auf der dieses Bild nicht die Hauptsache ist. */
+    flach: { type: Boolean, default: false },
     raster: { type: String, default: "stunde" },
     title: { type: String, default: "Anfragen" }
   },
   data() {
-    return { WIDTH, HEIGHT, PLOT_TOP, hovered: null };
+    return { WIDTH, PLOT_TOP, hovered: null };
   },
   computed: {
-    baseline() { return BASELINE; },
+    height() { return this.flach ? FLAT_HEIGHT : HEIGHT; },
+    baseline() { return this.height - LABEL_ROOM; },
     total() { return this.points.reduce((sum, point) => sum + point.anfragen, 0); },
     failures() { return this.points.reduce((sum, point) => sum + point.fehler, 0); },
     hasAnything() { return this.points.length > 0 && this.total > 0; },
@@ -123,22 +130,22 @@ export default {
     beforePoints() {
       if (!this.hasComparison) return "";
       const step = WIDTH / Math.max(1, this.vergleich.length);
-      const scale = (BASELINE - PLOT_TOP) / this.max;
+      const scale = (this.baseline - PLOT_TOP) / this.max;
       return this.vergleich
-        .map((point, index) => `${index * step + step / 2},${BASELINE - point.anfragen * scale}`)
+        .map((point, index) => `${index * step + step / 2},${this.baseline - point.anfragen * scale}`)
         .join(" ");
     },
     bars() {
       const step = WIDTH / Math.max(1, this.points.length);
       const width = Math.max(1, step - GAP);
-      const scale = (BASELINE - PLOT_TOP) / this.max;
+      const scale = (this.baseline - PLOT_TOP) / this.max;
       return this.points.map((point, index) => {
         const failHeight = Math.round(point.fehler * scale);
         const okHeight = Math.round(Math.max(0, point.anfragen - point.fehler) * scale);
         const x = index * step + GAP / 2;
         // Failures sit on top, so the eye compares the whole bar against the
         // scale and the red part against itself.
-        const okTop = BASELINE - okHeight;
+        const okTop = this.baseline - okHeight;
         const failTop = okTop - failHeight - (okHeight > 0 && failHeight > 0 ? GAP : 0);
         return {
           point,

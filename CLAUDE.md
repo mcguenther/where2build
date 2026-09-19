@@ -241,7 +241,7 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
   the administration area, and they are skipped rather than mocked because what
   they check is the database's own behaviour. Of the remaining 8, one needs
   pyosmium, which only the index builder wants; the other seven need Tesseract.
-- `vitest`: 661 passed — plus the integration file, excluded by `npm run test`
+- `vitest`: 665 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
 - `scripts/bookmarklet.mjs`: the handover across two origins, against the built
   app and a backend on :8000. It asserts the coordinate, which is the field

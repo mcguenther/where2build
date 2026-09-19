@@ -276,3 +276,22 @@ that collapsed at 390 px. None of them threw.
   und keine Erklärung. Jetzt heißen sie „Kennung beim Anbieter" und „Kennung
   dieses Kontos", beide stehen da, und darunter steht, welche der Betreiber
   braucht.
+
+- **Zwei Seiten, die dasselbe zeigen, driften — und die schlechtere gewinnt
+  nicht.** Die Dienstliste stand in „Übersicht" *und* in „Betrieb", und die im
+  Betrieb war die bessere (Karten statt Zeilen, deutsche Namen, Endpunkt).
+  Die Übersicht fasst jetzt zusammen („11 von 15 eingerichtet; ohne: …") und
+  verlinkt dorthin, wo die Einzelheiten stehen. Was eine erste Seite sonst
+  trägt: eine Zeile je Sache, die Aufmerksamkeit braucht, mit dem Weg dorthin,
+  wo sich etwas daran tun lässt — und die Zahlen, für die sonst jemand
+  navigieren müsste.
+
+- **Eine Antwort ohne das erwartete Feld nimmt die ganze Seite mit.**
+  `held.caches.length` und `day.summe.fehler` werfen beim Rendern, sobald die
+  Antwort ein Objekt *ohne* dieses Feld ist — und ein geworfenes Render bricht
+  nicht diese eine Zeile ab, sondern alles, was danach käme: die Seite zeigte
+  „Wird geladen …" in Kästen, deren Daten längst da waren. `Array.isArray(…)
+  ? … : []` in einem computed kostet eine Zeile und hält die Seite zusammen.
+  Aufgefallen an einer Test-Attrappe, die für unbekannte Pfade `{}` liefert —
+  also genau an dem Fall, den ein echter Server nach einem Teil-Ausfall auch
+  liefert.

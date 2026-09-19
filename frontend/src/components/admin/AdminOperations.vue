@@ -129,15 +129,15 @@
         <span v-if="held" class="chip">{{ bytes(held.cache_bytes) }} von {{ bytes(held.cache_grenze_bytes) }}</span>
       </div>
       <div class="panel__body stack">
-        <p v-if="!held" class="hint">Wird geladen …</p>
+        <p v-if="!caches.length && !held" class="hint">Wird geladen …</p>
         <template v-else>
-          <p v-if="held.caches.length === 0" class="hint">
+          <p v-if="caches.length === 0" class="hint">
             Auf diesem Server liegt noch nichts im Zwischenspeicher.
           </p>
           <!-- A bar each, because the question is „wovon ist das viel" and a
                number in a column cannot answer it. -->
           <ul v-else class="bars">
-            <li v-for="entry in held.caches" :key="entry.name">
+            <li v-for="entry in caches" :key="entry.name">
               <div class="bars__line">
                 <b>{{ entry.name }}</b>
                 <span class="spacer"></span>
@@ -245,6 +245,11 @@ export default {
     };
   },
   computed: {
+    /* Dasselbe für die Zwischenspeicher: eine Antwort ohne `caches` ist
+       „nichts zu zeigen" und darf die Seite nicht mitnehmen. */
+    caches() {
+      return Array.isArray(this.held?.caches) ? this.held.caches : [];
+    },
     /* `/api/health` answers `null` when it cannot be reached at all and, in a
        test or against an older build, an object without `dienste`. Both are
        "nothing to draw" and neither may take the rest of the page down. */

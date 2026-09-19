@@ -23,6 +23,7 @@ import AdminView from "../src/views/AdminView.vue";
 import AdminStats from "../src/components/admin/AdminStats.vue";
 import AdminAccounts from "../src/components/admin/AdminAccounts.vue";
 import AdminOperations from "../src/components/admin/AdminOperations.vue";
+import AdminOverview from "../src/components/admin/AdminOverview.vue";
 import AdminDanger from "../src/components/admin/AdminDanger.vue";
 import UsageChart from "../src/components/admin/UsageChart.vue";
 import { state } from "../src/lib/store.js";
@@ -131,13 +132,111 @@ describe("the way in", () => {
   it("opens the area it was asked for, and falls back to the overview", async () => {
     globalThis.fetch = serve({ "/verwaltung/dienste": ok({ caches: [], cache_bytes: 0, cache_grenze_bytes: 1, kontingent_dienste: 600, kontingent_kacheln: 6000, kontingent_fenster_s: 3600, kontingent_aktiv: true, sperre_ab: 300, sperre_fenster_s: 300, sperre_dauer_min: 60, aufbewahrung_tage: 90 }) });
 
-    const view = mountWithRouter(AdminView, { path: "/verwaltung/dienste", props: { bereich: "dienste" } });
+    const view = mountWithRouter(AdminView, { path: "/verwaltung/betrieb", props: { bereich: "betrieb" } });
     await flushPromises();
-    expect(view.text()).toContain("Zwischenspeicher");
+    // Etwas, das es nur im Betrieb gibt: „Zwischenspeicher" stand früher auch
+    // in der Übersicht, und der Test bestand deshalb auch dann, wenn die
+    // Weiche auf den ersten Bereich zurückfiel.
+    expect(view.text()).toContain("Betriebsansage");
 
     const unknown = mountWithRouter(AdminView, { path: "/verwaltung/quatsch", props: { bereich: "quatsch" } });
     await flushPromises();
     expect(unknown.vm.current).toBe("uebersicht");
+  });
+});
+
+describe("the first page", () => {
+  const COUNTS = {
+    konten: 12, grundstuecke: 30, freigaben: 3, sperren: 1, fehler: 4, protokoll: 9,
+    datenbank_bytes: 13000000, cache_bytes: 24000000, verwalter: 1, aus_konfiguration: 1
+  };
+  const JOBS = {
+    jobs: [
+      { name: "cache-sweep", zeitplan: "17 3 * * *", warum: "…", befehl: [], zuletzt: null,
+        exit_code: 0, dauer_s: 1, laeuft: false, angefordert: null }
+    ],
+    scheduler_zuletzt: "2026-09-19T05:00:00Z", scheduler_laeuft: true, hinweis: null
+  };
+  const HEALTH = {
+    version: "0.1.0",
+    dienste: [
+      { name: "alkis", konfiguriert: true, endpunkt: "…", hinweis: "Flurstücke." },
+      { name: "llm", konfiguriert: false, endpunkt: null, hinweis: "Kein Schlüssel." }
+    ]
+  };
+
+  const serveAll = (extra = {}) =>
+    serve({
+      "/verwaltung/uebersicht": ok(COUNTS),
+      "/verwaltung/jobs": ok(JOBS),
+      "/verwaltung/statistik": ok(STATISTICS),
+      "/verwaltung/ansage": ok({ text: "", art: "hinweis", sichtbar: false, bis: null }),
+      "/health": ok(HEALTH),
+      ...extra
+    });
+
+  it("fasst die Dienste zusammen, statt die Liste des Betriebs zu wiederholen", async () => {
+    globalThis.fetch = serveAll();
+
+    const view = mountWithRouter(AdminOverview);
+    await flushPromises();
+
+    expect(view.text()).toContain("1 von 2 eingerichtet");
+    expect(view.text()).toContain("ohne: Modell");
+    // Der Erklärsatz je Dienst steht im Betrieb und nur dort.
+    expect(view.text()).not.toContain("Kein Schlüssel.");
+    const links = view.findAll("a").map(link => link.attributes("href"));
+    expect(links).toContain("/verwaltung/betrieb");
+    expect(links).toContain("/verwaltung/konten");
+  });
+
+  it("zählt, was Aufmerksamkeit braucht — und sagt es in Worten", async () => {
+    globalThis.fetch = serveAll({
+      "/verwaltung/ansage": ok({ text: "Wartung heute.", art: "warnung", sichtbar: true, bis: null })
+    });
+
+    const view = mountWithRouter(AdminOverview);
+    await flushPromises();
+
+    // Ein gesperrtes Konto, drei Fehler in der Statistik, eine laufende Ansage.
+    expect(view.text()).toContain("3 zu sehen");
+    expect(view.text()).toContain("1 Konto ist gesperrt");
+    expect(view.text()).toContain("Wartung heute.");
+  });
+
+  it("warnt erst, wenn ein angeforderter Lauf auf niemanden trifft", async () => {
+    const wartend = {
+      ...JOBS,
+      scheduler_laeuft: false,
+      jobs: [{ ...JOBS.jobs[0], angefordert: "2026-09-19T05:00:00Z ein-verwalter" }]
+    };
+    globalThis.fetch = serveAll({ "/verwaltung/jobs": ok(wartend) });
+
+    const view = mountWithRouter(AdminOverview);
+    await flushPromises();
+
+    expect(view.text()).toContain("bleiben liegen, bis einer startet");
+    // Ein fehlender Scheduler allein ist keine Warnung; einer mit einem
+    // wartenden Lauf schon.
+    expect(view.findAll(".state__dot--warnung").length).toBeGreaterThan(1);
+  });
+
+  it("verliert nicht alles, wenn ein Teil nicht antwortet", async () => {
+    globalThis.fetch = vi.fn(path =>
+      Promise.resolve(
+        String(path).includes("/verwaltung/statistik")
+          ? fails(503, "Kein Speicher eingerichtet.")
+          : serveAll()(path)
+      )
+    );
+
+    const view = mountWithRouter(AdminOverview);
+    await flushPromises();
+
+    // Die Zahlen aus der Statistik fehlen, der Bestand steht trotzdem da.
+    expect(view.text()).toContain("Ohne Serverspeicher liegen keine Zähler vor");
+    expect(view.text()).toContain("12");
+    expect(view.text()).toContain("Scheduler läuft");
   });
 });
 
