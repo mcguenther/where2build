@@ -1075,3 +1075,36 @@ landen auf dem Boden. Gewicht 0,4, dieselbe Klasse wie die Entfernung: der
 Es befördert und versenkt nie. Dass es nur ordnet, ist nicht Vorsicht,
 sondern dieselbe Messung: ein Wert, der die richtige Antwort nicht trifft,
 darf sie nicht ausschließen.
+
+
+### Bebauung: zurückgelegt, und warum
+
+Das zweite geplante Merkmal aus B5. Die Abfrage wäre billig — eine BBOX über
+die Kandidatenmenge, `alkis.buildings_around` gibt es schon. Am Lesen scheitert
+es. Von sieben Bebauungssätzen im Korpus handeln **zwei** vom angebotenen
+Grundstück:
+
+```
+✓ 3423861748  „…größtenteils unbebaute Grundstück verfügt lediglich über
+               Garagen/Lagergebäude"
+✓ 3513280646  „Altbestand entfernen", „Altbestand ist abrissfrei"
+
+✗ 3375124391  „Das benachbarte Grundstück wird aktuell mit einem EFH bebaut."
+✗ 3495978117  „Garagen, Carports und Nebenanlagen sind von dieser Regelung
+               ausgenommen."          — eine B-Plan-Regel
+✗ 3222300158  „…zwei sind bereits veräußert und eins bereits bebaut."
+                                      — andere Lose desselben Projekts
+✗ 3222300158  „Bei der Planung von Stellplätzen und/oder Garagen…"
+```
+
+Fünf von sieben sind über etwas anderes, und der Fehlerfall lautet: *der
+Nachbar wird als dieses Grundstück gelesen*. Bei den Ortsbeziehungen hat
+dieselbe Falle zugeschlagen, aber dort widerspricht das Gemarkungsverzeichnis
+— hier gibt es nichts, was eine Fehllesart widerlegt.
+
+`ave:tntxt` taugt als Ersatz nicht: im B7-Fall trug ein Grundstück mit
+massiver Garage und Einfriedung die Nutzung `Weg;0.00|Landwirtschaft;577`.
+
+Was es bräuchte, um es zu bauen: aufgezeichnete Anzeigen mit Bebauungssätzen,
+gezielt gesammelt — insbesondere solche über den Nachbarn, über andere Lose
+und über B-Plan-Regeln, weil das die Fälle sind, an denen ein Leser scheitert.
