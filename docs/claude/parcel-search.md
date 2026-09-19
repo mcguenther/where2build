@@ -1017,3 +1017,34 @@ Gemessen am Ende: Straßen-Indizien 8 → 3, und alle drei sind Straßennamen
 (Goethestraße, Siedlungsstraße, Schwarzer Weg). Für 502/47 geht
 `street_match` von 0,05 auf 1,0, und der Kandidat trägt „amtliche Lage: Am
 Kurpark" als Begründung.
+
+
+## Ein Entfernungsband je Sorte (F3)
+
+Gemessen 19.09.2026: die 16 Anzeigen machen **62 Entfernungsaussagen**, und
+alle bekamen dasselbe Band — obwohl „Bushaltestelle ‚Kitzen‘: ca. 300 m" den
+Bezugspunkt eindeutig benennt und „Flughafen 40,5 km" gar nichts eingrenzt.
+
+Die Sorte steht im Satz und braucht keinen Dienst: ein Eigenname neben dem
+Gattungswort macht einen **Punkt** („Bäckerei Wendl", „Autobahnanschlussstelle
+A38" — eine Straßennummer zählt als Name), das Gattungswort allein eine
+**Klasse** („Bus", „Flughafen"), ein Name aus dem Verzeichnis eine
+**Ortschaft**. Gezählt: 10 Punkt, 44 Klasse, 8 Ortschaft. Nur ε unterscheidet
+sich (0,10 · 0,20 · 0,25); ϱ ist der Umweg zwischen Route und Luftlinie und
+kümmert sich nicht darum, wohin gemessen wurde.
+
+**„Region" ist keine vierte Sorte geworden.** Leipzig und Grimma stehen beide
+im Verzeichnis, und eine Liste der Großstädte wäre geraten. Was sie trennt,
+ist messbar: ein Band, das breiter ist als eine Gemarkung (sächsische
+Gemarkungen sind 1 bis 5 km groß), enthält jeden Kandidaten, den ein Anker
+anbieten kann. `usable` prüft genau das, und es trifft „Flughafen 40,5 km"
+(31,2–50,6 km) ebenso wie „40 km nach Leipzig". Elf der 62 Aussagen fallen
+darunter — und sie werden jetzt **nicht mehr aufgelöst**, was je zwei
+ALKIS-Anfragen spart.
+
+**Zwei Intervalle statt einem.** Ein schmaleres Band ordnet besser und würde
+zugleich häufiger widersprechen — und Widersprechen ist die einzige Richtung,
+in der die Zahl eines Maklers einen Kandidaten etwas kostet. Also trägt eine
+Aussage jetzt `band` (sortengerecht, für die Ordnung) und `outer_band` (immer
+die großzügigste Auslegung, für den Einspruch). F3 kann die Ordnung damit
+schärfen, ohne je zusätzlich jemanden zu versenken.

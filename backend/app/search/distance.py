@@ -45,6 +45,30 @@ from dataclasses import dataclass
 DETOUR = 1.30
 SLACK = 0.25
 
+# What a statement is *about*, which is what says how much slack it needs.
+# Measured 19.09.2026 over the 16 adverts: 62 statements, of which 8 name a
+# place and 4 name one the register knows. The other 54 were treated exactly
+# like „6 km bis Grimma" although „Bushaltestelle Kitzen: ca. 300 m" leaves far
+# less open and „Flughafen 40,5 km" leaves everything open.
+#
+#   punkt      a named point -- „Bushaltestelle Kitzen", „Autobahnanschluss-
+#              stelle A38", „Bäckerei Wendl". The reference is unambiguous;
+#              „Fernbahnhof 1,6 km" hit the measured 1,66 km footpath to 4 %.
+#   klasse     a bare class -- „Bus", „Flughafen", „Zentrum". The reference is
+#              whichever member is nearest, which is what the sentence claimed.
+#   ortschaft  a settlement. Its own spread from edge to middle is 1,22 to
+#              4,81 km and is carried by `Reference.readings`, not by the band.
+#
+# Only ``ε`` differs. ``ϱ`` is the detour between a route and a straight line
+# and does not care what was measured to.
+SLACK_OF_KIND = {"punkt": 0.10, "klasse": 0.20, "ortschaft": SLACK}
+
+# Above this width a band contains every candidate an anchor can offer and
+# therefore separates nothing: Saxon cadastral districts run 1 to 5 km across,
+# so a band 20 km wide („Flughafen 40,5 km" admits 31,2 to 50,6 km) is an
+# ornament. Such a statement is shown and never computed.
+MAX_USEFUL_WIDTH_M = 5_000.0
+
 # A walking or driving *time* says even less than a distance: it carries the
 # speed of whoever measured it as a third unknown. These are deliberately crude
 # -- what they buy is that a stated time still draws a band rather than nothing.
@@ -175,6 +199,7 @@ class DistanceStatement:
     mode: str
     beleg: str
     hedged: bool
+    kind: str = "klasse"
 
     @property
     def named(self) -> bool:
@@ -182,17 +207,68 @@ class DistanceStatement:
 
     @property
     def band(self) -> tuple[float, float]:
-        """The interval the statement admits: ``[d / ϱ, d · (1+ε)]``.
+        """The interval the statement admits, for *ordering*: ``[d / ϱ, d·(1+ε)]``.
 
-        A hedged figure („ca. 6 km") is the normal case and gets the full
-        slack. An unhedged one is not meaningfully more precise -- the recorded
-        adverts write both and are out by the same amount -- so the only thing
-        that narrows the band is a *time*, which cannot be narrowed at all and
-        therefore widens instead.
+        ``ε`` comes from what the statement is about — see ``SLACK_OF_KIND``. A
+        hedged figure („ca. 6 km") is the normal case and gets that slack; an
+        unhedged one is not meaningfully more precise, since the recorded
+        adverts write both and are out by the same amount. A *time* cannot be
+        narrowed at all and therefore widens instead.
+        """
+
+        stretch = SLACK_OF_KIND.get(self.kind, SLACK)
+        if self.mode == "zeit":
+            stretch = max(stretch, SLACK) * 2
+        return self.meters / DETOUR, self.meters * (1.0 + stretch)
+
+    @property
+    def outer_band(self) -> tuple[float, float]:
+        """The widest reading, for *objecting*: never narrower than before.
+
+        A narrower band orders better and would object more, and objecting is
+        the one direction in which a broker's sentence can cost a candidate. So
+        the two questions get two intervals: ``band`` may be as tight as the
+        kind allows, and this one stays at the full slack whatever the kind, so
+        no candidate is sunk by a band that F3 made tighter.
         """
 
         stretch = SLACK if self.mode != "zeit" else SLACK * 2
         return self.meters / DETOUR, self.meters * (1.0 + stretch)
+
+    @property
+    def usable(self) -> bool:
+        """Whether this statement can separate anything at all.
+
+        „Flughafen 40,5 km" admits 31,2 to 50,6 km — 20 km of band, where a
+        Saxon cadastral district is 1 to 5 km across. It contains every
+        candidate any anchor can offer, so it is shown and not computed.
+        """
+
+        low, high = self.outer_band
+        return high - low <= MAX_USEFUL_WIDTH_M
+
+
+def _kind(target: str | None, label: str) -> str:
+    """Which of the three the sentence made: a settlement, a point, a class.
+
+    The difference between a point and a class is a proper name beside the
+    class word — „Bushaltestelle Kitzen" against „Bus", „Bäckerei Wendl"
+    against „Bäckerei". A road number counts as the name: the junction
+    „Autobahnanschlussstelle A38" is as unambiguous as any station.
+    """
+
+    if target:
+        return "ortschaft"
+    for word in (w.strip(".,;:„“\"'()") for w in label.split()):
+        if not word or word.casefold() in _CLASS_WORDS:
+            continue
+        if _ROAD_RE.fullmatch(word.casefold()):
+            return "punkt"
+        if word.casefold() in _NOT_A_NAME or not word[0].isupper():
+            continue
+        if not word.casefold().endswith(_CLASS_ENDINGS):
+            return "punkt"
+    return "klasse"
 
 
 def read_distances(body: str | None) -> list[DistanceStatement]:
@@ -234,6 +310,7 @@ def read_distances(body: str | None) -> list[DistanceStatement]:
                 mode=_mode(match.group("unit")),
                 beleg=_excerpt(body, match.start(), match.end()),
                 hedged=bool(match.group("hedge")),
+                kind=_kind(target, label),
             )
         )
     return out

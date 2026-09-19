@@ -555,8 +555,18 @@ class SearchEngine:
         named = [
             (indiz, statement)
             for indiz, statement in self._distances
-            if statement.named and not indiz.verworfen
+            if statement.named and statement.usable and not indiz.verworfen
         ]
+        # A band wider than a cadastral district contains every candidate any
+        # anchor can offer, so resolving it would spend two requests to learn
+        # nothing. „40 km nach Leipzig" admits 30,8 to 50 km; Saxon districts
+        # run 1 to 5 km across.
+        for indiz, statement in self._distances:
+            if statement.named and not statement.usable and not indiz.verworfen:
+                indiz.text = (
+                    f"{indiz.text} Mit {distance.kilometres(statement.meters)} ist das Band "
+                    "breiter als jede Gemarkung — es wird gezeigt und nicht gerechnet."
+                )
         if not named or not self.directory:
             return
 
@@ -672,7 +682,10 @@ class SearchEngine:
         point = parcel.geometry.centroid
         for statement, reference in self._references:
             reading = reference.readings(point)
-            if distance.refuted(reading, statement.band):
+            # The *outer* band on purpose: F3 narrowed the band for ordering,
+            # and objecting is the one direction in which a broker's sentence
+            # can cost a candidate. It stays as generous as it always was.
+            if distance.refuted(reading, statement.outer_band):
                 return (
                     f"liegt {distance.kilometres(reading[0])} von {reference.name} entfernt, "
                     f"das Inserat nennt „{distance.kilometres(statement.meters)}“ — auch als "

@@ -207,6 +207,53 @@ def test_one_label_can_name_several_parcels(text, numbers):
     assert len({i.beleg for i in read}) <= 1
 
 
+@pytest.mark.parametrize(
+    ("text", "kind"),
+    [
+        # A proper name beside the class word makes the reference unambiguous.
+        ("Bushaltestelle „Kitzen“: ca. 300 m entfernt", "punkt"),
+        ("Autobahnanschlussstelle A38: ca. 3 km", "punkt"),
+        ("Bäckerei Wendl 500 m", "punkt"),
+        # The class word alone: the reference is whichever member is nearest.
+        ("Bus 0,3 km", "klasse"),
+        ("Flughafen 40,5 km", "klasse"),
+        ("Fernbahnhof 1,6 km", "klasse"),
+        # A settlement the register can resolve to an outline.
+        ("Über die B107 erreichen Sie die ca. 6 km entfernte Kreisstadt Grimma.", "ortschaft"),
+    ],
+)
+def test_a_distance_is_read_by_what_it_is_measured_to(text, kind):
+    """62 statements over the recorded adverts got one band between them,
+    although „Bushaltestelle Kitzen: ca. 300 m" leaves far less open than
+    „6 km bis Grimma"."""
+
+    statement = read_distances(text)[0]
+    assert statement.kind == kind
+
+
+def test_a_band_wider_than_a_cadastral_district_is_shown_and_not_computed():
+    """„Flughafen 40,5 km" admits 31,2 to 50,6 km. Saxon districts run 1 to
+    5 km across, so that band holds every candidate any anchor can offer."""
+
+    far = read_distances("Flughafen 40,5 km")[0]
+    near = read_distances("Bushaltestelle „Kitzen“: ca. 300 m entfernt")[0]
+    assert not far.usable
+    assert near.usable
+
+
+def test_a_tighter_band_orders_better_and_never_objects_more():
+    """Objecting is the one direction in which a broker's sentence can cost a
+    candidate, so the two questions get two intervals: the band may be as
+    tight as the kind allows, the outer one stays as generous as it was."""
+
+    point = read_distances("Bäckerei Wendl 500 m")[0]
+    assert point.kind == "punkt"
+    # Tighter for ordering …
+    assert point.band[1] < point.outer_band[1]
+    # … and the outer bound is the one the old single band had.
+    assert point.outer_band == (500 / distance.DETOUR, 500 * (1 + distance.SLACK))
+
+
 def test_a_garbled_parcel_number_is_rejected_before_it_reaches_the_cadastre():
     """The 7-degree misreading that returned „Flurstück 790717“.
 
