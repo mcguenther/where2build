@@ -87,7 +87,13 @@ async def account(
         )
     return KontoAntwort(
         anbieter=overview.issuer,
-        kennung=overview.subject,
+        # Two identifiers, and until now this page showed only the provider's
+        # under a name the rest of the application uses for the other one --
+        # so somebody reading „Kennung" here and pasting it into
+        # ADMIN_ACCOUNTS got no access and no explanation. `kennung` is this
+        # application's own everywhere now; the provider's has its own name.
+        kennung=identity.account_key,
+        anbieter_kennung=overview.subject,
         anzeigename=overview.anzeigename,
         angelegt=overview.angelegt,
         grundstuecke=overview.grundstuecke,

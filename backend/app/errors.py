@@ -76,6 +76,20 @@ class UnauthorizedError(AppError):
     default_message = "Bitte zuerst anmelden."
 
 
+class ForbiddenError(AppError):
+    """Signed in, and still not allowed -- or not allowed any more.
+
+    Two callers reach this: somebody who asked for the administration area
+    without being an administrator, and an account that is blocked. Both get
+    403 rather than 404: pretending the area does not exist would leave an
+    administrator who lost the flag looking for a bug, and a blocked account
+    has to be told it is blocked, or it will simply keep trying.
+    """
+
+    status_code = 403
+    default_message = "Dieser Bereich ist für dieses Konto nicht freigegeben."
+
+
 class ConflictError(AppError):
     """The request is fine; the state it would produce is not."""
 

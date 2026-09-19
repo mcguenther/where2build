@@ -57,16 +57,26 @@
           <template v-else-if="held">
             <p class="hint">
               Das ist vollständig: mehr als diese Zeilen hält diese Anwendung nicht über
-              eine Person. Name und Kennung kommen vom Anmelde-Anbieter, nicht von uns.
+              eine Person. Name und Anbieter-Kennung kommen von der Anmeldung, nicht von uns.
             </p>
             <dl class="value-list">
               <dt>Name</dt><dd>{{ held.anzeigename || "vom Anbieter nicht mitgegeben" }}</dd>
               <dt>Anbieter</dt><dd class="wrap">{{ held.anbieter }}</dd>
-              <dt>Kennung</dt><dd class="wrap">{{ held.kennung }}</dd>
+              <dt>Kennung beim Anbieter</dt><dd class="wrap">{{ held.anbieter_kennung }}</dd>
+              <dt>Kennung dieses Kontos</dt><dd class="wrap">{{ held.kennung }}</dd>
               <dt>Angelegt</dt><dd>{{ date(held.angelegt) }}</dd>
               <dt>Grundstücke</dt><dd>{{ held.grundstuecke }}</dd>
               <dt>Umfang</dt><dd>{{ size }}</dd>
             </dl>
+            <!-- Two identifiers, and only one of them is the one an operator
+                 asks for. Saying which is cheaper than the support mail that
+                 follows from pasting the other. -->
+            <p class="hint">
+              „Kennung dieses Kontos“ ist die, unter der diese Anwendung das Konto führt —
+              sie steht auch in <code>ADMIN_ACCOUNTS</code>, wenn der Betreiber dieses Konto
+              zum Verwalter macht. Die Kennung beim Anbieter kommt von der Anmeldung und
+              wird hier nirgends sonst verwendet.
+            </p>
             <div class="row">
               <button type="button" class="btn btn--secondary" :disabled="exporting" @click="downloadRecord">
                 {{ exporting ? "Wird zusammengestellt …" : "Auskunft als JSON sichern" }}
@@ -143,6 +153,18 @@ export default {
     }
   },
   created() { this.load(); },
+  watch: {
+    /* Who is signed in is asked once, by the App, and the answer arrives after
+       this page has already been created — so a *direct* load of /konto found
+       `angemeldet` still false, `load()` returned at its first line, and the
+       panel stayed empty with no error to show for it. Clicking here from the
+       header always worked, which is why this survived until the page got a
+       screenshot of its own. Watching also covers signing in in the second
+       window, which lands back here with the account filled in. */
+    "state.account.angemeldet"(signedIn) {
+      if (signedIn && !this.held) this.load();
+    }
+  },
   methods: {
     /** Signing in runs in a window of its own, so this page stays standing --
      *  with whatever is half-entered on it. A refused window falls back to a

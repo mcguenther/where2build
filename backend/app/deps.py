@@ -11,9 +11,12 @@ from functools import lru_cache
 from fastapi import Depends, Request
 
 from .address_index import AddressIndex, load_index as load_address_index
-from .errors import RateLimitedError, UnauthorizedError
+from .errors import AppError, ForbiddenError, RateLimitedError, UnauthorizedError
 from .gemarkung_index import GemarkungDirectory, load_directory
+from .prices import Prices, load_prices
 from .ratelimit import RateLimiter, client_key, denied_message
+from .telemetry import recorder, reset_recorder
+from .services.admin import AdminStore
 from .services.airquality import AirQualityService
 from .services.alkis import AlkisService
 from .services.basemap import BasemapService
@@ -134,10 +137,8 @@ NOT_SIGNED_IN = (
 )
 
 
-def current_account(
-    request: Request, service: OidcService = Depends(oidc_service)
-) -> Identity:
-    """Who is signed in -- or a 401.
+def signed_in(request: Request, service: OidcService = Depends(oidc_service)) -> Identity:
+    """Who is signed in -- or a 401. Says nothing about what they may do.
 
     Checked before the storage routes ask whether this deployment even has a
     database: a request has to say who it is before the server tells it
@@ -149,6 +150,93 @@ def current_account(
     if identity is None:
         raise UnauthorizedError(NOT_SIGNED_IN)
     return identity
+
+
+def current_account(identity: Identity = Depends(signed_in)) -> Identity:
+    """Signed in, and not blocked.
+
+    Every route that stores, shares or spends something takes this one. The
+    administration area deliberately takes ``signed_in`` instead: an
+    administrator whom the burst guard caught must still be able to reach the
+    page that lifts the block, and a lockout with no way back in would be the
+    one failure this whole feature cannot repair.
+    """
+
+    refuse_if_blocked(identity)
+    return identity
+
+
+@lru_cache(maxsize=1)
+def llm_prices() -> Prices:
+    """The model price list, read from disk once per process.
+
+    Cached like the indexes: it changes when a job rewrites the file, and the
+    backend is restarted or the cache cleared for a new one to take effect --
+    which is the same rule the Gemarkung and address indexes already follow.
+    """
+
+    return load_prices(get_settings().llm.prices_path)
+
+
+@lru_cache(maxsize=1)
+def admin_store() -> AdminStore:
+    """The administration statements, over the storage pool."""
+
+    return AdminStore(storage_service())
+
+
+BLOCKED = (
+    "Dieser Zugang ist vorübergehend gesperrt, weil in kurzer Zeit außergewöhnlich "
+    "viele Anfragen von ihm kamen. Die Sperre endet von selbst; bei einem Irrtum "
+    "hilft die Verwaltung des Betreibers weiter."
+)
+
+
+def refuse_if_blocked(identity: Identity | None) -> None:
+    """A blocked account gets no further, on any route that spends anything.
+
+    Read out of this process rather than out of the database: a check per
+    request against Postgres would put a round trip in front of every call, and
+    the block reaches the other workers on the next flush anyway -- at most
+    ``ADMIN_FLUSH_S`` seconds, against an automatic block that is measured in
+    an hour.
+    """
+
+    if identity is None:
+        return
+    block = recorder().blocked(identity.account_key)
+    if block is not None:
+        raise ForbiddenError(f"{BLOCKED} ({block.grund})")
+
+
+async def current_admin(
+    identity: Identity = Depends(signed_in),
+    store: AdminStore = Depends(admin_store),
+) -> Identity:
+    """Who is signed in, if they administer this deployment -- or a 403.
+
+    Two sources, and the configured one comes first on purpose: it is what
+    survives an empty ``users`` table, which is exactly the state the red
+    button leaves behind. A database that is unreachable therefore does not
+    lock the configured administrator out of the area that would tell them so.
+    """
+
+    if await is_admin(identity, store):
+        return identity
+    raise ForbiddenError()
+
+
+async def is_admin(identity: Identity, store: AdminStore) -> bool:
+    if identity.account_key in get_settings().admin.bootstrap_accounts:
+        return True
+    if not store.configured:
+        return False
+    try:
+        return await store.is_admin(identity.account_key)
+    except AppError:
+        # The database is down. Nobody is promoted while it is, and the
+        # configured administrators above still get in.
+        return False
 
 
 @lru_cache(maxsize=1)
@@ -180,9 +268,13 @@ def _spend(limiter: RateLimiter, request: Request, service: OidcService) -> None
     """
 
     settings = get_settings()
+    identity = service.session_identity(request.cookies.get(service.settings.cookie_name))
+    # Before the budget, and regardless of whether the budget is switched on at
+    # all: a block is not a quota, and a deployment that runs without a ceiling
+    # is exactly the one that needs the block to still bite.
+    refuse_if_blocked(identity)
     if not settings.rate_limit.enabled:
         return
-    identity = service.session_identity(request.cookies.get(service.settings.cookie_name))
     decision = limiter.check(client_key(request, identity, settings.app.proxy_hops))
     if not decision.allowed:
         raise RateLimitedError(denied_message(decision), retry_after_s=decision.retry_after_s)
@@ -228,5 +320,8 @@ def reset_services() -> None:
         storage_service,
         service_limiter,
         map_limiter,
+        admin_store,
+        llm_prices,
     ):
         factory.cache_clear()
+    reset_recorder()

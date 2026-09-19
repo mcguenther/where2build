@@ -60,6 +60,14 @@ logger = logging.getLogger(__name__)
 # change to a column.
 SCHEMA_PATH = Path(__file__).resolve().parent.parent / "schema.sql"
 
+# Everything that changed after that baseline. Numbered files, applied once
+# each, in order, recorded in ``schema_migrations`` -- the tool ``schema.sql``
+# says is due before the first change to any column in it. Deliberately the
+# smallest thing that is one: no down-migrations, because a deployment that has
+# to go back goes back to a backup, and nothing here is clever enough to need
+# a framework.
+MIGRATIONS_PATH = Path(__file__).resolve().parent.parent / "migrations"
+
 NOT_CONFIGURED = (
     "Auf diesem Server ist kein Speicher für Konten eingerichtet. Die Grundstücke "
     "bleiben in diesem Browser; zum Einrichten wird DATABASE_URL auf eine "
@@ -216,6 +224,36 @@ async def _register_json(connection: asyncpg.Connection) -> None:
     )
 
 
+async def _migrate(connection: asyncpg.Connection) -> None:
+    """Apply every migration this process carries that the database has not.
+
+    Each file runs in a transaction of its own together with the row that
+    records it, so a file that fails half-way leaves neither half behind. The
+    order is the file name, which is why they are numbered.
+    """
+
+    await connection.execute(
+        """
+        create table if not exists schema_migrations (
+            version    text        primary key,
+            angewendet timestamptz not null default now()
+        )
+        """
+    )
+    applied = {
+        row["version"] for row in await connection.fetch("select version from schema_migrations")
+    }
+    for path in sorted(MIGRATIONS_PATH.glob("*.sql")):
+        if path.stem in applied:
+            continue
+        logger.info("Applying migration %s", path.stem)
+        async with connection.transaction():
+            await connection.execute(path.read_text(encoding="utf-8"))
+            await connection.execute(
+                "insert into schema_migrations (version) values ($1)", path.stem
+            )
+
+
 class Storage:
     """The pool, the schema and the statements. One instance per process."""
 
@@ -263,6 +301,7 @@ class Storage:
                 )
                 async with pool.acquire() as connection:
                     await connection.execute(SCHEMA_PATH.read_text(encoding="utf-8"))
+                    await _migrate(connection)
             except (asyncpg.PostgresError, OSError, TimeoutError) as exc:
                 # A pool that was built and then failed on the schema has open
                 # connections; leaving it to the garbage collector would hold
@@ -278,6 +317,18 @@ class Storage:
         pool, self._pool = self._pool, None
         if pool is not None:
             await pool.close()
+
+    async def open_pool(self) -> asyncpg.Pool:
+        """The pool, opened if it is not yet.
+
+        The administration statements live in ``services/admin.py`` -- they are
+        about the deployment rather than about one person's document, and
+        mixing them in here would make the file that holds the account rules
+        also hold the operator's tools. They share this pool rather than
+        opening a second one, so the ceiling on connections stays one number.
+        """
+
+        return await self._pool_or_open()
 
     async def _pool_or_open(self) -> asyncpg.Pool:
         self.require_configured()
@@ -312,8 +363,8 @@ class Storage:
             )
         return await connection.fetchval(
             """
-            insert into users (issuer, subject, anzeigename)
-            values ($1, $2, $3)
+            insert into users (issuer, subject, anzeigename, kennung)
+            values ($1, $2, $3, $4)
             on conflict (issuer, subject) do update
                 set anzeigename = coalesce(excluded.anzeigename, users.anzeigename)
             returning id
@@ -321,6 +372,7 @@ class Storage:
             identity.issuer,
             identity.subject,
             identity.name,
+            identity.account_key,
         )
 
     async def account_overview(self, identity: Identity) -> AccountOverview | None:

@@ -31,8 +31,22 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
-DEFAULT_JOBS = BACKEND_DIR.parent / "ops" / "jobs.json"
-DEFAULT_STATE = Path(os.environ.get("JOBS_STATE_DIR", "/state"))
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
+
+# Where the job list and the records live, and how a run is asked for from
+# outside, all live in `app/jobs.py` -- the API shows the same records and the
+# administration area writes those requests, and two spellings of one file name
+# is how the two sides stop agreeing.
+from app.jobs import (  # noqa: E402
+    DEFAULT_JOBS_FILE as DEFAULT_JOBS,
+    DEFAULT_STATE_DIR as DEFAULT_STATE,
+    beat,
+    read_state,
+    state_file,
+    take_request,
+    write_state as store_state,
+)
 
 # How often the loop wakes to see whether a minute with work in it has passed.
 # Cron's resolution is the minute, so anything finer only burns cycles.
@@ -111,27 +125,11 @@ def load(path: Path) -> list[Job]:
     return jobs
 
 
-def state_file(state_dir: Path, name: str) -> Path:
-    return state_dir / f"{name}.json"
-
-
-def read_state(state_dir: Path, name: str) -> dict:
-    try:
-        return json.loads(state_file(state_dir, name).read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
-
-
 def write_state(state_dir: Path, name: str, state: dict) -> None:
-    try:
-        state_dir.mkdir(parents=True, exist_ok=True)
-        target = state_file(state_dir, name)
-        temporary = target.with_suffix(".part")
-        temporary.write_text(json.dumps(state, indent=2), encoding="utf-8")
-        temporary.replace(target)
-    except OSError as error:
+    problem = store_state(state_dir, name, state)
+    if problem:
         # Losing the record is not worth losing the run over.
-        log(name, f"state not written: {error}")
+        log(name, f"state not written: {problem}")
 
 
 def log(name: str, message: str) -> None:
@@ -201,7 +199,19 @@ def command_serve(jobs: list[Job], state_dir: Path) -> int:
     while True:
         now = datetime.now(timezone.utc)
         stamp = now.strftime("%Y-%m-%dT%H:%M")
+        # The heartbeat first, so it is written even on a tick where a job
+        # takes minutes: the administration area reads it to say whether
+        # anything is here to pick a request up at all.
+        beat(state_dir)
         for job in jobs:
+            # A run asked for in the administration area. Claimed before the
+            # schedule is looked at, and claimed by *removing* the request, so
+            # a job that fails is not started again every twenty seconds.
+            asked = take_request(state_dir, job.name)
+            if asked is not None:
+                log(job.name, f"run requested ({asked or 'ohne Angabe'})")
+                run(job, state_dir)
+                continue
             if (job.name, stamp) in fired or not due(job, now):
                 continue
             fired.add((job.name, stamp))

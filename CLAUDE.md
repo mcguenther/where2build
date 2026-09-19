@@ -107,6 +107,25 @@ from the user directly. Reopen only if the user asks.
   only order the list, which is why the weights can ship uncalibrated: they
   can produce an unhelpful ordering, never a wrong answer. See
   `backend/app/search/`.
+- **The administration area is configuration first, database second.**
+  `ADMIN_ACCOUNTS` names account keys and is the bootstrap; everybody else is
+  promoted in the interface, where the flag lives on `users`. Configuration
+  rather than „the first one to sign up", because an instance on the open
+  internet would hand the area to whoever got there first — and configuration
+  is what survives the empty `users` table the red button leaves behind. What
+  the area counts are **aggregates**: one row per hour, area and outcome with
+  nobody in them, and one per hour and account for the question „who". Never a
+  row per request — that would record when each single call happened, which
+  nobody needs and everybody would then have to protect.
+- **A price is a file, not a constant, and a missing price is a dash.**
+  `ops/llm-preise.json` carries the model prices and the ECB rate with their
+  dates, written by `backend/scripts/update_llm_prices.py` from the provider's
+  own endpoint and committed, so a change is a diff. A model the file does not
+  list costs „—" and never 0,00 €.
+- **The administration area asks for a job, it does not run one.** The
+  scheduler owns the schedule, the lock and the writable data mount; „Jetzt
+  starten" writes a request into the state directory they share. Without a
+  scheduler the page says so rather than offering a button with no effect.
 - **Never show example data.** There is no sample state and no fallback: when a
   service fails, the German `detail` from the backend is shown instead. Tests
   run on recorded real responses in `frontend/tests/fixtures/`, not on invented
@@ -155,6 +174,11 @@ python3 -m venv backend/.venv
 backend/.venv/bin/pip install -e "backend[dev]"
 backend/.venv/bin/python -m pytest backend/tests -q
 backend/.venv/bin/python -m uvicorn app.main:app --reload --app-dir backend
+
+# the administration area: /verwaltung for whoever is named here. The value is
+# an *account key* -- the 32 characters /api/auth/me reports and the account
+# page shows -- never a mail address.
+export ADMIN_ACCOUNTS=88bcdb2925220580d02b1c458283db8e
 
 # the whole thing in containers: nginx with the build, the backend, Postgres
 # and authentik. The app is one origin, so no CORS; authentik is on 9000 of
@@ -212,18 +236,21 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 642 passed, 49 skipped. With `TEST_DATABASE_URL` pointed at a real
-  Postgres it is 683 passed, 8 skipped — the extra 41 are the account store,
-  and they are skipped rather than mocked because what they check is the
-  database's own behaviour. Of the remaining 8, one needs pyosmium, which only
-  the index builder wants; the other seven need Tesseract.
-- `vitest`: 638 passed — plus the integration file, excluded by `npm run test`
+- `pytest`: 660 passed, 67 skipped. With `TEST_DATABASE_URL` pointed at a real
+  Postgres it is 719 passed, 8 skipped — the extra 59 are the account store and
+  the administration area, and they are skipped rather than mocked because what
+  they check is the database's own behaviour. Of the remaining 8, one needs
+  pyosmium, which only the index builder wants; the other seven need Tesseract.
+- `vitest`: 665 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
 - `scripts/bookmarklet.mjs`: the handover across two origins, against the built
   app and a backend on :8000. It asserts the coordinate, which is the field
   that separates a handed-over document from a pasted one, and it writes
   `assistent-uebergabe.png`.
-- `scripts/screenshots.mjs`: 69 images plus two print PDFs. The narrow pass
+- `scripts/screenshots.mjs`: 90 images plus two print PDFs. Twenty-one of them
+  need a session (`konto-*` and the administration area) and they are taken only with `W2B_ADMIN_COOKIE`
+  set — see `docs/claude/tooling-and-tests.md` for how that cookie is made and
+  why the run says so rather than photographing the refusal page. The narrow pass
   runs in the **light** theme like the wide one, so the phone-width pictures
   are named `*-hell-schmal.png`. It fails on console errors, on horizontal
   overflow, and if not a single vector tile arrived. It

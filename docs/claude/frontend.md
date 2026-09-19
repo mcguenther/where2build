@@ -252,3 +252,46 @@ that collapsed at 390 px. None of them threw.
   walks every rectangle a block emits and fails the build on a cell covered
   twice or not at all — because neither a 40-unit overlap nor a 40-unit gap
   announces itself in a backdrop; it just looks slightly wrong.
+
+- **Eine Seite, die beim Aufbau `state.account` liest, liest sie zu früh.**
+  `AccountView.created()` rief `load()`, und `load()` steigt aus, solange
+  niemand angemeldet ist — die Antwort auf „wer ist angemeldet" kommt aber erst
+  danach, weil `App.created()` sie erst holt. Über den Kopf angeklickt
+  funktionierte die Seite deshalb immer, beim **direkten** Aufruf von `/konto`
+  blieb der Kasten „Gespeichert ist" leer: kein Fehler, keine Meldung, nichts.
+  Aufgefallen ist es erst, als die Seite ein eigenes Bild im Screenshot-Lauf
+  bekam — ein Zustand, den kein Test traf, weil jeder Test den Zustand vorher
+  setzt. Ein `watch` auf `state.account.angemeldet` zieht den Stand nach; das
+  deckt zugleich die Anmeldung im zweiten Fenster ab.
+  Preis davon: eine Seite, die auf einen globalen Zustand hört, wirkt in
+  vitest über das Testende hinaus — die Instanz bleibt montiert und lädt beim
+  nächsten Zustandswechsel nach, was dort als unerwarteter `fetch` auftaucht.
+  `open()` in `account-view.test.js` baut die vorige Seite deshalb ab.
+
+- **Zwei Dinge in der Oberfläche „Kennung" zu nennen, kostet genau dann etwas,
+  wenn jemand eines davon abtippt.** Die Kontoseite zeigte als „Kennung" das
+  *Subject des Anbieters*, während `/api/auth/me`, das Anfragebudget und
+  `ADMIN_ACCOUNTS` mit „Kennung" den Kontoschlüssel meinen. Wer sich zum
+  Verwalter machen wollte, trug den falschen Wert ein und bekam keinen Zugang
+  und keine Erklärung. Jetzt heißen sie „Kennung beim Anbieter" und „Kennung
+  dieses Kontos", beide stehen da, und darunter steht, welche der Betreiber
+  braucht.
+
+- **Zwei Seiten, die dasselbe zeigen, driften — und die schlechtere gewinnt
+  nicht.** Die Dienstliste stand in „Übersicht" *und* in „Betrieb", und die im
+  Betrieb war die bessere (Karten statt Zeilen, deutsche Namen, Endpunkt).
+  Die Übersicht fasst jetzt zusammen („11 von 15 eingerichtet; ohne: …") und
+  verlinkt dorthin, wo die Einzelheiten stehen. Was eine erste Seite sonst
+  trägt: eine Zeile je Sache, die Aufmerksamkeit braucht, mit dem Weg dorthin,
+  wo sich etwas daran tun lässt — und die Zahlen, für die sonst jemand
+  navigieren müsste.
+
+- **Eine Antwort ohne das erwartete Feld nimmt die ganze Seite mit.**
+  `held.caches.length` und `day.summe.fehler` werfen beim Rendern, sobald die
+  Antwort ein Objekt *ohne* dieses Feld ist — und ein geworfenes Render bricht
+  nicht diese eine Zeile ab, sondern alles, was danach käme: die Seite zeigte
+  „Wird geladen …" in Kästen, deren Daten längst da waren. `Array.isArray(…)
+  ? … : []` in einem computed kostet eine Zeile und hält die Seite zusammen.
+  Aufgefallen an einer Test-Attrappe, die für unbekannte Pfade `{}` liefert —
+  also genau an dem Fall, den ein echter Server nach einem Teil-Ausfall auch
+  liefert.

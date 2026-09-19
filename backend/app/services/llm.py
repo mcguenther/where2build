@@ -32,6 +32,7 @@ from pydantic import BaseModel, ValidationError
 from ..cache import DiskCache
 from ..errors import NotConfiguredError, UpstreamError
 from ..settings import AppSettings, LLMSettings
+from ..telemetry import AREA_MODEL, RESULT_OK, recorder
 from ..upstream import request
 
 SERVICE_NAME = "Der Extraktionsdienst"
@@ -141,6 +142,31 @@ def strict_json_schema(
     return {"name": name, "strict": True, "schema": schema}
 
 
+def _count_tokens(model: str, answer: Any) -> None:
+    """Record what one call to the model cost.
+
+    Counted here rather than beside the outward request in ``app/upstream.py``,
+    because the number is in the *answer*: the call itself is one request like
+    any other, and only the body says how many tokens it was. A provider that
+    reports no usage at all is counted as a call with no tokens rather than not
+    counted -- that the call happened is the more important of the two facts.
+    """
+
+    usage = answer.get("usage") if isinstance(answer, dict) else None
+    usage = usage if isinstance(usage, dict) else {}
+    recorder().count(
+        AREA_MODEL,
+        model or "unbekannt",
+        RESULT_OK,
+        tokens_in=_whole(usage.get("prompt_tokens") or usage.get("input_tokens")),
+        tokens_out=_whole(usage.get("completion_tokens") or usage.get("output_tokens")),
+    )
+
+
+def _whole(value: Any) -> int:
+    return int(value) if isinstance(value, (int, float)) and value > 0 else 0
+
+
 class LLMClient:
     """Talks to any OpenAI-compatible ``/chat/completions`` endpoint."""
 
@@ -176,11 +202,13 @@ class LLMClient:
             json=payload,
         )
         try:
-            return response.json()
+            answer = response.json()
         except ValueError as exc:
             raise UpstreamError(
                 f"{SERVICE_NAME} hat kein gültiges JSON geliefert. {ADVICE}"
             ) from exc
+        _count_tokens(self.settings.model, answer)
+        return answer
 
     @staticmethod
     def _message_content(payload: dict[str, Any]) -> str:

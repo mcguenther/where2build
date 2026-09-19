@@ -38,6 +38,30 @@ export const duration = seconds => {
   return `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, "0")} min`;
 };
 
+/** A size on disk, in the unit it is readable in. */
+export const bytes = value => {
+  if (!Number.isFinite(value)) return "—";
+  if (value < 1024) return `${num(value, 0)} Byte`;
+  const kib = value / 1024;
+  if (kib < 1024) return `${num(kib, 1)} KiB`;
+  const mib = kib / 1024;
+  return mib < 1024 ? `${num(mib, 1)} MiB` : `${num(mib / 1024, 2)} GiB`;
+};
+
+/** A moment with the time in it, for a log where the day alone says nothing. */
+export const moment = iso => {
+  const d = iso instanceof Date ? iso : new Date(iso);
+  return Number.isNaN(d.valueOf())
+    ? "—"
+    : d.toLocaleString("de-DE", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+};
+
 export const date = iso => {
   const d = iso instanceof Date ? iso : new Date(iso);
   return Number.isNaN(d.valueOf())

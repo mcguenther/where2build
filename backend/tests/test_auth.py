@@ -116,6 +116,8 @@ def test_me_says_no_sign_in_is_set_up_here(client: TestClient):
         "angemeldet": False,
         "name": None,
         "kennung": None,
+        # Nobody administers a deployment nobody can sign in to.
+        "verwalter": False,
     }
 
 
@@ -321,6 +323,9 @@ def test_a_successful_callback_signs_the_person_in(oidc, client: TestClient):
         "angemeldet": True,
         "name": "Erika Musterfrau",
         "kennung": body["kennung"],
+        # Signing in is not administering: the flag comes from ADMIN_ACCOUNTS
+        # or from the database, and this deployment has neither.
+        "verwalter": False,
     }
     assert len(body["kennung"]) == 32
     # Non-speaking: neither the subject nor the issuer is readable from it.

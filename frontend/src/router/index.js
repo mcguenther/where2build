@@ -19,6 +19,7 @@ import DestinationsView from "../views/DestinationsView.vue";
 import LocationView from "../views/LocationView.vue";
 import DataView from "../views/DataView.vue";
 import AccountView from "../views/AccountView.vue";
+import AdminView from "../views/AdminView.vue";
 import SharedPlotView from "../views/SharedPlotView.vue";
 import SignInDoneView from "../views/SignInDoneView.vue";
 import NotFoundView from "../views/NotFoundView.vue";
@@ -60,6 +61,18 @@ export const routes = [
   /* Reached from the name in the header rather than from the sections: it is
      about the person, not about a part of the work. */
   { path: "/konto", name: "account", component: AccountView, meta: { section: "account" } },
+  /* The administration area. One route with the area in the path, so a reload
+     stays where it was and „Konten" can be linked to. No guard: what may be
+     seen is decided by the backend on every request, and a guard here would
+     only be able to redirect somebody away from the page that tells them why
+     they are not allowed in. */
+  {
+    path: "/verwaltung/:bereich?",
+    name: "admin",
+    component: AdminView,
+    props: true,
+    meta: { section: "admin" }
+  },
   /* A shared plot, open to anybody with the link.
      The trailing segment is a readable slug and is never read: the token is
      the whole address, so `/geteilt/AbC…` and
