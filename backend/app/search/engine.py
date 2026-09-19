@@ -1645,6 +1645,11 @@ class SearchEngine:
                 stated_area=self._area.value if self._area else None,
                 street=self._streets,
                 distance_fit=self._distance_fit(parcel),
+                # A stated frontage ranks even where it cannot object: the
+                # plot may be a wedge, and then it matches no side of any
+                # rectangle while still sitting inside the interval the
+                # outline admits. See `scoring.front_interval`.
+                stated_front=self._dimensions.width if self._dimensions else None,
             )
             objection = self._distance_objection(parcel)
             if objection:

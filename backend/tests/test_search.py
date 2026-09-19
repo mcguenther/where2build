@@ -38,7 +38,7 @@ from app.search import distance
 from app.search.blocks import split_blocks
 from app.search.distance import read_distances
 from app.search.ladder import tolerance_ladder
-from app.search.scoring import land_use, score, street_match
+from app.search.scoring import front_fit, front_interval, land_use, score, street_match
 from app.services import ocr
 from app.services.alkis import Flurstueck, parse_feature_collection
 
@@ -292,6 +292,31 @@ def test_an_ambiguous_name_says_so_rather_than_picking_one():
 
     assert hoefgen.schluessel is None
     assert "2-mal" in hoefgen.text
+
+
+def test_a_stated_frontage_ranks_where_it_cannot_object():
+    """Plagwitz 309/6 is the right answer of advert 3375124391 and the one
+    parcel in the corpus whose listing states a frontage.
+
+    It is a wedge: 1 489 m² in a 39,8 x 71,5 m rectangle, and the stated
+    „Frontbreite ca. 26 m" matches *neither* rectangle side. That is why
+    `_shape_objection` refuses to object on a width — and why this is an
+    interval: the plot cannot be narrower on average than 20,8 m and cannot be
+    wider anywhere than 39,8 m, and 26 sits squarely inside.
+    """
+
+    parcel = parse_feature_collection(fixture_bytes("alkis_plagwitz_309_6.gml"))[0]
+    assert parcel.attributes["flaeche"] == "1489"
+    low, high = front_interval(parcel.geometry)
+    assert (round(low, 1), round(high, 1)) == (20.8, 39.8)
+
+    stated = read_dimensions(LISTINGS["3375124391"]["beschreibung"])
+    assert (stated.width, stated.depth) == (26.0, None)
+    fit, phrase = front_fit(parcel.geometry, stated.width)
+    assert fit == 1.0 and "26 m Front" in phrase
+    # It promotes and never demotes: a width nobody can place is still a width
+    # somebody paced out.
+    assert front_fit(parcel.geometry, 60.0)[0] == 0.05
 
 
 def test_an_address_needs_no_suffix():

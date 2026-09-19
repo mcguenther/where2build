@@ -32,12 +32,12 @@ Keep comments sparse and about *why*, not *what*.
 
 ```
 backend/     FastAPI. Proxy and disk cache in front of ALKIS, BORIS, GeoSN
-             WMS, MOTIS and the LLM. Owns no geometry maths and no database —
-             PostGIS is in the plan, not in the code.
-             `app/search/` is the exception in one direction only: it asks the
-             cadastre a series of narrow questions and answers NDJSON, so the
-             map can grow while it runs. Still no geometry maths.
-frontend/    Vite + Vue 3, Options API. Owns ALL geometry.
+             WMS, MOTIS and the LLM. No database — PostGIS is in the plan, not
+             in the code.
+             `app/search/` is the exception: it asks the cadastre a series of
+             narrow questions and answers NDJSON, so the map can grow while it
+             runs — and it *measures* what comes back. See below.
+frontend/    Vite + Vue 3, Options API. Owns all geometry the user touches.
 docs/        Spec, service research, screenshots. `strategie/` holds the four
              interactive strategy pages for parcel identification, and
              `claude/` the working notes this file points at.
@@ -51,9 +51,19 @@ from the user directly. Reopen only if the user asks.
 
 - **Vue 3 with the Options API.** No `<script setup>`, no Composition API
   rewrite, no Nuxt.
-- **Geometry runs in the browser**, not in Shapely. Buffering, rotation and
-  collision run while the user drags, without a round trip. The binding numbers
-  come from ALKIS anyway.
+- **Geometry the user touches runs in the browser**, not in Shapely. Buffering,
+  rotation and collision run while the user drags, without a round trip. The
+  binding numbers come from ALKIS anyway.
+- **Geometry the *search* uses runs in the backend**, and has since the
+  envelope was built. The two are not the same job: the browser draws what
+  somebody is moving, and the search measures what the cadastre just answered —
+  in order to rank a candidate list that is streamed as NDJSON and cannot wait
+  for a browser. `search/envelope.py` unions outlines, `engine.py` fits a
+  `minimum_rotated_rectangle` against the dimensions a listing states, and the
+  soft features in `scoring.py` measure a front width and a neighbouring use.
+  The rule that used to stand here („no geometry maths in `app/search/`") had
+  already stopped being true when it was read again on 19.09.2026, which is the
+  worst state a rule can be in.
 - **Use the official area** (`flaeche` attribute from ALKIS) for anything
   price-related. The area computed from the polygon differs by a few square
   metres and is for shape analysis only. Both are shown side by side.
@@ -220,7 +230,7 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 761 passed, 42 skipped — 41 of them the account store, waiting for
+- `pytest`: 762 passed, 42 skipped — 41 of them the account store, waiting for
   `TEST_DATABASE_URL` to point at a real Postgres, and one that needs pyosmium,
   which only the index builder wants. The account store is skipped rather than
   mocked because what it checks is the database's own behaviour. Without

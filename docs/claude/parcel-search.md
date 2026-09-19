@@ -1048,3 +1048,30 @@ in der die Zahl eines Maklers einen Kandidaten etwas kostet. Also trägt eine
 Aussage jetzt `band` (sortengerecht, für die Ordnung) und `outer_band` (immer
 die großzügigste Auslegung, für den Einspruch). F3 kann die Ordnung damit
 schärfen, ohne je zusätzlich jemanden zu versenken.
+
+
+## Die Frontbreite ist ein Intervall, keine Rechteckseite (B5)
+
+Der Leser kannte „Frontbreite ca. 26 m" schon — `read_dimensions` liest
+`breit` und `front` — und ließ sie fallen, weil `sides` beide Maße verlangt
+und die Tiefe fehlte. Nutzbar gemacht, aber nicht so, wie es naheliegt.
+
+Im Code stand die Warnung schon: `_shape_objection` weigert sich
+ausdrücklich, auf eine Breite hin zu widersprechen, weil das Plagwitz-Inserat
+26 m nennt und sein Flurstück in einem 39,8 × 71,5 m Rechteck sitzt. Am
+19.09.2026 selbst nachgemessen — ALKIS nach Gemarkung 148642 mit 1 489 m²
+gefragt, ein Treffer, als `alkis_plagwitz_309_6.gml` aufgezeichnet: das
+Grundstück ist ein **Keil**. Die genannte Front trifft *keine* der beiden
+Rechteckseiten.
+
+Was der Umriss dagegen schon bindet, ist die **Spanne**: schmaler als
+Fläche durch Länge kann ein Grundstück im Mittel nicht sein (20,8 m), und
+breiter als die kurze Rechteckseite nirgends (39,8 m). Die genannten 26 m
+liegen darin. `front_interval` liefert dieses Paar, `front_fit` prüft die
+Zugehörigkeit und fällt außerhalb über die Breite des Intervalls ab — 60 m
+landen auf dem Boden. Gewicht 0,4, dieselbe Klasse wie die Entfernung: der
+*Eingabewert* ist etwas, das jemand abgeschritten hat.
+
+Es befördert und versenkt nie. Dass es nur ordnet, ist nicht Vorsicht,
+sondern dieselbe Messung: ein Wert, der die richtige Antwort nicht trifft,
+darf sie nicht ausschließen.

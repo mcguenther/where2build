@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Any, Sequence
 
 from ..services.alkis import Flurstueck
 
@@ -47,6 +47,9 @@ WEIGHTS = {
     # search resolved itself. Below the official values on purpose: it is the
     # only feature here whose *input* is somebody's estimate.
     "entfernung": 0.4,
+    # The same class of input -- a width somebody paced out -- against an
+    # interval this search derived from the outline the cadastre answered.
+    "front": 0.4,
 }
 
 # What a building plot is normally recorded as. The inference
@@ -85,6 +88,64 @@ def area_fit(official: float | None, stated: float | None) -> float:
     if not official or not stated:
         return FLOOR
     return max(FLOOR, 1.0 - min(1.0, abs(official - stated) / stated / 0.2))
+
+
+def front_interval(geometry: Any) -> tuple[float, float] | None:
+    """How wide a parcel can be, from its own outline: ``(mean, widest)``.
+
+    A frontage is the length of the boundary along the street, and without the
+    street nobody knows which boundary that is. What the outline *does* bound
+    is the range. The plot cannot be narrower on average than its area over
+    its length, and it cannot be wider anywhere than the short side of the
+    smallest rectangle around it.
+
+    Measured 19.09.2026 on Plagwitz 309/6, the right answer of advert
+    3375124391 and the one parcel in the corpus whose listing states a
+    frontage: 1 489 m² in a 39,8 x 71,5 m rectangle, mean width 20,8 m,
+    stated „Frontbreite ca. 26 m". A wedge — its frontage matches *neither*
+    rectangle side, which is why `_shape_objection` refuses to object on a
+    width and why this is an interval rather than a number.
+    """
+
+    if geometry is None or getattr(geometry, "is_empty", True) or not geometry.area:
+        return None
+    try:
+        corners = list(geometry.minimum_rotated_rectangle.exterior.coords)[:4]
+    except (AttributeError, IndexError, ValueError):
+        return None
+    if len(corners) < 4:
+        return None
+    edges = sorted(
+        ((corners[i][0] - corners[(i + 1) % 4][0]) ** 2
+         + (corners[i][1] - corners[(i + 1) % 4][1]) ** 2) ** 0.5
+        for i in range(4)
+    )
+    short, long = edges[0], edges[3]
+    if short < 1 or long < 1:
+        return None
+    mean = geometry.area / long
+    return (min(mean, short), short)
+
+
+def front_fit(geometry: Any, stated: float | None) -> tuple[float, str | None]:
+    """Whether a candidate can have the frontage the listing states.
+
+    Inside the interval is a full match, outside it falls away over the
+    interval's own width — a plot twice as wide as it can be is no match, one
+    a metre off is nearly one. It may promote and never demote: a frontage is
+    what a seller paced out, and `Dimensions` already refuses to *object* on
+    one for the same reason.
+    """
+
+    interval = front_interval(geometry)
+    if not stated or interval is None:
+        return FLOOR, None
+    low, high = interval
+    if low <= stated <= high:
+        return 1.0, f"{stated:g} m Front passen zu {low:.0f}–{high:.0f} m am Flurstück"
+    span = max(high - low, 1.0)
+    miss = (low - stated) if stated < low else (stated - high)
+    return max(FLOOR, 1.0 - miss / span), None
 
 
 def land_use(tntxt: str | None) -> tuple[float, str | None]:
@@ -141,6 +202,7 @@ def score(
     stated_area: float | None = None,
     street: str | Sequence[str] | None = None,
     distance_fit: tuple[float, str] | None = None,
+    stated_front: float | None = None,
 ) -> tuple[float, list[str]]:
     """Points and reasons for one candidate.
 
@@ -168,6 +230,11 @@ def score(
     fit, kind = land_use(parcel.attributes.get("tntxt"))
     if kind:
         contributions.append(Contribution("nutzung", fit, f"Nutzung: {kind}"))
+
+    if stated_front is not None:
+        fit, phrase = front_fit(parcel.geometry, stated_front)
+        if phrase or fit > FLOOR:
+            contributions.append(Contribution("front", fit, phrase or ""))
 
     if distance_fit is not None:
         value, phrase = distance_fit
