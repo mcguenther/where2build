@@ -495,7 +495,7 @@ pre i{color:var(--muted);font-style:normal}
     </article>
 
     <article class="bs bs--hoch">
-      <div class="bs-kopf"><b>B2 · Mehrere Nummern</b><span class="bs-grad">hoch</span></div>
+      <div class="bs-kopf"><b>B2 · Mehrere Nummern</b><span class="bs-grad">behoben</span></div>
       <h3>„Ein Satz“ wird am Kanal erkannt, nicht am Dokument</h3>
       <p><code>named_as_a_set()</code> hält Nummern für ein zusammengehöriges Grundstück,
       wenn sie <em>dieselbe Quelle</em> haben. Jeder OCR-Fund trägt <code>quelle="bild"</code>
@@ -505,10 +505,13 @@ pre i{color:var(--muted);font-style:normal}
       <p class="beleg">Genau der Fall „auf dem Screenshot stehen mehrere Flurstücksnummern“.
       Ein Geoportal-Auszug trägt Dutzende Nummern im Kartenbild; gelesen wird nur die im
       Titelblock — was heute davor schützt, aber nicht dann, wenn zwei Auszüge dabei sind.</p>
-      <div class="fix"><b>Vorschlag</b>Quellenidentität = Kanal + Dokument + Fundstelle.
-      Mehrere Nummern aus <em>einem</em> Titelblock oder <em>einem</em> Satz sind ein Satz;
-      Nummern aus zwei Bildern sind rivalisierende Lesungen — Konflikt, beide Zweige einzeln
-      gegen die Fläche geprüft, der unterlegene bleibt sichtbar durchgestrichen.</div>
+      <div class="fix"><b>Gebaut am 18.09.2026</b>Jedes Indiz trägt einen
+      <code>fundort</code> — das Dokument, nicht den Kanal —, und <code>named_as_a_set</code>
+      fragt danach. Mehrere Nummern aus <em>einem</em> Titelblock oder <em>einem</em> Satz
+      sind ein Satz; Nummern aus zwei Bildern sind rivalisierende Lesungen und werden zur
+      Rückfrage. Nachgezogen am 19.09.2026: <em>ein</em> Satz ist jetzt auch im Fließtext
+      einer — „Flurstücke 790/11, 238/3 und 41/e“ liefert alle drei mit einem gemeinsamen
+      Beleg, und „Flurstücke“ mit Umlaut traf bis dahin überhaupt nichts.</div>
     </article>
 
     <article class="bs bs--hoch">
@@ -1546,8 +1549,13 @@ Teil 6 brauchen.</pre>
   des Laufs nicht — sie machen nur den Leser richtig.</p>
   <div class="stufen">
     <div class="st">
-      <span class="st-nr">Stufe 0</span>
+      <span class="st-nr">Stufe 0 ✓</span>
       <div class="st-was"><h4>Den Text in Blöcke zerlegen</h4>
+        <p style="color:var(--primary)"><b>Gebaut (18.09.2026):</b> <code>search/blocks.py</code>
+        mit vier Sorten — Überschrift, „Label: Wert“, Aufzählungspunkt, Absatz. Gemessen über
+        die 16 Anzeigen: 148 Absätze, 78 Wertepaare, 76 Überschriften, 55 Punkte. Belege, die
+        eine Blockgrenze überschreiten, gingen von 13 auf 7 zurück, und die sieben sind
+        mehrzeilige Absätze, also eine einzige Aussage.</p>
         <p>Überschrift, Absatz, Aufzählung, „Label: Wert“. Eine Anzeige ist zur Hälfte keine
         Prosa, und daran scheitern alle drei Leser gleichzeitig: der reguläre Ausdruck
         liest über Blockgrenzen hinweg, der Parser macht aus einer Überschrift ein Subjekt,
@@ -1571,15 +1579,19 @@ Teil 6 brauchen.</pre>
       <span class="st-mass">klein · kein Risiko<br>Prüffälle 2418686487,<br>3495978117, 3407135600</span>
     </div>
     <div class="st">
-      <span class="st-nr">Stufe 2</span>
+      <span class="st-nr">Stufe 2 ✓</span>
       <div class="st-was"><h4>Quellenidentität: Dokument statt Kanal</h4>
+        <p style="color:var(--primary)"><b>Gebaut (18.09.2026):</b> jedes Indiz trägt einen
+        <code>fundort</code>, und <code>named_as_a_set</code> fragt danach statt nach dem
+        Kanal. Zwei Nummern von zwei Auszügen sind damit rivalisierende Lesungen und keine
+        Menge mehr.</p>
         <p>Ein Satz Nummern kommt aus einem Titelblock oder einem Satz, nicht aus „irgendeinem
         Bild“. Behebt B2 und ist die Voraussetzung dafür, dass mehrere Nummern überhaupt
         gegeneinander geprüft werden können.</p></div>
       <span class="st-mass">klein · berührt <code>named_as_a_set</code></span>
     </div>
     <div class="st">
-      <span class="st-nr">Stufe 3 ◐</span>
+      <span class="st-nr">Stufe 3 ✓</span>
       <div class="st-was"><h4>Widerspruch wird ein Zweig, Bestätigung wird streng</h4>
         <p style="color:var(--primary)"><b>Gebaut (16.09.2026):</b> beides — die Form
         widerspricht einer Bestätigung, und ein widersprochener Nummerntreffer öffnet den
@@ -1610,18 +1622,28 @@ Teil 6 brauchen.</pre>
         dafür schon implementiert — es beschreibt in der App bereits jedes Grundstück.</p></div>
       <span class="st-mass">mittel · neue Merkmale in <code>scoring.py</code></span>
     </div>
-    <div class="st st--spaeter">
-      <span class="st-nr">Stufe 6</span>
+    <div class="st">
+      <span class="st-nr">Stufe 6 ◐</span>
       <div class="st-was"><h4>Entfernungsbänder als Indiz</h4>
+        <p style="color:var(--primary)"><b>Gebaut (17.09.2026):</b> <code>search/distance.py</code>
+        liest Ort, Zahl und Modus, rechnet den Intervallschnitt und ordnet die Kandidaten
+        (Gewicht 0,4); die Karte zeichnet den Ring. Offen bleiben die eigenen Bandbreiten je
+        Sorte (F3) und die Ankervorauswahl (Rolle 1), die die Messung bewusst zurückgestellt
+        hat.</p>
         <p>Ort, Zahl und Modus aus dem Satz lesen, den Bezugspunkt auflösen, das Band
         zeichnen — und die Kandidaten mit einem <code>one-to-many</code>-POST je Ort dagegen
         messen. Setzt <code>CAR</code> in <code>_STREET_MODES</code> voraus, was der Dienst
         längst kann. Vor allem ein Gewinn für die Karte.</p></div>
       <span class="st-mass">mittel · neue Indizart<br>1 POST je Ort und Modus</span>
     </div>
-    <div class="st st--spaeter">
-      <span class="st-nr">Stufe 7</span>
+    <div class="st">
+      <span class="st-nr">Stufe 7 ✓</span>
       <div class="st-was"><h4>Modellkanal mit Befund-Vorlage und Beleg-Gate</h4>
+        <p style="color:var(--primary)"><b>Gebaut (18.09.2026):</b> <code>InseratBefund</code>,
+        das vierteilige Beleg-Gate in <code>services/beleg.py</code> und das Abweichungs­protokoll
+        in <code>services/lehrbuch.py</code>. Anbieter frei wählbar; Standard bei OpenRouter ist
+        <code>google/gemini-2.5-flash-lite</code>, gemessen an sechs Modellen über die 16
+        Anzeigen mit 2,5 s und 0,0005 $ je Inserat.</p>
         <p>Unabhängig von Stufe 4 und jederzeit einschaltbar. Wirkt am stärksten zusammen
         mit Stufe 0 und 1: Was das Modell besser kann als jedes Muster, ist die
         Ortsbeziehung in einem Text, der keine Prosa ist. Ob danach noch genug übrig bleibt,

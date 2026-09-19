@@ -174,6 +174,38 @@ def _directory(monkeypatch: pytest.MonkeyPatch):
 # --------------------------------------------------------------------------
 
 
+@pytest.mark.parametrize(
+    ("text", "numbers"),
+    [
+        # The documented normal case: one label, several numbers, one set.
+        ("Flurstück 790/11 sowie 238/3 der Gemarkung Großbothen", ["790/11", "238/3"]),
+        ("Flurstücke 790/11, 238/3 und 41/e", ["790/11", "238/3", "41/e"]),
+        ("Flurstuecke 790/11 und 238/3", ["790/11", "238/3"]),
+        ("Flurstücke 12 und 13", ["12", "13"]),
+        # „Flurstücke" with the umlaut matched nothing at all until 19.09.2026:
+        # the plural „e" sat only on the ue-branch of the pattern.
+        ("Flurstücksnummer 107/60", ["107/60"]),
+        ("Flst. 41/e", ["41/e"]),
+        # A number after „und" that is a quantity, not a parcel. A denominator
+        # settles it outright; without one, a unit or a following noun has to
+        # rule it out.
+        ("Flurstück 107/60 und 502 m² Grundstücksfläche", ["107/60"]),
+        ("Flurstück 12 und 2 Garagen", ["12"]),
+        ("Die Flurstücke sind erschlossen.", []),
+    ],
+)
+def test_one_label_can_name_several_parcels(text, numbers):
+    """A plot is a *set* of parcels, and several numbers from one source are
+    that set — never rival readings. Only the first was read: the pattern needs
+    a label and the numbers behind „und" have none."""
+
+    read = [i for i in collect_indicia(text=text) if i.art == "flurstueck"]
+    assert [i.wert for i in read] == numbers
+    # One run, one Beleg: the span is the sentence that named them together,
+    # which is also what makes them one source rather than two.
+    assert len({i.beleg for i in read}) <= 1
+
+
 def test_a_garbled_parcel_number_is_rejected_before_it_reaches_the_cadastre():
     """The 7-degree misreading that returned „Flurstück 790717“.
 

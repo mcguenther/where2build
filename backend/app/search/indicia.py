@@ -70,10 +70,52 @@ MAX_NENNER_DIGITS = 4
 
 # „Flurstück 790/11“, „Flurstücksnummer: 85/1“, „Flst. 476“, „Flurstück 41/e“.
 _PARCEL_RE = re.compile(
-    r"(?:flurst(?:ü|ue)ck(?:s?nummer)?|flst\.?|flurstuecke?)\s*(?:nr\.?|nummer)?\s*[:.]?\s*"
+    # „Flurstücke" with the umlaut matched nothing until 19.09.2026: the plural
+    # „e" was only on the ue-branch, and the umlaut branch ran straight from
+    # „Flurstück" into the digits it then could not find.
+    r"(?:flurst(?:ü|ue)ck(?:e\b|s?nummer)?|flst\.?)\s*(?:nr\.?|nummer)?\s*[:.]?\s*"
     r"(\d{1,6})\s*(?:/\s*(\d{1,5}|[a-zA-Z]))?",
     re.IGNORECASE,
 )
+
+# „Flurstück 790/11 sowie 238/3" — the label stands once and the numbers follow.
+# That is the documented normal case („a plot is a *set* of parcels"), and only
+# the first number was read: the pattern above needs a label, and the second
+# has none.
+_PARCEL_MORE = re.compile(
+    r"\s*(?:,|;|&|\bund\b|\bsowie\b|\bu\.\s*)\s*(\d{1,6})\s*(?:/\s*(\d{1,5}|[a-zA-Z]))?",
+    re.IGNORECASE,
+)
+
+# What a bare number after „und" turns out to be when it is not a parcel:
+# „Flurstück 12 und 2 Garagen", „Flurstück 107/60 und 502 m²". A denominator
+# settles it outright — nothing else in an advert is written „238/3" — so a
+# continuation without one has to prove it is not a quantity, and a unit or a
+# following noun says that it is.
+_NOT_A_PARCEL_AFTER = re.compile(
+    r"\s*(?:m²|m2|qm|€|EUR\b|Euro\b|%|km\b|ha\b|min\b|Minuten\b|Jahre\b|[A-ZÄÖÜ])",
+)
+
+
+def _parcel_run(body: str, match: re.Match[str]) -> tuple[list[tuple[str, str | None]], int]:
+    """Every parcel number of one labelled run, and where the run ends.
+
+    The numbers of a run come from one sentence and are therefore one set, not
+    rival readings — the rule the whole search is built on. They share a Beleg
+    for the same reason: the span is the sentence that named them together.
+    """
+
+    numbers = [(match.group(1), match.group(2))]
+    end = match.end()
+    while (more := _PARCEL_MORE.match(body, end)) is not None:
+        numerator, denominator = more.group(1), more.group(2)
+        if denominator is None and (
+            match.group(2) is not None or _NOT_A_PARCEL_AFTER.match(body, more.end())
+        ):
+            break
+        numbers.append((numerator, denominator))
+        end = more.end()
+    return numbers, end
 
 # „Gemarkung Großbothen“, „Gemarkung: Mölkau (144241)“.
 _DISTRICT_RE = re.compile(
@@ -1135,25 +1177,32 @@ def _from_body(
     out: list[Indiz] = []
     pieces = blocks.split_blocks(body)
 
+    read_to = 0
     for match in _PARCEL_RE.finditer(body):
-        parsed = normalise_parcel_number(
-            f"{match.group(1)}/{match.group(2)}" if match.group(2) else match.group(1)
-        )
-        if not parsed:
+        if match.start() < read_to:
+            # Inside a run already read: „Flurstücke 790/11 und Flurstück 238/3".
             continue
-        label = parcel_label(*parsed)
-        if any(indiz.art == "flurstueck" and indiz.wert == label for indiz in out):
-            continue
-        out.append(
-            _indiz(
-                counter,
-                art="flurstueck",
-                wert=label,
-                text=f"Flurstück {label} im Text",
-                quelle="fliesstext",
-                beleg=_excerpt(body, match.start(), match.end(), pieces=pieces),
+        numbers, read_to = _parcel_run(body, match)
+        beleg = _excerpt(body, match.start(), read_to, pieces=pieces)
+        for numerator, denominator in numbers:
+            parsed = normalise_parcel_number(
+                f"{numerator}/{denominator}" if denominator else numerator
             )
-        )
+            if not parsed:
+                continue
+            label = parcel_label(*parsed)
+            if any(indiz.art == "flurstueck" and indiz.wert == label for indiz in out):
+                continue
+            out.append(
+                _indiz(
+                    counter,
+                    art="flurstueck",
+                    wert=label,
+                    text=f"Flurstück {label} im Text",
+                    quelle="fliesstext",
+                    beleg=beleg,
+                )
+            )
 
     # A place named as the municipality an Ortsteil belongs to is not a rival
     # reading of where the plot is -- it is the level above, and it is what
