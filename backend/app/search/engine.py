@@ -77,6 +77,7 @@ from .indicia import (
     outside_saxony,
     read_area,
     read_dimensions,
+    street_candidates,
 )
 from .ladder import Rung, confirmation_rung, tolerance_ladder
 from .scoring import clean_use, parcel_number, score
@@ -262,7 +263,7 @@ class SearchEngine:
         self.app_settings = app_settings or alkis.app_settings
         self.state = SearchState()
         self._area: AreaStatement | None = None
-        self._street: str | None = None
+        self._streets: list[str] = []
         # The sentence saying the plot is a piece of a bigger parcel, if any.
         self._part_area: str | None = None
         # The federal state the listing names, when it is not Saxony.
@@ -401,8 +402,20 @@ class SearchEngine:
                 )
                 area_indiz.beleg = self._part_area
 
-        street_indiz = next(iter(self.active("strasse")), None)
-        self._street = street_indiz.wert if street_indiz else None
+        # Every name the listing could mean, not the first one found. A
+        # suffix name („Wiesenstraße") is confident enough to be an Indiz on
+        # its own; a prepositional phrase („Am Kurpark") is not, and waits in
+        # the pool for a candidate's official address to confirm it. Both go
+        # into the same comparison, because the cadastre is what tells them
+        # apart — see `indicia.street_candidates`.
+        self._streets = [indiz.wert for indiz in self.active("strasse")]
+        self._streets += [
+            phrase
+            for phrase in street_candidates(
+                blocks.joined(self.payload.titel, self.payload.text)
+            )
+            if phrase not in self._streets
+        ]
         self._read_distances()
         self._dimensions = read_dimensions(
             blocks.joined(self.payload.titel, self.payload.text)
@@ -1617,7 +1630,7 @@ class SearchEngine:
             points, reasons = score(
                 parcel,
                 stated_area=self._area.value if self._area else None,
-                street=self._street,
+                street=self._streets,
                 distance_fit=self._distance_fit(parcel),
             )
             objection = self._distance_objection(parcel)
@@ -2012,7 +2025,7 @@ class SearchEngine:
         features = [
             name
             for name, present in (
-                ("Straße", bool(self._street)),
+                ("Straße", bool(self._streets)),
                 ("Nutzungsart", True),
                 ("Fläche", self._area is not None),
                 ("Entfernung", bool(self._references)),

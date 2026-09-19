@@ -321,10 +321,49 @@ def outside_saxony(adresse: str | None) -> str | None:
 # path through a field. German capitalises every noun, so the usual signal —
 # a capital letter — says nothing here.
 _NOT_A_STREET_PREFIX = (
-    "ihr", "ihre", "der", "die", "das", "den", "dem", "ein", "eine", "einen",
-    "einem", "mein", "unser", "unsere", "kein", "jeder", "dieser", "diese",
+    "ihr", "ihre", "ihren", "ihrem", "ihrer", "der", "die", "das", "den", "dem",
+    "ein", "eine", "einen", "einem", "mein", "unser", "unsere", "kein", "jeder",
+    "dieser", "diese", "hektar", "quadratmeter",
 )
-_NOT_A_STREET = ("feldweg", "wanderweg", "radweg", "waldweg", "fußweg", "gehweg", "kirchweg")
+# A kind of way, not the name of one. „Hauptstraße" and „Marktplatz" are names
+# and stay out of this list; a road class has no proper name in it at all.
+# Measured 19.09.2026 over the 16 adverts: „Bundesstraße", „Anliegerstraße" and
+# „Stellplatz" travelled as street names, and none of them is one.
+_NOT_A_STREET = (
+    "feldweg", "wanderweg", "radweg", "waldweg", "fußweg", "gehweg", "kirchweg",
+    "bundesstraße", "landstraße", "kreisstraße", "staatsstraße", "anliegerstraße",
+    "nebenstraße", "sackgasse", "stichstraße", "einbahnstraße", "spielstraße",
+    "privatstraße", "zufahrtsstraße", "stellplatz", "parkplatz", "wendehammer",
+)
+
+# A German address does not need a suffix. „Am Kurpark" is the official
+# `lagebeztxt` of 502/47 — the right answer of the Bad Lausick advert — while
+# the suffix pattern above cannot see it and does see „Bundesstraße".
+#
+# The preposition is matched case-insensitively and the noun is not: the advert
+# writes „Naturnah wohnen am Kurpark" in mid-sentence and the register spells
+# the address „Am Kurpark". Spaces rather than `\s`, and no dot inside a word:
+# `\s+` with a dot in the class produced „Zur Verfügung.\n\nFür", and a phrase
+# that runs across a sentence boundary cannot be an address.
+_PLACE_PHRASE_RE = re.compile(
+    r"\b((?:[Aa]m|[Aa]n\s+de[rn]|[Aa]uf\s+de[rm]|[Hh]inter\s+de[rmn]|[Vv]or\s+de[rm]|"
+    r"[Uu]nter\s+den|[Zz]um|[Zz]ur|[Bb]eim|[Bb]ei\s+der)[ \t]+"
+    r"[A-ZÄÖÜ][\wäöüßÄÖÜ\-]{2,}(?:[ \t]+[A-ZÄÖÜ][\wäöüßÄÖÜ\-]+){0,2})"
+)
+
+# What follows such a preposition when the phrase states a purpose or a
+# position rather than an address. German builds both regularly, so these are
+# rules and not a list: a nominalisation („Zur Verfügung", „Bei der Planung")
+# and a relational noun („Am Ortsrand"). A list of the first kind has no end —
+# of 47 phrases the loose harvest found over the 16 adverts, 39 were one.
+_ABSTRACT_NOUN = re.compile(r"(?:ung|heit|keit|schaft|nis|tion)$", re.IGNORECASE)
+_NOT_A_PLACE_NOUN = (
+    "ortsrand", "stadtrand", "waldrand", "feldrand", "rand", "rande", "ende",
+    "anfang", "stück", "standort", "objekt", "grundstück", "start", "ziel",
+    "gelände", "ort", "stelle", "seite", "hand", "verkauf", "kauf", "miete",
+    "wunsch", "wünsche", "zeit", "zeiten", "thema", "einsatz", "suche", "wahl",
+    "träumen", "ankommen", "entspannen", "wohlfühlen", "leben", "bauen",
+)
 
 # The GeoSN prints its own address on every sheet it issues. A street read out
 # of a map extract next to any of these is the authority signing its work, not
@@ -1416,6 +1455,33 @@ def _named_as_distant(
     return False
 
 
+def street_candidates(text: str) -> list[str]:
+    """Phrases that could be an address, for the cadastre to rule on.
+
+    These deliberately do *not* become Indizien. „Am Kurpark" and „Zur
+    Verfügung" are the same shape to a pattern, and a protocol that lists every
+    prepositional phrase in an advert is one nobody reads — the loose harvest
+    finds up to thirteen per listing. So they stay a pool: a phrase becomes
+    visible only where a candidate's official ``lagebeztxt`` carries it, and
+    then it is a property of that candidate, which is what it always was.
+
+    That is the whole point of reading loosely. The rules below only keep the
+    pool small enough to be worth comparing; being wrong here costs a string
+    comparison, never a parcel.
+    """
+
+    out: list[str] = []
+    for match in _PLACE_PHRASE_RE.finditer(text):
+        name = match.group(1).strip()
+        name = name[0].upper() + name[1:]
+        last = name.split()[-1].strip(".,;:")
+        if _ABSTRACT_NOUN.search(last) or last.lower() in _NOT_A_PLACE_NOUN:
+            continue
+        if name not in out:
+            out.append(name)
+    return out
+
+
 def _is_street_name(name: str) -> bool:
     """Whether a match ending in -weg or -platz is plausibly a street.
 
@@ -1466,6 +1532,7 @@ def _place_sentence(name: str, relation: Ortsbeziehung | None, count: int) -> st
 
 __all__ = [
     "AreaStatement",
+    "street_candidates",
     "DOCUMENT_OF",
     "federal_state",
     "outside_saxony",

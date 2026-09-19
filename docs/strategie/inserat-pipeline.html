@@ -533,7 +533,7 @@ pre i{color:var(--muted);font-style:normal}
     </article>
 
     <article class="bs bs--mittel">
-      <div class="bs-kopf"><b>B4 · Straßenname</b><span class="bs-grad">mittel</span></div>
+      <div class="bs-kopf"><b>B4 · Straßenname</b><span class="bs-grad">behoben</span></div>
       <h3>Das Muster trifft Wörter, keine Straßen</h3>
       <p>Am selben Leser gemessen: „Stellplatz“ und „Bundesstraße“ werden als Straßennamen
       erfasst, „Am Kurpark“ nicht — weil das Muster ein Suffix verlangt. „Am Kurpark“ ist
@@ -541,10 +541,12 @@ pre i{color:var(--muted);font-style:normal}
       Bad-Lausick-Inserats.</p>
       <p class="beleg">Die Straße ordnet nur (Gewicht 0,9), kann also nichts falsch machen —
       aber sie ist das stärkste zweite Merkmal, das es gibt: gemessen 25 Kandidaten auf 5.</p>
-      <div class="fix"><b>Vorschlag</b>Kandidatennamen gegen die <code>lagebeztxt</code>-Werte
-      im Anker prüfen statt gegen ein Suffixmuster — die Liste kommt ohnehin mit jedem
-      Flurstück. Formen ohne Suffix („Am Kurpark“, „Zur Mühle“) zulassen, Gattungswörter
-      („Bundesstraße“, „Feldweg“, „Stellplatz“) ausschließen.</div>
+      <div class="fix"><b>Gebaut am 19.09.2026</b>Formen ohne Suffix werden gelesen,
+      Straßenklassen ausgeschlossen — und eine präpositionale Phrase wird <em>kein</em>
+      Indiz, sondern ein Vorrat: sichtbar wird sie erst, wo die amtliche
+      <code>lagebeztxt</code> eines Kandidaten sie trägt. Gemessen über die 16 Anzeigen:
+      Straßen-Indizien von 8 auf 3, und alle drei sind Straßennamen. Für 502/47 geht
+      <code>street_match</code> von 0,05 auf 1,0.</div>
     </article>
 
     <article class="bs bs--mittel">

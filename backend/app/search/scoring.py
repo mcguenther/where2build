@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from typing import Sequence
 
 from ..services.alkis import Flurstueck
 
@@ -106,22 +107,31 @@ def land_use(tntxt: str | None) -> tuple[float, str | None]:
     return FLOOR, first
 
 
-def street_match(lagebeztxt: str | None, street: str | None) -> tuple[float, str | None]:
-    """Whether the cadastre's own address names the street the listing does.
+def street_match(
+    lagebeztxt: str | None, streets: str | Sequence[str] | None
+) -> tuple[float, str | None]:
+    """Whether the cadastre's own address names a street the listing does.
 
     Measured 05.09.2026: in Gemarkung Großbothen 71 of 1 131 parcels carry
     ``Wiesenstr*`` in ``ave:lagebeztxt`` and 577 carry ``"ohne Lage"`` -- and
     the parcel actually being sold is one of the 577. So this may promote a
     candidate and must never demote one: a missing address is missing data, not
     a contradiction, and hard-filtering on it would have deleted the answer.
+
+    Several names, because a listing does not say which of its phrases is the
+    address. „Naturnah wohnen am Kurpark" and „Wiesenstraße" arrive as equals
+    and this is where they stop being equal: the official value decides, and a
+    phrase no parcel carries simply never matches anything.
     """
 
-    if not street or not lagebeztxt:
+    if not streets or not lagebeztxt:
         return FLOOR, None
     if "ohne lage" in lagebeztxt.lower():
         return FLOOR, None
-    if normalise_street(street) in normalise_street(lagebeztxt):
-        return 1.0, lagebeztxt.strip()
+    official = normalise_street(lagebeztxt)
+    for street in [streets] if isinstance(streets, str) else streets:
+        if street and normalise_street(street) in official:
+            return 1.0, lagebeztxt.strip()
     return FLOOR, None
 
 
@@ -129,7 +139,7 @@ def score(
     parcel: Flurstueck,
     *,
     stated_area: float | None = None,
-    street: str | None = None,
+    street: str | Sequence[str] | None = None,
     distance_fit: tuple[float, str] | None = None,
 ) -> tuple[float, list[str]]:
     """Points and reasons for one candidate.

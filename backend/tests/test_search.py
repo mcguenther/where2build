@@ -32,6 +32,7 @@ from app.search.indicia import (
     outside_saxony,
     read_area,
     read_dimensions,
+    street_candidates,
 )
 from app.search import distance
 from app.search.blocks import split_blocks
@@ -244,6 +245,51 @@ def test_an_ambiguous_name_says_so_rather_than_picking_one():
 
     assert hoefgen.schluessel is None
     assert "2-mal" in hoefgen.text
+
+
+def test_an_address_needs_no_suffix():
+    """„Am Kurpark" is the official lagebeztxt of 502/47 — the right answer of
+    the Bad Lausick advert — and the suffix pattern cannot see it.
+
+    The advert writes it mid-sentence and lower case („Naturnah wohnen am
+    Kurpark"), which is why the preposition is matched without regard to case
+    and the phrase is capitalised to the spelling a register uses.
+    """
+
+    listing = LISTINGS["3503721553"]
+    phrases = street_candidates(f"{listing['titel']}\n\n{listing['beschreibung']}")
+    assert "Am Kurpark" in phrases
+
+    parcel = parse_feature_collection(fixture_bytes("alkis_etzoldshain_502_47.gml"))[0]
+    assert parcel.attributes["lagebeztxt"] == "Am Kurpark"
+    # What the suffix pattern alone could say about it: nothing.
+    assert street_match(parcel.attributes["lagebeztxt"], None) == (0.05, None)
+    assert street_match(parcel.attributes["lagebeztxt"], phrases) == (1.0, "Am Kurpark")
+
+
+def test_a_prepositional_phrase_is_a_pool_and_not_an_indiz():
+    """„Am Kurpark" and „Zur Verfügung" are one shape to a pattern, and a
+    protocol listing every prepositional phrase is one nobody reads — the loose
+    harvest finds up to thirteen per advert. So they wait for a candidate's
+    official address instead of being offered as evidence."""
+
+    text = "Zum Verkauf steht ein Grundstück am Kurpark. Zur Verfügung steht auch eine Garage."
+    assert street_candidates(text) == ["Am Kurpark"]
+    assert [i.art for i in collect_indicia(text=text) if i.art == "strasse"] == []
+
+
+@pytest.mark.parametrize(
+    "junk",
+    ["Bundesstraße", "Anliegerstraße", "Stellplatz", "Ihren Platz", "Hektar Platz"],
+)
+def test_a_road_class_is_not_the_name_of_a_road(junk):
+    """All five travelled as street names over the 16 adverts, measured
+    19.09.2026. „Hauptstraße" and „Marktplatz" are names and stay allowed."""
+
+    text = f"Das Grundstück liegt an der {junk} und ist erschlossen."
+    assert [i.wert for i in collect_indicia(text=text) if i.art == "strasse"] == []
+    named = "Das Grundstück liegt an der Hauptstraße und ist erschlossen."
+    assert [i.wert for i in collect_indicia(text=named) if i.art == "strasse"] == ["Hauptstraße"]
 
 
 def test_the_authoritys_own_address_is_not_read_as_a_street():

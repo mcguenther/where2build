@@ -975,3 +975,45 @@ The two that remain are real: the patterns place the plot in Gemarkung Bad
 Lausick and in Gemarkung Groitzsch, the model calls both the Gemeinde, and
 which is meant is a question for a person — which is what a row in this log is
 supposed to be.
+
+
+## Was eine Adresse ist, entscheidet das Kataster (B4)
+
+Gemessen 19.09.2026 über die 16 aufgezeichneten Anzeigen. Der Leser kannte
+Straßen nur an einem Suffix, und das war in beide Richtungen falsch: von acht
+`strasse`-Indizien waren fünf keine Straße — „Bundesstraße", „Anliegerstraße",
+„Stellplatz", „Hektar Platz" (aus „5.000 Hektar Platz"), „Ihren Platz" (aus
+„Ihren Platz zum Träumen") — und „Am Kurpark" fehlte, die amtliche
+`lagebeztxt` von 502/47, dem richtigen Flurstück des Bad-Lausick-Inserats.
+
+Drei Dinge daran, und nur das mittlere ist eine Regel über Sprache:
+
+- **Eine Straßenklasse ist kein Straßenname.** „Bundesstraße" und
+  „Anliegerstraße" benennen eine Art von Weg. „Hauptstraße" und „Marktplatz"
+  benennen eine bestimmte und bleiben zugelassen — die Liste enthält nur, was
+  gar keinen Eigennamen trägt.
+- **Eine Adresse braucht kein Suffix.** „Am Kurpark", „An der Laakenwiese",
+  „Zur Mühle". Die Präposition wird ohne Rücksicht auf Groß- und
+  Kleinschreibung gelesen, weil die Anzeige „Naturnah wohnen am Kurpark" mitten
+  im Satz schreibt und das Verzeichnis „Am Kurpark" buchstabiert; die Phrase
+  wird auf diese Schreibweise gehoben.
+- **Eine präpositionale Phrase wird kein Indiz.** Das ist der Kern. „Am
+  Kurpark" und „Zur Verfügung" sind für ein Muster dieselbe Form, und die lose
+  Ernte findet bis zu dreizehn Phrasen je Anzeige — ein Verlauf, der sie alle
+  auflistet, ist einer, den niemand liest. Sie bleiben deshalb ein *Vorrat*
+  (`indicia.street_candidates`), und sichtbar wird eine erst dort, wo die
+  amtliche `lagebeztxt` eines Kandidaten sie trägt. Dann ist sie eine
+  Eigenschaft dieses Kandidaten, was sie immer war.
+
+Weil der Vorrat nie ungeprüft sichtbar wird, dürfen die Erntenregeln grob
+sein: falsch zu liegen kostet einen Zeichenkettenvergleich, nie ein Flurstück.
+Zwei Regeln halten ihn trotzdem klein, und beide sind grammatisch statt
+aufgezählt — eine Nominalisierung auf `-ung/-heit/-keit/-schaft/-nis/-tion`
+(„Zur Verfügung", „Bei der Planung") und eine kurze Liste von
+Positionssubstantiven („Am Ortsrand"). Von 47 lose geernteten Phrasen bleiben
+19 übrig.
+
+Gemessen am Ende: Straßen-Indizien 8 → 3, und alle drei sind Straßennamen
+(Goethestraße, Siedlungsstraße, Schwarzer Weg). Für 502/47 geht
+`street_match` von 0,05 auf 1,0, und der Kandidat trägt „amtliche Lage: Am
+Kurpark" als Begründung.
