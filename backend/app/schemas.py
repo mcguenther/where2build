@@ -215,6 +215,11 @@ class ListingExtractResponse(BaseModel):
     # model ran, which is the normal case for a listing the deterministic
     # readers settled.
     indizien: list["Indiz"] = Field(default_factory=list)
+    # What the advert states about itself and nothing searches with: the
+    # provider's object id, the availability, the price per square metre.
+    # Shown, and the last of them checked — price over area has to produce it.
+    # German keys, like every other value that crosses this wire.
+    angaben: dict[str, str] = Field(default_factory=dict)
 
 
 # --------------------------------------------------------------------------

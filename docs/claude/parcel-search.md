@@ -1140,3 +1140,25 @@ bedeuten. Gezählt wird jetzt in `AlkisService`, der einzigen Stelle, die weiß,
 ob Bytes hinausgegangen sind; `SearchEngine._requests` liest die Differenz
 seit Laufbeginn. Kalt meldet derselbe Lauf 5, 8 und 7 — jetzt inklusive der
 Umrisse —, warm meldet er **0**.
+
+
+## Was ein Inserat über sich selbst sagt
+
+Drei der fünf „nur zeigen"-Werte aus dem Wertekatalog sind `Label: Wert`-Zeilen
+und damit genau das, wofür die Blockzerlegung aus Stufe 0 gebaut wurde —
+`indicia.stated_values` liest sie über `blocks.labelled` statt mit einem Muster
+je Label. Gemessen über die 16 Anzeigen: **14** tragen eine Anbieter-Objekt-ID,
+**10** eine Verfügbarkeit, **eine** einen Preis je Quadratmeter. Keiner davon
+schärft eine Suche; sie stehen in `ListingExtractResponse.angaben`.
+
+Der Preis je m² verdient seinen Platz doppelt, denn er ist die einzige
+Rechnung, die eine Anzeige gegen sich selbst anbietet: Preis durch Fläche muss
+ihn ergeben. `price_check` sagt nichts, wenn sie stimmt, und nichts, wenn eine
+Zahl fehlt — eine abgeleitete Größe mit fehlender Eingabe wird hier nie
+gerechnet. Stimmt sie nicht, steht ein Satz im `hinweis`. Es ist dieselbe
+Zahl, deren Fehllesart („Kaufpreis pro m²: 92,00 €" als Kaufpreis von 92 €)
+der Modellkanal in `portal_fields` aufgedeckt hat.
+
+Die beiden übrigen Werte der Gruppe — der KI-Hinweis zu den Bildern und
+Belastungen/Bestandsmiete — sind Prosa mit zwei beziehungsweise einem Beleg im
+Korpus und bleiben liegen.

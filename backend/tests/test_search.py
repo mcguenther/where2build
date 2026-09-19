@@ -31,7 +31,9 @@ from app.search.indicia import (
     normalise_parcel_number,
     outside_saxony,
     read_area,
+    price_check,
     read_dimensions,
+    stated_values,
     street_candidates,
 )
 from app.search import distance
@@ -317,6 +319,35 @@ def test_a_stated_frontage_ranks_where_it_cannot_object():
     # It promotes and never demotes: a width nobody can place is still a width
     # somebody paced out.
     assert front_fit(parcel.geometry, 60.0)[0] == 0.05
+
+
+def test_what_an_advert_states_about_itself_is_read_as_pairs():
+    """Object id, availability and price per square metre are „Label: Wert"
+    lines, which is exactly what the block splitter hands over. Measured over
+    the 16 adverts: 14 carry an object id, 10 an availability, one a rate."""
+
+    listing = LISTINGS["3499632623"]
+    stated = stated_values(f"{listing['titel']}\n\n{listing['beschreibung']}")
+    assert stated == {"objekt_id": "PI-1105_n", "verfuegbar_ab": "sofort"}
+    # None of it searches with anything: it is shown, and the rate is checked.
+    borna = LISTINGS["2418686487"]
+    assert stated_values(borna["beschreibung"])["preis_je_m2"] == "92,00 €"
+
+
+def test_price_over_area_has_to_produce_the_stated_rate():
+    """The one arithmetic an advert offers against itself — and the figure
+    whose misreading („Kaufpreis pro m²: 92,00 €" as a price of 92 €) the model
+    channel caught in `portal_fields`."""
+
+    assert price_check({"preis_je_m2": "229,79 €"}, 199_000, 866) is None
+    wrong = price_check({"preis_je_m2": "92,00 €"}, 199_000, 866)
+    assert wrong == (
+        "Die Angaben widersprechen sich: 199.000 € auf 866 m² sind 229,79 € je m², "
+        "das Inserat nennt 92,00 €."
+    )
+    # A derived figure with a missing input is never computed.
+    assert price_check({"preis_je_m2": "92,00 €"}, None, 866) is None
+    assert price_check({}, 199_000, 866) is None
 
 
 def test_an_address_needs_no_suffix():

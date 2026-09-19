@@ -21,7 +21,7 @@ from ..schemas import (
     ListingExtractResponse,
     as_vorschlaege,
 )
-from ..search.indicia import collect_indicia, district_matches
+from ..search.indicia import collect_indicia, price_check, stated_values, district_matches
 from ..services import befund as befund_service
 from ..services import prompts
 from ..services import lehrbuch as lehrbuch_service
@@ -263,6 +263,8 @@ def _answer(
     indizien: list[Indiz] | None = None,
 ) -> ListingExtractResponse:
     text = " ".join(part for part in (titel, beschreibung) if part).strip()
+    stated = stated_values(text)
+    mismatch = price_check(stated, felder.kaufpreis_eur, felder.grundstuecksflaeche_m2)
     try:
         inserat = Inserat(**felder.model_dump(), quelle_url=quelle_url)
     except ValidationError as exc:
@@ -277,10 +279,11 @@ def _answer(
         felder=as_vorschlaege(inserat or felder, InseratVorschlaege, quelle_url),
         quelle_url=quelle_url,
         weg=weg,
-        hinweis=hinweis or titel,
+        hinweis=" ".join(part for part in (hinweis or titel, mismatch) if part) or None,
         beschreibung=text[:_DESCRIPTION_LIMIT] or None,
         bilder=bilder or [],
         indizien=indizien or [],
+        angaben=stated,
     )
 
 

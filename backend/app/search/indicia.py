@@ -1455,6 +1455,80 @@ def _named_as_distant(
     return False
 
 
+# What an advert states about itself as a „Label: Wert" pair, and what none of
+# it may do: none of these narrow a search. Measured 19.09.2026 over the 16
+# recorded adverts — the object id appears 14 times, the availability 10, the
+# price per square metre once — and all three are pairs, which is exactly what
+# the block splitter from Stufe 0 was built to hand over.
+#
+# The price per square metre earns its place twice. It is a line worth showing,
+# and it is a *consistency check*: price over area has to produce it. That is
+# the same figure whose misreading („Kaufpreis pro m²: 92,00 €" as a purchase
+# price of 92 €) the model channel caught in `portal_fields`.
+STATED_LABELS = {
+    "objekt_id": ("anbieter-objekt-id", "objekt-nr", "objektnummer", "objekt-id"),
+    "verfuegbar_ab": ("verfuegbar ab", "bezugsfrei ab", "verfuegbarkeit"),
+    "preis_je_m2": ("kaufpreis pro m", "preis pro m", "kaufpreis je m", "preis je m"),
+}
+
+
+def stated_values(text: str | None) -> dict[str, str]:
+    """What the advert says about itself in its own attribute list.
+
+    Shown and checked, never searched with. Read out of the blocks rather than
+    with a pattern per label: a pair is a pair, and the splitter already knows
+    which lines are one.
+    """
+
+    if not text:
+        return {}
+    pieces = blocks.split_blocks(text)
+    found: dict[str, str] = {}
+    for field, words in STATED_LABELS.items():
+        for block in blocks.labelled(pieces, *words):
+            value = block.text.strip()
+            if value:
+                found[field] = value
+                break
+    return found
+
+
+def price_check(
+    stated: dict[str, str], price_eur: int | None, area_m2: int | None
+) -> str | None:
+    """Whether price, area and the stated rate agree — a German sentence if not.
+
+    The one arithmetic an advert offers against itself. It says nothing when a
+    figure is missing, because a derived number with a missing input is never
+    computed here, and it says nothing when the three agree: a check that
+    speaks when everything is fine is one nobody reads.
+    """
+
+    raw = stated.get("preis_je_m2")
+    if not raw or not price_eur or not area_m2:
+        return None
+    # „92,00 €" carries its unit; `german_number` wants digits alone.
+    digits = re.search(r"\d[\d.,\s]*", raw)
+    rate = german_number(digits.group(0)) if digits else None
+    if rate is None or rate <= 0:
+        return None
+    expected = price_eur / area_m2
+    if abs(expected - rate) / rate <= 0.02:
+        return None
+    return (
+        f"Die Angaben widersprechen sich: {_german(price_eur)} € auf "
+        f"{_german(area_m2)} m² sind {_german(expected, 2)} € je m², "
+        f"das Inserat nennt {raw.strip()}."
+    )
+
+
+def _german(value: float, places: int = 0) -> str:
+    """A number as a German page writes it: dot for thousands, comma for the rest."""
+
+    text = f"{value:,.{places}f}"
+    return text.replace(",", "\x00").replace(".", ",").replace("\x00", ".")
+
+
 def street_candidates(text: str) -> list[str]:
     """Phrases that could be an address, for the cadastre to rule on.
 
@@ -1532,6 +1606,8 @@ def _place_sentence(name: str, relation: Ortsbeziehung | None, count: int) -> st
 
 __all__ = [
     "AreaStatement",
+    "price_check",
+    "stated_values",
     "street_candidates",
     "DOCUMENT_OF",
     "federal_state",
