@@ -572,7 +572,7 @@ pre i{color:var(--muted);font-style:normal}
     </article>
 
     <article class="bs bs--mittel">
-      <div class="bs-kopf"><b>B6 · Zustand</b><span class="bs-grad">mittel</span></div>
+      <div class="bs-kopf"><b>B6 · Zustand</b><span class="bs-grad">teilweise</span></div>
       <h3>Eine Entscheidung startet alles neu</h3>
       <p>Ein Konflikt ist eine Frage an den Nutzer, und die Antwort läuft als
       <code>entscheidungen</code> in einen komplett neuen Lauf. Was der erste Lauf schon
@@ -580,9 +580,13 @@ pre i{color:var(--muted);font-style:normal}
       <p class="beleg">Das Brehna-Inserat kostete elf Anfragen für eine Antwort, die keine
       Anfrage hätte richtig beantworten können. Heute stoppt der Bundesland-Filter das vorher
       — die Anfragen selbst werden aber weiterhin nirgends verbucht.</p>
-      <div class="fix"><b>Vorschlag</b>Ein Lauf führt Buch: jede Bedingung mit ihrer Antwort.
-      Gleiche Bedingung wird nie zweimal gefragt, und eine Entscheidung nimmt nur den
-      betroffenen Zweig wieder auf statt den ganzen Lauf.</div>
+      <div class="fix"><b>Gemessen am 19.09.2026</b>Drei echte Läufe: <em>null</em>
+      Doppelfragen innerhalb eines Laufs, und über Läufe hinweg fängt der Plattencache
+      alles ab — „nie eine Anfrage zweimal“ war längst erfüllt. Kaputt war der Zähler: er
+      stieg bei jedem <em>Aufruf</em>, zählte also Cache-Treffer als Anfragen, und
+      <code>districts_around</code> zählte gar nicht mit. Gemeldet 5, 8, 7 bei 4, 7, 5
+      Aufrufen. Gezählt wird jetzt im Dienst; warm meldet derselbe Lauf 0. Ein Ledger
+      wurde nicht gebaut — es hätte nichts zu tun.</div>
     </article>
 
     <article class="bs bs--hoch">

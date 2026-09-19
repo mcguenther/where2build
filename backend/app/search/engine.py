@@ -242,7 +242,6 @@ class SearchState:
     candidates: list[Flurstueck] = field(default_factory=list)
     outline: KatasterBezirk | None = None
     areas: list[Suchgebiet] = field(default_factory=list)
-    requests: int = 0
     status: SuchStatus = "erfolglos"
     hint: str | None = None
 
@@ -264,6 +263,9 @@ class SearchEngine:
         self.state = SearchState()
         self._area: AreaStatement | None = None
         self._streets: list[str] = []
+        # Where the service's own counter stood when this run began; what it
+        # has added since is what this run asked for. See `_requests`.
+        self._calls_at_start = getattr(alkis, "network_calls", 0)
         # The sentence saying the plot is a piece of a bigger parcel, if any.
         self._part_area: str | None = None
         # The federal state the listing names, when it is not Saxony.
@@ -322,12 +324,25 @@ class SearchEngine:
         return found
 
     async def _count(self, conditions: Sequence[str]) -> int:
-        self.state.requests += 1
         return await self.alkis.count(conditions)
 
     async def _search(self, conditions: Sequence[str], limit: int | None = None) -> list[Flurstueck]:
-        self.state.requests += 1
         return await self.alkis.search(conditions, limit=limit)
+
+    def _requests(self) -> int:
+        """What this run actually asked the cadastre.
+
+        Read off the service rather than counted here, and that is the whole
+        correction. The hand-kept counter said 5 where the run made 4 calls and
+        8 where it made 7: it incremented on a *call*, so an answer served from
+        the disk cache counted as a request, while `districts_around` — which
+        does not go through `_count` or `_search` — was never counted at all.
+        A number every measurement in this project is quoted in has to mean one
+        thing, and the only place that knows whether bytes left the machine is
+        the service.
+        """
+
+        return max(0, self.alkis.network_calls - self._calls_at_start)
 
     # ------------------------------------------------------------------
     # Phase 0 -- gather, and notice contradictions
@@ -622,14 +637,12 @@ class SearchEngine:
         try:
             outline = self._district_outlines.get(key)
             if outline is None or outline.geometry is None:
-                self.state.requests += 1
                 found = await self.alkis.district_outlines([key])
                 outline = next((o for o in found if o.geometry is not None), None)
             if outline is None or outline.geometry is None:
                 return None
             seed = outline.geometry.centroid
             lon, lat = geo.utm33_to_wgs84(seed.x, seed.y)
-            self.state.requests += 1
             built_up = await self.alkis.built_up_area(lat, lon, largest=True)
         except AppError:
             # A band is an ornament on the answer, never the answer. An
@@ -1403,7 +1416,6 @@ class SearchEngine:
         allowed to fail on its own.
         """
 
-        self.state.requests += len(anchors)
         results = await asyncio.gather(
             *(self.alkis.district_outlines(anchor.keys[:MAX_FLUR_OUTLINES]) for anchor in anchors),
             return_exceptions=True,
@@ -1768,7 +1780,6 @@ class SearchEngine:
             self.state.outline = already
             return
         try:
-            self.state.requests += 1
             self.state.outline = await self.alkis.district_outline(key)
         except UpstreamError:
             # A missing wash is a paler map, not a failed search.
@@ -1976,7 +1987,7 @@ class SearchEngine:
                 anzahl=0,
                 text=self._outside_note(),
                 gebiete=self.state.areas or None,
-                anfragen=self.state.requests,
+                anfragen=self._requests(),
             )
             return
 
@@ -2030,7 +2041,7 @@ class SearchEngine:
             text=hint,
             gemarkung_umriss=_geojson(getattr(self.state.outline, "geometry", None)),
             gebiete=self.state.areas or None,
-            anfragen=self.state.requests,
+            anfragen=self._requests(),
         )
 
     async def rank(self) -> AsyncIterator[SuchEreignis]:

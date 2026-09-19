@@ -9,6 +9,7 @@ import respx
 from app.deps import alkis_service
 from app.errors import NotFoundError, UpstreamError
 from app.services.alkis import (
+    equals,
     expand_gemarkung_key,
     parse_feature_collection,
     parse_land_use,
@@ -245,3 +246,32 @@ async def test_built_up_area_is_none_where_nothing_is_recorded():
     )
 
     assert await alkis_service().built_up_area(*KITZEN) is None
+
+
+@respx.mock
+async def test_an_answer_off_the_disk_is_not_a_request():
+    """The run's request count is what the project quotes every measurement in
+    („5 Anfragen ohne, 7 mit"), so it has to mean one thing.
+
+    It did not. The engine incremented a counter on every *call*, so an answer
+    served from the disk cache counted as a request — while `districts_around`,
+    which goes through neither `_count` nor `_search`, was never counted at
+    all. Measured 19.09.2026 on three real runs: reported 5, 8 and 7 against 4,
+    7 and 5 calls, and a fully cached repeat still reported the same numbers
+    although nothing left the machine. Counting moved into the one place that
+    knows whether bytes went out.
+    """
+
+    route = respx.post(ALKIS_URL).mock(
+        return_value=httpx.Response(200, content=fixture_bytes("alkis_hits_eins.xml"))
+    )
+    service = alkis_service()
+    before = service.network_calls
+
+    assert await service.count([equals("gemaschl", "144241")]) == 1
+    assert service.network_calls == before + 1
+
+    # The same question again: answered off the disk, and not a request.
+    assert await service.count([equals("gemaschl", "144241")]) == 1
+    assert service.network_calls == before + 1
+    assert route.call_count == 1

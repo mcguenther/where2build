@@ -580,6 +580,11 @@ class AlkisService:
         self.settings = settings
         self.app_settings = app_settings
         self.cache = DiskCache(app_settings.cache_dir / "alkis", ttl_s=settings.cache_ttl_s)
+        # What actually went to the GeoSN, cache hits excluded. Counted here
+        # rather than at the call sites because only this class knows which
+        # answers came off the disk -- and because a call site that forgets to
+        # count is invisible, which is how `districts_around` went unrecorded.
+        self.network_calls = 0
 
     @property
     def _crs_urn(self) -> str:
@@ -590,6 +595,7 @@ class AlkisService:
         cached = self.cache.get_bytes(cache_key)
         if cached is not None:
             return cached
+        self.network_calls += 1
         response = await request(
             "GET",
             self.settings.wfs_url,
@@ -606,6 +612,7 @@ class AlkisService:
         cached = self.cache.get_bytes(body)
         if cached is not None:
             return cached
+        self.network_calls += 1
         response = await request(
             "POST",
             self.settings.wfs_url,

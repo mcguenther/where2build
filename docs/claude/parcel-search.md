@@ -1108,3 +1108,35 @@ massiver Garage und Einfriedung die Nutzung `Weg;0.00|Landwirtschaft;577`.
 Was es bräuchte, um es zu bauen: aufgezeichnete Anzeigen mit Bebauungssätzen,
 gezielt gesammelt — insbesondere solche über den Nachbarn, über andere Lose
 und über B-Plan-Regeln, weil das die Fälle sind, an denen ein Leser scheitert.
+
+
+## Der Anfragenzähler hat gelogen (B6)
+
+B6 war als Buchführung geplant: „Ein Lauf führt Buch: jede Bedingung mit ihrer
+Antwort. Gleiche Bedingung wird nie zweimal gefragt." Gemessen am 19.09.2026
+an drei echten Läufen gegen ALKIS, und die Messung sagt etwas anderes als
+erwartet.
+
+**Doppelt gefragt wird innerhalb eines Laufs nichts.** Null Wiederholungen in
+drei Läufen (4, 7 und 5 Aufrufe über `_count`/`_search`). Ein Ledger hätte
+nichts zu tun, also gibt es keins — ein Mechanismus ohne gemessenen Nutzen ist
+Code, der nur altert.
+
+**Über Läufe hinweg wird wiederholt, und es kostet nichts.** `_get` und
+`_post` liegen beide hinter `DiskCache`, `_post` mit dem ganzen Anfragerumpf
+als Schlüssel. Die Regel „nie eine Anfrage zweimal" war also längst erfüllt;
+was fehlte, war jemand, der es weiß.
+
+**Was wirklich kaputt war, ist der Zähler.** Er wurde bei jedem *Aufruf* erhöht
+— eine Antwort von der Platte zählte als Anfrage — und `districts_around`
+zählte gar nicht mit, weil es weder durch `_count` noch durch `_search` geht.
+Gemeldet wurden 5, 8 und 7 bei 4, 7 und 5 Aufrufen, und ein vollständig
+gecachter Wiederholungslauf meldete dieselben Zahlen, obwohl nichts die
+Maschine verließ.
+
+Das ist die Zahl, in der jede Messung dieses Projekts angegeben ist („5
+Anfragen ohne, 7 mit", „24 bis 40 Anfragen"), also muss sie eine Sache
+bedeuten. Gezählt wird jetzt in `AlkisService`, der einzigen Stelle, die weiß,
+ob Bytes hinausgegangen sind; `SearchEngine._requests` liest die Differenz
+seit Laufbeginn. Kalt meldet derselbe Lauf 5, 8 und 7 — jetzt inklusive der
+Umrisse —, warm meldet er **0**.
