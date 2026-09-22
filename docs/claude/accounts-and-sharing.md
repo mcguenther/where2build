@@ -267,3 +267,55 @@ server.
   posts nothing and a window that posts and then closes is a race. A sign-in
   that breaks off still lands on the start page with „Die Anmeldung kam nicht
   zustande" — in the small window, which is where it happened.
+
+
+## `create table if not exists` ist keine Migration
+
+Gemessen 19.09.2026 in einem laufenden Stapel. Die Anmeldung klappte, und der
+erste Speicherversuch antwortete 500:
+
+```
+null value in column "kennung" of relation "users" violates not-null constraint
+```
+
+`kennung` kommt in `schema.sql` nicht vor — auch in keiner Fassung der
+Historie. Die Tabelle stammte aus einer anderen Version, und das ist kein
+Zufall: `schema.sql` wird bei jedem Start mit `create table if not exists`
+angewandt, und das **ändert eine vorhandene Tabelle nie**. Das Volume
+`db-data` überlebt `docker compose down`, also bleibt ein einmal angelegtes
+Schema für immer bestehen. Der Kommentar über `SCHEMA_PATH` hatte das
+vorhergesagt („what has to replace it before the first change to a column"),
+und die Grenze ist jetzt überschritten.
+
+Bis es Migrationen gibt, sagt der Start es wenigstens laut. `_check_columns`
+liest nach dem Anwenden des Schemas aus `information_schema`, welche Spalten
+die Datenbank **verlangt** (`not null`, kein Default), und vergleicht sie mit
+denen, die `schema.sql` deklariert. Eine Spalte, die die Datenbank fordert und
+das Schema nicht kennt, bricht jeden `insert` — also bricht sie jetzt den
+Start, mit dem Namen der Spalte und dem Weg heraus.
+
+Was zu tun ist, wenn es auftritt: entweder die Spalte von Hand entfernen
+(`alter table users drop column kennung`) oder, wenn nichts darin gespeichert
+ist, `docker compose down -v` — das wirft die Volumes weg, **mitsamt aller
+gespeicherten Grundstücke**.
+
+## Ein Cache darf keinen Request töten
+
+Im selben Stapel antwortete jeder `/api/listings/extract` mit 500:
+
+```
+PermissionError: [Errno 13] Permission denied: '.cache'
+```
+
+Der Prozess läuft unprivilegiert, `APP_CACHE_DIR=/cache` zeigt auf das
+gemountete Volume — und der Pfad im Fehler ist der relative Standardwert,
+also griff die Einstellung in dem laufenden Image nicht (ein Start ohne
+`--build` reicht dafür). Das ist die eine Hälfte.
+
+Die andere ist schlimmer und unabhängig davon: `DiskCache.get_bytes` hat einen
+`OSError` immer geschluckt, `set_bytes` hat ihn durchgelassen. Das ist die
+falsche Richtung — ein Cache, der nicht lesen kann, ist langsam, und einer,
+der nicht schreiben kann, ist genauso langsam. Stattdessen starb der Request
+**nachdem** das Modell geantwortet hatte: die Arbeit war getan und bezahlt und
+wurde weggeworfen, weil das Ablegen scheiterte. `set_bytes` protokolliert
+jetzt einmal je Verzeichnis und gibt auf.

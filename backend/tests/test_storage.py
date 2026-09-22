@@ -1047,3 +1047,23 @@ def test_the_note_is_withheld_by_a_tuple_and_not_by_four_letters(account: TestCl
     # And the letters are not what got removed either.
     assert stored["name"] == "Wiesenstraße, Großbothen"
     assert account.get(f"/api/shares/{token}").json()["dokument"]["gemarkung"] == "Großbothen"
+
+
+def test_a_column_the_database_demands_and_nobody_fills_is_caught():
+    """`schema.sql` is applied with `create table if not exists`, which does
+    nothing to a table that already exists — and the volume outlives
+    `docker compose down`.
+
+    Measured 19.09.2026 in a running stack: a `users` table carried a
+    `kennung` column, not null and with no default, that this code has never
+    written. Sign-in worked; the first attempt to store a plot answered 500.
+    """
+
+    from app.services.storage import SCHEMA_PATH, declared_columns
+
+    declared = declared_columns(SCHEMA_PATH.read_text(encoding="utf-8"))
+    assert declared["users"] == {"id", "issuer", "subject", "anzeigename", "angelegt"}
+    # A constraint line is not a column.
+    assert "unique" not in declared["users"] and "primary" not in declared["users"]
+    # Every table the schema creates is found, so the check cannot miss one.
+    assert set(declared) == {"users", "plots", "freigaben", "settings", "abweichungen"}

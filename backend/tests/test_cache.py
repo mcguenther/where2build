@@ -65,3 +65,25 @@ def test_clear_removes_everything(tmp_path: Path):
     cache.clear()
 
     assert cache.get_bytes("key") is None
+
+
+def test_a_cache_that_cannot_write_does_not_fail_the_request(tmp_path):
+    """`get_bytes` has always swallowed an OSError and `set_bytes` did not,
+    which is the wrong way round.
+
+    Measured 19.09.2026 in the compose stack: the backend runs unprivileged and
+    its cache directory was not the one the volume is mounted at, so every
+    `/api/listings/extract` answered 500 with a PermissionError — *after* the
+    model had answered. The work was done and paid for and thrown away because
+    storing it failed.
+    """
+
+    blocked = tmp_path / "nogo"
+    blocked.write_text("a file where a directory would have to be")
+    cache = DiskCache(blocked / "llm")
+
+    cache.set_json("k", {"a": 1})  # must not raise
+    assert cache.get_json("k") is None
+    # And again: the second write is as quiet as the first.
+    cache.set_json("k2", {"b": 2})
+    assert cache.get_json("k2") is None
