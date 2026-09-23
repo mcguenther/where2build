@@ -196,33 +196,42 @@
      itself and only carries a cursor; hiding it prints an empty envelope. */
   .plan-hint{ display: none !important; }
 
-  /* ---------- The location sheet ----------
-     Not two columns. The plot sheet puts the plan beside its figures because
+  /* ---------- The location record ----------
+     Not two columns. The plan sheet puts the plan beside its figures because
      both are short; here the record runs to eleven checks and the map is one
      picture, so side by side leaves half a page of white under the map. The
      map goes across the top, the record flows beneath it. */
-  .location-grid{
-    display: grid !important;
-    grid-template-columns: 1fr !important;
+  .location{
+    display: block !important;
     break-inside: auto;
   }
-  /* The map first, as on the plot sheet: it is what says where this is. */
-  .location-grid__map{
-    order: -1 !important;
+  .location__map{
     position: static !important;
     border: .6pt solid #000 !important;
     border-radius: 0;
     margin-bottom: 4mm;
     break-inside: avoid;
   }
-  /* Without a cap the map takes 130 mm of the first sheet on its own. */
-  .location-grid__map svg{ max-height: 85mm; width: auto; margin: 0 auto; display: block; }
+  /* Without a cap the map takes 130 mm of the sheet on its own. */
+  .location__map svg{ max-height: 85mm; width: auto; margin: 0 auto; display: block; }
 
-  /* Two columns for the checks: at full width each row is one short line above
-     a lot of empty paper, and the sheet grows by a page for nothing. */
-  .checks__list{ column-count: 2; column-gap: 6mm; }
-  .location-grid__facts, .checks{ break-inside: auto; }
-  .check{ break-inside: avoid; }
+  /* Every group, the folded ones too: paper has nothing to click, and a sheet
+     that left out what was found clean would read as one that found less. Two
+     columns, because at full width each card is one short line above a lot of
+     empty paper. */
+  .checks__group--folded{ display: block !important; }
+  .checks__cards{ display: block !important; column-count: 2; column-gap: 6mm; }
+  .checks, .checks__group{ break-inside: auto; }
+  .check{ break-inside: avoid; margin-bottom: 3mm; }
+  /* The status band is a surface; the bar on the left and the mark keep the
+     verdict on paper without filling it. */
+  .check__head, .tally{ background: none !important; }
+  .tally{ padding: 0 6pt 0 0 !important; }
+
+  /* The folded panels are figures of this sheet like any other. */
+  .fold::details-content{ content-visibility: visible !important; }
+  .fold > .fold__head::after, .fold__summary{ display: none !important; }
+  .fold:not([open]) > .fold__head{ border-bottom: .8pt solid #000 !important; }
 
   /* The disclosure holds the soil map's own wording — evidence for the
      sentence above it, and paper has nothing to click. Chromium wraps the

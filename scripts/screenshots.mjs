@@ -167,9 +167,11 @@ const PASTED_PAGE = readFileSync(
 /* The map reports when every tile for the current view has arrived. A tile
  * that 502s never lets it, and a whole screenshot run must not hang on one --
  * so the wait is bounded and says what it settled for. */
-async function mapSettled(page, what) {
+async function mapSettled(page, what, within = "") {
+  // Scoped when a page carries more than one map: the first ready one anywhere
+  // may be a different map from the one about to be photographed.
   try {
-    await page.waitForSelector('[data-map-ready="true"]', { timeout: 45000 });
+    await page.waitForSelector(`${within} [data-map-ready="true"]`.trim(), { timeout: 45000 });
   } catch {
     problems.push(`${what}: Kartenkacheln kamen nicht vollständig an`);
     await page.waitForTimeout(2000);
@@ -212,6 +214,18 @@ async function shot(page, name, mode, zusatz = "") {
   if (overflow > 1) problems.push(`${name}/${mode}: ${overflow}px waagerechter Überlauf`);
   const file = `${name}-${mode}${zusatz}.png`;
   await page.screenshot({ path: resolve(outDir, file), fullPage: true });
+  taken.push(file);
+}
+
+/** One section of a page rather than all of it — for a part that lives far
+ *  down a long page, where a full-page picture is mostly everything else. */
+async function shotOf(page, selector, name, mode, zusatz = "") {
+  await page.waitForTimeout(340);
+  const overflow = await page.evaluate(() =>
+    document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  if (overflow > 1) problems.push(`${name}/${mode}: ${overflow}px waagerechter Überlauf`);
+  const file = `${name}-${mode}${zusatz}.png`;
+  await page.locator(selector).screenshot({ path: resolve(outDir, file) });
   taken.push(file);
 }
 
@@ -382,30 +396,39 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
   await page.getByRole("button", { name: "Schließen" }).click();
 
   if (!narrow) {
-    await page.getByRole("button", { name: "Luftbild" }).click();
+    // The plan's own ground: the location map further down has the same
+    // buttons, and an unscoped name would match both.
+    const ground = page.locator('[aria-label="Kartenhintergrund"]');
+    await ground.getByRole("button", { name: "Luftbild" }).click();
     await page.waitForTimeout(4000);
     await shot(page, "grundstueck-luftbild", mode);
-    await page.getByRole("button", { name: "Karte" }).click();
+    await ground.getByRole("button", { name: "Karte" }).click();
     await page.waitForTimeout(2000);
   }
 
-  /* The location record: eleven checks against the authority services, asked
-   * with the parcel outline. Waited on either outcome — with no backend on
-   * :8000 the list shows the German failure sentence, and that is a state
-   * worth photographing too. */
-  await page.getByRole("link", { name: "Standort prüfen" }).click();
-  await page.waitForSelector(".checks__list, .checks .notice--error", { timeout: 90000 });
-  await page.waitForTimeout(3000);
-  await shot(page, "standort", mode, narrow ? "-schmal" : "");
-  if (!narrow) {
-    // The noise layer over the ground: the one raster in this app that does
-    // not come from a WMS, because that service speaks no Web Mercator.
-    await page.getByRole("button", { name: "Lärm" }).click();
-    await mapSettled(page, `${mode}/${width} Lärmschleier`);
-    await shot(page, "standort-laerm", mode);
+  /* The location record, a section of the plot page: eleven checks against the
+   * authority services, asked with the parcel outline, beside a small map with
+   * the noise layer on — the one raster in this app that does not come from a
+   * WMS, because that service speaks no Web Mercator. Waited on either
+   * outcome: with no backend on :8000 the list shows the German failure
+   * sentence, and that is a state worth photographing too. `.check` and not
+   * `.checks__cards`, which the placeholders carry as well. */
+  await page.locator("#standort").scrollIntoViewIfNeeded();
+  await page.waitForSelector("#standort .check, #standort .checks .notice--error", { timeout: 90000 });
+  await mapSettled(page, `${mode}/${width} Standortkarte`, "#standort");
+  await shotOf(page, "#standort", "standort", mode, narrow ? "-schmal" : "");
+  if (!narrow && await page.locator("#standort .checks__more button").count()) {
+    await page.locator("#standort .checks__more button").click();
+    await shotOf(page, "#standort", "standort-alle", mode);
+    await page.locator("#standort .checks__more button").click();
   }
-  await page.click(".breadcrumb a:nth-child(3)");
-  await page.waitForSelector(".plot-page", { timeout: 20000 });
+  // The two panels that start folded, opened: what they hold has to read too.
+  if (!narrow) {
+    await page.locator("details.fold > summary").evaluateAll(heads => heads.forEach(h => h.click()));
+    await shotOf(page, ".facts", "grundstueck-form", mode);
+    await shotOf(page, ".tools", "grundstueck-abstaende", mode);
+    await page.locator("details.fold > summary").evaluateAll(heads => heads.forEach(h => h.click()));
+  }
 
   /* The point of the addresses: the plot has one of its own, and reloading it
    * comes back to the same page instead of the overview. This is also what
@@ -508,7 +531,11 @@ await page.goto(address, { waitUntil: "load" });
 await page.evaluate(() => document.fonts.ready);
 await addPlot(page);
 await page.getByRole("button", { name: "Anlegen und öffnen" }).click();
-await page.waitForTimeout(6000);
+/* The location record is part of this sheet now, and eleven checks are taller
+   than one page — the PDF is what shows whether the breaks land between cards.
+   Its answer takes longer than the rest of the page, so it is waited for. */
+await page.waitForSelector("#standort .check, #standort .checks .notice--error", { timeout: 90000 });
+await page.waitForTimeout(3000);
 await page.emulateMedia({ media: "print" });
 await page.waitForTimeout(300);
 await page.screenshot({ path: resolve(outDir, "grundstueck-druck.png"), fullPage: true });
@@ -517,19 +544,6 @@ taken.push("grundstueck-druck.png");
 await page.pdf({ path: resolve(outDir, "grundstueck-druck.pdf"), format: "A4", preferCSSPageSize: true });
 taken.push("grundstueck-druck.pdf");
 
-/* And the location sheet, which prints the other way round — the record leads,
-   the map follows it. Eleven checks are taller than one page, so the PDF is
-   the part that shows whether the breaks land between rows. */
-await page.emulateMedia({ media: null });
-await page.getByRole("link", { name: "Standort prüfen" }).click();
-await page.waitForSelector(".checks__list, .checks .notice--error", { timeout: 90000 });
-await page.waitForTimeout(2000);
-await page.emulateMedia({ media: "print" });
-await page.waitForTimeout(300);
-await page.screenshot({ path: resolve(outDir, "standort-druck.png"), fullPage: true });
-taken.push("standort-druck.png");
-await page.pdf({ path: resolve(outDir, "standort-druck.pdf"), format: "A4", preferCSSPageSize: true });
-taken.push("standort-druck.pdf");
 await ctx.close();
 
 /* The administration area, which needs somebody signed in *and* administering.

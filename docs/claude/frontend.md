@@ -295,3 +295,31 @@ that collapsed at 390 px. None of them threw.
   Aufgefallen an einer Test-Attrappe, die für unbekannte Pfade `{}` liefert —
   also genau an dem Fall, den ein echter Server nach einem Teil-Ausfall auch
   liefert.
+
+- **Two keys of the same name in one `watch` object are one watcher, and the
+  last one wins without a word.** `PlotView` had `"plot.id"()` twice — one
+  that routed the next plot, one that fetched its neighbour outlines — and an
+  object literal keeps only the second. Stepping with „Nächstes ›" therefore
+  never routed the plot it arrived at; nothing threw, the route cards simply
+  stayed empty until somebody pressed „Neu berechnen". Found while adding a
+  third thing that has to happen on the same change. One watcher now does all
+  of it; a linter's `no-dupe-keys` would have said so on day one.
+
+- **The location record is a section of the plot page, not a page.** It
+  repeated the parcel and the land value from the plot page next to it, and
+  its one own figure — the note that the Bodenrichtwert applies to a notional
+  reference plot — now sits in the Preis panel. `/grundstueck/:id/standort`
+  redirects to `#standort`, and `scrollBehavior` follows a hash. The checks
+  open with the gravest group that has a member (`zu beachten`, else `ohne
+  Befund`, else `offen`) and fold the rest behind a button that says how many;
+  the folded groups are rendered and only hidden, so the print sheet opens
+  them all. A second `SitePlan` on the page is fine — its SVG ids carry a
+  per-instance `uid` — but its ground and noise switches have their own names
+  (`aria-label="Hintergrund der Standortkarte"`), because the screenshot run
+  finds buttons by name and Playwright refuses a name that matches twice.
+
+- **A panel that is only needed for the odd plot starts folded, and its
+  summary line still answers the first question.** Form and Abstandsflächen
+  are `details.fold` with the verdict or the depths beside the title
+  („rechteckig · 1 : 1,42", „3,0 m ringsum"), so a closed one is not a blank.
+  `print.css` opens them through `::details-content`, like the soil wording.

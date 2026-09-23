@@ -9,6 +9,7 @@
       'site-plan--dragging': dragging,
       'site-plan--measuring': measuring,
       'site-plan--navigable': navigable && !measuring,
+      'site-plan--cooperative': cooperative,
       'site-plan--panning': panning
     }"
     :viewBox="`0 0 ${width} ${height}`"
@@ -305,6 +306,11 @@ export default {
     showBuilding: { type: Boolean, default: true },
     /** Let the pointer pan and the wheel zoom the framing, backdrop included. */
     navigable: { type: Boolean, default: false },
+    /** The plan sits in the middle of a long page, and the page has to keep
+     *  scrolling across it: the wheel zooms only with Ctrl or ⌘ held (a
+     *  trackpad pinch arrives as exactly that), and a vertical swipe scrolls
+     *  the page instead of panning. */
+    cooperative: { type: Boolean, default: false },
     /** Per-segment depths a neighbouring building's own minimum would ask for.
      *  Absent, or equal to the statutory ones, and nothing extra is drawn. */
     neighbourDepths: { type: Array, default: null },
@@ -925,6 +931,7 @@ export default {
     /** Zoom towards the cursor: the metre under it stays where it is. */
     onWheel(event) {
       if (!this.navigable || this.measuring) return;
+      if (this.cooperative && !event.ctrlKey && !event.metaKey) return;
       event.preventDefault();
       const next = clamp(this.zoomFactor * Math.exp(-event.deltaY * 0.0015), MIN_ZOOM, MAX_ZOOM);
       if (next === this.zoomFactor) return;
@@ -995,6 +1002,7 @@ export default {
 .site-plan{ display: block; width: 100%; height: auto; touch-action: none; position: relative; }
 .site-plan--dragging{ cursor: grabbing; }
 .site-plan--navigable{ cursor: grab; }
+.site-plan--cooperative{ touch-action: pan-y; }
 .site-plan--panning{ cursor: grabbing; }
 .site-plan--measuring{ cursor: crosshair; }
 .site-plan__dimension--measuring{ fill: var(--w2b-map-violation); }
