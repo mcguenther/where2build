@@ -37,6 +37,12 @@
     <rect v-if="!hasBackdrop" x="0" y="0" :width="width" :height="height" :fill="backgroundFill" />
 
     <g :transform="`rotate(${rotation}, ${width / 2}, ${height / 2})`">
+      <g v-if="groundTiles.length" class="site-plan__tile-ground"
+         :class="{ 'site-plan__tile-ground--dark': darkBackdrop }" aria-hidden="true">
+        <image v-for="tile in groundTiles" :key="tile.key" :href="tile.href"
+               :x="tile.x" :y="tile.y" :width="tile.size" :height="tile.size"
+               preserveAspectRatio="none" />
+      </g>
 
       <polygon :points="path(plot.polygon)" fill="var(--w2b-map-surface)"
                :fill-opacity="hasBackdrop ? 0.42 : 1" />
@@ -193,11 +199,12 @@
 <script>
 import {
   buildableArea, polygonEdges, rectangleCorners, pointInPolygon,
-  closestBoundaryPoint, boundingBox, alignmentToEdge, asCounterClockwise,
+  closestBoundaryPoint, streetDownRotation, turnedBox, asCounterClockwise,
   minimumRotatedRectangleCorners, constrainToEnvelope, hasNeighbourHint,
   polygonCentroid
 } from "../lib/geometry.js";
-import { cameraFor, toLocal, toWgs84 } from "../lib/projection.js";
+import { cameraFor, metresPerDegreeLon, toLocal, toWgs84 } from "../lib/projection.js";
+import { tileCover, tileUrl } from "../lib/routes.js";
 import { outerRing } from "../lib/plots.js";
 import { num, area } from "../lib/format.js";
 import { BACKDROPS, canRenderMap, withOverlay } from "../lib/basemap.js";
@@ -281,6 +288,15 @@ export default {
     /** A raster layer laid over the backdrop — today the noise survey. Needs a
      *  backdrop under it: the bands are translucent and mean nothing on paper. */
     overlay: { type: String, default: null },
+    /** A proxied raster layer drawn as plain <image> tiles under the plot —
+     *  the ground a thumbnail gets instead of a MapLibre backdrop. Several
+     *  cards on one page would each start a WebGL context otherwise, and
+     *  contexts past the browser's limit go blank without a word. */
+    tileGround: { type: String, default: null },
+    /** Relative breathing room around the outline, overriding the default.
+     *  A thumbnail that shows its neighbours needs more than one that
+     *  shows the plot alone. */
+    padding: { type: Number, default: null },
     /** Keep the camera where it is when the plot changes. Picking another
      *  parcel is a change the user has to *see*: a drawing that re-centres on
      *  the new outline looks the same before and after, and the neighbours
@@ -345,13 +361,12 @@ export default {
     /** Dimension chains are noise at thumbnail size. */
     dimensionsVisible() { return this.showDimensions && !this.compact; },
     /* Real outlines arrive already oriented: local +y is north. "Genordet"
-       therefore means no rotation, and "straßenparallel" turns the drawing by
-       the angle of the street front. */
+       therefore means no rotation, and "straßenparallel" turns the drawing so
+       the street front runs left to right along the bottom — the way one
+       stands on the pavement looking at the plot. */
     rotation() {
       if (this.northUp) return 0;
-      // Normalised to (-90°, 90°]: the raw edge angle would turn the plan upside
-      // down whenever the ring happens to run the other way round the boundary.
-      return alignmentToEdge(this.plot.polygon, this.plot.streetEdge ?? 0);
+      return streetDownRotation(this.plot.polygon, this.plot.streetEdge ?? 0);
     },
     northAngle() { return this.rotation; },
     /** Whether a backdrop is *wanted*: one that is not "none", and an anchor
@@ -362,6 +377,34 @@ export default {
      *  was fetched again, forever. */
     wantsBackdrop() { return this.backdrop !== "none" && Boolean(this.plot.anchor); },
     hasBackdrop() { return this.wantsBackdrop && !this.mapUnavailable; },
+    /** Raster tiles under the drawing, placed in the rotated group so they
+     *  turn with it. Local metres and Web Mercator share one scale factor
+     *  around the anchor, which is what makes this a linear map. The cover is
+     *  asked for the frame's diagonal on every side, since a turned drawing
+     *  shows ground from beyond the unturned frame's corners. */
+    groundTiles() {
+      if (!this.tileGround || this.hasBackdrop || !this.plot.anchor) return [];
+      const { lat, lon } = this.plot.anchor;
+      const radians = Math.PI / 180;
+      const metresPerUnit = metresPerDegreeLon(lat) / radians;
+      const scale = this.view.scale * metresPerUnit;
+      const phi = lat * radians;
+      const pad = Math.hypot(this.width, this.height) / 2;
+      const padX = pad - this.width / 2, padY = pad - this.height / 2;
+      const fit = {
+        scale,
+        dx: this.width / 2 - this.view.mx * this.view.scale - lon * radians * scale + padX,
+        dy: this.height / 2 + this.view.my * this.view.scale
+          + Math.log(Math.tan(Math.PI / 4 + phi / 2)) * scale + padY
+      };
+      const cover = tileCover(fit, 2 * pad, 2 * pad);
+      if (!cover) return [];
+      // A hair of overlap, or the antialiased tile edges draw a lattice.
+      return cover.tiles.map(tile => ({
+        key: tile.key, href: tileUrl(tile, this.tileGround),
+        x: tile.left - padX, y: tile.top - padY, size: tile.size + 0.6
+      }));
+    },
     backgroundFill() { return this.backdrop === "aerial" ? "var(--w2b-map-green)" : "var(--w2b-map-ground)"; },
     /** Which palette the vector backdrop should be drawn in. Deliberately not
      *  a function of whether the last build succeeded — see `rebuildMap`. */
@@ -439,7 +482,7 @@ export default {
        label — and therefore how much frame the outer rings need. It never reads
        that reserve back, so the two do not chase each other: reserving in
        metres did, and shrank a 35 m plot to a third of its frame. */
-    trialScale() { return this.fitBox(boundingBox(this.plot.polygon), this.baseMargin); },
+    trialScale() { return this.fitBox(turnedBox(this.plot.polygon, this.rotation), this.baseMargin); },
 
     /** Whether a chain per boundary segment can still be read on this outline. */
     edgesLabelled() { return this.ccwPolygon.length <= MAX_LABELLED_EDGES; },
@@ -488,14 +531,16 @@ export default {
          of them instead put 33 parcels across 200 m: the neighbours became
          specks, and their numbers floated in empty paper. A band, not a factor,
          because the width that matters is a neighbour's, not this plot's. */
-      const box = this.parcels?.length
-        ? grow(boundingBox(this.plot.polygon), CHOICE_BAND_M)
-        : boundingBox(this.plot.polygon);
+      /* The box is the one the plot has on screen, turned to its street: the
+         drawing rotates about the frame's centre, so that box's centre is the
+         point the frame centres on and its size is what has to fit. */
+      const turned = turnedBox(this.plot.polygon, this.rotation);
+      const box = this.parcels?.length ? grow(turned, CHOICE_BAND_M) : turned;
       /* A caller that hands us a scale is drawing several plots side by side
          and needs them comparable, so its value wins over our own fit. It is
          the smallest of the individual fits, so nothing overflows its frame. */
       const scale = Number.isFinite(this.scale) && this.scale > 0 ? this.scale : this.fitBox(box, this.margin);
-      return { scale, mx: (box.minX + box.maxX) / 2, my: (box.minY + box.maxY) / 2 };
+      return { scale, mx: turned.centre.x, my: turned.centre.y };
     },
     /** The fit as the user has moved it. Everything projects through this —
      *  `px`/`py` for the drawing and `setCamera` for the ground — so the two
@@ -792,7 +837,7 @@ export default {
       /* The relative padding is breathing room around the outline. Once a ring
          of chains is reserved in the margin, that ring *is* the breathing room,
          and keeping both spends the frame twice. */
-      const padding = this.dimensionsVisible ? 0.02 : 0.16;
+      const padding = this.padding ?? (this.dimensionsVisible ? 0.02 : 0.16);
       let bw = box.width * (1 + padding * 2);
       let bh = box.height * (1 + padding * 2);
       const aspect = (this.width - margin * 2) / (this.height - margin * 2);
@@ -959,6 +1004,12 @@ export default {
 </script>
 
 <style scoped>
+/* The tile ground is context, not subject: grey, and multiplied into the paper
+   so the service's white falls away and only its line work is left. The plot's
+   own opaque fill then sits above it as the one light, coloured shape. In the
+   dark theme the render is inverted first, or it would be a pale sheet. */
+.site-plan__tile-ground{ opacity: .42; filter: grayscale(1); mix-blend-mode: multiply; }
+.site-plan__tile-ground--dark{ opacity: .45; filter: invert(1) grayscale(1); mix-blend-mode: screen; }
 /* The parcels on offer. Deliberately quiet: the plot itself keeps the halo and
    the drawn contour, and a candidate is a thin outline with its number — a
    choice, not a finding. */

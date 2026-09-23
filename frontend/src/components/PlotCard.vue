@@ -7,7 +7,7 @@
     </label>
 
     <button type="button" class="plot-card__plan" :aria-label="`Lageplan ${plot.name} öffnen`" @click="$emit('open')">
-      <SitePlan :plot="plot" :building="building" :width="300" :height="196" compact />
+      <PlotThumbnail :plot="plot" />
     </button>
 
     <div class="plot-card__body">
@@ -44,14 +44,14 @@
 </template>
 
 <script>
-import SitePlan from "./SitePlan.vue";
+import PlotThumbnail from "./PlotThumbnail.vue";
 import { plotMetrics } from "../lib/metrics.js";
-import { placement, state, destinationName } from "../lib/store.js";
+import { state, destinationName } from "../lib/store.js";
 import { area, euro, euroPerSqm, percent, duration } from "../lib/format.js";
 
 export default {
   name: "PlotCard",
-  components: { SitePlan },
+  components: { PlotThumbnail },
   // `selectable` defaults to true so the card on its own is complete; the list
   // switches it off outside comparison mode, where a plot is opened, not ticked.
   props: {
@@ -61,7 +61,6 @@ export default {
   },
   emits: ["open", "remove", "select"],
   computed: {
-    building() { return placement(this.plot); },
     metrics() { return plotMetrics(this.plot); },
     firstDestination() { return state.data.destinations[0] || null; },
     firstDestinationTime() {

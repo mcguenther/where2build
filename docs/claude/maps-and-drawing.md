@@ -182,3 +182,31 @@ routines under it.
   an unhandled rejection against whichever test file happened to be running.
   `canRenderMap()` is asked first now. It is not only a test concern: a browser
   with WebGL switched off did the same thing.
+
+- **„Straßenparallel" put the street on top for half the plots.**
+  `alignmentToEdge` normalises to (-90°, 90°] so a *house* is never turned more
+  than a quarter; used for the drawing, it made the street edge horizontal and
+  left whether the street sat above or below to the winding of the cadastral
+  ring. The fixture plot `plot-concave` came out exactly 180° wrong and the old
+  test passed, because it compared against the same function.
+  `streetDownRotation` turns the edge's own direction to east on a
+  counter-clockwise ring (the interior is on its left, so above) and returns
+  (-180°, 180°]. Keep `alignmentToEdge` for the footprint.
+
+- **Fit the turned box, not the north-up one.** The drawing rotates about the
+  frame's centre, so the fit has to measure the outline *as turned*
+  (`turnedBox`): framing the unturned box let a long plot at 45° run off a
+  thumbnail once it lay flat along its street, and gave a diamond the frame of
+  a square half again as wide.
+
+- **A thumbnail's ground is `<image>` tiles, and one component draws it.**
+  `PlotThumbnail` is the only small plan — cards and the comparison both use
+  it — and it takes the `umgebung` layer (the web atlas without its lettering)
+  through `SitePlan`'s `tileGround` prop, the same way route cards do, so a list
+  of twenty plots starts no WebGL context. Measured over Liebertwolkwitz at z18:
+  the ALKIS render draws parcel numbers and boundary points at full size, and
+  the plain web atlas writes street names, which stand on their heads once the
+  thumbnail is turned by more than a quarter. The tile cover is asked for the
+  frame's diagonal on every side, since a turned drawing shows ground from past
+  the unturned frame's corners. Local metres and Web Mercator share one scale
+  factor around the anchor, so the placement is linear.

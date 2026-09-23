@@ -63,7 +63,7 @@
         <div class="plan-figures">
           <figure v-for="p in selectedPlots" :key="p.id" class="plan-figure">
             <button type="button" class="plan-figure__button" :aria-label="`${p.name} öffnen`" @click="open(p.id)">
-              <SitePlan :plot="p" :building="building(p)" :width="220" :height="280" :scale="sharedScale" compact />
+              <PlotThumbnail :plot="p" :width="220" :height="280" :scale="sharedScale" />
             </button>
             <figcaption>
               <span>{{ p.gemarkung }}</span>
@@ -81,22 +81,21 @@
 </template>
 
 <script>
-import SitePlan from "../components/SitePlan.vue";
-import { state, placement, destinationName } from "../lib/store.js";
+import PlotThumbnail from "../components/PlotThumbnail.vue";
+import { state, destinationName } from "../lib/store.js";
 import { plotMetrics } from "../lib/metrics.js";
-import { fitScale } from "../lib/geometry.js";
+import { sharedThumbnailScale } from "../lib/thumbnail.js";
 import { area, euro, euroPerSqm, percent, num, duration } from "../lib/format.js";
 
 export default {
   name: "CompareView",
-  components: { SitePlan },
+  components: { PlotThumbnail },
   computed: {
     selectedPlots() { return state.data.plots.filter(p => state.data.selection.includes(p.id)); },
     /** The smallest of the individual fits, so the largest plot still fits and
      *  every drawing shares one scale — which is what the panel claims. */
     sharedScale() {
-      if (!this.selectedPlots.length) return null;
-      return Math.min(...this.selectedPlots.map(p => fitScale(p.polygon, 220, 280, 6)));
+      return sharedThumbnailScale(this.selectedPlots, 220, 280);
     },
     scaleDenominator() {
       // A CSS pixel is about 0.2646 mm; the drawing renders near its viewBox width.
@@ -114,7 +113,6 @@ export default {
     destinationName,
     area, euro, euroPerSqm, percent, num,
     metrics(plot) { return plotMetrics(plot); },
-    building(plot) { return placement(plot); },
     /** One mode's travel time to one destination, or a dash when the routing
      *  service found nothing. Modes are addressed by name — the mockup's
      *  positional array is gone. */
