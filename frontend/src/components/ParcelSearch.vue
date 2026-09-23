@@ -32,7 +32,8 @@
       </div>
       <p v-if="optionsOf(conflict).some(o => o.bild_url)" class="konflikt__fussnote">
         Auf einem Katasterauszug stehen die Nummern der Nachbarflurstücke mit auf der
-        Karte. Gelesen wird nur die beschriftete Angabe im Kopf des Auszugs; steht dort
+        Karte. Gelesen wird nur die beschriftete Angabe im Kopf des Auszugs oder die
+        Nummer in einem roten Rahmen, den der Anbieter eingezeichnet hat; steht dort
         mehr als eine, entscheidet das Bild.
       </p>
     </section>

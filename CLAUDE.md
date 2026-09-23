@@ -254,11 +254,11 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 785 passed, 60 skipped. With `TEST_DATABASE_URL` pointed at a
+- `pytest`: 797 passed, 60 skipped. With `TEST_DATABASE_URL` pointed at a
   real Postgres the account store and the administration area run too; they are
   skipped rather than mocked because what they check is the database's own
   behaviour. Of the rest, one needs pyosmium, which only the index builder
-  wants, and seven need Tesseract — this sandbox has it, and for that reason
+  wants, and twelve need Tesseract — this sandbox has it, and for that reason
   never run two suites at once here. Three Tesseract tests failed on a run
   sharing the machine with another pytest, and they failed exactly as a
   photograph of a lawn does: an empty reading, past the 30 s timeout.
