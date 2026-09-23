@@ -609,29 +609,44 @@ describe("Die Suchansicht", () => {
       expect(outcome.kandidaten).toHaveLength(2);
     });
 
-    it("schwenkt beim Klick auf die Zeile dorthin, ohne zu wählen", async () => {
+    it("zeigt Kacheln statt einer Tabelle, jede mit ihrem Bild", async () => {
+      const { wrapper } = await openAmbiguous();
+
+      expect(wrapper.find("table.kandidaten").exists()).toBe(false);
+      const cards = wrapper.findAll(".vorschlag");
+      expect(cards).toHaveLength(2);
+      cards.forEach((card, i) => {
+        const props = outcome.kandidaten[i].properties;
+        expect(card.text()).toContain(props.flurstuecksnummer);
+        expect(card.text()).toContain(props.gemarkung);
+        expect(card.find(".vorschlag__bild svg path").attributes("d")).toMatch(/^M/);
+        // The photo and, this close in, the cadastre over it.
+        expect(card.findAll("image").some(i => i.attributes("href").includes("/dop/"))).toBe(true);
+        expect(card.findAll("image").some(i => i.attributes("href").includes("/liegenschaftskarte/"))).toBe(true);
+      });
+    });
+
+    it("schwenkt beim Klick auf das Kachelbild dorthin, ohne zu wählen", async () => {
       const { wrapper, map } = await openAmbiguous();
       const second = outcome.kandidaten[1];
 
-      await wrapper.findAll(".kandidaten tbody tr")[1].trigger("click");
+      await wrapper.findAll(".vorschlag__bild")[1].trigger("click");
 
       expect(map.vm.focusCandidate).toHaveBeenCalledWith(second.geometry);
       expect(map.props("highlighted")).toEqual(second.geometry);
       expect(map.props("shown")).toBe(second.id);
       // Looking at a candidate must not change the answer.
       expect(map.props("chosen")).toBeNull();
-      expect(wrapper.find(".kandidaten--gezeigt").exists()).toBe(true);
-      expect(wrapper.find(".kandidaten--gewaehlt").exists()).toBe(false);
+      expect(wrapper.find(".vorschlag--gezeigt").exists()).toBe(true);
+      expect(wrapper.find(".vorschlag--gewaehlt").exists()).toBe(false);
     });
 
     it("hat neben „Wählen“ einen Knopf, der nur dorthin schwenkt", async () => {
       const { wrapper, map } = await openAmbiguous();
-      const row = wrapper.findAll(".kandidaten tbody tr")[0];
-      const show = row.findAll("button").find(b => b.text() === "Zeigen");
+      const card = wrapper.findAll(".vorschlag")[0];
 
-      await show.trigger("click");
+      await card.findAll("button").find(b => b.text() === "Zeigen").trigger("click");
 
-      // Once, not twice: the row's own handler must not fire as well.
       expect(map.vm.focusCandidate).toHaveBeenCalledTimes(1);
       expect(map.vm.focusCandidate).toHaveBeenCalledWith(outcome.kandidaten[0].geometry);
       expect(map.props("chosen")).toBeNull();
@@ -639,19 +654,20 @@ describe("Die Suchansicht", () => {
 
     it("wählt mit „Wählen“ und schwenkt dabei mit", async () => {
       const { wrapper, map } = await openAmbiguous();
-      const row = wrapper.findAll(".kandidaten tbody tr")[1];
+      const card = wrapper.findAll(".vorschlag")[1];
 
-      await row.findAll("button").find(b => b.text() === "Wählen").trigger("click");
+      await card.findAll("button").find(b => b.text() === "Wählen").trigger("click");
 
       expect(map.props("chosen")).toBe(outcome.kandidaten[1].id);
       expect(map.vm.focusCandidate).toHaveBeenCalledTimes(1);
-      expect(row.text()).toContain("Gewählt");
+      expect(card.text()).toContain("Gewählt");
+      expect(card.classes()).toContain("vorschlag--gewaehlt");
     });
 
-    it("nummeriert die Zeilen so, wie die Karte die Flurstücke beschriftet", async () => {
+    it("nummeriert die Kacheln so, wie die Karte die Flurstücke beschriftet", async () => {
       const { wrapper } = await openAmbiguous();
 
-      expect(wrapper.findAll(".kandidaten__marke").map(m => m.text())).toEqual(["1", "2"]);
+      expect(wrapper.findAll(".vorschlag .kandidaten__marke").map(m => m.text())).toEqual(["1", "2"]);
     });
   });
 

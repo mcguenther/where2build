@@ -219,3 +219,20 @@ routines under it.
   floats is the stylesheet's decision. jsdom has no `ResizeObserver`, so the
   measurement is skipped there — without that guard thirty tests failed on
   mount.
+
+- **An ambiguous result is cards, and each card's picture is not a map.** The
+  point of the picture is recognition — a roof or a hedge from the listing's
+  photographs — so it is fixed: `lib/candidateSketch.js` frames the parcel with
+  at least 60 m either side and draws the orthophoto and, from zoom 17, the
+  Liegenschaftskarte as `<image>` tiles in an SVG, the way the route cards do.
+  A MapLibre instance per card would run into the WebGL context limit at a
+  dozen candidates, and the maps past it go blank without a word. Twelve cards
+  are drawn before „Alle zeigen"; each is some six tiles of each layer from
+  the authority's WMS. The candidate's outline is drawn wider (3,6 over an 8 px
+  halo) than on the big map: among the cadastre's own lines at this size, a
+  contour of the same weight is one boundary more.
+
+- **„Is the map on screen" has to mean most of it.** The cards sit right under
+  the map, so after a click the map's lower edge was usually in view and the
+  check passed — while the pan happened in a strip at the top of the screen.
+  It scrolls unless 60 % of the map is visible.
