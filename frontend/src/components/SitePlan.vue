@@ -201,7 +201,7 @@ import { cameraFor, toLocal, toWgs84 } from "../lib/projection.js";
 import { outerRing } from "../lib/plots.js";
 import { num, area } from "../lib/format.js";
 import { BACKDROPS, canRenderMap, withOverlay } from "../lib/basemap.js";
-import { MapStack } from "../lib/mapFade.js";
+import { MapStack, TILE_FADE_MS, quickTiles } from "../lib/mapFade.js";
 import { darkTheme } from "../lib/store.js";
 // MapLibre 6 ships named exports only — there is no default.
 // Its worker URL is set once in main.js; see the note there.
@@ -726,7 +726,8 @@ export default {
         if (run !== this._mapRun || !this.$refs.mapContainer || this._map) return;
         const map = this._maps.start(this.$refs.mapContainer, container => new MapLibreMap({
           container,
-          style,
+          style: quickTiles(style),
+          fadeDuration: TILE_FADE_MS,
           center: [this.plot.anchor.lon, this.plot.anchor.lat],
           zoom: 17,
           interactive: false,

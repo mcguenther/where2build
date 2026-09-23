@@ -50,7 +50,7 @@
  */
 import { Map as MapLibreMap, Marker, NavigationControl } from "maplibre-gl";
 import { aerialCadastreStyle, canRenderMap, vectorStyle } from "../lib/basemap.js";
-import { MapStack } from "../lib/mapFade.js";
+import { MapStack, TILE_FADE_MS, quickTiles } from "../lib/mapFade.js";
 import { darkTheme } from "../lib/store.js";
 import { bandFeatures } from "../lib/bands.js";
 import {
@@ -178,7 +178,8 @@ export default {
         // (`lib/mapFade.js`). `ready` waits for the fade as well as the tiles.
         const map = this._maps.start(this.$refs.mapContainer, container => new MapLibreMap({
           container,
-          style,
+          style: quickTiles(style),
+          fadeDuration: TILE_FADE_MS,
           center: [13.35, 51.05],   // Saxony, until the first clue says otherwise
           zoom: 6.4,
           attributionControl: { compact: true },

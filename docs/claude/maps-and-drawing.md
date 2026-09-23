@@ -188,11 +188,21 @@ routines under it.
   one down first showed bare paper for as long as the tiles took, then let them
   pop in one by one — on the plan, the Lage view's noise layer and the search
   map alike. `lib/mapFade.js` builds the next map in an element of its own on
-  top, keeps it at opacity 0 until its first `idle`, fades it in over 0,42 s
-  and only then removes the one underneath. Three things that matter: a map
-  superseded *during* its fade has its timer cancelled, or it clears the stack
-  under the map replacing it; the reveal has a 2,5 s fallback, because `idle`
-  never comes while one tile keeps failing; and `data-map-ready` now waits for
-  the fade as well as the tiles — a picture taken on `idle` alone is a
-  half-transparent one. The host needs `position: relative` of its own now,
-  since MapLibre's `.maplibregl-map` sits on the inner element.
+  top, keeps it at opacity 0 until its first `idle` or 400 ms, whichever comes
+  first, fades it in over 0,15 s, and removes the one underneath only once the
+  new one is idle (4 s at most). What that took:
+  - Speed is the point. The first cut faded over 0,42 s after waiting for
+    `idle`, which was 0,8–1,2 s per switch here, measured, and read as a button
+    that lagged. Revealing early is safe *because* the old map stays under it:
+    a tile still missing shows the previous ground, not paper. Later tiles fade
+    in over 100 ms (`raster-fade-duration`, `fadeDuration`), not MapLibre's 300.
+  - End the fade on `transitionend`, not on a timer of the same length. On a
+    busy main thread the transition started 80 ms after the timer, and the map
+    below was removed with the new one at 18 %. A timer remains as fallback for
+    reduced motion, which has no transition and so no event.
+  - A map superseded during its fade has its timers cancelled, or it clears
+    the stack under the map replacing it.
+  - `data-map-ready` waits for the fade as well as the tiles — a picture taken
+    on `idle` alone is a half-transparent one.
+  - The host needs `position: relative` of its own now, since MapLibre's
+    `.maplibregl-map` sits on the inner element.

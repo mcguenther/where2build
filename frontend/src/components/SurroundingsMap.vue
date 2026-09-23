@@ -41,7 +41,7 @@
  */
 import { Map as MapLibreMap, Marker, NavigationControl } from "maplibre-gl";
 import { vectorStyle } from "../lib/basemap.js";
-import { MapStack } from "../lib/mapFade.js";
+import { MapStack, TILE_FADE_MS, quickTiles } from "../lib/mapFade.js";
 import { darkTheme } from "../lib/store.js";
 import { toWgs84 } from "../lib/projection.js";
 import { rectangleCorners } from "../lib/geometry.js";
@@ -131,7 +131,8 @@ export default {
         // photographing it waits for the fade as well as for the tiles.
         const map = this._maps.start(this.$refs.mapContainer, container => new MapLibreMap({
           container,
-          style,
+          style: quickTiles(style),
+          fadeDuration: TILE_FADE_MS,
           center: [this.plot.anchor.lon, this.plot.anchor.lat],
           zoom: 15,
           attributionControl: { compact: true },
