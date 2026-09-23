@@ -13,6 +13,22 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# Extra certificate authorities for the build, and nothing on a normal machine:
+# `ca/` holds a README and whatever `scripts/setup-build-ca.sh` put next to it.
+# An environment that re-terminates outbound TLS through its own CA — the cloud
+# sandbox this is developed in, a corporate proxy — otherwise fails every
+# `pip install` here with "self-signed certificate in certificate chain", and
+# pip does not read the system trust store, so pointing it at the bundle is the
+# only thing that works.
+#
+# The directory is copied rather than a glob: `COPY ca/*.crt` fails the build
+# outright when there is nothing to match, and *empty is the normal case*.
+#
+# It goes to a path of its own, not into the system trust store: this is a
+# single-stage build, so anything written there would ship. A build-time proxy
+# CA has no business in the image that runs on somebody's server.
+COPY ca/ /build-ca/
+
 # Dependencies first: the sources change far more often than pyproject.toml, so
 # this layer survives most rebuilds.
 COPY pyproject.toml ./
@@ -40,7 +56,26 @@ RUN apt-get update \
 # runs that build from this image, so leaving it out makes that job fail on an
 # import nobody can fix from outside the container. "ocr" brings Pillow, which
 # does the upscale that the measurements say buys the most.
-RUN pip install --no-cache-dir ".[poi,ocr]" && pip uninstall -y where2build-backend
+# The certificates, where there are any — for this one command and no longer.
+# `/build-ca` goes away in the same layer, so neither the bundle nor the README
+# beside it reaches the final image.
+#
+# Three statements and an import check, not one `&&` chain ending in `rm`.
+# Measured 18.09.2026: written as
+# `pip install … && pip uninstall …; rm -rf …`, a failed install left `rm`'s
+# zero as the layer's exit status — the build reported success and shipped a
+# 350 MB image with no fastapi in it. An exit code is not a check; the import
+# is.
+RUN set -eux; \
+    if ls /build-ca/*.crt >/dev/null 2>&1; then \
+      cat /build-ca/*.crt > /tmp/build-ca.crt; \
+      export PIP_CERT=/tmp/build-ca.crt REQUESTS_CA_BUNDLE=/tmp/build-ca.crt \
+             SSL_CERT_FILE=/tmp/build-ca.crt; \
+    fi; \
+    pip install --no-cache-dir ".[poi,ocr]"; \
+    pip uninstall -y where2build-backend; \
+    rm -rf /build-ca /tmp/build-ca.crt; \
+    python -c "import fastapi, shapely, pyproj, PIL"
 
 COPY app ./app
 # The scheduler runs these, and it runs from this same image — the jobs are

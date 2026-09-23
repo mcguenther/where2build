@@ -444,6 +444,108 @@ def like(name: str, pattern: str) -> str:
     )
 
 
+# The built-up area of a settlement -- what „6 km bis Grimma" is measured from
+# when the reading is "to the edge of the town" rather than "to its middle".
+#
+# Measured 16.09.2026 against the live service. `ave:Nutzung` carries the
+# recorded land use as polygons with `nutzart` in plain text, and a POST can
+# carry a BBOX and a property filter at once. Around Grimma a 2 km box holds
+# 486 `Wohnbaufläche` polygons, 674 kB in 1.8 s.
+#
+# Three numbers behind the constants, all measured on that box:
+#
+# * **Wohnbaufläche alone, not the wider settlement classes.** Adding mixed and
+#   industrial use stretches the outline along the works and moves the near
+#   edge from 5.32 km to 3.16 km -- and the advert's own „ca. 6 km" then falls
+#   *outside* the interval the readings span. The narrow set is the better
+#   model of what a seller calls "the town".
+# * **A 25 m closing.** The polygons stop at the street, so without one the
+#   union is 484 fragments whose largest is 0.07 km². At 15 m it is 78
+#   fragments, at 25 m 55 around a 1.91 km² core, and at 50 m the gaps between
+#   neighbouring hamlets start closing too and the near edge jumps 0.7 km.
+# * **A 2 km radius** holds a small town whole: Grimma's core measures
+#   2.9 x 2.3 km, Borna's 3.0 x 2.6 km, Bad Lausick's 3.2 x 2.3 km.
+# * **A count of its own.** The service-wide `max_features` of 200 truncates
+#   this query and nothing says so: 200 of Grimma's 431 polygons close into a
+#   0.35 km² fragment instead of the 1.65 km² town, and the near edge reads
+#   5.4 km where the whole town reads 5.3 km -- a plausible number from an
+#   outline that is a tenth of the place. Measured 16.09.2026; 1 500 is well
+#   above what a 2 km box has returned anywhere.
+BUILT_UP_RADIUS_M = 2000.0
+BUILT_UP_CLOSING_M = 25.0
+BUILT_UP_KIND = "Wohnbau*"
+BUILT_UP_MAX_FEATURES = 1500
+
+
+@dataclass(frozen=True, slots=True)
+class BuiltUpArea:
+    """One settlement's built-up outline, assembled from its land-use polygons.
+
+    Not an ALKIS object -- the cadastre records land use surface by surface and
+    knows nothing of "a town". The union is ours, which is why this name is
+    English while ``Flurstueck`` and ``KatasterBezirk`` keep the service's own.
+    """
+
+    geometry: Any
+    parts: int
+    pieces: int
+
+    @property
+    def area_m2(self) -> float:
+        return float(self.geometry.area)
+
+
+def _bbox_filter(easting: float, northing: float, radius_m: float, crs: str) -> str:
+    """A square box as a filter condition, for the POSTs that need both.
+
+    A WFS GET cannot carry a BBOX and a property filter at once; ``fes:BBOX``
+    on ``ave:geometrie`` in a POST body can, and that is what keeps the
+    land-use query from returning every kind of surface in the box.
+    """
+
+    return (
+        "<fes:BBOX>"
+        "<fes:ValueReference>ave:geometrie</fes:ValueReference>"
+        f'<gml:Envelope srsName="{crs}">'
+        f"<gml:lowerCorner>{easting - radius_m:.0f} {northing - radius_m:.0f}</gml:lowerCorner>"
+        f"<gml:upperCorner>{easting + radius_m:.0f} {northing + radius_m:.0f}</gml:upperCorner>"
+        "</gml:Envelope>"
+        "</fes:BBOX>"
+    )
+
+
+def parse_land_use(xml: bytes | str) -> list[Polygon]:
+    """The polygons of an ``ave:Nutzung`` response.
+
+    The response puts its feature elements in the *default* namespace, so
+    ``nutzart`` arrives without the ``ave:`` prefix the filter needs -- which
+    is why this does not go through ``parse_feature_collection``.
+    """
+
+    try:
+        root = ElementTree.fromstring(xml if isinstance(xml, bytes) else xml.encode("utf-8"))
+    except ElementTree.ParseError as exc:
+        raise UpstreamError(f"{SERVICE_NAME} hat kein gültiges GML geliefert. {ADVICE}") from exc
+
+    default_srs = root.get("srsName")
+    out: list[Polygon] = []
+    for element in root.iter():
+        if _local(element.tag) != "Nutzung":
+            continue
+        srs_name = next(
+            (child.get("srsName") for child in element.iter() if child.get("srsName")),
+            default_srs,
+        )
+        swap = _axis_swapped(srs_name)
+        for polygon_element in element.iter():
+            if _local(polygon_element.tag) != "Polygon":
+                continue
+            polygon = _parse_polygon(polygon_element, swap)
+            if polygon is not None and not polygon.is_empty:
+                out.append(polygon)
+    return out
+
+
 @dataclass(frozen=True, slots=True)
 class KatasterBezirk:
     """One cadastral district with its outline.
@@ -478,6 +580,11 @@ class AlkisService:
         self.settings = settings
         self.app_settings = app_settings
         self.cache = DiskCache(app_settings.cache_dir / "alkis", ttl_s=settings.cache_ttl_s)
+        # What actually went to the GeoSN, cache hits excluded. Counted here
+        # rather than at the call sites because only this class knows which
+        # answers came off the disk -- and because a call site that forgets to
+        # count is invisible, which is how `districts_around` went unrecorded.
+        self.network_calls = 0
 
     @property
     def _crs_urn(self) -> str:
@@ -488,6 +595,7 @@ class AlkisService:
         cached = self.cache.get_bytes(cache_key)
         if cached is not None:
             return cached
+        self.network_calls += 1
         response = await request(
             "GET",
             self.settings.wfs_url,
@@ -504,6 +612,7 @@ class AlkisService:
         cached = self.cache.get_bytes(body)
         if cached is not None:
             return cached
+        self.network_calls += 1
         response = await request(
             "POST",
             self.settings.wfs_url,
@@ -787,6 +896,56 @@ class AlkisService:
             )
         return found
 
+    async def district_outlines(self, schluessel: Sequence[str]) -> list[KatasterBezirk]:
+        """Several districts in one request, for a place filed as many Flure.
+
+        „Kitzen" is eleven entries in the directory and one place on the map, so
+        drawing it must not cost eleven requests. An ``fes:Or`` over the keys
+        answers all of them at once -- the same move the parcel search makes to
+        count them.
+        """
+
+        keys = [expand_gemarkung_key(key) for key in schluessel]
+        if not keys:
+            return []
+        matches = (
+            equals("schluessel", keys[0])
+            if len(keys) == 1
+            else "<fes:Or>" + "".join(equals("schluessel", key) for key in keys) + "</fes:Or>"
+        )
+        body = self._envelope(
+            [matches, equals("art", "Gemarkung")],
+            result_type="results",
+            count=len(keys),
+            type_names="ave:KatasterBezirk",
+        )
+        xml = await self._post(body)
+        try:
+            root = ElementTree.fromstring(xml)
+        except ElementTree.ParseError as exc:
+            raise UpstreamError(
+                f"{SERVICE_NAME} hat kein gültiges GML geliefert. {ADVICE}"
+            ) from exc
+        default_srs = root.get("srsName")
+        out: list[KatasterBezirk] = []
+        for element in root.iter():
+            if _local(element.tag) != "KatasterBezirk":
+                continue
+            values = {
+                _local(child.tag): (child.text or "").strip()
+                for child in element
+                if child.text
+            }
+            out.append(
+                KatasterBezirk(
+                    schluessel=values.get("schluessel", ""),
+                    name=values.get("name") or None,
+                    gemeinde=values.get("gemeinde") or None,
+                    geometry=_parse_geometry(element, default_srs),
+                )
+            )
+        return out
+
     async def district_outline(self, schluessel: str) -> KatasterBezirk | None:
         """One cadastral district with its boundary, for the map.
 
@@ -824,3 +983,78 @@ class AlkisService:
                 geometry=_parse_geometry(element, default_srs),
             )
         return None
+
+    async def built_up_area(
+        self,
+        lat: float,
+        lon: float,
+        *,
+        radius_m: float = BUILT_UP_RADIUS_M,
+        closing_m: float = BUILT_UP_CLOSING_M,
+        largest: bool = False,
+    ) -> BuiltUpArea | None:
+        """The built-up outline of the settlement at a coordinate.
+
+        What a distance in a listing is measured *from* is not one point.
+        „6 km bis Grimma" can mean the middle of the town or its edge, and the
+        two are kilometres apart -- so the search wants both, and the edge is
+        what this answers. Measured 16.09.2026 from Flurstück 790/11: 5.32 km
+        to the edge of Grimma's built-up area, 6.25 km to its middle, and the
+        advert says „ca. 6 km" -- inside that interval and outside every
+        single-point reading.
+
+        The cadastral district is not a substitute, and measuring refuted it:
+        Gemarkung Grimma reaches to within 1.22 km of that same parcel, because
+        a district is farmland too.
+
+        Answers the connected piece the coordinate falls in -- or the largest
+        one, when the point sits just outside, which is what a village edge
+        does. ``largest`` asks for the biggest piece regardless, which is what
+        a *named* reference wants: seeded from Grimma's market square, the
+        piece under the seed is a 0.48 km² island of housing inside a centre
+        the cadastre records as mixed use, while the town is the 1.65 km² belt
+        around it. Measured from Flurstück 790/11, the island reads 4.6 to
+        5.1 km and the belt 5.3 to 6.1 km -- and it is the belt the advert's
+        „ca. 6 km" is about.
+
+        The union stops at the largest piece either way. Taking every piece in
+        the box instead pulls the near edge from 5.3 km to 2.9 km, because the
+        box also holds the hamlets around the town -- the same failure that
+        made the cloud of stops named after a town useless as a proxy for it.
+        """
+
+        easting, northing = geo.wgs84_to_utm33(lon, lat)
+        body = self._envelope(
+            [
+                _bbox_filter(easting, northing, radius_m, self._crs_urn),
+                like("nutzart", BUILT_UP_KIND),
+            ],
+            result_type="results",
+            count=BUILT_UP_MAX_FEATURES,
+            type_names="ave:Nutzung",
+        )
+        polygons = parse_land_use(await self._post(body))
+        if not polygons:
+            return None
+
+        # Assembled here rather than in the browser for the same reason the
+        # common envelope is: one datum about the world, made of many the
+        # service returns, and the search ranks with it. The drawing geometry
+        # still belongs to the frontend.
+        closed = unary_union([polygon.buffer(closing_m) for polygon in polygons])
+        closed = closed.buffer(-closing_m)
+        parts = [
+            part
+            for part in (closed.geoms if isinstance(closed, MultiPolygon) else [closed])
+            if not part.is_empty
+        ]
+        if not parts:
+            return None
+        parts.sort(key=lambda part: -part.area)
+        point = Point(easting, northing)
+        core = (
+            parts[0]
+            if largest
+            else next((part for part in parts if part.covers(point)), parts[0])
+        )
+        return BuiltUpArea(geometry=core, parts=len(parts), pieces=len(polygons))

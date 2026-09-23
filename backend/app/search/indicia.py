@@ -24,8 +24,9 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from ..gemarkung_index import GemarkungDirectory, GemarkungEntry, fold
+from ..gemarkung_index import GemarkungDirectory, GemarkungEntry, base_name, fold
 from ..schemas import Indiz, IndizQuelle, Ortsbeziehung
+from . import blocks
 
 # How far each source is trusted, and thereby which one wins a contradiction:
 # an official extract outranks the platform's attribute list, which outranks
@@ -43,6 +44,23 @@ SOURCE_CONFIDENCE: dict[IndizQuelle, float] = {
     "pin": 0.15,
 }
 
+# Which *document* each channel reads. The channel alone cannot serve as the
+# identity of a source, and that is the whole of B2: every text find carries
+# „fliesstext" and every OCR find „bild", so two numbers off two different
+# sheets looked exactly like two numbers in one sentence -- and two numbers
+# from one source are a plot made of several parcels, which this project treats
+# as the normal case and never puts to the user as a question. The body text is
+# one document however many paragraphs it has; each image is one of its own,
+# and `ocr.as_indicia` names it by URL.
+DOCUMENT_OF: dict[IndizQuelle, str] = {
+    "nutzer": "eingabe",
+    "attribut": "attributliste",
+    "fliesstext": "anzeigentext",
+    "modell": "modell",
+    "standortfeld": "standortfeld",
+    "pin": "kartenpunkt",
+}
+
 # The AdV parcel key is 20 characters: six for the district, three for the
 # Flur, five for the numerator, four for the denominator, two spare. Those two
 # widths are the whole validity test a number can be given without asking the
@@ -52,10 +70,52 @@ MAX_NENNER_DIGITS = 4
 
 # „Flurstück 790/11“, „Flurstücksnummer: 85/1“, „Flst. 476“, „Flurstück 41/e“.
 _PARCEL_RE = re.compile(
-    r"(?:flurst(?:ü|ue)ck(?:s?nummer)?|flst\.?|flurstuecke?)\s*(?:nr\.?|nummer)?\s*[:.]?\s*"
+    # „Flurstücke" with the umlaut matched nothing until 19.09.2026: the plural
+    # „e" was only on the ue-branch, and the umlaut branch ran straight from
+    # „Flurstück" into the digits it then could not find.
+    r"(?:flurst(?:ü|ue)ck(?:e\b|s?nummer)?|flst\.?)\s*(?:nr\.?|nummer)?\s*[:.]?\s*"
     r"(\d{1,6})\s*(?:/\s*(\d{1,5}|[a-zA-Z]))?",
     re.IGNORECASE,
 )
+
+# „Flurstück 790/11 sowie 238/3" — the label stands once and the numbers follow.
+# That is the documented normal case („a plot is a *set* of parcels"), and only
+# the first number was read: the pattern above needs a label, and the second
+# has none.
+_PARCEL_MORE = re.compile(
+    r"\s*(?:,|;|&|\bund\b|\bsowie\b|\bu\.\s*)\s*(\d{1,6})\s*(?:/\s*(\d{1,5}|[a-zA-Z]))?",
+    re.IGNORECASE,
+)
+
+# What a bare number after „und" turns out to be when it is not a parcel:
+# „Flurstück 12 und 2 Garagen", „Flurstück 107/60 und 502 m²". A denominator
+# settles it outright — nothing else in an advert is written „238/3" — so a
+# continuation without one has to prove it is not a quantity, and a unit or a
+# following noun says that it is.
+_NOT_A_PARCEL_AFTER = re.compile(
+    r"\s*(?:m²|m2|qm|€|EUR\b|Euro\b|%|km\b|ha\b|min\b|Minuten\b|Jahre\b|[A-ZÄÖÜ])",
+)
+
+
+def _parcel_run(body: str, match: re.Match[str]) -> tuple[list[tuple[str, str | None]], int]:
+    """Every parcel number of one labelled run, and where the run ends.
+
+    The numbers of a run come from one sentence and are therefore one set, not
+    rival readings — the rule the whole search is built on. They share a Beleg
+    for the same reason: the span is the sentence that named them together.
+    """
+
+    numbers = [(match.group(1), match.group(2))]
+    end = match.end()
+    while (more := _PARCEL_MORE.match(body, end)) is not None:
+        numerator, denominator = more.group(1), more.group(2)
+        if denominator is None and (
+            match.group(2) is not None or _NOT_A_PARCEL_AFTER.match(body, more.end())
+        ):
+            break
+        numbers.append((numerator, denominator))
+        end = more.end()
+    return numbers, end
 
 # „Gemarkung Großbothen“, „Gemarkung: Mölkau (144241)“.
 _DISTRICT_RE = re.compile(
@@ -149,8 +209,21 @@ _OT_NAMED_RE = re.compile(
     rf"(?:von|bei|in|der\s+Gemeinde|der\s+Stadt|des\s+Marktes)\s+(?P<municipality>{_NAME})",
 )
 _OT_BEFORE_RE = re.compile(
-    rf"(?P<district>{_NAME})\s*,\s*(?:einem?\s+|ein\s+)?"
-    rf"(?:OT|Ortsteil|Stadtteil|Gemeindeteil)\s+(?:von|der|des)\s+(?P<municipality>{_NAME})",
+    # „Kitzen, ein idyllischer Ortsteil der Stadt Pegau": the adjective between
+    # the article and the noun is not optional in German prose, it is the norm.
+    rf"(?P<district>{_NAME})\s*,\s*(?:ein(?:em|er|es)?\s+)?(?:[a-zäöüß]+\s+){{0,2}}"
+    rf"(?:OT|Ortsteil|Stadtteil|Gemeindeteil)\s+(?:von|der|des|bei)\s+(?P<municipality>{_NAME})",
+)
+# „Thräna ist mit seinen etwa 765 Einwohnern ein kleiner Ortsteil der
+# Kreisstadt Borna." The trigger stands *behind* the name, which every window
+# that looks to the left misses -- and it cost the one advert in the corpus
+# whose answer is Thräna its anchor. Only taken when the directory knows the
+# name, because „Das Grundstück ist … ein Ortsteil von X" reads the same way to
+# a pattern and German capitalises every noun.
+_OT_IS_RE = re.compile(
+    rf"(?P<district>{_NAME})\s+ist\s+(?:[^.;]{{0,80}}?\s)?ein(?:em|er|es)?\s+"
+    rf"(?:[a-zäöüß]+\s+){{0,2}}(?:OT|Ortsteil|Stadtteil|Gemeindeteil)\s+"
+    rf"(?:von|der|des|bei)\s+(?P<municipality>{_NAME})",
 )
 _OT_PLAIN_RE = re.compile(
     rf"(?:einem?\s+|ein\s+)?(?:OT|Ortsteil|Stadtteil|Gemeindeteil)\s+(?:von|der|des)\s+"
@@ -184,6 +257,10 @@ _LOCALITY_RE = re.compile(
 # the recorded adverts carry. Then the municipality is simply the tail, and
 # there is no slot a district could stand in.
 _LOCALITY_TAIL_RE = re.compile(rf"(?:^|[-–—])\s*(?P<tail>{_NAME})\s*$")
+# The same line with both halves kept. The separator is a dash *with spaces*,
+# which is what tells „Sachsen - Schönwölkau-Hohenroda" from the hyphen inside
+# „Sachsen-Anhalt": one is a separator, the other is part of a name.
+_LOCALITY_PAIR_RE = re.compile(rf"^\s*(?P<head>{_NAME})\s+[-–—]\s+(?P<tail>{_NAME})\s*$")
 
 # The same field names the *federal state*, and that is the one statement in a
 # listing this tool can be certain it cannot serve. ALKIS is state-specific, so
@@ -244,10 +321,49 @@ def outside_saxony(adresse: str | None) -> str | None:
 # path through a field. German capitalises every noun, so the usual signal —
 # a capital letter — says nothing here.
 _NOT_A_STREET_PREFIX = (
-    "ihr", "ihre", "der", "die", "das", "den", "dem", "ein", "eine", "einen",
-    "einem", "mein", "unser", "unsere", "kein", "jeder", "dieser", "diese",
+    "ihr", "ihre", "ihren", "ihrem", "ihrer", "der", "die", "das", "den", "dem",
+    "ein", "eine", "einen", "einem", "mein", "unser", "unsere", "kein", "jeder",
+    "dieser", "diese", "hektar", "quadratmeter",
 )
-_NOT_A_STREET = ("feldweg", "wanderweg", "radweg", "waldweg", "fußweg", "gehweg", "kirchweg")
+# A kind of way, not the name of one. „Hauptstraße" and „Marktplatz" are names
+# and stay out of this list; a road class has no proper name in it at all.
+# Measured 19.09.2026 over the 16 adverts: „Bundesstraße", „Anliegerstraße" and
+# „Stellplatz" travelled as street names, and none of them is one.
+_NOT_A_STREET = (
+    "feldweg", "wanderweg", "radweg", "waldweg", "fußweg", "gehweg", "kirchweg",
+    "bundesstraße", "landstraße", "kreisstraße", "staatsstraße", "anliegerstraße",
+    "nebenstraße", "sackgasse", "stichstraße", "einbahnstraße", "spielstraße",
+    "privatstraße", "zufahrtsstraße", "stellplatz", "parkplatz", "wendehammer",
+)
+
+# A German address does not need a suffix. „Am Kurpark" is the official
+# `lagebeztxt` of 502/47 — the right answer of the Bad Lausick advert — while
+# the suffix pattern above cannot see it and does see „Bundesstraße".
+#
+# The preposition is matched case-insensitively and the noun is not: the advert
+# writes „Naturnah wohnen am Kurpark" in mid-sentence and the register spells
+# the address „Am Kurpark". Spaces rather than `\s`, and no dot inside a word:
+# `\s+` with a dot in the class produced „Zur Verfügung.\n\nFür", and a phrase
+# that runs across a sentence boundary cannot be an address.
+_PLACE_PHRASE_RE = re.compile(
+    r"\b((?:[Aa]m|[Aa]n\s+de[rn]|[Aa]uf\s+de[rm]|[Hh]inter\s+de[rmn]|[Vv]or\s+de[rm]|"
+    r"[Uu]nter\s+den|[Zz]um|[Zz]ur|[Bb]eim|[Bb]ei\s+der)[ \t]+"
+    r"[A-ZÄÖÜ][\wäöüßÄÖÜ\-]{2,}(?:[ \t]+[A-ZÄÖÜ][\wäöüßÄÖÜ\-]+){0,2})"
+)
+
+# What follows such a preposition when the phrase states a purpose or a
+# position rather than an address. German builds both regularly, so these are
+# rules and not a list: a nominalisation („Zur Verfügung", „Bei der Planung")
+# and a relational noun („Am Ortsrand"). A list of the first kind has no end —
+# of 47 phrases the loose harvest found over the 16 adverts, 39 were one.
+_ABSTRACT_NOUN = re.compile(r"(?:ung|heit|keit|schaft|nis|tion)$", re.IGNORECASE)
+_NOT_A_PLACE_NOUN = (
+    "ortsrand", "stadtrand", "waldrand", "feldrand", "rand", "rande", "ende",
+    "anfang", "stück", "standort", "objekt", "grundstück", "start", "ziel",
+    "gelände", "ort", "stelle", "seite", "hand", "verkauf", "kauf", "miete",
+    "wunsch", "wünsche", "zeit", "zeiten", "thema", "einsatz", "suche", "wahl",
+    "träumen", "ankommen", "entspannen", "wohlfühlen", "leben", "bauen",
+)
 
 # The GeoSN prints its own address on every sheet it issues. A street read out
 # of a map extract next to any of these is the authority signing its work, not
@@ -330,12 +446,98 @@ class AreaStatement:
         return not self.wording and self.upper is None and self.part_of is None
 
 
+# What a label or a lead-in has to say for a figure in m² to be *this plot's*
+# area. Folded and unspaced, so „Grundstücks-Fläche" and „Grundstücksgröße"
+# both match.
+_PLOT_AREA_WORDS = (
+    "grundstuecksflaeche", "grundstuecksgroesse", "grundstueck",
+    "gesamtflaeche", "flurstuecksflaeche", "parzellenflaeche", "flaeche",
+)
+
+# And what says it is a figure about something else. Every one of these stands
+# in a recorded advert next to a number in m²: advert 3381469778 writes „die
+# zulässige Grundfläche beträgt insgesamt ca. 240 m²" three sentences after its
+# „ca. 600 m²", and a reader that takes whichever comes first is one paragraph
+# away from filtering the cadastre on a building footprint.
+_OTHER_AREA_WORDS = (
+    "wohnflaeche", "nutzflaeche", "grundflaeche", "geschossflaeche",
+    "bebaubar", "ueberbaubar", "dachflaeche", "gewerbeflaeche",
+    "verkaufsflaeche", "kellerflaeche", "terrasse", "garage",
+)
+
+# „20 voll erschlossene Grundstücke zwischen 360 und 800 m²" is a sentence
+# about a development, not about the plot on offer — and advert 3441433250,
+# which writes exactly that, states 590 m² in its attribute list. A plural or a
+# „weitere" anywhere in the block is what separates the two: the same advert
+# writes „Die Grundstücke variieren in ihrer Größe zwischen ca. 360 m² und
+# 800 m²", where the plural stands 64 characters in front of the second figure
+# and any window narrow enough to be safe misses it. A block is one statement,
+# so the whole block is the window.
+_SEVERAL_PLOTS = re.compile(
+    r"(?:grundst(?:ü|ue)cke|parzellen|bauplätze|bauplaetze|weitere|"
+    r"je(?:weils)?\s+\w+\s+grundst)",
+    re.IGNORECASE,
+)
+
+# How far in front of a figure its lead-in is looked for. One clause: „Mit
+# einer bebaubaren Fläche von ca. 240 m²" is 34 characters.
+_AREA_LEAD_IN = 60
+
+
 def read_area(text: str) -> AreaStatement | None:
-    """The first plot area in a piece of text, with how it was written."""
+    """The plot area a piece of text states, with how it was written.
+
+    Block-aware, and that is what makes it more than "the first number followed
+    by m²". A listing states three or four areas and only one of them is the
+    thing the cadastre can be filtered on:
+
+        Grundstücksfläche: ca. 711 m²          a labelled pair — the answer
+        bebaubare Fläche von ca. 240 m²        the building footprint
+        Grundstücke zwischen 360 und 800 m²    the other plots in the estate
+
+    So a labelled pair wins outright, a figure whose label or lead-in names
+    something else is refused, and only then does the first remaining figure
+    count. Measured over the 16 recorded adverts: advert 3441433250 stops
+    answering 360 m² where its attribute list says 590, and no other run
+    changes.
+
+    A short string with no structure — „502 m²“, the portal's own field — is
+    one block and reads exactly as it did before.
+    """
+
+    pieces = blocks.split_blocks(text)
+    labelled = [
+        block
+        for block in blocks.labelled(pieces, *_PLOT_AREA_WORDS)
+        if not any(word in blocks.fold(block.label or "") for word in _OTHER_AREA_WORDS)
+    ]
+    for block in labelled:
+        statement = _area_in(block.text, lead_in="")
+        if statement is not None:
+            return statement
+
+    for block in pieces or [None]:
+        body = block.text if block is not None else text
+        lead = blocks.fold(block.label or "") if block is not None else ""
+        if any(word in lead for word in _OTHER_AREA_WORDS):
+            continue
+        statement = _area_in(body, lead_in=lead)
+        if statement is not None:
+            return statement
+    return None
+
+
+def _area_in(text: str, *, lead_in: str) -> AreaStatement | None:
+    """The first usable figure in one block, or nothing."""
 
     for match in _AREA_RE.finditer(text):
         value = german_number(match.group("from"))
         if value is None or value < 10 or value > 10_000_000:
+            continue
+        before = lead_in + blocks.fold(text[max(0, match.start() - _AREA_LEAD_IN) : match.start()])
+        if any(word in before for word in _OTHER_AREA_WORDS):
+            continue
+        if _SEVERAL_PLOTS.search(text):
             continue
         upper = german_number(match.group("to")) if match.group("to") else None
         wording = (match.group("wording") or "").strip().lower()
@@ -368,6 +570,63 @@ _PART_AREA_RE = re.compile(
 )
 
 
+# „Die Abmessungen von etwa 14,00 Metern Breite und ca. 40,00 Metern Tiefe",
+# „Frontbreite ca. 26 m". A measurement with a word beside it saying what was
+# measured -- without the word it is a setback, a street width or a distance to
+# a lake, and those are in the same sentences.
+_MEASURE_RE = re.compile(r"(\d{1,3}(?:[.,]\d+)?)\s*(?:m\b|Metern?\b)", re.IGNORECASE)
+_WIDTH_WORDS = ("breit", "front")
+_DEPTH_WORDS = ("tief", "läng", "laeng", "lang")
+_MEASURE_WINDOW = 34
+
+
+@dataclass(frozen=True, slots=True)
+class Dimensions:
+    """What a listing says the plot measures, and the sentence it said it in.
+
+    Never a filter. A seller measures the frontage along the street and the
+    depth to the back fence; the cadastre records a polygon, and the smallest
+    rectangle around it is a different number whenever the plot is not a
+    rectangle. It is good enough to *contradict* a candidate that is nothing
+    like the shape described, and that is all it is used for.
+    """
+
+    width: float
+    depth: float | None
+    beleg: str
+
+    @property
+    def sides(self) -> tuple[float, float] | None:
+        return (min(self.width, self.depth), max(self.width, self.depth)) if self.depth else None
+
+
+def read_dimensions(text: str | None) -> Dimensions | None:
+    """The stated width and depth of the plot, where a word says which is which."""
+
+    if not text:
+        return None
+    width = depth = None
+    beleg = ""
+    for match in _MEASURE_RE.finditer(text):
+        try:
+            value = float(match.group(1).replace(",", "."))
+        except ValueError:
+            continue
+        if not 2 <= value <= 400:
+            continue
+        around = text[
+            max(0, match.start() - _MEASURE_WINDOW) : match.end() + _MEASURE_WINDOW
+        ].lower()
+        if width is None and any(word in around for word in _WIDTH_WORDS):
+            width, beleg = value, _excerpt(text, match.start(), match.end())
+        elif depth is None and any(word in around for word in _DEPTH_WORDS):
+            depth = value
+            beleg = beleg or _excerpt(text, match.start(), match.end())
+    if width is None:
+        return None
+    return Dimensions(width=width, depth=depth, beleg=beleg)
+
+
 def describes_part_area(text: str | None) -> str | None:
     """The sentence saying the plot is still to be surveyed out of a parcel.
 
@@ -381,19 +640,35 @@ def describes_part_area(text: str | None) -> str | None:
     return " ".join(match.group(0).split()) if match else None
 
 
-def _excerpt(text: str, start: int, end: int, pad: int = 45) -> str:
-    """The sentence around a match, for the user to look up."""
+def _excerpt(
+    text: str, start: int, end: int, pad: int = 45, pieces: list[blocks.Block] | None = None
+) -> str:
+    """The sentence around a match, for the user to look up.
 
-    left = max(0, start - pad)
-    right = min(len(text), end + pad)
+    Clamped to the block the match sits in, where the blocks are known. Without
+    that, the padding reaches over a line break and glues a heading to the
+    statement under it — „# Lagebeschreibung Thräna ist …“ is a Beleg the user
+    is asked to check, and the first two words of it belong to another line.
+    """
+
+    low, high = blocks.bounds_at(pieces or [], start, (0, len(text)))
+    left = max(low, start - pad)
+    right = min(high, end + pad)
     snippet = " ".join(text[left:right].split())
-    return f"{'…' if left else ''}{snippet}{'…' if right < len(text) else ''}"
+    return f"{'…' if left > low else ''}{snippet}{'…' if right < high else ''}"
 
 
-def _relation_before(text: str, start: int) -> Ortsbeziehung | None:
-    """Which relation the words just before a place name express, if any."""
+def _relation_before(
+    text: str, start: int, pieces: list[blocks.Block] | None = None
+) -> Ortsbeziehung | None:
+    """Which relation the words just before a place name express, if any.
 
-    window = text[max(0, start - _RELATION_WINDOW) : start]
+    The window stops at the block boundary. A trigger on the line above is not
+    a trigger for this name, however close the two are in characters.
+    """
+
+    low, _ = blocks.bounds_at(pieces or [], start, (0, len(text)))
+    window = text[max(low, start - _RELATION_WINDOW) : start]
     best: tuple[int, Ortsbeziehung] | None = None
     for relation, pattern in _RELATION_PATTERNS:
         for match in pattern.finditer(window):
@@ -463,10 +738,11 @@ def _indiz(
         schluessel=schluessel,
         beziehung=beziehung,
         teil_von=teil_von,
+        fundort=DOCUMENT_OF.get(quelle, quelle),
     )
 
 
-def _district_matches(
+def district_matches(
     directory: GemarkungDirectory, name: str
 ) -> list[GemarkungEntry]:
     """Directory entries whose name is exactly this word.
@@ -477,7 +753,102 @@ def _district_matches(
     """
 
     needle = fold(name)
-    return [entry for entry in directory.entries if fold(entry.name) == needle]
+    exact = [entry for entry in directory.entries if fold(entry.name) == needle]
+    if exact:
+        return exact
+    # The Flur suffix, and only as a fallback: an entry that carries the name
+    # outright is the better answer, and „Kitzen" must not also collect
+    # „Kitzenhausen". Measured 16.09.2026: 248 of the directory's base names
+    # exist *only* with the suffix -- Kitzen, Pehritzsch, Krostitz, Eilenburg
+    # with 48 of them -- and five of six freshly recorded adverts named one.
+    return [entry for entry in directory.entries if fold(base_name(entry.name)) == needle]
+
+
+# What a German sentence and the directory's own column both put in front of a
+# municipality: „der Kreisstadt Borna", „Stadt Borna". It states a role, not a
+# name — but a name can *be* one, so exactly one is ever removed. The directory
+# proves the distinction itself: Stadt Wehlen is listed as „Stadt Stadt
+# Wehlen", the column's word in front of a name that begins with the same word.
+# Strip one and the official name is left; strip greedily and it is not.
+#
+# Measured 18.09.2026 over the recorded adverts: „Kreisstadt Borna" and „Stadt
+# Sandersdorf-Brehna" travelled as Gemeinde values, and neither can match
+# anything in ALKIS. It was the model channel that showed it — the same
+# sentences came back from a model as „Borna" and „Brehna".
+_APPELLATIVE_RE = re.compile(
+    r"^\s*(?:gro(?:ß|ss)e\s+)?"
+    r"(?:kreisstadt|landeshauptstadt|universit(?:ä|ae)tsstadt|bergstadt|stadt|"
+    r"gemeinde|marktes|markt)\s+",
+    re.IGNORECASE,
+)
+
+
+def without_appellative(name: str) -> str:
+    """„Kreisstadt Borna" -> „Borna", „Stadt Stadt Wehlen" -> „Stadt Wehlen"."""
+
+    return _APPELLATIVE_RE.sub("", name, count=1).strip() or name
+
+
+def municipality_spelling(directory: GemarkungDirectory, name: str) -> str | None:
+    """The directory's own name for a municipality, if it knows this one.
+
+    Both sides are compared in both forms, as written and with one appellative
+    removed, because either side may carry one and „Stadt Wehlen" is a name
+    that survives only when the written form is tried too. Exactly rather than
+    by substring: „Borna" must not match „Bornaer Land".
+    """
+
+    wanted = {fold(name), fold(without_appellative(name))}
+    for entry in directory.entries:
+        if not entry.gemeinde:
+            continue
+        bare = without_appellative(entry.gemeinde)
+        if wanted & {fold(entry.gemeinde), fold(bare)}:
+            return bare
+    return None
+
+
+def municipality_name(directory: GemarkungDirectory | None, name: str) -> str:
+    """The municipality's own name, out of what a sentence called it.
+
+    The directory decides where it can: a name it knows comes back in its own
+    spelling. Where it cannot — a municipality outside Saxony — the appellative
+    is dropped anyway, because „Stadt Sandersdorf-Brehna" is not a name any
+    register carries either.
+    """
+
+    spelled = municipality_spelling(directory, name) if directory is not None else None
+    return spelled or without_appellative(name)
+
+
+def split_municipality_and_district(
+    name: str, directory: GemarkungDirectory
+) -> tuple[str, str] | None:
+    """„Schönwölkau-Hohenroda" -> („Schönwölkau", „Hohenroda").
+
+    A platform's location field has one slot for a place, and a municipality
+    writes its Ortsteil into it with a hyphen. Splitting is only safe when the
+    directory confirms *both* halves -- the left one as a municipality, the
+    right one as a district inside it -- which is what keeps „Sandersdorf-
+    Brehna" (a municipality whose name simply contains a hyphen, and not a
+    Saxon one) in one piece. A name the directory already knows as a
+    municipality is never split at all.
+    """
+
+    if "-" not in name or municipality_spelling(directory, name):
+        return None
+    left, right = (part.strip() for part in name.split("-", 1))
+    if len(left) < 3 or len(right) < 3:
+        return None
+    spelled = municipality_spelling(directory, left)
+    if not spelled:
+        return None
+    inside = [
+        entry
+        for entry in district_matches(directory, right)
+        if entry.gemeinde and fold(spelled) == fold(without_appellative(entry.gemeinde))
+    ]
+    return (left, right) if inside else None
 
 
 def _districts_in_compound(
@@ -509,7 +880,7 @@ def _districts_in_compound(
     for part in name.split("-"):
         if len(part) < 3:
             continue
-        for entry in _district_matches(directory, part):
+        for entry in district_matches(directory, part):
             if entry.gemeinde and needle in fold(entry.gemeinde):
                 out.append(entry)
     return out
@@ -566,12 +937,12 @@ def collect_indicia(
 
     counter = [0]
     found: list[Indiz] = []
-    body = " ".join(part for part in (titel, text) if part)
+    body = blocks.joined(titel, text)
 
     # 1 · What the caller states outright. A district and a number typed by a
     #     person, or read off an official extract, are the strongest thing here.
     if gemarkung:
-        entries = _district_matches(directory, gemarkung) if directory else []
+        entries = district_matches(directory, gemarkung) if directory else []
         key = entries[0].schluessel if len(entries) == 1 else None
         if key is None and gemarkung.strip().isdigit():
             key = gemarkung.strip()
@@ -743,7 +1114,11 @@ def _from_location_field(
     """
 
     out: list[Indiz] = []
-    match = _LOCALITY_RE.search(adresse) or _LOCALITY_TAIL_RE.search(adresse)
+    match = (
+        _LOCALITY_RE.search(adresse)
+        or _LOCALITY_PAIR_RE.match(adresse)
+        or _LOCALITY_TAIL_RE.search(adresse)
+    )
     if not match:
         return out
 
@@ -755,7 +1130,24 @@ def _from_location_field(
         municipality = behind
     else:
         municipality = tail
+
+    district = groups.get("district")
+    head = groups.get("head")
+    if head and directory is not None and federal_state(head) != head:
+        # „Leipzig - Knautkleeberg-Knauthain": the half in front of the dash is
+        # usually the federal state, but a city writes its own name there and
+        # the Ortsteil behind it. Only taken when the directory knows the head
+        # as a municipality, so a state and a stray word both fall through.
+        if municipality_spelling(directory, head):
+            municipality, district = head, district or tail
+    if municipality and directory is not None and not district:
+        # „Sachsen - Schönwölkau-Hohenroda": one slot, two levels, and the
+        # directory can tell them apart.
+        halves = split_municipality_and_district(municipality, directory)
+        if halves:
+            municipality, district = halves
     if municipality:
+        municipality = municipality_name(directory, municipality)
         out.append(
             _indiz(
                 counter,
@@ -771,7 +1163,6 @@ def _from_location_field(
             )
         )
 
-    district = groups.get("district")
     if not district or directory is None:
         return out
 
@@ -779,7 +1170,7 @@ def _from_location_field(
     # offered, the way a name in the running text is — the municipality above
     # sorts out which one afterwards. A street stands in this slot on one of the
     # three portals, so a name the directory does not know contributes nothing.
-    entries = _district_matches(directory, district)
+    entries = district_matches(directory, district)
     derived = False
     if not entries:
         entries = _districts_in_compound(directory, district, municipality)
@@ -823,45 +1214,62 @@ def _from_body(
     """
 
     out: list[Indiz] = []
+    pieces = blocks.split_blocks(body)
 
+    read_to = 0
     for match in _PARCEL_RE.finditer(body):
-        parsed = normalise_parcel_number(
-            f"{match.group(1)}/{match.group(2)}" if match.group(2) else match.group(1)
-        )
-        if not parsed:
+        if match.start() < read_to:
+            # Inside a run already read: „Flurstücke 790/11 und Flurstück 238/3".
             continue
-        label = parcel_label(*parsed)
-        if any(indiz.art == "flurstueck" and indiz.wert == label for indiz in out):
-            continue
-        out.append(
-            _indiz(
-                counter,
-                art="flurstueck",
-                wert=label,
-                text=f"Flurstück {label} im Text",
-                quelle="fliesstext",
-                beleg=_excerpt(body, match.start(), match.end()),
+        numbers, read_to = _parcel_run(body, match)
+        beleg = _excerpt(body, match.start(), read_to, pieces=pieces)
+        for numerator, denominator in numbers:
+            parsed = normalise_parcel_number(
+                f"{numerator}/{denominator}" if denominator else numerator
             )
-        )
+            if not parsed:
+                continue
+            label = parcel_label(*parsed)
+            if any(indiz.art == "flurstueck" and indiz.wert == label for indiz in out):
+                continue
+            out.append(
+                _indiz(
+                    counter,
+                    art="flurstueck",
+                    wert=label,
+                    text=f"Flurstück {label} im Text",
+                    quelle="fliesstext",
+                    beleg=beleg,
+                )
+            )
 
     # A place named as the municipality an Ortsteil belongs to is not a rival
     # reading of where the plot is -- it is the level above, and it is what
     # tells two districts of the same name apart. Collected first so the
     # district scan below knows which names are already spoken for.
-    municipalities: dict[str, tuple[int, int]] = {}
+    municipalities: dict[str, tuple[str, tuple[int, int]]] = {}
     stated_districts: dict[str, tuple[int, int]] = {}
-    for pattern in (_OT_NAMED_RE, _OT_BEFORE_RE, _OT_PLAIN_RE):
+    for pattern in (_OT_NAMED_RE, _OT_BEFORE_RE, _OT_IS_RE, _OT_PLAIN_RE):
         for match in pattern.finditer(body):
             groups = match.groupdict()
-            name = groups["municipality"]
-            municipalities.setdefault(fold(name), match.span("municipality"))
-            if groups.get("district"):
-                stated_districts.setdefault(
-                    fold(groups["district"]), match.span("district")
-                )
+            district = groups.get("district")
+            if (
+                pattern is _OT_IS_RE
+                and district
+                and not (directory and district_matches(directory, district))
+            ):
+                # „Das Grundstück ist … ein Ortsteil von X" -- the shape is the
+                # same and the subject is not a place.
+                continue
+            # „der Kreisstadt Borna" names Borna. The span stays the one the
+            # sentence has, because that is what the Beleg quotes; only the
+            # value is the name.
+            name = municipality_name(directory, groups["municipality"])
+            municipalities.setdefault(fold(name), (name, match.span("municipality")))
+            if district:
+                stated_districts.setdefault(fold(district), match.span("district"))
 
-    for _, (start, end) in municipalities.items():
-        name = body[start:end]
+    for name, (start, end) in municipalities.values():
         out.append(
             _indiz(
                 counter,
@@ -873,7 +1281,7 @@ def _from_body(
                     "Gemarkungen auseinanderhält"
                 ),
                 quelle="fliesstext",
-                beleg=_excerpt(body, start, end),
+                beleg=_excerpt(body, start, end, pieces=pieces),
                 beziehung="liegt_in",
                 sicherheit=0.5,
             )
@@ -891,7 +1299,7 @@ def _from_body(
                 wert=name,
                 text=f"Der Text nennt {name} ausdrücklich als Ortsteil",
                 quelle="fliesstext",
-                beleg=_excerpt(body, start, end),
+                beleg=_excerpt(body, start, end, pieces=pieces),
                 beziehung="liegt_in",
                 sicherheit=0.68,
             )
@@ -900,7 +1308,7 @@ def _from_body(
     named: set[str] = set(stated_districts)
     for match in _DISTRICT_RE.finditer(body):
         name = match.group(1).strip(" .:-")
-        entries = _district_matches(directory, name) if directory else []
+        entries = district_matches(directory, name) if directory else []
         named.add(fold(name))
         out.append(
             _indiz(
@@ -909,7 +1317,7 @@ def _from_body(
                 wert=name,
                 text=f"Der Text nennt die Gemarkung {name}",
                 quelle="fliesstext",
-                beleg=_excerpt(body, match.start(), match.end()),
+                beleg=_excerpt(body, match.start(), match.end(), pieces=pieces),
                 schluessel=entries[0].schluessel if len(entries) == 1 else None,
                 beziehung="liegt_in",
                 # An explicit "Gemarkung X" is a cadastral statement, not a
@@ -932,7 +1340,7 @@ def _from_body(
                 # „Stadtteil Burghausen-Rückmarsdorf“ is not a place name), and
                 # only with the municipality's consent -- the guard is in the
                 # helper.
-                if " " in word or _relation_before(body, start) != "liegt_in":
+                if " " in word or _relation_before(body, start, pieces) != "liegt_in":
                     continue
                 named.add(key)
                 for entry in _districts_in_compound(directory, word, municipality):
@@ -946,7 +1354,7 @@ def _from_body(
                                 f"{entry.schluessel} ist ein Teil davon"
                             ),
                             quelle="fliesstext",
-                            beleg=_excerpt(body, start, end),
+                            beleg=_excerpt(body, start, end, pieces=pieces),
                             schluessel=entry.schluessel,
                             beziehung="liegt_in",
                             sicherheit=0.5,
@@ -956,25 +1364,48 @@ def _from_body(
                 continue
             named.add(key)
             entries = index[key]
-            relation = _relation_before(body, start)
+            relation = _relation_before(body, start, pieces)
             # Every occurrence, not the first: „Grimma" appears once as the
             # municipality Großbothen belongs to and once as „die ca. 6 km
             # entfernte Kreisstadt". Reading only the first turns a place the
             # text puts at a distance into the anchor.
-            if _named_as_distant(body, key):
+            if _named_as_distant(body, key, pieces):
                 relation = "entfernt_von"
             elif key in municipalities:
                 relation = "erwaehnt"
+            # „südlich von Leipzig" names the city, not the cadastral district
+            # that happens to share its name. Where the sentence does not place
+            # the plot, the level is not the lookup's to decide, and the
+            # register knows which of the two the name is. Only there: „Ihr
+            # neues Wohngrundstück in Groitzsch" places the plot, and Groitzsch
+            # is a municipality *and* the district meant.
+            #
+            # Measured 18.09.2026: the patterns answered „Gemarkung Leipzig"
+            # fourteen times over the corpus, with Groitzsch, Borna, Bad
+            # Lausick, Chemnitz and Taucha once each, and a model read every
+            # one of them as the municipality.
+            # The relation as the Indiz will carry it: an unread one becomes
+            # „erwaehnt" below, and that is the value this has to judge.
+            beziehung = relation or "erwaehnt"
+            named_level = "gemarkung"
+            if beziehung not in ANCHORING and municipality_spelling(directory, word):
+                named_level = "gemeinde"
             out.append(
                 _indiz(
                     counter,
-                    art="gemarkung",
+                    art=named_level,
                     wert=word,
-                    text=_place_sentence(word, relation, len(entries)),
+                    text=_place_sentence(
+                        word, relation, 1 if named_level == "gemeinde" else len(entries)
+                    ),
                     quelle="fliesstext",
-                    beleg=_excerpt(body, start, end),
-                    schluessel=entries[0].schluessel if len(entries) == 1 else None,
-                    beziehung=relation or "erwaehnt",
+                    beleg=_excerpt(body, start, end, pieces=pieces),
+                    schluessel=(
+                        entries[0].schluessel
+                        if named_level == "gemarkung" and len(entries) == 1
+                        else None
+                    ),
+                    beziehung=beziehung,
                     # A place the text places the plot *in* is worth far more
                     # than one it merely names -- and one it names as being
                     # kilometres away is worth less than nothing as an anchor.
@@ -995,7 +1426,7 @@ def _from_body(
                 wert=name,
                 text=f"Straße {name} — innerhalb einer Gemarkung nahezu eindeutig, allein wertlos",
                 quelle="fliesstext",
-                beleg=_excerpt(body, match.start(), match.end()),
+                beleg=_excerpt(body, match.start(), match.end(), pieces=pieces),
                 sicherheit=0.4,
             )
         )
@@ -1003,7 +1434,9 @@ def _from_body(
     return out
 
 
-def _named_as_distant(body: str, folded_name: str) -> bool:
+def _named_as_distant(
+    body: str, folded_name: str, pieces: list[blocks.Block] | None = None
+) -> bool:
     """Whether any occurrence of a name is preceded by a distance.
 
     One statement of distance outweighs any number of neutral mentions: „die
@@ -1015,10 +1448,112 @@ def _named_as_distant(body: str, folded_name: str) -> bool:
     for word, start, _ in _word_positions(body):
         if fold(word) != folded_name:
             continue
-        window = body[max(0, start - _RELATION_WINDOW) : start]
+        low, _high = blocks.bounds_at(pieces or [], start, (0, len(body)))
+        window = body[max(low, start - _RELATION_WINDOW) : start]
         if any(m.end() >= len(window) - 2 for m in pattern.finditer(window)):
             return True
     return False
+
+
+# What an advert states about itself as a „Label: Wert" pair, and what none of
+# it may do: none of these narrow a search. Measured 19.09.2026 over the 16
+# recorded adverts — the object id appears 14 times, the availability 10, the
+# price per square metre once — and all three are pairs, which is exactly what
+# the block splitter from Stufe 0 was built to hand over.
+#
+# The price per square metre earns its place twice. It is a line worth showing,
+# and it is a *consistency check*: price over area has to produce it. That is
+# the same figure whose misreading („Kaufpreis pro m²: 92,00 €" as a purchase
+# price of 92 €) the model channel caught in `portal_fields`.
+STATED_LABELS = {
+    "objekt_id": ("anbieter-objekt-id", "objekt-nr", "objektnummer", "objekt-id"),
+    "verfuegbar_ab": ("verfuegbar ab", "bezugsfrei ab", "verfuegbarkeit"),
+    "preis_je_m2": ("kaufpreis pro m", "preis pro m", "kaufpreis je m", "preis je m"),
+}
+
+
+def stated_values(text: str | None) -> dict[str, str]:
+    """What the advert says about itself in its own attribute list.
+
+    Shown and checked, never searched with. Read out of the blocks rather than
+    with a pattern per label: a pair is a pair, and the splitter already knows
+    which lines are one.
+    """
+
+    if not text:
+        return {}
+    pieces = blocks.split_blocks(text)
+    found: dict[str, str] = {}
+    for field, words in STATED_LABELS.items():
+        for block in blocks.labelled(pieces, *words):
+            value = block.text.strip()
+            if value:
+                found[field] = value
+                break
+    return found
+
+
+def price_check(
+    stated: dict[str, str], price_eur: int | None, area_m2: int | None
+) -> str | None:
+    """Whether price, area and the stated rate agree — a German sentence if not.
+
+    The one arithmetic an advert offers against itself. It says nothing when a
+    figure is missing, because a derived number with a missing input is never
+    computed here, and it says nothing when the three agree: a check that
+    speaks when everything is fine is one nobody reads.
+    """
+
+    raw = stated.get("preis_je_m2")
+    if not raw or not price_eur or not area_m2:
+        return None
+    # „92,00 €" carries its unit; `german_number` wants digits alone.
+    digits = re.search(r"\d[\d.,\s]*", raw)
+    rate = german_number(digits.group(0)) if digits else None
+    if rate is None or rate <= 0:
+        return None
+    expected = price_eur / area_m2
+    if abs(expected - rate) / rate <= 0.02:
+        return None
+    return (
+        f"Die Angaben widersprechen sich: {_german(price_eur)} € auf "
+        f"{_german(area_m2)} m² sind {_german(expected, 2)} € je m², "
+        f"das Inserat nennt {raw.strip()}."
+    )
+
+
+def _german(value: float, places: int = 0) -> str:
+    """A number as a German page writes it: dot for thousands, comma for the rest."""
+
+    text = f"{value:,.{places}f}"
+    return text.replace(",", "\x00").replace(".", ",").replace("\x00", ".")
+
+
+def street_candidates(text: str) -> list[str]:
+    """Phrases that could be an address, for the cadastre to rule on.
+
+    These deliberately do *not* become Indizien. „Am Kurpark" and „Zur
+    Verfügung" are the same shape to a pattern, and a protocol that lists every
+    prepositional phrase in an advert is one nobody reads — the loose harvest
+    finds up to thirteen per listing. So they stay a pool: a phrase becomes
+    visible only where a candidate's official ``lagebeztxt`` carries it, and
+    then it is a property of that candidate, which is what it always was.
+
+    That is the whole point of reading loosely. The rules below only keep the
+    pool small enough to be worth comparing; being wrong here costs a string
+    comparison, never a parcel.
+    """
+
+    out: list[str] = []
+    for match in _PLACE_PHRASE_RE.finditer(text):
+        name = match.group(1).strip()
+        name = name[0].upper() + name[1:]
+        last = name.split()[-1].strip(".,;:")
+        if _ABSTRACT_NOUN.search(last) or last.lower() in _NOT_A_PLACE_NOUN:
+            continue
+        if name not in out:
+            out.append(name)
+    return out
 
 
 def _is_street_name(name: str) -> bool:
@@ -1071,6 +1606,10 @@ def _place_sentence(name: str, relation: Ortsbeziehung | None, count: int) -> st
 
 __all__ = [
     "AreaStatement",
+    "price_check",
+    "stated_values",
+    "street_candidates",
+    "DOCUMENT_OF",
     "federal_state",
     "outside_saxony",
     "SOURCE_CONFIDENCE",

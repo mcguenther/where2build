@@ -23,7 +23,7 @@ from app.services.portal_fields import (
 )
 from app.services.portals import parse_page
 
-from .conftest import fixture_text
+from .conftest import fixture_json, fixture_text
 
 # name, area, price, the location line the reader composes
 PORTALS = [
@@ -76,6 +76,51 @@ def test_a_rate_per_square_metre_is_not_the_asking_price():
     page = fixture_text("inserat-immoscout.html")
     assert "370,62 €/m²" in page
     assert read_price_eur(page) == 275_000
+
+
+def test_a_rate_is_refused_where_it_is_the_only_price_shaped_number():
+    """The case the test above cannot make: advert 2418686487 names no purchase
+    price at all, only „Kaufpreis pro m²: 92,00 €".
+
+    Measured 18.09.2026: this read as a purchase price of 92 € for as long as
+    the guard existed, and the test above passed the whole time — on ImmoScout
+    the real price stands nearer its label than the rate, so `_nearest` wins
+    without the guard ever being consulted. A rate near a price is not the same
+    test as a rate instead of one.
+    """
+
+    listing = fixture_json("inserate-sachsen.json")["2418686487"]
+    assert "Kaufpreis pro m²: 92,00 €" in listing["beschreibung"]
+    assert read_price_eur(listing["beschreibung"]) is None
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Kaufpreis pro m²: 92,00 €",
+        "Kaufpreis: 92,00 €/m²",
+        "Kaufpreis je qm 92,00 €",
+        "Kaufpreis pro Quadratmeter 92,00 €",
+        # A rate does not become a price because another label stands nearer.
+        "Kaufpreis (Preis pro m²: 92 €)",
+    ],
+)
+def test_the_unit_is_read_on_both_sides_of_the_number(text):
+    assert read_price_eur(text) is None
+
+
+@pytest.mark.parametrize(
+    ("text", "price"),
+    [
+        ("Kaufpreis: 199.000 €", 199_000),
+        ("199.000 € | Kaufpreis 229,79 €/m²", 199_000),
+        ("Kaufpreis (Preis pro m²: 92 €) 199.000 €", 199_000),
+        # The words without the adjacency: „je m²" belongs to another sentence.
+        ("Fläche je m² bebaubar, Kaufpreis 199.000 €", 199_000),
+    ],
+)
+def test_a_price_beside_a_rate_still_reads(text, price):
+    assert read_price_eur(text) == price
 
 
 def test_prose_about_the_area_contributes_nothing():

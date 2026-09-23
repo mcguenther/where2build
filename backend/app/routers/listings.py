@@ -7,35 +7,39 @@ import re
 from fastapi import APIRouter, Depends
 from pydantic import ValidationError
 
-from ..deps import gemarkung_directory, llm_client, settings_dep
+from ..deps import gemarkung_directory, lehrbuch, llm_client, settings_dep
 from ..errors import BadRequestError, NotConfiguredError, UpstreamError
 from ..schemas import (
+    BEFUND_VORLAGE,
     Extraktionsweg,
+    Indiz,
     Inserat,
+    InseratBefund,
     InseratFelder,
     InseratVorschlaege,
     ListingExtractRequest,
     ListingExtractResponse,
     as_vorschlaege,
 )
-from ..search.indicia import collect_indicia
-from ..services.llm import LLMClient, normalize_url
+from ..search.indicia import collect_indicia, price_check, stated_values, district_matches
+from ..services import befund as befund_service
+from ..services import prompts
+from ..services import lehrbuch as lehrbuch_service
+from ..services.beleg import Urteil, refusal_note
+from ..services.llm import LLMClient, fingerprint, normalize_url
 from ..services.portals import PASTE_HINT, fetch_page, is_blocked, is_kleinanzeigen, parse_page
 from ..settings import Settings
 
 router = APIRouter(prefix="/api/listings", tags=["Inserate"])
 
-_FETCH_TASK = (
-    "Es geht um ein Grundstücksinserat: Adresse, Flurstücksnummern, Kaufpreis "
-    "und Grundstücksfläche."
-)
-_STRUCTURE_TASK = (
-    "Lies aus dem folgenden Text eines Grundstücksinserats aus: Adresse, "
-    "Koordinaten, Flurstückskennungen (etwa „Flurstück 790 sowie 706“), Kaufpreis "
-    "in Euro und Grundstücksfläche in Quadratmetern. Trage nur ein, was im Text "
-    "tatsächlich steht, sonst null. Namen, Telefonnummern und andere Kontaktdaten "
-    "werden nicht erfasst."
-)
+# A capitalised word, which in German is every noun — the register is what
+# decides whether one of them is a place.
+_WORDS = re.compile(r"\b[A-ZÄÖÜ][\wäöüßÄÖÜ-]{2,}\b")
+
+# What the model is told lives in `services/prompts.py`: it is content rather
+# than plumbing, and it is the one part of this channel that has to know what a
+# German property advert looks like.
+_FETCH_TASK = prompts.FETCH
 
 # What the reader produces, as a number. It rides in the cache key, because the
 # cache that holds an extracted listing has no expiry (`ttl_s=None`) and is
@@ -47,7 +51,9 @@ _STRUCTURE_TASK = (
 #
 #   1  the original reader
 #   2  asking price, plot area from the attribute list, description and images
-EXTRACTION_VERSION = 2
+#   3  the model answers a Befund with a Beleg per value, and what passes the
+#      gate arrives as Indizien beside the fields
+EXTRACTION_VERSION = 3
 
 _NO_LOCATOR = (
     "Aus dieser Seite ließ sich weder eine Adresse noch eine Koordinate noch ein "
@@ -83,6 +89,121 @@ def _area_from(angaben: dict[str, str]) -> int | None:
         return int(float(match.group(0).replace(".", "").replace(" ", "")))
     except ValueError:
         return None
+
+
+async def _ask_the_model(
+    llm: LLMClient,
+    text: str,
+    known: InseratFelder,
+    start: int = 0,
+    quelle_url: str | None = None,
+) -> tuple[InseratFelder, list[Indiz], str | None]:
+    """One model call, gated: the fields it may fill, the Indizien, the refusals.
+
+    Every value comes back with the sentence it was read from, and every one of
+    them is checked against `text` before it is used — which is why this is the
+    only place the model's answer is ever unpacked.
+
+    And every disagreement between the two readers is written down on the way
+    past. A model here is a teacher whose answer is never trusted: where it
+    reads something the patterns did not, that is the pattern that is missing,
+    with the sentence it is missing on — and the gate has already proved the
+    sentence stands in the page. See `services/lehrbuch.py`.
+    """
+
+    befund = await llm.structure(
+        text=prompts.user_message(text, _known_districts(text)),
+        model=InseratBefund,
+        name="inserat-befund",
+        auftrag="",
+        system=prompts.SYSTEM,
+    )
+    fields, field_verdicts = befund_service.fields_from(befund, text, known)
+    indicia, indiz_verdicts = befund_service.indicia_from(befund, text, start)
+    verdicts = [*field_verdicts, *indiz_verdicts]
+    await _note_divergences(text, known, indicia, verdicts, llm, quelle_url)
+    return fields, indicia, refusal_note(verdicts)
+
+
+async def _note_divergences(
+    text: str,
+    known: InseratFelder,
+    indicia: list[Indiz],
+    verdicts: list[Urteil],
+    llm: LLMClient,
+    quelle_url: str | None,
+) -> None:
+    """File what the two readers disagreed about. Never fails the request.
+
+    The comparison is fair because both sides read the *same* text: the
+    deterministic side is asked here, with the reader the search itself uses,
+    rather than taken from whatever a portal's attribute list happened to
+    carry.
+    """
+
+    patterns = [
+        (indiz.art, indiz.wert)
+        for indiz in collect_indicia(text=text, directory=gemarkung_directory())
+    ]
+    patterns += [
+        ("adresse", known.adresse),
+        ("kaufpreis_eur", _as_text(known.kaufpreis_eur)),
+        ("grundstuecksflaeche_m2", _as_text(known.grundstuecksflaeche_m2)),
+    ]
+    accepted = [(indiz.art, indiz.wert, indiz.beleg) for indiz in indicia]
+    accepted += [
+        (verdict.feld, _as_text(verdict.wert), verdict.beleg)
+        for verdict in verdicts
+        if verdict.angenommen and ":" not in verdict.feld
+    ]
+    refused = [
+        (verdict.feld.split(":")[0], _as_text(verdict.wert), verdict.beleg, verdict.grund)
+        for verdict in verdicts
+        if verdict.verworfen and verdict.wert is not None
+    ]
+    await lehrbuch().record(
+        lehrbuch_service.compare(
+            deterministic=patterns,
+            accepted=accepted,
+            refused=refused,
+            text_hash=lehrbuch_service.fingerprint(text),
+            quelle_url=quelle_url,
+            modell_id=llm.settings.model,
+            vorlage=BEFUND_VORLAGE,
+        )
+    )
+
+
+def _known_districts(text: str) -> list[str]:
+    """The names in this text that the Saxon district register actually carries.
+
+    Reference material, not an answer: which of them the advert means, and on
+    which level, is precisely what the model is being asked. A closed list of
+    names that exist is worth sending — it is data about Saxony — and it costs
+    one pass over a file that is already in memory.
+
+    What is *not* sent is anything our own readers concluded. Handing the model
+    our findings would make it agree with us, and the divergence log in
+    `services/lehrbuch.py` would then measure nothing at all. This function
+    therefore reads the register, never `collect_indicia`.
+    """
+
+    directory = gemarkung_directory()
+    if directory is None:
+        return []
+    found: list[str] = []
+    for word in dict.fromkeys(_WORDS.findall(text)):
+        if district_matches(directory, word):
+            found.append(word)
+        if len(found) >= prompts.MAX_DISTRICT_HINTS:
+            break
+    return found
+
+
+def _as_text(value: object) -> str | None:
+    if value is None:
+        return None
+    return f"{value:g}" if isinstance(value, float) else str(value)
 
 
 def _merge(deterministic: InseratFelder, extracted: InseratFelder | None) -> InseratFelder:
@@ -139,8 +260,11 @@ def _answer(
     titel: str | None = None,
     beschreibung: str | None = None,
     bilder: list[str] | None = None,
+    indizien: list[Indiz] | None = None,
 ) -> ListingExtractResponse:
     text = " ".join(part for part in (titel, beschreibung) if part).strip()
+    stated = stated_values(text)
+    mismatch = price_check(stated, felder.kaufpreis_eur, felder.grundstuecksflaeche_m2)
     try:
         inserat = Inserat(**felder.model_dump(), quelle_url=quelle_url)
     except ValidationError as exc:
@@ -155,9 +279,11 @@ def _answer(
         felder=as_vorschlaege(inserat or felder, InseratVorschlaege, quelle_url),
         quelle_url=quelle_url,
         weg=weg,
-        hinweis=hinweis or titel,
+        hinweis=" ".join(part for part in (hinweis or titel, mismatch) if part) or None,
         beschreibung=text[:_DESCRIPTION_LIMIT] or None,
         bilder=bilder or [],
+        indizien=indizien or [],
+        angaben=stated,
     )
 
 
@@ -176,10 +302,11 @@ async def _from_url(url: str, llm: LLMClient, settings: Settings) -> ListingExtr
         weg: Extraktionsweg = "meta-tags" if seite.has_coordinates else "llm"
         hinweis = None
         extracted: InseratFelder | None = None
+        indizien: list[Indiz] = []
         if llm.settings.configured and seite.text:
             try:
-                extracted = await llm.structure(
-                    seite.text, InseratFelder, "inserat", _STRUCTURE_TASK
+                extracted, indizien, hinweis = await _ask_the_model(
+                    llm, seite.text, deterministic, quelle_url=url
                 )
             except UpstreamError as exc:
                 if not seite.has_coordinates:
@@ -200,6 +327,7 @@ async def _from_url(url: str, llm: LLMClient, settings: Settings) -> ListingExtr
             # reads a portal's navigation and cookie banner as evidence.
             seite.beschreibung or seite.text,
             seite.bilder,
+            indizien,
         )
 
     # Unknown domain: the spec's chain is web_fetch first, then meta tags and
@@ -229,19 +357,23 @@ async def _from_url(url: str, llm: LLMClient, settings: Settings) -> ListingExtr
                 "Bitte den Seiteninhalt einfügen."
             )
 
-    extracted = await llm.structure(text, InseratFelder, "inserat", _STRUCTURE_TASK)
     deterministic = (
         InseratFelder(adresse=seite.adresse, lat=seite.lat, lon=seite.lon)
         if seite is not None
         else InseratFelder()
     )
+    extracted, indizien, hinweis = await _ask_the_model(
+        llm, text, deterministic, quelle_url=url
+    )
     return _answer(
         _merge(deterministic, extracted),
         url,
         "llm",
+        hinweis,
         titel=seite.titel if seite else None,
         beschreibung=(seite.beschreibung if seite and seite.beschreibung else text),
         bilder=seite.bilder if seite else None,
+        indizien=indizien,
     )
 
 
@@ -253,7 +385,12 @@ async def extract(
 ) -> ListingExtractResponse:
     if payload.url is not None:
         url = str(payload.url)
-        cache_key = f"inserat:v{EXTRACTION_VERSION}:{normalize_url(url)}"
+        # The model rides in the key too: a different one gives a different
+        # answer, and this cache has no expiry.
+        cache_key = (
+            f"inserat:v{EXTRACTION_VERSION}:{fingerprint(llm.settings.model)}"
+            f":{normalize_url(url)}"
+        )
         cached = llm.cache.get_json(cache_key)
         if cached is not None:
             return ListingExtractResponse.model_validate(cached)
@@ -291,9 +428,10 @@ async def extract(
 
     extracted: InseratFelder | None = None
     hinweis: str | None = None
+    indizien: list[Indiz] = []
     if llm.settings.configured:
         try:
-            extracted = await llm.structure(text, InseratFelder, "inserat", _STRUCTURE_TASK)
+            extracted, indizien, hinweis = await _ask_the_model(llm, text, deterministic)
         except UpstreamError as exc:
             hinweis = f"Nur die Angaben der Seite konnten gelesen werden: {exc.message}"
     elif not _has_locator(deterministic) and not _is_searchable(beschreibung):
@@ -316,4 +454,5 @@ async def extract(
         beschreibung=beschreibung,
         bilder=seite.bilder,
         titel=seite.titel,
+        indizien=indizien,
     )

@@ -26,6 +26,66 @@ also "Decisions that are settled" in `CLAUDE.md`.
   leaves 15. Two requests, no model call. Only use the exact value when the
   listing's number is exact — "ca. 500 m²" has to widen into a band.
 
+- **The relation can stand behind the name, and every window that looks left
+  misses it.** „Thräna ist mit seinen etwa 765 Einwohnern ein kleiner Ortsteil
+  der Kreisstadt Borna" — the one advert in the corpus whose answer is Thräna,
+  and its district was read as a bare mention until the predicative pattern
+  existed. The appositive one needs its adjective too: „Kitzen, ein
+  idyllischer Ortsteil der Stadt Pegau" did not match a pattern that allowed
+  „ein OT" and not „ein idyllischer Ortsteil". Measured: Borna went from 29
+  candidates in 34 requests to 5 in 8, with the first in Gemarkung Thräna and
+  no image read. The predicative form only counts when the directory knows the
+  name — „Das Grundstück ist … ein Ortsteil von Machern" has the same shape,
+  and German capitalises every noun.
+
+- **A parcel number that resolves to the wrong parcel used to close the
+  search.** The staircase runs only while the candidate list is empty, so a
+  number that found *some* parcel stopped the area route that would have found
+  the right one, and the contradiction was reported and dropped. Both stand
+  now: the number keeps its parcel with the objection attached, the area is
+  searched as well, and an empty area route gives the marked parcel back. The
+  threshold comes from the tolerance staircase — as far as the wording
+  justifies, 5 % exact and 10 % rounded — because the old factor of two let
+  700 m² pass for a stated 502.
+
+- **A location field with no postcode carries two levels in one slot, and the
+  directory can tell them apart.** „Leipzig - Knautkleeberg-Knauthain": the
+  half in front of the dash is usually the federal state, but a city writes its
+  own name there. „Sachsen - Schönwölkau-Hohenroda": the state is in front and
+  the municipality behind it has its Ortsteil hyphenated on. Both are read only
+  when the directory confirms them — the head as a municipality it knows, the
+  tail's right half as a district inside that municipality — which is what
+  keeps „Sandersdorf-Brehna" in one piece. Fixing this is what ended the one
+  false confirmation in the corpus: advert 3508042470 now searches all three
+  districts and answers „mehrdeutig" instead of confirming a parcel its own
+  location field contradicts.
+
+- **„Bestätigt" means nothing contradicts, not that one candidate is left.**
+  The shape is the contradiction the area cannot see: two parcels of 577 m²
+  can be 14 x 40 m and 22 x 27, and only one is the plot with the 14 m
+  frontage. `read_dimensions` takes the measures out of the text where a word
+  says what was measured, and over sixteen adverts it finds exactly the two
+  that state any — „einen Abstand von 15 m" out of a Bebauungsplan is not one.
+  Two guards, both measured: a **frontage on its own may not object** (advert
+  3375124391 states 26 m and its correct parcel sits in a 39,8 x 71,5 m
+  rectangle, because the plot is a wedge), and a parcel whose rectangle is more
+  than **1,3 times its own area** is not rectangular enough to be checked
+  against one at all.
+
+- **248 districts cannot be found under their own name.** The directory files
+  2 105 of its 5 339 entries with a Flur suffix — „Kitzen Flur 1" to „Kitzen
+  Flur 11" — and `_district_matches` compares names for equality, which it has
+  to: a substring search turns „Grimma" into a match for „Grimmaischer".
+  Behind those entries stand 295 base names and **248 have no plain twin**.
+  Measured 16.09.2026 over six freshly recorded adverts: Pehritzsch (7 Flure),
+  Hohenroda (3), Krostitz (8), Doberschütz (5), Sprotta (6), Jesewitz (6) and
+  Eilenburg (**48**) are all unreachable by name, so five of those six runs
+  reported „die Anzeige nennt keine Gemarkung", fell back on the platform's pin
+  with 12 to 14 districts, and cost **24 to 40 requests** each where the right
+  anchor costs two. The fix is measured and cheap: match on the base name and
+  send the Flur keys as one `fes:Or` — „Kitzen" then resolves to 2 062 parcels
+  in a single request, and with the advert's exact area exactly one remains.
+
 - **`ave:lagebeztxt` is often `"ohne Lage"`**, so a street name cannot be matched
   against ALKIS as an attribute. Take the way from OSM and buffer it instead: a
   40 m buffer around Wiesenstraße catches 790/11 at 3 m, and an 80 m buffer cuts
@@ -74,6 +134,17 @@ also "Decisions that are settled" in `CLAUDE.md`.
   minimum half-width, so even a confirmed parcel is never shown without its
   neighbours. And a layer whose extent dwarfs the frame stops informing and
   starts tinting: the district wash and the street buffer fade out on the way in.
+
+- **A dependency parser reads the relation a regular expression cannot — on a
+  sentence.** spaCy's German model takes „Thräna ist … ein Ortsteil der
+  Kreisstadt Borna" apart correctly, and four rules cover every phrasing in the
+  corpus, the distance-to-place binding included. On the real text it falls
+  apart: a markdown heading without a full stop becomes the subject of the next
+  sentence, and the bullet lists bind „ca. 300 m" to Leipzig instead of Kitzen,
+  four times in one advert. The cause is format, not language, so the first
+  step is splitting a listing into headings, paragraphs, bullets and „Label:
+  Wert" lines — which helps the regular expressions and the model just as much.
+  Measured 15.09.2026, with what it would cost: `docs/research/nlp-spacy.md`.
 
 - **Counting place-name mentions picks the wrong place.** Against the 5 339
   names in `gemarkungen-sachsen.json`, this ad scores Grimma 3× and Großbothen
@@ -636,3 +707,458 @@ also "Decisions that are settled" in `CLAUDE.md`.
   — a scoreable set — and adding Gemarkung Lausen leaves exactly **one**,
   Flurstück 8/a, 742 m², „Staffelsteinstraße 4", `Wohnbaufläche;742`. So a
   Stadtteil is worth resolving to the Gemarkungen under it; it is never one.
+
+- **A stated distance is a band, and everything about it is measured as an
+  interval.** Advert 3499632623 says „die ca. 6 km entfernte Kreisstadt
+  Grimma". Measured 16.09.2026 from the parcel actually offered, 790/11: the
+  geocoder's point for Grimma is 5,34 km away, the car route 7,37 km, the edge
+  of the built-up area 5,3 km, its middle 6,0 km. Every single-point reading
+  misses the stated figure; the interval between the last two contains it. So
+  `search/distance.py` reduces nothing: the reference resolves to an outline,
+  the candidate carries `[dist(x, Ortslage), dist(x, Mitte)]`, the sentence
+  carries `[d/1,30 · d·1,25]`, and the test is whether they overlap.
+
+  The three roles this may play, and the one it may not:
+
+  - **Order.** One feature for all of a listing's distances together, averaged
+    — station, bus stop and school sit in the same village, so their errors are
+    one error, and a product would count it three times.
+  - **Object, outwards only.** A route is never shorter than the straight line,
+    measured without exception, so a candidate whose straight line already
+    exceeds the outer bound cannot satisfy the statement under any reading.
+    Measured: 1538 Großzschocher reads 29,9 km against Grimma's „6 km". It
+    still deletes nobody; it sinks the candidate and writes the sentence.
+  - **Never confirm.** No intersection of bands makes a verdict. That stays
+    with official statements.
+
+- **Most distances in a listing name a kind of place, and those are a single
+  row.** Measured over the 16 recorded adverts: 62 statements, 8 naming a
+  place, 4 of those a place the Gemarkungsverzeichnis carries (Grimma, Machern,
+  Leipzig, Groitzsch); „Penny 500 m" and „Nahkauf 700 m" read exactly like
+  place names and the directory is what says they are shops. Advert 3375124391
+  alone lists thirteen — „Kindergarten 2 km", „Gymnasium 6,8 km", „Flughafen
+  35 km" — and is settled by its exact area in five requests. Thirteen rows
+  that cannot contribute would push the five that did out of view, so the
+  unresolvable ones are collapsed into one Indiz that names what it collapsed.
+
+- **Two regex traps, both of which produced a plausible wrong reference.** A
+  greedy optional qualifier („Kreisstadt" in „6 km entfernte Kreisstadt
+  Grimma") swallows the name and takes the next capitalised word instead — and
+  with `\s` it crosses a paragraph break, so „im 3 km entfernten Machern\n\nDie
+  verwendeten Bilder" read as a distance to a place called „Die". The
+  separators in these patterns are `[ \t]`, not `\s`. And a class word is a
+  whole word or a German compound ending, never a substring: „see" and „wald"
+  sit inside „Seelitz" and „Waldheim", and as substrings they turn two towns
+  into a lake and a forest that nothing can resolve.
+
+- **A band never pays for itself on a run the cadastre can settle.** Resolving
+  one costs two ALKIS requests — the district boundary for a seed point, then
+  the built-up area around it — so it runs only once there is more than one
+  candidate to order. Measured on the reference advert with its area rounded to
+  „ca. 500 m²": 5 requests without the band, 7 with, 11 candidates all inside
+  the band. Within one Gemarkung a 6 km statement separates nothing, which is
+  the expected outcome and the reason this may only ever rank.
+
+- **Half an advert is not prose, and reading it as one string costs a hard
+  filter.** `search/blocks.py` cuts the text once — heading, `Label: Wert`
+  pair, bullet, paragraph — and the readers work inside a block. Measured over
+  the 16 recorded adverts: 148 paragraphs, 78 pairs, 76 headings, 55 bullets.
+  What it buys is not tidiness:
+
+  - **A labelled pair outranks prose.** Advert 3464790207 writes
+    „Grundstücksfläche: ca. 711 m²" as a pair and „das ca. 711 m² große
+    Grundstück" as prose; when the two disagree the pair is the answer.
+  - **A figure whose label or lead-in names something else is refused.**
+    Advert 3381469778 writes „die zulässige Grundfläche beträgt insgesamt ca.
+    240 m²" three sentences after its „ca. 600 m²", and a reader that takes
+    whichever comes first is one paragraph away from filtering the cadastre on
+    a building footprint.
+  - **A sentence about the development is not about the plot.** Advert
+    3441433250 writes „Die Grundstücke variieren in ihrer Größe zwischen ca.
+    360 m² und 800 m²" and states 590 m² in its attribute list. The reader
+    answered **360**; it now answers nothing and the attribute field wins.
+    Measured against the whole corpus, that is the *only* run whose area
+    reading changed.
+  - **A Beleg stops at its block.** The excerpt padding used to reach over a
+    line break and glue „# Lagebeschreibung" to the sentence under it. 13 of
+    the corpus's Belege crossed a line; 7 remain, and all seven are inside a
+    paragraph written on several lines, which is one statement.
+
+  The plural is the window, not a character count: „Die Grundstücke variieren …
+  zwischen ca. 360 m² und 800 m²" puts the plural 64 characters in front of the
+  second figure, and any window narrow enough to be safe misses it. A block is
+  one statement, so the block is the window.
+
+- **Three shapes that are not a `Label: Wert` pair, all from one advert.**
+  Measured on 3441433250: a URL („https://www.ohne-makler.net/…" read as the
+  pair `https` = `//www…`), a sentence with a colon in it („Die
+  Verkehrsanbindung ist hervorragend: Über den …"), and advertising copy
+  („Stellen Sie sich vor: …"). Three conditions remove all three — whitespace
+  after the colon, at most five words not beginning with an article, and no
+  finite verb — and the pronoun is what catches the imperative, because German
+  puts one in every one of them.
+
+- **A source is a *document*, not a channel.** `named_as_a_set()` asked
+  `quelle`, and every OCR find carries `quelle="bild"` — so two numbers off two
+  different Geoportal prints looked exactly like „Flurstück 790/11 sowie
+  Flurstück 238/3" in one sentence: one plot of two parcels, no question asked,
+  and `_narrow_by_area` deliberately declining to tell them apart. A print
+  carries dozens of numbers in its map image, so two prints in one listing is
+  not a rare shape. `Indiz.fundort` now names the document (`bild:<url>`,
+  `anzeigentext`, `attributliste`), the body text is one document however many
+  paragraphs it has, and the Konflikt machinery that follows was already there.
+
+- **A parcel number needs its label on every occurrence.** „Flurstück 790/11
+  sowie Flurstück 238/3" reads as two; „Flurstücke 790/11 und 238/3" reads as
+  none, because `_PARCEL_RE` does not carry the plural and the second number
+  has no label of its own. Not fixed — noted, because the shape occurs and the
+  fix is a widening of the pattern that wants its own measurement.
+
+- **Never run two pytest processes at once here.** Three Tesseract tests failed
+  on a run that shared the machine with two other suites, and they failed
+  exactly as a photograph of a lawn does: an empty reading. `TIMEOUT_S = 30`
+  and Tesseract is CPU-bound, which the module docstring already says about
+  reading images concurrently — it is just as true of the test runner.
+
+- **A model is the last reader in this chain, not the first — and the gate is a
+  string comparison, not a promise in the prompt.** `services/beleg.py` runs
+  four tests before a model value becomes anything, in this order: the Beleg
+  stands verbatim in the page (normalised over whitespace, quotes and case, and
+  nothing else); the value stands in the Beleg (German notation, so „1.076" and
+  „1076" are one number); the value is within bounds; and it agrees with what
+  was read deterministically — where it does not, the page wins and the
+  difference is shown.
+
+  The first test is the one that earns the module. Advert 2418686487 states
+  748,50 m² and „92,00 € pro m²“ and never states a price; 748,5 × 92 is
+  68 862 €, which a model rounds to 69 000 € and writes a Beleg for that stands
+  nowhere on the page. **Rechnen ist nicht Lesen**, and a price nobody wrote is
+  not a statement in a listing. The same test catches „rund 30 km bis Leipzig“
+  under an advert that never mentions Leipzig.
+
+- **The model answers a Befund, not `InseratFelder` with more fields.** Every
+  value travels in the same envelope as the sentence it was read from, and
+  without that sentence there is no value. Two things are absent from the
+  schema on purpose, and the absence is the enforcement: **contact details**,
+  so no personal data can arrive however the prompt is worded, and a
+  **coordinate**, because a coordinate has no sentence it could be quoted from
+  — the meta tags give it or nothing does.
+
+- **Where a model actually earns its keep is the level, not the number.** Area
+  and price the deterministic reader gets better and for free. „Thräna ist ein
+  kleiner Ortsteil der Kreisstadt Borna" names a district *and* the
+  municipality above it, and telling those two apart is what the patterns in
+  `indicia.py` are maintained for and where they measurably fail (B3, twice).
+  So `orte` carries `ebene` and `beziehung`, and `services/befund.py` turns
+  them into Indizien at `quelle="modell"` — 0.45, below the body text. That
+  bound is the whole safety argument: a model Indiz may rank and may open a
+  branch an official filter then checks; it can never filter and never produce
+  „bestätigt“, and no special case is needed to say so.
+
+- **A cache with no expiry has to name what answered it, and this one has
+  broken that rule twice.** An extraction cached before the price parser
+  existed outlived the parser and kept the field empty on exactly the listings
+  the fix was written for; a page text cached under a bare URL outlived a
+  change of prompt. `llm.fingerprint()` now puts the model, the prompt and the
+  JSON schema into every key, and `structure()` caches its answer at all, which
+  it did not before — every re-run of a listing was paid for twice.
+
+- **Open, and measurable the moment there is an API key.** The model is handed
+  the *raw* page text today, not the blocks — so whether the structure that
+  helps the deterministic readers also helps the model is untested in both
+  directions. The measurement is the same advert twice, raw against
+  block-rendered, counting fields filled and Belege refused by test 1. Nothing
+  in this sandbox has `LLM_API_KEY`, so every model answer here is a recorded
+  one and the live call is untested.
+
+- **Where the model and the patterns disagree is the corpus, so it is written
+  down.** `services/lehrbuch.py` files three kinds, and each says something
+  different: a **Lücke** (the patterns found nothing, the model found something
+  the gate accepted — the pattern that is missing, with the sentence it is
+  missing on), a **Widerspruch** (both found something and they differ), and a
+  **Verworfen** (the gate refused the model — the teacher being wrong, and the
+  only kind that can show the gate earning its keep). An *agreement* produces
+  nothing: a log that also holds the cases where the pipeline was right is a
+  log nobody reads.
+
+  Both sides read the same text. The deterministic side is asked at extraction
+  time with `collect_indicia` — the reader the search itself uses — rather than
+  taken from whatever a portal's attribute list happened to carry, or the
+  comparison would be measuring the portal rather than the patterns.
+
+- **The Beleg is what makes the log worth keeping.** It is already proved
+  verbatim against the page by the gate, so it is exactly the sentence a new
+  pattern would be written against and exactly the test case that new pattern
+  needs. Which is also why the listing itself is never stored: `text_hash`
+  names it, so a listing read three times is one row, and re-reading is the
+  normal case — the extraction cache has no expiry and a changed prompt makes
+  every listing new again.
+
+- **Postgres when there is one, a JSONL file otherwise.** A development machine
+  must not need Postgres before it can resolve a parcel, and this sandbox has
+  none — so the file is what makes the log readable here at all. Same writer,
+  same reader, and `GET /api/lehrbuch` says which of the two answered.
+
+- **A Beleg is a whole sentence, and a sentence can carry what the schema
+  cannot.** The extraction schema has no contact fields, so no *value* can be
+  one; a Beleg is free text out of the advert. Telephone numbers and mail
+  addresses are therefore cut out of every Beleg before it is written anywhere,
+  and it is capped at 300 characters. „No contact details are stored" holds for
+  a diagnostic log too.
+
+- **Filing a note never fails a reading.** A listing that was read is read
+  whether or not the note about it could be written, and an extraction that
+  answered 502 because a diagnostic table was missing would be the tail wagging
+  the dog.
+
+
+## What the model channel found in our own readers
+
+All of it measured 18.09.2026, the 16 recorded adverts through
+`_ask_the_model`, and all of it the point of the exercise: a teacher whose
+answer is checked is worth having because of where it disagrees.
+
+- **A rate per square metre read as the purchase price.** Advert 2418686487
+  names no price, only „Kaufpreis pro m²: 92,00 €", and `read_price_eur`
+  answered 92. Every one of the five working models left the field null. The
+  guard for it, `_PER_UNIT`, had never fired: `pattern.match(text, pos)`
+  anchors the match at `pos`, but „^" inside the pattern still means the start
+  of the *string*. Its two tests passed the whole time, because on both
+  recordings the real price stands nearer its label than the rate does and
+  `_nearest` wins without the guard being consulted — a rate *near* a price is
+  not the same test as a rate *instead of* one. Now two patterns, one per side
+  of the number, asked about the value rather than about a value-and-label
+  pair: a rate does not become a price because another word stands nearer.
+
+- **The generic word travelled as part of the municipality's name.** „ein
+  kleiner Ortsteil der Kreisstadt Borna" yielded `gemeinde = "Kreisstadt
+  Borna"`, and „Stadt Sandersdorf-Brehna" likewise; neither can match anything
+  in ALKIS. The article's noun is grammar, not a name — but a name can *be*
+  one, and the directory proves it itself: Stadt Wehlen is listed as „Stadt
+  Stadt Wehlen", the column's word in front of a name that begins with the same
+  word. So `without_appellative` removes exactly one, `municipality_spelling`
+  compares both sides in both forms, and `municipality_name` lets the register
+  decide where it can. Strip greedily and Wehlen is lost; do not strip at all
+  and Borna never resolves.
+
+- **A city name was read as a Gemarkung.** „Anbindung an Leipzig" is a
+  sentence about transport, but the register does carry a Gemarkung Leipzig, so
+  the name resolved and the Indiz was emitted at that level — fourteen times
+  over the corpus, plus Groitzsch, Borna, Bad Lausick, Chemnitz and Taucha once
+  each, and a model read every one of them as the municipality. Where the
+  relation does not place the plot, the level is not the lookup's to decide:
+  `municipality_spelling` is asked, and a name the register knows as a
+  municipality is emitted as one. Only there — „Ihr neues Wohngrundstück in
+  Bad Lausick" places the plot, and Bad Lausick is a municipality *and* the
+  district meant, so the rule asks about the relation before it asks the
+  register.
+
+- **A municipality nobody placed the plot in still filtered the anchors.**
+  Found while fixing the one above, and the more serious of the two. `anchors`
+  has filtered Gemarkung Indizien on the relation since „Anbindung an Leipzig"
+  put Gemarkung Leipzig up next to Lobstädt; `municipalities` never did, so a
+  Gemeinde Indiz with any relation at all narrowed the anchor set to itself and
+  could raise anchors of its own through `_municipality_anchors`. Nothing in
+  the deterministic reader produced one — it only ever emits `liegt_in` — but
+  the model channel can, and „Leipzig, entfernt_von" is the one thing the
+  relation exists to say. Both now go through `placing()`, which is `active()`
+  plus the relation test the anchors already used.
+
+Over the corpus, the divergence log before any of this and after all of it:
+
+| | einig | lücke | widerspruch | verworfen |
+|---|---|---|---|---|
+| vorher | 25 | 22 | 24 | 6 |
+| nachher | 42 | 25 | **2** | 9 |
+
+The two that remain are real: the patterns place the plot in Gemarkung Bad
+Lausick and in Gemarkung Groitzsch, the model calls both the Gemeinde, and
+which is meant is a question for a person — which is what a row in this log is
+supposed to be.
+
+
+## Was eine Adresse ist, entscheidet das Kataster (B4)
+
+Gemessen 19.09.2026 über die 16 aufgezeichneten Anzeigen. Der Leser kannte
+Straßen nur an einem Suffix, und das war in beide Richtungen falsch: von acht
+`strasse`-Indizien waren fünf keine Straße — „Bundesstraße", „Anliegerstraße",
+„Stellplatz", „Hektar Platz" (aus „5.000 Hektar Platz"), „Ihren Platz" (aus
+„Ihren Platz zum Träumen") — und „Am Kurpark" fehlte, die amtliche
+`lagebeztxt` von 502/47, dem richtigen Flurstück des Bad-Lausick-Inserats.
+
+Drei Dinge daran, und nur das mittlere ist eine Regel über Sprache:
+
+- **Eine Straßenklasse ist kein Straßenname.** „Bundesstraße" und
+  „Anliegerstraße" benennen eine Art von Weg. „Hauptstraße" und „Marktplatz"
+  benennen eine bestimmte und bleiben zugelassen — die Liste enthält nur, was
+  gar keinen Eigennamen trägt.
+- **Eine Adresse braucht kein Suffix.** „Am Kurpark", „An der Laakenwiese",
+  „Zur Mühle". Die Präposition wird ohne Rücksicht auf Groß- und
+  Kleinschreibung gelesen, weil die Anzeige „Naturnah wohnen am Kurpark" mitten
+  im Satz schreibt und das Verzeichnis „Am Kurpark" buchstabiert; die Phrase
+  wird auf diese Schreibweise gehoben.
+- **Eine präpositionale Phrase wird kein Indiz.** Das ist der Kern. „Am
+  Kurpark" und „Zur Verfügung" sind für ein Muster dieselbe Form, und die lose
+  Ernte findet bis zu dreizehn Phrasen je Anzeige — ein Verlauf, der sie alle
+  auflistet, ist einer, den niemand liest. Sie bleiben deshalb ein *Vorrat*
+  (`indicia.street_candidates`), und sichtbar wird eine erst dort, wo die
+  amtliche `lagebeztxt` eines Kandidaten sie trägt. Dann ist sie eine
+  Eigenschaft dieses Kandidaten, was sie immer war.
+
+Weil der Vorrat nie ungeprüft sichtbar wird, dürfen die Erntenregeln grob
+sein: falsch zu liegen kostet einen Zeichenkettenvergleich, nie ein Flurstück.
+Zwei Regeln halten ihn trotzdem klein, und beide sind grammatisch statt
+aufgezählt — eine Nominalisierung auf `-ung/-heit/-keit/-schaft/-nis/-tion`
+(„Zur Verfügung", „Bei der Planung") und eine kurze Liste von
+Positionssubstantiven („Am Ortsrand"). Von 47 lose geernteten Phrasen bleiben
+19 übrig.
+
+Gemessen am Ende: Straßen-Indizien 8 → 3, und alle drei sind Straßennamen
+(Goethestraße, Siedlungsstraße, Schwarzer Weg). Für 502/47 geht
+`street_match` von 0,05 auf 1,0, und der Kandidat trägt „amtliche Lage: Am
+Kurpark" als Begründung.
+
+
+## Ein Entfernungsband je Sorte (F3)
+
+Gemessen 19.09.2026: die 16 Anzeigen machen **62 Entfernungsaussagen**, und
+alle bekamen dasselbe Band — obwohl „Bushaltestelle ‚Kitzen‘: ca. 300 m" den
+Bezugspunkt eindeutig benennt und „Flughafen 40,5 km" gar nichts eingrenzt.
+
+Die Sorte steht im Satz und braucht keinen Dienst: ein Eigenname neben dem
+Gattungswort macht einen **Punkt** („Bäckerei Wendl", „Autobahnanschlussstelle
+A38" — eine Straßennummer zählt als Name), das Gattungswort allein eine
+**Klasse** („Bus", „Flughafen"), ein Name aus dem Verzeichnis eine
+**Ortschaft**. Gezählt: 10 Punkt, 44 Klasse, 8 Ortschaft. Nur ε unterscheidet
+sich (0,10 · 0,20 · 0,25); ϱ ist der Umweg zwischen Route und Luftlinie und
+kümmert sich nicht darum, wohin gemessen wurde.
+
+**„Region" ist keine vierte Sorte geworden.** Leipzig und Grimma stehen beide
+im Verzeichnis, und eine Liste der Großstädte wäre geraten. Was sie trennt,
+ist messbar: ein Band, das breiter ist als eine Gemarkung (sächsische
+Gemarkungen sind 1 bis 5 km groß), enthält jeden Kandidaten, den ein Anker
+anbieten kann. `usable` prüft genau das, und es trifft „Flughafen 40,5 km"
+(31,2–50,6 km) ebenso wie „40 km nach Leipzig". Elf der 62 Aussagen fallen
+darunter — und sie werden jetzt **nicht mehr aufgelöst**, was je zwei
+ALKIS-Anfragen spart.
+
+**Zwei Intervalle statt einem.** Ein schmaleres Band ordnet besser und würde
+zugleich häufiger widersprechen — und Widersprechen ist die einzige Richtung,
+in der die Zahl eines Maklers einen Kandidaten etwas kostet. Also trägt eine
+Aussage jetzt `band` (sortengerecht, für die Ordnung) und `outer_band` (immer
+die großzügigste Auslegung, für den Einspruch). F3 kann die Ordnung damit
+schärfen, ohne je zusätzlich jemanden zu versenken.
+
+
+## Die Frontbreite ist ein Intervall, keine Rechteckseite (B5)
+
+Der Leser kannte „Frontbreite ca. 26 m" schon — `read_dimensions` liest
+`breit` und `front` — und ließ sie fallen, weil `sides` beide Maße verlangt
+und die Tiefe fehlte. Nutzbar gemacht, aber nicht so, wie es naheliegt.
+
+Im Code stand die Warnung schon: `_shape_objection` weigert sich
+ausdrücklich, auf eine Breite hin zu widersprechen, weil das Plagwitz-Inserat
+26 m nennt und sein Flurstück in einem 39,8 × 71,5 m Rechteck sitzt. Am
+19.09.2026 selbst nachgemessen — ALKIS nach Gemarkung 148642 mit 1 489 m²
+gefragt, ein Treffer, als `alkis_plagwitz_309_6.gml` aufgezeichnet: das
+Grundstück ist ein **Keil**. Die genannte Front trifft *keine* der beiden
+Rechteckseiten.
+
+Was der Umriss dagegen schon bindet, ist die **Spanne**: schmaler als
+Fläche durch Länge kann ein Grundstück im Mittel nicht sein (20,8 m), und
+breiter als die kurze Rechteckseite nirgends (39,8 m). Die genannten 26 m
+liegen darin. `front_interval` liefert dieses Paar, `front_fit` prüft die
+Zugehörigkeit und fällt außerhalb über die Breite des Intervalls ab — 60 m
+landen auf dem Boden. Gewicht 0,4, dieselbe Klasse wie die Entfernung: der
+*Eingabewert* ist etwas, das jemand abgeschritten hat.
+
+Es befördert und versenkt nie. Dass es nur ordnet, ist nicht Vorsicht,
+sondern dieselbe Messung: ein Wert, der die richtige Antwort nicht trifft,
+darf sie nicht ausschließen.
+
+
+### Bebauung: zurückgelegt, und warum
+
+Das zweite geplante Merkmal aus B5. Die Abfrage wäre billig — eine BBOX über
+die Kandidatenmenge, `alkis.buildings_around` gibt es schon. Am Lesen scheitert
+es. Von sieben Bebauungssätzen im Korpus handeln **zwei** vom angebotenen
+Grundstück:
+
+```
+✓ 3423861748  „…größtenteils unbebaute Grundstück verfügt lediglich über
+               Garagen/Lagergebäude"
+✓ 3513280646  „Altbestand entfernen", „Altbestand ist abrissfrei"
+
+✗ 3375124391  „Das benachbarte Grundstück wird aktuell mit einem EFH bebaut."
+✗ 3495978117  „Garagen, Carports und Nebenanlagen sind von dieser Regelung
+               ausgenommen."          — eine B-Plan-Regel
+✗ 3222300158  „…zwei sind bereits veräußert und eins bereits bebaut."
+                                      — andere Lose desselben Projekts
+✗ 3222300158  „Bei der Planung von Stellplätzen und/oder Garagen…"
+```
+
+Fünf von sieben sind über etwas anderes, und der Fehlerfall lautet: *der
+Nachbar wird als dieses Grundstück gelesen*. Bei den Ortsbeziehungen hat
+dieselbe Falle zugeschlagen, aber dort widerspricht das Gemarkungsverzeichnis
+— hier gibt es nichts, was eine Fehllesart widerlegt.
+
+`ave:tntxt` taugt als Ersatz nicht: im B7-Fall trug ein Grundstück mit
+massiver Garage und Einfriedung die Nutzung `Weg;0.00|Landwirtschaft;577`.
+
+Was es bräuchte, um es zu bauen: aufgezeichnete Anzeigen mit Bebauungssätzen,
+gezielt gesammelt — insbesondere solche über den Nachbarn, über andere Lose
+und über B-Plan-Regeln, weil das die Fälle sind, an denen ein Leser scheitert.
+
+
+## Der Anfragenzähler hat gelogen (B6)
+
+B6 war als Buchführung geplant: „Ein Lauf führt Buch: jede Bedingung mit ihrer
+Antwort. Gleiche Bedingung wird nie zweimal gefragt." Gemessen am 19.09.2026
+an drei echten Läufen gegen ALKIS, und die Messung sagt etwas anderes als
+erwartet.
+
+**Doppelt gefragt wird innerhalb eines Laufs nichts.** Null Wiederholungen in
+drei Läufen (4, 7 und 5 Aufrufe über `_count`/`_search`). Ein Ledger hätte
+nichts zu tun, also gibt es keins — ein Mechanismus ohne gemessenen Nutzen ist
+Code, der nur altert.
+
+**Über Läufe hinweg wird wiederholt, und es kostet nichts.** `_get` und
+`_post` liegen beide hinter `DiskCache`, `_post` mit dem ganzen Anfragerumpf
+als Schlüssel. Die Regel „nie eine Anfrage zweimal" war also längst erfüllt;
+was fehlte, war jemand, der es weiß.
+
+**Was wirklich kaputt war, ist der Zähler.** Er wurde bei jedem *Aufruf* erhöht
+— eine Antwort von der Platte zählte als Anfrage — und `districts_around`
+zählte gar nicht mit, weil es weder durch `_count` noch durch `_search` geht.
+Gemeldet wurden 5, 8 und 7 bei 4, 7 und 5 Aufrufen, und ein vollständig
+gecachter Wiederholungslauf meldete dieselben Zahlen, obwohl nichts die
+Maschine verließ.
+
+Das ist die Zahl, in der jede Messung dieses Projekts angegeben ist („5
+Anfragen ohne, 7 mit", „24 bis 40 Anfragen"), also muss sie eine Sache
+bedeuten. Gezählt wird jetzt in `AlkisService`, der einzigen Stelle, die weiß,
+ob Bytes hinausgegangen sind; `SearchEngine._requests` liest die Differenz
+seit Laufbeginn. Kalt meldet derselbe Lauf 5, 8 und 7 — jetzt inklusive der
+Umrisse —, warm meldet er **0**.
+
+
+## Was ein Inserat über sich selbst sagt
+
+Drei der fünf „nur zeigen"-Werte aus dem Wertekatalog sind `Label: Wert`-Zeilen
+und damit genau das, wofür die Blockzerlegung aus Stufe 0 gebaut wurde —
+`indicia.stated_values` liest sie über `blocks.labelled` statt mit einem Muster
+je Label. Gemessen über die 16 Anzeigen: **14** tragen eine Anbieter-Objekt-ID,
+**10** eine Verfügbarkeit, **eine** einen Preis je Quadratmeter. Keiner davon
+schärft eine Suche; sie stehen in `ListingExtractResponse.angaben`.
+
+Der Preis je m² verdient seinen Platz doppelt, denn er ist die einzige
+Rechnung, die eine Anzeige gegen sich selbst anbietet: Preis durch Fläche muss
+ihn ergeben. `price_check` sagt nichts, wenn sie stimmt, und nichts, wenn eine
+Zahl fehlt — eine abgeleitete Größe mit fehlender Eingabe wird hier nie
+gerechnet. Stimmt sie nicht, steht ein Satz im `hinweis`. Es ist dieselbe
+Zahl, deren Fehllesart („Kaufpreis pro m²: 92,00 €" als Kaufpreis von 92 €)
+der Modellkanal in `portal_fields` aufgedeckt hat.
+
+Die beiden übrigen Werte der Gruppe — der KI-Hinweis zu den Bildern und
+Belastungen/Bestandsmiete — sind Prosa mit zwei beziehungsweise einem Beleg im
+Korpus und bleiben liegen.

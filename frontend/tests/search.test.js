@@ -457,27 +457,38 @@ describe("Die Suchansicht", () => {
   });
 
   it("rollt den Verlauf zum neuesten Eintrag mit", async () => {
+    // Der neueste Eintrag steht oben, also ist Mitlaufen: oben bleiben.
     const wrapper = await openSearch();
     const box = wrapper.vm.$refs.protocol;
-    asScrollBox(box, { scrollTop: 2400 - 560 });
+    asScrollBox(box, { scrollTop: 0 });
 
     wrapper.vm.record({ kind: "phase", phase: "raum", text: "Noch ein Schritt" });
     await flushPromises();
 
-    expect(box.scrollTop).toBe(box.scrollHeight);
+    expect(box.scrollTop).toBe(0);
   });
 
-  it("reißt aber niemanden weg, der nach oben gescrollt hat", async () => {
-    // Wer ein früheres Indiz liest, liest es. Eine Liste, die darunter
-    // wegspringt, ist schlimmer als eine, die nicht mitläuft.
+  it("reißt aber niemanden weg, der nach unten gescrollt hat", async () => {
+    // Wer ein früheres Indiz liest, liest es. Der neue Eintrag kommt *darüber*
+    // dazu, also muss die Leseposition um dessen Höhe nachgeführt werden —
+    // sonst rutscht die gelesene Zeile nach unten weg.
     const wrapper = await openSearch();
     const box = wrapper.vm.$refs.protocol;
-    asScrollBox(box, { scrollTop: 120 });
+    asScrollBox(box, { scrollTop: 600 });
+    // Die Liste wächst zwischen den beiden Messungen — vorher gelesen, nachher
+    // gelesen —, genau wie im Browser, wenn oben eine Zeile dazukommt.
+    const gewachsen = 80;
+    const vorher = box.scrollHeight;
+    let gelesen = 0;
+    Object.defineProperty(box, "scrollHeight", {
+      configurable: true,
+      get: () => (gelesen++ === 0 ? vorher : vorher + gewachsen)
+    });
 
     wrapper.vm.record({ kind: "phase", phase: "raum", text: "Noch ein Schritt" });
     await flushPromises();
 
-    expect(box.scrollTop).toBe(120);
+    expect(box.scrollTop).toBe(600 + gewachsen);
   });
 
   it("führt den Verlauf in der Reihenfolge, in der er passiert ist", async () => {
@@ -485,18 +496,22 @@ describe("Die Suchansicht", () => {
 
     // Die Liste war nach Sicherheit sortiert, und die Schritte standen
     // getrennt darunter — hinterher war nicht mehr zu sehen, was zuerst kam.
+    // Gezeigt wird neueste zuerst — ein Lauf, dem man zusieht, wird oben
+    // gelesen. Die Nummern bleiben die Reihenfolge des Geschehens und zählen
+    // deshalb nach unten ab.
     const rows = wrapper.findAll(".verlauf__schritt");
     const numbers = wrapper.findAll(".verlauf__nr").map(n => Number(n.text()));
-    expect(numbers).toEqual(numbers.map((_, i) => i + 1));
+    expect(numbers).toEqual([...numbers].sort((a, b) => b - a));
+    expect(numbers.at(-1)).toBe(1);
 
     const text = rows.map(row => row.text());
     const firstPhase = EVENTS.find(e => e.art === "phase").text;
     const firstIndiz = EVENTS.find(e => e.art === "indiz").indiz.text;
-    expect(text[0]).toContain(firstPhase);
-    expect(text[1]).toContain(firstIndiz);
+    expect(text.at(-1)).toContain(firstPhase);
+    expect(text.at(-2)).toContain(firstIndiz);
 
-    // Und das Ergebnis steht am Ende, nicht irgendwo dazwischen.
-    expect(text.at(-1)).toContain("Ergebnis");
+    // Und das Ergebnis steht oben, nicht irgendwo dazwischen.
+    expect(text[0]).toContain("Ergebnis");
   });
 
   it("führt vom letzten Eintrag zurück zum gefundenen Flurstück", async () => {
@@ -505,7 +520,7 @@ describe("Die Suchansicht", () => {
     const focusOn = vi.fn();
     map.vm.focusOn = focusOn;
 
-    await wrapper.findAll(".verlauf__zeile").at(-1).trigger("click");
+    await wrapper.findAll(".verlauf__zeile").at(0).trigger("click");
 
     expect(focusOn).toHaveBeenCalledTimes(1);
     // Die Hülle des bestätigten Flurstücks, nicht die Gemarkung darum.
@@ -547,7 +562,7 @@ describe("Die Suchansicht", () => {
     // Vorher zeigt nichts auf etwas Bestimmtes.
     expect(map.props("highlighted")).toBeNull();
 
-    await wrapper.findAll(".verlauf__zeile").at(-1).trigger("click");
+    await wrapper.findAll(".verlauf__zeile").at(0).trigger("click");
 
     // Ein Sprung, der nur die Kamera bewegt, kommt irgendwo an, ohne zu sagen,
     // welches der Dinge dort der Grund war.
@@ -560,7 +575,7 @@ describe("Die Suchansicht", () => {
     const map = wrapper.findComponent({ name: "EvidenceMap" });
     map.vm.focusOn = vi.fn();
 
-    await wrapper.findAll(".verlauf__zeile").at(-1).trigger("click");
+    await wrapper.findAll(".verlauf__zeile").at(0).trigger("click");
     expect(map.props("highlighted")).toBeTruthy();
 
     await wrapper.findAll("button").find(b => b.text() === "Alles zeigen").trigger("click");

@@ -8,7 +8,13 @@ import respx
 
 from app.deps import alkis_service
 from app.errors import NotFoundError, UpstreamError
-from app.services.alkis import expand_gemarkung_key, parse_feature_collection, to_collection
+from app.services.alkis import (
+    equals,
+    expand_gemarkung_key,
+    parse_feature_collection,
+    parse_land_use,
+    to_collection,
+)
 
 from .conftest import ALKIS_URL, fixture_bytes
 
@@ -179,3 +185,93 @@ def test_expanding_an_already_expanded_key_changes_nothing():
     once = expand_gemarkung_key("3044")
 
     assert expand_gemarkung_key(once) == once
+
+
+# --------------------------------------------------------------------------
+# The built-up area of a settlement -- `ave:Nutzung`, unioned
+# --------------------------------------------------------------------------
+
+# Kitzen 25/24, the parcel the Pegau advert sells, at the village's edge.
+KITZEN = (51.226727, 12.220633)
+
+
+def test_land_use_gml_is_parsed_from_the_default_namespace():
+    """`ave:Nutzung` answers in the default namespace, unlike the parcels."""
+
+    polygons = parse_land_use(fixture_bytes("alkis_nutzung_kitzen.gml"))
+
+    assert len(polygons) == 25
+    assert sum(polygon.area for polygon in polygons) == pytest.approx(116_690, rel=0.01)
+
+
+@respx.mock
+async def test_built_up_area_asks_for_land_use_inside_a_box():
+    route = respx.post(ALKIS_URL).mock(
+        return_value=httpx.Response(200, content=fixture_bytes("alkis_nutzung_kitzen.gml"))
+    )
+
+    area = await alkis_service().built_up_area(*KITZEN)
+
+    body = route.calls[0].request.content.decode("utf-8")
+    assert 'typeNames="ave:Nutzung"' in body
+    # Both at once, which only a POST can carry.
+    assert "fes:BBOX" in body and "ave:geometrie" in body
+    assert "Wohnbau*" in body
+    assert area is not None
+    assert area.pieces == 25
+
+
+@respx.mock
+async def test_the_closing_width_is_what_makes_one_outline_out_of_many():
+    """Without it the union is the parcels again; 25 m bridges the street."""
+
+    respx.post(ALKIS_URL).mock(
+        return_value=httpx.Response(200, content=fixture_bytes("alkis_nutzung_kitzen.gml"))
+    )
+
+    loose = await alkis_service().built_up_area(*KITZEN, closing_m=0)
+    closed = await alkis_service().built_up_area(*KITZEN, closing_m=25)
+
+    assert loose is not None and closed is not None
+    assert closed.parts < loose.parts
+    assert closed.area_m2 > loose.area_m2
+
+
+@respx.mock
+async def test_built_up_area_is_none_where_nothing_is_recorded():
+    """Open country answers with an empty collection, and that is an answer."""
+
+    respx.post(ALKIS_URL).mock(
+        return_value=httpx.Response(200, content=fixture_bytes("alkis_leer.gml"))
+    )
+
+    assert await alkis_service().built_up_area(*KITZEN) is None
+
+
+@respx.mock
+async def test_an_answer_off_the_disk_is_not_a_request():
+    """The run's request count is what the project quotes every measurement in
+    („5 Anfragen ohne, 7 mit"), so it has to mean one thing.
+
+    It did not. The engine incremented a counter on every *call*, so an answer
+    served from the disk cache counted as a request — while `districts_around`,
+    which goes through neither `_count` nor `_search`, was never counted at
+    all. Measured 19.09.2026 on three real runs: reported 5, 8 and 7 against 4,
+    7 and 5 calls, and a fully cached repeat still reported the same numbers
+    although nothing left the machine. Counting moved into the one place that
+    knows whether bytes went out.
+    """
+
+    route = respx.post(ALKIS_URL).mock(
+        return_value=httpx.Response(200, content=fixture_bytes("alkis_hits_eins.xml"))
+    )
+    service = alkis_service()
+    before = service.network_calls
+
+    assert await service.count([equals("gemaschl", "144241")]) == 1
+    assert service.network_calls == before + 1
+
+    # The same question again: answered off the disk, and not a request.
+    assert await service.count([equals("gemaschl", "144241")]) == 1
+    assert service.network_calls == before + 1
+    assert route.call_count == 1

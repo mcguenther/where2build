@@ -44,6 +44,54 @@ of Overpass or a local extract, the listing portals, and the extraction model.
   says otherwise. The proxy still earns its place — disk cache, one contract,
   no key in the browser — but not for the reason stated there.
 
+- **`ave:Nutzung` is where the built-up area of a town comes from, and a POST
+  can carry a BBOX and a filter at once.** Measured 16.09.2026: a 2 km box
+  around Grimma holds 486 `Wohnbaufläche` polygons, 674 kB in 1.8 s; union them
+  with a 25 m closing and the largest connected piece is the town, 1.91 km²,
+  2.9 x 2.3 km. That is what „6 km bis Grimma" is measured *from* when the
+  reading is "to the edge": 5.32 km from Flurstück 790/11, against 6.25 km to
+  its middle — and the advert's „ca. 6 km" sits between them. Three parameters,
+  all measured: **Wohnbaufläche alone** (adding mixed and industrial use drags
+  the outline along the works and moves the near edge to 3.16 km, outside the
+  advert's own figure), a **25 m closing** (without one the union is 484
+  fragments; at 50 m neighbouring hamlets start merging and the edge jumps
+  0.7 km) and a **2 km radius** (Grimma 2.9 x 2.3 km, Borna 3.0 x 2.6 km, Bad
+  Lausick 3.2 x 2.3 km). `AlkisService.built_up_area`. The response puts its
+  features in the *default* namespace, so `nutzart` arrives without the `ave:`
+  prefix the filter needs — which is why it has its own parser.
+
+- **That query needs a count of its own, and the largest piece rather than the
+  one under the seed.** Two things the note above got right by measuring
+  outside the service and wrong inside it, both found on 16.09.2026 when the
+  band was built on top of it. The service-wide `max_features` of 200
+  **truncates** the land-use query and nothing says so: 200 of Grimma's 431
+  polygons close into a 0.35 km² fragment instead of the town, and the near
+  edge then reads 5.4 km — a plausible number out of a tenth of the place.
+  Hence `BUILT_UP_MAX_FEATURES = 1500`. And seeded from Grimma's market square,
+  the piece *covering* the seed is a 0.48 km² island of housing inside a centre
+  the cadastre records as mixed use, while the town is the 1.65 km² belt around
+  it; the island reads 4.6–5.1 km from Flurstück 790/11 and the belt 5.3–6.0,
+  and it is the belt „ca. 6 km" is about. So a named reference asks for
+  `largest=True`. Taking *every* piece in the box instead pulls the near edge
+  to 2.9 km, because the box also holds the hamlets — the same failure as the
+  stop cloud below.
+
+- **The cadastral district is not the town.** Measured on the same parcel:
+  Gemarkung Grimma is 21.50 km² of which most is field, and its boundary
+  reaches to within **1.22 km** of a plot that is 5 km from the town. Neither
+  is the stop cloud: 65 stops carry „Grimma" in their name and span 5.89 km,
+  because the municipality's villages are named after it. Both were candidates
+  for "the edge of the town" and both are refuted.
+
+- **immowelt.de answers server-side fetches with 403,** and it is DataDome at
+  the CloudFront edge: `x-datadome: protected`, a 771-byte JavaScript challenge
+  („Please enable JS and disable any ad blocker"), `x-cache:
+  LambdaGeneratedResponse from cloudfront`. Measured 15.09.2026 with the
+  project agent and with a full browser header set — identical. `robots.txt`
+  allows `/expose/` and names ClaudeBot explicitly; the refusal happens before
+  the server. Same shape as immobilienscout24.de, different vendor, same way
+  in: the user's own browser, so the bookmarklet.
+
 - **`ave:KatasterBezirk` will not drop its geometry.** `PROPERTYNAME` without the
   `ave:` prefix is rejected outright (`ErrorInPropertyName`); with the prefix the
   request is accepted and the outline comes back anyway — about 5 kB per
@@ -345,3 +393,181 @@ of Overpass or a local extract, the listing portals, and the extraction model.
   abstract says „keine Flaechen sondern nur Konturen“ — that is the one for an
   orthophoto. Streets and their names come from the WebAtlas as
   `Verkehr,Beschriftung`, transparent at every zoom from 13 to 19.
+
+- **Four providers, two wire formats — and the second one is not a variant of
+  the first.** OpenRouter, OpenAI, Ollama and any other OpenAI-compatible host
+  answer `POST /chat/completions`, take `Authorization: Bearer` and put the
+  schema in `response_format`. Anthropic answers `POST /v1/messages`, takes
+  `x-api-key` plus a dated `anthropic-version` header, puts the schema in
+  `output_config.format`, **requires** `max_tokens`, and returns `content` as a
+  list of blocks rather than one message string — so `content[0]` reads
+  whichever block came first, and a thinking block can be that one. It gets its
+  own adapter in `services/llm.py`, never a translation layer: a shim that
+  pretends one API is the other is exactly the shape that answers wrongly but
+  successfully the first time either side changes.
+
+- **A refusal is HTTP 200 with no text.** `stop_reason: "refusal"` and an empty
+  or text-free `content`. Read as „leere Antwort" it is true and useless; the
+  client says „hat die Anfrage abgelehnt" instead.
+
+- **The fetch tool is per provider, and two of the four have none.** OpenRouter
+  has `openrouter:web_fetch` with its `parameters` block; Anthropic has
+  `web_fetch_20260209` (dated types are that API's own versioning — an older
+  model wants `web_fetch_20250910` and answers 400 to the newer one) declared
+  flat on the tool. OpenAI's endpoint, a local Ollama and an unknown compatible
+  host have none, and `can_fetch_pages` says so *before* spending a request —
+  the paste field is this app's own way in anyway, and it is what the two
+  blocked portals need regardless. Neither provider reports a failed fetch as
+  an HTTP error: OpenRouter says so in `usage.server_tool_use_details`,
+  Anthropic by whether a `web_fetch_tool_result` block is in the answer at all.
+
+- **`localhost:11434` carries the word „ollama" nowhere.** The provider is read
+  off the endpoint when it is not named, and Ollama's own default URL is the
+  one case where the host name gives nothing — the port is the only signal. A
+  compose file that names the service `ollama` is caught by the name.
+
+- **The OpenRouter default is `google/gemini-2.5-flash-lite`, and it was
+  measured.** 18.09.2026, the 16 recorded adverts through the real extraction
+  path — `_ask_the_model`, the Beleg gate, the divergence log — against six
+  models with `structured_outputs` in OpenRouter's own model list. $0,28 for
+  the whole exercise.
+
+  | Modell | s/Inserat | $/Inserat | ok | einig | lücke | verworfen |
+  |---|---|---|---|---|---|---|
+  | `mistralai/mistral-small-24b` | 6,1 | 0,00015 | 16/16 | 26 | 19 | 8 |
+  | `google/gemini-2.5-flash-lite` | 2,5 | 0,00054 | 16/16 | 25 | 22 | 6 |
+  | `deepseek/deepseek-v4-flash` | 84 | 0,0011 | 16/16 | 26 | 39 | 3 |
+  | `z-ai/glm-4.7-flash` | 67 | 0,0014 | 13/16 | 21 | 30 | 9 |
+  | `openai/gpt-5-nano` | 53 | 0,0028 | 16/16 | 28 | 23 | 6 |
+  | `qwen/qwen3.5-flash` | — | — | 1/16 | — | — | — |
+
+  Three things the table is: **`qwen/qwen3.5-flash` is broken, not weak** — to a
+  `response_format` request it answers `"-0.5749816320421072"`, a bare number,
+  and fails 15 of 16. `z-ai/glm-4.7-flash` returns an empty or unparseable
+  answer three times. And the three slow ones are *reasoning* models: deepseek
+  emits 5 232 output tokens per advert, gpt-5-nano 6 546, glm 3 187, against
+  Flash Lite's 706. That is where both the seconds and the dollars go, and
+  `/api/listings/extract` is a call the assistant makes while somebody waits.
+
+  What the table is not is a quality verdict. It says every working model got
+  the hard case right — advert 2418686487 names only „Kaufpreis pro m²:
+  92,00 €", and all five left `kaufpreis_eur` null while the pattern reader
+  returns 92. `mistralai/mistral-small-24b` is the one that found no area
+  there, which is why the cheapest option is not the default.
+
+- **A local Ollama needs no key, and demanding one would make the only free
+  provider the only one nobody can try.** `needs_key` is false there, and
+  `configured` then asks for an endpoint instead.
+
+- **The official `anthropic` SDK is deliberately not used.** Every outbound
+  call in this backend goes through `upstream.request`, which owns the user
+  agent, the timeout, the single retry, the content-type check and the German
+  sentence a failure turns into. The SDK would be the one call that bypasses
+  all of it. This is not an OpenAI shim — it is a first-class Messages adapter
+  written against the documented wire shape.
+
+- **A system prompt and a user message, not one blob.** The instructions are
+  the same on every listing and the listing is not, so the stable half goes in
+  the field both APIs have for it — a top-level `system` on Anthropic, a
+  message with `role: "system"` on the OpenAI-compatible side. Sent as one
+  string, as it was, every advert paid for the instructions again and neither
+  API could cache the prefix.
+
+- **The prompt names the vocabulary, because an enum conveys nothing.** The
+  schema says `liegt_in` is an allowed value; it does not say that „die ca.
+  6 km entfernte Kreisstadt Grimma" is the *opposite* of it. So
+  `services/prompts.py` states the five levels and the four relations with the
+  traps this project measured and got wrong first — the same ones the patterns
+  in `search/indicia.py` carry, written as examples instead of as regular
+  expressions: the relation standing behind the name (Thräna), the two levels
+  in one sentence (Großbothen/Grimma), „Anbindung an Leipzig" as a statement
+  about transport, „Schulen in Roitzsch" as a statement about schools.
+
+- **The listing is fenced, and the fence is derived from the listing.** An
+  advert is prose with headings, colons and its own „Hinweis:" lines, and it
+  arrives after a hint of ours in the same message; without a delimiter the
+  boundary between our sentences and the seller's is a matter of
+  interpretation. `prompts.fence_for` returns a line of percent signs — four,
+  and one more for as long as the text still contains it, which terminates
+  because a text of *n* characters cannot contain a fence of *n* + 1. The rule
+  („zwischen zwei Zeilen, die nur aus Prozentzeichen bestehen") goes in the
+  system prompt, so it stays cacheable while the fence itself varies; the
+  announcement sentence goes with the text. The fence is *added* around the
+  text and never written into it: the Beleg gate checks against the raw
+  listing, so a model that quotes a fence line fails that check rather than
+  smuggling our own words in as evidence.
+
+- **A strict schema rejects a wrong shape and states nothing.** Both wire
+  formats carry the JSON schema — `response_format` there, `output_config.
+  format` here — and Pydantic's dump of `InseratBefund` is names and types with
+  no descriptions at all. It does not say that a value the advert lacks is
+  `null` rather than an omitted key, that `wortlaut` keeps the rounding while
+  `wert` drops the unit and the thousands separator, or that a denominator can
+  be a letter. `RÜCKGABE` demands a JSON object and nothing else — no sentence
+  before, none after, no code fences, no extra fields — and `prompts.SHAPE`
+  states the rest.
+
+- **The shape is a commented skeleton, not a worked example.** The first draft
+  of that section carried a filled Befund from a real advert. It read well and
+  it brings what a worked example always brings: values to copy, out of a
+  listing that is not the one being read, in the one channel whose whole point
+  is that it read *this* text. The skeleton has nothing to copy. Each field
+  instead carries the one line the schema cannot: what it means, and when it is
+  `null` — a price per square metre is not a purchase price, minutes are not
+  kilometres, a parcel is never derived from an address. `test_prompts` strips
+  the `//` lines, parses what is left, and holds its key set against
+  `InseratBefund` plus the two enumerations against `Ortsebene` and
+  `Ortsbeziehung`, so a field added to the schema — or invented in the prompt —
+  fails a test rather than travelling unexplained.
+
+  `vorbehalte` used to be asked for here and is gone. It was in the schema and
+  in the prompt and read by nothing — „teilflaeche" should suppress the area's
+  tolerance staircase and „mehrere-grundstuecke" should say so on the result,
+  and until one of them is built, asking for it is tokens spent on a promise
+  nobody keeps.
+
+- **The model gets our material and never our findings.** The Saxon district
+  register is data about Saxony and travels: the names in this text that the
+  register actually carries, as a closed list, so a model can say which of them
+  the advert means rather than invent one. What our own readers *concluded*
+  does not travel, and that is the rule worth stating twice — a teacher shown
+  the student's answers is not a teacher, and the divergence log in
+  `services/lehrbuch.py` would then measure nothing at all. `_known_districts`
+  therefore reads the register and never `collect_indicia`.
+
+- **The fetch prompt is told about the page and not about the fields.** Naming
+  a field there is an invitation to summarise instead of quote — and a
+  summarised page is one whose every Beleg the gate then refuses.
+
+
+## Transitous antwortet 403 ohne Kontakt im User-Agent
+
+Gemessen 19.09.2026, und es sah aus wie eine Sperre: dreißig
+`one-to-many`-Anfragen in Folge kamen als `403 Forbidden` zurück, dieselbe
+Anfrage mit
+`User-Agent: GrundstuecksCheckSachsen/0.1 (+https://github.com/…)` sofort mit
+`200`. Die Nutzungsregeln des Dienstes verlangen genau das („Name of the
+application / Version of the client / A way of contact"), und
+`AppSettings.contact_user_agent` setzt es für jeden Aufruf aus der App. Ein
+Skript, das für eine Messung schnell `urllib` nimmt, umgeht das — und belastet
+dabei einen ehrenamtlich betriebenen Dienst.
+
+## `one-to-many` kennt keine Tageszeit
+
+Das war die offene Frage F4: wie stark streuen Fahrzeit und Verkehrsmodell
+über den Tag. Die Antwort steht in der Schnittstellenbeschreibung
+(`motis-project/motis`, `openapi.yaml`): die Operation nimmt `one`, `many`,
+`mode`, `max`, `maxMatchingDistance` und die Fahrzeugmaße — **keinen
+Zeitparameter**. Ein trotzdem mitgeschicktes `time` ändert die Antwort nicht;
+verifiziert an zwei identischen Antworten für dieselbe Strecke. Es ist eine
+Berechnung auf dem Straßennetz ohne Fahrplan und ohne Verkehrsmodell, also
+kann die Tageszeit nicht streuen. Die geplante Messung zu drei Tageszeiten
+wäre dreimal dieselbe Zahl gewesen.
+
+Verwertbar war die andere Hälfte: **die Geschwindigkeiten selbst.** Drei
+Strecken je Modus, aus den aufgezeichneten Flurstücken heraus — zu Fuß 70, 71,
+70 m/min, Rad 245, 244, 243, Auto 908 und 924 (eine Strecke war für CAR nicht
+routbar). Die Streuung zwischen Strecken ist winzig, die geratenen Konstanten
+in `search/distance.py` lagen bei Fuß und Rad um 7 % und 2 % daneben und beim
+Auto um **31 %**: 700 gegen 915 m/min. „ca. 7 min mit dem Auto" zog damit ein
+Band um 4,9 km, wo der Dienst 6,4 km sagt.

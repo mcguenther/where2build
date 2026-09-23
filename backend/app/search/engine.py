@@ -35,11 +35,12 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field, replace
-from typing import AsyncIterator, Sequence
+from typing import Any, AsyncIterator, Sequence
 
 from ..errors import AppError, UpstreamError
-from ..gemarkung_index import GemarkungDirectory, GemarkungEntry, fold
+from ..gemarkung_index import GemarkungDirectory, GemarkungEntry, base_name, fold
 from ..schemas import (
+    Entfernungsband,
     Indiz,
     Kandidat,
     KandidatProperties,
@@ -60,16 +61,23 @@ from ..services.alkis import (
     expand_gemarkung_key,
     like,
 )
+from .. import geo
+from . import blocks, distance
+from .distance import DistanceStatement
 from .envelope import _geojson, common_envelope, next_question
 from .indicia import (
     ANCHORING,
+    district_matches,
     AreaStatement,
+    Dimensions,
     collect_indicia,
     describes_part_area,
     federal_state,
     normalise_parcel_number,
     outside_saxony,
     read_area,
+    read_dimensions,
+    street_candidates,
 )
 from .ladder import Rung, confirmation_rung, tolerance_ladder
 from .scoring import clean_use, parcel_number, score
@@ -107,6 +115,10 @@ MAX_MUNICIPALITY_DISTRICTS = 12
 # only, which is what allows a number to be chosen without a corpus: a box too
 # small to contain the plot's district makes every anchor count zero and the run
 # reports that it found nothing. It cannot name a wrong parcel, only no parcel.
+# How many of a district's Flure are drawn. Eilenburg has 48, and a map that
+# fetches all of them to shade one town is spending 240 kB on a backdrop.
+MAX_FLUR_OUTLINES = 12
+
 PIN_RADIUS_M = 1500.0
 
 # How many districts are worth widening to their municipality when the exact
@@ -127,7 +139,33 @@ MAX_DRAWN_AREAS = 4
 # What the short circuit accepts as agreement between the parcel it resolved
 # and the area the listing states. Wider than the plausibility check's factor
 # of four on purpose: this only decides whether one more phase runs.
-SHORT_CIRCUIT_AREA_FACTOR = 2.0
+# How far the smallest rectangle around a parcel may differ from the measures a
+# listing states before the two describe different plots. Generous on purpose:
+# a seller measures the frontage and the depth to the back fence, the cadastre
+# records a polygon, and the rectangle around an irregular one is bigger than
+# either. Measured on advert 3508042470, which states 14 x 40 m: the parcel the
+# run confirmed is 21,7 x 26,7 (1,55 times too wide, caught), and the parcel in
+# the district its own location field names is 17,3 x 34,1 (1,24 and 0,85,
+# passed).
+# How many of a listing's distance statements are resolved to an outline. Two
+# ALKIS requests each -- the district boundary for a seed point, then the
+# built-up area around it -- and the corpus of 16 adverts offers at most one
+# resolvable reference per listing anyway: 62 statements, 8 naming a place, 3
+# of those a place the cadastral directory carries.
+MAX_DISTANCE_REFERENCES = 2
+
+# How many distance statements are read at all, and how many of the
+# unresolvable ones the collapsed row names before it says "and n more".
+MAX_DISTANCE_STATEMENTS = 20
+MAX_DISTANCE_LISTED = 4
+
+SHAPE_TOLERANCE = 0.25
+
+# How much bigger the rectangle around a parcel may be than the parcel itself
+# before it stops describing it. A wedge of 1 489 m² sits in 2 845 m² of
+# rectangle (1,91) and its stated frontage cannot be checked against that; a
+# parcel of 577 m² in a 579 m² rectangle (1,004) can.
+SHAPE_RECTANGULARITY = 1.3
 
 
 @dataclass
@@ -149,10 +187,50 @@ class Anchor:
     # The municipality this district belongs to, as the directory spells it.
     # Not decoration: it is what separates the two Gemarkungen called Plagwitz.
     gemeinde: str | None = None
+    # Every key this anchor stands for. One district is often filed as several
+    # Flure -- Kitzen as eleven, Eilenburg as forty-eight -- and they are one
+    # place, not eleven candidates. Asking them together is one request where
+    # asking them apart was eleven, and it is why a listing that names such a
+    # place costs two requests instead of the thirty the pin fallback cost.
+    keys: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not self.keys:
+            object.__setattr__(self, "keys", (self.schluessel,))
 
     @property
     def condition(self) -> str:
-        return equals("gemaschl" if self.art == "gemarkung" else "gmdschl", self.schluessel)
+        name = "gemaschl" if self.art == "gemarkung" else "gmdschl"
+        if len(self.keys) == 1:
+            return equals(name, self.keys[0])
+        return "<fes:Or>" + "".join(equals(name, key) for key in self.keys) + "</fes:Or>"
+
+
+@dataclass(frozen=True, slots=True)
+class Reference:
+    """A place a distance was measured to, resolved to everything it may mean.
+
+    Never a point. „6 km bis Grimma" is a statement about a town, and a town
+    has an edge and a middle that lie kilometres apart -- so both are kept and
+    a candidate is tested against the whole interval between them. ``area`` is
+    the built-up outline in UTM 33; ``centre`` its centroid.
+    """
+
+    name: str
+    area: Any
+    centre: Any
+
+    def readings(self, point: Any) -> tuple[float, float]:
+        """What this reference admits as "the distance" from one point.
+
+        The near end is the distance to the built-up area itself -- zero inside
+        it -- and the far end the distance to its middle. Nothing in between is
+        chosen.
+        """
+
+        near = float(self.area.distance(point))
+        far = float(self.centre.distance(point))
+        return (near, far) if near <= far else (far, near)
 
 
 @dataclass
@@ -164,7 +242,6 @@ class SearchState:
     candidates: list[Flurstueck] = field(default_factory=list)
     outline: KatasterBezirk | None = None
     areas: list[Suchgebiet] = field(default_factory=list)
-    requests: int = 0
     status: SuchStatus = "erfolglos"
     hint: str | None = None
 
@@ -185,21 +262,51 @@ class SearchEngine:
         self.app_settings = app_settings or alkis.app_settings
         self.state = SearchState()
         self._area: AreaStatement | None = None
-        self._street: str | None = None
+        self._streets: list[str] = []
+        # Where the service's own counter stood when this run began; what it
+        # has added since is what this run asked for. See `_requests`.
+        self._calls_at_start = getattr(alkis, "network_calls", 0)
         # The sentence saying the plot is a piece of a bigger parcel, if any.
         self._part_area: str | None = None
         # The federal state the listing names, when it is not Saxony.
         self._outside: str | None = None
+        # What the listing says the plot measures, where it says so.
+        self._dimensions: Dimensions | None = None
+        # The parcel a contradicted number resolved to. Kept, not dropped: if
+        # the area route finds nothing, it is the only answer there is.
+        self._refuted: list[Flurstueck] = []
         # District outlines already fetched, by key. Drawn once for the map and
         # reused for the wash under a confirmed parcel.
         self._district_outlines: dict[str, KatasterBezirk] = {}
         # The districts the platform's pin lands among. `None` until asked,
         # a list -- possibly empty -- afterwards, so it is asked exactly once.
         self._pin_anchors: list[Anchor] | None = None
+        # What the listing says about distance, and the band each statement
+        # admits. Read in phase 0, resolved only when there is something to
+        # order -- a band never decides, so it never needs to run earlier.
+        self._distances: list[tuple[Indiz, DistanceStatement]] = []
+        self._references: list[tuple[DistanceStatement, Reference]] = []
+        self._bands_resolved = False
 
     # ------------------------------------------------------------------
     # Small helpers over the Indiz list
     # ------------------------------------------------------------------
+
+    def placing(self, art: str) -> list[Indiz]:
+        """Indicia of one kind that actually place the plot somewhere.
+
+        German capitalises every noun and a listing names half a county, so a
+        mention is not a location: „Anbindung an Leipzig" put Gemarkung Leipzig
+        up as an anchor next to Lobstädt, and Leipzig holds two parcels of
+        exactly the stated size. `anchors` has filtered on the relation since
+        that measurement; the municipality did not, and a Gemeinde Indiz
+        without a placing relation therefore still narrowed the anchors to
+        itself and could produce anchors of its own. A model may report
+        „Leipzig, entfernt_von" — the one thing the relation exists to say —
+        and that must no more filter than it may anchor.
+        """
+
+        return [indiz for indiz in self.active(art) if indiz.beziehung in ANCHORING]
 
     def active(self, art: str) -> list[Indiz]:
         """Indicia of one kind the user has not switched off, strongest first."""
@@ -217,12 +324,25 @@ class SearchEngine:
         return found
 
     async def _count(self, conditions: Sequence[str]) -> int:
-        self.state.requests += 1
         return await self.alkis.count(conditions)
 
     async def _search(self, conditions: Sequence[str], limit: int | None = None) -> list[Flurstueck]:
-        self.state.requests += 1
         return await self.alkis.search(conditions, limit=limit)
+
+    def _requests(self) -> int:
+        """What this run actually asked the cadastre.
+
+        Read off the service rather than counted here, and that is the whole
+        correction. The hand-kept counter said 5 where the run made 4 calls and
+        8 where it made 7: it incremented on a *call*, so an answer served from
+        the disk cache counted as a request, while `districts_around` — which
+        does not go through `_count` or `_search` — was never counted at all.
+        A number every measurement in this project is quoted in has to mean one
+        thing, and the only place that knows whether bytes left the machine is
+        the service.
+        """
+
+        return max(0, self.alkis.network_calls - self._calls_at_start)
 
     # ------------------------------------------------------------------
     # Phase 0 -- gather, and notice contradictions
@@ -287,7 +407,7 @@ class SearchEngine:
             # finds some other parcel of that size and confirms it — exactly the
             # confidently wrong answer this search exists to refuse.
             self._part_area = describes_part_area(
-                " ".join(part for part in (self.payload.titel, self.payload.text) if part)
+                blocks.joined(self.payload.titel, self.payload.text)
             )
             if self._part_area:
                 self._area = replace(self._area, part_of=self._part_area)
@@ -297,8 +417,24 @@ class SearchEngine:
                 )
                 area_indiz.beleg = self._part_area
 
-        street_indiz = next(iter(self.active("strasse")), None)
-        self._street = street_indiz.wert if street_indiz else None
+        # Every name the listing could mean, not the first one found. A
+        # suffix name („Wiesenstraße") is confident enough to be an Indiz on
+        # its own; a prepositional phrase („Am Kurpark") is not, and waits in
+        # the pool for a candidate's official address to confirm it. Both go
+        # into the same comparison, because the cadastre is what tells them
+        # apart — see `indicia.street_candidates`.
+        self._streets = [indiz.wert for indiz in self.active("strasse")]
+        self._streets += [
+            phrase
+            for phrase in street_candidates(
+                blocks.joined(self.payload.titel, self.payload.text)
+            )
+            if phrase not in self._streets
+        ]
+        self._read_distances()
+        self._dimensions = read_dimensions(
+            blocks.joined(self.payload.titel, self.payload.text)
+        )
 
         # The frame before the narration. The clues play out one at a time so a
         # run can be followed, and the districts used to be emitted *after* all
@@ -315,6 +451,260 @@ class SearchEngine:
         for conflict in self._conflicts():
             self.state.conflicts.append(conflict)
             yield SuchEreignis(art="konflikt", konflikt=conflict)
+
+    # ------------------------------------------------------------------
+    # Distance bands -- they order, they may object, they never confirm
+    # ------------------------------------------------------------------
+
+    def _read_distances(self) -> None:
+        """Turn the distances the prose states into Indizien.
+
+        A *named* reference gets a row of its own, because it is the only kind
+        the cadastre can resolve and therefore the only kind that can order
+        anything. Everything else is collapsed into one row.
+
+        That split is measured, not tidiness. Over the 16 recorded adverts the
+        prose states 62 distances and 8 of them name a place; advert 3375124391
+        alone lists thirteen — „Kindergarten 2 km", „Gymnasium 6,8 km",
+        „Flughafen 35 km" — and it is settled by its exact area in five
+        requests. Thirteen rows that cannot contribute would push the five that
+        did out of view, which is the same reason one district is one Indiz
+        however often the text names it.
+        """
+
+        body = blocks.joined(self.payload.titel, self.payload.text)
+        statements = distance.read_distances(body)
+        if not statements:
+            return
+        counter = 0
+        for statement in statements[:MAX_DISTANCE_STATEMENTS]:
+            if not statement.named:
+                continue
+            counter += 1
+            inner, outer = statement.band
+            indiz = self._distance_indiz(
+                f"e{counter}",
+                wert=distance.kilometres(statement.meters),
+                text=distance.band_sentence(statement),
+                beleg=statement.beleg,
+                sicherheit=0.25,
+                band=Entfernungsband(
+                    meter=statement.meters,
+                    innen_m=inner,
+                    aussen_m=outer,
+                    bezug=statement.label,
+                    modus=statement.mode,
+                ),
+            )
+            self.state.indicia.append(indiz)
+            self._distances.append((indiz, statement))
+
+        rest = [s for s in statements if not s.named]
+        if not rest:
+            return
+        listed = ", ".join(
+            f"{s.label} {distance.kilometres(s.meters)}" for s in rest[:MAX_DISTANCE_LISTED]
+        )
+        more = "" if len(rest) <= MAX_DISTANCE_LISTED else f" und {len(rest) - MAX_DISTANCE_LISTED} weitere"
+        self.state.indicia.append(
+            self._distance_indiz(
+                "e0",
+                wert=f"{len(rest)} Angaben",
+                text=(
+                    f"{listed}{more}. Jede nennt eine Art von Ort statt eines bestimmten, "
+                    "also gibt es nichts, wogegen sich messen ließe — sie stehen hier, "
+                    "gerechnet wird mit ihnen nicht."
+                ),
+                beleg=rest[0].beleg,
+                sicherheit=0.1,
+                band=None,
+            )
+        )
+
+    def _distance_indiz(
+        self,
+        id: str,
+        *,
+        wert: str,
+        text: str,
+        beleg: str,
+        sicherheit: float,
+        band: Entfernungsband | None,
+    ) -> Indiz:
+        indiz = Indiz(
+            id=id,
+            art="entfernung",
+            wert=wert,
+            text=text,
+            beleg=beleg,
+            quelle="fliesstext",
+            # Weak on purpose and by rule, not by taste: a band may order the
+            # list and may object, so its number is never allowed near the
+            # threshold that separates „bestätigt“ from „mehrdeutig“.
+            sicherheit=sicherheit,
+            beziehung="entfernt_von",
+            band=band,
+        )
+        if indiz.id in self.payload.verworfen:
+            indiz.verworfen = True
+            indiz.verworfen_grund = "Von Hand abgewählt."
+        return indiz
+
+    async def resolve_bands(self) -> AsyncIterator[SuchEreignis]:
+        """Resolve the named references to the built-up areas they mean.
+
+        Two requests per reference and at most ``MAX_DISTANCE_REFERENCES`` of
+        them, and only once there is more than one candidate to order — a band
+        cannot confirm, so on a run the cadastre already settled it would buy
+        nothing at all.
+
+        A name the directory does not carry is not resolved and not guessed.
+        „Penny 500 m" and „Nahkauf 700 m" read as place names and are shops;
+        the directory is what tells them from Machern, and an unresolved
+        reference stays in the protocol as a statement nobody could look up.
+        """
+
+        if self._bands_resolved:
+            return
+        self._bands_resolved = True
+        named = [
+            (indiz, statement)
+            for indiz, statement in self._distances
+            if statement.named and statement.usable and not indiz.verworfen
+        ]
+        # A band wider than a cadastral district contains every candidate any
+        # anchor can offer, so resolving it would spend two requests to learn
+        # nothing. „40 km nach Leipzig" admits 30,8 to 50 km; Saxon districts
+        # run 1 to 5 km across.
+        for indiz, statement in self._distances:
+            if statement.named and not statement.usable and not indiz.verworfen:
+                indiz.text = (
+                    f"{indiz.text} Mit {distance.kilometres(statement.meters)} ist das Band "
+                    "breiter als jede Gemarkung — es wird gezeigt und nicht gerechnet."
+                )
+        if not named or not self.directory:
+            return
+
+        for indiz, statement in named[:MAX_DISTANCE_REFERENCES]:
+            reference = await self._resolve_reference(statement.target or "")
+            if reference is None:
+                indiz.text = (
+                    f"{indiz.text} Der genannte Bezug „{statement.label}“ steht nicht im "
+                    "Gemarkungsverzeichnis — das Band wird gezeigt und nicht gerechnet."
+                )
+                yield SuchEreignis(art="indiz", indiz=indiz)
+                continue
+            self._references.append((statement, reference))
+            band = indiz.band
+            if band is not None:
+                indiz.band = band.model_copy(
+                    update={
+                        "aufgeloest": True,
+                        # `_geojson` projects out of UTM 33 itself, like every
+                        # other geometry that leaves this module.
+                        "umriss": _geojson(reference.area),
+                        "mitte": _geojson(reference.centre),
+                    }
+                )
+            yield SuchEreignis(art="indiz", indiz=indiz)
+
+        if self._references:
+            names = ", ".join(reference.name for _, reference in self._references)
+            yield SuchEreignis(
+                art="phase",
+                phase="bewertung",
+                text=(
+                    f"Die bebaute Ortslage von {names} als Bezug — der Abstand dorthin ist "
+                    "kein Wert, sondern ein Bereich vom Ortsrand bis zur Ortsmitte. Das "
+                    "ordnet die Kandidaten, ausschließen kann es nur nach außen."
+                ),
+            )
+
+    async def _resolve_reference(self, name: str) -> Reference | None:
+        """The built-up outline of a named place, or nothing.
+
+        Seeded from the cadastral district of that name, which is *not* the
+        town — Gemarkung Grimma reaches to within 1.22 km of a parcel 5.32 km
+        from the town's edge, because a district is farmland too. It is only
+        ever used here as a point to put the land-use box around, and the
+        outline that comes back is the settlement itself.
+        """
+
+        entries = district_matches(self.directory, name) if self.directory else []
+        if not entries:
+            return None
+        key = expand_gemarkung_key(entries[0].schluessel)
+        try:
+            outline = self._district_outlines.get(key)
+            if outline is None or outline.geometry is None:
+                found = await self.alkis.district_outlines([key])
+                outline = next((o for o in found if o.geometry is not None), None)
+            if outline is None or outline.geometry is None:
+                return None
+            seed = outline.geometry.centroid
+            lon, lat = geo.utm33_to_wgs84(seed.x, seed.y)
+            built_up = await self.alkis.built_up_area(lat, lon, largest=True)
+        except AppError:
+            # A band is an ornament on the answer, never the answer. An
+            # upstream that cannot draw it is not a reason to end the run.
+            return None
+        if built_up is None:
+            return None
+        return Reference(
+            name=entries[0].name or name,
+            area=built_up.geometry,
+            centre=built_up.geometry.centroid,
+        )
+
+    def _distance_fit(self, parcel: Flurstueck) -> tuple[float, str] | None:
+        """How well one candidate fits every resolved distance statement, as one number.
+
+        One feature, not one per statement. The three distances the reference
+        listing states all point into the same village, so their errors are one
+        error — averaging them says that, and multiplying them would count it
+        three times over.
+        """
+
+        if not self._references or parcel.geometry is None:
+            return None
+        point = parcel.geometry.centroid
+        fits: list[float] = []
+        phrases: list[str] = []
+        for statement, reference in self._references:
+            reading = reference.readings(point)
+            fits.append(distance.membership(reading, statement.band))
+            phrases.append(
+                f"{distance.kilometres(reading[0])}–{distance.kilometres(reading[1])} "
+                f"bis {reference.name} gegen „{distance.kilometres(statement.meters)}“ "
+                "im Inserat"
+            )
+        return sum(fits) / len(fits), "; ".join(phrases)
+
+    def _distance_objection(self, parcel: Flurstueck) -> str | None:
+        """The one thing a stated distance can prove, and only outwards.
+
+        A route is never shorter than the straight line, so a candidate whose
+        straight line already exceeds the outer bound cannot satisfy the
+        statement in any reading, by any means of travel. It still deletes
+        nobody — the sentence goes next to the candidate and the candidate
+        sinks.
+        """
+
+        if not self._references or parcel.geometry is None:
+            return None
+        point = parcel.geometry.centroid
+        for statement, reference in self._references:
+            reading = reference.readings(point)
+            # The *outer* band on purpose: F3 narrowed the band for ordering,
+            # and objecting is the one direction in which a broker's sentence
+            # can cost a candidate. It stays as generous as it always was.
+            if distance.refuted(reading, statement.outer_band):
+                return (
+                    f"liegt {distance.kilometres(reading[0])} von {reference.name} entfernt, "
+                    f"das Inserat nennt „{distance.kilometres(statement.meters)}“ — auch als "
+                    "Luftlinie zu weit"
+                )
+        return None
 
     async def read_images(self) -> AsyncIterator[SuchEreignis]:
         """Read the listing's images for a cadastral reference, and stop at one.
@@ -495,13 +885,25 @@ class SearchEngine:
         """Whether the parcel numbers were listed together rather than in dispute.
 
         A plot is a set of parcels -- the normal case. Numbers that all come
-        from *one* source are that set; numbers from different sources (an
-        image against the body text) are rival readings, and only those are a
-        contradiction worth putting to the user.
+        from *one document* are that set; numbers from different documents are
+        rival readings, and only those are a contradiction worth putting to the
+        user.
+
+        The document, not the *channel*. That distinction is the whole of this
+        method: every OCR find carries ``quelle="bild"``, so asking the channel
+        made two numbers off two different sheets look exactly like „790/11
+        sowie 238/3" in one sentence -- one plot of two parcels, no question
+        asked, and `_narrow_by_area` deliberately declining to tell them apart.
+        A Geoportal print carries dozens of numbers in its map image, so two
+        prints in one listing is not a rare shape.
+
+        ``fundort`` falls back to ``quelle`` for an Indiz a caller handed in
+        without one, which is exactly the old behaviour for the old inputs.
         """
 
         numbers = self.active("flurstueck")
-        return len(numbers) > 1 and len({indiz.quelle for indiz in numbers}) == 1
+        places = {indiz.fundort or indiz.quelle for indiz in numbers}
+        return len(numbers) > 1 and len(places) == 1
 
     @staticmethod
     def _conflict_key(indiz: Indiz) -> str:
@@ -531,7 +933,7 @@ class SearchEngine:
         # „geprägt von Wiesen und Feldern“ — a real Gemarkung name and an
         # entirely accidental one. A mention without a positional relation
         # stays in the protocol as weak evidence and is never searched.
-        active = [i for i in self.active("gemarkung") if i.beziehung in ANCHORING]
+        active = self.placing("gemarkung")
         chosen_id = self.payload.entscheidungen.get("gemarkung")
         if chosen_id:
             # A person who picked one has settled it; searching the rejected
@@ -540,23 +942,11 @@ class SearchEngine:
             active = decided or active
 
         out: list[Anchor] = []
-        seen: set[str] = set()
         for indiz in active:
-            for entry in self._district_entries(indiz):
-                key = expand_gemarkung_key(entry.schluessel)
-                if key in seen:
-                    continue
-                seen.add(key)
-                out.append(
-                    Anchor(
-                        art="gemarkung",
-                        schluessel=key,
-                        name=entry.name if entry.name != "?" else indiz.wert,
-                        indiz_id=indiz.id,
-                        confidence=indiz.sicherheit,
-                        gemeinde=entry.gemeinde,
-                    )
-                )
+            out.extend(
+                _group_into_anchors(self._district_entries(indiz), indiz, indiz.sicherheit)
+            )
+        out = _without_repeats(out)
         return (
             self._filter_by_municipality(out)
             or self._municipality_anchors()
@@ -598,26 +988,22 @@ class SearchEngine:
         if not self.directory:
             return []
         out: list[Anchor] = []
-        for indiz in self.active("gemeinde"):
+        for indiz in self.placing("gemeinde"):
             needle = fold(indiz.wert)
             districts = [
                 entry
                 for entry in self.directory.entries
                 if entry.gemeinde and needle in fold(entry.gemeinde)
             ]
-            if not districts or len(districts) > MAX_MUNICIPALITY_DISTRICTS:
+            # Counted as places, not as entries. Gemeinde Krostitz is fourteen
+            # directory rows and six districts, and refusing it for having
+            # fourteen while the pin then offers the same fourteen was the
+            # wrong way round -- measured on advert 3495973954.
+            grouped = _group_into_anchors(districts, indiz, indiz.sicherheit * 0.6)
+            if not grouped or len(grouped) > MAX_MUNICIPALITY_DISTRICTS:
                 continue
-            out.extend(
-                Anchor(
-                    art="gemarkung",
-                    schluessel=expand_gemarkung_key(entry.schluessel),
-                    name=entry.name,
-                    indiz_id=indiz.id,
-                    confidence=indiz.sicherheit * 0.6,
-                )
-                for entry in districts
-            )
-        return out
+            out.extend(grouped)
+        return _without_repeats(out)
 
     def _district_entries(self, indiz: Indiz) -> list[GemarkungEntry]:
         """Every cadastral district this Indiz could mean.
@@ -638,14 +1024,15 @@ class SearchEngine:
             return known or [GemarkungEntry(name=indiz.wert, schluessel=key)]
         if not self.directory:
             return []
-        needle = fold(indiz.wert)
-        entries = [entry for entry in self.directory.entries if fold(entry.name) == needle]
+        # Through the same reader the Indizien came from, so a place filed only
+        # as „<name> Flur n" resolves here exactly as it did there.
+        entries = district_matches(self.directory, indiz.wert)
         return self._within_municipality(entries) or entries
 
     def municipalities(self) -> list[str]:
-        """The municipalities the listing names, folded, strongest first."""
+        """The municipalities the listing puts the plot *in*, folded, strongest first."""
 
-        return [fold(indiz.wert) for indiz in self.active("gemeinde")]
+        return [fold(indiz.wert) for indiz in self.placing("gemeinde")]
 
     def _within_municipality(self, entries: list[GemarkungEntry]) -> list[GemarkungEntry]:
         """The entries whose municipality the listing also names.
@@ -781,14 +1168,16 @@ class SearchEngine:
         # rather than an objection to it. `_part_area_note` says what is going
         # on; repeating it as „bitte die Nummer prüfen“ would send someone
         # looking for a mistake that is not there.
-        if self._area is not None and official and not self._part_area:
-            factor = official / self._area.value
-            if factor >= SHORT_CIRCUIT_AREA_FACTOR or factor <= 1 / SHORT_CIRCUIT_AREA_FACTOR:
-                return (
-                    f"Das gefundene Flurstück misst amtlich {official:g} m², das Inserat "
-                    f"nennt {self._area.value:g} m². Nummer und Fläche widersprechen "
-                    "sich — bitte die Flurstücksnummer prüfen."
-                )
+        if self._area_contradicts(parcel):
+            return (
+                f"Das gefundene Flurstück misst amtlich {official:g} m², das Inserat "
+                f"nennt {self._area.value:g} m². Nummer und Fläche widersprechen "
+                "sich — bitte die Flurstücksnummer prüfen."
+            )
+
+        shape = self._shape_objection(parcel)
+        if shape:
+            return shape
 
         place = next(iter(self.active("ort")), None)
         municipality = (parcel.attributes.get("gemeinde") or "").strip()
@@ -805,6 +1194,85 @@ class SearchEngine:
                     "geokodiert ihr eigenes Ortsfeld —, ist aber ungeprüft."
                 )
         return None
+
+    def _area_contradicts(self, parcel: Flurstueck) -> bool:
+        """Whether the parcel's official area is outside anything the wording allows.
+
+        The threshold used to be a factor of two, which let 700 m² pass for a
+        stated 502 -- 39 % out and confirmed. It comes from the tolerance
+        staircase now: the widest rung the listing's own wording justifies is
+        as far as an official area may be from the stated one, which is 5 % for
+        a figure written exactly and 10 % for a rounded one.
+
+        Never for a part-area: a plot to be surveyed out of a bigger parcel is
+        *expected* to be smaller than it.
+        """
+
+        official = parcel.flaeche_amtlich_m2
+        if self._area is None or not official or self._part_area:
+            return False
+        rungs = tolerance_ladder(self._area)
+        if not rungs:
+            return False
+        widest = rungs[-1]
+        return not (widest.lower <= official <= widest.upper)
+
+    def _shape_objection(self, parcel: Flurstueck) -> str | None:
+        """Whether the parcel is shaped like the plot the listing describes.
+
+        „Bestätigt" has to mean that nothing contradicts, not merely that the
+        hard filters left one candidate -- and this is the contradiction the
+        area cannot see: two parcels of 577 m² can be 14 by 40 metres and 22 by
+        27, and only one of them is the plot with the 14 m frontage.
+
+        It objects; it never removes. The smallest rectangle around a polygon
+        is not what a seller measured, so the tolerance is wide and the
+        sentence says what was compared.
+        """
+
+        stated = self._dimensions
+        geometry = getattr(parcel, "geometry", None)
+        if stated is None or geometry is None or geometry.is_empty:
+            return None
+        try:
+            corners = list(geometry.minimum_rotated_rectangle.exterior.coords)[:4]
+        except (AttributeError, IndexError, ValueError):
+            return None
+        if len(corners) < 4:
+            return None
+        edges = sorted(
+            ((corners[i][0] - corners[(i + 1) % 4][0]) ** 2
+             + (corners[i][1] - corners[(i + 1) % 4][1]) ** 2) ** 0.5
+            for i in range(4)
+        )
+        short, long = edges[0], edges[3]
+        if short < 1:
+            return None
+
+        def apart(one: float, other: float) -> bool:
+            return abs(one - other) / other > SHAPE_TOLERANCE
+
+        sides = stated.sides
+        if sides is None:
+            # A frontage on its own says nothing here, and measuring showed why:
+            # advert 3375124391 states „Frontbreite ca. 26 m" and its parcel
+            # (1 489 m², correct) sits in a 39,8 x 71,5 m rectangle, because the
+            # plot is a wedge. The width may rank one day; it may not object.
+            return None
+        if geometry.area and short * long > geometry.area * SHAPE_RECTANGULARITY:
+            # The rectangle around a wedge says more about the wedge than about
+            # the plot, so it is not evidence either way. Measured: 1 489 m² in
+            # a 2 845 m² rectangle is 1,91 -- refused; 577 m² in 579 m² is
+            # 1,004, and that is the case this check is for.
+            return None
+        if not (apart(short, sides[0]) or apart(long, sides[1])):
+            return None
+        return (
+            f"Das Inserat nennt {sides[0]:g} × {sides[1]:g} m; das gefundene Flurstück "
+            f"passt in ein Rechteck von {short:.0f} × {long:.0f} m. Fläche und Nummer "
+            "stimmen, die Form nicht — das kann an einem anderen Zuschnitt liegen oder "
+            "daran, dass es das falsche Flurstück ist."
+        )
 
     # ------------------------------------------------------------------
     # Phases 2 and 3 -- the haystack, then the staircase
@@ -948,29 +1416,34 @@ class SearchEngine:
         allowed to fail on its own.
         """
 
-        self.state.requests += len(anchors)
         results = await asyncio.gather(
-            *(self.alkis.district_outline(anchor.schluessel) for anchor in anchors),
+            *(self.alkis.district_outlines(anchor.keys[:MAX_FLUR_OUTLINES]) for anchor in anchors),
             return_exceptions=True,
         )
         # Padded rather than zipped short: `frame` has no counts yet, and a
         # bare zip would silently return no outlines at all.
         padded = list(counts) + [None] * (len(anchors) - len(counts))
         out: list[Suchgebiet] = []
-        for anchor, count, outline in zip(anchors, padded, results):
-            if not isinstance(outline, KatasterBezirk) or outline is None:
+        for anchor, count, outlines in zip(anchors, padded, results):
+            if isinstance(outlines, BaseException) or not outlines:
                 continue
-            # Kept whole, not just as GeoJSON: the wash under a confirmed parcel
-            # is this same document, and the common envelope needs its geometry.
-            self._district_outlines[anchor.schluessel] = outline
-            out.append(
-                Suchgebiet(
-                    schluessel=anchor.schluessel,
-                    name=outline.name or anchor.name,
-                    anzahl=count if isinstance(count, int) else None,
-                    geometry=_geojson(outline.geometry),
+            for outline in outlines:
+                # Kept whole, not just as GeoJSON: the wash under a confirmed
+                # parcel is this same document, and the common envelope needs
+                # its geometry.
+                self._district_outlines[outline.schluessel or anchor.schluessel] = outline
+            # One place, one area on the map: the Flure of a district are drawn
+            # as themselves, because a union of eleven of them is a shape the
+            # cadastre never records and nobody can look up.
+            for outline in outlines:
+                out.append(
+                    Suchgebiet(
+                        schluessel=outline.schluessel or anchor.schluessel,
+                        name=anchor.name if len(outlines) > 1 else (outline.name or anchor.name),
+                        anzahl=count if isinstance(count, int) and len(outlines) == 1 else None,
+                        geometry=_geojson(outline.geometry),
+                    )
                 )
-            )
         return out
 
     async def _widen_the_place(
@@ -1182,8 +1655,17 @@ class SearchEngine:
             points, reasons = score(
                 parcel,
                 stated_area=self._area.value if self._area else None,
-                street=self._street,
+                street=self._streets,
+                distance_fit=self._distance_fit(parcel),
+                # A stated frontage ranks even where it cannot object: the
+                # plot may be a wedge, and then it matches no side of any
+                # rectangle while still sitting inside the interval the
+                # outline admits. See `scoring.front_interval`.
+                stated_front=self._dimensions.width if self._dimensions else None,
             )
+            objection = self._distance_objection(parcel)
+            if objection:
+                reasons = [*reasons, objection]
             out.append(
                 Kandidat(
                     id=parcel.attributes.get("flstkennz") or parcel.gml_id or "",
@@ -1298,7 +1780,6 @@ class SearchEngine:
             self.state.outline = already
             return
         try:
-            self.state.requests += 1
             self.state.outline = await self.alkis.district_outline(key)
         except UpstreamError:
             # A missing wash is a paler map, not a failed search.
@@ -1383,6 +1864,9 @@ class SearchEngine:
         async for event in self.short_circuit():
             yield event
 
+        async for event in self._branch_on_contradiction():
+            yield event
+
         if not self.state.candidates and anchors:
             async for event in self.measure_space(anchors):
                 yield event
@@ -1390,8 +1874,54 @@ class SearchEngine:
                 yield event
 
         if not self.state.candidates:
+            # The area route found nothing either, so the contradicted parcel
+            # is all there is. It comes back with its objection attached --
+            # a candidate somebody can look at beats no answer at all.
+            self.state.candidates = self._refuted
+            self._refuted = []
+
+        if not self.state.candidates:
             async for event in self.by_number_alone():
                 yield event
+
+    async def _branch_on_contradiction(self) -> AsyncIterator[SuchEreignis]:
+        """A parcel number whose parcel is the wrong size opens the area route.
+
+        The short circuit used to close it: the staircase runs only while the
+        candidate list is empty, so a number that resolved to *some* parcel
+        stopped the search that would have found the right one. The
+        contradiction was reported and never followed.
+
+        Both readings now stand. The number keeps its parcel, marked with what
+        contradicts it, and the area is searched as well -- and if that finds
+        nothing, the marked parcel is what the answer carries.
+        """
+
+        if len(self.state.candidates) != 1 or not self.active("flurstueck"):
+            return
+        parcel = self.state.candidates[0]
+        if not self._area_contradicts(parcel):
+            return
+
+        official = parcel.flaeche_amtlich_m2 or 0.0
+        for number in self.active("flurstueck"):
+            number.verworfen = True
+            number.verworfen_grund = (
+                f"Das Flurstück dieser Nummer misst amtlich {official:g} m², das Inserat "
+                f"nennt {self._area.value:g} m². Die Fläche ist die verlässlichere Angabe, "
+                "deshalb wird auch ohne die Nummer gesucht."
+            )
+            yield SuchEreignis(art="indiz", indiz=number)
+        yield SuchEreignis(
+            art="phase",
+            phase="kurzschluss",
+            text=(
+                f"Nummer und Fläche widersprechen sich ({official:g} gegen "
+                f"{self._area.value:g} m²) — es wird zusätzlich über die Fläche gesucht"
+            ),
+        )
+        self._refuted = self.state.candidates
+        self.state.candidates = []
 
     def _outside_note(self) -> str | None:
         """What to say about a listing that places itself outside Saxony.
@@ -1457,7 +1987,7 @@ class SearchEngine:
                 anzahl=0,
                 text=self._outside_note(),
                 gebiete=self.state.areas or None,
-                anfragen=self.state.requests,
+                anfragen=self._requests(),
             )
             return
 
@@ -1511,7 +2041,7 @@ class SearchEngine:
             text=hint,
             gemarkung_umriss=_geojson(getattr(self.state.outline, "geometry", None)),
             gebiete=self.state.areas or None,
-            anfragen=self.state.requests,
+            anfragen=self._requests(),
         )
 
     async def rank(self) -> AsyncIterator[SuchEreignis]:
@@ -1519,12 +2049,15 @@ class SearchEngine:
 
         if len(self.state.candidates) < 2:
             return
+        async for event in self.resolve_bands():
+            yield event
         features = [
             name
             for name, present in (
-                ("Straße", bool(self._street)),
+                ("Straße", bool(self._streets)),
                 ("Nutzungsart", True),
                 ("Fläche", self._area is not None),
+                ("Entfernung", bool(self._references)),
             )
             if present
         ]
@@ -1552,6 +2085,54 @@ async def run_search(
     engine = SearchEngine(payload, alkis, directory, app_settings)
     async for event in engine.run():
         yield event
+
+
+def _group_into_anchors(
+    entries: Sequence[GemarkungEntry], indiz: Indiz, confidence: float
+) -> list[Anchor]:
+    """One anchor per *place*, however many Flure the directory files it as.
+
+    „Kitzen Flur 1" to „Flur 11" are one district and one request; two
+    districts that merely share a base name in different municipalities stay
+    two, because the municipality is what tells them apart.
+    """
+
+    grouped: dict[tuple[str, str | None], list[GemarkungEntry]] = {}
+    for entry in entries:
+        key = expand_gemarkung_key(entry.schluessel)
+        group = (fold(base_name(entry.name)), entry.gemeinde)
+        rows = grouped.setdefault(group, [])
+        if all(row.schluessel != key for row in rows):
+            rows.append(replace(entry, schluessel=key))
+
+    out: list[Anchor] = []
+    for rows in grouped.values():
+        printed = base_name(rows[0].name)
+        out.append(
+            Anchor(
+                art="gemarkung",
+                schluessel=rows[0].schluessel,
+                name=printed if printed and printed != "?" else indiz.wert,
+                indiz_id=indiz.id,
+                confidence=confidence,
+                gemeinde=rows[0].gemeinde,
+                keys=tuple(row.schluessel for row in rows),
+            )
+        )
+    return out
+
+
+def _without_repeats(anchors: list[Anchor]) -> list[Anchor]:
+    """The same district named twice is one anchor, and the first wins."""
+
+    seen: set[str] = set()
+    out: list[Anchor] = []
+    for anchor in anchors:
+        if any(key in seen for key in anchor.keys):
+            continue
+        seen.update(anchor.keys)
+        out.append(anchor)
+    return out
 
 
 def _thousands(value: int) -> str:

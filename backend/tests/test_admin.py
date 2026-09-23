@@ -675,9 +675,15 @@ def test_the_shipped_price_list_prices_the_model_this_project_defaults_to():
     from pathlib import Path
 
     from app.prices import load_prices
-    from app.settings import LLMSettings
+    from app.settings import LLM_DEFAULTS, LLMSettings
 
-    shipped = LLMSettings.model_fields["model"].default
+    # Not `model_fields["model"].default`: that field is empty on purpose since
+    # the provider became a choice, and the model a deployment actually gets
+    # comes from `LLM_DEFAULTS`. The price list is OpenRouter's, so it is
+    # OpenRouter's default that has to be in it — the others are priced by
+    # whoever serves them, and Ollama runs on the deployment's own machine.
+    assert LLMSettings.model_fields["model"].default == ""
+    shipped = LLM_DEFAULTS["openrouter"][1]
     prices = load_prices(Path(__file__).resolve().parents[2] / "ops" / "llm-preise.json")
 
     assert prices.usable

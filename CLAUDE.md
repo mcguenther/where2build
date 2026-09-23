@@ -32,12 +32,12 @@ Keep comments sparse and about *why*, not *what*.
 
 ```
 backend/     FastAPI. Proxy and disk cache in front of ALKIS, BORIS, GeoSN
-             WMS, MOTIS and the LLM. Owns no geometry maths and no database —
-             PostGIS is in the plan, not in the code.
-             `app/search/` is the exception in one direction only: it asks the
-             cadastre a series of narrow questions and answers NDJSON, so the
-             map can grow while it runs. Still no geometry maths.
-frontend/    Vite + Vue 3, Options API. Owns ALL geometry.
+             WMS, MOTIS and the LLM. No database — PostGIS is in the plan, not
+             in the code.
+             `app/search/` is the exception: it asks the cadastre a series of
+             narrow questions and answers NDJSON, so the map can grow while it
+             runs — and it *measures* what comes back. See below.
+frontend/    Vite + Vue 3, Options API. Owns all geometry the user touches.
 docs/        Spec, service research, screenshots. `strategie/` holds the four
              interactive strategy pages for parcel identification, and
              `claude/` the working notes this file points at.
@@ -51,9 +51,19 @@ from the user directly. Reopen only if the user asks.
 
 - **Vue 3 with the Options API.** No `<script setup>`, no Composition API
   rewrite, no Nuxt.
-- **Geometry runs in the browser**, not in Shapely. Buffering, rotation and
-  collision run while the user drags, without a round trip. The binding numbers
-  come from ALKIS anyway.
+- **Geometry the user touches runs in the browser**, not in Shapely. Buffering,
+  rotation and collision run while the user drags, without a round trip. The
+  binding numbers come from ALKIS anyway.
+- **Geometry the *search* uses runs in the backend**, and has since the
+  envelope was built. The two are not the same job: the browser draws what
+  somebody is moving, and the search measures what the cadastre just answered —
+  in order to rank a candidate list that is streamed as NDJSON and cannot wait
+  for a browser. `search/envelope.py` unions outlines, `engine.py` fits a
+  `minimum_rotated_rectangle` against the dimensions a listing states, and the
+  soft features in `scoring.py` measure a front width and a neighbouring use.
+  The rule that used to stand here („no geometry maths in `app/search/`") had
+  already stopped being true when it was read again on 19.09.2026, which is the
+  worst state a rule can be in.
 - **Use the official area** (`flaeche` attribute from ALKIS) for anything
   price-related. The area computed from the polygon differs by a few square
   metres and is for shape analysis only. Both are shown side by side.
@@ -63,7 +73,14 @@ from the user directly. Reopen only if the user asks.
   and are never put to the user as a question, while numbers from *different*
   sources — an image against the body text — are rival readings and are.
 - **No contact details are stored.** The extraction schema does not carry
-  agent names or phone numbers, so no personal data reaches the database.
+  agent names or phone numbers, so no personal data reaches the database. A
+  *Beleg* is free text out of an advert, though, so the divergence log scrubs
+  telephone numbers and mail addresses out of every one it keeps.
+- **The extraction provider is the deployment's choice.** OpenRouter, OpenAI,
+  Anthropic, a local Ollama or any other OpenAI-compatible host: `LLM_ANBIETER`
+  names it, `LLM_BASE_URL` overrides where it lives, and „auto" reads it off
+  the endpoint. Anthropic speaks a different API and has an adapter of its own
+  — never a translation layer. See `docs/claude/services.md`.
 - **Fonts come from npm (Fontsource)**, never from a CDN.
 - **No separate print view.** `print.css` restyles the live page.
 - **There is no "6 m between buildings" rule in Saxony.** § 6 Abs. 5 SächsBO
@@ -187,12 +204,13 @@ export ADMIN_ACCOUNTS=88bcdb2925220580d02b1c458283db8e
 # in a window of its own so this page keeps whatever is half-entered on it.
 # authentik needs about a minute on the first start.
 # --remove-orphans every time: a renamed service leaves its container behind.
+# Behind a TLS-reterminating proxy (the cloud sandbox, a corporate network),
+# run this once first: it copies that CA into the two build contexts, which is
+# what the proxy's own documentation says to do. It does nothing where there is
+# no such CA, so it is safe to run always.
+scripts/setup-build-ca.sh
 docker compose up --build --remove-orphans     # http://localhost:8080
 docker compose down --remove-orphans           # volumes stay; -v throws them away
-# the same thing in the Claude Code cloud sandbox, where a plain build fails
-# on the proxy's own CA -- see docs/claude/tooling-and-tests.md for why.
-# No --build here: it reaches the plain `docker compose` behind the script.
-scripts/docker-build-sandbox.sh up -d
 
 # routing on this machine instead of Transitous -- opt-in, off by default.
 # fetch-data.sh pulls the OSM extract and the DELFI GTFS; the first start
@@ -236,21 +254,25 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 660 passed, 67 skipped. With `TEST_DATABASE_URL` pointed at a real
-  Postgres it is 719 passed, 8 skipped — the extra 59 are the account store and
-  the administration area, and they are skipped rather than mocked because what
-  they check is the database's own behaviour. Of the remaining 8, one needs
-  pyosmium, which only the index builder wants; the other seven need Tesseract.
-- `vitest`: 665 passed — plus the integration file, excluded by `npm run test`
+- `pytest`: 785 passed, 60 skipped. With `TEST_DATABASE_URL` pointed at a
+  real Postgres the account store and the administration area run too; they are
+  skipped rather than mocked because what they check is the database's own
+  behaviour. Of the rest, one needs pyosmium, which only the index builder
+  wants, and seven need Tesseract — this sandbox has it, and for that reason
+  never run two suites at once here. Three Tesseract tests failed on a run
+  sharing the machine with another pytest, and they failed exactly as a
+  photograph of a lawn does: an empty reading, past the 30 s timeout.
+- `vitest`: 672 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
 - `scripts/bookmarklet.mjs`: the handover across two origins, against the built
   app and a backend on :8000. It asserts the coordinate, which is the field
   that separates a handed-over document from a pasted one, and it writes
   `assistent-uebergabe.png`.
 - `scripts/screenshots.mjs`: 90 images plus two print PDFs. Twenty-one of them
-  need a session (`konto-*` and the administration area) and they are taken only with `W2B_ADMIN_COOKIE`
-  set — see `docs/claude/tooling-and-tests.md` for how that cookie is made and
-  why the run says so rather than photographing the refusal page. The narrow pass
+  need a session (`konto-*` and the administration area) and they are taken only
+  with `W2B_ADMIN_COOKIE` set — see `docs/claude/tooling-and-tests.md` for how
+  that cookie is made and why the run says so rather than photographing the
+  refusal page. The narrow pass
   runs in the **light** theme like the wide one, so the phone-width pictures
   are named `*-hell-schmal.png`. It fails on console errors, on horizontal
   overflow, and if not a single vector tile arrived. It
@@ -265,4 +287,7 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
   `/api/listings/extract`, which needs the same backend and no LLM key, and
   then open the „Gelesene Werte" fold inside the search step — that list is no
   longer a step of its own. The `assistent-einfuegen-*` images are the same
-  step with the bookmarklet's fold open.
+  step with the bookmarklet's fold open. The `suche-band-*` images run the
+  reference advert a second time with its area rounded to „ca. 1.100 m²", which
+  is what keeps the run ambiguous — an exact area settles it in five requests
+  and no distance band is ever resolved.

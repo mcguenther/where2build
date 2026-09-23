@@ -210,6 +210,138 @@ class ListingExtractResponse(BaseModel):
     # places named -- all of which live in the prose and in no attribute.
     # Capped, because a whole page of it is of no use to anything downstream.
     beschreibung: str | None = Field(default=None, max_length=20_000)
+    # What a model contributed, as Indizien the search can weigh — every one of
+    # them with the sentence the Beleg gate found in the page. Empty when no
+    # model ran, which is the normal case for a listing the deterministic
+    # readers settled.
+    indizien: list["Indiz"] = Field(default_factory=list)
+    # What the advert states about itself and nothing searches with: the
+    # provider's object id, the availability, the price per square metre.
+    # Shown, and the last of them checked — price over area has to produce it.
+    # German keys, like every other value that crosses this wire.
+    angaben: dict[str, str] = Field(default_factory=dict)
+
+
+# --------------------------------------------------------------------------
+# What a model is allowed to answer: a Befund, not a set of fields
+#
+# A language model is the last reader in this chain, not the first. The portal's
+# own fields are statements, the word reader is a reading, and a model is a
+# guess -- `SOURCE_CONFIDENCE` already says so, at 0.45, below the body text.
+# One hard rule follows: a model value may never filter and may never produce
+# „bestätigt“. It may rank, it may fill a gap, and it may open a branch that an
+# official filter then checks.
+#
+# So it does not answer `InseratFelder` with more fields in it. It answers a
+# *Befund*, in which every value travels in the same envelope as the sentence it
+# was read from -- and without that sentence there is no value. The check is in
+# `services.beleg`, and the first of its four tests costs nothing and catches
+# the case the whole thing exists for: 748,5 m² x 92,00 €/m² is 68 862 €, a
+# model rounds that to 69 000 € and writes a Beleg for it that stands nowhere.
+# A price nobody wrote is not a statement in a listing.
+#
+# Two things are deliberately absent from this schema, and the absence is the
+# enforcement: **contact details**, so no personal data can arrive however the
+# prompt is worded, and a **coordinate**, because a coordinate has no sentence
+# it could be quoted from -- the meta tags give it or nothing does.
+# --------------------------------------------------------------------------
+
+BEFUND_VORLAGE = "inserat-befund/1"
+
+
+class BelegteZahl(BaseModel):
+    """A number a model read, with the sentence it stood in.
+
+    ``wortlaut`` is not decoration: „ca. 748,50 m²“ is rounded and „748,50 m²“
+    is exact, and the tolerance staircase starts where the wording says -- the
+    same distinction the deterministic reader makes in ``AreaStatement``.
+    """
+
+    wert: float | None = None
+    wortlaut: str | None = None
+    beleg: str | None = None
+
+
+class BelegterText(BaseModel):
+    wert: str | None = None
+    beleg: str | None = None
+
+
+class BefundFelder(BaseModel):
+    adresse: BelegterText = Field(default_factory=BelegterText)
+    kaufpreis_eur: BelegteZahl = Field(default_factory=BelegteZahl)
+    grundstuecksflaeche_m2: BelegteZahl = Field(default_factory=BelegteZahl)
+
+
+# What level a named place sits on. This is the part a model earns its keep
+# with: „Thräna ist ein kleiner Ortsteil der Kreisstadt Borna“ names a district
+# and the municipality above it, and telling the two apart is what the patterns
+# in `search.indicia` are maintained for and where they fail.
+Ortsebene = Literal["gemarkung", "gemeinde", "ortsteil", "strasse", "unbekannt"]
+
+
+class BefundOrt(BaseModel):
+    """One place a listing names, with the level and the relation."""
+
+    name: str
+    ebene: Ortsebene = "unbekannt"
+    beziehung: Ortsbeziehung = "erwaehnt"
+    entfernung_km: float | None = None
+    beleg: str | None = None
+
+
+class BefundFlurstueck(Flurstueckskennung):
+    beleg: str | None = None
+
+
+class InseratBefund(BaseModel):
+    """Everything a model may answer about a listing.
+
+    The shape the search already accepts: the places and the parcel numbers
+    become ``Indiz`` objects on ``ParcelSearchRequest.indizien``, with
+    ``quelle="modell"`` and the Beleg the gate verified.
+    """
+
+    vorlage: Literal["inserat-befund/1"] = BEFUND_VORLAGE
+    felder: BefundFelder = Field(default_factory=BefundFelder)
+    orte: list[BefundOrt] = Field(default_factory=list)
+    flurstuecke: list[BefundFlurstueck] = Field(default_factory=list)
+
+
+class AbweichungZeile(BaseModel):
+    """One row of the divergence log, as the diagnostic view answers it."""
+
+    art: str
+    feld: str
+    regulaer: str | None = None
+    modell: str | None = None
+    beleg: str | None = None
+    grund: str | None = None
+    text_hash: str
+    quelle_url: str | None = None
+    modell_id: str | None = None
+    vorlage: str | None = None
+    gesehen_am: str
+
+
+class Abweichungen(BaseModel):
+    """The divergence log: the findings as rows, everything as counts.
+
+    ``zeilen`` leaves „einig" out unless it is asked for by name — a listing of
+    the cases where the pipeline was already right is one nobody reads. The
+    counts keep it, because it is the denominator every other number needs:
+    „six gaps" means nothing without „out of how many".
+    """
+
+    # How many rows the listing holds, which is not how many were counted.
+    anzahl: int
+    # „postgres" or „datei" — which of the two this deployment is keeping.
+    speicher: str
+    # Per art, over everything the log has ever held.
+    statistik: dict[str, int] = Field(default_factory=dict)
+    # The same, split by field — which reader is missing what.
+    je_feld: dict[str, dict[str, int]] = Field(default_factory=dict)
+    zeilen: list[AbweichungZeile] = Field(default_factory=list)
 
 
 class HousetypeExtractRequest(BaseModel):
@@ -1375,6 +1507,7 @@ IndizArt = Literal[
     "gemeinde",
     "ort",
     "nutzung",
+    "entfernung",
     "pin",
 ]
 
@@ -1398,6 +1531,37 @@ IndizQuelle = Literal[
 Ortsbeziehung = Literal["liegt_in", "liegt_an", "entfernt_von", "erwaehnt"]
 
 SuchStatus = Literal["bestaetigt", "mehrdeutig", "erfolglos"]
+
+
+class Entfernungsband(BaseModel):
+    """The ring a stated distance admits, around a reference that is a *set*.
+
+    „ca. 6 km bis Grimma" is not a radius. Measured from the parcel actually
+    offered: the geocoder's point for Grimma lies 5.32 km away, the edge of the
+    built-up area 5.32 km, its middle 6.25 km and the car route 7.37 km. So the
+    reference is resolved to an outline rather than a point, the candidate
+    carries the whole interval that outline admits, and the two are tested for
+    overlap. ``innen_m`` and ``aussen_m`` are the statement's own interval.
+
+    ``umriss`` is the built-up area the distance is measured from, in WGS 84.
+    It travels because the band is only honest if it can be seen: the drawing
+    -- the buffer outwards and the circle inwards -- belongs to the browser,
+    like every other piece of geometry in this project.
+    """
+
+    meter: float
+    innen_m: float
+    aussen_m: float
+    bezug: str
+    # „strecke" for a plain kilometre figure, „auto", „fuss", „rad" or „zeit"
+    # where the wording said how it was measured.
+    modus: str
+    # False when the reference could not be resolved to an outline -- a class
+    # („Bushaltestelle"), a shop, or a name the cadastral directory does not
+    # carry. Then the band is shown and nothing is computed from it.
+    aufgeloest: bool = False
+    umriss: dict[str, Any] | None = None
+    mitte: dict[str, Any] | None = None
 
 
 class Indiz(BaseModel):
@@ -1430,12 +1594,22 @@ class Indiz(BaseModel):
     # a reading has to be *chosen*, the image travels with it and the choice is
     # made against the sheet rather than against a transcription of it.
     bild_url: str | None = None
+    # Which *document* this was read out of -- the body text, one particular
+    # image, the attribute list. Not the same thing as ``quelle``, which is the
+    # channel: every OCR find carries ``quelle="bild"``, so the channel cannot
+    # tell one picture from another, and two numbers off two different sheets
+    # were being read as one plot made of two parcels. See
+    # ``SearchEngine.named_as_a_set``.
+    fundort: str | None = None
     # The compound place name this district was taken out of, where it was one.
     # „Burghausen-Rückmarsdorf“ is no Gemarkung and both its halves are, so the
     # two readings are one statement admitting two districts -- not a
     # contradiction, and never a question. Same rule as several parcel numbers
     # from one source, which are a plot rather than a dispute.
     teil_von: str | None = None
+    # The ring a stated distance admits, for an Indiz of art „entfernung“. It
+    # may order the candidates and it may object; it may never confirm.
+    band: Entfernungsband | None = None
 
 
 class Konflikt(BaseModel):

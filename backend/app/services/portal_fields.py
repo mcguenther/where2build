@@ -64,8 +64,35 @@ _PRICE_VALUE = re.compile(
     re.IGNORECASE,
 )
 # „370,62 €/m²" is a rate, not the asking price, and it sits one element from
-# the price on ImmoScout's own main criteria. Same for „Preis pro m²".
-_PER_UNIT = re.compile(r"^[\s|]*(?:/|pro\b|je\b)[\s|]*(?:m²|m2|qm)", re.IGNORECASE)
+# the price on ImmoScout's own main criteria. The unit stands on either side of
+# the number and German portals use both sides:
+#
+#   „Kaufpreis 370,62 €/m²"       -- behind it
+#   „Kaufpreis pro m²: 92,00 €"   -- in front, as part of the label
+#
+# so there are two patterns, one per side, and a value that either of them
+# touches is a rate. The question is asked about the *value*, never about a
+# value-and-label pair: a rate does not become a price because some other word
+# happens to stand nearer to it, and asking per pair let „Kaufpreis (Preis pro
+# m²: 92 €) 199.000 €" answer 92.
+#
+# Neither carries „^". Measured 18.09.2026: the original did, and never matched
+# anything. `pattern.match(text, pos)` anchors the match at `pos`, but „^"
+# inside the pattern still means the start of the *string*, so the guard was
+# dead from the day it was written and „Kaufpreis: 92,00 €/m²" read as a
+# purchase price of 92 €. Its two tests passed throughout, because on both
+# recordings the real price stands nearer its label than the rate does and
+# `_nearest` wins without the guard ever being consulted.
+_UNIT = r"(?:m²|m2|qm|Quadratmeter)"
+_PER_UNIT_AFTER = re.compile(rf"[\s|]*(?:/|pro\b|je\b)[\s|]*{_UNIT}", re.IGNORECASE)
+# „…pro m²:  92,00 €". Anchored at the end of the span so only a marker that
+# actually touches the number counts -- „Fläche je m² bebaubar, Kaufpreis
+# 199.000 €" has the words but not the adjacency.
+_PER_UNIT_BEFORE = re.compile(
+    rf"(?:/|\bpro\b|\bje\b)[\s|]*{_UNIT}[\s|:.,\-–—]*\Z", re.IGNORECASE
+)
+# How far back a label's own unit may stand. „pro Quadratmeter: " is 19.
+_UNIT_LOOKBACK = 32
 
 # The labels, as the three portals write them. A leading boundary that excludes
 # German letters is what keeps „Wohnfläche" and „Nutzfläche" out of „Fläche",
@@ -131,12 +158,22 @@ def german_number(raw: str) -> float | None:
         return None
 
 
+def _is_rate(text: str, value: re.Match[str], *, lookback: int = _UNIT_LOOKBACK) -> bool:
+    """Whether this number is a rate per square metre rather than a price."""
+
+    if _PER_UNIT_AFTER.match(text, value.end()):
+        return True
+    return bool(
+        _PER_UNIT_BEFORE.search(text, max(0, value.start() - lookback), value.start())
+    )
+
+
 def _nearest(
     text: str,
     label_re: re.Pattern[str],
     value_re: re.Pattern[str],
     *,
-    reject_after: re.Pattern[str] | None = None,
+    drop_rates: bool = False,
 ) -> float | None:
     """The value nearest to any occurrence of the label, either side of it.
 
@@ -150,7 +187,7 @@ def _nearest(
         window_start = max(0, label.start() - _WINDOW)
         window_end = min(len(text), label.end() + _WINDOW)
         for value in value_re.finditer(text, window_start, window_end):
-            if reject_after and reject_after.match(text, value.end()):
+            if drop_rates and _is_rate(text, value):
                 continue
             number = german_number(value.group(1))
             if number is None:
@@ -178,9 +215,7 @@ def read_area_m2(html: str) -> int | None:
 def read_price_eur(html: str) -> int | None:
     """The asking price in euro. A per-square-metre rate is not a price."""
 
-    value = _nearest(
-        flat_text(html), _PRICE_LABEL_RE, _PRICE_VALUE, reject_after=_PER_UNIT
-    )
+    value = _nearest(flat_text(html), _PRICE_LABEL_RE, _PRICE_VALUE, drop_rates=True)
     if value is None or not 0 < value < 100_000_000:
         return None
     return int(round(value))

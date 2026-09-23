@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import logging
 import os
 import re
 import shutil
@@ -23,6 +24,8 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Iterator
+
+logger = logging.getLogger(__name__)
 
 # The ceiling for the whole cache directory. Wired through
 # AppSettings.cache_max_bytes; until a caller passes one, this is what applies.
@@ -295,6 +298,9 @@ class DiskCache:
         self.ttl_s = ttl_s
         self.sweeper = get_sweeper(self.directory.parent, max_bytes)
         self.sweeper.register(self.directory.name, ttl_s)
+        # Said once, not once per write: a wrong path would otherwise turn a
+        # warning into the thing that fills the disk.
+        self._write_failed = False
 
     def _path(self, key: str) -> Path:
         digest = _digest(key)
@@ -317,18 +323,41 @@ class DiskCache:
             return None
 
     def set_bytes(self, key: str, value: bytes) -> None:
+        """Keep an answer, or do not. Never fail the request over it.
+
+        `get_bytes` has always swallowed an OSError and this did not, which is
+        the wrong way round: a cache that cannot read is slow, and a cache that
+        cannot *write* is slow too. Measured 19.09.2026 in the compose stack --
+        the backend runs as an unprivileged user and its cache directory was
+        not the one the volume is mounted at, so every single
+        `/api/listings/extract` answered 500 with a PermissionError on `.cache`
+        *after* the model had already answered. The work was done and paid for
+        and thrown away because storing it failed.
+
+        Said once per directory. A warning per write turns a wrong path into a
+        full disk.
+        """
+
         path = self._path(key)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        # Write-then-rename so a reader never sees a half-written entry, and
-        # under a name of its own so two writers of the same key cannot end up
-        # renaming each other's half-written file into place.
         tmp = path.with_name(f"{path.name}.{uuid.uuid4().hex}{_TEMP_SUFFIX}")
         try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            # Write-then-rename so a reader never sees a half-written entry,
+            # and under a name of its own so two writers of the same key cannot
+            # end up renaming each other's half-written file into place.
             tmp.write_bytes(value)
             tmp.replace(path)
-        except OSError:
+        except OSError as exc:
             _unlink(tmp)
-            raise
+            if not self._write_failed:
+                self._write_failed = True
+                logger.warning(
+                    "Cache %s ist nicht beschreibbar (%s) — die Antworten werden "
+                    "weiter geliefert, aber jede kostet den Dienst erneut.",
+                    self.directory,
+                    exc,
+                )
+            return
         self.sweeper.note_write(len(value))
 
     def get_json(self, key: str) -> Any | None:

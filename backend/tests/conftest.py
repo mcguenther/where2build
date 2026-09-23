@@ -62,6 +62,10 @@ def isolated_settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("LUIS_BASE_URL", LUIS_URL)
     monkeypatch.setenv("AIRQUALITY_BASE_URL", UBA_URL)
     monkeypatch.setenv("BASEMAP_UPSTREAM_URL", BASEMAP_URL)
+    # Named rather than inferred: the test endpoint is a made-up host, and the
+    # provider is what decides the wire format. The suite's baseline is the
+    # OpenAI-compatible one; the Anthropic tests set their own.
+    monkeypatch.setenv("LLM_ANBIETER", "openrouter")
     monkeypatch.setenv("LLM_BASE_URL", LLM_URL)
     monkeypatch.setenv("LLM_API_KEY", "test-key")
     monkeypatch.setenv("LLM_MODEL", "test/model")

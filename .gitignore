@@ -12,3 +12,10 @@ motis/data-input/
 
 # Build artefact: the official Saxon address coordinates, rebuilt quarterly.
 backend/data/hauskoordinaten-sachsen.json.gz
+
+# The build-time CA of a TLS-reterminating proxy, put there by
+# scripts/setup-build-ca.sh. Machine-specific and never committed; the `ca/`
+# directories themselves are, with their README, because the Dockerfiles copy
+# them and an absent directory fails the build.
+backend/ca/*.crt
+frontend/ca/*.crt

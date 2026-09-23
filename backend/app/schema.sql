@@ -85,3 +85,37 @@ create table if not exists settings (
     dokument     jsonb       not null,
     geaendert_am timestamptz not null default now()
 );
+
+-- Where the deterministic readers and a model disagreed. Not a user's data and
+-- deliberately not tied to an account: it is a note about the *pipeline*, made
+-- while reading somebody's listing, and what it keeps is the sentence a pattern
+-- could be written against — never the listing and never who was selling.
+--
+-- `text_hash` names the listing without storing it, so the same advert read
+-- three times is one row. The unique key is what makes that true; re-reading is
+-- the normal case, because the extraction cache has no expiry and a changed
+-- prompt makes every listing new again.
+--
+-- No foreign key, no `user_id`, and it survives an account deletion on purpose:
+-- there is nothing personal in it to delete. Belege are scrubbed of telephone
+-- numbers and mail addresses on the way in (`services/lehrbuch.py`), because a
+-- sentence out of an advert can carry what the extraction schema cannot.
+create table if not exists abweichungen (
+    id          bigserial   primary key,
+    -- 'luecke' | 'widerspruch' | 'verworfen'
+    art         text        not null,
+    feld        text        not null,
+    regulaer    text,
+    modell      text,
+    beleg       text,
+    grund       text,
+    text_hash   text        not null,
+    quelle_url  text,
+    modell_id   text,
+    vorlage     text,
+    gesehen_am  timestamptz not null default now(),
+    unique (text_hash, art, feld, modell)
+);
+
+-- What the evaluation asks: everything of one kind, newest first.
+create index if not exists abweichungen_art_idx on abweichungen (art, gesehen_am desc);

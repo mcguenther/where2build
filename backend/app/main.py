@@ -39,6 +39,7 @@ from .routers import (
     search,
     sitechecks,
     shares,
+    lehrbuch,
     storage,
     tiles,
 )
@@ -255,6 +256,28 @@ def _adressen_hinweis(index: AddressIndex | None) -> str:
         "alles außerhalb Sachsens kommen weiterhin aus MOTIS."
     )
 
+
+def _llm_hinweis(current: Settings) -> str:
+    """Which provider answered, and what is missing where nothing can.
+
+    The provider is named because it is now a choice: „auto" resolves it off
+    the endpoint, and somebody who pasted a URL should be able to see which of
+    the two wire formats their server is about to speak.
+    """
+
+    llm = current.llm
+    if not llm.configured:
+        return (
+            f"Anbieter {llm.provider}, aber kein LLM_API_KEY gesetzt — "
+            "Seiten können nicht ausgelesen werden."
+        )
+    fetch = (
+        "kann Seiten selbst abrufen"
+        if llm.provider in ("openrouter", "anthropic")
+        else "kann Seiten nicht selbst abrufen — dafür das Einfügen-Feld"
+    )
+    key = "" if llm.needs_key else ", ohne Schlüssel"
+    return f"Anbieter {llm.provider}{key}, Modell {llm.model_id}; {fetch}."
 
 # Routes whose calls are counted for the account but kept out of the burst
 # window: one screen of a map is dozens of tiles and a pan is dozens more, so a
@@ -612,12 +635,12 @@ def create_app() -> FastAPI:
                 DienstStatus(
                     name="llm",
                     konfiguriert=current.llm.configured,
-                    endpunkt=current.llm.base_url,
-                    hinweis=(
-                        f"Modell {current.llm.model}, Fetch-Engine {current.llm.fetch_engine}."
-                        if current.llm.configured
-                        else "Kein LLM_API_KEY gesetzt — Seiten können nicht ausgelesen werden."
-                    ),
+                    # The endpoint actually in play, with the provider's own
+                    # default filled in — a deployment that named only a
+                    # provider would otherwise see an empty field and think
+                    # nothing was set.
+                    endpunkt=current.llm.endpoint,
+                    hinweis=_llm_hinweis(current),
                 ),
             ],
         )
@@ -667,11 +690,13 @@ def create_app() -> FastAPI:
     # our own database. Worth knowing that one of its routes has no session at
     # all -- a shared link is meant to be opened by whoever was sent it, so the
     # token is the access. See the module docstring.
-    # `admin` belongs with them: it speaks only to our own database and to the
-    # cache directory. Its own budget is the one that matters -- every route in
-    # it is behind `current_admin`, and an administrator who is blocked by the
-    # burst guard would be blocked out of the page that lifts the block.
-    for module in (auth, gemarkungen, storage, shares, admin):
+    # `lehrbuch` is in here too: it reads our own divergence log, which is
+    # either our own Postgres or a file on this machine. `admin` belongs with
+    # them as well: it speaks only to our own database and to the cache
+    # directory. Its own budget is the one that matters -- every route in it is
+    # behind `current_admin`, and an administrator who is blocked by the burst
+    # guard would be blocked out of the page that lifts the block.
+    for module in (auth, gemarkungen, storage, shares, lehrbuch, admin):
         app.include_router(module.router)
 
     # The operator's announcement, and the one route of that module that is not

@@ -1,33 +1,5 @@
 <template>
   <div class="suche stack">
-    <!-- The verdict, before anything else. Three outcomes and none of them is
-         "probably": a search that always produces an answer eventually
-         produces a wrong one. -->
-    <div class="suche__urteil" :class="`suche__urteil--${status || 'laeuft'}`" role="status">
-      <div class="suche__urteilstext">
-        <!-- The phase belongs in the eyebrow and its sentence in the body line.
-             It used to be the h2, where a wording that changes every step and
-             runs from four words to four lines resized the box under itself —
-             and the box sits above the map, so the whole stage moved with it. -->
-        <p class="eyebrow">{{ running ? "Suche läuft" : "Ergebnis" }}</p>
-        <h2>{{ running ? phaseLabel : statusLabel }}</h2>
-        <p class="suche__satz" :class="{ 'suche__satz--laeuft': running }">
-          {{ running ? phaseText : sentence }}
-        </p>
-        <p v-if="hint && !running" class="suche__hinweis">{{ hint }}</p>
-      </div>
-      <div class="spacer"></div>
-      <!-- Kept in the layout while it is still unknown rather than appearing
-           with the answer: below 700 px it wraps onto its own line, and a line
-           that arrives at the end is one more shove of the map. -->
-      <p class="suche__kosten">
-        <template v-if="requests">
-          {{ requests }} {{ requests === 1 ? "Abfrage" : "Abfragen" }} ans Kataster
-        </template>
-      </p>
-      <span v-if="running" class="suche__puls" aria-hidden="true"></span>
-    </div>
-
     <p v-if="error" class="notice notice--error" role="alert">{{ error }}</p>
 
     <!-- A contradiction is never resolved quietly. The most trustworthy
@@ -65,6 +37,10 @@
       </p>
     </section>
 
+    <!-- The stage: the map fills it, and the run plays in a panel over its
+         right-hand side. The status box used to sit above the whole thing and
+         the course beside it, which put the two halves of one story in two
+         places and left the map competing with a column for width. -->
     <div class="suche__buehne">
       <div class="panel suche__karte">
         <!-- Zooming away from the answer and not finding the way back was the
@@ -95,7 +71,7 @@
         </div>
         <EvidenceMap ref="karte" :candidates="candidates" :district-outline="districtOutline"
                      :areas="areas" :huelle="huelle" :refuted-pin="refutedPin" :pin="pin"
-                     :status="status" :flight="flight" :height="mapHeight"
+                     :status="status" :flight="flight" :height="mapHeight" :indicia="indicia"
                      :ground="ground" :highlighted="highlighted" @select="pick" />
         <p v-if="ground === 'site'" class="panel__footnote">
           Luftbild und Straßen vom GeoSN. Die amtlichen Flurstücksgrenzen zeichnet der
@@ -103,65 +79,101 @@
         </p>
       </div>
 
-      <!-- The course of the search, in the order it happened. One list, not
-           two: the clues used to be sorted by confidence and the steps kept
-           separately, so afterwards nobody could tell what came first. Every
-           row that stands for something on the map jumps to it, and a clue can
-           still be switched off — a contradiction nobody can check is one
-           nobody can resolve. -->
-      <div ref="protocol" class="panel suche__protokoll">
-        <div class="panel__head suche__protokollkopf">
-          <h3>Verlauf</h3>
+      <!-- The head-up display: what the run is doing, and under it what it
+           has found. Newest first, because a run one is watching is read from
+           the top — the older entries are the ones you scroll back for. -->
+      <div class="suche__hud">
+        <!-- The verdict, before anything else. Three outcomes and none of them
+             is "probably": a search that always produces an answer eventually
+             produces a wrong one. -->
+        <div class="suche__urteil" :class="`suche__urteil--${status || 'laeuft'}`" role="status">
+          <div class="suche__urteilstext">
+            <!-- The phase belongs in the eyebrow and its sentence in the body
+                 line. It used to be the h2, where a wording that changes every
+                 step and runs from four words to four lines resized the box
+                 under itself — and everything under it moved along. -->
+            <p class="eyebrow">{{ running ? "Suche läuft" : "Ergebnis" }}</p>
+            <h2 :key="running ? phaseLabel : statusLabel" class="suche__phase">
+              {{ running ? phaseLabel : statusLabel }}
+            </h2>
+            <p class="suche__satz" :class="{ 'suche__satz--laeuft': running }">
+              {{ running ? phaseText : sentence }}
+            </p>
+            <p v-if="hint && !running" class="suche__hinweis">{{ hint }}</p>
+          </div>
           <div class="spacer"></div>
-          <span v-if="queued" class="chip">{{ queued }} wartet</span>
-          <button v-if="queued" type="button" class="btn btn--quiet btn--small" @click="skip">
-            Rest zeigen
-          </button>
+          <!-- Kept in the layout while it is still unknown rather than
+               appearing with the answer: it wraps onto its own line when the
+               panel is narrow, and a line that arrives at the end is one more
+               shove of everything below it. -->
+          <p class="suche__kosten">
+            <template v-if="requests">
+              {{ requests }} {{ requests === 1 ? "Abfrage" : "Abfragen" }} ans Kataster
+            </template>
+          </p>
+          <span v-if="running" class="suche__puls" aria-hidden="true"></span>
         </div>
-        <ol class="verlauf">
-          <li v-for="step in steps" :key="step.n"
-              class="verlauf__schritt" :class="[
-                `verlauf__schritt--${step.kind}`,
-                {
-                  'verlauf--verworfen': step.indiz && indizOf(step).verworfen,
-                  'verlauf--gezeigt': shownStep === step.n
-                }
-              ]">
-            <span class="verlauf__nr" aria-hidden="true">{{ step.n }}</span>
 
-            <button v-if="step.kind === 'indiz'" type="button" class="verlauf__zeile"
-                    @click="focusStep(step)">
-              <span class="verlauf__staerke"
-                    :style="{ opacity: 0.25 + 0.75 * indizOf(step).sicherheit }"></span>
-              <span class="verlauf__text">
-                <b>{{ indizOf(step).text }}</b>
-                <span class="verlauf__meta">
-                  {{ sourceLabel(indizOf(step).quelle) }} ·
-                  Sicherheit {{ percent(indizOf(step).sicherheit) }}
+        <!-- The course of the search, newest first. One list, not two: the
+             clues used to be sorted by confidence and the steps kept
+             separately, so afterwards nobody could tell what came first. Every
+             row that stands for something on the map jumps to it, and a clue
+             can still be switched off — a contradiction nobody can check is
+             one nobody can resolve. -->
+        <div ref="protocol" class="panel suche__protokoll">
+          <div class="panel__head suche__protokollkopf">
+            <h3>Verlauf</h3>
+            <div class="spacer"></div>
+            <span v-if="queued" class="chip">{{ queued }} wartet</span>
+            <button v-if="queued" type="button" class="btn btn--quiet btn--small" @click="skip">
+              Rest zeigen
+            </button>
+          </div>
+          <TransitionGroup tag="ol" class="verlauf" name="verlauf" :css="animated">
+            <li v-for="step in newestFirst" :key="step.n"
+                class="verlauf__schritt" :class="[
+                  `verlauf__schritt--${step.kind}`,
+                  {
+                    'verlauf--verworfen': step.indiz && indizOf(step).verworfen,
+                    'verlauf--gezeigt': shownStep === step.n
+                  }
+                ]">
+              <span class="verlauf__nr" aria-hidden="true">{{ step.n }}</span>
+
+              <button v-if="step.kind === 'indiz'" type="button" class="verlauf__zeile"
+                      @click="focusStep(step)">
+                <span class="verlauf__staerke"
+                      :style="{ opacity: 0.25 + 0.75 * indizOf(step).sicherheit }"></span>
+                <span class="verlauf__text">
+                  <b>{{ indizOf(step).text }}</b>
+                  <span class="verlauf__meta">
+                    {{ sourceLabel(indizOf(step).quelle) }} ·
+                    Sicherheit {{ percent(indizOf(step).sicherheit) }}
+                  </span>
+                  <span v-if="indizOf(step).beleg" class="verlauf__beleg">„{{ indizOf(step).beleg }}“</span>
+                  <span v-if="indizOf(step).verworfen_grund" class="verlauf__grund">
+                    {{ indizOf(step).verworfen_grund }}
+                  </span>
                 </span>
-                <span v-if="indizOf(step).beleg" class="verlauf__beleg">„{{ indizOf(step).beleg }}“</span>
-                <span v-if="indizOf(step).verworfen_grund" class="verlauf__grund">
-                  {{ indizOf(step).verworfen_grund }}
+              </button>
+
+              <button v-else type="button" class="verlauf__zeile verlauf__zeile--schritt"
+                      :disabled="!hasFocus(step)" @click="focusStep(step)">
+                <span class="verlauf__text">
+                  <span class="verlauf__marke">{{ stepLabel(step) }}</span>
+                  {{ step.text }}
                 </span>
-              </span>
-            </button>
+              </button>
 
-            <button v-else type="button" class="verlauf__zeile verlauf__zeile--schritt"
-                    :disabled="!hasFocus(step)" @click="focusStep(step)">
-              <span class="verlauf__text">
-                <span class="verlauf__marke">{{ stepLabel(step) }}</span>
-                {{ step.text }}
-              </span>
-            </button>
-
-            <button v-if="step.kind === 'indiz'" type="button" class="verlauf__schalter"
-                    :aria-pressed="String(!indizOf(step).verworfen)"
-                    :title="indizOf(step).verworfen ? 'Wieder berücksichtigen' : 'Ohne dieses Indiz suchen'"
-                    @click="toggle(indizOf(step))">
-              {{ indizOf(step).verworfen ? "+" : "×" }}
-            </button>
-          </li>
-        </ol>
+              <button v-if="step.kind === 'indiz'" type="button" class="verlauf__schalter"
+                      :aria-pressed="String(!indizOf(step).verworfen)"
+                      :title="indizOf(step).verworfen ? 'Wieder berücksichtigen' : 'Ohne dieses Indiz suchen'"
+                      @click="toggle(indizOf(step))">
+                {{ indizOf(step).verworfen ? "+" : "×" }}
+              </button>
+            </li>
+          </TransitionGroup>
+        </div>
       </div>
     </div>
 
@@ -223,6 +235,7 @@
  * runs the search again — it is cheap enough for that.
  */
 import EvidenceMap from "./EvidenceMap.vue";
+import { bandPolygon } from "../lib/bands.js";
 import {
   DWELL_MS, FLIGHT_MS, StepQueue, movesTheMap, prefersReducedMotion
 } from "../lib/evidence.js";
@@ -235,10 +248,14 @@ import { area } from "../lib/format.js";
 const PHASE_LABELS = {
   ernten: "Gelesen",
   raum: "Raum",
+  kurzschluss: "Kurzschluss",
   treppe: "Toleranz",
   gegenprobe: "Gegenprobe",
+  gemeinde: "Gemeinde",
+  bewertung: "Bewertung",
   bilder: "Bilder",
   nummer: "Nummer",
+  "nummer-sachsenweit": "Nummer",
   strasse: "Straße"
 };
 
@@ -265,7 +282,9 @@ export default {
   props: {
     /** What is known about the listing; the shape `POST /api/parcels/search` takes. */
     query: { type: Object, required: true },
-    mapHeight: { type: Number, default: 460 },
+    /* Taller than it was: the run now plays in a panel over the map's right
+       side, and the panel needs the room the two columns used to take. */
+    mapHeight: { type: Number, default: 560 },
     /** Off in tests: they assert on the finished state, not on the pacing. */
     paced: { type: Boolean, default: true }
   },
@@ -317,6 +336,17 @@ export default {
     /** Still going as long as anything is unplayed. A heading that says
      *  „Ergebnis“ over a half-drawn map is worse than one that waits. */
     running() { return this.streaming || this.queued > 0; },
+    /** The course, newest first.
+     *
+     *  A run one is watching is read at the top: what just happened is the
+     *  line one waits for, and the earlier ones are what one scrolls back to.
+     *  The numbers stay the order things happened in — they are the point of
+     *  the list — so they count *down* the screen. */
+    newestFirst() { return [...this.steps].reverse(); },
+    /** Whether the entries animate in. Off when the run is not paced (tests
+     *  assert on the finished list) and off when the reader asked for less
+     *  motion. */
+    animated() { return this.paced && !prefersReducedMotion(); },
     statusLabel() { return STATUS_LABEL[this.status] ?? "Suche"; },
     /** Which stage the run is in. The heading it goes in has to keep its
      *  height, so this is the phase's *label* — one word, the same vocabulary
@@ -470,33 +500,43 @@ export default {
 
     /** One entry in the course of the run. */
     record(step) {
-      const following = this.atLatest();
+      const box = this.$refs.protocol;
+      const following = this.atNewest();
+      const before = box ? box.scrollHeight : 0;
       this.steps = [...this.steps, { ...step, n: this.steps.length + 1 }];
-      if (following) this.$nextTick(() => this.scrollToLatest());
+      this.$nextTick(() => {
+        if (following) return void this.scrollToNewest();
+        /* Somebody is reading an older entry, and the new one goes in *above*
+         * it — so without this the text they are looking at slides down by the
+         * height of the new row. Keeping the distance to the bottom keeps the
+         * line where their eye is. */
+        const now = this.$refs.protocol;
+        if (now) now.scrollTop += now.scrollHeight - before;
+      });
     },
 
     /** Whether the protocol is showing its newest entry.
      *
      *  Asked *before* the entry is added, and it is what keeps the scroll from
-     *  being a yank: somebody who scrolled up to read an earlier clue is
+     *  being a yank: somebody who scrolled down to read an earlier clue is
      *  reading it, and a list that jumps out from under them is worse than one
      *  that does not follow. The tolerance is about one row — a list resting a
-     *  few pixels short of the end is still at the end as far as anyone
+     *  few pixels short of the top is still at the top as far as anyone
      *  reading it is concerned.
      */
-    atLatest() {
+    atNewest() {
       const box = this.$refs.protocol;
       if (!box) return true;
-      return box.scrollHeight - box.scrollTop - box.clientHeight <= FOLLOW_SLACK_PX;
+      return box.scrollTop <= FOLLOW_SLACK_PX;
     },
 
-    scrollToLatest() {
+    scrollToNewest() {
       const box = this.$refs.protocol;
       if (!box) return;
       /* A plain assignment, not `scrollTo`: the smoothness is a stylesheet
        * question (`scroll-behavior`) and jsdom implements neither, so this is
        * the one form that is the same everywhere. */
-      box.scrollTop = box.scrollHeight;
+      box.scrollTop = 0;
     },
 
     indizOf(step) {
@@ -560,6 +600,12 @@ export default {
         const area = this.areas.find(entry => entry.name === indiz.wert);
         if (area?.geometry) return area.geometry;
         return this.districtOutline;
+      }
+      if (indiz.art === "entfernung") {
+        // The band itself, where one could be drawn. Focusing on what survived
+        // it instead would frame the candidates and say nothing about the
+        // statement — and this is the one clue whose whole point is its shape.
+        return bandPolygon(indiz.band) || null;
       }
       if (indiz.art === "pin") {
         const [lat, lon] = String(indiz.wert).split(",").map(Number);
@@ -698,18 +744,73 @@ export default {
   line-height: 1.45; overflow-wrap: anywhere;
 }
 
-.suche__buehne{ display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: var(--w2b-space-4); align-items: start; }
-@media (max-width: 900px){ .suche__buehne{ grid-template-columns: 1fr; } }
+/* The stage. The map has the whole width and the run plays on top of it: the
+   status box and the course are one story, and they used to stand in two
+   places with a column of width taken off the map for the second. Below
+   1000 px there is no room to float anything, and the HUD becomes what it was
+   — two panels under the map. */
+.suche__buehne{ position: relative; }
 .suche__karte{ padding: var(--w2b-space-3); }
-.suche__protokoll{ max-height: 560px; overflow-y: auto; scroll-behavior: smooth; }
+.suche__hud{
+  display: flex; flex-direction: column; gap: var(--w2b-space-3);
+  margin-top: var(--w2b-space-4);
+}
+@media (min-width: 1000px){
+  .suche__hud{
+    position: absolute; z-index: 2;
+    top: var(--w2b-space-4); right: var(--w2b-space-4); bottom: var(--w2b-space-4);
+    width: min(400px, 40%); margin-top: 0;
+    /* The gaps between the panels stay the map's: dragging it must not be
+       blocked by a column of nothing. */
+    pointer-events: none;
+  }
+  .suche__hud > *{ pointer-events: auto; }
+  /* Over an orthophoto a panel has to carry its own ground, and the blur is
+     what keeps it from reading as a sticker: the map stays visible underneath
+     without competing with the text. */
+  .suche__hud .suche__urteil,
+  .suche__hud .suche__protokoll{
+    background: color-mix(in srgb, var(--w2b-surface) 93%, transparent);
+    backdrop-filter: blur(9px);
+    box-shadow: 0 6px 28px -12px rgba(0, 0, 0, .45);
+  }
+  .suche__hud .suche__protokoll{ flex: 1 1 auto; min-height: 0; max-height: none; }
+}
+.suche__protokoll{ max-height: 420px; overflow-y: auto; scroll-behavior: smooth; }
 /* The list scrolls itself as the run plays, so the head has to stay: „Rest
    zeigen" is the only control that matters while it does, and it was the first
    thing to disappear upwards. */
 .suche__protokollkopf{
   position: sticky; top: 0; z-index: 1; background: var(--w2b-surface);
 }
+/* --- The run, arriving --------------------------------------------------
+   An entry does not appear, it arrives: it comes in from the right the way it
+   came from the map, and its edge lights up once so the eye knows which of the
+   rows is new. The list slides down under it rather than jumping, which is
+   what makes a run readable while it plays instead of only afterwards. */
+.verlauf-enter-from{ opacity: 0; transform: translateX(18px); }
+.verlauf-enter-active{
+  transition: opacity .32s ease, transform .32s cubic-bezier(.2, .8, .3, 1);
+}
+.verlauf-enter-active .verlauf__zeile{ animation: verlauf-blitz .9s ease-out; }
+.verlauf-move{ transition: transform .34s cubic-bezier(.2, .8, .3, 1); }
+.verlauf-leave-active{ transition: opacity .2s ease; position: absolute; }
+.verlauf-leave-to{ opacity: 0; }
+@keyframes verlauf-blitz{
+  0%{ box-shadow: inset 3px 0 0 var(--w2b-primary); background: var(--w2b-primary-veil); }
+  100%{ box-shadow: inset 3px 0 0 transparent; background: transparent; }
+}
+
+/* The phase word is keyed, so it is a new element on every change and can be
+   faded in. Nothing moves: the box holds its height, which is the whole reason
+   the word is in the heading and the sentence is not. */
+.suche__phase{ animation: phase-ein .3s ease-out; }
+@keyframes phase-ein{ from{ opacity: .25; } to{ opacity: 1; } }
+
 @media (prefers-reduced-motion: reduce){
   .suche__protokoll{ scroll-behavior: auto; }
+  .verlauf-enter-active, .verlauf-move, .verlauf-leave-active{ transition: none; }
+  .verlauf-enter-active .verlauf__zeile, .suche__phase{ animation: none; }
 }
 
 .verlauf{ list-style: none; margin: 0; padding: 0; counter-reset: none; }

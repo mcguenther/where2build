@@ -7,11 +7,13 @@ are the same figures ``docs/research/flurstueck-identifikation.md`` reports.
 
 from __future__ import annotations
 
+import asyncio
 import io
 import json
 
 import httpx
 import pytest
+from shapely.geometry import Polygon, box
 import respx
 from fastapi.testclient import TestClient
 
@@ -21,21 +23,40 @@ from app.search.envelope import common_envelope
 from app.search.indicia import (
     AreaStatement,
     collect_indicia,
+    district_matches,
     describes_part_area,
     federal_state,
+    municipality_name,
+    municipality_spelling,
     normalise_parcel_number,
     outside_saxony,
     read_area,
+    price_check,
+    read_dimensions,
+    stated_values,
+    street_candidates,
 )
+from app.search import distance
+from app.search.blocks import split_blocks
+from app.search.distance import read_distances
 from app.search.ladder import tolerance_ladder
-from app.search.scoring import land_use, score, street_match
+from app.search.scoring import front_fit, front_interval, land_use, score, street_match
 from app.services import ocr
-from app.services.alkis import parse_feature_collection
+from app.services.alkis import Flurstueck, parse_feature_collection
 
 from app.deps import alkis_service
-from app.search.engine import SearchEngine
+from app.search.engine import Reference, SearchEngine
 
 from .conftest import ALKIS_URL, fixture_bytes, fixture_json, fixture_text
+
+def _drain(events):
+    """Every event of an async generator, as a list."""
+
+    async def collect():
+        return [event async for event in events]
+
+    return asyncio.run(collect())
+
 
 # The three district names the reference listing contains, plus the second
 # Höfgen -- a name is not a key, and two of these share one.
@@ -64,6 +85,7 @@ DIRECTORY = GemarkungDirectory(
         GemarkungEntry("Grünau", "148814", "Großolbersdorf"),
         GemarkungEntry("Grünau", "148916", "Langenweißbach"),
         GemarkungEntry("Borna", "141810", "Stadt Borna"),
+        GemarkungEntry("Thräna", "141922", "Stadt Borna"),
         GemarkungEntry("Bad Lausick", "143836", "Stadt Bad Lausick"),
         GemarkungEntry("Etzoldshain", "143840", "Stadt Bad Lausick"),
         # A common German noun that is also a real Gemarkung. The Machern
@@ -74,6 +96,9 @@ DIRECTORY = GemarkungDirectory(
         GemarkungEntry("Roitzsch", "143027", "Stadt Dresden"),
         GemarkungEntry("Roitzsch", "146088", "Stadt Lommatzsch"),
         GemarkungEntry("Roitzsch", "148654", "Stadt Wurzen"),
+        # A name that begins with the word the column also puts in front of
+        # it. The real register spells this one „Stadt Stadt Wehlen".
+        GemarkungEntry("Wehlen", "122015", "Stadt Stadt Wehlen"),
     ],
     stand="2026-09-05",
 )
@@ -152,6 +177,85 @@ def _directory(monkeypatch: pytest.MonkeyPatch):
 # --------------------------------------------------------------------------
 
 
+@pytest.mark.parametrize(
+    ("text", "numbers"),
+    [
+        # The documented normal case: one label, several numbers, one set.
+        ("Flurstück 790/11 sowie 238/3 der Gemarkung Großbothen", ["790/11", "238/3"]),
+        ("Flurstücke 790/11, 238/3 und 41/e", ["790/11", "238/3", "41/e"]),
+        ("Flurstuecke 790/11 und 238/3", ["790/11", "238/3"]),
+        ("Flurstücke 12 und 13", ["12", "13"]),
+        # „Flurstücke" with the umlaut matched nothing at all until 19.09.2026:
+        # the plural „e" sat only on the ue-branch of the pattern.
+        ("Flurstücksnummer 107/60", ["107/60"]),
+        ("Flst. 41/e", ["41/e"]),
+        # A number after „und" that is a quantity, not a parcel. A denominator
+        # settles it outright; without one, a unit or a following noun has to
+        # rule it out.
+        ("Flurstück 107/60 und 502 m² Grundstücksfläche", ["107/60"]),
+        ("Flurstück 12 und 2 Garagen", ["12"]),
+        ("Die Flurstücke sind erschlossen.", []),
+    ],
+)
+def test_one_label_can_name_several_parcels(text, numbers):
+    """A plot is a *set* of parcels, and several numbers from one source are
+    that set — never rival readings. Only the first was read: the pattern needs
+    a label and the numbers behind „und" have none."""
+
+    read = [i for i in collect_indicia(text=text) if i.art == "flurstueck"]
+    assert [i.wert for i in read] == numbers
+    # One run, one Beleg: the span is the sentence that named them together,
+    # which is also what makes them one source rather than two.
+    assert len({i.beleg for i in read}) <= 1
+
+
+@pytest.mark.parametrize(
+    ("text", "kind"),
+    [
+        # A proper name beside the class word makes the reference unambiguous.
+        ("Bushaltestelle „Kitzen“: ca. 300 m entfernt", "punkt"),
+        ("Autobahnanschlussstelle A38: ca. 3 km", "punkt"),
+        ("Bäckerei Wendl 500 m", "punkt"),
+        # The class word alone: the reference is whichever member is nearest.
+        ("Bus 0,3 km", "klasse"),
+        ("Flughafen 40,5 km", "klasse"),
+        ("Fernbahnhof 1,6 km", "klasse"),
+        # A settlement the register can resolve to an outline.
+        ("Über die B107 erreichen Sie die ca. 6 km entfernte Kreisstadt Grimma.", "ortschaft"),
+    ],
+)
+def test_a_distance_is_read_by_what_it_is_measured_to(text, kind):
+    """62 statements over the recorded adverts got one band between them,
+    although „Bushaltestelle Kitzen: ca. 300 m" leaves far less open than
+    „6 km bis Grimma"."""
+
+    statement = read_distances(text)[0]
+    assert statement.kind == kind
+
+
+def test_a_band_wider_than_a_cadastral_district_is_shown_and_not_computed():
+    """„Flughafen 40,5 km" admits 31,2 to 50,6 km. Saxon districts run 1 to
+    5 km across, so that band holds every candidate any anchor can offer."""
+
+    far = read_distances("Flughafen 40,5 km")[0]
+    near = read_distances("Bushaltestelle „Kitzen“: ca. 300 m entfernt")[0]
+    assert not far.usable
+    assert near.usable
+
+
+def test_a_tighter_band_orders_better_and_never_objects_more():
+    """Objecting is the one direction in which a broker's sentence can cost a
+    candidate, so the two questions get two intervals: the band may be as
+    tight as the kind allows, the outer one stays as generous as it was."""
+
+    point = read_distances("Bäckerei Wendl 500 m")[0]
+    assert point.kind == "punkt"
+    # Tighter for ordering …
+    assert point.band[1] < point.outer_band[1]
+    # … and the outer bound is the one the old single band had.
+    assert point.outer_band == (500 / distance.DETOUR, 500 * (1 + distance.SLACK))
+
+
 def test_a_garbled_parcel_number_is_rejected_before_it_reaches_the_cadastre():
     """The 7-degree misreading that returned „Flurstück 790717“.
 
@@ -172,11 +276,16 @@ def test_a_place_is_read_by_its_relation_and_not_by_how_often_it_is_named():
 
     indicia = collect_indicia(text=LISTING, directory=DIRECTORY)
     districts = {i.wert: i for i in indicia if i.art == "gemarkung"}
+    grimma = [i for i in indicia if i.wert == "Grimma"]
 
     assert districts["Großbothen"].beziehung == "liegt_in"
     assert districts["Höfgen"].beziehung == "liegt_in"
     # The one the text places the plot *in* outranks the one it merely mentions.
-    assert districts["Großbothen"].sicherheit > districts["Grimma"].sicherheit
+    distant = next(i for i in grimma if i.beziehung == "entfernt_von")
+    assert districts["Großbothen"].sicherheit > distant.sicherheit
+    # And the distant one is not offered as a cadastral district at all: the
+    # sentence names the town, and the register knows Grimma as one.
+    assert {i.art for i in grimma} == {"gemeinde"}
 
 
 def test_an_ambiguous_name_says_so_rather_than_picking_one():
@@ -185,6 +294,105 @@ def test_an_ambiguous_name_says_so_rather_than_picking_one():
 
     assert hoefgen.schluessel is None
     assert "2-mal" in hoefgen.text
+
+
+def test_a_stated_frontage_ranks_where_it_cannot_object():
+    """Plagwitz 309/6 is the right answer of advert 3375124391 and the one
+    parcel in the corpus whose listing states a frontage.
+
+    It is a wedge: 1 489 m² in a 39,8 x 71,5 m rectangle, and the stated
+    „Frontbreite ca. 26 m" matches *neither* rectangle side. That is why
+    `_shape_objection` refuses to object on a width — and why this is an
+    interval: the plot cannot be narrower on average than 20,8 m and cannot be
+    wider anywhere than 39,8 m, and 26 sits squarely inside.
+    """
+
+    parcel = parse_feature_collection(fixture_bytes("alkis_plagwitz_309_6.gml"))[0]
+    assert parcel.attributes["flaeche"] == "1489"
+    low, high = front_interval(parcel.geometry)
+    assert (round(low, 1), round(high, 1)) == (20.8, 39.8)
+
+    stated = read_dimensions(LISTINGS["3375124391"]["beschreibung"])
+    assert (stated.width, stated.depth) == (26.0, None)
+    fit, phrase = front_fit(parcel.geometry, stated.width)
+    assert fit == 1.0 and "26 m Front" in phrase
+    # It promotes and never demotes: a width nobody can place is still a width
+    # somebody paced out.
+    assert front_fit(parcel.geometry, 60.0)[0] == 0.05
+
+
+def test_what_an_advert_states_about_itself_is_read_as_pairs():
+    """Object id, availability and price per square metre are „Label: Wert"
+    lines, which is exactly what the block splitter hands over. Measured over
+    the 16 adverts: 14 carry an object id, 10 an availability, one a rate."""
+
+    listing = LISTINGS["3499632623"]
+    stated = stated_values(f"{listing['titel']}\n\n{listing['beschreibung']}")
+    assert stated == {"objekt_id": "PI-1105_n", "verfuegbar_ab": "sofort"}
+    # None of it searches with anything: it is shown, and the rate is checked.
+    borna = LISTINGS["2418686487"]
+    assert stated_values(borna["beschreibung"])["preis_je_m2"] == "92,00 €"
+
+
+def test_price_over_area_has_to_produce_the_stated_rate():
+    """The one arithmetic an advert offers against itself — and the figure
+    whose misreading („Kaufpreis pro m²: 92,00 €" as a price of 92 €) the model
+    channel caught in `portal_fields`."""
+
+    assert price_check({"preis_je_m2": "229,79 €"}, 199_000, 866) is None
+    wrong = price_check({"preis_je_m2": "92,00 €"}, 199_000, 866)
+    assert wrong == (
+        "Die Angaben widersprechen sich: 199.000 € auf 866 m² sind 229,79 € je m², "
+        "das Inserat nennt 92,00 €."
+    )
+    # A derived figure with a missing input is never computed.
+    assert price_check({"preis_je_m2": "92,00 €"}, None, 866) is None
+    assert price_check({}, 199_000, 866) is None
+
+
+def test_an_address_needs_no_suffix():
+    """„Am Kurpark" is the official lagebeztxt of 502/47 — the right answer of
+    the Bad Lausick advert — and the suffix pattern cannot see it.
+
+    The advert writes it mid-sentence and lower case („Naturnah wohnen am
+    Kurpark"), which is why the preposition is matched without regard to case
+    and the phrase is capitalised to the spelling a register uses.
+    """
+
+    listing = LISTINGS["3503721553"]
+    phrases = street_candidates(f"{listing['titel']}\n\n{listing['beschreibung']}")
+    assert "Am Kurpark" in phrases
+
+    parcel = parse_feature_collection(fixture_bytes("alkis_etzoldshain_502_47.gml"))[0]
+    assert parcel.attributes["lagebeztxt"] == "Am Kurpark"
+    # What the suffix pattern alone could say about it: nothing.
+    assert street_match(parcel.attributes["lagebeztxt"], None) == (0.05, None)
+    assert street_match(parcel.attributes["lagebeztxt"], phrases) == (1.0, "Am Kurpark")
+
+
+def test_a_prepositional_phrase_is_a_pool_and_not_an_indiz():
+    """„Am Kurpark" and „Zur Verfügung" are one shape to a pattern, and a
+    protocol listing every prepositional phrase is one nobody reads — the loose
+    harvest finds up to thirteen per advert. So they wait for a candidate's
+    official address instead of being offered as evidence."""
+
+    text = "Zum Verkauf steht ein Grundstück am Kurpark. Zur Verfügung steht auch eine Garage."
+    assert street_candidates(text) == ["Am Kurpark"]
+    assert [i.art for i in collect_indicia(text=text) if i.art == "strasse"] == []
+
+
+@pytest.mark.parametrize(
+    "junk",
+    ["Bundesstraße", "Anliegerstraße", "Stellplatz", "Ihren Platz", "Hektar Platz"],
+)
+def test_a_road_class_is_not_the_name_of_a_road(junk):
+    """All five travelled as street names over the 16 adverts, measured
+    19.09.2026. „Hauptstraße" and „Marktplatz" are names and stay allowed."""
+
+    text = f"Das Grundstück liegt an der {junk} und ist erschlossen."
+    assert [i.wert for i in collect_indicia(text=text) if i.art == "strasse"] == []
+    named = "Das Grundstück liegt an der Hauptstraße und ist erschlossen."
+    assert [i.wert for i in collect_indicia(text=named) if i.art == "strasse"] == ["Hauptstraße"]
 
 
 def test_the_authoritys_own_address_is_not_read_as_a_street():
@@ -851,6 +1059,121 @@ def test_ortsteil_names_the_district_and_the_municipality_in_one_breath():
 
     assert [i.wert for i in districts] == ["Plagwitz"]
     assert "Machern" in municipalities
+
+
+def test_the_generic_word_in_front_of_a_municipality_is_not_part_of_its_name():
+    """„ein kleiner Ortsteil der Kreisstadt Borna" names Borna.
+
+    Measured 18.09.2026: the Gemeinde Indizien carried „Kreisstadt Borna" and
+    „Stadt Sandersdorf-Brehna", and neither can match anything in ALKIS. It was
+    the model channel that showed it — the same sentences came back from a
+    model as „Borna" and „Brehna", which is exactly what the divergence log is
+    for.
+    """
+
+    indicia = _indicia_of("2418686487")
+    placing = {i.wert for i in indicia if i.art == "gemeinde" and i.beziehung == "liegt_in"}
+    # A set: the location field and the sentence both name it, which is two
+    # Indizien of one value and a separate question.
+    assert placing == {"Borna"}
+    # And nothing anywhere still carries the article's noun.
+    assert not [i for i in indicia if i.wert.lower().startswith(("stadt ", "kreisstadt "))]
+
+
+def test_a_municipality_only_mentioned_neither_filters_nor_anchors():
+    """`anchors` has filtered Gemarkung Indizien on the relation since „Anbindung
+    an Leipzig" put Gemarkung Leipzig up next to Lobstädt. The municipality did
+    not, so a Gemeinde Indiz without a placing relation still narrowed the
+    anchors to itself — and a model may report exactly that: „Leipzig,
+    entfernt_von"."""
+
+    engine = SearchEngine(
+        ParcelSearchRequest(text="Baugrundstück in Lobstädt."), alkis_service(), DIRECTORY
+    )
+    engine.state.indicia = [
+        Indiz(
+            id="a",
+            art="gemarkung",
+            wert="Lobstädt",
+            text="…",
+            quelle="fliesstext",
+            beziehung="liegt_in",
+            sicherheit=0.6,
+        ),
+        Indiz(
+            id="b",
+            art="gemeinde",
+            wert="Leipzig",
+            text="…",
+            quelle="modell",
+            beziehung="entfernt_von",
+            sicherheit=0.2,
+        ),
+    ]
+
+    assert engine.municipalities() == []
+    assert [a.name for a in engine.anchors()] == ["Lobstädt"]
+
+
+def test_a_city_the_text_only_mentions_is_not_offered_as_a_gemarkung():
+    """„Anbindung an Leipzig" is a sentence about transport.
+
+    There *is* a Gemarkung Leipzig, so the name resolves and the Indiz used to
+    be emitted at that level — fourteen times over the recorded corpus, with
+    Groitzsch, Borna, Bad Lausick, Chemnitz and Taucha once each, and a model
+    read every one of them as the municipality. Where the sentence does not
+    place the plot, the level is not the lookup's to decide.
+    """
+
+    indicia = collect_indicia(
+        text="Baugrundstück in Lobstädt. Gute Anbindung an Leipzig.",
+        directory=DIRECTORY,
+    )
+    by_name = {i.wert: i for i in indicia}
+    assert by_name["Leipzig"].art == "gemeinde"
+    assert by_name["Leipzig"].beziehung == "erwaehnt"
+    # The district it does place the plot in is untouched.
+    assert (by_name["Lobstädt"].art, by_name["Lobstädt"].beziehung) == (
+        "gemarkung",
+        "liegt_in",
+    )
+
+
+def test_a_municipality_that_is_also_the_district_survives_being_named():
+    """„Ihr neues Wohngrundstück in Groitzsch" places the plot, and Groitzsch is
+    a municipality *and* the cadastral district meant. The rule above must not
+    reach it — which is why it asks about the relation first."""
+
+    indicia = collect_indicia(
+        text="Ihr neues Wohngrundstück in Bad Lausick", directory=DIRECTORY
+    )
+    lausick = next(i for i in indicia if i.wert == "Bad Lausick")
+    assert (lausick.art, lausick.beziehung) == ("gemarkung", "liegt_in")
+
+
+def test_a_name_that_is_a_generic_word_keeps_it():
+    """Stadt Wehlen is a town called Stadt Wehlen, and the directory says so
+    itself: it lists the place as „Stadt Stadt Wehlen", the column's word in
+    front of a name that begins with the same word. Strip one and the name is
+    left; strip greedily and it is not."""
+
+    assert municipality_spelling(DIRECTORY, "Stadt Stadt Wehlen") == "Stadt Wehlen"
+    assert municipality_spelling(DIRECTORY, "Stadt Wehlen") == "Stadt Wehlen"
+    assert municipality_name(DIRECTORY, "Stadt Wehlen") == "Stadt Wehlen"
+    # And the ordinary case, from both directions.
+    assert municipality_name(DIRECTORY, "Kreisstadt Borna") == "Borna"
+    assert municipality_name(DIRECTORY, "Stadt Borna") == "Borna"
+    assert municipality_name(DIRECTORY, "Borna") == "Borna"
+    # „Borna" must not match „Bornaer Land".
+    assert municipality_spelling(DIRECTORY, "Bornaer Land") is None
+
+
+def test_a_municipality_outside_saxony_still_loses_the_generic_word():
+    """The directory cannot confirm Sandersdorf-Brehna, and „Stadt
+    Sandersdorf-Brehna" is not a name any register carries either."""
+
+    assert municipality_name(DIRECTORY, "Stadt Sandersdorf-Brehna") == "Sandersdorf-Brehna"
+    assert municipality_name(None, "Kreisstadt Borna") == "Borna"
 
 
 def test_the_municipality_tells_two_districts_of_one_name_apart():
@@ -1612,3 +1935,475 @@ def test_two_districts_that_came_from_two_names_still_disagree():
 
     assert len(districts) >= 2
     assert not engine.halves_of_one_ortsteil(districts)
+
+
+# --------------------------------------------------------------------------
+# „Bestätigt" means nothing contradicts, not merely that one candidate is left
+# --------------------------------------------------------------------------
+
+
+def test_stated_measures_are_read_only_where_a_word_says_what_was_measured():
+    """A metre with no word beside it is a setback, a street or a lake."""
+
+    assert read_dimensions("Der Bebauungsplan sieht einen Abstand von 15 m vor") is None
+
+    both = read_dimensions(
+        "Die Abmessungen von etwa 14,00 Metern Breite und ca. 40,00 Metern Tiefe"
+    )
+    assert both is not None and both.sides == (14.0, 40.0)
+
+    front = read_dimensions("1.489 m² pure Freiheit (Frontbreite ca. 26 m) am Rand")
+    assert front is not None and front.width == 26.0 and front.depth is None
+    # And a frontage alone is not a shape: it may not object to anything.
+    assert front.sides is None
+
+
+def test_a_parcel_shaped_unlike_the_listing_is_an_objection_not_a_confirmation():
+    """Advert 3508042470: 577 m² is 14 x 40 or 22 x 27, and only one is the plot."""
+
+    engine = SearchEngine(
+        ParcelSearchRequest(text="Die Abmessungen von etwa 14,00 Metern Breite und "
+                                 "ca. 40,00 Metern Tiefe bieten Platz."),
+        alkis_service(),
+        DIRECTORY,
+    )
+    engine._dimensions = read_dimensions(engine.payload.text)
+
+    # 21,7 x 26,7 m -- the parcel the run confirmed before this check existed.
+    wrong = Flurstueck(gml_id="a", attributes={"flaeche": "577"},
+                       geometry=box(0, 0, 21.7, 26.7))
+    # 17,3 x 34,1 m -- the one in the district the location field names.
+    right = Flurstueck(gml_id="b", attributes={"flaeche": "577"},
+                       geometry=box(0, 0, 17.3, 34.1))
+
+    engine.state.candidates = [wrong]
+    objection = engine.cross_check()
+    assert objection is not None and "14 × 40" in objection
+    assert engine.verdict() == "mehrdeutig"
+
+    engine.state.candidates = [right]
+    assert engine.cross_check() is None
+
+    # A plot that is not a rectangle cannot be checked against one. Measured on
+    # advert 3375124391: 1 489 m² of wedge inside 39,8 x 71,5 m of rectangle.
+    wedge = Flurstueck(
+        gml_id="c",
+        attributes={"flaeche": "1489"},
+        geometry=Polygon([(0, 0), (39.8, 0), (39.8, 71.5), (0, 0)]),
+    )
+    engine.state.candidates = [wedge]
+    assert engine.cross_check() is None
+
+
+def test_the_relation_is_read_when_the_trigger_stands_behind_the_name():
+    """„Thräna ist … ein Ortsteil der Kreisstadt Borna" — every window that
+    looks to the left of the name misses it, and it is the one advert in the
+    corpus whose answer is Thräna."""
+
+    indicia = collect_indicia(
+        text="Thräna ist mit seinen etwa 765 Einwohnern ein kleiner Ortsteil "
+             "der Kreisstadt Borna.",
+        directory=DIRECTORY,
+    )
+    district = next(i for i in indicia if i.art == "gemarkung" and i.wert == "Thräna")
+    assert district.beziehung == "liegt_in"
+    assert any(i.art == "gemeinde" and "Borna" in i.wert for i in indicia)
+
+
+def test_a_capitalised_noun_is_not_a_district_however_the_sentence_reads():
+    """German capitalises every noun, so the same shape carries things that are
+    not places — and only the directory can tell."""
+
+    indicia = collect_indicia(
+        text="Das Grundstück ist ein ruhiger Ortsteil von Machern.",
+        directory=DIRECTORY,
+    )
+    assert not any(i.art == "gemarkung" and "Grundstück" in i.wert for i in indicia)
+
+
+# --------------------------------------------------------------------------
+# A parcel number that resolves to the wrong parcel used to close the search
+# --------------------------------------------------------------------------
+
+
+@respx.mock
+def test_a_contradicted_parcel_number_opens_the_area_route(client):
+    """The short circuit found *a* parcel, so the staircase never ran — and the
+    parcel was 2 994 m² against the 502 the listing states."""
+
+    respx.post(ALKIS_URL).mock(
+        side_effect=_cadastre(
+            # The number resolves inside Großbothen, and the exact area finds
+            # the right parcel there.
+            {"144241+502": 1, "144241": 1131},
+            {
+                "flstnrzae": "alkis_thraena_107_60.gml",   # 2 994 m², the wrong one
+                "502": "alkis_grossbothen_790_11.gml",     # the right one
+            },
+        )
+    )
+
+    events = _stream(
+        client,
+        {
+            "gemarkung": "Großbothen",
+            "flurstuecksnummer": "107/60",
+            "flaeche_m2": 502,
+            "flaeche_text": "502 m²",
+        },
+    )
+
+    said = " ".join(e.get("text") or "" for e in events if e.get("art") == "phase")
+    assert "widersprechen sich" in said
+    # The staircase ran after the contradiction, and it is what answered.
+    result = next(e for e in events if e["art"] == "ergebnis")
+    assert result["anzahl"] >= 1
+    number = next(
+        e["indiz"] for e in events
+        if e.get("art") == "indiz" and e["indiz"]["art"] == "flurstueck"
+        and e["indiz"]["verworfen"]
+    )
+    assert "verlässlichere" in number["verworfen_grund"]
+
+
+# ----------------------------------------------------------------------
+# Distance bands
+# ----------------------------------------------------------------------
+
+
+def test_a_stated_distance_is_read_with_the_place_it_names():
+    """Advert 3499632623: „die ca. 6 km entfernte Kreisstadt Grimma“."""
+
+    statements = read_distances(
+        "Großbothen liegt an der B107, die ca. 6 km entfernte Kreisstadt Grimma "
+        "ist gut erreichbar.\nFernbahnhof 1,6 km\nBus 300 m"
+    )
+    by_metres = {round(s.meters): s for s in statements}
+    assert by_metres[6000].target == "Grimma"
+    assert by_metres[6000].named
+    # A kind of place is not a place. „Fernbahnhof" and „Bus" are read, kept
+    # and shown -- and never resolved to an outline, because there is none.
+    assert by_metres[1600].target is None and by_metres[1600].label == "Fernbahnhof"
+    assert by_metres[300].target is None
+
+
+def test_a_dimension_is_not_a_distance():
+    """„14 x 40 m“ and „15 m Abstand“ are about the plot, not about where it is."""
+
+    assert read_distances("Die Abmessungen betragen 14 x 40 m.") == []
+    assert read_distances("Der Bebauungsplan sieht einen Abstand von 15 m vor.") == []
+    assert read_distances("Das Grundstück ist ca. 20 m breit.") == []
+
+
+def test_a_name_across_a_paragraph_break_is_not_the_reference():
+    """„im 3 km entfernten Machern\n\nDie verwendeten Bilder …“ — the greedy
+    qualifier swallowed Machern and read the next capital word instead, which
+    made „Die“ a place three kilometres away."""
+
+    statements = read_distances(
+        "Einkaufsmöglichkeiten im 3 km entfernten Machern\n\nDie verwendeten Bilder "
+        "wurden teilweise nachbearbeitet."
+    )
+    assert [s.target for s in statements] == ["Machern"]
+
+
+def test_a_class_word_is_never_read_as_a_place_and_a_place_never_as_a_class():
+    """Whole words and German compound endings — never a substring, or
+    „Waldheim“ becomes a forest and „Seelitz“ a lake."""
+
+    assert read_distances("Bushaltestelle: ca. 300 m")[0].target is None
+    assert read_distances("Autobahnanschlussstelle A38: ca. 3 km")[0].target is None
+    assert read_distances("ca. 4 km bis Waldheim")[0].target == "Waldheim"
+    assert read_distances("ca. 2 km bis zur A14")[0].target is None
+
+
+def test_the_band_is_an_interval_and_so_is_the_candidate():
+    """The whole design in one assertion: nothing is reduced to a number.
+
+    Measured 16.09.2026 from Flurstück 790/11 against Grimma's built-up
+    outline: 5,3 km to the edge, 6,0 km to the middle. The advert says
+    „ca. 6 km“, which is the band 4,6 to 7,5 km. Read as the edge alone, or as
+    the middle alone, neither is the stated figure — as an interval they
+    overlap, and the right parcel survives.
+    """
+
+    reading = (5300.0, 6000.0)
+    band = (6000 / distance.DETOUR, 6000 * (1 + distance.SLACK))
+    assert distance.overlaps(reading, band)
+    assert distance.membership(reading, band) == 1.0
+    assert not distance.refuted(reading, band)
+
+
+def test_a_distance_objects_outwards_and_only_outwards():
+    """A route is never shorter than the straight line, so that is the one
+    direction in which a broker's figure proves anything."""
+
+    band = (6000 / distance.DETOUR, 6000 * (1 + distance.SLACK))
+    # 29,9 km from Grimma — advert 3508042470's parcel in Leipzig.
+    assert distance.refuted((29900.0, 30900.0), band)
+    # Far too close is not a refutation: the seller may have measured a detour,
+    # and the straight line says nothing about how long that was.
+    assert not distance.refuted((200.0, 900.0), band)
+    assert distance.membership((200.0, 900.0), band) < 1.0
+
+
+def test_a_band_orders_the_candidates_and_never_confirms():
+    """Role 2 and role 3 of the plan, and the rule that bounds both."""
+
+    engine = SearchEngine(
+        ParcelSearchRequest(text="Die ca. 6 km entfernte Kreisstadt Grimma ist nah."),
+        alkis_service(),
+        DIRECTORY,
+    )
+    engine._read_distances()
+    indiz = next(i for i in engine.state.indicia if i.art == "entfernung")
+    assert indiz.band is not None and indiz.band.bezug == "Grimma"
+    assert round(indiz.band.innen_m) == round(6000 / distance.DETOUR)
+    assert round(indiz.band.aussen_m) == 7500
+    # Never near the threshold that separates „bestätigt“ from „mehrdeutig“.
+    assert indiz.sicherheit <= 0.25
+
+    # A resolved reference 6 km from the near candidate and 30 km from the far
+    # one, stood in for here so the test asks nothing of the live service.
+    town = box(0, 0, 1000, 1000)
+    engine._references = [
+        (
+            next(s for s in read_distances(engine.payload.text)),
+            Reference(name="Grimma", area=town, centre=town.centroid),
+        )
+    ]
+    near = Flurstueck(gml_id="a", attributes={"flaeche": "502"},
+                      geometry=box(6000, 0, 6020, 1000))
+    far = Flurstueck(gml_id="b", attributes={"flaeche": "502"},
+                     geometry=box(30000, 0, 30020, 1000))
+
+    assert engine._distance_fit(near)[0] == 1.0
+    assert engine._distance_fit(far)[0] == 0.0
+    assert engine._distance_objection(near) is None
+    assert "zu weit" in (engine._distance_objection(far) or "")
+
+    # And it may not decide. One candidate, a band that fits perfectly, and the
+    # verdict still comes from the hard filters alone.
+    engine.state.candidates = [near]
+    assert engine.verdict() == "mehrdeutig"
+
+
+def test_an_unresolvable_reference_is_shown_and_not_computed():
+    """„Penny 500 m“ reads exactly like a place name, and the cadastral
+    directory is what says it is a shop."""
+
+    engine = SearchEngine(
+        ParcelSearchRequest(text="Penny und Nahkauf sind 500 m entfernt."),
+        alkis_service(),
+        DIRECTORY,
+    )
+    engine._read_distances()
+    assert [i.wert for i in engine.state.indicia if i.art == "entfernung"] == ["500 m"]
+    assert not district_matches(DIRECTORY, "Penny")
+
+
+def test_thirteen_unresolvable_distances_are_one_row():
+    """Advert 3375124391 lists thirteen of them and is settled by its exact
+    area in five requests. One row per statement would push every finding that
+    did contribute out of view."""
+
+    engine = SearchEngine(
+        ParcelSearchRequest(
+            text="Einkaufsmöglichkeiten im 3 km entfernten Machern.\n"
+                 "Kindergarten 2 km\nGrundschule 2 km\nRealschule 6 km\n"
+                 "Gymnasium 6,8 km\nFlughafen 35 km\nFernbahnhof 3,8 km\n"
+                 "Autobahn 9,7 km\nBus 500 m\nZentrum 3 km"
+        ),
+        alkis_service(),
+        DIRECTORY,
+    )
+    engine._read_distances()
+    rows = [i for i in engine.state.indicia if i.art == "entfernung"]
+    assert [i.wert for i in rows] == ["3 km", "9 Angaben"]
+    # Which is not the same as dropping them: the collapsed row names what it
+    # collapsed and says why nothing is computed from it.
+    assert "Kindergarten 2 km" in rows[1].text and "und 5 weitere" in rows[1].text
+    assert rows[1].band is None
+
+
+def test_the_band_travels_in_degrees_and_only_once():
+    """The reference outline is UTM 33 in the engine and WGS 84 on the wire.
+
+    It went out through `_geojson`, which projects out of UTM 33 itself, after
+    being projected once already — and a band 6 km around Grimma arrived at
+    10,51° E, 0,0005° N, in the Gulf of Guinea. Nothing threw, the legend
+    counted one band, and the map drew it where nobody was looking.
+    """
+
+    engine = SearchEngine(
+        ParcelSearchRequest(text="Die ca. 6 km entfernte Kreisstadt Grimma ist nah."),
+        alkis_service(),
+        DIRECTORY,
+    )
+    engine._read_distances()
+    # Grimma's own outline, in the coordinates the cadastre answers in.
+    town = box(320_000, 5_675_000, 322_000, 5_677_000)
+
+    async def resolved(name):
+        return Reference(name="Grimma", area=town, centre=town.centroid)
+
+    engine._resolve_reference = resolved
+    events = _drain(engine.resolve_bands())
+    band = next(e.indiz.band for e in events if e.art == "indiz")
+    assert band.aufgeloest
+    lon, lat = band.mitte["coordinates"]
+    assert 11.8 < lon < 15.1 and 50.1 < lat < 51.7, (lon, lat)
+    for ring in band.umriss["coordinates"]:
+        for point in ring:
+            assert 11.8 < point[0] < 15.1 and 50.1 < point[1] < 51.7
+
+
+# ----------------------------------------------------------------------
+# Stufe 0 -- the blocks a listing is written in
+# ----------------------------------------------------------------------
+
+
+def test_a_listing_is_cut_into_the_blocks_it_was_written_in():
+    """Heading, pair, bullet, paragraph — the four shapes the recordings use."""
+
+    pieces = split_blocks(
+        "Willkommen in Eilenburg\n"
+        "\n"
+        "Hier bieten wir Ihnen eines der letzten Baugrundstücke an.\n"
+        "\n"
+        "# Eckdaten\n"
+        "Objektart: Baugrundstück\n"
+        "Grundstücksfläche: ca. 711 m²\n"
+        "\n"
+        "- Voll erschlossen\n"
+    )
+    assert [(b.kind, b.label) for b in pieces] == [
+        ("ueberschrift", None),
+        ("absatz", None),
+        ("ueberschrift", None),
+        ("paar", "Objektart"),
+        ("paar", "Grundstücksfläche"),
+        ("punkt", None),
+    ]
+    assert pieces[4].text == "ca. 711 m²"
+
+
+def test_a_sentence_with_a_colon_in_it_is_not_a_label():
+    """Three shapes out of advert 3441433250, each of which produced a label
+    for half a paragraph or for a URL."""
+
+    def labels(line):
+        return [b.label for b in split_blocks(line) if b.is_pair]
+
+    assert labels("- https://www.ohne-makler.net/immobilie/file/1611841.pdf (Überblick)") == []
+    assert labels("Die Verkehrsanbindung ist hervorragend: Über den S-Bahn-Anschluss …") == []
+    assert labels("Familien profitieren von der nahen Infrastruktur: Die Grundschule …") == []
+    assert labels("Stellen Sie sich vor: Ihr Haus auf diesem Grundstück") == []
+    # And the ones that are labels still are.
+    assert labels("Autobahnanschlussstelle A38 „Leipzig-Südwest“: ca. 3 km") == [
+        "Autobahnanschlussstelle A38 „Leipzig-Südwest“"
+    ]
+
+
+def test_the_area_of_the_plot_is_not_whichever_number_comes_first():
+    """Three figures in m², one plot. Which one the cadastre gets filtered on
+    is the difference between an answer and a confidently wrong one."""
+
+    # A labelled pair wins outright -- advert 3464790207.
+    assert read_area(
+        "In diesem Neubaugebiet bietet Ihnen das ca. 711 m² große Grundstück …\n"
+        "\n"
+        "Grundstücksfläche: ca. 680 m²\n"
+    ).value == 680.0
+
+    # A building footprint is not a plot area -- advert 3381469778 states both.
+    assert read_area("Die zulässige Grundfläche beträgt insgesamt ca. 240 m².") is None
+    assert read_area("Mit einer bebaubaren Fläche von ca. 240 m²") is None
+    assert read_area("Wohnfläche: 140 m²") is None
+
+    # And a sentence about the other plots in the estate is not about this one.
+    # Advert 3441433250 writes this and states 590 m² in its attribute list;
+    # the reader used to answer 360.
+    assert read_area(
+        "Die Grundstücke variieren in ihrer Größe zwischen ca. 360 m² und 800 m²."
+    ) is None
+
+
+def test_a_beleg_and_a_relation_stop_at_the_block_they_were_read_in():
+    """„# Lagebeschreibung“ glued to the sentence under it is a Beleg whose
+    first two words belong to another line."""
+
+    indicia = collect_indicia(
+        text="Kaufpreis pro m²: 92,00 €\n# Lagebeschreibung\nThräna ist ein kleiner "
+             "Ortsteil der Kreisstadt Borna.",
+        directory=DIRECTORY,
+    )
+    district = next(i for i in indicia if i.art == "gemarkung" and i.wert == "Thräna")
+    assert "Lagebeschreibung" not in (district.beleg or "")
+    assert "Kaufpreis" not in (district.beleg or "")
+    assert district.beziehung == "liegt_in"
+
+
+# ----------------------------------------------------------------------
+# B2 -- a source is a document, not a channel
+# ----------------------------------------------------------------------
+
+
+def _numbers(*indicia):
+    engine = SearchEngine(ParcelSearchRequest(text="x"), alkis_service(), DIRECTORY)
+    engine.state.indicia = list(indicia)
+    return engine
+
+
+def _number(id, wert, quelle, fundort):
+    return Indiz(id=id, art="flurstueck", wert=wert, text=wert, quelle=quelle,
+                 sicherheit=0.9, fundort=fundort)
+
+
+def test_two_numbers_off_two_sheets_are_two_readings_not_one_plot():
+    """B2. Every OCR find carries `quelle="bild"`, so the channel could not tell
+    one Geoportal print from another — and two numbers from one source are a
+    plot made of several parcels, which is never put to the user as a question.
+    A print carries dozens of numbers in its map image, so two prints in one
+    listing is not a rare shape."""
+
+    one_sheet = _numbers(
+        _number("a", "790/11", "bild", "bild:https://example.org/1.jpg"),
+        _number("b", "238/3", "bild", "bild:https://example.org/1.jpg"),
+    )
+    assert one_sheet.named_as_a_set()
+    assert not [k for k in one_sheet._conflicts() if k.art == "flurstueck"]
+
+    two_sheets = _numbers(
+        _number("a", "790/11", "bild", "bild:https://example.org/1.jpg"),
+        _number("b", "238/3", "bild", "bild:https://example.org/2.jpg"),
+    )
+    assert not two_sheets.named_as_a_set()
+    question = next(k for k in two_sheets._conflicts() if k.art == "flurstueck")
+    assert question.optionen == ["a", "b"]
+
+
+def test_two_numbers_in_one_text_are_still_one_plot():
+    """„790/11 sowie 238/3“ is the normal case, not a dispute — and the body
+    text is one document however many paragraphs it has."""
+
+    indicia = collect_indicia(
+        text="Verkauft werden Flurstück 790/11 sowie Flurstück 238/3 der Gemarkung "
+             "Großbothen.",
+        directory=DIRECTORY,
+    )
+    numbers = [i for i in indicia if i.art == "flurstueck"]
+    assert {i.wert for i in numbers} == {"790/11", "238/3"}
+    assert {i.fundort for i in numbers} == {"anzeigentext"}
+    engine = _numbers(*numbers)
+    assert engine.named_as_a_set()
+
+
+def test_an_indiz_without_a_fundort_behaves_as_it_did():
+    """A caller may hand in an Indiz of its own, and the channel is the fallback."""
+
+    engine = _numbers(
+        _number("a", "790/11", "bild", None),
+        _number("b", "238/3", "bild", None),
+    )
+    assert engine.named_as_a_set()

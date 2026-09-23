@@ -1054,3 +1054,32 @@ def test_the_note_is_withheld_by_a_tuple_and_not_by_four_letters(account: TestCl
     # And the letters are not what got removed either.
     assert stored["name"] == "Wiesenstraße, Großbothen"
     assert account.get(f"/api/shares/{token}").json()["dokument"]["gemarkung"] == "Großbothen"
+
+
+def test_a_column_the_database_demands_and_nobody_fills_is_caught():
+    """`schema.sql` is the baseline and the migrations are the rest, so the
+    shape this code expects is both of them together.
+
+    Measured 19.09.2026 in a running stack: a `users` table carried a `kennung`
+    column, not null and with no default, that the branch's code never wrote.
+    Sign-in worked; the first attempt to store a plot answered 500. The column
+    is not a stranger — `0002_verwaltung.sql` adds it — the *code* was behind,
+    which is why reading only the baseline here would report the application's
+    own schema as foreign.
+    """
+
+    from app.services.storage import MIGRATIONS_PATH, SCHEMA_PATH, declared_columns
+
+    sources = [SCHEMA_PATH.read_text(encoding="utf-8")]
+    sources += [path.read_text(encoding="utf-8") for path in sorted(MIGRATIONS_PATH.glob("*.sql"))]
+
+    baseline = declared_columns(sources[0])
+    assert baseline["users"] == {"id", "issuer", "subject", "anzeigename", "angelegt"}
+    # A constraint line is not a column.
+    assert "unique" not in baseline["users"] and "primary" not in baseline["users"]
+
+    whole = declared_columns(*sources)
+    # What the migrations add to a table the baseline already declared.
+    assert {"kennung", "ist_admin"} <= whole["users"]
+    # And the tables they create on their own.
+    assert {"sperren", "nutzung", "fehler", "betriebsansage"} <= set(whole)

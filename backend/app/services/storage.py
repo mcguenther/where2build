@@ -33,6 +33,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import secrets
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -82,6 +83,99 @@ UNAVAILABLE = (
     "Der Serverspeicher hat nicht geantwortet. Der Stand in diesem Browser ist "
     "unverändert; bitte später erneut speichern."
 )
+
+
+# Every column `create table` declares, per table. The file is ours, so a
+# small reader for our own DDL is honest; a general SQL parser would not be.
+_TABLE_RE = re.compile(
+    r"create\s+table\s+(?:if\s+not\s+exists\s+)?(\w+)\s*\((.*?)\n\);",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+# „alter table users add column if not exists kennung text" -- a migration adds
+# to a table that `schema.sql` already declared, so the baseline alone is not
+# the shape the database has.
+_ADD_COLUMN_RE = re.compile(
+    r"alter\s+table\s+(\w+)\s+add\s+column\s+(?:if\s+not\s+exists\s+)?(\w+)",
+    re.IGNORECASE,
+)
+
+
+def declared_columns(*sources: str) -> dict[str, set[str]]:
+    """Every table this code creates and every column it gives them.
+
+    The baseline *and* the migrations, because the two together are the shape
+    the database is meant to have. Reading only `schema.sql` was wrong the
+    moment the first migration added a column: `kennung` is `not null` there
+    and appears in no `create table`, so the check below would have reported
+    the application's own schema as a stranger.
+    """
+
+    tables: dict[str, set[str]] = {}
+    for source in sources:
+        for name, body in _TABLE_RE.findall(source):
+            columns = tables.setdefault(name.lower(), set())
+            for line in body.splitlines():
+                line = line.split("--")[0].strip().rstrip(",")
+                word = line.split()[0].lower() if line else ""
+                if word and word not in (
+                    "primary", "unique", "foreign", "check", "constraint", "exclude"
+                ):
+                    columns.add(word)
+        for name, column in _ADD_COLUMN_RE.findall(source):
+            tables.setdefault(name.lower(), set()).add(column.lower())
+    return tables
+
+
+async def _check_columns(connection: Any, schema: str) -> None:
+    """Refuse a database whose tables demand a column this code never fills.
+
+    ``schema.sql`` is applied with ``create table if not exists``, which is
+    enough right up to the first change to a column and does nothing at all
+    after it: the volume outlives `docker compose down`, so an older table
+    simply stays. Measured 19.09.2026 in a running stack — a `users` table
+    carried a ``kennung`` column that is ``not null`` with no default and that
+    this code has never written, and every attempt to store a plot answered
+    500 on the first insert, long after sign-in had succeeded.
+
+    So it is said at start-up, in the one place that can still say it clearly,
+    and only for the shape that actually breaks an insert: a column the
+    database requires, has no default for, and the schema does not declare.
+    """
+
+    expected = declared_columns(
+        schema, *(path.read_text(encoding="utf-8") for path in sorted(MIGRATIONS_PATH.glob("*.sql")))
+    )
+    if not expected:
+        return
+    rows = await connection.fetch(
+        """
+        select table_name, column_name
+        from information_schema.columns
+        where table_schema = current_schema()
+          and is_nullable = 'NO'
+          and column_default is null
+          and table_name = any($1::text[])
+        """,
+        list(expected),
+    )
+    surplus = [
+        f"{row['table_name']}.{row['column_name']}"
+        for row in rows
+        if row["column_name"].lower() not in expected.get(row["table_name"].lower(), set())
+    ]
+    if surplus:
+        raise UpstreamError(
+            "Die Datenbank passt nicht zu dieser Fassung: "
+            + ", ".join(sorted(surplus))
+            + " wird verlangt und von diesem Stand nie gefüllt. Meist ist die "
+            "Datenbank *neuer* als der Code — dieselbe Datenbank wurde schon "
+            "von einem anderen Zweig benutzt, der die Spalte über eine "
+            "Migration angelegt hat. Dann hilft, den Code auf den Stand zu "
+            "bringen, der sie kennt; die Spalte zu löschen macht die Migration "
+            "kaputt und ist fast nie richtig."
+        )
 
 
 @dataclass(frozen=True)
@@ -299,9 +393,13 @@ class Storage:
                     timeout=self.settings.timeout_s,
                     init=_register_json,
                 )
+                schema = SCHEMA_PATH.read_text(encoding="utf-8")
                 async with pool.acquire() as connection:
-                    await connection.execute(SCHEMA_PATH.read_text(encoding="utf-8"))
+                    await connection.execute(schema)
                     await _migrate(connection)
+                    # Last, so it only reports what the migrations did not put
+                    # right.
+                    await _check_columns(connection, schema)
             except (asyncpg.PostgresError, OSError, TimeoutError) as exc:
                 # A pool that was built and then failed on the schema has open
                 # connections; leaving it to the garbage collector would hold
