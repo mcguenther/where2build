@@ -180,4 +180,119 @@ describe("QueryBox", () => {
     expect(box.find(".query-box__note").exists()).toBe(false);
     box.unmount();
   });
+
+  describe("Enter", () => {
+    const enter = field => field.trigger("keydown", { key: "Enter" });
+
+    it("schickt einen Link aus dem Suchfeld ab, ohne dass der Knopf geklickt wird", async () => {
+      const box = mount(QueryBox);
+      await type(box, "https://www.kleinanzeigen.de/s-anzeige/baugrundstueck/123");
+
+      await enter(box.find(".search__field input"));
+      await flushPromises();
+
+      const [payload] = box.emitted("read")[0];
+      expect(payload.kind).toBe("url");
+      box.unmount();
+    });
+
+    it("wartet auf die Adresse, wenn Enter vor der Antwort kommt", async () => {
+      const box = mount(QueryBox);
+      const input = box.find(".search__field input");
+      // With the postcode, so only the address index has a row to offer.
+      input.element.value = "Lessingweg 44, 04316 Leipzig";
+      await input.trigger("input");
+      // Straight after the keystroke: the lookup has not even been asked yet.
+      await enter(input);
+      expect(box.emitted("resolve")).toBeUndefined();
+
+      await vi.advanceTimersByTimeAsync(200);
+      await flushPromises();
+
+      const [payload] = box.emitted("resolve")[0];
+      expect(payload.query).toEqual({ lat: 51.33655, lon: 12.44181 });
+      box.unmount();
+    });
+
+    it("nimmt bei mehreren Adressen die oberste", async () => {
+      globalThis.fetch = url => {
+        if (String(url).includes("/geocode")) {
+          return Promise.resolve(answer({ ...GEOCODE, treffer: [
+            ...GEOCODE.treffer,
+            { lat: 51.2, lon: 12.3, name: "Lessingweg", beschreibung: "04316 Leipzig", art: "adresse" }
+          ] }));
+        }
+        return Promise.resolve(answer(gemarkungen));
+      };
+      const box = mount(QueryBox);
+      await type(box, "Lessingweg 44, 04316 Leipzig");
+      expect(box.findAll(".hit")).toHaveLength(2);
+
+      await enter(box.find(".search__field input"));
+      expect(box.emitted("resolve")[0][0].query).toEqual({ lat: 51.33655, lon: 12.44181 });
+      box.unmount();
+    });
+
+    it("rät zwischen Flurstück und Adresse nicht, sondern hebt die erste Zeile hervor", async () => {
+      globalThis.fetch = url => {
+        if (String(url).includes("/geocode")) {
+          return Promise.resolve(answer({ ...GEOCODE, treffer: [
+            ...GEOCODE.treffer,
+            { lat: 51.2, lon: 12.3, name: "Lessingweg 44", beschreibung: "04420 Markranstädt", art: "adresse" }
+          ] }));
+        }
+        return Promise.resolve(answer(gemarkungen));
+      };
+      const box = mount(QueryBox);
+      await type(box, "Lessingweg 44");
+      const input = box.find(".search__field input");
+
+      await enter(input);
+      expect(box.emitted("resolve")).toBeUndefined();
+      // Three rows -- the parcel reading and two addresses -- and the first
+      // one highlighted, not taken.
+      expect(box.findAll(".hit")).toHaveLength(3);
+      expect(box.findAll(".hit")[0].classes()).toContain("is-active");
+
+      // The second Enter is a choice somebody saw.
+      await enter(input);
+      expect(box.emitted("resolve")).toHaveLength(1);
+      box.unmount();
+    });
+
+    it("fragt aus dem Feld der Flurstücksnummer das Kataster", async () => {
+      const box = mount(QueryBox);
+      await type(box, "85/1");
+      const district = box.find(".gemarkung input");
+      district.element.value = MOELKAU.name;
+      await district.trigger("input");
+      await flushPromises();
+
+      await enter(box.find("#q-parcel-number"));
+      await flushPromises();
+
+      expect(box.emitted("resolve")[0][0].query)
+        .toEqual({ gemarkung: MOELKAU.schluessel, flurstuecksnummer: "85/1" });
+      box.unmount();
+    });
+
+    it("nimmt in der Gemarkung erst die markierte Zeile und schickt danach ab", async () => {
+      const box = mount(QueryBox);
+      await type(box, "85/1");
+      const district = box.find(".gemarkung input");
+      district.element.value = "Mölk";
+      await district.trigger("input");
+      await flushPromises();
+      await district.trigger("keydown", { key: "ArrowDown" });
+
+      await enter(district);
+      expect(district.element.value).toBe(MOELKAU.name);
+      expect(box.emitted("resolve")).toBeUndefined();
+
+      await enter(district);
+      await flushPromises();
+      expect(box.emitted("resolve")[0][0].query.flurstuecksnummer).toBe("85/1");
+      box.unmount();
+    });
+  });
 });

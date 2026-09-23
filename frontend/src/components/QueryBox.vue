@@ -4,6 +4,7 @@
       <PlotSearch ref="search" v-model="text" bare
                   :placeholder="placeholder"
                   @select="$emit('resolve', $event)"
+                  @submit="go"
                   @paste="takePaste">
         <template #action>
           <button type="button" class="btn btn--large" :disabled="busy || !ready" @click="go">
@@ -36,10 +37,11 @@
          one field. A bare number lands here by itself — without a district it
          is nothing. -->
     <div v-if="wantsPair" class="query-box__pair">
-      <CadastralDistrictPicker v-model="district" @select="districtEntry = $event" />
+      <CadastralDistrictPicker v-model="district" @select="districtEntry = $event" @submit="go" />
       <div class="field">
         <label for="q-parcel-number">Flurstücksnummer</label>
-        <input id="q-parcel-number" type="text" v-model="parcelNumber" placeholder="85/1">
+        <input id="q-parcel-number" type="text" v-model="parcelNumber" placeholder="85/1"
+               @keydown.enter.prevent="go">
       </div>
     </div>
 

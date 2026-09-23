@@ -51,13 +51,15 @@
                 <label :for="`n-${destination.id}`">Name</label>
                 <input :id="`n-${destination.id}`" type="text" placeholder="Neues Ziel"
                        :value="draft(destination).name"
-                       @input="setName(destination, $event.target.value)">
+                       @input="setName(destination, $event.target.value)"
+                       @keydown.enter.exact.prevent="lookUpByEnter(destination)">
               </div>
               <div class="field">
                 <label :for="`a-${destination.id}`">Adresse</label>
                 <input :id="`a-${destination.id}`" type="text" placeholder="Straße Hausnummer, Ort"
                        :value="draft(destination).address"
-                       @input="setAddress(destination, $event.target.value)">
+                       @input="setAddress(destination, $event.target.value)"
+                       @keydown.enter.exact.prevent="lookUpByEnter(destination)">
               </div>
               <button type="button" class="btn btn--secondary btn--small"
                       :disabled="!draft(destination).address || busy === destination.id"
@@ -243,6 +245,11 @@ export default {
       delete this.edits[destination.id];
       delete this.errors[destination.id];
       delete this.matches[destination.id];
+    },
+
+    lookUpByEnter(destination) {
+      if (!this.draft(destination).address || this.busy === destination.id) return;
+      this.lookUp(destination);
     },
 
     async lookUp(destination) {
