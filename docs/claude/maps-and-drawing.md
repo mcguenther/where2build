@@ -196,3 +196,12 @@ routines under it.
   carries the plan, the location map and the surroundings map, so a bare
   `[data-map-ready="true"]` returns for whichever finished first.
   `mapSettled()` in the screenshot run takes a scope for that reason.
+
+- **The surroundings map framed the plot, not the surroundings, whenever the
+  nearby answer was slower than the map style.** `frame()` ran once, on
+  `load`; with the stops not yet there it fitted the bare parcel at zoom 17,
+  and the `located` watcher only drew markers. Lessingweg 44 showed one of
+  seven stops. The watcher reframes now, unless the user has already panned or
+  zoomed (a `movestart` with an `originalEvent`). Reproduced by delaying
+  `/api/nearby` 5 s in Playwright: 1 of 7 markers in view before, 7 of 7 after.
+  A warm backend cache hides it — the answer then beats the style.

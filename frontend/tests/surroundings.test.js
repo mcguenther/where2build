@@ -104,6 +104,27 @@ describe("Umgebungskarte", () => {
       restore();
     }
   });
+  it("rahmt neu, wenn die Orte nach dem Laden der Karte ankommen", async () => {
+    const { w, restore } = buildMap();
+    try {
+      await flushPromises();
+      // Stand-in for a map that has loaded and framed the bare plot: jsdom
+      // has no WebGL, so the camera itself cannot be asked.
+      const framed = [];
+      w.vm.frame = () => framed.push(w.vm.framing);
+      w.vm._framed = true;
+
+      await w.setProps({ hits: recorded.treffer });
+      expect(framed).toEqual(["nearby"]);
+
+      // Once the user has moved the map, the view is theirs.
+      w.vm._userMoved = true;
+      await w.setProps({ hits: recorded.treffer.slice(1) });
+      expect(framed).toEqual(["nearby"]);
+    } finally {
+      restore();
+    }
+  });
 });
 
 describe("Umgebung auf der Grundstücksseite", () => {
