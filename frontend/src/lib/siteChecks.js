@@ -206,5 +206,19 @@ export function siteTally(checks) {
   return { counts, text: tallyText(counts) };
 }
 
+/**
+ * Whether the noise layer has anything to draw around this plot.
+ *
+ * The tiles cannot say: where the survey mapped nothing they answer 200 with a
+ * transparent image, so an empty layer looks exactly like a quiet one. The
+ * check can — it asked the same survey, with the plot's outline and a radius.
+ */
+export function noiseMapped(answer) {
+  const noise = answer?.laerm;
+  if (!noise || failed(noise)) return false;
+  const onThePlot = Object.values(noise.tag ?? {}).some(bands => (bands ?? []).length);
+  return onThePlot || Boolean(noise.kartiert_umkreis);
+}
+
 /* Re-exported so a view can colour a row without importing the templates. */
 export { GOOD, NOTE, OPEN };

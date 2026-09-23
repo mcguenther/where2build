@@ -15,7 +15,9 @@ vi.mock("../src/lib/api.js", () => ({
   // which shows up as unrelated component errors.
   PAGE_LIMIT: 3000000,
   neighbourBuildings: vi.fn(),
-  reachability: vi.fn()
+  reachability: vi.fn(),
+  // The location record on the same page; these tests are not about it.
+  siteChecks: vi.fn(() => new Promise(() => {}))
 }));
 
 import SitePlan from "../src/components/SitePlan.vue";

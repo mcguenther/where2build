@@ -16,7 +16,6 @@ import WizardView from "../views/WizardView.vue";
 import CompareView from "../views/CompareView.vue";
 import HouseTypesView from "../views/HouseTypesView.vue";
 import DestinationsView from "../views/DestinationsView.vue";
-import LocationView from "../views/LocationView.vue";
 import DataView from "../views/DataView.vue";
 import AccountView from "../views/AccountView.vue";
 import AdminView from "../views/AdminView.vue";
@@ -41,15 +40,13 @@ export const routes = [
     meta: { section: "plots" }
   },
   { path: "/grundstueck/:id", name: "plot", component: PlotView, props: true, meta: { section: "plots" } },
+  // The location record and the surroundings map live on the plot page itself
+  // now; the addresses they used to have are kept because they were linkable,
+  // and lead there — the record to its own section.
   {
     path: "/grundstueck/:id/standort",
-    name: "location",
-    component: LocationView,
-    props: true,
-    meta: { section: "plots" }
+    redirect: to => ({ name: "plot", params: { id: to.params.id }, hash: "#standort" })
   },
-  // The surroundings map lives on the plot page itself now; the address it used
-  // to have is kept because it was linkable, and leads there.
   {
     path: "/grundstueck/:id/umgebung",
     redirect: to => ({ name: "plot", params: { id: to.params.id } })
@@ -106,7 +103,9 @@ export const createAppRouter = history =>
   createRouter({
     history,
     routes,
-    // Going back returns to where the page was left; every other navigation
-    // starts at the top, which is what the views used to do by hand.
-    scrollBehavior: (to, from, savedPosition) => savedPosition || { top: 0 }
+    // Going back returns to where the page was left, an address with a section
+    // in it goes to that section, and every other navigation starts at the
+    // top, which is what the views used to do by hand.
+    scrollBehavior: (to, from, savedPosition) =>
+      savedPosition || (to.hash ? { el: to.hash, top: 12 } : { top: 0 })
   });
