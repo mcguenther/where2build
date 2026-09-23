@@ -75,7 +75,7 @@ export default {
   },
   /** `select` carries the directory entry behind the text, or null when the
    *  text matches none. Its key is unambiguous where a name is not. */
-  emits: ["update:modelValue", "select"],
+  emits: ["update:modelValue", "select", "submit"],
   data() {
     instances += 1;
     return {
@@ -147,11 +147,15 @@ export default {
       });
     },
 
-    /** Enter takes the highlighted row. With nothing highlighted it does
-     *  nothing at all — the typed text is an answer in its own right. */
+    /** Enter takes the highlighted row. With nothing highlighted the typed
+     *  text is an answer in its own right, and Enter hands it on. */
     take(event) {
-      if (!this.open || this.activeIndex < 0 || !this.hits.length) return;
+      if (event.isComposing) return;
       event.preventDefault();
+      if (!this.open || this.activeIndex < 0 || !this.hits.length) {
+        this.$emit("submit");
+        return;
+      }
       this.choose(this.hits[this.activeIndex]);
     },
 

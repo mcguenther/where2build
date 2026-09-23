@@ -222,3 +222,26 @@ routines under it.
   street of the plot's own address wins at a corner. Plots stored before this
   carry `streetFront` unset and are asked once on load; `null` means asked and
   nothing borders a street, and the guess stays.
+
+- **A navigable plan in the middle of a long page takes the page's scroll.**
+  `onWheel` calls `preventDefault` on every wheel event over a navigable plan,
+  and `.site-plan` carries `touch-action: none` — right for the plan somebody
+  drags a house on, a trap for the small location map halfway down the plot
+  page: the cursor passes over it on the way down and the page stops. That map
+  is `cooperative`: the wheel zooms only with Ctrl or ⌘ (a trackpad pinch
+  arrives as exactly that), and `touch-action: pan-y` lets a vertical swipe
+  scroll the page while a sideways drag still pans.
+
+- **`data-map-ready` is per map, and a page can have three.** The plot page
+  carries the plan, the location map and the surroundings map, so a bare
+  `[data-map-ready="true"]` returns for whichever finished first.
+  `mapSettled()` in the screenshot run takes a scope for that reason.
+
+- **The surroundings map framed the plot, not the surroundings, whenever the
+  nearby answer was slower than the map style.** `frame()` ran once, on
+  `load`; with the stops not yet there it fitted the bare parcel at zoom 17,
+  and the `located` watcher only drew markers. Lessingweg 44 showed one of
+  seven stops. The watcher reframes now, unless the user has already panned or
+  zoomed (a `movestart` with an `originalEvent`). Reproduced by delaying
+  `/api/nearby` 5 s in Playwright: 1 of 7 markers in view before, 7 of 7 after.
+  A warm backend cache hides it — the answer then beats the style.

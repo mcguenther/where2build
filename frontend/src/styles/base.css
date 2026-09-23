@@ -101,6 +101,26 @@ a{ color: var(--w2b-primary); text-underline-offset: 2px; text-decoration-thickn
 .panel__head h3{ font-size: var(--w2b-text-l); }
 .panel__body{ padding: var(--w2b-space-4); }
 
+/* A panel that starts folded: the head is the summary, and the line beside the
+   title says what is inside, so a closed one still answers the first question.
+   Used for the figures a plot page carries for the odd case — the shape, the
+   setback table — next to the ones everybody reads. */
+.fold > .fold__head{ cursor: pointer; list-style: none; user-select: none; }
+.fold > .fold__head::-webkit-details-marker{ display: none; }
+.fold > .fold__head::after{
+  content: ""; flex: none; width: 7px; height: 7px; margin: 0 2px 3px 2px;
+  border-right: 1.5px solid var(--w2b-muted); border-bottom: 1.5px solid var(--w2b-muted);
+  transform: rotate(45deg); transition: transform .15s ease;
+}
+.fold[open] > .fold__head::after{ transform: rotate(225deg); margin-bottom: -3px; }
+.fold:not([open]) > .fold__head{ border-bottom: 0; }
+.fold > .fold__head:hover h3{ color: var(--w2b-primary); }
+.fold > .fold__head:focus-visible{ outline: 2px solid var(--w2b-primary); outline-offset: -2px; }
+.fold__summary{
+  font-family: var(--w2b-font-mono); font-size: var(--w2b-text-xs);
+  font-variant-numeric: tabular-nums; color: var(--w2b-muted); white-space: nowrap;
+}
+
 /* ---------- Chips ---------- */
 .chip{
   display: inline-block;

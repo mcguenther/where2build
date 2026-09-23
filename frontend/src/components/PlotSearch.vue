@@ -18,7 +18,7 @@
              @focus="open = true"
              @keydown.down.prevent="move(1)"
              @keydown.up.prevent="move(-1)"
-             @keydown.enter.prevent="take"
+             @keydown.enter.prevent="enter"
              @keydown.esc="open = false">
       <span v-if="badge && !bare" class="search__badge" :data-certain="String(reading.certain)">{{ badge }}</span>
       <!-- What sits beside the field is the wrapper's business: the wizard
@@ -87,7 +87,7 @@ export default {
     bare: { type: Boolean, default: false },
     placeholder: { type: String, default: "Lessingweg 44 · Mölkau 204 · 51.33652, 12.44176" }
   },
-  emits: ["select", "update:modelValue", "paste"],
+  emits: ["select", "update:modelValue", "paste", "submit"],
   data() {
     instances += 1;
     return {
@@ -99,7 +99,10 @@ export default {
       busy: false,
       error: "",
       open: false,
-      activeIndex: -1
+      activeIndex: -1,
+      /* Enter came before the answer it needs. Held until that answer lands,
+       * and dropped by the next keystroke: it was meant for other text. */
+      takeWhenReady: false
     };
   },
   watch: {
@@ -210,8 +213,9 @@ export default {
       this.$emit("update:modelValue", value);
       this.open = true;
       this.activeIndex = -1;
+      this.takeWhenReady = false;
       clearTimeout(this._timer);
-      this._timer = setTimeout(() => this.look(), DEBOUNCE_MS);
+      this._timer = setTimeout(() => { this._timer = null; this.look(); }, DEBOUNCE_MS);
     },
 
     async look() {
@@ -222,6 +226,7 @@ export default {
       if (!wanted.includes("address") && !wanted.includes("district")) {
         this.addresses = [];
         this.districts = [];
+        this.takeIfWaiting();
         return;
       }
 
@@ -254,8 +259,17 @@ export default {
         this.addresses = [];
         if (error.status !== 404) this.error = error.message;
       } finally {
-        if (asked === this.text) this.busy = false;
+        if (asked === this.text) {
+          this.busy = false;
+          this.takeIfWaiting();
+        }
       }
+    },
+
+    takeIfWaiting() {
+      if (!this.takeWhenReady) return;
+      this.takeWhenReady = false;
+      this.take();
     },
 
     move(step) {
@@ -265,9 +279,38 @@ export default {
       this.activeIndex = next < 0 ? this.hits.length - 1 : next % this.hits.length;
     },
 
-    take() {
-      const hit = this.hits[this.activeIndex] ?? (this.hits.length === 1 ? this.hits[0] : null);
+    /** Enter on a highlighted row takes that row. Otherwise it is the
+     *  wrapper's to decide — a link or a bare number is not one of the rows,
+     *  and only the wrapper knows what else it holds. */
+    enter(event) {
+      if (event.isComposing) return;
+      const hit = this.open ? this.hits[this.activeIndex] : null;
       if (hit) this.choose(hit);
+      else this.$emit("submit");
+    },
+
+    /** The row the field stands for, if there is one.
+     *
+     *  Asked before the lookup has answered, it waits for it: pressing Enter
+     *  straight after typing is the normal speed, not an impatient one.
+     *  Rows of one reading are in the order the index ranks them, so the top
+     *  one is taken — the geocoder answers five rows even for a full address
+     *  with its postcode. Rows of two readings, a parcel beside an address,
+     *  are the ambiguity the field exists to show rather than resolve: then
+     *  the first is only highlighted, and a second Enter is a choice
+     *  somebody saw. */
+    take() {
+      if (this._timer || this.busy) {
+        this.takeWhenReady = true;
+        return;
+      }
+      const highlighted = this.hits[this.activeIndex];
+      if (highlighted) return this.choose(highlighted);
+      if (!this.hits.length) return;
+      const readings = new Set(this.hits.map(hit => (hit.kind === "Ort" ? "Adresse" : hit.kind)));
+      if (readings.size === 1) return this.choose(this.hits[0]);
+      this.open = true;
+      this.activeIndex = 0;
     },
 
     choose(hit) {
