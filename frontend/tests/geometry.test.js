@@ -6,7 +6,8 @@ import {
   pointInPolygon, distanceToBoundary, closestBoundaryPoint,
   rectangleCorners, cornersOutside, smallestSetback, footprintFromArea,
   findPlacement, fitsAnywhere, alignmentToEdge, alignToEdge, edgeCompass,
-  constrainToEnvelope, neighbourDistances, neighbourSetbackDepths, hasNeighbourHint
+  constrainToEnvelope, neighbourDistances, neighbourSetbackDepths, hasNeighbourHint,
+  streetDownRotation, turnedBox, fitScale
 } from "../src/lib/geometry.js";
 import { toLocal } from "../src/lib/projection.js";
 import neighbourAnswer from "./fixtures/neighbours-moelkau.json";
@@ -187,6 +188,49 @@ describe("An der Straße ausrichten", () => {
     const angle = alignmentToEdge(upward, 0);
     expect(angle).toBeGreaterThan(-90);
     expect(angle).toBeLessThanOrEqual(90);
+  });
+
+  /* Turn a ring clockwise on screen, as SVG rotate() does in a y-up frame. */
+  const turn = (points, degrees) => {
+    const r = (degrees * Math.PI) / 180;
+    return points.map(p => ({ x: p.x * Math.cos(r) + p.y * Math.sin(r), y: -p.x * Math.sin(r) + p.y * Math.cos(r) }));
+  };
+
+  it("legt die Straße unten hin, gleich in welcher Richtung der Ring läuft", () => {
+    // Every edge of both windings, each taken as the street in turn.
+    for (const shape of [SQUARE, [...SQUARE].reverse(), LIEBERTWOLKWITZ, [...LIEBERTWOLKWITZ].reverse()]) {
+      shape.forEach((_, i) => {
+        const degrees = streetDownRotation(shape, i);
+        expect(degrees).toBeGreaterThan(-180);
+        expect(degrees).toBeLessThanOrEqual(180);
+        const turned = turn(shape, degrees);
+        const edge = polygonEdges(turned)[i];
+        // Horizontal ...
+        expect(Math.abs(edge.dy)).toBeLessThan(1e-9);
+        // ... and the lowest thing in the drawing: y is north here, so down is the minimum.
+        expect(Math.max(edge.a.y, edge.b.y)).toBeCloseTo(Math.min(...turned.map(p => p.y)), 9);
+      });
+    }
+  });
+
+  it("dreht ein nach Norden an die Straße grenzendes Grundstück auf den Kopf", () => {
+    // Street along the top edge of the square: the drawing turns half a circle.
+    expect(Math.abs(streetDownRotation(SQUARE, 2))).toBeCloseTo(180, 9);
+    expect(streetDownRotation(SQUARE, 0)).toBeCloseTo(0, 9);
+  });
+
+  it("rahmt den gedrehten Umriss, nicht den ungedrehten", () => {
+    const diamond = turnedBox(SQUARE, 45);
+    expect(diamond.width).toBeCloseTo(10 * Math.SQRT2, 9);
+    expect(diamond.centre.x).toBeCloseTo(5, 9);
+    expect(diamond.centre.y).toBeCloseTo(5, 9);
+    const strip = ring([[0, 0], [40, 40], [38, 42], [-2, 2]]);
+    const upright = turnedBox(strip, streetDownRotation(strip, 0));
+    expect(upright.width).toBeCloseTo(Math.hypot(40, 40), 6);
+    expect(upright.height).toBeCloseTo(Math.hypot(2, 2), 6);
+    // Turned to lie flat, the strip fits at a larger scale than its north-up box allows.
+    expect(fitScale(strip, 300, 196, 6, 0.4, streetDownRotation(strip, 0)))
+      .toBeGreaterThan(fitScale(strip, 300, 196, 6, 0.4));
   });
 
   it("dreht den Baukörper parallel zur Front und lässt ihn im Fenster", () => {

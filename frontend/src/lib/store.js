@@ -17,6 +17,7 @@ import {
 } from "./geometry.js";
 import { coordinatesOf, zubringerOf } from "./routes.js";
 import { authState } from "./api.js";
+import { settleStreetFront } from "./streetFront.js";
 import * as server from "./serverStore.js";
 
 /** Centre of a ring in the shape a placement expects. The centroid returns
@@ -340,6 +341,16 @@ export function validate(raw) {
     p.wallHeight = Math.min(12, Math.max(2.5, Number(p.wallHeight) || 6.4));
     p.northOffset = Number(p.northOffset) || 0;
     p.streetEdge = Number.isInteger(p.streetEdge) && p.streetEdge < p.polygon.length ? p.streetEdge : 0;
+    /* Absent: never asked, so the edge is the longest-edge guess. Null: asked,
+     * and no boundary borders traffic land. See lib/streetFront.js. */
+    if (p.streetFront && Number.isFinite(p.streetFront.length)) {
+      p.streetFront = {
+        street: typeof p.streetFront.street === "string" ? p.streetFront.street : null,
+        length: p.streetFront.length
+      };
+    } else if (p.streetFront !== null) {
+      delete p.streetFront;
+    }
     if (p.anchor && Number.isFinite(p.anchor.lat) && Number.isFinite(p.anchor.lon)) {
       p.anchor = { lat: p.anchor.lat, lon: p.anchor.lon };
     } else {
@@ -578,6 +589,24 @@ export function autoSeatHouse(plot) {
   const seat = seatHouse(plot);
   if (seat) plot.house = seat;
   return Boolean(seat);
+}
+
+/**
+ * Read the street front off the cadastre for every plot that was stored with
+ * the longest-edge guess. One plot after another, and quietly: a failed
+ * request leaves the guess standing and the next load asks again. The house
+ * stays where it is — it may be where the user put it.
+ */
+export async function settleStoredStreetFronts() {
+  for (const plot of state.data.plots) {
+    if (!plot.anchor || plot.streetFront !== undefined) continue;
+    try {
+      await settleStreetFront(plot);
+      save();
+    } catch {
+      // The guess stays; nothing on screen depends on this having worked.
+    }
+  }
 }
 
 export function addPlot(plot) {

@@ -257,10 +257,12 @@
 
             <!-- A way out, drawn the way `RouteCards` draws a real one: the
                  mode's own colour over the halo every line here carries. It
-                 starts at the middle of the building's lower edge -- where a
-                 drive leaves a house -- meets the street where the plot fronts
-                 it, and follows the centre line east off the page. Starting at
-                 the centroid instead drew the line out through the roof.
+                 starts on the plot a little below the middle of the building's
+                 lower edge -- where a drive leaves a house -- meets the street
+                 where the plot fronts it, and follows the centre line east off
+                 the page. Starting at the centroid drew the line out through
+                 the roof; starting on the wall itself made it read as part of
+                 the house rather than as a way away from it.
                  No marker at either end. The far end would claim a destination
                  the start page knows nothing about, and running off the frame
                  survives every viewport where a fixed point does not. The
@@ -268,9 +270,9 @@
                  here: it is drawn in the violation colour, and in a backdrop
                  there is no legend behind it to say otherwise. -->
             <g fill="none" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M1406.6,373 C1408,394 1405,418 1406,438 Q1409,468 1440,470 L3980,202.7"
+              <path d="M1408.6,392 C1409,408 1405.5,424 1406,438 Q1409,468 1440,470 L3980,202.7"
                     stroke="var(--w2b-map-halo)" stroke-width="13" opacity=".85"></path>
-              <path d="M1406.6,373 C1408,394 1405,418 1406,438 Q1409,468 1440,470 L3980,202.7"
+              <path d="M1408.6,392 C1409,408 1405.5,424 1406,438 Q1409,468 1440,470 L3980,202.7"
                     stroke="var(--w2b-primary)" stroke-width="4.6"></path>
             </g>
           </g>

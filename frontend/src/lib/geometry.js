@@ -627,6 +627,40 @@ export function alignmentToEdge(ring, edgeIndex = 0) {
 }
 
 /**
+ * Screen rotation, in degrees clockwise, that lays an edge horizontal with the
+ * plot *above* it: the street a plot fronts runs left to right along the
+ * bottom of the drawing. `alignmentToEdge` only makes the edge horizontal, and
+ * whether the street then sat above or below depended on which way round the
+ * cadastre happened to wind the ring. The interior lies to the left of a
+ * counter-clockwise edge, so that edge's own direction is the one to turn to
+ * east; a clockwise ring runs the other way. Normalised to (-180°, 180°].
+ */
+export function streetDownRotation(ring, edgeIndex = 0) {
+  const edge = polygonEdges(ring)[edgeIndex];
+  if (!edge || !(edge.length > 0)) return 0;
+  const angle = edge.angle + (isCounterClockwise(ring) ? 0 : Math.PI);
+  let degrees = (angle * 180) / Math.PI;
+  while (degrees > 180) degrees -= 360;
+  while (degrees <= -180) degrees += 360;
+  return degrees;
+}
+
+/**
+ * The bounding box a ring has on screen once the drawing is turned `degrees`
+ * clockwise, in metres of that turned frame, and the box's centre back in the
+ * ring's own frame. Fitting the unturned box instead framed a plot lying at
+ * 45° as if it were a square half again as wide, and let a long one run off
+ * the frame once it was turned to its street.
+ */
+export function turnedBox(ring, degrees = 0) {
+  const r = (degrees * Math.PI) / 180, cos = Math.cos(r), sin = Math.sin(r);
+  // Clockwise on screen is clockwise in a y-up frame as well.
+  const box = boundingBox(ring.map(p => ({ x: p.x * cos + p.y * sin, y: -p.x * sin + p.y * cos })));
+  const cx = (box.minX + box.maxX) / 2, cy = (box.minY + box.maxY) / 2;
+  return { ...box, centre: { x: cx * cos - cy * sin, y: cx * sin + cy * cos } };
+}
+
+/**
  * Align to an edge and, if the rotated footprint no longer fits, slide it back
  * inside without changing the angle. Returns the new placement, or the rotated
  * placement unchanged when nothing valid exists.
@@ -662,8 +696,8 @@ export function edgeCompass(ring, edgeIndex, northOffset = 0) {
  * relative padding around the outline. Exported so several plans can agree on
  * one scale — a comparison drawn at four different scales is a lie.
  */
-export function fitScale(ring, frameWidth, frameHeight, margin = 40, padding = 0.16) {
-  const box = boundingBox(ring);
+export function fitScale(ring, frameWidth, frameHeight, margin = 40, padding = 0.16, degrees = 0) {
+  const box = turnedBox(ring, degrees);
   const width = box.width * (1 + padding * 2);
   const height = box.height * (1 + padding * 2);
   return Math.min((frameWidth - margin * 2) / width, (frameHeight - margin * 2) / height);

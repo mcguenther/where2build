@@ -328,8 +328,11 @@ describe("Aufnahme — Absenden", () => {
     // „Mölkau 204“ lässt genau eine Zeile stehen; Enter nimmt sie, ohne dass
     // der Knopf daneben gedrückt werden muss.
     await intoQuery(w, "Mölkau 204");
+    // Pressed before the lookup answered: Enter waits for it rather than
+    // taking whatever row happens to stand there already.
     await w.find(".search__field input").trigger("keydown", { key: "Enter" });
-    await flushPromises();
+    expect(resolveParcel).not.toHaveBeenCalled();
+    await settle();
 
     expect(resolveParcel).toHaveBeenCalledWith({ gemarkung: "Mölkau", flurstuecksnummer: "204" });
   });
