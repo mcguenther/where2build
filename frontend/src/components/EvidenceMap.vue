@@ -53,8 +53,17 @@ import { aerialCadastreStyle, canRenderMap, vectorStyle } from "../lib/basemap.j
 import { darkTheme } from "../lib/store.js";
 import { bandFeatures } from "../lib/bands.js";
 import {
-  FLIGHT_MS, boundsOf, contextOpacity, frameFor, isEmptyBounds, prefersReducedMotion
+  FLIGHT_MS, SLACK, boundsOf, contextOpacity, frameFor, isEmptyBounds, padBounds,
+  prefersReducedMotion
 } from "../lib/evidence.js";
+
+/** Up to how many candidates each gets a numbered badge. Past that the badges
+ *  overlap into a smear at district scale, and the plain dots take over. */
+export const NUMBERED_MAX = 40;
+
+/** How much ground a jump to one candidate keeps around it: a neighbour or two
+ *  either side, and close enough for the cadastre's own numbers to draw. */
+const CANDIDATE_HALF_WIDTH_M = 55;
 
 const token = (element, name) =>
   getComputedStyle(element).getPropertyValue(name).trim() || "#000";
@@ -107,6 +116,9 @@ export default {
     /** The geometry the protocol is currently pointing at, marked on the map so
      *  a jump says *which* thing it jumped to. One or several. */
     highlighted: { type: [Object, Array], default: null },
+    /** The candidate the user has chosen, and the one the table last showed. */
+    chosen: { type: [String, Number], default: null },
+    shown: { type: [String, Number], default: null },
     status: { type: String, default: null },
     height: { type: Number, default: 460 },
     /** What lies under the drawing. `site` is the orthophoto with the roads
@@ -124,6 +136,8 @@ export default {
     /** Which palette the ground is drawn in. Deliberately not a function of
      *  `unavailable`: a flag that feeds the rebuild rebuilds forever. */
     darkGround() { return darkTheme(); },
+    /** Whether the candidates are few enough to carry the table's numbers. */
+    numbered() { return !this.confirmed && this.candidates.length <= NUMBERED_MAX; },
     candidateGeometries() { return this.candidates.map(c => c.geometry).filter(Boolean); },
     areaGeometries() { return this.areas.map(a => a.geometry).filter(Boolean); },
     /** The distance bands, as features. Empty until a reference resolved. */
@@ -157,6 +171,8 @@ export default {
     areas() { this.draw(); this.moveCamera(); },
     pin() { this.moveCamera(); },
     highlighted() { this.drawHighlight(); },
+    chosen() { this.markBadges(); },
+    shown() { this.markBadges(); },
     huelle() { this.draw(); },
     indicia() { this.draw(); },
     status() { this.draw(); }
@@ -218,6 +234,8 @@ export default {
       this.ready = false;
       (this._markers || []).forEach(marker => marker.remove());
       this._markers = [];
+      (this._badges || []).forEach(badge => badge.marker.remove());
+      this._badges = [];
       if (this._map) { this._map.remove(); this._map = null; }
     },
 
@@ -305,20 +323,23 @@ export default {
 
       // Every surviving candidate, equally strong. A ranking is an ordering,
       // not a finding, so nothing here says "this one".
+      /* A candidate has to stand out from the cadastre drawn under it, which
+       * is line work too. So its contour is the widest line on the map, over
+       * a halo on either ground, and the fill stays light enough to show the
+       * roof or the lawn the listing's photographs can be compared with. */
       this._map.addLayer({
         id: "kandidaten-fill", type: "fill", source: "kandidaten",
-        paint: { "fill-color": selection, "fill-opacity": photo ? 0.5 : 0.42 }
+        paint: { "fill-color": selection, "fill-opacity": photo ? 0.34 : 0.3 }
       });
-      if (haloWidth) {
-        this._map.addLayer({
-          id: "kandidaten-halo", type: "line", source: "kandidaten",
-          layout: { "line-join": "round" },
-          paint: { "line-color": halo, "line-width": haloWidth }
-        });
-      }
+      this._map.addLayer({
+        id: "kandidaten-halo", type: "line", source: "kandidaten",
+        layout: { "line-join": "round" },
+        paint: { "line-color": halo, "line-width": photo ? 7 : 5, "line-opacity": photo ? 0.9 : 0.8 }
+      });
       this._map.addLayer({
         id: "kandidaten-line", type: "line", source: "kandidaten",
-        paint: { "line-color": selection, "line-width": lineWidth }
+        layout: { "line-join": "round" },
+        paint: { "line-color": selection, "line-width": photo ? 3.2 : 2.6 }
       });
 
       /* Twenty-two candidates spread over two districts are each a couple of
@@ -422,10 +443,11 @@ export default {
       this.set("bestaetigt", polygonFeature(confirmed?.geometry));
       this.drawHighlight();
       // No dot over a confirmed parcel: that one has a contour of its own, and
-      // a marker on top of it says "one of several" about the opposite.
+      // a marker on top of it says "one of several" about the opposite. Nor
+      // under a numbered badge, which is the same mark with more in it.
       this.set(
         "punkte",
-        others
+        (this.numbered ? [] : others)
           .map(candidate => ({ candidate, point: centre(candidate.geometry) }))
           .filter(entry => entry.point)
           .map(({ candidate, point }) => ({
@@ -452,6 +474,42 @@ export default {
 
       this.fadeContext();
       this.drawPin();
+      this.drawBadges();
+    },
+
+    /**
+     * The table's row numbers, on the parcels they stand for.
+     *
+     * Markers rather than a symbol layer: the aerial ground is raster only and
+     * carries no glyphs, and a badge is a button, so it can be clicked.
+     */
+    drawBadges() {
+      (this._badges || []).forEach(badge => badge.marker.remove());
+      this._badges = [];
+      if (!this._map || !this.numbered) return;
+      this._badges = this.candidates.flatMap((candidate, index) => {
+        const point = centre(candidate.geometry);
+        if (!point) return [];
+        const element = document.createElement("button");
+        element.type = "button";
+        element.className = "indizienkarte__marke";
+        element.textContent = String(index + 1);
+        element.title = `Flurstück ${candidate.properties?.flurstuecksnummer ?? ""} wählen`.trim();
+        element.addEventListener("click", event => {
+          event.stopPropagation();
+          this.$emit("select", candidate.id);
+        });
+        const marker = new Marker({ element, anchor: "center" }).setLngLat(point).addTo(this._map);
+        return [{ id: candidate.id, element, marker }];
+      });
+      this.markBadges();
+    },
+
+    markBadges() {
+      for (const badge of this._badges || []) {
+        badge.element.classList.toggle("indizienkarte__marke--gewaehlt", badge.id === this.chosen);
+        badge.element.classList.toggle("indizienkarte__marke--gezeigt", badge.id === this.shown);
+      }
     },
 
     /** Fade the wide context layers as the camera closes in on the candidates. */
@@ -526,6 +584,20 @@ export default {
       this.fadeContext();
     },
 
+    /** Close in on one candidate, which `focusOn` cannot: it frames the whole
+     *  set around the evidence, and a candidate is one of that set. */
+    focusCandidate(geometry) {
+      if (!this._map || !geometry) return;
+      const frame = padBounds(boundsOf(geometry), SLACK, CANDIDATE_HALF_WIDTH_M);
+      if (isEmptyBounds(frame)) return;
+      this._frame = frame;
+      this._map.fitBounds(
+        [[frame.west, frame.south], [frame.east, frame.north]],
+        { padding: 36, maxZoom: 19, duration: prefersReducedMotion() ? 0 : this.flight, essential: true }
+      );
+      this.fadeContext();
+    },
+
     /** Exposed so the protocol can jump to a clue without waiting for the queue. */
     focusOn(geometry) {
       if (!this._map || !geometry) return;
@@ -554,7 +626,10 @@ export default {
 }
 .indizienkarte__legend li{ display: flex; align-items: center; gap: 6px; }
 .indizienkarte__swatch{ width: 14px; height: 10px; border-radius: 2px; display: inline-block; }
-.indizienkarte__swatch--kandidat{ background: var(--w2b-map-selection); opacity: .42; border: 1px solid var(--w2b-map-selection); }
+.indizienkarte__swatch--kandidat{
+  background: color-mix(in srgb, var(--w2b-map-selection) 34%, transparent);
+  border: 2px solid var(--w2b-map-selection);
+}
 .indizienkarte__swatch--bestaetigt{ background: var(--w2b-map-halo); border: 2px solid var(--w2b-map-boundary); }
 .indizienkarte__swatch--gemarkung{ background: transparent; border: 1px dashed var(--w2b-map-envelope); }
 .indizienkarte__swatch--pin{ background: var(--w2b-map-violation); opacity: .5; }
@@ -576,5 +651,23 @@ export default {
   text-decoration-color: var(--w2b-map-violation);
   text-decoration-thickness: 1.5px;
   transform: translateX(10px);
+}
+/* The candidate's row number. The halo colour as its ring keeps it legible on
+   the photograph and on the vector ground alike, in either theme. */
+.indizienkarte__marke{
+  display: grid; place-items: center; min-width: 24px; height: 24px; padding: 0 6px;
+  border-radius: var(--w2b-radius-full); cursor: pointer;
+  font: 700 12px/1 var(--w2b-font-mono);
+  background: var(--w2b-surface); color: var(--w2b-ink);
+  border: 2px solid var(--w2b-map-selection);
+  box-shadow: 0 0 0 2px var(--w2b-map-halo), 0 1px 4px rgba(0,0,0,.35);
+}
+.indizienkarte__marke:focus-visible{ outline: 2px solid var(--w2b-primary); outline-offset: 2px; }
+.indizienkarte__marke--gewaehlt{ background: var(--w2b-map-selection); color: var(--w2b-map-halo); }
+/* Not a scale: MapLibre positions a marker through its inline transform, and
+   a transform in here would throw it off its parcel. */
+.indizienkarte__marke--gezeigt{
+  z-index: 1; min-width: 30px; height: 30px; font-size: 14px;
+  box-shadow: 0 0 0 3px var(--w2b-map-halo), 0 0 0 5px var(--w2b-primary), 0 1px 6px rgba(0,0,0,.4);
 }
 </style>

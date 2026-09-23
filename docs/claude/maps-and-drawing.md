@@ -182,3 +182,23 @@ routines under it.
   an unhandled rejection against whichever test file happened to be running.
   `canRenderMap()` is asked first now. It is not only a test concern: a browser
   with WebGL switched off did the same thing.
+
+- **The search map's cadastre was yellow, from zoom 15, and it buried the
+  answer.** The ground used the oversampled `flurstuecke` layer in the
+  service's „Gelb“ style, so over a district every hedge carried a yellow line
+  and an ambiguous run's two candidates were two outlines among a few hundred —
+  in a colour nothing else in the app uses. The ground now takes the site
+  plan's own `liegenschaftskarte` (default style, black line work) from
+  `PARCEL_OUTLINE_MIN_ZOOM = 17`; the numbers get legible at 18. Measured over
+  Mölkau on 23.09.2026: at 17 a plot is some forty pixels wide and its number
+  three pixels high. The backend's `flurstuecke` layer is no longer asked for.
+
+- **`focusOn` cannot close in on one candidate.** It frames the whole candidate
+  set around the evidence, which is right for a clue and does nothing for a
+  candidate — the set already contains it. The table's row click and „Zeigen"
+  go through `focusCandidate`, which frames that parcel with ~55 m around it.
+  The row numbers are drawn on the map as DOM markers, not a symbol layer: the
+  aerial ground is raster only and carries no glyphs. And a marker is
+  positioned through its own inline `transform`, so a CSS `transform` on it
+  (a scale for „shown") throws it off its parcel — the highlight grows the
+  badge's box instead.

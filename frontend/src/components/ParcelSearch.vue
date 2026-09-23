@@ -72,10 +72,11 @@
         <EvidenceMap ref="karte" :candidates="candidates" :district-outline="districtOutline"
                      :areas="areas" :huelle="huelle" :refuted-pin="refutedPin" :pin="pin"
                      :status="status" :flight="flight" :height="mapHeight" :indicia="indicia"
-                     :ground="ground" :highlighted="highlighted" @select="pick" />
+                     :ground="ground" :highlighted="highlighted" :chosen="chosen"
+                     :shown="shownCandidate" @select="pick" />
         <p v-if="ground === 'site'" class="panel__footnote">
-          Luftbild und Straßen vom GeoSN. Die amtlichen Flurstücksgrenzen zeichnet der
-          Dienst erst ab Zoomstufe {{ parcelOutlineZoom }}; darüber liefert er ein leeres Bild.
+          Luftbild und Straßen vom GeoSN. Flurstücksgrenzen ab Zoomstufe {{ parcelOutlineZoom }},
+          ihre Nummern ab {{ parcelOutlineZoom + 1 }}.
         </p>
       </div>
 
@@ -186,18 +187,30 @@
       </div>
       <table class="kandidaten">
         <thead>
-          <tr><th>Flurstück</th><th>Gemarkung</th><th class="num">Fläche</th><th>Lage</th><th>Nutzung</th><th></th></tr>
+          <tr><th class="num" aria-label="Nummer auf der Karte">#</th><th>Flurstück</th><th>Gemarkung</th><th class="num">Fläche</th><th>Lage</th><th>Nutzung</th><th></th></tr>
         </thead>
         <tbody>
-          <tr v-for="candidate in candidates" :key="candidate.id"
-              :class="{ 'kandidaten--gewaehlt': chosen === candidate.id }">
+          <!-- A click on the row only moves the map; choosing stays a button of
+               its own, so looking at a candidate never changes the answer. -->
+          <tr v-for="(candidate, index) in candidates" :key="candidate.id"
+              :class="{
+                'kandidaten--gewaehlt': chosen === candidate.id,
+                'kandidaten--gezeigt': shownCandidate === candidate.id
+              }"
+              @click="show(candidate.id)">
+            <td class="num"><span class="kandidaten__marke">{{ index + 1 }}</span></td>
             <td class="mono">{{ candidate.properties.flurstuecksnummer }}</td>
             <td>{{ candidate.properties.gemarkung }}</td>
             <td class="num mono">{{ area(candidate.properties.flaeche_amtlich_m2) }}</td>
             <td>{{ lage(candidate.properties.lagebezeichnung) }}</td>
             <td>{{ candidate.properties.nutzung || "—" }}</td>
-            <td class="num">
-              <button type="button" class="btn btn--quiet btn--small" @click="pick(candidate.id)">
+            <td class="num kandidaten__knoepfe">
+              <button type="button" class="btn btn--quiet btn--small"
+                      :aria-label="`Flurstück ${candidate.properties.flurstuecksnummer} auf der Karte zeigen`"
+                      @click.stop="show(candidate.id)">
+                Zeigen
+              </button>
+              <button type="button" class="btn btn--quiet btn--small" @click.stop="pick(candidate.id)">
                 {{ chosen === candidate.id ? "Gewählt" : "Wählen" }}
               </button>
             </td>
@@ -325,6 +338,8 @@ export default {
       // without saying which of the things on it was the reason.
       shownStep: null,
       highlighted: null,
+      // Which row of the candidate table the map was last moved to.
+      shownCandidate: null,
       // The ground under the drawing. Remembered per visit only: which
       // backdrop helps depends on the plot in front of you.
       ground: "site",
@@ -426,7 +441,7 @@ export default {
         streaming: true, error: "", status: null, indicia: [], conflicts: [],
         candidates: [], huelle: null, districtOutline: null, areas: [],
         hint: "", requests: 0, steps: [], chosen: null,
-        shownStep: null, highlighted: null,
+        shownStep: null, highlighted: null, shownCandidate: null,
         phaseText: "Angaben werden gelesen …", phaseKey: "ernten"
       });
 
@@ -633,6 +648,7 @@ export default {
       const geometry = this.focusOf(step);
       if (!geometry) return;
       this.shownStep = step.n;
+      this.shownCandidate = null;
       this.highlighted = geometry;
       this.$refs.karte?.focusOn?.(geometry);
     },
@@ -641,6 +657,7 @@ export default {
       this.skip();
       if (!this.resultGeometry) return;
       this.shownStep = null;
+      this.shownCandidate = null;
       this.highlighted = this.resultGeometry;
       this.$refs.karte?.focusOn?.(this.resultGeometry);
     },
@@ -650,14 +667,37 @@ export default {
       if (!this.everything.length) return;
       // Showing everything is the opposite of pointing at one thing.
       this.shownStep = null;
+      this.shownCandidate = null;
       this.highlighted = null;
       this.$refs.karte?.focusOn?.(this.everything);
     },
 
+    /** Move the map to one candidate and mark it, without choosing it. */
+    show(id) {
+      this.skip();
+      const candidate = this.candidates.find(c => c.id === id);
+      if (!candidate?.geometry) return;
+      this.shownStep = null;
+      this.shownCandidate = id;
+      this.highlighted = candidate.geometry;
+      this.$refs.karte?.focusCandidate?.(candidate.geometry);
+      this.bringMapIntoView();
+    },
+
+    /** On a phone the table sits a screen below the map, and a pan nobody sees
+     *  is indistinguishable from a button that does nothing. */
+    bringMapIntoView() {
+      const element = this.$refs.karte?.$el;
+      if (!element?.getBoundingClientRect || !element.scrollIntoView) return;
+      const box = element.getBoundingClientRect();
+      const visible = box.bottom > 80 && box.top < window.innerHeight - 80;
+      if (visible) return;
+      element.scrollIntoView({ block: "center", behavior: prefersReducedMotion() ? "auto" : "smooth" });
+    },
+
     pick(id) {
       this.chosen = id;
-      const candidate = this.candidates.find(c => c.id === id);
-      if (candidate) this.$refs.karte?.focusOn?.(candidate.geometry);
+      this.show(id);
     }
   }
 };
@@ -903,11 +943,34 @@ export default {
 .kandidaten th{ font-size: var(--w2b-text-xs); color: var(--w2b-muted); font-weight: 600; }
 .kandidaten .num{ text-align: right; }
 .kandidaten .mono{ font-family: var(--w2b-font-mono); font-variant-numeric: tabular-nums; }
-.kandidaten--gewaehlt{ background: var(--w2b-primary-veil); }
+.kandidaten tbody tr{ cursor: pointer; }
+.kandidaten tbody tr:hover{ background: var(--w2b-line-faint); }
+.kandidaten--gewaehlt, .kandidaten tbody tr.kandidaten--gewaehlt:hover{ background: var(--w2b-primary-veil); }
+.kandidaten--gezeigt td:first-child{ box-shadow: inset 3px 0 0 var(--w2b-primary); }
+.kandidaten__knoepfe{ white-space: nowrap; }
+/* The same badge the map puts on the parcel, so row and outline are matched
+   by eye rather than by reading two parcel numbers. */
+.kandidaten__marke{
+  display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 5px;
+  border-radius: var(--w2b-radius-full); border: 2px solid var(--w2b-map-selection);
+  background: var(--w2b-surface); color: var(--w2b-ink);
+  font-family: var(--w2b-font-mono); font-size: var(--w2b-text-xs); font-weight: 700;
+}
+.kandidaten--gewaehlt .kandidaten__marke{ background: var(--w2b-map-selection); color: var(--w2b-map-halo); }
 .panel__footnote{ padding: var(--w2b-space-3) var(--w2b-space-4); font-size: var(--w2b-text-xs); color: var(--w2b-muted); }
 
+.kandidaten td.num{ white-space: nowrap; }
+
 @media (max-width: 700px){
-  .kandidaten th:nth-child(4), .kandidaten td:nth-child(4),
-  .kandidaten th:nth-child(5), .kandidaten td:nth-child(5){ display: none; }
+  .kandidaten th:nth-child(5), .kandidaten td:nth-child(5),
+  .kandidaten th:nth-child(6), .kandidaten td:nth-child(6){ display: none; }
+  .kandidaten th, .kandidaten td{ padding: 8px 6px; }
+  .kandidaten th:first-child, .kandidaten td:first-child{ padding-left: var(--w2b-space-4); }
+  .kandidaten th:last-child, .kandidaten td:last-child{ padding-right: var(--w2b-space-4); }
+}
+/* Two buttons a row do not fit beside the Gemarkung at phone width. The
+   Gemarkung is the column most likely to repeat itself down the table. */
+@media (max-width: 480px){
+  .kandidaten th:nth-child(3), .kandidaten td:nth-child(3){ display: none; }
 }
 </style>

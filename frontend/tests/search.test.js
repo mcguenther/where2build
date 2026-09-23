@@ -10,6 +10,10 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 // The recorded run, verbatim: `?raw` keeps it the text a reader would see.
 import STREAM from "./fixtures/suche-grossbothen.ndjson?raw";
+// An ambiguous run, recorded on 23.09.2026 with the area rounded to „ca.
+// 1.100 m²": two parcels stand. Only its final event is kept -- the district
+// outlines of the earlier ones are a quarter megabyte the table never reads.
+import AMBIGUOUS from "./fixtures/suche-grossbothen-mehrdeutig.ndjson?raw";
 
 import {
   MIN_HALF_WIDTH_M, QUICK_MS, StepQueue, boundsOf, contains, contextOpacity,
@@ -582,6 +586,73 @@ describe("Die Suchansicht", () => {
 
     expect(map.props("highlighted")).toBeNull();
     expect(wrapper.find(".verlauf--gezeigt").exists()).toBe(false);
+  });
+
+  describe("bei mehreren Kandidaten", () => {
+    const outcome = JSON.parse(AMBIGUOUS.trim());
+
+    const openAmbiguous = async () => {
+      global.fetch = stubFetch(AMBIGUOUS);
+      const wrapper = mount(ParcelSearch, {
+        props: { query: { text: "x" }, paced: false },
+        global: { stubs: { EvidenceMap: true } }
+      });
+      await flushPromises();
+      await flushPromises();
+      const map = wrapper.findComponent({ name: "EvidenceMap" });
+      map.vm.focusCandidate = vi.fn();
+      return { wrapper, map };
+    };
+
+    it("ist ein mehrdeutiger Lauf mit zwei Flurstücken", () => {
+      expect(outcome.status).toBe("mehrdeutig");
+      expect(outcome.kandidaten).toHaveLength(2);
+    });
+
+    it("schwenkt beim Klick auf die Zeile dorthin, ohne zu wählen", async () => {
+      const { wrapper, map } = await openAmbiguous();
+      const second = outcome.kandidaten[1];
+
+      await wrapper.findAll(".kandidaten tbody tr")[1].trigger("click");
+
+      expect(map.vm.focusCandidate).toHaveBeenCalledWith(second.geometry);
+      expect(map.props("highlighted")).toEqual(second.geometry);
+      expect(map.props("shown")).toBe(second.id);
+      // Looking at a candidate must not change the answer.
+      expect(map.props("chosen")).toBeNull();
+      expect(wrapper.find(".kandidaten--gezeigt").exists()).toBe(true);
+      expect(wrapper.find(".kandidaten--gewaehlt").exists()).toBe(false);
+    });
+
+    it("hat neben „Wählen“ einen Knopf, der nur dorthin schwenkt", async () => {
+      const { wrapper, map } = await openAmbiguous();
+      const row = wrapper.findAll(".kandidaten tbody tr")[0];
+      const show = row.findAll("button").find(b => b.text() === "Zeigen");
+
+      await show.trigger("click");
+
+      // Once, not twice: the row's own handler must not fire as well.
+      expect(map.vm.focusCandidate).toHaveBeenCalledTimes(1);
+      expect(map.vm.focusCandidate).toHaveBeenCalledWith(outcome.kandidaten[0].geometry);
+      expect(map.props("chosen")).toBeNull();
+    });
+
+    it("wählt mit „Wählen“ und schwenkt dabei mit", async () => {
+      const { wrapper, map } = await openAmbiguous();
+      const row = wrapper.findAll(".kandidaten tbody tr")[1];
+
+      await row.findAll("button").find(b => b.text() === "Wählen").trigger("click");
+
+      expect(map.props("chosen")).toBe(outcome.kandidaten[1].id);
+      expect(map.vm.focusCandidate).toHaveBeenCalledTimes(1);
+      expect(row.text()).toContain("Gewählt");
+    });
+
+    it("nummeriert die Zeilen so, wie die Karte die Flurstücke beschriftet", async () => {
+      const { wrapper } = await openAmbiguous();
+
+      expect(wrapper.findAll(".kandidaten__marke").map(m => m.text())).toEqual(["1", "2"]);
+    });
   });
 
   it("sucht erneut, wenn ein Indiz abgewählt wird", async () => {
