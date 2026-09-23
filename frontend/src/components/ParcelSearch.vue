@@ -222,7 +222,8 @@
 
       <!-- A card per candidate: the row it used to be, and a picture of the
            parcel on the orthophoto. The picture is fixed — it is there to be
-           recognised, and a click on it sends the big map there instead. -->
+           recognised, so a click on it is „that one": it chooses the parcel
+           and sends the big map there. „Zeigen" only looks. -->
       <div v-else class="vorschlaege">
         <article v-for="card in visibleCards" :key="card.candidate.id" class="vorschlag"
                  :class="{
@@ -230,8 +231,8 @@
                    'vorschlag--gezeigt': shownCandidate === card.candidate.id
                  }">
           <button type="button" class="vorschlag__bild" :disabled="!card.sketch"
-                  :aria-label="`Flurstück ${card.candidate.properties.flurstuecksnummer} auf der großen Karte zeigen`"
-                  @click="show(card.candidate.id)">
+                  :aria-label="`Flurstück ${card.candidate.properties.flurstuecksnummer} wählen und auf der großen Karte zeigen`"
+                  @click="pick(card.candidate.id)">
             <svg v-if="card.sketch" :viewBox="card.sketch.viewBox" role="img"
                  :aria-label="`Luftbild um Flurstück ${card.candidate.properties.flurstuecksnummer}`">
               <rect x="0" y="0" :width="card.sketch.width" :height="card.sketch.height" fill="var(--w2b-map-ground)" />

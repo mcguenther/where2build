@@ -626,19 +626,21 @@ describe("Die Suchansicht", () => {
       });
     });
 
-    it("schwenkt beim Klick auf das Kachelbild dorthin, ohne zu wählen", async () => {
+    it("wählt beim Klick auf das Kachelbild und schwenkt dorthin", async () => {
       const { wrapper, map } = await openAmbiguous();
       const second = outcome.kandidaten[1];
 
       await wrapper.findAll(".vorschlag__bild")[1].trigger("click");
 
+      expect(map.vm.focusCandidate).toHaveBeenCalledTimes(1);
       expect(map.vm.focusCandidate).toHaveBeenCalledWith(second.geometry);
       expect(map.props("highlighted")).toEqual(second.geometry);
       expect(map.props("shown")).toBe(second.id);
-      // Looking at a candidate must not change the answer.
-      expect(map.props("chosen")).toBeNull();
-      expect(wrapper.find(".vorschlag--gezeigt").exists()).toBe(true);
-      expect(wrapper.find(".vorschlag--gewaehlt").exists()).toBe(false);
+      // The picture is where a parcel is recognised, so the click is the choice.
+      expect(map.props("chosen")).toBe(second.id);
+      const card = wrapper.findAll(".vorschlag")[1];
+      expect(card.classes()).toContain("vorschlag--gewaehlt");
+      expect(card.text()).toContain("Gewählt");
     });
 
     it("hat neben „Wählen“ einen Knopf, der nur dorthin schwenkt", async () => {
