@@ -42,7 +42,7 @@
       <ul class="checks__tally" aria-label="Zusammenfassung">
         <li v-for="group in groups" :key="group.status" class="tally" :data-status="group.status">
           <span class="mark" aria-hidden="true">{{ group.mark }}</span>
-          {{ group.checks.length }} {{ group.label.toLowerCase() }}
+          {{ group.checks.length }} {{ group.counted }}
         </li>
       </ul>
       <p class="checks__no-score">
@@ -136,9 +136,9 @@ import { toWgs84 } from "../lib/projection.js";
 /** Gravest first. The mark repeats the colour in a shape, for anyone who
  *  cannot tell amber from green, and for paper printed in black. */
 const GROUPS = [
-  { status: NOTE, label: "Zu beachten", mark: "!" },
-  { status: GOOD, label: "Ohne Befund", mark: "✓" },
-  { status: OPEN, label: "Offen", mark: "?" }
+  { status: NOTE, label: "Zu beachten", counted: "zu beachten", mark: "!" },
+  { status: GOOD, label: "Ohne Befund", counted: "ohne Befund", mark: "✓" },
+  { status: OPEN, label: "Offen", counted: "offen", mark: "?" }
 ];
 
 export default {

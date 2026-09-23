@@ -297,47 +297,51 @@
       </section>
 
       <!-- Folded: the plan draws the setbacks and the notice above it says
-           whether the house keeps them. The table is for changing a depth. -->
-      <details class="panel fold">
-        <summary class="panel__head fold__head">
-          <h3>Abstandsflächen</h3><span class="spacer"></span>
-          <span class="fold__summary">{{ setbackSummary }}</span>
-          <span class="chip chip--warn">§ 6 SächsBO</span>
-        </summary>
-        <table class="data-table setback-table">
-          <thead><tr><th>Grenze</th><th class="num">Länge</th><th class="num">Tiefe</th></tr></thead>
-          <tbody>
-            <tr v-for="(boundary, i) in boundaries" :key="i">
-              <td>{{ boundary.name }}</td>
-              <td class="num">{{ metres(boundary.length) }}</td>
-              <td class="num">
-                <input type="number" min="0" max="20" step="0.1" class="depth"
-                       :value="plot.setbacks[i]" :aria-label="`Abstandstiefe ${boundary.name}`"
-                       @input="setSetback(i, $event.target.value)">
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        <div class="slider no-print">
-          <label for="wall-height">Wandhöhe</label>
-          <output class="mono">{{ metres(plot.wallHeight) }}</output>
-          <input id="wall-height" type="range" min="2.5" max="12" step="0.1"
-                 :value="plot.wallHeight" @input="setWallHeight($event.target.value)">
-          <p class="slider__hint">
-            0,4 · H = <b>{{ metres(plot.wallHeight * 0.4) }}</b>
-            <template v-if="plot.wallHeight * 0.4 < 3">. Unter dem Mindestmaß von 3 m, deshalb greift der Mindestwert.</template>
-            <template v-else>. Maßgeblich, weil größer als das Mindestmaß von 3 m.</template>
-          </p>
-        </div>
-      </details>
+           whether the house keeps them. The table is for changing a depth.
+           It shares a column with the caution, which is about the same
+           paragraph — a closed fold alone in a column is a bar above a gap. -->
+      <div class="tools__column">
+        <details class="panel fold">
+          <summary class="panel__head fold__head">
+            <h3>Abstandsflächen</h3><span class="spacer"></span>
+            <span class="fold__summary">{{ setbackSummary }}</span>
+            <span class="chip chip--warn">§ 6 SächsBO</span>
+          </summary>
+          <table class="data-table setback-table">
+            <thead><tr><th>Grenze</th><th class="num">Länge</th><th class="num">Tiefe</th></tr></thead>
+            <tbody>
+              <tr v-for="(boundary, i) in boundaries" :key="i">
+                <td>{{ boundary.name }}</td>
+                <td class="num">{{ metres(boundary.length) }}</td>
+                <td class="num">
+                  <input type="number" min="0" max="20" step="0.1" class="depth"
+                         :value="plot.setbacks[i]" :aria-label="`Abstandstiefe ${boundary.name}`"
+                         @input="setSetback(i, $event.target.value)">
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="slider no-print">
+            <label for="wall-height">Wandhöhe</label>
+            <output class="mono">{{ metres(plot.wallHeight) }}</output>
+            <input id="wall-height" type="range" min="2.5" max="12" step="0.1"
+                   :value="plot.wallHeight" @input="setWallHeight($event.target.value)">
+            <p class="slider__hint">
+              0,4 · H = <b>{{ metres(plot.wallHeight * 0.4) }}</b>
+              <template v-if="plot.wallHeight * 0.4 < 3">. Unter dem Mindestmaß von 3 m, deshalb greift der Mindestwert.</template>
+              <template v-else>. Maßgeblich, weil größer als das Mindestmaß von 3 m.</template>
+            </p>
+          </div>
+        </details>
 
-      <div class="callout callout--caution">
-        <h4>Keine bauordnungsrechtliche Prüfung</h4>
-        <p>Die Abstandstiefe bemisst sich nach § 6 SächsBO grundsätzlich nach der Wandhöhe;
-          3 m sind der Mindestwert, nicht die Regel. Grenzgaragen sind privilegiert, ein
-          Bebauungsplan kann abweichende Baugrenzen festsetzen.</p>
-        <p>Nach § 15 Abs. 2 ImmoWertV kann ein einzelnes Grundstück innerhalb der
-          Richtwertzone eine abweichende Nutzungsart haben; dann gilt der Zonenwert nicht.</p>
+        <div class="callout callout--caution">
+          <h4>Keine bauordnungsrechtliche Prüfung</h4>
+          <p>Die Abstandstiefe bemisst sich nach § 6 SächsBO grundsätzlich nach der Wandhöhe;
+            3 m sind der Mindestwert, nicht die Regel. Grenzgaragen sind privilegiert, ein
+            Bebauungsplan kann abweichende Baugrenzen festsetzen.</p>
+          <p>Nach § 15 Abs. 2 ImmoWertV kann ein einzelnes Grundstück innerhalb der
+            Richtwertzone eine abweichende Nutzungsart haben; dann gilt der Zonenwert nicht.</p>
+        </div>
       </div>
     </div>
 
@@ -373,9 +377,12 @@
                       @click="locationBackdrop = b.id">{{ b.name }}</button>
             </div>
             <div class="spacer"></div>
-            <span class="plan-bar__label">Ebene</span>
-            <button type="button" class="toggle" :aria-pressed="String(Boolean(locationOverlay))"
-                    @click="toggleNoise">Lärm</button>
+            <!-- One unit, so a narrow bar wraps the label with its switch. -->
+            <span class="location__layer">
+              <span class="plan-bar__label">Ebene</span>
+              <button type="button" class="toggle" :aria-pressed="String(Boolean(locationOverlay))"
+                      @click="toggleNoise">Lärm</button>
+            </span>
           </div>
 
           <!-- No house: this map is about the ground, and a footprint would be
@@ -990,6 +997,7 @@ export default {
 @media (max-width: 1000px){ .location{ grid-template-columns: 1fr; } }
 .location__map{ position: sticky; top: var(--w2b-space-3); }
 @media (max-width: 1000px){ .location__map{ position: static; } }
+.location__layer{ display: inline-flex; align-items: center; gap: 6px; }
 .location__hint{
   margin: 0; padding: 6px var(--w2b-space-3);
   font-size: var(--w2b-text-xs); color: var(--w2b-muted);
@@ -1010,6 +1018,7 @@ export default {
 }
 
 .tools{ display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--w2b-space-4); align-items: start; }
+.tools__column{ display: grid; gap: var(--w2b-space-4); align-content: start; min-width: 0; }
 .depth{ width: 72px; padding: 4px 7px; text-align: right; }
 .slider{ display: grid; grid-template-columns: 1fr auto; gap: 5px var(--w2b-space-3); align-items: center; padding: var(--w2b-space-3) var(--w2b-space-4); border-top: 1px solid var(--w2b-line-faint); }
 .slider label{ font-family: var(--w2b-font-display); font-weight: 600; font-size: var(--w2b-text-xs); letter-spacing: .09em; text-transform: uppercase; color: var(--w2b-muted); }

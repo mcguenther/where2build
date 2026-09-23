@@ -255,6 +255,9 @@
     display: block !important;
   }
   .tools > *{ break-inside: avoid; margin-bottom: 4mm; }
+  /* The column that pairs the setback table with the caution flows too. */
+  .tools__column{ display: block !important; }
+  .tools__column > *{ break-inside: avoid; margin-bottom: 4mm; }
 
   /* A depth reads as a measurement, like the length beside it — the input is
      only how it gets edited on screen. */
