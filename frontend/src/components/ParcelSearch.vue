@@ -73,7 +73,7 @@
                      :areas="areas" :huelle="huelle" :refuted-pin="refutedPin" :pin="pin"
                      :status="status" :flight="flight" :height="mapHeight" :indicia="indicia"
                      :ground="ground" :highlighted="highlighted" :chosen="chosen"
-                     :shown="shownCandidate" @select="pick" />
+                     :shown="shownCandidate" :covered-right="hudCover" @select="pick" />
         <p v-if="ground === 'site'" class="panel__footnote">
           Luftbild und Straßen vom GeoSN. Flurstücksgrenzen ab Zoomstufe {{ parcelOutlineZoom }},
           ihre Nummern ab {{ parcelOutlineZoom + 1 }}.
@@ -83,7 +83,7 @@
       <!-- The head-up display: what the run is doing, and under it what it
            has found. Newest first, because a run one is watching is read from
            the top — the older entries are the ones you scroll back for. -->
-      <div class="suche__hud">
+      <div ref="hud" class="suche__hud">
         <!-- The verdict, before anything else. Three outcomes and none of them
              is "probably": a search that always produces an answer eventually
              produces a wrong one. -->
@@ -340,6 +340,8 @@ export default {
       highlighted: null,
       // Which row of the candidate table the map was last moved to.
       shownCandidate: null,
+      // How many pixels of the map's right side the HUD lies over.
+      hudCover: 0,
       // The ground under the drawing. Remembered per visit only: which
       // backdrop helps depends on the plot in front of you.
       ground: "site",
@@ -414,8 +416,17 @@ export default {
       return this.candidates.length ? this.pin : null;
     }
   },
-  mounted() { this.start(); },
+  mounted() {
+    this.start();
+    // The HUD floats over the map from 1000 px up and sits under it below
+    // that; which one it is, is the stylesheet's business, so it is measured.
+    if (typeof ResizeObserver === "undefined") return;
+    this._hudResizes = new ResizeObserver(() => this.measureHud());
+    if (this.$refs.hud) this._hudResizes.observe(this.$refs.hud);
+    if (this.$refs.karte?.$el instanceof Element) this._hudResizes.observe(this.$refs.karte.$el);
+  },
   beforeUnmount() {
+    this._hudResizes?.disconnect();
     this._queue?.stop();
     this._abort?.abort();
   },
@@ -670,6 +681,14 @@ export default {
       this.shownCandidate = null;
       this.highlighted = null;
       this.$refs.karte?.focusOn?.(this.everything);
+    },
+
+    measureHud() {
+      const hud = this.$refs.hud?.getBoundingClientRect?.();
+      const map = this.$refs.karte?.$el?.getBoundingClientRect?.();
+      if (!hud || !map) return;
+      const overlaps = hud.left < map.right && hud.top < map.bottom && hud.bottom > map.top;
+      this.hudCover = overlaps ? Math.max(0, Math.round(map.right - hud.left)) : 0;
     },
 
     /** Move the map to one candidate and mark it, without choosing it. */

@@ -202,3 +202,20 @@ routines under it.
   positioned through its own inline `transform`, so a CSS `transform` on it
   (a scale for „shown") throws it off its parcel — the highlight grows the
   badge's box instead.
+
+- **Two badges on one pixel read as one candidate.** At district scale 134/m
+  and 97/4 in Großbothen, 500 m apart, landed on the same spot and the „1" sat
+  under the „2" — the map said one, the table two. Badges that would come
+  within `MERGE_DISTANCE_PX` of each other are merged into one labelled with
+  what it holds („1, 2", „1–5", „1, 2, 4–7"; `lib/badges.js`), regrouped once a
+  frame while zooming, and a click on a merged badge zooms in until they part.
+
+- **Every frame the search map fitted ignored the HUD.** From 1000 px up the
+  verdict and the Verlauf float over the map's right 40 %, and `fitBounds`
+  with a plain 36 px padding centred the answer under them: after zooming in
+  on „1, 2", candidate 2 was behind the panel. `ParcelSearch` measures how much
+  of the map the HUD covers and `EvidenceMap.padding()` adds it on the right.
+  Measured rather than derived from the breakpoint, because whether the HUD
+  floats is the stylesheet's decision. jsdom has no `ResizeObserver`, so the
+  measurement is skipped there — without that guard thirty tests failed on
+  mount.
