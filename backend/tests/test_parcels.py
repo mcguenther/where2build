@@ -706,3 +706,69 @@ def test_a_list_of_numbers_needs_its_gemarkung(client: TestClient):
 
     assert answer.status_code == 422
     assert "Gemarkung" in answer.json()["detail"]
+
+
+# --------------------------------------------------------------------------
+# POST /api/parcels/streets -- the traffic land a plot's front is measured against
+# --------------------------------------------------------------------------
+
+
+@respx.mock
+def test_streets_answers_the_traffic_parcels_with_their_names(client: TestClient):
+    """Recorded around Kirchstraße 4, Liebertwolkwitz, on 23.09.2026.
+
+    The plot fronts the Kirchstraße with its short west side; its longest edge
+    faces the neighbours. The cadastre carries the street as parcels of its own.
+    """
+
+    route = respx.post(ALKIS_URL).mock(
+        return_value=httpx.Response(200, content=fixture_bytes("alkis_verkehr_concave.gml"))
+    )
+
+    answer = client.post(
+        "/api/parcels/streets", json={"lat": 51.28293, "lon": 12.46283, "umkreis_m": 57}
+    )
+
+    assert answer.status_code == 200
+    features = answer.json()["features"]
+    assert {f["properties"]["nutzung"] for f in features} <= {"Straßenverkehr", "Weg", "Platz"}
+    assert any("Kirchstraße" in (f["properties"]["lagebezeichnung"] or "") for f in features)
+    assert all(f["geometry"]["type"] in {"Polygon", "MultiPolygon"} for f in features)
+    # Filtered at the service: the land use is in the request, not only in the answer.
+    body = route.calls[0].request.content.decode()
+    assert "ave:tntxt" in body and "Straßenverkehr" in body and "<fes:BBOX>" in body
+
+
+@respx.mock
+def test_streets_drops_a_parcel_that_only_touches_a_kerb(client: TestClient):
+    """„Industrie- und Gewerbefläche …;2164|Straßenverkehr;0.00" mentions a street
+    and is a works. The service's filter lets it through; the dominant use does not."""
+
+    respx.post(ALKIS_URL).mock(
+        return_value=httpx.Response(200, content=fixture_bytes("alkis_verkehr_concave.gml"))
+    )
+
+    features = client.post(
+        "/api/parcels/streets", json={"lat": 51.28293, "lon": 12.46283, "umkreis_m": 57}
+    ).json()["features"]
+
+    # Eight parcels matched the filter, seven are traffic land.
+    assert len(features) == 7
+
+
+@respx.mock
+def test_streets_is_empty_rather_than_an_error_where_no_street_is(client: TestClient):
+    respx.post(ALKIS_URL).mock(
+        return_value=httpx.Response(200, content=fixture_bytes("alkis_leer.gml"))
+    )
+
+    answer = client.post("/api/parcels/streets", json={"lat": 51.3, "lon": 12.4})
+
+    assert answer.status_code == 200
+    assert answer.json()["features"] == []
+
+
+def test_streets_accepts_a_box_the_size_of_a_field_and_no_more(client: TestClient):
+    assert client.post(
+        "/api/parcels/streets", json={"lat": 51.3, "lon": 12.4, "umkreis_m": 5000}
+    ).status_code == 422

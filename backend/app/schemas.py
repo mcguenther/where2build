@@ -567,6 +567,24 @@ class ParcelsAroundRequest(BaseModel):
     )
 
 
+class StreetsAroundRequest(BaseModel):
+    """The traffic parcels in a box around a plot.
+
+    Wider than `ParcelsAroundRequest` allows, because the box has to hold the
+    whole plot and its street: a field of 1 594 m needs a half-edge of about
+    820 m, and the answer stays small since only traffic land comes back.
+    """
+
+    lat: float = Field(ge=-90, le=90)
+    lon: float = Field(ge=-180, le=180)
+    umkreis_m: int = Field(
+        default=60,
+        ge=10,
+        le=1000,
+        description="Halbe Kantenlänge des Suchfensters um die Koordinate.",
+    )
+
+
 class Geometry(BaseModel):
     type: Literal["Polygon", "MultiPolygon", "LineString", "Point"]
     coordinates: Any
@@ -651,6 +669,33 @@ class ParcelCollection(BaseModel):
     quelle: str = "Landesamt für Geobasisinformation Sachsen (GeoSN), dl-de/by-2-0"
     hinweis: str | None = None
     plausibility: Plausibility | None = None
+
+
+class StreetParcelProperties(BaseModel):
+    kennzeichen: str | None = None
+    # The street's name as the register writes it: „Kirchstraße; Liebertwolkwitzer Markt“.
+    lagebezeichnung: str | None = None
+    # The use that covers most of the parcel: „Straßenverkehr“, „Weg“ or „Platz“.
+    nutzung: str
+
+
+class StreetParcelFeature(BaseModel):
+    type: Literal["Feature"] = "Feature"
+    geometry: Geometry
+    properties: StreetParcelProperties
+
+
+class StreetParcelCollection(BaseModel):
+    """The traffic parcels around a plot -- what its street front is measured against.
+
+    Streets are parcels of their own in ALKIS, and a plot's boundary to the
+    street is the very line it shares with one. Empty is an answer, not an
+    error: a plot in the fields may have no street within reach.
+    """
+
+    type: Literal["FeatureCollection"] = "FeatureCollection"
+    features: list[StreetParcelFeature]
+    quelle: str = "Landesamt für Geobasisinformation Sachsen (GeoSN), dl-de/by-2-0"
 
 
 # --------------------------------------------------------------------------

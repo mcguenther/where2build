@@ -210,3 +210,15 @@ routines under it.
   frame's diagonal on every side, since a turned drawing shows ground from past
   the unturned frame's corners. Local metres and Web Mercator share one scale
   factor around the anchor, so the placement is linear.
+
+- **The street side was the longest edge, and that was wrong on seven of eight
+  real plots.** Measured 23.09.2026 on every parcel fixture: only the 1 594 m
+  strip at the Tauchaer Straße fronts its street with its longest side. A deep
+  plot fronts it with its narrow end (Lessingweg 44: 13,5 m, not 47,9 m), and
+  Kirchstraße 4 with a short side — so the turned thumbnail showed some other
+  road at the bottom, correctly turned to the wrong edge. The side is now read
+  off the cadastre (`lib/streetFront.js`): a street is a parcel of its own in
+  ALKIS, so the front is the boundary the plot shares with traffic land, and the
+  street of the plot's own address wins at a corner. Plots stored before this
+  carry `streetFront` unset and are asked once on load; `null` means asked and
+  nothing borders a street, and the guess stays.

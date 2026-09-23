@@ -60,6 +60,15 @@ of Overpass or a local extract, the listing portals, and the extraction model.
   features in the *default* namespace, so `nutzart` arrives without the `ave:`
   prefix the filter needs — which is why it has its own parser.
 
+- **Streets are parcels, and `tntxt` says so — filter at the service.** Each
+  entry of `ave:tntxt` is „Art;Fläche", several joined by „|": the Kirchstraße in
+  Liebertwolkwitz is „Straßenverkehr;1316", a works on a kerb „Industrie- und
+  Gewerbefläche …;2164|Straßenverkehr;0.00" — so the *dominant* use decides.
+  Measured 23.09.2026: the unfiltered box over the Tauchaer Straße strip came
+  back at exactly 200 parcels and said nothing about the rest; a POST with
+  `fes:BBOX` and `fes:Or` of `PropertyIsLike` on `tntxt` returns 235 traffic
+  parcels in the same box. `AlkisService.streets_around`, `/api/parcels/streets`.
+
 - **That query needs a count of its own, and the largest piece rather than the
   one under the seed.** Two things the note above got right by measuring
   outside the service and wrong inside it, both found on 16.09.2026 when the

@@ -274,6 +274,7 @@ import SitePlan from "../components/SitePlan.vue";
 import ParcelSearch from "../components/ParcelSearch.vue";
 import QueryBox from "../components/QueryBox.vue";
 import { state, addPlot, autoSeatHouse } from "../lib/store.js";
+import { settleStreetFront } from "../lib/streetFront.js";
 import { WIZARD_STAGES, wizardStage } from "../router/stages.js";
 import { takeHandoff } from "../lib/handoff.js";
 import {
@@ -435,7 +436,10 @@ export default {
     this.stopHandover();
   },
   watch: {
-    stage() { this.checkStage(); }
+    stage() { this.checkStage(); },
+    /* Every outline the Flurstück step settles on gets its street read off the
+     * cadastre, so the plan there is already turned to the right side. */
+    "draft.polygon"() { this.settleStreet(this.draft); }
   },
   methods: {
     area, euroPerSqm, num,
@@ -777,7 +781,17 @@ export default {
       await this.loadChoices(plot, extra);
     },
 
-    create() {
+    /** The street front for this draft. A failure keeps the longest-edge guess
+     *  and `create` asks once more; an answer for a draft that has since been
+     *  replaced lands on that old object and changes nothing on screen. */
+    async settleStreet(draft) {
+      if (!draft) return;
+      try { await settleStreetFront(draft); } catch { /* the guess stands */ }
+    },
+
+    async create() {
+      // Before the house is seated: it is turned to the street edge.
+      if (this.draft.streetFront === undefined) await this.settleStreet(this.draft);
       // Seated here, not at the Flurstück step: until the plot exists nobody
       // has chosen a house type, so a footprint there is a placeholder the
       // user never asked for — and "no room for it" a finding about nothing.

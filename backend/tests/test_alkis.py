@@ -275,3 +275,15 @@ async def test_an_answer_off_the_disk_is_not_a_request():
     assert await service.count([equals("gemaschl", "144241")]) == 1
     assert service.network_calls == before + 1
     assert route.call_count == 1
+
+
+def test_the_dominant_use_decides_not_any_mention():
+    from app.services.alkis import dominant_use
+
+    assert dominant_use("Straßenverkehr;720") == "Straßenverkehr"
+    assert dominant_use(
+        "Industrie- und Gewerbefläche / Industrie und Gewerbe;2164|Straßenverkehr;0.00"
+    ) == "Industrie- und Gewerbefläche / Industrie und Gewerbe"
+    assert dominant_use("Weg;12|Wohnbaufläche;900") == "Wohnbaufläche"
+    assert dominant_use(None) is None
+    assert dominant_use("") is None
