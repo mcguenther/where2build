@@ -300,6 +300,13 @@ table.data-table tbody tr:last-child td{ border-bottom: 0; }
   *, *::before, *::after{ animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
 
+/* ---------- A map fades in, it does not jump ----------
+ * Each ground, overlay or palette is a map instance of its own, laid over the
+ * one it replaces and shown only once it has drawn (`lib/mapFade.js`). The
+ * duration there is this one; reduced motion is covered by the rule above. */
+.map-fade{ opacity: 0; transition: opacity .42s ease; }
+.map-fade.is-shown{ opacity: 1; }
+
 /* ---------- MapLibre's own controls ----------
  * The zoom buttons and the attribution pill are drawn by MapLibre, not by us,
  * and its stylesheet paints them white. On the dark backdrop that is a bright

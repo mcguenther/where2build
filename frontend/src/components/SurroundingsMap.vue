@@ -41,6 +41,7 @@
  */
 import { Map as MapLibreMap, Marker, NavigationControl } from "maplibre-gl";
 import { vectorStyle } from "../lib/basemap.js";
+import { MapStack } from "../lib/mapFade.js";
 import { darkTheme } from "../lib/store.js";
 import { toWgs84 } from "../lib/projection.js";
 import { rectangleCorners } from "../lib/geometry.js";
@@ -104,6 +105,7 @@ export default {
       return this.routedDestinations.map(d => d.line).filter(line => Array.isArray(line) && line.length > 1);
     }
   },
+  created() { this._maps = new MapStack(); },
   mounted() { this.build(); },
   beforeUnmount() { this.destroy(); },
   watch: {
@@ -124,19 +126,25 @@ export default {
       try {
         const style = await vectorStyle();
         if (!this.$refs.mapContainer || this._map) return;
-        this._map = new MapLibreMap({
-          container: this.$refs.mapContainer,
+        // Built over the map it replaces and faded in once it has drawn, so a
+        // theme switch does not flash bare paper (`lib/mapFade.js`). Anything
+        // photographing it waits for the fade as well as for the tiles.
+        const map = this._maps.start(this.$refs.mapContainer, container => new MapLibreMap({
+          container,
           style,
           center: [this.plot.anchor.lon, this.plot.anchor.lat],
           zoom: 15,
           attributionControl: { compact: true },
           ...(this._camera || {})
-        });
+        }), () => { this.ready = true; });
+        this._map = map;
         this._map.addControl(new NavigationControl({ showCompass: false }), "top-right");
         // One missing icon or tile is not a broken map -- the same rule the
         // site plan learned. Only a style that never arrives counts as failure.
         this._map.on("error", e => console.warn("Umgebungskarte:", e?.error?.message || e));
         this._map.on("load", () => {
+          // Superseded before it finished loading; its successor draws itself.
+          if (this._map !== map) return;
           // The canvas is sized at construction; inside a grid that is before
           // the column has its width, and the map then paints a patch in the
           // corner of a box it thinks is smaller than it is.
@@ -149,15 +157,15 @@ export default {
           if (this._camera) this._camera = null;
           else this.frame();
         });
-        // "idle" means every tile for the current view has arrived and been
-        // drawn. Anything that photographs this map waits for it.
-        this._map.on("idle", () => { this.ready = true; });
-        this._resizes = new ResizeObserver(() => this._map?.resize());
-        this._resizes.observe(this.$refs.mapContainer);
+        if (!this._resizes) {
+          this._resizes = new ResizeObserver(() => this._map?.resize());
+          this._resizes.observe(this.$refs.mapContainer);
+        }
       } catch (error) {
         // Set once and left alone: the flag must not feed back into whatever
         // decides to build, or the failure restarts itself forever.
         console.warn("Umgebungskarte nicht verfügbar:", error);
+        this.destroy();
         this.unavailable = error.message;
       }
     },
@@ -168,7 +176,12 @@ export default {
           bearing: this._map.getBearing(), pitch: this._map.getPitch()
         };
       }
-      this.destroy();
+      // The old map and its markers stay on screen until the new one has
+      // faded in over them, and go with it.
+      this._maps.retire();
+      this._map = null;
+      this._markers = [];
+      this.ready = false;
       this.unavailable = null;
       this.$nextTick(() => this.build());
     },
@@ -178,7 +191,8 @@ export default {
       this.ready = false;
       (this._markers || []).forEach(m => m.remove());
       this._markers = [];
-      if (this._map) { this._map.remove(); this._map = null; }
+      this._map = null;
+      this._maps.clear();
     },
     polygon(ring) {
       return {
@@ -345,7 +359,7 @@ export default {
 
 <style scoped>
 .surroundings__canvas{
-  width: 100%; border-radius: var(--w2b-radius-m); overflow: hidden;
+  position: relative; width: 100%; border-radius: var(--w2b-radius-m); overflow: hidden;
   background: var(--w2b-map-ground); border: 1px solid var(--w2b-line);
 }
 .surroundings__notice{ margin-top: var(--w2b-space-3); }

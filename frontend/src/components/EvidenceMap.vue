@@ -50,6 +50,7 @@
  */
 import { Map as MapLibreMap, Marker, NavigationControl } from "maplibre-gl";
 import { aerialCadastreStyle, canRenderMap, vectorStyle } from "../lib/basemap.js";
+import { MapStack } from "../lib/mapFade.js";
 import { darkTheme } from "../lib/store.js";
 import { bandFeatures } from "../lib/bands.js";
 import {
@@ -141,6 +142,7 @@ export default {
       return pin ? [{ type: "Point", coordinates: [pin.lon, pin.lat] }] : [];
     }
   },
+  created() { this._maps = new MapStack(); },
   mounted() {
     this._frame = null;
     this._lastCount = null;
@@ -171,8 +173,11 @@ export default {
       try {
         const style = this.ground === "site" ? aerialCadastreStyle() : await vectorStyle();
         if (!this.$refs.mapContainer || this._map) return;
-        this._map = new MapLibreMap({
-          container: this.$refs.mapContainer,
+        // Built over the map it replaces and faded in once it has drawn, so
+        // switching to the photograph does not flash bare paper
+        // (`lib/mapFade.js`). `ready` waits for the fade as well as the tiles.
+        const map = this._maps.start(this.$refs.mapContainer, container => new MapLibreMap({
+          container,
           style,
           center: [13.35, 51.05],   // Saxony, until the first clue says otherwise
           zoom: 6.4,
@@ -180,26 +185,31 @@ export default {
           // A theme switch is a rebuild -- MapLibre cannot swap a style under
           // its own layers -- and it must not throw away where the user is.
           ...(this._camera || {})
-        });
+        }), () => { this.ready = true; });
+        this._map = map;
         this._map.addControl(new NavigationControl({ showCompass: false }), "top-right");
         // One missing icon or tile is not a broken map — the rule the site plan
         // learned. Only a style that never arrives counts as a failure.
         this._map.on("error", e => console.warn("Indizienkarte:", e?.error?.message || e));
         this._map.on("load", () => {
+          // Superseded before it finished loading; its successor draws itself.
+          if (this._map !== map) return;
           this._map.resize();
           this.addLayers();
           this.draw();
           if (this._camera) this._camera = null;
           else this.moveCamera({ instant: true });
         });
-        this._map.on("idle", () => { this.ready = true; });
-        this._resizes = new ResizeObserver(() => this._map?.resize());
-        this._resizes.observe(this.$refs.mapContainer);
+        if (!this._resizes) {
+          this._resizes = new ResizeObserver(() => this._map?.resize());
+          this._resizes.observe(this.$refs.mapContainer);
+        }
       } catch (error) {
         // Set once and left alone: a failure flag that feeds whatever decides
         // to build restarts itself forever, and the loop is pure microtasks —
         // no watchdog and no test timeout can end it.
         console.warn("Indizienkarte nicht verfügbar:", error);
+        this.destroy();
         this.unavailable = error.message;
       }
     },
@@ -207,7 +217,12 @@ export default {
       const camera = this._map
         ? { center: this._map.getCenter(), zoom: this._map.getZoom() }
         : null;
-      this.destroy();
+      // The old map and its pin stay on screen until the new one has faded
+      // in over them, and go with it.
+      this._maps.retire();
+      this._map = null;
+      this._markers = [];
+      this.ready = false;
       this.unavailable = null;
       this._camera = camera;
       this.$nextTick(() => this.build());
@@ -218,7 +233,8 @@ export default {
       this.ready = false;
       (this._markers || []).forEach(marker => marker.remove());
       this._markers = [];
-      if (this._map) { this._map.remove(); this._map = null; }
+      this._map = null;
+      this._maps.clear();
     },
 
     addLayers() {
@@ -543,7 +559,7 @@ export default {
 
 <style scoped>
 .indizienkarte__canvas{
-  width: 100%; border-radius: var(--w2b-radius-m); overflow: hidden;
+  position: relative; width: 100%; border-radius: var(--w2b-radius-m); overflow: hidden;
   background: var(--w2b-map-ground); border: 1px solid var(--w2b-line);
 }
 .indizienkarte__notice{ margin-top: var(--w2b-space-3); }

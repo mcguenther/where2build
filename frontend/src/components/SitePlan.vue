@@ -201,6 +201,7 @@ import { cameraFor, toLocal, toWgs84 } from "../lib/projection.js";
 import { outerRing } from "../lib/plots.js";
 import { num, area } from "../lib/format.js";
 import { BACKDROPS, canRenderMap, withOverlay } from "../lib/basemap.js";
+import { MapStack } from "../lib/mapFade.js";
 import { darkTheme } from "../lib/store.js";
 // MapLibre 6 ships named exports only — there is no default.
 // Its worker URL is set once in main.js; see the note there.
@@ -629,7 +630,10 @@ export default {
       };
     }
   },
-  created() { this._mapRun = 0; },
+  created() {
+    this._mapRun = 0;
+    this._maps = new MapStack();
+  },
   mounted() {
     this.buildMap();
     this.watchSize();
@@ -644,7 +648,8 @@ export default {
   },
   watch: {
     // A different backdrop means a different style; MapLibre cannot swap sources
-    // underneath itself, so the map is torn down and rebuilt.
+    // underneath itself, so a new map is built -- and faded in over the old
+    // one, which is what keeps the switch from jumping (`lib/mapFade.js`).
     wantsBackdrop() { this.rebuildMap(); },
     backdrop() { this.rebuildMap(); },
     // MapLibre cannot add a source to a running style either, so switching the
@@ -681,7 +686,9 @@ export default {
     /** MapLibre needs WebGL and a network; neither is guaranteed. Any failure
      *  leaves the drawing alone rather than taking the page down with it. */
     rebuildMap() {
-      this.destroyMap();
+      // The map on screen stays there until its successor has drawn.
+      this._maps.retire();
+      this._map = null;
       this.mapUnavailable = false;
       this.mapReady = false;
       // The container only exists once `hasBackdrop` has re-rendered it.
@@ -699,11 +706,14 @@ export default {
       this._sizeWatcher.observe(this.$refs.svg);
     },
     async buildMap() {
-      if (!this.hasBackdrop || !this.plot.anchor || this._map) return;
+      if (this._map) return;
+      // No backdrop wanted any more: nothing will fade in over the old one.
+      if (!this.hasBackdrop || !this.plot.anchor) { this.destroyMap(); return; }
       // A raster backdrop needs no network, so without this the map would be
       // constructed wherever there is no WebGL and only fail on the way out,
       // inside the library. The flag is a boolean here, not a message.
       if (!canRenderMap()) {
+        this.destroyMap();
         this.mapUnavailable = true;
         return;
       }
@@ -714,8 +724,8 @@ export default {
         );
         // The backdrop may have changed again while the style was in flight.
         if (run !== this._mapRun || !this.$refs.mapContainer || this._map) return;
-        this._map = new MapLibreMap({
-          container: this.$refs.mapContainer,
+        const map = this._maps.start(this.$refs.mapContainer, container => new MapLibreMap({
+          container,
           style,
           center: [this.plot.anchor.lon, this.plot.anchor.lat],
           zoom: 17,
@@ -723,10 +733,13 @@ export default {
           attributionControl: false,
           // Set at construction or the map prints blank — it cannot be added later.
           preserveDrawingBuffer: true
+        }), () => {
+          // Every tile for this view has arrived and been drawn, and the fade
+          // is over: a picture taken now is the finished one.
+          this.mapReady = true;
         });
-        this._map.on("load", () => this.setCamera());
-        // "idle" means every tile for this view has arrived and been drawn.
-        this._map.on("idle", () => { this.mapReady = true; });
+        this._map = map;
+        map.on("load", () => this.setCamera());
         // A single missing icon or tile is not a broken map. Tearing the
         // backdrop down for one of those is what made it look permanently
         // unavailable; only a style that never loads counts as a failure.
@@ -739,12 +752,11 @@ export default {
       }
     },
     destroyMap() {
-      const map = this._map;
       this._map = null;
-      // A map that never finished starting cannot always be taken apart again:
-      // MapLibre's teardown reaches for internals it never got round to
-      // creating. Unmounting a component must not fail over that.
-      try { map?.remove(); } catch { /* there is nothing left to keep */ }
+      // Every map, the ones still fading out included. A map that never
+      // finished starting cannot always be taken apart again; `MapStack`
+      // swallows that, so unmounting a component does not fail over it.
+      this._maps.clear();
     },
     /** Where the drawing stands, in a frame that survives a change of anchor:
      *  the local metres are measured from the plot's own anchor, and the next
@@ -769,13 +781,20 @@ export default {
     setCamera() {
       if (!this._map || !this.plot.anchor) return;
       const renderedWidth = this.$refs.svg?.getBoundingClientRect().width || this.width;
+      const camera = cameraFor({
+        anchor: this.plot.anchor,
+        centreMetres: { x: this.view.mx, y: this.view.my },
+        metresPerPixel: 1 / (this.view.scale * (renderedWidth / this.width)),
+        rotation: this.rotation
+      });
+      // A map still fading out follows too, or a pan during the fade would
+      // show the drawing over two grounds that disagree.
+      for (const leaving of this._maps.maps) {
+        if (leaving === this._map) continue;
+        try { leaving.jumpTo(camera); leaving.resize(); } catch { /* it is going anyway */ }
+      }
       try {
-        this._map.jumpTo(cameraFor({
-          anchor: this.plot.anchor,
-          centreMetres: { x: this.view.mx, y: this.view.my },
-          metresPerPixel: 1 / (this.view.scale * (renderedWidth / this.width)),
-          rotation: this.rotation
-        }));
+        this._map.jumpTo(camera);
         this._map.resize();
       } catch (error) {
         // Without WebGL the constructor succeeds and the first frame does not,

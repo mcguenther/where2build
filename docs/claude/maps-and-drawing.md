@@ -182,3 +182,17 @@ routines under it.
   an unhandled rejection against whichever test file happened to be running.
   `canRenderMap()` is asked first now. It is not only a test concern: a browser
   with WebGL switched off did the same thing.
+
+- **A new ground is built over the old one, not in its place.** Every switch
+  of ground, overlay or palette is a new MapLibre instance, and tearing the old
+  one down first showed bare paper for as long as the tiles took, then let them
+  pop in one by one — on the plan, the Lage view's noise layer and the search
+  map alike. `lib/mapFade.js` builds the next map in an element of its own on
+  top, keeps it at opacity 0 until its first `idle`, fades it in over 0,42 s
+  and only then removes the one underneath. Three things that matter: a map
+  superseded *during* its fade has its timer cancelled, or it clears the stack
+  under the map replacing it; the reveal has a 2,5 s fallback, because `idle`
+  never comes while one tile keeps failing; and `data-map-ready` now waits for
+  the fade as well as the tiles — a picture taken on `idle` alone is a
+  half-transparent one. The host needs `position: relative` of its own now,
+  since MapLibre's `.maplibregl-map` sits on the inner element.
