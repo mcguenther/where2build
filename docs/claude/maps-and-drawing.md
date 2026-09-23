@@ -182,3 +182,12 @@ routines under it.
   an unhandled rejection against whichever test file happened to be running.
   `canRenderMap()` is asked first now. It is not only a test concern: a browser
   with WebGL switched off did the same thing.
+
+- **The surroundings map framed the plot, not the surroundings, whenever the
+  nearby answer was slower than the map style.** `frame()` ran once, on
+  `load`; with the stops not yet there it fitted the bare parcel at zoom 17,
+  and the `located` watcher only drew markers. Lessingweg 44 showed one of
+  seven stops. The watcher reframes now, unless the user has already panned or
+  zoomed (a `movestart` with an `originalEvent`). Reproduced by delaying
+  `/api/nearby` 5 s in Playwright: 1 of 7 markers in view before, 7 of 7 after.
+  A warm backend cache hides it — the answer then beats the style.
