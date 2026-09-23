@@ -7,6 +7,7 @@ import { mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import SitePlan from "../src/components/SitePlan.vue";
 import PlotCard from "../src/components/PlotCard.vue";
+import PlotThumbnail from "../src/components/PlotThumbnail.vue";
 import RouteCards from "../src/components/RouteCards.vue";
 import PlotsView from "../src/views/PlotsView.vue";
 import PlotView from "../src/views/PlotView.vue";
@@ -15,7 +16,7 @@ import CompareView from "../src/views/CompareView.vue";
 import WizardView from "../src/views/WizardView.vue";
 import { state, placement, plotById } from "../src/lib/store.js";
 import { realState, realPlot, mountWithRouter, testRouter } from "./helpers.js";
-import { buildableArea, cornersOutside, alignmentToEdge, polygonArea, findPlacement, polygonEdges } from "../src/lib/geometry.js";
+import { buildableArea, cornersOutside, alignmentToEdge, polygonArea, findPlacement, polygonEdges, streetDownRotation } from "../src/lib/geometry.js";
 import { area } from "../src/lib/format.js";
 import { plotMetrics } from "../src/lib/metrics.js";
 import { boundingBox } from "../src/lib/geometry.js";
@@ -101,7 +102,45 @@ describe("Lageplan", () => {
     expect(build({ northUp: true }).find("g[transform^='rotate']").attributes("transform")).toMatch(/^rotate\(0,/);
     const parallel = build({ northUp: false });
     const angle = Number(parallel.find("g[transform^='rotate']").attributes("transform").match(/rotate\(([-\d.]+),/)[1]);
-    expect(angle).toBeCloseTo(alignmentToEdge(plot().polygon, plot().streetEdge ?? 0), 1);
+    expect(angle).toBeCloseTo(streetDownRotation(plot().polygon, plot().streetEdge ?? 0), 1);
+  });
+
+  it("zeichnet die Straße straßenparallel unten, von links nach rechts", () => {
+    const w = build({ northUp: false });
+    const [, angle, cx, cy] = w.find("g[transform^='rotate']").attributes("transform")
+      .match(/rotate\(([-\d.]+), ([-\d.]+), ([-\d.]+)\)/).map(Number);
+    const r = (angle * Math.PI) / 180;
+    // The outline as drawn, then turned the way the SVG turns it: screen y grows downward.
+    const drawn = w.findAll("polygon")[0].attributes("points").trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(",").map(Number);
+      const dx = x - cx, dy = y - cy;
+      return { x: cx + dx * Math.cos(r) - dy * Math.sin(r), y: cy + dx * Math.sin(r) + dy * Math.cos(r) };
+    });
+    const i = plot().streetEdge ?? 0;
+    const a = drawn[i], b = drawn[(i + 1) % drawn.length];
+    expect(Math.abs(a.y - b.y)).toBeLessThan(0.5);
+    // Walked with the plot on its left, the front runs left to right ...
+    expect(b.x).toBeGreaterThan(a.x);
+    // ... and lies below the plot. Below its middle, not below every vertex:
+    // this outline is concave, and a corner of it reaches past the front.
+    const middle = drawn.reduce((sum, p) => sum + p.y, 0) / drawn.length;
+    expect((a.y + b.y) / 2).toBeGreaterThan(middle + 20);
+  });
+
+  it("zeichnet Miniaturen überall mit derselben Komponente, samt Umgebung", () => {
+    const card = mount(PlotCard, { props: { plot: plot(), selectable: false } });
+    const thumb = card.findComponent(PlotThumbnail);
+    expect(thumb.exists()).toBe(true);
+    const plan = thumb.findComponent(SitePlan);
+    expect(plan.props("compact")).toBe(true);
+    expect(plan.props("northUp")).toBe(false);
+    expect(plan.props("tileGround")).toBe("umgebung");
+    const tiles = plan.findAll(".site-plan__tile-ground image");
+    expect(tiles.length).toBeGreaterThan(0);
+    expect(tiles[0].attributes("href")).toMatch(/^\/api\/tiles\/umgebung\/\d+\/\d+\/\d+\.png$/);
+    // The ground lies under the plot, not over it.
+    const html = plan.html();
+    expect(html.indexOf("site-plan__tile-ground")).toBeLessThan(html.indexOf("var(--w2b-map-surface)"));
   });
 
   it("markiert den Verstoß, sobald der Baukörper hinausragt", () => {

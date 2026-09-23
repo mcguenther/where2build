@@ -32,6 +32,9 @@ from ..schemas import (
     ParcelFeature,
     ParcelProperties,
     Plausibility,
+    StreetParcelCollection,
+    StreetParcelFeature,
+    StreetParcelProperties,
 )
 from ..settings import AlkisSettings, AppSettings
 from ..upstream import request
@@ -310,6 +313,57 @@ def parse_buildings(xml: bytes | str) -> list[dict[str, object]]:
             "aktualitaet": attributes.get("aktualit"),
         })
     return buildings
+
+
+# The uses of ``tntxt`` a plot can front. The register writes one entry per use
+# as „Art;Fläche", joined by „|" -- measured over Liebertwolkwitz on
+# 23.09.2026: the Kirchstraße is „Straßenverkehr;1316", and a works that
+# touches a kerb reads „Industrie- und Gewerbefläche …;2164|Straßenverkehr;0.00".
+# That last one is why the *dominant* use decides, not any mention.
+TRAFFIC_USES = ("Straßenverkehr", "Weg", "Platz")
+
+# Enough for a plot the size of a field, whose box holds a whole village's
+# streets. Asked for with a filter, so the count is of traffic parcels only:
+# the unfiltered box over the 1 594 m strip at the Tauchaer Straße came back
+# at exactly the service's 200 and said nothing about the rest.
+STREETS_MAX_FEATURES = 1000
+
+
+def dominant_use(tntxt: str | None) -> str | None:
+    """The use that covers the largest share of a parcel, by ``tntxt``."""
+
+    best: tuple[float, str] | None = None
+    for entry in (tntxt or "").split("|"):
+        kind, _, share = entry.rpartition(";")
+        kind = kind.strip()
+        if not kind:
+            continue
+        size = _as_float(share.strip()) or 0.0
+        if best is None or size > best[0]:
+            best = (size, kind)
+    return best[1] if best else None
+
+
+def street_collection(parcels: Iterable[Flurstueck]) -> StreetParcelCollection:
+    """The traffic parcels among these, as the browser needs them to find a front."""
+
+    features: list[StreetParcelFeature] = []
+    for parcel in parcels:
+        use = dominant_use(parcel.attributes.get("tntxt"))
+        if use not in TRAFFIC_USES or parcel.geometry is None:
+            continue
+        wgs84 = geo.reproject_geometry(parcel.geometry, geo.UTM33, geo.WGS84)
+        features.append(
+            StreetParcelFeature(
+                geometry=geo.to_geojson(wgs84),
+                properties=StreetParcelProperties(
+                    kennzeichen=parcel.attributes.get("flstkennz"),
+                    lagebezeichnung=parcel.attributes.get("lagebeztxt"),
+                    nutzung=use,
+                ),
+            )
+        )
+    return StreetParcelCollection(features=features)
 
 
 def to_collection(
@@ -680,6 +734,24 @@ class AlkisService:
         parcels.sort(key=lambda parcel: (not parcel.geometry.covers(point),
                                          parcel.geometry.distance(point)))
         return parcels
+
+    async def streets_around(self, lat: float, lon: float, radius_m: float) -> list[Flurstueck]:
+        """The parcels in a box whose land use names a street, way or square.
+
+        Filtered at the service, because the unfiltered box truncates silently
+        on a large plot -- see ``STREETS_MAX_FEATURES``. The filter matches any
+        mention; ``street_collection`` then keeps the ones where traffic is the
+        dominant use.
+        """
+
+        easting, northing = geo.wgs84_to_utm33(lon, lat)
+        uses = "".join(like("tntxt", f"*{use}*") for use in TRAFFIC_USES)
+        body = self._envelope(
+            [_bbox_filter(easting, northing, radius_m, self._crs_urn), f"<fes:Or>{uses}</fes:Or>"],
+            result_type="results",
+            count=STREETS_MAX_FEATURES,
+        )
+        return parse_feature_collection(await self._post(body))
 
     async def buildings_around(self, lat: float, lon: float, radius_m: float) -> list[dict[str, object]]:
         """The building outlines around a point, from the cadastre itself.

@@ -1,0 +1,825 @@
+<?xml version="1.0" encoding="utf-8"?>
+<wfs:FeatureCollection timeStamp="2026-09-23T21:16:22.634+02:00" numberReturned="21" numberMatched="unknown" xmlns="http://repository.gdi-de.org/schemas/adv/produkt/alkis-vereinfacht/2.0" xmlns:gml="http://www.opengis.net/gml/3.2" xmlns:wfs="http://www.opengis.net/wfs/2.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://repository.gdi-de.org/schemas/adv/produkt/alkis-vereinfacht/2.0 https://geodienste.sachsen.de/aaa-suite_schema/guest/AAA-vereinfacht/2.0/schema/ALKIS-vereinfacht.xsd http://www.opengis.net/wfs/2.0 https://geodienste.sachsen.de/aaa-suite_schema/guest/ogc/wfs/2.0/wfs.xsd http://www.opengis.net/gml/3.2 https://geodienste.sachsen.de/aaa-suite_schema/guest/NAS/6.0.1/schema/gml/3.2.1/gml.xsd http://www.isotc211.org/2005/gco https://geodienste.sachsen.de/aaa-suite_schema/guest/NAS/6.0.1/schema/iso/19139/20070417/gco/gco.xsd http://www.isotc211.org/2005/gmd https://geodienste.sachsen.de/aaa-suite_schema/guest/NAS/6.0.1/schema/iso/19139/20070417/gmd/gmd.xsd">
+<wfs:boundedBy>
+<gml:Envelope srsName="urn:ogc:def:crs:EPSG::25833" srsDimension="2">
+<gml:lowerCorner>407042.76 5668570.201</gml:lowerCorner>
+<gml:upperCorner>409283.063 5671060.882</gml:upperCorner>
+</gml:Envelope>
+</wfs:boundedBy>
+<wfs:member>
+<Flurstueck gml:id="DESNALK0Gp0001RsFL">
+<gml:identifier codeSpace="urn:adv:oid:">urn:adv:oid:DESNALK0Gp0001RsFL</gml:identifier>
+<idflurst>DESNALK0Gp0001Rs</idflurst>
+<flstkennz>143044___00057____00</flstkennz>
+<land>Freistaat Sachsen</land>
+<landschl>14</landschl>
+<gemarkung>Moritzburg</gemarkung>
+<gemaschl>143044</gemaschl>
+<flstnrzae>57</flstnrzae>
+<regbezirk>NUTS 2-Region Dresden</regbezirk>
+<regbezschl>146</regbezschl>
+<kreis>Landkreis Meißen</kreis>
+<kreisschl>14627</kreisschl>
+<gemeinde>Moritzburg</gemeinde>
+<gmdschl>14627150</gmdschl>
+<oid>DESNALK0Gp0001RsFL</oid>
+<aktualit>2014-02-15Z</aktualit>
+<geometrie>
+<gml:MultiSurface gml:id="flurstueck.id.96175209.geometrie.Geom_0" srsName="urn:ogc:def:crs:EPSG::25833" srsDimension="2">
+<gml:surfaceMember>
+<gml:Polygon gml:id="flurstueck.id.96175209.geometrie.Geom_1">
+<gml:exterior>
+<gml:LinearRing>
+<gml:posList>407675.1 5669022.041 407676.864 5669005.881 407678.083 5669005.847 407691.481 5669005.297 407691.742 5669005.299 407711.895 5669004.407 407767.202 5669001.336 407782.324 5669000.856 407799.379 5669001.124 407817.683 5669001.41 407827.744 5669000.373 407863.662 5668998.609 407863.939 5669000.67 407832.863 5669016.054 407719.481 5669020.016 407706.416 5669019.955 407702.526 5669018.631 407700.726 5669017.515 407692.02 5669018.142 407675.1 5669022.041</gml:posList>
+</gml:LinearRing>
+</gml:exterior>
+</gml:Polygon>
+</gml:surfaceMember>
+</gml:MultiSurface>
+</geometrie>
+<flaeche>2330</flaeche>
+<abwrecht>Kein abweichender Rechtszustand</abwrecht>
+<lagebeztxt>Radeburger Straße, Ortsteil Moritzburg</lagebeztxt>
+<tntxt>Straßenverkehr;2330</tntxt>
+</Flurstueck>
+</wfs:member>
+<wfs:member>
+<Flurstueck gml:id="DESNALK0Gp0002JyFL">
+<gml:identifier codeSpace="urn:adv:oid:">urn:adv:oid:DESNALK0Gp0002JyFL</gml:identifier>
+<idflurst>DESNALK0Gp0002Jy</idflurst>
+<flstkennz>143044___00005____00</flstkennz>
+<land>Freistaat Sachsen</land>
+<landschl>14</landschl>
+<gemarkung>Moritzburg</gemarkung>
+<gemaschl>143044</gemaschl>
+<flstnrzae>5</flstnrzae>
+<regbezirk>NUTS 2-Region Dresden</regbezirk>
+<regbezschl>146</regbezschl>
+<kreis>Landkreis Meißen</kreis>
+<kreisschl>14627</kreisschl>
+<gemeinde>Moritzburg</gemeinde>
+<gmdschl>14627150</gmdschl>
+<oid>DESNALK0Gp0002JyFL</oid>
+<aktualit>2017-06-21Z</aktualit>
+<geometrie>
+<gml:MultiSurface gml:id="flurstueck.id.151001704.geometrie.Geom_0" srsName="urn:ogc:def:crs:EPSG::25833" srsDimension="2">
+<gml:surfaceMember>
+<gml:Polygon gml:id="flurstueck.id.151001704.geometrie.Geom_1">
+<gml:exterior>
+<gml:LinearRing>
+<gml:posList>407281.802 5669159.697 407288.967 5669157.846 407299.159 5669156.773 407308.503 5669155.643 407318.726 5669153.9 407328.474 5669151.47 407339.247 5669146.872 407350.132 5669140.257 407373.321 5669128.369 407389.838 5669119.901 407399.421 5669116.136 407392.821 5669144.95 407389.705 5669149.064 407373.385 5669157.191 407357.034 5669162.18 407355.442 5669157.392 407340.009 5669161.398 407311.212 5669166.248 407284.953 5669164.535 407281.802 5669159.697</gml:posList>
+</gml:LinearRing>
+</gml:exterior>
+</gml:Polygon>
+</gml:surfaceMember>
+</gml:MultiSurface>
+</geometrie>
+<flaeche>1935</flaeche>
+<abwrecht>Kein abweichender Rechtszustand</abwrecht>
+<lagebeztxt>Meißner Straße 2</lagebeztxt>
+<tntxt>Wohnbaufläche;1152|Straßenverkehr;0.00|Landwirtschaft;783</tntxt>
+</Flurstueck>
+</wfs:member>
+<wfs:member>
+<Flurstueck gml:id="DESNALK0Gp0003W8FL">
+<gml:identifier codeSpace="urn:adv:oid:">urn:adv:oid:DESNALK0Gp0003W8FL</gml:identifier>
+<idflurst>DESNALK0Gp0003W8</idflurst>
+<flstkennz>143045___00038000200</flstkennz>
+<land>Freistaat Sachsen</land>
+<landschl>14</landschl>
+<gemarkung>Eisenberg</gemarkung>
+<gemaschl>143045</gemaschl>
+<flstnrzae>38</flstnrzae>
+<flstnrnen>2</flstnrnen>
+<regbezirk>NUTS 2-Region Dresden</regbezirk>
+<regbezschl>146</regbezschl>
+<kreis>Landkreis Meißen</kreis>
+<kreisschl>14627</kreisschl>
+<gemeinde>Moritzburg</gemeinde>
+<gmdschl>14627150</gmdschl>
+<oid>DESNALK0Gp0003W8FL</oid>
+<aktualit>2017-12-12Z</aktualit>
+<geometrie>
+<gml:MultiSurface gml:id="flurstueck.id.152529566.geometrie.Geom_0" srsName="urn:ogc:def:crs:EPSG::25833" srsDimension="2">
+<gml:surfaceMember>
+<gml:Polygon gml:id="flurstueck.id.152529566.geometrie.Geom_1">
+<gml:exterior>
+<gml:LinearRing>
+<gml:posList>407566.807 5669005.363 407579.651 5669001.676 407571.734 5668979.355 407590.343 5668972.805 407593.052 5669018.085 407582.677 5669017.871 407579.324 5669016.879 407571.771 5669010.968 407566.807 5669005.363</gml:posList>
+</gml:LinearRing>
+</gml:exterior>
+</gml:Polygon>
+</gml:surfaceMember>
+</gml:MultiSurface>
+</geometrie>
+<flaeche>732</flaeche>
+<abwrecht>Kein abweichender Rechtszustand</abwrecht>
+<lagebeztxt>Markt 24</lagebeztxt>
+<tntxt>Wohnbaufläche;276|Straßenverkehr;0.00|Landwirtschaft;456</tntxt>
+</Flurstueck>
+</wfs:member>
+<wfs:member>
+<Flurstueck gml:id="DESNALK0Gp0001WBFL">
+<gml:identifier codeSpace="urn:adv:oid:">urn:adv:oid:DESNALK0Gp0001WBFL</gml:identifier>
+<idflurst>DESNALK0Gp0001WB</idflurst>
+<flstkennz>143045___00041____00</flstkennz>
+<land>Freistaat Sachsen</land>
+<landschl>14</landschl>
+<gemarkung>Eisenberg</gemarkung>
+<gemaschl>143045</gemaschl>
+<flstnrzae>41</flstnrzae>
+<regbezirk>NUTS 2-Region Dresden</regbezirk>
+<regbezschl>146</regbezschl>
+<kreis>Landkreis Meißen</kreis>
+<kreisschl>14627</kreisschl>
+<gemeinde>Moritzburg</gemeinde>
+<gmdschl>14627150</gmdschl>
+<oid>DESNALK0Gp0001WBFL</oid>
+<aktualit>2017-12-12Z</aktualit>
+<geometrie>
+<gml:MultiSurface gml:id="flurstueck.id.152529619.geometrie.Geom_0" srsName="urn:ogc:def:crs:EPSG::25833" srsDimension="2">
+<gml:surfaceMember>
+<gml:Polygon gml:id="flurstueck.id.152529619.geometrie.Geom_1">
+<gml:exterior>
+<gml:LinearRing>
+<gml:posList>407474.744 5669006.867 407510.434 5668996.675 407545.681 5668986.679 407555.213 5669005.019 407549.685 5669007.788 407548.184 5669004.982 407538.217 5669009.262 407521.836 5669015.776 407510.554 5669020.262 407496.579 5669025.82 407481.483 5669031.827 407478.766 5669021.704 407474.744 5669006.867</gml:posList>
+</gml:LinearRing>
+</gml:exterior>
+</gml:Polygon>
+</gml:surfaceMember>
+</gml:MultiSurface>
+</geometrie>
+<flaeche>1670</flaeche>
+<abwrecht>Kein abweichender Rechtszustand</abwrecht>
+<lagebeztxt>Markt 13</lagebeztxt>
+<tntxt>Wohnbaufläche;361|Straßenverkehr;0.00|Landwirtschaft;1309</tntxt>
+</Flurstueck>
+</wfs:member>
+<wfs:member>
+<Flurstueck gml:id="DESNALK0Gp0004urFL">
+<gml:identifier codeSpace="urn:adv:oid:">urn:adv:oid:DESNALK0Gp0004urFL</gml:identifier>
+<idflurst>DESNALK0Gp0004ur</idflurst>
+<flstkennz>143045___00619____00</flstkennz>
+<land>Freistaat Sachsen</land>
+<landschl>14</landschl>
+<gemarkung>Eisenberg</gemarkung>
+<gemaschl>143045</gemaschl>
+<flstnrzae>619</flstnrzae>
+<regbezirk>NUTS 2-Region Dresden</regbezirk>
+<regbezschl>146</regbezschl>
+<kreis>Landkreis Meißen</kreis>
+<kreisschl>14627</kreisschl>
+<gemeinde>Moritzburg</gemeinde>
+<gmdschl>14627150</gmdschl>
+<oid>DESNALK0Gp0004urFL</oid>
+<aktualit>2017-12-12Z</aktualit>
+<geometrie>
+<gml:MultiSurface gml:id="flurstueck.id.152529679.geometrie.Geom_0" srsName="urn:ogc:def:crs:EPSG::25833" srsDimension="2">
+<gml:surfaceMember>
+<gml:Polygon gml:id="flurstueck.id.152529679.geometrie.Geom_1">
+<gml:exterior>
+<gml:LinearRing>
+<gml:posList>407350.132 5669140.257 407370.605 5669115.85 407374.849 5669111.977 407396.794 5669102.525 407403.725 5669100.077 407424.766 5669093.372 407575.174 5669042.332 407573.686 5669038.887 407593.052 5669018.085 407616.67 5669026.115 407636.549 5669019.657 407659.353 5669012.424 407676.014 5669006.461 407676.864 5669005.881 407675.1 5669022.041 407672.134 5669023.184 407525.234 5669073.6 407407.656 5669112.045 407402.663 5669115.33 407399.421 5669116.136 407389.838 5669119.901 407373.321 5669128.369 407350.132 5669140.257</gml:posList>
+</gml:LinearRing>
+</gml:exterior>
+</gml:Polygon>
+</gml:surfaceMember>
+</gml:MultiSurface>
+</geometrie>
+<flaeche>4760</flaeche>
+<abwrecht>Kein abweichender Rechtszustand</abwrecht>
+<lagebeztxt>Meißner Straße</lagebeztxt>
+<tntxt>Straßenverkehr;4760</tntxt>
+</Flurstueck>
+</wfs:member>
+<wfs:member>
+<Flurstueck gml:id="DESNALK0Gp0000BFFL">
+<gml:identifier codeSpace="urn:adv:oid:">urn:adv:oid:DESNALK0Gp0000BFFL</gml:identifier>
+<idflurst>DESNALK0Gp0000BF</idflurst>
+<flstkennz>143045___00642000100</flstkennz>
+<land>Freistaat Sachsen</land>
+<landschl>14</landschl>
+<gemarkung>Eisenberg</gemarkung>
+<gemaschl>143045</gemaschl>
+<flstnrzae>642</flstnrzae>
+<flstnrnen>1</flstnrnen>
+<regbezirk>NUTS 2-Region Dresden</regbezirk>
+<regbezschl>146</regbezschl>
+<kreis>Landkreis Meißen</kreis>
+<kreisschl>14627</kreisschl>
+<gemeinde>Moritzburg</gemeinde>
+<gmdschl>14627150</gmdschl>
+<oid>DESNALK0Gp0000BFFL</oid>
+<aktualit>2019-12-03Z</aktualit>
+<geometrie>
+<gml:MultiSurface gml:id="flurstueck.id.160002487.geometrie.Geom_0" srsName="urn:ogc:def:crs:EPSG::25833" srsDimension="2">
+<gml:surfaceMember>
+<gml:Polygon gml:id="flurstueck.id.160002487.geometrie.Geom_1">
+<gml:exterior>
+<gml:LinearRing>
+<gml:posList>407678.083 5669005.847 407678.313809389 5669005.4084168 407678.67554188 5669004.68178206 407679.009236124 5669003.96224216 407679.316153295 5669003.25065964 407679.597540113 5669002.54779166 407679.854623051 5669001.85429709 407680.088603474 5669001.17074349 407680.300653623 5669000.49761398 407680.49191337 5668999.83531394 407680.667380899 5668999.16865603 407680.830554192 5668998.4820389 407680.980246799 5668997.77522599 407681.115204602 5668997.04803086 407681.234105181 5668996.30032465 407681.335557741 5668995.53204396 407681.418103689 5668994.74319943 407681.480217974 5668993.93388475 407681.507 5668993.439 407684.076 5668922.547 407684.01078845 5668922.12522597 407683.906782479 5668921.64002351 407683.778917799 5668921.18158277 407683.63098854 5668920.75016232 407683.466483357 5668920.34559226 407683.28856444 5668919.96736072 407683.10006205 5668919.61469192 407682.903480733 5668919.28661452 407682.701013888 5668918.98201989 407682.484821235 5668918.68700896 407682.244555761 5668918.38943292 407681.97842106 5668918.09096893 407681.684642374 5668917.79363356 407681.36151633 5668917.49981653 407681.007472959 5668917.21231008 407680.62115084 5668916.93433074 407680.201485562 5668916.66952946 407679.828 5668916.463 407680.161 5668908.265 407680.468357454 5668908.12381554 407680.90795552 5668907.89339124 407681.315375097 5668907.64716725 407681.691385077 5668907.38886612 407682.037084845 5668907.12180147 407682.353815401 5668906.84888097 407682.64308279 5668906.57262201 407682.906494009 5668906.29517596 407683.145704771 5668906.0183579 407683.372002183 5668905.73088701 407683.594315717 5668905.41953757 407683.810548665 5668905.0830291 407684.018283376 5668904.72019287 407684.214762084 5668904.33002884 407684.396875222 5668903.91177319 407684.561160612 5668903.46497651 407684.703817398 5668902.98959155 407684.784 5668902.661 407685.972 5668869.481 407692.567 5668868.181 407691.161 5668904.93 407691.171592527 5668905.01951294 407691.247950261 5668905.50988464 407691.349642037 5668905.97489046 407691.472895408 5668906.41405761 407691.61421855 5668906.82735815 407691.770426084 5668907.21512393 407691.938648955 5668907.57796893 407692.116332093 5668907.9167208 407692.301223186 5668908.23236179 407692.500361588 5668908.53921331 407692.723388195 5668908.84999178 407692.972191355 5668909.16312501 407693.248657076 5668909.47670083 407693.554621305 5668909.78843062 407693.891809724 5668910.09561646 407694.261763999 5668910.39512517 407694.665754095 5668910.68337317 407694.741 5668910.733 407694.409 5668916.875 407694.326819838 5668916.92476096 407693.895220855 5668917.20926015 407693.498944784 5668917.50812183 407693.136988049 5668917.81733879 407692.80798657 5668918.13336328 407692.510316715 5668918.45310476 407692.242182501 5668918.77391254 407692.001688584 5668919.09354778 407691.786899541 5668919.41014918 407691.595886581 5668919.72219517 407691.419347509 5668920.04265205 407691.250622591 5668920.38602164 407691.091988777 5668920.75322639 407690.946021491 5668921.14502626 407690.815604294 5668921.56195949 407690.70392942 5668922.00427405 407690.614485884 5668922.47185041 407690.551031441 5668922.96411718 407690.517544553 5668923.47996221 407690.515 5668923.576 407687.819 5668994.28 407687.81958136 5668994.64678594 407687.84130924 5668995.32095167 407687.88798297 5668995.97419632 407687.957321517 5668996.6060846 407688.047150795 5668997.21637064 407688.155411952 5668997.80497433 407688.280166507 5668998.37195898 407688.419598838 5668998.91751049 407688.572016457 5668999.44191828 407688.735848502 5668999.94555784 407688.915292059 5669000.44384868 407689.116487775 5669000.95154439 407689.340906743 5669001.46797827 407689.590063324 5669001.99234102 407689.865505676 5669002.52366605 407690.168803813 5669003.06081463 407690.501534883 5669003.60246088 407690.865265414 5669004.14707736 407691.261530232 5669004.69292141 407691.486 5669004.983 407691.481 5669005.297 407678.083 5669005.847</gml:posList>
+</gml:LinearRing>
+</gml:exterior>
+</gml:Polygon>
+</gml:surfaceMember>
+</gml:MultiSurface>
+</geometrie>
+<flaeche>1000</flaeche>
+<abwrecht>Kein abweichender Rechtszustand</abwrecht>
+<lagebeztxt>Schloßallee</lagebeztxt>
+<tntxt>Straßenverkehr;1000</tntxt>
+</Flurstueck>
+</wfs:member>
+<wfs:member>
+<Flurstueck gml:id="DESNALK0Gp0000HnFL">
+<gml:identifier codeSpace="urn:adv:oid:">urn:adv:oid:DESNALK0Gp0000HnFL</gml:identifier>
+<idflurst>DESNALK0Gp0000Hn</idflurst>
+<flstkennz>143045___00603000600</flstkennz>
+<land>Freistaat Sachsen</land>
+<landschl>14</landschl>
+<gemarkung>Eisenberg</gemarkung>
+<gemaschl>143045</gemaschl>
+<flstnrzae>603</flstnrzae>
+<flstnrnen>6</flstnrnen>
+<regbezirk>NUTS 2-Region Dresden</regbezirk>
+<regbezschl>146</regbezschl>
+<kreis>Landkreis Meißen</kreis>
+<kreisschl>14627</kreisschl>
+<gemeinde>Moritzburg</gemeinde>
+<gmdschl>14627150</gmdschl>
+<oid>DESNALK0Gp0000HnFL</oid>
+<aktualit>2019-12-03Z</aktualit>
+<geometrie>
+<gml:MultiSurface gml:id="flurstueck.id.160002657.geometrie.Geom_0" srsName="urn:ogc:def:crs:EPSG::25833" srsDimension="2">
+<gml:surfaceMember>
+<gml:Polygon gml:id="flurstueck.id.160002657.geometrie.Geom_1">
+<gml:exterior>
+<gml:LinearRing>
+<gml:posList>407691.481 5669005.297 407691.486 5669004.983 407691.612907129 5669005.14188536 407691.742 5669005.299 407691.481 5669005.297</gml:posList>
+</gml:LinearRing>
+</gml:exterior>
+</gml:Polygon>
+</gml:surfaceMember>
+</gml:MultiSurface>
+</geometrie>
+<flaeche>0.1</flaeche>
+<abwrecht>Kein abweichender Rechtszustand</abwrecht>
+<lagebeztxt>Schloßallee</lagebeztxt>
+<tntxt>Straßenverkehr;0.10</tntxt>
+</Flurstueck>
+</wfs:member>
+<wfs:member>
+<Flurstueck gml:id="DESNALK0Gp0000F8FL">
+<gml:identifier codeSpace="urn:adv:oid:">urn:adv:oid:DESNALK0Gp0000F8FL</gml:identifier>
+<idflurst>DESNALK0Gp0000F8</idflurst>
+<flstkennz>143045___00603000500</flstkennz>
+<land>Freistaat Sachsen</land>
+<landschl>14</landschl>
+<gemarkung>Eisenberg</gemarkung>
+<gemaschl>143045</gemaschl>
+<flstnrzae>603</flstnrzae>
+<flstnrnen>5</flstnrnen>
+<regbezirk>NUTS 2-Region Dresden</regbezirk>
+<regbezschl>146</regbezschl>
+<kreis>Landkreis Meißen</kreis>
+<kreisschl>14627</kreisschl>
+<gemeinde>Moritzburg</gemeinde>
+<gmdschl>14627150</gmdschl>
+<oid>DESNALK0Gp0000F8FL</oid>
+<aktualit>2019-12-03Z</aktualit>
+<geometrie>
+<gml:MultiSurface gml:id="flurstueck.id.160002784.geometrie.Geom_0" srsName="urn:ogc:def:crs:EPSG::25833" srsDimension="2">
+<gml:surfaceMember>
+<gml:Polygon gml:id="flurstueck.id.160002784.geometrie.Geom_1">
+<gml:exterior>
+<gml:LinearRing>
+<gml:posList>407691.486 5669004.983 407691.761 5668986.744 407692.047 5668979.059 407693.896 5668926.658 407694.241 5668919.968 407696.561 5668916.759 407697.651 5668917.679 407695.009 5668989.446 407695.196 5668990.874 407695.997 5668993.369 407698.71 5668996.9 407701.28 5668999.923 407707.932 5669003.332 407711.895 5669004.407 407691.742 5669005.299 407691.612907129 5669005.14188536 407691.486 5669004.983</gml:posList>
+</gml:LinearRing>
+</gml:exterior>
+</gml:Polygon>
+</gml:surfaceMember>
+</gml:MultiSurface>
+</geometrie>
+<flaeche>404</flaeche>
+<abwrecht>Kein abweichender Rechtszustand</abwrecht>
+<lagebeztxt>Schloßallee</lagebeztxt>
+<tntxt>Straßenverkehr;404</tntxt>
+</Flurstueck>
+</wfs:member>
+<wfs:member>
+<Flurstueck gml:id="DESNALK0Gp0000aSFL">
+<gml:identifier codeSpace="urn:adv:oid:">urn:adv:oid:DESNALK0Gp0000aSFL</gml:identifier>
+<idflurst>DESNALK0Gp0000aS</idflurst>
+<flstkennz>143045___00642000400</flstkennz>
+<land>Freistaat Sachsen</land>
+<landschl>14</landschl>
+<gemarkung>Eisenberg</gemarkung>
+<gemaschl>143045</gemaschl>
+<flstnrzae>642</flstnrzae>
+<flstnrnen>4</flstnrnen>
+<regbezirk>NUTS 2-Region Dresden</regbezirk>
+<regbezschl>146</regbezschl>
+<kreis>Landkreis Meißen</kreis>
+<kreisschl>14627</kreisschl>
+<gemeinde>Moritzburg</gemeinde>
+<gmdschl>14627150</gmdschl>
+<oid>DESNALK0Gp0000aSFL</oid>
+<aktualit>2019-12-03Z</aktualit>
+<geometrie>
+<gml:MultiSurface gml:id="flurstueck.id.160002812.geometrie.Geom_0" srsName="urn:ogc:def:crs:EPSG::25833" srsDimension="2">
+<gml:surfaceMember>
+<gml:Polygon gml:id="flurstueck.id.160002812.geometrie.Geom_1">
+<gml:exterior>
+<gml:LinearRing>
+<gml:posList>407676.864 5669005.881 407678.249 5668971.149 407678.827 5668942.187 407679.828 5668916.463 407680.201485562 5668916.66952946 407680.62115084 5668916.93433074 407681.007472959 5668917.21231008 407681.36151633 5668917.49981653 407681.684642374 5668917.79363356 407681.97842106 5668918.09096893 407682.244555761 5668918.38943292 407682.484821235 5668918.68700896 407682.701013888 5668918.98201989 407682.903480733 5668919.28661452 407683.10006205 5668919.61469192 407683.28856444 5668919.96736072 407683.466483357 5668920.34559226 407683.63098854 5668920.75016232 407683.778917799 5668921.18158277 407683.906782479 5668921.64002351 407684.01078845 5668922.12522597 407684.076 5668922.547 407681.507 5668993.439 407681.480217974 5668993.93388475 407681.418103689 5668994.74319943 407681.335557741 5668995.53204396 407681.234105181 5668996.30032465 407681.115204602 5668997.04803086 407680.980246799 5668997.77522599 407680.830554192 5668998.4820389 407680.667380899 5668999.16865603 407680.49191337 5668999.83531394 407680.300653623 5669000.49761398 407680.088603474 5669001.17074349 407679.854623051 5669001.85429709 407679.597540113 5669002.54779166 407679.316153295 5669003.25065964 407679.009236124 5669003.96224216 407678.67554188 5669004.68178206 407678.313809389 5669005.4084168 407678.083 5669005.847 407676.864 5669005.881</gml:posList>
+</gml:LinearRing>
+</gml:exterior>
+</gml:Polygon>
+</gml:surfaceMember>
+</gml:MultiSurface>
+</geometrie>
+<flaeche>363</flaeche>
+<abwrecht>Kein abweichender Rechtszustand</abwrecht>
+<lagebeztxt>Schloßallee</lagebeztxt>
+<tntxt>Straßenverkehr;363</tntxt>
+</Flurstueck>
+</wfs:member>
+<wfs:member>
+<Flurstueck gml:id="DESNALK0Gp0000NKFL">
+<gml:identifier codeSpace="urn:adv:oid:">urn:adv:oid:DESNALK0Gp0000NKFL</gml:identifier>
+<idflurst>DESNALK0Gp0000NK</idflurst>
+<flstkennz>143045___00642000500</flstkennz>
+<land>Freistaat Sachsen</land>
+<landschl>14</landschl>
+<gemarkung>Eisenberg</gemarkung>
+<gemaschl>143045</gemaschl>
+<flstnrzae>642</flstnrzae>
+<flstnrnen>5</flstnrnen>
+<regbezirk>NUTS 2-Region Dresden</regbezirk>
+<regbezschl>146</regbezschl>
+<kreis>Landkreis Meißen</kreis>
+<kreisschl>14627</kreisschl>
+<gemeinde>Moritzburg</gemeinde>
+<gmdschl>14627150</gmdschl>
+<oid>DESNALK0Gp0000NKFL</oid>
+<aktualit>2019-12-03Z</aktualit>
+<geometrie>
+<gml:MultiSurface gml:id="flurstueck.id.160003339.geometrie.Geom_0" srsName="urn:ogc:def:crs:EPSG::25833" srsDimension="2">
+<gml:surfaceMember>
+<gml:Polygon gml:id="flurstueck.id.160003339.geometrie.Geom_1">
+<gml:exterior>
+<gml:LinearRing>
+<gml:posList>407687.819 5668994.28 407690.515 5668923.576 407690.517544553 5668923.47996221 407690.551031441 5668922.96411718 407690.614485884 5668922.47185041 407690.70392942 5668922.00427405 407690.815604294 5668921.56195949 407690.946021491 5668921.14502626 407691.091988777 5668920.75322639 407691.250622591 5668920.38602164 407691.419347509 5668920.04265205 407691.595886581 5668919.72219517 407691.786899541 5668919.41014918 407692.001688584 5668919.09354778 407692.242182501 5668918.77391254 407692.510316715 5668918.45310476 407692.80798657 5668918.13336328 407693.136988049 5668917.81733879 407693.498944784 5668917.50812183 407693.895220855 5668917.20926015 407694.326819838 5668916.92476096 407694.409 5668916.875 407694.241 5668919.968 407693.896 5668926.658 407692.047 5668979.059 407691.761 5668986.744 407691.486 5669004.983 407691.261530232 5669004.69292141 407690.865265414 5669004.14707736 407690.501534883 5669003.60246088 407690.168803813 5669003.06081463 407689.865505676 5669002.52366605 407689.590063324 5669001.99234102 407689.340906743 5669001.46797827 407689.116487775 5669000.95154439 407688.915292059 5669000.44384868 407688.735848502 5668999.94555784 407688.572016457 5668999.44191828 407688.419598838 5668998.91751049 407688.280166507 5668998.37195898 407688.155411952 5668997.80497433 407688.047150795 5668997.21637064 407687.957321517 5668996.6060846 407687.88798297 5668995.97419632 407687.84130924 5668995.32095167 407687.81958136 5668994.64678594 407687.819 5668994.28</gml:posList>
+</gml:LinearRing>
+</gml:exterior>
+</gml:Polygon>
+</gml:surfaceMember>
+</gml:MultiSurface>
+</geometrie>
+<flaeche>299</flaeche>
+<abwrecht>Kein abweichender Rechtszustand</abwrecht>
+<lagebeztxt>Schloßallee</lagebeztxt>
+<tntxt>Straßenverkehr;299</tntxt>
+</Flurstueck>
+</wfs:member>
+<wfs:member>
+<Flurstueck gml:id="DESNALK0Gp0005nCFL">
+<gml:identifier codeSpace="urn:adv:oid:">urn:adv:oid:DESNALK0Gp0005nCFL</gml:identifier>
+<idflurst>DESNALK0Gp0005nC</idflurst>
+<flstkennz>143045___00641000100</flstkennz>
+<land>Freistaat Sachsen</land>
+<landschl>14</landschl>
+<gemarkung>Eisenberg</gemarkung>
+<gemaschl>143045</gemaschl>
+<flstnrzae>641</flstnrzae>
+<flstnrnen>1</flstnrnen>
+<regbezirk>NUTS 2-Region Dresden</regbezirk>
+<regbezschl>146</regbezschl>
+<kreis>Landkreis Meißen</kreis>
+<kreisschl>14627</kreisschl>
+<gemeinde>Moritzburg</gemeinde>
+<gmdschl>14627150</gmdschl>
+<oid>DESNALK0Gp0005nCFL</oid>
+<aktualit>2019-12-03Z</aktualit>
+<geometrie>
+<gml:MultiSurface gml:id="flurstueck.id.160004976.geometrie.Geom_0" srsName="urn:ogc:def:crs:EPSG::25833" srsDimension="2">
+<gml:surfaceMember>
+<gml:Polygon gml:id="flurstueck.id.160004976.geometrie.Geom_1">
+<gml:exterior>
+<gml:LinearRing>
+<gml:posList>407583.406 5668882.383 407584.715 5668882.233 407614.353 5668878.724 407671.481 5668871.969 407679.026 5668870.755 407677.746 5668908.318 407679.148 5668908.357 407679.28959885 5668908.35187316 407679.655953493 5668908.32700422 407680.020794284 5668908.28546647 407680.161 5668908.265 407679.828 5668916.463 407678.827 5668942.187 407653.765 5668941.556 407652.864 5668970.531 407678.249 5668971.149 407676.864 5669005.881 407676.014 5669006.461 407659.353 5669012.424 407636.549 5669019.657 407616.67 5669026.115 407593.052 5669018.085 407590.343 5668972.805 407588.503 5668949.435 407593.591 5668921.677 407585.325 5668889.8 407583.406 5668882.383</gml:posList>
+</gml:LinearRing>
+</gml:exterior>
+</gml:Polygon>
+</gml:surfaceMember>
+</gml:MultiSurface>
+</geometrie>
+<flaeche>11605</flaeche>
+<abwrecht>Kein abweichender Rechtszustand</abwrecht>
+<lagebeztxt>ohne Lage</lagebeztxt>
+<tntxt>Platz;11605|Landwirtschaft;0.00</tntxt>
+</Flurstueck>
+</wfs:member>
+<wfs:member>
+<Flurstueck gml:id="DESNALK0Crw000LXFL">
+<gml:identifier codeSpace="urn:adv:oid:">urn:adv:oid:DESNALK0Crw000LXFL</gml:identifier>
+<idflurst>DESNALK0Crw000LX</idflurst>
+<flstkennz>143045___00235000100</flstkennz>
+<land>Freistaat Sachsen</land>
+<landschl>14</landschl>
+<gemarkung>Eisenberg</gemarkung>
+<gemaschl>143045</gemaschl>
+<flstnrzae>235</flstnrzae>
+<flstnrnen>1</flstnrnen>
+<regbezirk>NUTS 2-Region Dresden</regbezirk>
+<regbezschl>146</regbezschl>
+<kreis>Landkreis Meißen</kreis>
+<kreisschl>14627</kreisschl>
+<gemeinde>Moritzburg</gemeinde>
+<gmdschl>14627150</gmdschl>
+<oid>DESNALK0Crw000LXFL</oid>
+<aktualit>2024-06-02Z</aktualit>
+<geometrie>
+<gml:MultiSurface gml:id="flurstueck.id.172488800.geometrie.Geom_0" srsName="urn:ogc:def:crs:EPSG::25833" srsDimension="2">
+<gml:surfaceMember>
+<gml:Polygon gml:id="flurstueck.id.172488800.geometrie.Geom_1">
+<gml:exterior>
+<gml:LinearRing>
+<gml:posList>407456.374 5668669.124 407461.443 5668653.801 407462.252 5668651.022 407467.9 5668631.51 407468.28 5668630.31 407475.813 5668605.436 407479.072 5668590.152 407478.489 5668577.902 407478.829 5668577.865 407478.334 5668570.201 407484.881 5668574.218 407489.204 5668574.602 407493.715 5668572.687 407497.332 5668578.602 407495.156 5668586.272 407490.616 5668602.281 407483.821 5668632.019 407476.299 5668664.944 407478.525 5668683.644 407479.129 5668687.204 407480.019 5668694.033 407480.724 5668700.346 407482.609 5668714.163 407485.095 5668732.394 407485.5 5668735.365 407490.861 5668758.066 407491.207 5668759.686 407491.832 5668762.618 407496.258 5668783.36 407500.777 5668803.148 407501.047 5668804.329 407504.736 5668820.48 407511.583 5668844.439 407517.311 5668864.491 407519.03 5668870.489 407525.748 5668893.928 407529.856 5668910.179 407536.278 5668931.432 407538.499 5668938.009 407545.972 5668961.294 407551.082 5668973.984 407557.551 5668989.674 407558.36 5668992.951 407566.807 5669005.363 407571.771 5669010.968 407579.324 5669016.879 407582.677 5669017.871 407593.052 5669018.085 407573.686 5669038.887 407568.295 5669029.681 407564.899 5669022.929 407555.213 5669005.019 407545.681 5668986.679 407532.636 5668961.97 407523.589 5668944.147 407522.91 5668942.807 407515.492 5668928.203 407512.904 5668921.638 407503.884 5668895.279 407501.204 5668887.612 407494.374 5668868.069 407480.925 5668806.056 407474.126 5668771.483 407472.968 5668765.592 407472.089 5668761.124 407467.337 5668739.59 407466.347 5668732.499 407463.953 5668722.659 407462.079 5668711.228 407458.277 5668697.852 407457.355 5668692.083 407456.374 5668669.124</gml:posList>
+</gml:LinearRing>
+</gml:exterior>
+</gml:Polygon>
+</gml:surfaceMember>
+</gml:MultiSurface>
+</geometrie>
+<flaeche>8645</flaeche>
+<abwrecht>Kein abweichender Rechtszustand</abwrecht>
+<lagebeztxt>Markt</lagebeztxt>
+<tntxt>Straßenverkehr;8645</tntxt>
+</Flurstueck>
+</wfs:member>
+<wfs:member>
+<Flurstueck gml:id="DESNALK0Gp0003GPFL">
+<gml:identifier codeSpace="urn:adv:oid:">urn:adv:oid:DESNALK0Gp0003GPFL</gml:identifier>
+<idflurst>DESNALK0Gp0003GP</idflurst>
+<flstkennz>143045___00237000102</flstkennz>
+<land>Freistaat Sachsen</land>
+<landschl>14</landschl>
+<gemarkung>Eisenberg</gemarkung>
+<gemaschl>143045</gemaschl>
+<flstnrzae>237</flstnrzae>
+<flstnrnen>1</flstnrnen>
+<regbezirk>NUTS 2-Region Dresden</regbezirk>
+<regbezschl>146</regbezschl>
+<kreis>Landkreis Meißen</kreis>
+<kreisschl>14627</kreisschl>
+<gemeinde>Moritzburg</gemeinde>
+<gmdschl>14627150</gmdschl>
+<oid>DESNALK0Gp0003GPFL</oid>
+<aktualit>2024-06-12Z</aktualit>
+<geometrie>
+<gml:MultiSurface gml:id="flurstueck.id.172538401.geometrie.Geom_0" srsName="urn:ogc:def:crs:EPSG::25833" srsDimension="2">
+<gml:surfaceMember>
+<gml:Polygon gml:id="flurstueck.id.172538401.geometrie.Geom_1">
+<gml:exterior>
+<gml:LinearRing>
+<gml:posList>407042.76 5668753.35 407104.295 5668766.714 407258.562 5668761.554 407261.431 5668761.044 407261.921 5668768.371 407276.905 5668781.876 407289.94 5668797.629 407295.758 5668809.064 407305.264 5668850.897 407312.343 5668900.817 407332.386 5668921.518 407347.6 5668925.964 407351.618 5668924.199 407359.543 5668924.097 407446.964 5668901.49 407501.204 5668887.612 407503.884 5668895.279 407500.975 5668893.863 407448.408 5668907.303 407399.118 5668919.908 407355.108 5668931.424 407350.156 5668932.392 407361.104 5668966.848 407381.017 5669029.737 407401.568 5669094.564 407368.348 5669105.105 407368.293 5669103.677 407366.964 5669103.96 407359.441 5669094.298 407357.808 5669090.953 407347.362 5669069.547 407336.095 5669045.997 407334.366 5669042.378 407257.268 5669079.175 407258.128 5669105.415 407237.366 5669104.375 407214.286 5669103.226 407194.084 5669096.039 407172.662 5669088.422 407138.196 5669077.867 407052.291 5669053.519 407050.561 5668999.15 407048.381 5668930.458 407046.27 5668863.955 407042.76 5668753.35</gml:posList>
+</gml:LinearRing>
+</gml:exterior>
+</gml:Polygon>
+</gml:surfaceMember>
+</gml:MultiSurface>
+</geometrie>
+<flaeche>91804</flaeche>
+<abwrecht>Kein abweichender Rechtszustand</abwrecht>
+<lagebeztxt>Meißner Straße 3, 3a, 3b</lagebeztxt>
+<tntxt>Fläche besonderer funktionaler Prägung;51029|Sport-, Freizeit- und Erholungsfläche;0.00|Weg;2706|Landwirtschaft;33346|Wald;4724</tntxt>
+</Flurstueck>
+</wfs:member>
+<wfs:member>
+<Flurstueck gml:id="DESNALK06Ul000BFFL">
+<gml:identifier codeSpace="urn:adv:oid:">urn:adv:oid:DESNALK06Ul000BFFL</gml:identifier>
+<idflurst>DESNALK06Ul000BF</idflurst>
+<flstkennz>143044___00057000100</flstkennz>
+<land>Freistaat Sachsen</land>
+<landschl>14</landschl>
+<gemarkung>Moritzburg</gemarkung>
+<gemaschl>143044</gemaschl>
+<flstnrzae>57</flstnrzae>
+<flstnrnen>1</flstnrnen>
+<regbezirk>NUTS 2-Region Dresden</regbezirk>
+<regbezschl>146</regbezschl>
+<kreis>Landkreis Meißen</kreis>
+<kreisschl>14627</kreisschl>
+<gemeinde>Moritzburg</gemeinde>
+<gmdschl>14627150</gmdschl>
+<oid>DESNALK06Ul000BFFL</oid>
+<aktualit>2024-12-06Z</aktualit>
+<geometrie>
+<gml:MultiSurface gml:id="flurstueck.id.173772885.geometrie.Geom_0" srsName="urn:ogc:def:crs:EPSG::25833" srsDimension="2">
+<gml:surfaceMember>
+<gml:Polygon gml:id="flurstueck.id.173772885.geometrie.Geom_1">
+<gml:exterior>
+<gml:LinearRing>
+<gml:posList>407832.863 5669016.054 407863.939 5669000.67 407975.867 5668995.711 408080.608 5668991.164 408087.316 5668989.034 408104.548 5668998.338 408123.797 5669008.6 408147.523 5669039.833 408197.078 5669130.451 408199.551 5669134.843 408225.473 5669183.56 408227.311 5669186.762 408244.945 5669217.482 408281.123 5669264.398 408290.763 5669275.42 408343.392 5669328.801 408377.732 5669363.578 408616.653 5669605.961 408644.955 5669669.267 408697.371 5669724.137 408761.636 5669768.719 408789.369 5669800.481 408821.241 5669845.472 408837.305 5669862.413 408965.892 5669951.5 408985.406 5669959.424 409044.151 5669977.58 409083.448 5669994.721 409191.455 5670049.776 409237.727 5670071.113 409283.063 5670094.734 409278.4 5670102.309 409277.65 5670100.312 409258.273 5670090.058 409184.109 5670053.969 409078.07 5670007.227 409039.206 5669990.227 408981.033 5669971.952 408952.407 5669958.137 408877.629 5669908.556 408825.618 5669875.369 408807.446 5669856.463 408775.58 5669811.183 408749.64 5669781.785 408685.644 5669737.172 408630.275 5669678.667 408599.262 5669617.378 408489.095 5669503.559 408370.31 5669381.174 408323.285 5669333.414 408296.87 5669306.584 408281.576 5669291.051 408266.111 5669269.584 408229.944 5669227.142 408210.581 5669194.62 408194.603 5669161.35 408133.42 5669050.336 408114.153 5669024.442 408097.809 5669016.187 408079.912 5669018.836 408079.333 5669012.577 408077.389 5669009.528 408074.422 5669007.567 408070.433 5669006.932 407957.235 5669010.122 407832.863 5669016.054</gml:posList>
+</gml:LinearRing>
+</gml:exterior>
+</gml:Polygon>
+</gml:surfaceMember>
+</gml:MultiSurface>
+</geometrie>
+<flaeche>30200</flaeche>
+<abwrecht>Kein abweichender Rechtszustand</abwrecht>
+<lagebeztxt>Radeburger Straße, Ortsteil Moritzburg</lagebeztxt>
+<tntxt>Straßenverkehr;30200</tntxt>
+</Flurstueck>
+</wfs:member>
+<wfs:member>
+<Flurstueck gml:id="DESNALK0Gp0005rEFL">
+<gml:identifier codeSpace="urn:adv:oid:">urn:adv:oid:DESNALK0Gp0005rEFL</gml:identifier>
+<idflurst>DESNALK0Gp0005rE</idflurst>
+<flstkennz>143044___00042000102</flstkennz>
+<land>Freistaat Sachsen</land>
+<landschl>14</landschl>
+<gemarkung>Moritzburg</gemarkung>
+<gemaschl>143044</gemaschl>
+<flstnrzae>42</flstnrzae>
+<flstnrnen>1</flstnrnen>
+<regbezirk>NUTS 2-Region Dresden</regbezirk>
+<regbezschl>146</regbezschl>
+<kreis>Landkreis Meißen</kreis>
+<kreisschl>14627</kreisschl>
+<gemeinde>Moritzburg</gemeinde>
+<gmdschl>14627150</gmdschl>
+<oid>DESNALK0Gp0005rEFL</oid>
+<aktualit>2026-07-02Z</aktualit>
+<geometrie>
+<gml:MultiSurface gml:id="flurstueck.id.177995264.geometrie.Geom_0" srsName="urn:ogc:def:crs:EPSG::25833" srsDimension="2">
+<gml:surfaceMember>
+<gml:Polygon gml:id="flurstueck.id.177995264.geometrie.Geom_1">
+<gml:exterior>
+<gml:LinearRing>
+<gml:posList>407588.552 5669727.693 407591.144 5669649.546 407593.233 5669604.515 407595.16 5669569.488 407606.818 5669569.852 407607.85 5669517.817 407615.741 5669517.93 407615.937 5669513.685 407616.404 5669503.583 407599.701 5669503.333 407600.553 5669483.401 407606.001 5669483.568 407607.458 5669483.833 407609.91 5669423.052 407661.641 5669426.058 407662.08 5669420.573 407666.512 5669417.285 407666.628 5669413.932 407672.752 5669414.185 407672.611 5669417.802 407675.798 5669420.832 407675.27 5669427.092 407728.392 5669429.503 407725.169 5669489.072 407735.78 5669489.368 407735.783 5669490.824 407908.912 5669498.495 408040.012 5669504.304 408175.167 5669507.759 408205.632 5669487.763 408219.963 5669457.967 408224.839 5669468.148 408227.317 5669530.123 408045.589 5669524.37 407908.104 5669518.639 407755.095 5669512.577 407752.733 5669598.298 407732.9 5669598.191 407730.545 5669674.913 407728.392 5669736.015 407721.79 5669736.029 407721.921 5669733.908 407686.628 5669733.614 407686.644 5669730.005 407669.516 5669729.556 407669.228 5669734.655 407668.233 5669737.114 407666.454 5669739.553 407664.189 5669741.395 407661.123 5669742.65 407659.979 5669742.845 407656.166 5669742.895 407653.671 5669742.241 407650.612 5669740.333 407648.989 5669738.427 407647.511 5669735.696 407646.811 5669732.995 407646.927 5669729.333 407588.552 5669727.693</gml:posList>
+</gml:LinearRing>
+</gml:exterior>
+</gml:Polygon>
+</gml:surfaceMember>
+</gml:MultiSurface>
+</geometrie>
+<flaeche>53340</flaeche>
+<abwrecht>Kein abweichender Rechtszustand</abwrecht>
+<lagebeztxt>Schloßweg, Ortsteil Moritzburg</lagebeztxt>
+<tntxt>Wohnbaufläche;1384|Sport-, Freizeit- und Erholungsfläche;44193|Weg;6654|Landwirtschaft;1109</tntxt>
+</Flurstueck>
+</wfs:member>
+<wfs:member>
+<Flurstueck gml:id="DESNALK0Gp0002qUFL">
+<gml:identifier codeSpace="urn:adv:oid:">urn:adv:oid:DESNALK0Gp0002qUFL</gml:identifier>
+<idflurst>DESNALK0Gp0002qU</idflurst>
+<flstkennz>143044___00381000200</flstkennz>
+<land>Freistaat Sachsen</land>
+<landschl>14</landschl>
+<gemarkung>Moritzburg</gemarkung>
+<gemaschl>143044</gemaschl>
+<flstnrzae>381</flstnrzae>
+<flstnrnen>2</flstnrnen>
+<regbezirk>NUTS 2-Region Dresden</regbezirk>
+<regbezschl>146</regbezschl>
+<kreis>Landkreis Meißen</kreis>
+<kreisschl>14627</kreisschl>
+<gemeinde>Moritzburg</gemeinde>
+<gmdschl>14627150</gmdschl>
+<oid>DESNALK0Gp0002qUFL</oid>
+<aktualit>2026-07-02Z</aktualit>
+<geometrie>
+<gml:MultiSurface gml:id="flurstueck.id.177995386.geometrie.Geom_0" srsName="urn:ogc:def:crs:EPSG::25833" srsDimension="2">
+<gml:surfaceMember>
+<gml:Polygon gml:id="flurstueck.id.177995386.geometrie.Geom_1">
+<gml:exterior>
+<gml:LinearRing>
+<gml:posList>407288.403 5669595.532 407304.357 5669558.284 407345.957 5669579.983 407361.964 5669582.667 407379.31 5669557.287 407379.238 5669542.804 407413.076 5669514.974 407426.927 5669502.083 407526.501 5669502.241 407522.766 5669602.245 407582.617 5669604.296 407593.233 5669604.515 407591.144 5669649.546 407588.552 5669727.693 407646.927 5669729.333 407646.811 5669732.995 407647.511 5669735.696 407648.989 5669738.427 407650.612 5669740.333 407653.671 5669742.241 407656.166 5669742.895 407659.979 5669742.845 407661.123 5669742.65 407664.189 5669741.395 407666.454 5669739.553 407668.233 5669737.114 407669.228 5669734.655 407669.516 5669729.556 407686.644 5669730.005 407686.628 5669733.614 407721.921 5669733.908 407721.79 5669736.029 407728.392 5669736.015 407730.545 5669674.913 407732.9 5669598.191 407752.733 5669598.298 407755.095 5669512.577 407908.104 5669518.639 408045.589 5669524.37 408227.317 5669530.123 408224.839 5669468.148 408219.963 5669457.967 408216.009 5669342.268 408210.581 5669194.62 408229.944 5669227.142 408266.111 5669269.584 408281.576 5669291.051 408282.611 5669311.176 408255.913 5669358.611 408234.318 5669414.1 408234.648 5669457.069 408234.983 5669527.778 408246.827 5669553.925 408288.531 5669581.289 408337.77 5669460.384 408357.459 5669412.672 408370.31 5669381.174 408489.095 5669503.559 408599.262 5669617.378 408630.275 5669678.667 408685.644 5669737.172 408749.64 5669781.785 408775.58 5669811.183 408807.446 5669856.463 408825.618 5669875.369 408877.629 5669908.556 408952.407 5669958.137 408981.033 5669971.952 409039.206 5669990.227 409078.07 5670007.227 409184.109 5670053.969 409258.273 5670090.058 409244.358 5670113.526 409231.807 5670146.172 409222.901 5670169.828 409224.645 5670174.799 409218.053 5670191.961 409160.143 5670224.984 409131.221 5670220.792 409128.367 5670220.154 409114.583 5670216.245 409102.388 5670219.888 409059.326 5670250.447 409041.741 5670275.818 409025.624 5670292.146 408990.215 5670315.822 408941.378 5670349.522 408892.974 5670395.202 408857.438 5670423.314 408656.578 5670573.131 408663.544 5670574.228 408741.497 5670591.737 408779.162 5670591.08 408804.024 5670607.486 408879.004 5670670.22 408827.318 5670767.931 408604.729 5670907.256 408549.957 5670941.319 408308.626 5670988.662 408288.777 5670976.802 408245.157 5670874.794 408243.086 5670868.72 408224.357 5670787.102 408272.263 5670770.917 408279.043 5670721.036 408282.444 5670690.639 408342.521 5670638.318 408369.254 5670637.128 408388.632 5670649.018 408403.677 5670678.808 408482.024 5670682.248 408485.269 5670574.471 408434.496 5670538.355 408387.913 5670554.796 408352.68 5670599.35 408335.575 5670608.844 408257.703 5670567.213 408208.394 5670671.628 408166.342 5670746.686 408156.457 5670800.162 408123.143 5670819.825 408135.922 5670847.319 408088.885 5670864.521 408030.15 5670886.001 407995.591 5670907.128 407985.213 5670914.49 407970.628 5670924.832 407962.192 5670930.746 407950.928 5670939.643 407893.962 5670979.91 407868.769 5670998.094 407838.158 5671020.19 407823.805 5671030.385 407803.197 5671046.991 407797.363 5671052.893 407790.586 5671060.882 407761.627 5671042.464 407755.827 5671038.78 407685.887 5670961.754 407662.614 5670948.873 407653.386 5670929.737 407664.479 5670894.993 407668.379 5670880.828 407666.149 5670852.023 407676.192 5670819.793 407650.886 5670812.762 407658.79 5670782.684 407672.567 5670730.268 407683.306 5670653.5 407681.145 5670595.454 407677.189 5670559.434 407670.027 5670535.099 407668.424 5670532.244 407688.564 5670474.345 407671.293 5670435.705 407622.992 5670459.682 407581.287 5670406.217 407570.087 5670388.796 407550.927 5670348.141 407540.948 5670306.802 407542.819 5670265.917 407544.812 5670201.138 407545.01 5670064.193 407538.812 5670064.132 407538.95 5670050.138 407530.234 5670023.073 407514.785 5669992.795 407460.306 5669891.618 407407.061 5669799.201 407350.013 5669698.735 407288.403 5669595.532</gml:posList>
+</gml:LinearRing>
+</gml:exterior>
+<gml:interior>
+<gml:LinearRing>
+<gml:posList>407966.568 5670396.158 407982.715 5670408.299 408017.541 5670410.814 408054.169 5670435.607 408075.02 5670476.083 408145.539 5670474.933 408165.965 5670465.899 408192.151 5670441.749 408195.456 5670438.965 408143.09 5670312.701 408139.666 5670314.08 408072.283 5670348.49 408046.016 5670352.949 408000.147 5670360.128 407982.122 5670358.579 407966.568 5670396.158</gml:posList>
+</gml:LinearRing>
+</gml:interior>
+<gml:interior>
+<gml:LinearRing>
+<gml:posList>408411.027 5670114.768 408414.481 5670116.827 408469.191 5670151.517 408543.705 5670198.757 408562.216 5670197.798 408626.872 5670134.885 408663.371 5670051.151 408693.467 5669963.023 408699.2 5669947.953 408728.464 5669944.703 408715.164 5669905.262 408701.734 5669862.086 408602.231 5669905.31 408588.148 5669840.319 408600.304 5669788.927 408609.388 5669748.442 408541.104 5669731.545 408535.44 5669730.442 408411.027 5670114.768</gml:posList>
+</gml:LinearRing>
+</gml:interior>
+<gml:interior>
+<gml:LinearRing>
+<gml:posList>408048.401 5670124.336 408048.896 5670145.323 408049.217652893 5670145.0730816 408049.674375306 5670144.75641728 408050.13199544 5670144.47915244 408050.587097567 5670144.23900159 408051.036793804 5670144.03349203 408051.478694147 5670143.86005247 408051.910866905 5670143.71608587 408052.331793569 5670143.59902746 408052.740321373 5670143.50638907 408053.135615992 5670143.43579158 408053.517116148 5670143.38498709 408053.900461269 5670143.35078209 408054.301610334 5670143.33285806 408054.720509347 5670143.33353126 408055.156866758 5670143.35530598 408055.610104282 5670143.40086277 408056.079303643 5670143.47303725 408056.563150545 5670143.57478722 408057.059877923 5670143.70914604 408057.567211322 5670143.87916015 408058.082320226 5670144.08780932 408058.451 5670144.261 408060.079 5670145.099 408063.39 5670146.28 408066.951 5670147.454 408069.945 5670148.267 408072.496 5670148.465 408075.625 5670148.072 408078.226 5670147.203 408080.26 5670146.191 408082.07 5670144.472 408083.717 5670142.321 408084.869 5670140.429 408085.892 5670138.103 408086.656 5670135.222 408086.554 5670132.482 408086.451 5670129.68 408086.046 5670127.446 408085.261 5670124.783 408083.93 5670122.028 408082.344 5670119.74 408080.049 5670117.436 408077.923 5670116.02 408075.655 5670114.951 408073.113 5670114.371 408070.377 5670114.301 408067.771 5670114.603 408065.17 5670115.153 408062.693 5670115.763 408060.35 5670117.057 408058.262 5670118.719 408056.67 5670120.832 408055.375 5670122.693 408054.74 5670124.334 408054.472673656 5670124.58164431 408054.131757265 5670124.8452751 408053.784979518 5670125.06469941 408053.438443369 5670125.2427768 408053.097106213 5670125.38302479 408052.764820325 5670125.48930692 408052.444433137 5670125.56558431 408052.137919889 5670125.61573183 408051.846527563 5670125.64341246 408051.570915523 5670125.65200003 408051.295298119 5670125.64358637 408051.003888384 5670125.61608962 408050.697343553 5670125.56613553 408050.376908297 5670125.49006033 408050.04455541 5670125.3839879 408049.703129823 5670125.24395532 408049.356481374 5670125.06609663 408049.009565236 5670124.84689119 408048.668482558 5670124.58347557 408048.401 5670124.336</gml:posList>
+</gml:LinearRing>
+</gml:interior>
+<gml:interior>
+<gml:LinearRing>
+<gml:posList>407652.143 5670054.88 407697.157 5670041.187 407743.654 5670002.559 407655.824 5669965.145 407652.143 5670054.88</gml:posList>
+</gml:LinearRing>
+</gml:interior>
+<gml:interior>
+<gml:LinearRing>
+<gml:posList>407683.365 5669934.242 407758.251 5669928.642 407777.316 5669902.407 407781.263 5669832.243 407758.636 5669815.278 407747.017 5669801.504 407689.706 5669860.621 407685.955 5669881.774 407683.365 5669934.242</gml:posList>
+</gml:LinearRing>
+</gml:interior>
+</gml:Polygon>
+</gml:surfaceMember>
+</gml:MultiSurface>
+</geometrie>
+<flaeche>1692306</flaeche>
+<abwrecht>Kein abweichender Rechtszustand</abwrecht>
+<lagebeztxt>ohne Lage</lagebeztxt>
+<tntxt>Wohnbaufläche;0.00|Weg;79569|Wald;1611825|Fließgewässer;915</tntxt>
+</Flurstueck>
+</wfs:member>
+<wfs:member>
+<Flurstueck gml:id="DESNALK0Gp0002fhFL">
+<gml:identifier codeSpace="urn:adv:oid:">urn:adv:oid:DESNALK0Gp0002fhFL</gml:identifier>
+<idflurst>DESNALK0Gp0002fh</idflurst>
+<flstkennz>143044___00004____01</flstkennz>
+<land>Freistaat Sachsen</land>
+<landschl>14</landschl>
+<gemarkung>Moritzburg</gemarkung>
+<gemaschl>143044</gemaschl>
+<flstnrzae>4</flstnrzae>
+<regbezirk>NUTS 2-Region Dresden</regbezirk>
+<regbezschl>146</regbezschl>
+<kreis>Landkreis Meißen</kreis>
+<kreisschl>14627</kreisschl>
+<gemeinde>Moritzburg</gemeinde>
+<gmdschl>14627150</gmdschl>
+<oid>DESNALK0Gp0002fhFL</oid>
+<aktualit>2026-07-02Z</aktualit>
+<geometrie>
+<gml:MultiSurface gml:id="flurstueck.id.177995567.geometrie.Geom_0" srsName="urn:ogc:def:crs:EPSG::25833" srsDimension="2">
+<gml:surfaceMember>
+<gml:Polygon gml:id="flurstueck.id.177995567.geometrie.Geom_1">
+<gml:exterior>
+<gml:LinearRing>
+<gml:posList>407196.169 5669409.714 407207.207 5669352.288 407236.729 5669202.659 407246.46 5669182.666 407266.983 5669166.149 407281.802 5669159.697 407284.953 5669164.535 407311.212 5669166.248 407340.009 5669161.398 407355.442 5669157.392 407357.034 5669162.18 407373.385 5669157.191 407389.705 5669149.064 407392.821 5669144.95 407399.421 5669116.136 407402.663 5669115.33 407407.656 5669112.045 407525.234 5669073.6 407672.134 5669023.184 407675.1 5669022.041 407677.895 5669024.528 407671.684 5669154.231 407675.691 5669157.81 407675.56 5669161.068 407663.489 5669169.121 407663.287 5669176.01 407617.239 5669175.128 407614.889 5669240.986 407605.295 5669240.643 407598.475 5669240.399 407597.736 5669261.086 407586.528 5669260.376 407578.483 5669262.263 407572.93 5669267.711 407570.503 5669267.621 407570.224 5669274.538 407579.215 5669274.648 407578.752 5669291.741 407570.072 5669291.569 407570.177 5669298.256 407572.07 5669298.285 407577.241 5669304.312 407584.969 5669307.095 407596.639 5669307.709 407595.948 5669327.626 407612.016 5669328.068 407609.886 5669394.814 407654.917 5669396.824 407654.599 5669404.543 407666.628 5669413.932 407666.512 5669417.285 407662.08 5669420.573 407661.641 5669426.058 407609.91 5669423.052 407607.458 5669483.833 407606.001 5669483.568 407600.553 5669483.401 407525.68 5669481.096 407453.412 5669478.872 407437.124 5669492.127 407426.927 5669502.083 407413.076 5669514.974 407379.238 5669542.804 407379.31 5669557.287 407361.964 5669582.667 407345.957 5669579.983 407304.357 5669558.284 407288.403 5669595.532 407283.796 5669587.661 407244.147 5669525.315 407235.161 5669507.897 407221.492 5669481.403 407204.408 5669450.361 407196.781 5669428.532 407196.169 5669409.714</gml:posList>
+</gml:LinearRing>
+</gml:exterior>
+</gml:Polygon>
+</gml:surfaceMember>
+</gml:MultiSurface>
+</geometrie>
+<flaeche>165428</flaeche>
+<abwrecht>Kein abweichender Rechtszustand</abwrecht>
+<lagebeztxt>Westlicher Schloßteich</lagebeztxt>
+<tntxt>Fläche besonderer funktionaler Prägung;6717|Weg;2277|Wald;9654|Fließgewässer;95|Stehendes Gewässer;146686</tntxt>
+</Flurstueck>
+</wfs:member>
+<wfs:member>
+<Flurstueck gml:id="DESNALK0Gp0001msFL">
+<gml:identifier codeSpace="urn:adv:oid:">urn:adv:oid:DESNALK0Gp0001msFL</gml:identifier>
+<idflurst>DESNALK0Gp0001ms</idflurst>
+<flstkennz>143044___00001____01</flstkennz>
+<land>Freistaat Sachsen</land>
+<landschl>14</landschl>
+<gemarkung>Moritzburg</gemarkung>
+<gemaschl>143044</gemaschl>
+<flstnrzae>1</flstnrzae>
+<regbezirk>NUTS 2-Region Dresden</regbezirk>
+<regbezschl>146</regbezschl>
+<kreis>Landkreis Meißen</kreis>
+<kreisschl>14627</kreisschl>
+<gemeinde>Moritzburg</gemeinde>
+<gmdschl>14627150</gmdschl>
+<oid>DESNALK0Gp0001msFL</oid>
+<aktualit>2026-07-02Z</aktualit>
+<geometrie>
+<gml:MultiSurface gml:id="flurstueck.id.177995648.geometrie.Geom_0" srsName="urn:ogc:def:crs:EPSG::25833" srsDimension="2">
+<gml:surfaceMember>
+<gml:Polygon gml:id="flurstueck.id.177995648.geometrie.Geom_1">
+<gml:exterior>
+<gml:LinearRing>
+<gml:posList>407570.072 5669291.569 407578.752 5669291.741 407579.215 5669274.648 407570.224 5669274.538 407570.503 5669267.621 407572.93 5669267.711 407578.483 5669262.263 407586.528 5669260.376 407597.736 5669261.086 407598.475 5669240.399 407605.295 5669240.643 407614.889 5669240.986 407617.239 5669175.128 407663.287 5669176.01 407663.489 5669169.121 407675.56 5669161.068 407675.691 5669157.81 407671.684 5669154.231 407677.895 5669024.528 407675.1 5669022.041 407692.02 5669018.142 407691.514 5669040.243 407685.831 5669155.225 407681.279 5669158.17 407681.145 5669161.203 407693.09 5669170.196 407692.703 5669176.979 407738.566 5669178.598 407737.8 5669245.894 407753.748 5669246.134 407753.436 5669266.764 407764.332 5669267.031 407772.296 5669269.648 407777.713 5669275.745 407779.569 5669275.815 407779.295 5669282.66 407772.222 5669282.344 407768.729 5669283.535 407767.933 5669286.517 407767.573 5669294.111 407768.802 5669297.011 407771.817 5669298.427 407778.541 5669298.596 407778.44 5669305.387 407776.497 5669305.341 407770.753 5669310.902 407762.864 5669313.094 407751.678 5669312.944 407751.295 5669333.648 407734.724 5669333.056 407731.147 5669399.805 407685.112 5669398.41 407684.921 5669405.773 407672.752 5669414.185 407666.628 5669413.932 407654.599 5669404.543 407654.917 5669396.824 407609.886 5669394.814 407612.016 5669328.068 407595.948 5669327.626 407596.639 5669307.709 407584.969 5669307.095 407577.241 5669304.312 407572.07 5669298.285 407570.177 5669298.256 407570.072 5669291.569</gml:posList>
+</gml:LinearRing>
+</gml:exterior>
+</gml:Polygon>
+</gml:surfaceMember>
+</gml:MultiSurface>
+</geometrie>
+<flaeche>34799</flaeche>
+<abwrecht>Kein abweichender Rechtszustand</abwrecht>
+<lagebeztxt>ohne Lage</lagebeztxt>
+<tntxt>Fläche besonderer funktionaler Prägung;9280|Sport-, Freizeit- und Erholungsfläche;19302|Weg;6215</tntxt>
+</Flurstueck>
+</wfs:member>
+<wfs:member>
+<Flurstueck gml:id="DESNALK0Gp00045cFL">
+<gml:identifier codeSpace="urn:adv:oid:">urn:adv:oid:DESNALK0Gp00045cFL</gml:identifier>
+<idflurst>DESNALK0Gp00045c</idflurst>
+<flstkennz>143044___00042000300</flstkennz>
+<land>Freistaat Sachsen</land>
+<landschl>14</landschl>
+<gemarkung>Moritzburg</gemarkung>
+<gemaschl>143044</gemaschl>
+<flstnrzae>42</flstnrzae>
+<flstnrnen>3</flstnrnen>
+<regbezirk>NUTS 2-Region Dresden</regbezirk>
+<regbezschl>146</regbezschl>
+<kreis>Landkreis Meißen</kreis>
+<kreisschl>14627</kreisschl>
+<gemeinde>Moritzburg</gemeinde>
+<gmdschl>14627150</gmdschl>
+<oid>DESNALK0Gp00045cFL</oid>
+<aktualit>2026-07-02Z</aktualit>
+<geometrie>
+<gml:MultiSurface gml:id="flurstueck.id.177995731.geometrie.Geom_0" srsName="urn:ogc:def:crs:EPSG::25833" srsDimension="2">
+<gml:surfaceMember>
+<gml:Polygon gml:id="flurstueck.id.177995731.geometrie.Geom_1">
+<gml:exterior>
+<gml:LinearRing>
+<gml:posList>407426.927 5669502.083 407437.124 5669492.127 407453.412 5669478.872 407525.68 5669481.096 407600.553 5669483.401 407599.701 5669503.333 407596.139 5669503.28 407526.501 5669502.241 407426.927 5669502.083</gml:posList>
+</gml:LinearRing>
+</gml:exterior>
+</gml:Polygon>
+</gml:surfaceMember>
+</gml:MultiSurface>
+</geometrie>
+<flaeche>3473</flaeche>
+<abwrecht>Kein abweichender Rechtszustand</abwrecht>
+<lagebeztxt>ohne Lage</lagebeztxt>
+<tntxt>Weg;584|Wald;2889</tntxt>
+</Flurstueck>
+</wfs:member>
+<wfs:member>
+<Flurstueck gml:id="DESNALK0Gp0005IPFL">
+<gml:identifier codeSpace="urn:adv:oid:">urn:adv:oid:DESNALK0Gp0005IPFL</gml:identifier>
+<idflurst>DESNALK0Gp0005IP</idflurst>
+<flstkennz>143044___00042000200</flstkennz>
+<land>Freistaat Sachsen</land>
+<landschl>14</landschl>
+<gemarkung>Moritzburg</gemarkung>
+<gemaschl>143044</gemaschl>
+<flstnrzae>42</flstnrzae>
+<flstnrnen>2</flstnrnen>
+<regbezirk>NUTS 2-Region Dresden</regbezirk>
+<regbezschl>146</regbezschl>
+<kreis>Landkreis Meißen</kreis>
+<kreisschl>14627</kreisschl>
+<gemeinde>Moritzburg</gemeinde>
+<gmdschl>14627150</gmdschl>
+<oid>DESNALK0Gp0005IPFL</oid>
+<aktualit>2026-07-02Z</aktualit>
+<geometrie>
+<gml:MultiSurface gml:id="flurstueck.id.177995751.geometrie.Geom_0" srsName="urn:ogc:def:crs:EPSG::25833" srsDimension="2">
+<gml:surfaceMember>
+<gml:Polygon gml:id="flurstueck.id.177995751.geometrie.Geom_1">
+<gml:exterior>
+<gml:LinearRing>
+<gml:posList>407522.766 5669602.245 407526.501 5669502.241 407596.139 5669503.28 407599.701 5669503.333 407616.404 5669503.583 407615.937 5669513.685 407615.741 5669517.93 407607.85 5669517.817 407606.818 5669569.852 407595.16 5669569.488 407593.233 5669604.515 407582.617 5669604.296 407522.766 5669602.245</gml:posList>
+</gml:LinearRing>
+</gml:exterior>
+</gml:Polygon>
+</gml:surfaceMember>
+</gml:MultiSurface>
+</geometrie>
+<flaeche>8025</flaeche>
+<abwrecht>Kein abweichender Rechtszustand</abwrecht>
+<lagebeztxt>ohne Lage</lagebeztxt>
+<tntxt>Wohnbaufläche;4242|Weg;304|Landwirtschaft;3480</tntxt>
+</Flurstueck>
+</wfs:member>
+<wfs:member>
+<Flurstueck gml:id="DESNALK0Gp0002DzFL">
+<gml:identifier codeSpace="urn:adv:oid:">urn:adv:oid:DESNALK0Gp0002DzFL</gml:identifier>
+<idflurst>DESNALK0Gp0002Dz</idflurst>
+<flstkennz>143044___00058____00</flstkennz>
+<land>Freistaat Sachsen</land>
+<landschl>14</landschl>
+<gemarkung>Moritzburg</gemarkung>
+<gemaschl>143044</gemaschl>
+<flstnrzae>58</flstnrzae>
+<regbezirk>NUTS 2-Region Dresden</regbezirk>
+<regbezschl>146</regbezschl>
+<kreis>Landkreis Meißen</kreis>
+<kreisschl>14627</kreisschl>
+<gemeinde>Moritzburg</gemeinde>
+<gmdschl>14627150</gmdschl>
+<oid>DESNALK0Gp0002DzFL</oid>
+<aktualit>2026-07-30Z</aktualit>
+<geometrie>
+<gml:MultiSurface gml:id="flurstueck.id.178204703.geometrie.Geom_0" srsName="urn:ogc:def:crs:EPSG::25833" srsDimension="2">
+<gml:surfaceMember>
+<gml:Polygon gml:id="flurstueck.id.178204703.geometrie.Geom_1">
+<gml:exterior>
+<gml:LinearRing>
+<gml:posList>407863.662 5668998.609 407868.742 5668966.55 407873.522 5668936.718 407875.301 5668924.876 407877.351 5668911.233 407880.553 5668889.303 407880.947 5668886.605 407883.564 5668872.025 407888.802 5668861.265 407892.741 5668852.872 407895.386 5668847.438 407898.668 5668841.655 407902.054 5668837.909 407912.143 5668826.638 407915.343 5668823.026 407928.453 5668813.355 407931.794 5668810.739 407938.446 5668805.836 407949.723 5668814.72 407967.291 5668816.056 407976.19 5668816.733 408003.624 5668818.819 408014.491 5668819.645 408047.701 5668822.171 408079.969 5668824.625 408111.82 5668827.047 408128.988 5668828.353 408154.435 5668823.09 408161.821 5668865.296 408164.528 5668883.617 408163.579 5668886.042 408125.96 5668936.837 408131.642 5668940.418 408118.54 5668962.153 408110.486 5668957.631 408087.316 5668989.034 408080.608 5668991.164 407975.867 5668995.711 407863.939 5669000.67 407863.662 5668998.609</gml:posList>
+</gml:LinearRing>
+</gml:exterior>
+</gml:Polygon>
+</gml:surfaceMember>
+</gml:MultiSurface>
+</geometrie>
+<flaeche>44967</flaeche>
+<abwrecht>Kein abweichender Rechtszustand</abwrecht>
+<lagebeztxt>Schwanenteich</lagebeztxt>
+<tntxt>Wohnbaufläche;187|Weg;32|Landwirtschaft;18605|Fließgewässer;189|Stehendes Gewässer;25955</tntxt>
+</Flurstueck>
+</wfs:member>
+</wfs:FeatureCollection>
