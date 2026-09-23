@@ -55,7 +55,7 @@ include = ["app*"]
 # The schema is applied from the installed package, not from a checkout, and
 # the preview card is drawn from fonts that ship with it.
 [tool.setuptools.package-data]
-app = ["schema.sql", "assets/fonts/*.woff"]
+app = ["schema.sql", "migrations/*.sql", "assets/fonts/*.woff"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

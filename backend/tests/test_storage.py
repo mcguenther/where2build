@@ -648,7 +648,13 @@ def test_the_account_page_answers_with_everything_that_is_held(account: TestClie
     assert held.status_code == 200
     body = held.json()
     assert body["anbieter"] == OIDC_ISSUER
-    assert body["kennung"] == "8f1c-4711"
+    # Two identifiers, each under its own name: what this application calls the
+    # account (and what goes into ADMIN_ACCOUNTS), and what the provider calls
+    # the person. They used to share the name „kennung", which is how somebody
+    # comes to paste the wrong one into the configuration.
+    assert body["anbieter_kennung"] == "8f1c-4711"
+    assert body["kennung"] == Identity(issuer=OIDC_ISSUER, subject="8f1c-4711", name=None).account_key
+    assert body["kennung"] != body["anbieter_kennung"]
     assert body["anzeigename"] == "Erika Musterfrau"
     assert body["grundstuecke"] == 1
     assert body["groesse_bytes"] > 0
@@ -656,7 +662,8 @@ def test_the_account_page_answers_with_everything_that_is_held(account: TestClie
     # Nothing beyond those, or the page would be claiming a completeness it
     # does not have.
     assert set(body) == {
-        "anbieter", "kennung", "anzeigename", "angelegt", "grundstuecke", "groesse_bytes"
+        "anbieter", "kennung", "anbieter_kennung", "anzeigename", "angelegt",
+        "grundstuecke", "groesse_bytes"
     }
 
 
@@ -1050,20 +1057,29 @@ def test_the_note_is_withheld_by_a_tuple_and_not_by_four_letters(account: TestCl
 
 
 def test_a_column_the_database_demands_and_nobody_fills_is_caught():
-    """`schema.sql` is applied with `create table if not exists`, which does
-    nothing to a table that already exists — and the volume outlives
-    `docker compose down`.
+    """`schema.sql` is the baseline and the migrations are the rest, so the
+    shape this code expects is both of them together.
 
-    Measured 19.09.2026 in a running stack: a `users` table carried a
-    `kennung` column, not null and with no default, that this code has never
-    written. Sign-in worked; the first attempt to store a plot answered 500.
+    Measured 19.09.2026 in a running stack: a `users` table carried a `kennung`
+    column, not null and with no default, that the branch's code never wrote.
+    Sign-in worked; the first attempt to store a plot answered 500. The column
+    is not a stranger — `0002_verwaltung.sql` adds it — the *code* was behind,
+    which is why reading only the baseline here would report the application's
+    own schema as foreign.
     """
 
-    from app.services.storage import SCHEMA_PATH, declared_columns
+    from app.services.storage import MIGRATIONS_PATH, SCHEMA_PATH, declared_columns
 
-    declared = declared_columns(SCHEMA_PATH.read_text(encoding="utf-8"))
-    assert declared["users"] == {"id", "issuer", "subject", "anzeigename", "angelegt"}
+    sources = [SCHEMA_PATH.read_text(encoding="utf-8")]
+    sources += [path.read_text(encoding="utf-8") for path in sorted(MIGRATIONS_PATH.glob("*.sql"))]
+
+    baseline = declared_columns(sources[0])
+    assert baseline["users"] == {"id", "issuer", "subject", "anzeigename", "angelegt"}
     # A constraint line is not a column.
-    assert "unique" not in declared["users"] and "primary" not in declared["users"]
-    # Every table the schema creates is found, so the check cannot miss one.
-    assert set(declared) == {"users", "plots", "freigaben", "settings", "abweichungen"}
+    assert "unique" not in baseline["users"] and "primary" not in baseline["users"]
+
+    whole = declared_columns(*sources)
+    # What the migrations add to a table the baseline already declared.
+    assert {"kennung", "ist_admin"} <= whole["users"]
+    # And the tables they create on their own.
+    assert {"sperren", "nutzung", "fehler", "betriebsansage"} <= set(whole)

@@ -26,10 +26,21 @@ const server = createServer(async (req, res) => {
     try {
       const answer = await fetch(`http://127.0.0.1:8000${req.url}`, {
         method: req.method,
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          // The session travels in a cookie, and without passing it on this
+          // proxy makes every request anonymous -- so no signed-in state can
+          // be photographed at all, and the pictures of the administration
+          // area would all show „kein Verwalter".
+          ...(req.headers.cookie ? { Cookie: req.headers.cookie } : {})
+        },
         body: ["GET", "HEAD"].includes(req.method) ? undefined : await collect(req)
       });
-      res.writeHead(answer.status, { "Content-Type": answer.headers.get("content-type") || "application/json" });
+      const setCookie = answer.headers.getSetCookie?.() ?? [];
+      res.writeHead(answer.status, {
+        "Content-Type": answer.headers.get("content-type") || "application/json",
+        ...(setCookie.length ? { "Set-Cookie": setCookie } : {})
+      });
       res.end(Buffer.from(await answer.arrayBuffer()));
     } catch {
       res.writeHead(503, { "Content-Type": "application/json" }).end('{"detail":"Backend nicht erreichbar"}');
@@ -520,6 +531,61 @@ taken.push("standort-druck.png");
 await page.pdf({ path: resolve(outDir, "standort-druck.pdf"), format: "A4", preferCSSPageSize: true });
 taken.push("standort-druck.pdf");
 await ctx.close();
+
+/* The administration area, which needs somebody signed in *and* administering.
+ *
+ * Opt-in through `W2B_ADMIN_COOKIE`, and the reason is that this run has no
+ * identity provider: the session cookie is signed with `OIDC_SESSION_SECRET`,
+ * so only whoever started the backend can produce one. Handing the value in is
+ * shorter than standing up a provider, and it is the same cookie a real
+ * sign-in would leave behind -- the backend cannot tell the difference, which
+ * is the point.
+ *
+ *   ADMIN_ACCOUNTS=<kennung> OIDC_SESSION_SECRET=… uvicorn …
+ *   W2B_ADMIN_COOKIE=<cookie> node scripts/screenshots.mjs
+ *
+ * Without it the run skips these pictures and says so, rather than
+ * photographing eight copies of „Dieses Konto ist kein Verwalter“.
+ */
+const adminCookie = process.env.W2B_ADMIN_COOKIE || "";
+if (!adminCookie) {
+  console.log("Ohne W2B_ADMIN_COOKIE: die Bilder der Verwaltung werden übersprungen.");
+} else {
+  const AREAS = ["uebersicht", "statistik", "konten", "dienste", "freigaben", "fehler", "protokoll", "gefahrenzone"];
+  for (const [mode, width, narrow] of [["hell", 1440, false], ["dunkel", 1440, false], ["hell", 402, true]]) {
+    const ctx = await browser.newContext({ viewport: { width, height: 1000 }, deviceScaleFactor: 2 });
+    await ctx.addCookies([{ name: "w2b_sitzung", value: adminCookie, url: address }]);
+    const page = await ctx.newPage();
+    page.on("pageerror", e => problems.push(`verwaltung ${mode}/${width}: ${e.message}`));
+    page.on("console", m => {
+      if (m.type() === "error" && !/Failed to load resource/.test(m.text())) {
+        problems.push(`verwaltung ${mode}/${width}: ${m.text()}`);
+      }
+    });
+    await page.goto(address, { waitUntil: "load" });
+    await page.evaluate(() => document.fonts.ready);
+    await page.click(`.theme-switch button:nth-child(${mode === "hell" ? 1 : 2})`);
+    // The entry is only drawn for an administrator, so its absence is the
+    // failure to report -- a run that quietly photographed the refusal page
+    // would look like eight good pictures.
+    await page.waitForSelector(".account__admin", { timeout: 10000 }).catch(() => {
+      problems.push(`verwaltung ${mode}: „Verwaltung“ fehlt im Kopf — ist ADMIN_ACCOUNTS gesetzt?`);
+    });
+    for (const area of narrow ? ["uebersicht", "konten"] : AREAS) {
+      await page.goto(`${address}verwaltung/${area}`, { waitUntil: "load" });
+      await page.waitForTimeout(500);
+      await shot(page, `verwaltung-${area}`, mode, narrow ? "-schmal" : "");
+    }
+    /* The account page belongs in this pass rather than in the one without a
+       session: signed out it is an invitation to sign in, and what is worth
+       looking at -- what is held about somebody, and the two identifiers --
+       only exists once somebody is. */
+    await page.goto(`${address}konto`, { waitUntil: "load" });
+    await page.waitForTimeout(500);
+    await shot(page, "konto", mode, narrow ? "-schmal" : "");
+    await ctx.close();
+  }
+}
 
 await browser.close();
 server.close();

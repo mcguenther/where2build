@@ -19,7 +19,8 @@ import { realState, mountWithRouter } from "./helpers.js";
 
 const HELD = {
   anbieter: "https://auth.example.org",
-  kennung: "8f1c-4711",
+  kennung: "f3d01e1d76062d58716a4fc940044dc6",
+  anbieter_kennung: "8f1c-4711",
   anzeigename: "Erika Musterfrau",
   angelegt: "2026-09-01T10:00:00Z",
   grundstuecke: 2,
@@ -50,12 +51,23 @@ beforeEach(() => {
   globalThis.fetch = serve({ "/account": ok(HELD) });
 });
 
-afterEach(() => { vi.restoreAllMocks(); });
+afterEach(() => {
+  if (open_) { open_.unmount(); open_ = null; }
+  vi.restoreAllMocks();
+});
+
+/* Die zuletzt geöffnete Seite, damit sie vor der nächsten abgebaut wird.
+   Seit die Seite auf `state.account.angemeldet` hört, sieht eine liegen
+   gebliebene Instanz die Zustandswechsel der folgenden Tests noch mit und
+   holt dort ein Konto nach — was dann als Aufruf in einem Test auftaucht, der
+   von dieser Seite gar nichts mehr wissen will. */
+let open_ = null;
 
 async function open() {
-  const view = mountWithRouter(AccountView, { path: "/konto" });
+  if (open_) open_.unmount();
+  open_ = mountWithRouter(AccountView, { path: "/konto" });
   await flushPromises();
-  return view;
+  return open_;
 }
 
 describe("Kontoseite", () => {
@@ -69,6 +81,34 @@ describe("Kontoseite", () => {
     expect(text).toContain("4.0 KiB");
     // Die Behauptung der Vollständigkeit steht daneben, also muss sie stimmen.
     expect(text).toContain("Das ist vollständig");
+  });
+
+  it("holt den Stand nach, wenn die Anmeldung erst nach dem Aufbau feststeht", async () => {
+    // Beim direkten Aufruf von /konto ist `angemeldet` noch false, wenn diese
+    // Seite entsteht — die Antwort auf „wer ist angemeldet" kommt später. Ohne
+    // das Nachziehen blieb die Seite leer, ohne Fehler und ohne Hinweis.
+    state.account = { eingerichtet: true, angemeldet: false, name: null, kennung: null };
+    const view = await open();
+    expect(view.text()).not.toContain("Erika Musterfrau");
+
+    state.account = { eingerichtet: true, angemeldet: true, name: "Erika Musterfrau", kennung: "f3d0" };
+    await flushPromises();
+
+    expect(view.text()).toContain("Kennung dieses Kontos");
+  });
+
+  it("trennt die beiden Kennungen und sagt, welche der Betreiber braucht", async () => {
+    // Beide hießen „Kennung", und die Seite zeigte nur die des Anbieters —
+    // wer sie in ADMIN_ACCOUNTS eintrug, bekam keinen Zugang und keine
+    // Erklärung dazu.
+    const view = await open();
+
+    const text = view.text();
+    expect(text).toContain("Kennung beim Anbieter");
+    expect(text).toContain("8f1c-4711");
+    expect(text).toContain("Kennung dieses Kontos");
+    expect(text).toContain("f3d01e1d76062d58716a4fc940044dc6");
+    expect(text).toContain("ADMIN_ACCOUNTS");
   });
 
   it("sagt es, wenn der Anbieter keinen Namen mitgab", async () => {

@@ -41,7 +41,47 @@ a `pg_ctl … start` without `-o '-p 5433'` comes up happily on 5432 and produce
 that same failure while `pg_isready` on 5432 says everything is fine.
 
 `TEST_DATABASE_URL` points the suite at it. Everything in that database is
-dropped between tests, so it must never name anything worth keeping.
+dropped between tests, so it must never name anything worth keeping — and that
+includes whatever a screenshot run has just put there. Running `pytest` against
+the same Postgres the pictures are taken from empties it mid-way, and the
+screenshots that follow show an administration area full of zeroes without
+anything having failed. Seed first, photograph, and run the database tests
+afterwards.
+
+## Photographing a signed-in page
+
+`scripts/screenshots.mjs` takes the administration pictures only when
+`W2B_ADMIN_COOKIE` holds a session cookie, and skips them with one line
+otherwise. Two things make that work, and both were failures first:
+
+- **The static server has to pass the cookie on.** Its `/api` proxy forwarded
+  method and body but not headers, so every request it relayed was anonymous —
+  no signed-in state could be photographed at all, and the run quietly produced
+  eight copies of „Dieses Konto ist kein Verwalter" instead of failing.
+- **The cookie is signed, so it has to come from the same secret the backend
+  runs with.** There is no provider in this run; `session.sign` produces one
+  directly:
+
+```bash
+backend/.venv/bin/python -c "
+from app import session
+from app.services.oidc import Identity
+i = Identity(issuer='https://auth.example.org', subject='bilder', name='Erika Musterfrau')
+print(i.account_key); print(session.sign({'iss': i.issuer, 'sub': i.subject, 'name': i.name}, 'geheim', ttl_s=7200))"
+```
+
+The first line goes into `ADMIN_ACCOUNTS`, the second into
+`W2B_ADMIN_COOKIE`, and the backend is started with
+`OIDC_SESSION_SECRET=geheim` plus an issuer, a client id and a client secret —
+none of which is ever called, because nothing here runs the round trip. The run
+fails loudly if „Verwaltung" is missing from the header, so a wrong secret
+cannot pass as a page with nothing on it.
+
+**A screenshot run trips the burst guard if it is repeated.** 300 calls in five
+minutes is the default, and one admin pass is well under it — three in a row
+are not, and the account is then blocked for an hour and its plot list answers
+403 while the area itself still opens. Restarting the backend clears the
+window; `delete from sperren` clears what was written.
 
 ## Signing in, without a provider
 
@@ -310,3 +350,29 @@ Both directions were then measured: without a CA the build fails with exit 1 at
 that step; with one it exits 0 and the image imports. **Check the image, not
 the exit code** — `docker run --rm <image> python -c "import fastapi"` is the
 whole test.
+- **An export that is *read* at module level breaks five test files; one that
+  is only called does not.** Five files mock `lib/api.js` by listing its
+  surface, and `methods: { recordUrl: adminRecordUrl }` reads that binding the
+  moment the component module is evaluated — so vitest throws
+  „No `adminRecordUrl` export is defined on the mock", at *import* time, in
+  components that have nothing to do with it (`destinations`, `nearby`,
+  `neighbours`, `plot-tools`, `wizard` all failed at once). Wrapping it —
+  `recordUrl(kennung) { return adminRecordUrl(kennung); }` — defers the read to
+  the call and the five factories stay as they are. The earlier note about
+  adding an export to the factories still holds; this is the cheaper half of
+  the same trap.
+
+- **The database tests empty the database the screenshots are being taken
+  from.** The fixture drops every table in `public`, which is right for a test
+  and fatal for a half-prepared picture run: an administration area
+  photographed after it shows zeroes everywhere with nothing having failed.
+  Seed, photograph, then run `pytest` — or point `TEST_DATABASE_URL` somewhere
+  else.
+
+- **Ein Test, der den Namen eines Bereichs prüft, kann ihn aus dem falschen
+  Grund finden.** „öffnet den angefragten Bereich" mountete
+  `/verwaltung/dienste` und suchte „Zwischenspeicher" — ein Wort, das auch in
+  der Übersicht stand, auf die die Weiche bei einem unbekannten Bereich
+  zurückfällt. Der Bereich hieß längst „betrieb", der Test bestand trotzdem,
+  und er hätte auch bestanden, wenn die Weiche kaputt gewesen wäre. Prüfe auf
+  etwas, das es *nur* im gesuchten Bereich gibt.

@@ -263,6 +263,31 @@ table.data-table thead th{
 table.data-table td.num, table.data-table th.num{ text-align: right; font-family: var(--w2b-font-mono); font-variant-numeric: tabular-nums; }
 table.data-table tbody tr:last-child td{ border-bottom: 0; }
 
+/* A wide table on a phone, as a stack of labelled rows.
+ *
+ * `.table-scroll` keeps a wide table from pushing the page sideways, and on a
+ * table with buttons in its last column that is not enough: what scrolls out
+ * of sight is what the row is for, and nothing on screen says it is there. A
+ * table that carries `data-table--stack` turns into one block per row below
+ * the breakpoint, each cell labelled from its own `data-label`. */
+@media (max-width: 760px){
+  table.data-table--stack, table.data-table--stack tbody, table.data-table--stack tr,
+  table.data-table--stack td{ display: block; width: 100%; }
+  table.data-table--stack thead{ display: none; }
+  table.data-table--stack tr{
+    border-bottom: 1px solid var(--w2b-line);
+    padding: var(--w2b-space-2) 0;
+  }
+  table.data-table--stack td{ border-bottom: 0; padding: 3px 0; }
+  table.data-table--stack td[data-label]::before{
+    content: attr(data-label) ": ";
+    color: var(--w2b-muted); font-size: var(--w2b-text-xs);
+  }
+  /* The numbers keep their monospace but stop hanging off the right edge,
+     where the label now stands. */
+  table.data-table--stack td.num{ text-align: left; }
+}
+
 /* ---------- Key figures ---------- */
 .key-figures{ display: grid; gap: var(--w2b-space-4); }
 .key-figure .num{ font-family: var(--w2b-font-mono); font-size: var(--w2b-text-xl); font-weight: 500; font-variant-numeric: tabular-nums; }

@@ -37,6 +37,12 @@
              but the start page then says so in words instead of the app being
              silent about it, which is what made this look broken. -->
         <div v-if="state.account.angemeldet" class="account">
+          <!-- Only for whoever administers this instance. Beside the account
+               rather than among the sections: it is about the deployment, not
+               about a part of somebody's work. -->
+          <RouterLink v-if="state.account.verwalter" class="account__admin"
+                      :to="{ name: 'admin' }"
+                      :aria-current="$route.meta.section === 'admin' ? 'page' : null">Verwaltung</RouterLink>
           <!-- The name is the way to the account page: what is stored, and how
                to get rid of it. A section of its own would put it beside the
                work, which is not what it is about. -->
@@ -51,6 +57,17 @@
            :href="signInHref" @click.prevent="signIn">Anmelden</a>
       </div>
     </header>
+
+    <!-- What the operator has to say, if anything. Above the work and below
+         the header: a maintenance window is not a section of the application,
+         and a banner nobody sees is not a banner. -->
+    <div v-if="notice.sichtbar && notice.text" class="ansage no-print"
+         :class="{ 'ansage--warnung': notice.art === 'warnung' }" role="status">
+      <div class="container ansage__inner">
+        <span class="ansage__mark" aria-hidden="true">{{ notice.art === "warnung" ? "!" : "i" }}</span>
+        <p>{{ notice.text }}</p>
+      </div>
+    </div>
 
     <div v-if="state.sync.adoption" class="adoption no-print">
       <div class="container adoption__inner">
@@ -90,7 +107,7 @@
 
 <script>
 import { state, applyTheme, loadAccount, loadFromAccount, adoptLocal, declineAdoption, isFresh } from "./lib/store.js";
-import { signInUrl, signOut } from "./lib/api.js";
+import { announcement, signInUrl, signOut } from "./lib/api.js";
 import { beginSignIn } from "./lib/signIn.js";
 
 export default {
@@ -102,10 +119,17 @@ export default {
         { id: "light", name: "Hell" },
         { id: "dark", name: "Dunkel" },
         { id: "system", name: "System" }
-      ]
+      ],
+      /* The operator's announcement. Empty and invisible is the normal state,
+         which is why it starts that way rather than as null: nothing on the
+         page moves while the answer is on its way. */
+      notice: { text: "", art: "hinweis", sichtbar: false }
     };
   },
   async created() {
+    // Not awaited before the account: the banner is the least urgent thing on
+    // the page, and nothing else waits for it.
+    announcement().then(answer => { this.notice = answer; });
     await loadAccount();
     // Only after the answer: which document is in force depends on whether
     // there is an account behind this browser at all.
@@ -163,7 +187,12 @@ export default {
 </script>
 
 <style scoped>
-.shell{ min-height: 100vh; display: flex; flex-direction: column; }
+/* `overflow-x: clip` and not `hidden`: the start page's reception is a
+   `100vw` breakout out of the 1360 px container, and on a window with a
+   classic scrollbar `100vw` is wider than the page by exactly that scrollbar.
+   Clipping swallows the overshoot without making this a scroll container, so
+   nothing inside loses `position: sticky`. */
+.shell{ min-height: 100vh; display: flex; flex-direction: column; overflow-x: clip; }
 main{ flex: 1; padding-top: var(--w2b-space-5); }
 
 .site-header{ background: var(--w2b-surface); border-bottom: 1px solid var(--w2b-line); }
@@ -224,6 +253,29 @@ main{ flex: 1; padding-top: var(--w2b-space-5); }
 .sync-error{ padding-top: var(--w2b-space-3); font-size: var(--w2b-text-s); color: var(--w2b-error); }
 
 .account{ display: flex; align-items: center; gap: var(--w2b-space-2); }
+/* A link, not a button: it goes to a page like the name beside it does. */
+.ansage{ background: var(--w2b-secondary-veil); border-bottom: 1px solid var(--w2b-line); }
+.ansage--warnung{ background: var(--w2b-error-surface); }
+.ansage__inner{ display: flex; gap: var(--w2b-space-3); align-items: baseline; padding: var(--w2b-space-2) 0; }
+.ansage__inner p{ margin: 0; }
+.ansage__mark{
+  display: grid; place-items: center; width: 20px; height: 20px; flex: 0 0 auto;
+  border-radius: var(--w2b-radius-full); font-family: var(--w2b-font-display); font-size: var(--w2b-text-xs);
+  background: var(--w2b-secondary); color: var(--w2b-white);
+}
+.ansage--warnung .ansage__mark{ background: var(--w2b-error); }
+
+.account__admin{
+  font-size: var(--w2b-text-xs);
+  color: var(--w2b-primary);
+  text-decoration: none;
+  border: 1px solid var(--w2b-line);
+  border-radius: var(--w2b-radius-full);
+  padding: 2px var(--w2b-space-2);
+  white-space: nowrap;
+}
+.account__admin:hover{ border-color: var(--w2b-primary); }
+.account__admin[aria-current="page"]{ background: var(--w2b-primary-veil); border-color: var(--w2b-primary); }
 .account__initials{
   display: grid; place-items: center; width: 28px; height: 28px; border-radius: var(--w2b-radius-full);
   background: var(--w2b-primary); color: var(--w2b-primary-on);

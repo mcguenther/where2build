@@ -465,6 +465,13 @@ class LLMSettings(BaseSettings):
     api_key: SecretStr | None = None
     model: str = ""
     fetch_engine: Literal["openrouter", "exa", "parallel", "native", "auto"] = "openrouter"
+    # The price list behind the cost column in the administration area. A file
+    # rather than a constant, because a price is a claim about somebody else's
+    # price list and goes stale; ``scripts/update_llm_prices.py`` writes it
+    # from the provider's own endpoint and it is committed, so every change is
+    # a diff. Absent, the tokens are still counted and the money column says
+    # so -- never 0,00 €.
+    prices_path: Path = Path("ops/llm-preise.json")
     timeout_s: int = 120
     max_content_tokens: int = 50000
     # The dated contract the Anthropic API requires on every request. Pinned
@@ -643,6 +650,78 @@ class RateLimitSettings(BaseSettings):
     max_clients: int = Field(default=20000, ge=1)
 
 
+class AdminSettings(BaseSettings):
+    """The administration area (env prefix ``ADMIN_``).
+
+    Two things are configured here and they answer two different questions.
+
+    **Who gets in.** ``ADMIN_ACCOUNTS`` is a comma-separated list of account
+    keys -- the same stable, non-speaking identifier ``/api/auth/me`` reports
+    and the account page shows. It is the bootstrap and nothing else: everybody
+    else is promoted in the interface, and the flag for that lives in the
+    database. Configuration rather than a first-one-wins rule because an
+    instance on the open internet would otherwise hand the area to whoever
+    signed up first, and configuration rather than a group claim from the
+    provider because this deployment asks for ``openid profile`` and nothing
+    more. An account key is not a secret -- it identifies, it does not
+    authenticate -- so a list of them in the environment grants nothing to
+    anyone who cannot already sign in as that person.
+
+    **What is counted.** Nothing was, before this: the request budget counts in
+    memory and forgets, and a deployment could not say what it had done. The
+    counters below are aggregates -- an hour, a service, an outcome -- and the
+    per-account half is the one that answers "who is doing this" when something
+    is wrong. Both are swept after ``retention_days``.
+
+    The burst window is the part that has to be fast. An hourly counter cannot
+    stop anything: by the time it shows the hour, the hour has happened. So the
+    recorder watches a short window per account, and an account that crosses
+    ``burst_calls`` in it is blocked for ``auto_block_minutes`` -- in this
+    process immediately, and in the database within one flush, which is where
+    the other workers and the interface read it.
+    """
+
+    model_config = SettingsConfigDict(env_prefix="ADMIN_", env_file=_ENV_FILE, extra="ignore")
+
+    # Comma-separated account keys. Empty means the area exists but nobody is
+    # let in by configuration -- which is the right default for a machine that
+    # is not a deployment.
+    accounts: str = ""
+    # How often the in-process counters are written out, and the blocks read
+    # back. Short enough that "letzte Stunde" in the interface is current and
+    # that a block reaches the other workers quickly, long enough that a busy
+    # minute is one UPDATE per bucket rather than one per request.
+    flush_s: int = Field(default=30, ge=1)
+    # How long counters, errors and the audit trail are kept. The same ninety
+    # days a shared link gets, for the same reason: every row needs an end.
+    retention_days: int = Field(default=90, ge=1)
+    # The short window, and what crossing it costs. 300 calls in five minutes
+    # is one a second sustained -- far past anything a person clicking produces
+    # (the whole screenshot run is 59 service calls), and far below the hourly
+    # ceiling, which is the point: this is the guard that acts inside the hour.
+    burst_window_s: int = Field(default=300, ge=1)
+    burst_calls: int = Field(default=300, ge=1)
+    auto_block_minutes: int = Field(default=60, ge=1)
+    # The error log the interface shows and offers as a download, kept in this
+    # process as well so a deployment without a database is not silent about
+    # its own failures. Bounded: an outage produces one of these per request.
+    error_buffer: int = Field(default=500, ge=1)
+    # The recurring jobs, as the administration area shows them. The list is
+    # the same file the scheduler reads and the records are the same directory
+    # it writes -- see ``app/jobs.py`` for why a "run now" here writes a
+    # request instead of running anything itself.
+    jobs_file: Path = Field(default=Path("ops/jobs.json"), validation_alias="JOBS_FILE")
+    state_dir: Path = Field(default=Path("/state"), validation_alias="JOBS_STATE_DIR")
+
+    @property
+    def bootstrap_accounts(self) -> tuple[str, ...]:
+        """The configured account keys, split and cleaned."""
+
+        return tuple(
+            part.strip() for part in self.accounts.replace(";", ",").split(",") if part.strip()
+        )
+
+
 class OidcSettings(BaseSettings):
     """Sign-in through an OpenID Connect provider (env prefix ``OIDC_``).
 
@@ -748,6 +827,7 @@ class Settings(BaseSettings):
     rate_limit: RateLimitSettings = Field(default_factory=RateLimitSettings)
     oidc: OidcSettings = Field(default_factory=OidcSettings)
     storage: StorageSettings = Field(default_factory=StorageSettings)
+    admin: AdminSettings = Field(default_factory=AdminSettings)
 
 
 @lru_cache(maxsize=1)

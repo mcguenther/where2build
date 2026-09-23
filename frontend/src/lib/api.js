@@ -77,7 +77,23 @@ export async function authState() {
   try {
     return await request("/auth/me");
   } catch {
-    return { eingerichtet: false, angemeldet: false, name: null, kennung: null };
+    return { eingerichtet: false, angemeldet: false, name: null, kennung: null, verwalter: false };
+  }
+}
+
+/**
+ * What this deployment currently says to everybody: a maintenance window, an
+ * outage, anything the operator typed. Answers an empty, invisible
+ * announcement when there is nothing to say, so a healthy deployment produces
+ * no error in the console on every page load.
+ */
+export async function announcement() {
+  try {
+    return await request("/ansage");
+  } catch {
+    // A banner that cannot be fetched is not worth an error on the page it
+    // would have sat on.
+    return { text: "", art: "hinweis", sichtbar: false };
   }
 }
 
@@ -105,6 +121,76 @@ export const createShare = (dokument, umfang) =>
 export const sharesOnServer = () => request("/shares");
 export const deleteShare = token => request(`/shares/${encodeURIComponent(token)}`, { method: "DELETE" });
 export const sharedPlot = token => request(`/shares/${encodeURIComponent(token)}`);
+
+/* ---------- The administration area ----------
+ * Every one of these answers 403 for somebody who is not an administrator, so
+ * the interface may draw the way in from `authState().verwalter` and still not
+ * be what grants anything. 503 means this deployment has no database: the
+ * statistics need one, the error list deliberately does not.
+ *
+ * The period is passed as two ISO moments rather than as "last week", because
+ * the picker offers a free range and a server that parsed „letzte Woche" would
+ * have to agree with the browser about where the week starts. */
+const period = (von, bis) =>
+  `?von=${encodeURIComponent(von.toISOString())}&bis=${encodeURIComponent(bis.toISOString())}`;
+
+/** A page, as every list in the administration area asks for one. */
+const page = ({ limit = 25, offset = 0, suche = "" } = {}) =>
+  `limit=${limit}&offset=${offset}${suche ? `&suche=${encodeURIComponent(suche)}` : ""}`;
+
+export const adminOverview = () => request("/verwaltung/uebersicht");
+export const adminStatistics = (von, bis, raster = "stunde", vergleich = false) =>
+  request(`/verwaltung/statistik${period(von, bis)}&raster=${raster}&vergleich=${vergleich}`);
+export const adminAccounts = (von, bis, options = {}) =>
+  request(
+    `/verwaltung/konten${period(von, bis)}&${page(options)}` +
+      `&sortierung=${options.sortierung || "anfragen"}`
+  );
+/** The whole record of one account, for the Auskunft somebody is entitled to.
+ *  A link rather than a fetch, so the browser saves it under the name the
+ *  server sends. */
+export const adminRecordUrl = kennung =>
+  `${BASE}/verwaltung/konten/${encodeURIComponent(kennung)}/auskunft`;
+export const adminSetRole = (kennung, ist_admin) =>
+  request(`/verwaltung/konten/${encodeURIComponent(kennung)}/rolle`, {
+    method: "POST",
+    body: JSON.stringify({ ist_admin })
+  });
+export const adminBlock = (kennung, minuten, grund) =>
+  request(`/verwaltung/konten/${encodeURIComponent(kennung)}/sperre`, {
+    method: "POST",
+    body: JSON.stringify({ minuten, grund })
+  });
+export const adminUnblock = kennung =>
+  request(`/verwaltung/konten/${encodeURIComponent(kennung)}/sperre`, { method: "DELETE" });
+export const adminDeleteAccount = kennung =>
+  request(`/verwaltung/konten/${encodeURIComponent(kennung)}`, { method: "DELETE" });
+export const adminErrors = (von, bis, options = {}) =>
+  request(`/verwaltung/fehler${period(von, bis)}&${page(options)}`);
+/** The download is a plain link, not a fetch: the browser saves it under the
+ *  name the Content-Disposition carries, and a blob built here would not. */
+export const adminErrorDownloadUrl = (von, bis) => `${BASE}/verwaltung/fehler.ndjson${period(von, bis)}`;
+export const adminShares = (options = {}) => request(`/verwaltung/freigaben?${page(options)}`);
+export const adminDeleteShare = token =>
+  request(`/verwaltung/freigaben/${encodeURIComponent(token)}`, { method: "DELETE" });
+export const adminSweepShares = () => request("/verwaltung/freigaben/aufraeumen", { method: "POST" });
+export const adminServices = () => request("/verwaltung/dienste");
+export const adminClearCache = name =>
+  request("/verwaltung/cache/leeren", { method: "POST", body: JSON.stringify({ name }) });
+export const adminAudit = (options = {}) => request(`/verwaltung/protokoll?${page(options)}`);
+export const adminJobs = () => request("/verwaltung/jobs");
+export const adminStartJob = name =>
+  request(`/verwaltung/jobs/${encodeURIComponent(name)}/starten`, { method: "POST" });
+/** The banner, as the operator sees it — including while it is switched off. */
+export const adminAnnouncement = () => request("/verwaltung/ansage");
+export const putAnnouncement = ansage =>
+  request("/verwaltung/ansage", { method: "PUT", body: JSON.stringify(ansage) });
+export const adminPrepareWipe = () => request("/verwaltung/datenbank/vorbereiten", { method: "POST" });
+export const adminWipe = (schluessel, bestaetigung, umfang) =>
+  request("/verwaltung/datenbank/leeren", {
+    method: "POST",
+    body: JSON.stringify({ schluessel, bestaetigung, umfang })
+  });
 
 export const plotsOnServer = () => request("/plots");
 export const putPlot = (id, dokument, geaendert_am) =>

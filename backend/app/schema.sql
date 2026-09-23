@@ -4,9 +4,14 @@
 -- is enough for a schema that has never changed and is deliberately not a
 -- migration tool: the moment a column has to be renamed, dropped or backfilled,
 -- IF NOT EXISTS says nothing about the database it found and silently leaves it
--- as it was. A real tool (Alembic, or plain numbered .sql files with a
--- schema_migrations table) is due before the first change to anything below --
--- not before the first deployment.
+-- as it was.
+--
+-- The numbered files in `migrations/` are the tool that was due, and they
+-- arrived with the first such change (`users` grew `kennung` and `ist_admin`
+-- for the administration area). They run once each, in order, recorded in
+-- `schema_migrations`. This file is the baseline they build on and is not
+-- edited again: a new table, or a change to a column below, is a new file
+-- there.
 --
 -- Column names are German where the API is German. `dokument` and
 -- `geaendert_am` are the wire format the frontend sends and reads back, the

@@ -61,6 +61,14 @@ logger = logging.getLogger(__name__)
 # change to a column.
 SCHEMA_PATH = Path(__file__).resolve().parent.parent / "schema.sql"
 
+# Everything that changed after that baseline. Numbered files, applied once
+# each, in order, recorded in ``schema_migrations`` -- the tool ``schema.sql``
+# says is due before the first change to any column in it. Deliberately the
+# smallest thing that is one: no down-migrations, because a deployment that has
+# to go back goes back to a backup, and nothing here is clever enough to need
+# a framework.
+MIGRATIONS_PATH = Path(__file__).resolve().parent.parent / "migrations"
+
 NOT_CONFIGURED = (
     "Auf diesem Server ist kein Speicher für Konten eingerichtet. Die Grundstücke "
     "bleiben in diesem Browser; zum Einrichten wird DATABASE_URL auf eine "
@@ -85,20 +93,38 @@ _TABLE_RE = re.compile(
 )
 
 
-def declared_columns(schema: str) -> dict[str, set[str]]:
-    """The tables this schema creates and the columns it gives each of them."""
+# „alter table users add column if not exists kennung text" -- a migration adds
+# to a table that `schema.sql` already declared, so the baseline alone is not
+# the shape the database has.
+_ADD_COLUMN_RE = re.compile(
+    r"alter\s+table\s+(\w+)\s+add\s+column\s+(?:if\s+not\s+exists\s+)?(\w+)",
+    re.IGNORECASE,
+)
+
+
+def declared_columns(*sources: str) -> dict[str, set[str]]:
+    """Every table this code creates and every column it gives them.
+
+    The baseline *and* the migrations, because the two together are the shape
+    the database is meant to have. Reading only `schema.sql` was wrong the
+    moment the first migration added a column: `kennung` is `not null` there
+    and appears in no `create table`, so the check below would have reported
+    the application's own schema as a stranger.
+    """
 
     tables: dict[str, set[str]] = {}
-    for name, body in _TABLE_RE.findall(schema):
-        columns = set()
-        for line in body.splitlines():
-            line = line.split("--")[0].strip().rstrip(",")
-            word = line.split()[0].lower() if line else ""
-            if word and word not in (
-                "primary", "unique", "foreign", "check", "constraint", "exclude"
-            ):
-                columns.add(word)
-        tables[name.lower()] = columns
+    for source in sources:
+        for name, body in _TABLE_RE.findall(source):
+            columns = tables.setdefault(name.lower(), set())
+            for line in body.splitlines():
+                line = line.split("--")[0].strip().rstrip(",")
+                word = line.split()[0].lower() if line else ""
+                if word and word not in (
+                    "primary", "unique", "foreign", "check", "constraint", "exclude"
+                ):
+                    columns.add(word)
+        for name, column in _ADD_COLUMN_RE.findall(source):
+            tables.setdefault(name.lower(), set()).add(column.lower())
     return tables
 
 
@@ -118,7 +144,9 @@ async def _check_columns(connection: Any, schema: str) -> None:
     database requires, has no default for, and the schema does not declare.
     """
 
-    expected = declared_columns(schema)
+    expected = declared_columns(
+        schema, *(path.read_text(encoding="utf-8") for path in sorted(MIGRATIONS_PATH.glob("*.sql")))
+    )
     if not expected:
         return
     rows = await connection.fetch(
@@ -139,13 +167,14 @@ async def _check_columns(connection: Any, schema: str) -> None:
     ]
     if surplus:
         raise UpstreamError(
-            "Die Datenbank passt nicht zu dieser Version: "
+            "Die Datenbank passt nicht zu dieser Fassung: "
             + ", ".join(sorted(surplus))
-            + " wird verlangt und von dieser Anwendung nie gefüllt. Die Tabellen "
-            "stammen aus einer älteren Fassung — `create table if not exists` "
-            "ändert eine vorhandene Tabelle nicht. Entweder die Spalte von Hand "
-            "entfernen oder, wenn nichts darin gespeichert ist, das Volume "
-            "verwerfen: docker compose down -v."
+            + " wird verlangt und von diesem Stand nie gefüllt. Meist ist die "
+            "Datenbank *neuer* als der Code — dieselbe Datenbank wurde schon "
+            "von einem anderen Zweig benutzt, der die Spalte über eine "
+            "Migration angelegt hat. Dann hilft, den Code auf den Stand zu "
+            "bringen, der sie kennt; die Spalte zu löschen macht die Migration "
+            "kaputt und ist fast nie richtig."
         )
 
 
@@ -289,6 +318,36 @@ async def _register_json(connection: asyncpg.Connection) -> None:
     )
 
 
+async def _migrate(connection: asyncpg.Connection) -> None:
+    """Apply every migration this process carries that the database has not.
+
+    Each file runs in a transaction of its own together with the row that
+    records it, so a file that fails half-way leaves neither half behind. The
+    order is the file name, which is why they are numbered.
+    """
+
+    await connection.execute(
+        """
+        create table if not exists schema_migrations (
+            version    text        primary key,
+            angewendet timestamptz not null default now()
+        )
+        """
+    )
+    applied = {
+        row["version"] for row in await connection.fetch("select version from schema_migrations")
+    }
+    for path in sorted(MIGRATIONS_PATH.glob("*.sql")):
+        if path.stem in applied:
+            continue
+        logger.info("Applying migration %s", path.stem)
+        async with connection.transaction():
+            await connection.execute(path.read_text(encoding="utf-8"))
+            await connection.execute(
+                "insert into schema_migrations (version) values ($1)", path.stem
+            )
+
+
 class Storage:
     """The pool, the schema and the statements. One instance per process."""
 
@@ -337,6 +396,9 @@ class Storage:
                 schema = SCHEMA_PATH.read_text(encoding="utf-8")
                 async with pool.acquire() as connection:
                     await connection.execute(schema)
+                    await _migrate(connection)
+                    # Last, so it only reports what the migrations did not put
+                    # right.
                     await _check_columns(connection, schema)
             except (asyncpg.PostgresError, OSError, TimeoutError) as exc:
                 # A pool that was built and then failed on the schema has open
@@ -353,6 +415,18 @@ class Storage:
         pool, self._pool = self._pool, None
         if pool is not None:
             await pool.close()
+
+    async def open_pool(self) -> asyncpg.Pool:
+        """The pool, opened if it is not yet.
+
+        The administration statements live in ``services/admin.py`` -- they are
+        about the deployment rather than about one person's document, and
+        mixing them in here would make the file that holds the account rules
+        also hold the operator's tools. They share this pool rather than
+        opening a second one, so the ceiling on connections stays one number.
+        """
+
+        return await self._pool_or_open()
 
     async def _pool_or_open(self) -> asyncpg.Pool:
         self.require_configured()
@@ -387,8 +461,8 @@ class Storage:
             )
         return await connection.fetchval(
             """
-            insert into users (issuer, subject, anzeigename)
-            values ($1, $2, $3)
+            insert into users (issuer, subject, anzeigename, kennung)
+            values ($1, $2, $3, $4)
             on conflict (issuer, subject) do update
                 set anzeigename = coalesce(excluded.anzeigename, users.anzeigename)
             returning id
@@ -396,6 +470,7 @@ class Storage:
             identity.issuer,
             identity.subject,
             identity.name,
+            identity.account_key,
         )
 
     async def account_overview(self, identity: Identity) -> AccountOverview | None:

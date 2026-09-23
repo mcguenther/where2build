@@ -204,3 +204,94 @@ that collapsed at 390 px. None of them threw.
   `:not(.gelesen--lesezeichen)`; a test asserts the entry step has no plain
   one.
 
+
+- **A full-bleed section inside `.container` bleeds to 1360 px, not to the
+  window.** The reception's negative margins only took back the container's own
+  padding, so on anything wider than about 1440 px the drawing sat as a panel
+  in the middle of bare `--w2b-paper` — while the header and the footer, which
+  are outside the container, went edge to edge. Nothing failed; it simply read
+  as a card on the one screen that is supposed to read as a place. Reaching the
+  window needs `width: 100vw; margin-inline: calc(50% - 50vw)`, and `100vw`
+  counts the classic scrollbar the page does not have, so `.shell` carries
+  `overflow-x: clip` to swallow those few pixels. **`clip`, never `hidden`:**
+  `hidden` makes the shell a scroll container and every `position: sticky`
+  inside it — the site plan, the two maps, the parcel list's header — silently
+  stops sticking.
+
+- **The backdrop's box decides how big a parcel looks, and `slice` is what
+  couples them.** The drawing is a lattice rotated by the street's gradient in
+  a `0 0 3840 1200` box with `xMidYMin slice`, so the scale is
+  `max(width/3840, 1300/1200)`: below 4160 px the height wins, a parcel is the
+  same size on every monitor, and a wider window shows more fabric instead of a
+  magnified piece of it. Two things follow from the box being centred. The plot
+  keeps a fixed offset from the middle, which is a fixed offset on screen — and
+  the quiet core in the middle must be a fixed size too, because it exists to
+  back an 860 px column of type and to stop short of that plot. Left as a bare
+  `34%` it grew with the window until it washed the plot out.
+
+- **Widening the box moves the street up, because the street is not level.**
+  Its gradient is about −0.105, so translating the plot 1200 units right along
+  it lifts it 126 units out of the frame; the fabric has to come down by the
+  same amount for the composition to survive. And the reception is
+  `clamp(600px, 82vh, 940px)` tall while the drawing is anchored to its top, so
+  a tall window moves the type down over a street that stayed put: the route
+  ran through the sentence under the headline. The street now crosses where the
+  search panel is, which is opaque at every height the reception takes.
+
+- **Two rows of parcels between two streets cannot be drawn independently.**
+  The first version gave the row on the kerb a depth from one set and the row
+  behind it a depth from another, which is how the drawing it was read out of
+  had done it — and in a 1360 px window the mismatch mostly fell outside the
+  frame. Full width it is everywhere: the block is 469 units kerb to kerb, the
+  two depths summed to anything between 420 and 550, so the rows overlapped by
+  up to 80 units in one place and left a strip of bare paper in the next. The
+  block is now cut into superblocks along the street first; a superblock has
+  one rear boundary at one depth, and each row subdivides that same run with
+  widths of its own. Both rows then share their outer edges and the boundary
+  between them, and nothing else can happen. The generator asserts it — it
+  walks every rectangle a block emits and fails the build on a cell covered
+  twice or not at all — because neither a 40-unit overlap nor a 40-unit gap
+  announces itself in a backdrop; it just looks slightly wrong.
+
+- **Eine Seite, die beim Aufbau `state.account` liest, liest sie zu früh.**
+  `AccountView.created()` rief `load()`, und `load()` steigt aus, solange
+  niemand angemeldet ist — die Antwort auf „wer ist angemeldet" kommt aber erst
+  danach, weil `App.created()` sie erst holt. Über den Kopf angeklickt
+  funktionierte die Seite deshalb immer, beim **direkten** Aufruf von `/konto`
+  blieb der Kasten „Gespeichert ist" leer: kein Fehler, keine Meldung, nichts.
+  Aufgefallen ist es erst, als die Seite ein eigenes Bild im Screenshot-Lauf
+  bekam — ein Zustand, den kein Test traf, weil jeder Test den Zustand vorher
+  setzt. Ein `watch` auf `state.account.angemeldet` zieht den Stand nach; das
+  deckt zugleich die Anmeldung im zweiten Fenster ab.
+  Preis davon: eine Seite, die auf einen globalen Zustand hört, wirkt in
+  vitest über das Testende hinaus — die Instanz bleibt montiert und lädt beim
+  nächsten Zustandswechsel nach, was dort als unerwarteter `fetch` auftaucht.
+  `open()` in `account-view.test.js` baut die vorige Seite deshalb ab.
+
+- **Zwei Dinge in der Oberfläche „Kennung" zu nennen, kostet genau dann etwas,
+  wenn jemand eines davon abtippt.** Die Kontoseite zeigte als „Kennung" das
+  *Subject des Anbieters*, während `/api/auth/me`, das Anfragebudget und
+  `ADMIN_ACCOUNTS` mit „Kennung" den Kontoschlüssel meinen. Wer sich zum
+  Verwalter machen wollte, trug den falschen Wert ein und bekam keinen Zugang
+  und keine Erklärung. Jetzt heißen sie „Kennung beim Anbieter" und „Kennung
+  dieses Kontos", beide stehen da, und darunter steht, welche der Betreiber
+  braucht.
+
+- **Zwei Seiten, die dasselbe zeigen, driften — und die schlechtere gewinnt
+  nicht.** Die Dienstliste stand in „Übersicht" *und* in „Betrieb", und die im
+  Betrieb war die bessere (Karten statt Zeilen, deutsche Namen, Endpunkt).
+  Die Übersicht fasst jetzt zusammen („11 von 15 eingerichtet; ohne: …") und
+  verlinkt dorthin, wo die Einzelheiten stehen. Was eine erste Seite sonst
+  trägt: eine Zeile je Sache, die Aufmerksamkeit braucht, mit dem Weg dorthin,
+  wo sich etwas daran tun lässt — und die Zahlen, für die sonst jemand
+  navigieren müsste.
+
+- **Eine Antwort ohne das erwartete Feld nimmt die ganze Seite mit.**
+  `held.caches.length` und `day.summe.fehler` werfen beim Rendern, sobald die
+  Antwort ein Objekt *ohne* dieses Feld ist — und ein geworfenes Render bricht
+  nicht diese eine Zeile ab, sondern alles, was danach käme: die Seite zeigte
+  „Wird geladen …" in Kästen, deren Daten längst da waren. `Array.isArray(…)
+  ? … : []` in einem computed kostet eine Zeile und hält die Seite zusammen.
+  Aufgefallen an einer Test-Attrappe, die für unbekannte Pfade `{}` liefert —
+  also genau an dem Fall, den ein echter Server nach einem Teil-Ausfall auch
+  liefert.

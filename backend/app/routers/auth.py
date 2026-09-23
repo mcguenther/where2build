@@ -20,7 +20,7 @@ from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.responses import RedirectResponse
 
 from .. import session
-from ..deps import oidc_service
+from ..deps import admin_store, is_admin, oidc_service
 from ..errors import AppError
 from ..schemas import AnmeldungStatus
 from ..services.oidc import OidcService, challenge_for, new_verifier
@@ -155,6 +155,11 @@ async def me(
         angemeldet=True,
         name=identity.name,
         kennung=identity.account_key,
+        # The interface needs this to decide whether to draw the way in, and
+        # this is the one request it already makes on every page load. It is
+        # not what grants anything: every route under /api/verwaltung asks
+        # again, on the server, where the answer cannot be edited.
+        verwalter=await is_admin(identity, admin_store()),
     )
 
 

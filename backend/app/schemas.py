@@ -1281,6 +1281,14 @@ class AnmeldungStatus(BaseModel):
             "gebildet, damit keine Kennung des Anmeldedienstes selbst nach außen geht."
         ),
     )
+    verwalter: bool = Field(
+        default=False,
+        description=(
+            "Ob dieses Konto den Verwaltungsbereich öffnen darf. Die Oberfläche "
+            "blendet den Menüpunkt danach ein; geprüft wird jede Anfrage erneut "
+            "am Server."
+        ),
+    )
 
 
 # --------------------------------------------------------------------------
@@ -1336,8 +1344,19 @@ class KontoAntwort(BaseModel):
         description="Der OpenID-Anbieter, der diese Anmeldung bestätigt hat (issuer)."
     )
     kennung: str = Field(
-        description="Die Kennung, unter der der Anbieter diese Person führt (subject). "
-        "Sie stammt vom Anbieter, nicht von uns."
+        description=(
+            "Die Kennung dieses Kontos in dieser Anwendung — dieselbe, die "
+            "/api/auth/me meldet und die in ADMIN_ACCOUNTS eingetragen wird. "
+            "Aus Anbieter und Anbieter-Kennung gebildet, damit die Kennung des "
+            "Anmeldedienstes selbst nirgends nach außen geht."
+        )
+    )
+    anbieter_kennung: str = Field(
+        description=(
+            "Die Kennung, unter der der Anbieter diese Person führt (subject). "
+            "Sie stammt vom Anbieter, nicht von uns, und ist nicht die, die der "
+            "Betreiber einträgt."
+        )
     )
     anzeigename: str | None = Field(
         default=None,
@@ -1761,3 +1780,286 @@ class ParcelSearchResponse(BaseModel):
     gebiete: list[Suchgebiet] = Field(default_factory=list)
     anfragen: int
     hinweis: str | None = None
+
+
+# --------------------------------------------------------------------------
+# Administration (/api/verwaltung/...)
+#
+# Field names are German like the rest of the wire format. Two of them are
+# worth a sentence: `kennung` is the account key -- the same non-speaking
+# identifier /api/auth/me reports -- and never a name or an address, and
+# `bereich` is one of the three areas a count belongs to („anfrage", „dienst",
+# „modell"), which is the distinction every question here starts from.
+# --------------------------------------------------------------------------
+
+
+class VerwaltungsUebersicht(BaseModel):
+    """The numbers on the first page of the administration area."""
+
+    konten: int = Field(description="Konten mit gespeichertem Stand.")
+    grundstuecke: int
+    freigaben: int = Field(description="Offene Freigabe-Links.")
+    sperren: int = Field(description="Zurzeit gesperrte Konten.")
+    fehler: int = Field(description="Gespeicherte Fehlereinträge.")
+    protokoll: int = Field(description="Einträge im Prüfprotokoll.")
+    datenbank_bytes: int
+    cache_bytes: int
+    verwalter: int = Field(description="Konten mit Verwaltungsrecht in der Datenbank.")
+    aus_konfiguration: int = Field(
+        description="Verwalter aus ADMIN_ACCOUNTS; sie stehen nicht in der Datenbank."
+    )
+
+
+class Zeitpunktwerte(BaseModel):
+    """One point of the series, and one row of the per-service table."""
+
+    zeit: datetime | None = None
+    bereich: str | None = None
+    dienst: str | None = None
+    anfragen: int = 0
+    fehler: int = 0
+    limitiert: int = Field(default=0, description="Wegen des Abrufkontingents abgelehnt.")
+    dauer_ms: int = Field(default=0, description="Summe der Antwortzeiten, nicht der Mittelwert.")
+    tokens_ein: int = 0
+    tokens_aus: int = 0
+    kosten_eur: float | None = Field(
+        default=None,
+        description=(
+            "Was die Tokens gekostet haben, umgerechnet über den Kurs aus der "
+            "Preisliste. null heißt „kein Preis für dieses Modell hinterlegt“ — "
+            "niemals 0,00 €."
+        ),
+    )
+
+
+class Preisstand(BaseModel):
+    """Where the money column comes from, so it can be checked.
+
+    Every field is nullable on purpose: without a price list there is no cost
+    column at all, and the interface says which of the two states it is in
+    rather than showing 0,00 €.
+    """
+
+    vorhanden: bool = False
+    stand: str | None = Field(default=None, description="Wann die Preisliste geschrieben wurde.")
+    usd_je_eur: float | None = None
+    kurs_stand: str | None = Field(default=None, description="Tag des EZB-Referenzkurses.")
+    quellen: dict[str, str] = Field(default_factory=dict)
+    modelle: int = 0
+    hinweis: str | None = Field(default=None, description="Warum keine Preise vorliegen.")
+
+
+class Statistik(BaseModel):
+    von: datetime
+    bis: datetime
+    raster: str = Field(description="„stunde“ oder „tag“.")
+    zeitreihe: list[Zeitpunktwerte]
+    nach_dienst: list[Zeitpunktwerte]
+    summe: Zeitpunktwerte
+    vergleich: list[Zeitpunktwerte] | None = Field(
+        default=None,
+        description=(
+            "Derselbe Zeitraum davor, gleich lang — nur wenn danach gefragt wurde. "
+            "Die Punkte tragen die Zeiten des Vergleichszeitraums."
+        ),
+    )
+    vergleich_summe: Zeitpunktwerte | None = None
+    preise: Preisstand = Field(default_factory=Preisstand)
+
+
+class Konto(BaseModel):
+    """One line of the account list."""
+
+    kennung: str
+    anzeigename: str | None = None
+    angelegt: datetime | None = None
+    ist_admin: bool = False
+    grundstuecke: int = 0
+    freigaben: int = 0
+    bytes: int = 0
+    anfragen: int = 0
+    fehler: int = 0
+    tokens_ein: int = 0
+    tokens_aus: int = 0
+    zuletzt_aktiv: datetime | None = None
+    gesperrt_bis: datetime | None = None
+    gesperrt_grund: str | None = None
+    gesperrt_automatisch: bool = False
+
+
+class Konten(BaseModel):
+    von: datetime
+    bis: datetime
+    konten: list[Konto]
+    gesamt: int = Field(default=0, description="Wie viele Zeilen es insgesamt gibt.")
+    offset: int = 0
+    limit: int = 50
+
+
+class RollenAenderung(BaseModel):
+    ist_admin: bool = Field(description="Ob dieses Konto die Verwaltung öffnen darf.")
+
+
+class SperrAnfrage(BaseModel):
+    minuten: int = Field(default=60, ge=1, le=60 * 24 * 365)
+    grund: str = Field(default="", max_length=500)
+
+
+class Sperre(BaseModel):
+    kennung: str
+    bis: datetime
+    grund: str
+    automatisch: bool = False
+
+
+class Fehlereintrag(BaseModel):
+    zeit: datetime
+    bereich: str
+    dienst: str | None = None
+    status: int | None = None
+    route: str | None = None
+    kennung: str | None = None
+    meldung: str
+
+
+class Fehlerliste(BaseModel):
+    von: datetime
+    bis: datetime
+    gesamt: int = 0
+    offset: int = 0
+    limit: int = 50
+    quelle: str = Field(
+        description=(
+            "„datenbank“, oder „speicher“, wenn ohne Serverspeicher nur die "
+            "Fehler dieses Prozesses vorliegen."
+        )
+    )
+    eintraege: list[Fehlereintrag]
+
+
+class FreigabeZeile(BaseModel):
+    """A shared link as the operator sees it: never what is inside it."""
+
+    token: str
+    angelegt: datetime
+    laeuft_ab: datetime
+    kennung: str
+    anzeigename: str | None = None
+    bytes: int = 0
+
+
+class Freigabenliste(BaseModel):
+    freigaben: list[FreigabeZeile]
+    gesamt: int = 0
+    offset: int = 0
+    limit: int = 50
+
+
+class Zwischenspeicher(BaseModel):
+    name: str
+    dateien: int
+    bytes: int
+
+
+class Dienstlage(BaseModel):
+    """What the services and the caches are doing, for the operations page."""
+
+    caches: list[Zwischenspeicher]
+    cache_bytes: int
+    cache_grenze_bytes: int
+    kontingent_dienste: int
+    kontingent_kacheln: int
+    kontingent_fenster_s: int
+    kontingent_aktiv: bool
+    sperre_ab: int = Field(description="Anfragen im Sperrfenster, ab denen automatisch gesperrt wird.")
+    sperre_fenster_s: int
+    sperre_dauer_min: int
+    aufbewahrung_tage: int
+
+
+class Protokolleintrag(BaseModel):
+    zeit: datetime
+    kennung: str
+    name: str | None = None
+    aktion: str
+    ziel: str | None = None
+    details: dict[str, Any] | None = None
+
+
+class Protokoll(BaseModel):
+    eintraege: list[Protokolleintrag]
+    gesamt: int = 0
+    offset: int = 0
+    limit: int = 50
+
+
+class Ansage(BaseModel):
+    """The announcement every visitor sees. Public on the way out."""
+
+    text: str = Field(default="", max_length=1000)
+    art: Literal["hinweis", "warnung"] = "hinweis"
+    sichtbar: bool = False
+    bis: datetime | None = Field(
+        default=None,
+        description="Ab wann sie von selbst verschwindet; null heißt „bis jemand sie abschaltet“.",
+    )
+    geaendert_am: datetime | None = None
+
+
+class AnsageAnfrage(BaseModel):
+    text: str = Field(default="", max_length=1000)
+    art: Literal["hinweis", "warnung"] = "hinweis"
+    sichtbar: bool = False
+    bis: datetime | None = None
+
+
+class JobZeile(BaseModel):
+    """One recurring job, and what is known about its last run."""
+
+    name: str
+    zeitplan: str
+    warum: str
+    befehl: list[str]
+    zuletzt: datetime | None = None
+    exit_code: int | None = None
+    dauer_s: float | None = None
+    laeuft: bool = False
+    angefordert: str | None = Field(
+        default=None, description="Wann und von wem ein Lauf angefordert wurde, falls offen."
+    )
+
+
+class Jobs(BaseModel):
+    jobs: list[JobZeile]
+    scheduler_zuletzt: datetime | None = Field(
+        default=None, description="Wann sich der Scheduler zuletzt gemeldet hat."
+    )
+    scheduler_laeuft: bool = Field(
+        default=False,
+        description=(
+            "Ob gerade einer läuft. Ist er aus, bleibt ein angeforderter Lauf "
+            "liegen — die Oberfläche sagt das, statt einen Knopf ohne Wirkung zu zeigen."
+        ),
+    )
+    hinweis: str | None = None
+
+
+class LoeschVorbereitung(BaseModel):
+    """The first of the two confirmations. The key is single use."""
+
+    schluessel: str
+    gueltig_bis: datetime
+    satz: str = Field(description="Wortlaut, den die zweite Bestätigung tragen muss.")
+
+
+class LoeschAnfrage(BaseModel):
+    schluessel: str
+    bestaetigung: str = Field(description="Muss dem Wortlaut aus der Vorbereitung entsprechen.")
+    umfang: list[str] = Field(
+        default_factory=list,
+        description="Welche Tabellen geleert werden: „konten“, „statistik“, „sperren“.",
+    )
+
+
+class LoeschErgebnis(BaseModel):
+    geleert: dict[str, int] = Field(description="Tabelle → Anzahl gelöschter Zeilen.")
