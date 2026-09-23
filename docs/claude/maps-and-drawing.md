@@ -245,3 +245,57 @@ routines under it.
   zoomed (a `movestart` with an `originalEvent`). Reproduced by delaying
   `/api/nearby` 5 s in Playwright: 1 of 7 markers in view before, 7 of 7 after.
   A warm backend cache hides it — the answer then beats the style.
+
+- **The search map's cadastre was yellow, from zoom 15, and it buried the
+  answer.** The ground used the oversampled `flurstuecke` layer in the
+  service's „Gelb“ style, so over a district every hedge carried a yellow line
+  and an ambiguous run's two candidates were two outlines among a few hundred —
+  in a colour nothing else in the app uses. The ground now takes the site
+  plan's own `liegenschaftskarte` (default style, black line work) from
+  `PARCEL_OUTLINE_MIN_ZOOM = 17`; the numbers get legible at 18. Measured over
+  Mölkau on 23.09.2026: at 17 a plot is some forty pixels wide and its number
+  three pixels high. The backend's `flurstuecke` layer is no longer asked for.
+
+- **`focusOn` cannot close in on one candidate.** It frames the whole candidate
+  set around the evidence, which is right for a clue and does nothing for a
+  candidate — the set already contains it. The table's row click and „Zeigen"
+  go through `focusCandidate`, which frames that parcel with ~55 m around it.
+  The row numbers are drawn on the map as DOM markers, not a symbol layer: the
+  aerial ground is raster only and carries no glyphs. And a marker is
+  positioned through its own inline `transform`, so a CSS `transform` on it
+  (a scale for „shown") throws it off its parcel — the highlight grows the
+  badge's box instead.
+
+- **Two badges on one pixel read as one candidate.** At district scale 134/m
+  and 97/4 in Großbothen, 500 m apart, landed on the same spot and the „1" sat
+  under the „2" — the map said one, the table two. Badges that would come
+  within `MERGE_DISTANCE_PX` of each other are merged into one labelled with
+  what it holds („1, 2", „1–5", „1, 2, 4–7"; `lib/badges.js`), regrouped once a
+  frame while zooming, and a click on a merged badge zooms in until they part.
+
+- **Every frame the search map fitted ignored the HUD.** From 1000 px up the
+  verdict and the Verlauf float over the map's right 40 %, and `fitBounds`
+  with a plain 36 px padding centred the answer under them: after zooming in
+  on „1, 2", candidate 2 was behind the panel. `ParcelSearch` measures how much
+  of the map the HUD covers and `EvidenceMap.padding()` adds it on the right.
+  Measured rather than derived from the breakpoint, because whether the HUD
+  floats is the stylesheet's decision. jsdom has no `ResizeObserver`, so the
+  measurement is skipped there — without that guard thirty tests failed on
+  mount.
+
+- **An ambiguous result is cards, and each card's picture is not a map.** The
+  point of the picture is recognition — a roof or a hedge from the listing's
+  photographs — so it is fixed: `lib/candidateSketch.js` frames the parcel with
+  at least 60 m either side and draws the orthophoto and, from zoom 17, the
+  Liegenschaftskarte as `<image>` tiles in an SVG, the way the route cards do.
+  A MapLibre instance per card would run into the WebGL context limit at a
+  dozen candidates, and the maps past it go blank without a word. Twelve cards
+  are drawn before „Alle zeigen"; each is some six tiles of each layer from
+  the authority's WMS. The candidate's outline is drawn wider (3,6 over an 8 px
+  halo) than on the big map: among the cadastre's own lines at this size, a
+  contour of the same weight is one boundary more.
+
+- **„Is the map on screen" has to mean most of it.** The cards sit right under
+  the map, so after a click the map's lower edge was usually in view and the
+  check passed — while the pan happened in a strip at the top of the screen.
+  It scrolls unless 60 % of the map is visible.

@@ -157,9 +157,9 @@ describe("Der Lärmschleier über dem Hintergrund", () => {
 
     expect(style.sources.liegenschaftskarte.minzoom).toBeUndefined();
     expect(style.layers.at(-1).minzoom).toBeUndefined();
-    // Der Suchhintergrund dagegen hat eine Untergrenze, weil dort das
-    // Vergrößern irgendwann am Dienst scheitert.
-    expect(aerialCadastreStyle().sources.flurstuecke.minzoom).toBe(PARCEL_OUTLINE_MIN_ZOOM);
+    // The search ground takes the same picture, but only from a floor: over a
+    // district it is a mesh the candidates vanish in.
+    expect(aerialCadastreStyle().sources.liegenschaftskarte.minzoom).toBe(PARCEL_OUTLINE_MIN_ZOOM);
   });
 });
 
@@ -169,7 +169,7 @@ describe("Luftbild mit Kataster", () => {
 
     // Die Reihenfolge ist der ganze Trick: das Foto unten, die Straßen
     // darüber, die Grenzen zuoberst.
-    expect(style.layers.map(l => l.id)).toEqual(["dop", "strassen", "flurstuecke"]);
+    expect(style.layers.map(l => l.id)).toEqual(["dop", "strassen", "liegenschaftskarte"]);
     style.layers.forEach(layer => expect(layer.type).toBe("raster"));
   });
 
@@ -182,16 +182,18 @@ describe("Luftbild mit Kataster", () => {
     });
   });
 
-  it("fragt die Flurstücksgrenzen erst da, wo der Dienst sie zeichnet", () => {
+  it("zeichnet die Flurstücksgrenzen erst aus der Nähe und schwarz wie der Lageplan", () => {
     const style = aerialCadastreStyle();
 
-    // adv_alkis_flurstuecke trägt MaxScaleDenominator 2000 und antwortet
-    // darüber mit einer leeren PNG statt mit einem Fehler. Das Backend rendert
-    // die Kachel deshalb größer und skaliert sie zurück — das trägt bis Zoom 15;
-    // Zoom 14 bräuchte 4368 px, und der Dienst rendert höchstens 4000.
-    expect(PARCEL_OUTLINE_MIN_ZOOM).toBe(15);
-    expect(style.sources.flurstuecke.minzoom).toBe(PARCEL_OUTLINE_MIN_ZOOM);
-    expect(style.layers.find(l => l.id === "flurstuecke").minzoom).toBe(PARCEL_OUTLINE_MIN_ZOOM);
+    // At 15 an ambiguous run's candidates drowned in a few hundred yellow
+    // outlines. From 17 a plot is some forty pixels wide; the numbers follow
+    // at 18. The layer is the site plan's own Liegenschaftskarte — the
+    // service's default style, black line work — not the „Gelb“ contours.
+    expect(PARCEL_OUTLINE_MIN_ZOOM).toBe(17);
+    expect(style.sources.liegenschaftskarte.minzoom).toBe(PARCEL_OUTLINE_MIN_ZOOM);
+    expect(style.sources.liegenschaftskarte.tiles[0]).toContain("/api/tiles/liegenschaftskarte/");
+    expect(style.sources.flurstuecke).toBeUndefined();
+    expect(style.layers.find(l => l.id === "liegenschaftskarte").minzoom).toBe(PARCEL_OUTLINE_MIN_ZOOM);
     // Das Foto und die Straßen dagegen zeichnen auf jeder Stufe.
     expect(style.sources.dop.minzoom).toBeUndefined();
     expect(style.sources.strassen.minzoom).toBeUndefined();
