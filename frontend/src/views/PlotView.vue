@@ -20,8 +20,6 @@
       <div class="row no-print">
         <button type="button" class="btn btn--quiet" :disabled="!hasPrevious" @click="step(-1)">‹ Voriges</button>
         <button type="button" class="btn btn--quiet" :disabled="!hasNext" @click="step(1)">Nächstes ›</button>
-        <RouterLink v-if="hasAnchor" class="btn btn--secondary"
-                    :to="{ name: 'location', params: { id: plot.id } }">Standort prüfen</RouterLink>
         <button type="button" class="btn btn--secondary" :aria-pressed="String(sharing)"
                 @click="sharing = !sharing">Teilen</button>
         <button type="button" class="btn btn--secondary" @click="print">Drucken</button>
@@ -129,22 +127,15 @@
         </section>
 
         <section class="panel">
-          <div class="panel__head"><h3>Form</h3></div>
-          <dl class="value-list">
-            <dt>Rechteckigkeit</dt><dd>{{ num(metrics.rectangularity, 3) }}</dd>
-            <dt>Einstufung</dt><dd><span class="chip chip--good">{{ metrics.shapeClass }}</span></dd>
-            <dt>Seitenverhältnis</dt><dd>1 : {{ num(aspectRatio) }}</dd>
-            <dt>Umschl. Rechteck</dt><dd>{{ num(metrics.mrr.width, 1) }} × {{ num(metrics.mrr.height, 1) }} m</dd>
-          </dl>
-        </section>
-
-        <section class="panel">
           <div class="panel__head"><h3>Preis</h3><div class="spacer"></div><span class="chip">BORIS</span></div>
           <dl class="value-list">
             <dt>Kaufpreis</dt><dd>{{ euro(plot.askingPrice) }}</dd>
             <dt>Angebot je m²</dt><dd>{{ euroPerSqm(metrics.pricePerSqm) }}</dd>
             <dt>Bodenrichtwert</dt><dd>{{ euroPerSqm(plot.bodenrichtwert) }} <span class="faint">Zone {{ plot.brwZone }}</span></dd>
             <dt>Stichtag</dt><dd>{{ date(plot.brwReferenceDate) }}</dd>
+            <template v-if="plot.brwReferencePlotArea">
+              <dt>Richtwertgrundstück</dt><dd>{{ area(plot.brwReferencePlotArea) }}</dd>
+            </template>
           </dl>
           <div v-if="Number.isFinite(plot.bodenrichtwert)" class="price-band">
             <div class="price-band__scale">
@@ -169,40 +160,33 @@
               Der Preis steht im Inserat und kann oben eingetragen werden.
             </p>
           </div>
+          <p v-if="conversionNeeded" class="panel__footnote">
+            Der Richtwert gilt für ein gedachtes Grundstück von
+            {{ area(plot.brwReferencePlotArea) }}. Für {{ area(plot.officialArea) }} ist er
+            nach der Umrechnungstabelle des Gutachterausschusses anzupassen. Das Produkt
+            aus Wert und Fläche ist also nicht der Bodenwert dieses Grundstücks.
+            <a v-if="plot.brwConversionUrl" :href="plot.brwConversionUrl"
+               target="_blank" rel="noopener noreferrer">Umrechnungstabelle</a>
+          </p>
         </section>
+        <!-- Folded: the shape figures are for the plot that looks odd, and the
+             line on the fold already names the verdict. -->
+        <details class="panel fold">
+          <summary class="panel__head fold__head">
+            <h3>Form</h3><span class="spacer"></span>
+            <span class="fold__summary">{{ metrics.shapeClass }} · 1 : {{ num(aspectRatio) }}</span>
+          </summary>
+          <dl class="value-list">
+            <dt>Rechteckigkeit</dt><dd>{{ num(metrics.rectangularity, 3) }}</dd>
+            <dt>Einstufung</dt><dd><span class="chip chip--good">{{ metrics.shapeClass }}</span></dd>
+            <dt>Seitenverhältnis</dt><dd>1 : {{ num(aspectRatio) }}</dd>
+            <dt>Umschl. Rechteck</dt><dd>{{ num(metrics.mrr.width, 1) }} × {{ num(metrics.mrr.height, 1) }} m</dd>
+          </dl>
+        </details>
       </aside>
     </div>
 
     <div class="tools">
-      <section class="panel">
-        <div class="panel__head"><h3>Abstandsflächen</h3><div class="spacer"></div><span class="chip chip--warn">§ 6 SächsBO</span></div>
-        <table class="data-table setback-table">
-          <thead><tr><th>Grenze</th><th class="num">Länge</th><th class="num">Tiefe</th></tr></thead>
-          <tbody>
-            <tr v-for="(boundary, i) in boundaries" :key="i">
-              <td>{{ boundary.name }}</td>
-              <td class="num">{{ metres(boundary.length) }}</td>
-              <td class="num">
-                <input type="number" min="0" max="20" step="0.1" class="depth"
-                       :value="plot.setbacks[i]" :aria-label="`Abstandstiefe ${boundary.name}`"
-                       @input="setSetback(i, $event.target.value)">
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        <div class="slider no-print">
-          <label for="wall-height">Wandhöhe</label>
-          <output class="mono">{{ metres(plot.wallHeight) }}</output>
-          <input id="wall-height" type="range" min="2.5" max="12" step="0.1"
-                 :value="plot.wallHeight" @input="setWallHeight($event.target.value)">
-          <p class="slider__hint">
-            0,4 · H = <b>{{ metres(plot.wallHeight * 0.4) }}</b>
-            <template v-if="plot.wallHeight * 0.4 < 3">. Unter dem Mindestmaß von 3 m, deshalb greift der Mindestwert.</template>
-            <template v-else>. Maßgeblich, weil größer als das Mindestmaß von 3 m.</template>
-          </p>
-        </div>
-      </section>
-
       <section class="panel">
         <div class="panel__head"><h3>Baukörper</h3></div>
         <div class="field field--framed no-print">
@@ -312,15 +296,129 @@
         </div>
       </section>
 
-      <div class="callout callout--caution">
-        <h4>Keine bauordnungsrechtliche Prüfung</h4>
-        <p>Die Abstandstiefe bemisst sich nach § 6 SächsBO grundsätzlich nach der Wandhöhe;
-          3 m sind der Mindestwert, nicht die Regel. Grenzgaragen sind privilegiert, ein
-          Bebauungsplan kann abweichende Baugrenzen festsetzen.</p>
-        <p>Nach § 15 Abs. 2 ImmoWertV kann ein einzelnes Grundstück innerhalb der
-          Richtwertzone eine abweichende Nutzungsart haben; dann gilt der Zonenwert nicht.</p>
+      <!-- Folded: the plan draws the setbacks and the notice above it says
+           whether the house keeps them. The table is for changing a depth.
+           It shares a column with the caution, which is about the same
+           paragraph — a closed fold alone in a column is a bar above a gap. -->
+      <div class="tools__column">
+        <details class="panel fold">
+          <summary class="panel__head fold__head">
+            <h3>Abstandsflächen</h3><span class="spacer"></span>
+            <span class="fold__summary">{{ setbackSummary }}</span>
+            <span class="chip chip--warn">§ 6 SächsBO</span>
+          </summary>
+          <table class="data-table setback-table">
+            <thead><tr><th>Grenze</th><th class="num">Länge</th><th class="num">Tiefe</th></tr></thead>
+            <tbody>
+              <tr v-for="(boundary, i) in boundaries" :key="i">
+                <td>{{ boundary.name }}</td>
+                <td class="num">{{ metres(boundary.length) }}</td>
+                <td class="num">
+                  <input type="number" min="0" max="20" step="0.1" class="depth"
+                         :value="plot.setbacks[i]" :aria-label="`Abstandstiefe ${boundary.name}`"
+                         @input="setSetback(i, $event.target.value)">
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="slider no-print">
+            <label for="wall-height">Wandhöhe</label>
+            <output class="mono">{{ metres(plot.wallHeight) }}</output>
+            <input id="wall-height" type="range" min="2.5" max="12" step="0.1"
+                   :value="plot.wallHeight" @input="setWallHeight($event.target.value)">
+            <p class="slider__hint">
+              0,4 · H = <b>{{ metres(plot.wallHeight * 0.4) }}</b>
+              <template v-if="plot.wallHeight * 0.4 < 3">. Unter dem Mindestmaß von 3 m, deshalb greift der Mindestwert.</template>
+              <template v-else>. Maßgeblich, weil größer als das Mindestmaß von 3 m.</template>
+            </p>
+          </div>
+        </details>
+
+        <div class="callout callout--caution">
+          <h4>Keine bauordnungsrechtliche Prüfung</h4>
+          <p>Die Abstandstiefe bemisst sich nach § 6 SächsBO grundsätzlich nach der Wandhöhe;
+            3 m sind der Mindestwert, nicht die Regel. Grenzgaragen sind privilegiert, ein
+            Bebauungsplan kann abweichende Baugrenzen festsetzen.</p>
+          <p>Nach § 15 Abs. 2 ImmoWertV kann ein einzelnes Grundstück innerhalb der
+            Richtwertzone eine abweichende Nutzungsart haben; dann gilt der Zonenwert nicht.</p>
+        </div>
       </div>
     </div>
+
+    <!-- What holds at the plot. It used to be a page of its own, with the
+         parcel and the land value repeated from this one; here it keeps only
+         what is its own: a small map without the house, and the checks. -->
+    <section id="standort" class="stack">
+      <div class="page-head">
+        <div>
+          <p class="eyebrow">Standort</p>
+          <h2>Was am Grundstück gilt</h2>
+          <p class="page-head__sub">
+            Lärm, Hochwasser, Radon, Trinkwasserschutz, Schutzgebiete, Hangneigung, Baugrund
+            und Luftqualität, gefragt mit dem Umriss des Flurstücks, nicht mit einem Punkt.
+            Ein Grundstück schneidet Isophonen und Zonengrenzen; sein Mittelpunkt antwortet
+            nur für einen Quadratmeter davon.
+          </p>
+        </div>
+      </div>
+
+      <p v-if="!hasAnchor" class="notice">
+        Für dieses Grundstück ist keine Koordinate hinterlegt. Ohne sie gibt es keine Fläche,
+        mit der sich die Fachdienste fragen ließen.
+      </p>
+
+      <div v-else class="location">
+        <section class="panel location__map">
+          <div class="plan-bar no-print">
+            <span class="plan-bar__label">Grund</span>
+            <div class="button-group" role="group" aria-label="Hintergrund der Standortkarte">
+              <button v-for="b in locationBackdrops" :key="b.id" type="button"
+                      :aria-pressed="String(locationBackdrop === b.id)"
+                      @click="locationBackdrop = b.id">{{ b.name }}</button>
+            </div>
+            <div class="spacer"></div>
+            <!-- One unit, so a narrow bar wraps the label with its switch. -->
+            <span class="location__layer">
+              <span class="plan-bar__label">Ebene</span>
+              <button type="button" class="toggle" :aria-pressed="String(Boolean(locationOverlay))"
+                      @click="toggleNoise">Lärm</button>
+            </span>
+          </div>
+
+          <!-- No house: this map is about the ground, and a footprint would be
+               the loudest thing on it. -->
+          <SitePlan :plot="plot" :building="null" :show-building="false" navigable cooperative
+                    :backdrop="locationBackdrop" :overlay="locationOverlay" north-up
+                    :show-dimensions="false" :show-setbacks="false"
+                    :width="600" :height="470" />
+          <p class="location__hint no-print">
+            Ziehen verschiebt den Ausschnitt, Strg und Mausrad zoomen, ein Doppelklick
+            stellt ihn zurück.
+          </p>
+
+          <div v-if="locationOverlay" class="key">
+            <p class="key__head">Schallpegel L<sub>DEN</sub> über 24 Stunden, dB(A)</p>
+            <ul class="key__bands">
+              <li v-for="band in noiseBands" :key="band.label">
+                <span class="key__swatch" :style="{ background: band.colour }"></span>{{ band.label }}
+              </li>
+            </ul>
+            <p class="key__note">
+              Die Karte zeichnet erst ab 50 dB(A). Das Band 45–49 dB(A) steckt in den Daten
+              und hat in der amtlichen Darstellung keine Farbe; die Prüfung liest die Daten,
+              nicht das Bild.
+            </p>
+          </div>
+
+          <div class="plan-foot">
+            <span>{{ locationOverlay ? "Isophonen: LfULG · " : "" }}Kataster und Luftbild: © GeoSN, dl-de/by-2-0</span>
+            <span v-if="siteCheckResult">Abgerufen {{ date(siteCheckResult.abgerufen_am) }}</span>
+          </div>
+        </section>
+
+        <CheckList :plot="plot" auto @loaded="checksLoaded" />
+      </div>
+    </section>
 
     <section class="stack">
       <div class="page-head">
@@ -366,12 +464,6 @@
         <NearbyPanel :plot="plot" auto @loaded="r => (nearbyResult = r)" />
       </div>
 
-      <p v-if="hasAnchor" class="row no-print">
-        <RouterLink class="btn btn--quiet" :to="{ name: 'location', params: { id: plot.id } }">
-          Lärm, Hochwasser, Baugrund und Luft prüfen
-        </RouterLink>
-      </p>
-
       <!-- At the foot of the page and absent while there is nothing: a link
            already handed out is the one thing here somebody needs to be able
            to take back. -->
@@ -408,6 +500,7 @@ import SharedLinks from "../components/SharedLinks.vue";
 import RouteCards from "../components/RouteCards.vue";
 import NearbyPanel from "../components/NearbyPanel.vue";
 import SurroundingsMap from "../components/SurroundingsMap.vue";
+import CheckList from "../components/CheckList.vue";
 import {
   state, plotById, placement, houseTypeById, houseFootprint, save, addHouseType,
   newId, setRoutes, CUSTOM_SIZE, DEFAULT_FOOTPRINT
@@ -415,6 +508,8 @@ import {
 import { reachability, neighbourBuildings as fetchNeighbourBuildings } from "../lib/api.js";
 import { zubringerOf, fastestMode, coordinatesOf, MODES } from "../lib/routes.js";
 import { toLocal } from "../lib/projection.js";
+import { NOISE_BANDS } from "../lib/basemap.js";
+import { noiseMapped } from "../lib/siteChecks.js";
 import { plotMetrics } from "../lib/metrics.js";
 import {
   polygonEdges, edgeCompass, buildableArea, cornersOutside, smallestSetback,
@@ -428,7 +523,7 @@ const MAX_EDGE = 30;
 
 export default {
   name: "PlotView",
-  components: { SitePlan, SharePanel, SharedLinks, RouteCards, NearbyPanel, SurroundingsMap },
+  components: { SitePlan, SharePanel, SharedLinks, RouteCards, NearbyPanel, SurroundingsMap, CheckList },
   props: {
     /** The plot's id, straight out of the URL. */
     id: { type: String, required: true }
@@ -461,6 +556,21 @@ export default {
        *  every visit would put the routing service through the whole set for a
        *  page the user only opened to read the area. */
       routedFor: null,
+      /** The last /api/site-checks answer. It says whether the noise survey
+       *  mapped anything here, which the tiles cannot. */
+      siteCheckResult: null,
+      /* The location map keeps its own ground: it is a second map with another
+         job, and switching the plan to the aerial must not switch this one. */
+      locationBackdrop: "map",
+      /** On by default, and off again once the checks say there is nothing
+       *  for it to draw — unless somebody chose it by hand. */
+      locationOverlay: "laerm",
+      noiseChosen: false,
+      locationBackdrops: [
+        { id: "map", name: "Karte" },
+        { id: "aerial", name: "Luftbild" },
+        { id: "cadastre", name: "Kataster" }
+      ],
       backdrops: [
         { id: "none", name: "Ohne" },
         { id: "map", name: "Karte" },
@@ -561,6 +671,21 @@ export default {
       const m = this.metrics.mrr;
       return Math.max(m.width, m.height) / Math.min(m.width, m.height);
     },
+    noiseBands() { return NOISE_BANDS.laerm; },
+    /** Only worth a sentence when the two areas actually differ. */
+    conversionNeeded() {
+      const reference = this.plot?.brwReferencePlotArea;
+      const own = this.plot?.officialArea;
+      return Number.isFinite(reference) && Number.isFinite(own) && Math.abs(reference - own) > 1;
+    },
+    /** The line on the folded setback panel: the depths, not the table. */
+    setbackSummary() {
+      const depths = (this.plot?.setbacks ?? []).filter(Number.isFinite);
+      if (!depths.length) return "—";
+      const low = Math.min(...depths);
+      const high = Math.max(...depths);
+      return low === high ? `${metres(low, 1)} ringsum` : `${num(low, 1)}–${metres(high, 1)}`;
+    },
     priceRange() { return { lo: this.plot.bodenrichtwert * 0.7, hi: this.plot.bodenrichtwert * 1.45 }; },
     boundaries() {
       return polygonEdges(this.plot.polygon).map((edge, i) => ({
@@ -579,16 +704,22 @@ export default {
     this.routeAutomatically();
   },
   watch: {
-    "plot.id"() { this.routeAutomatically(); },
     /** A default nobody has touched follows the fields above it. */
     dimensionLabel(next, previous) {
       if (this.naming && this.typeName === previous) this.typeName = next;
     },
-    /* Another plot in the same view: its outlines are somewhere else. */
+    /* Another plot in the same view: its outlines are somewhere else, its
+       ways may not be computed yet, and its noise is another question. One
+       watcher — two `"plot.id"` keys in this object once meant the second
+       silently replaced the first, and the next plot was never routed. */
     "plot.id"() {
       this.neighbourBuildings = [];
       this.neighboursError = null;
       if (this.showNeighbours) this.loadNeighbours();
+      this.routeAutomatically();
+      this.siteCheckResult = null;
+      this.locationOverlay = "laerm";
+      this.noiseChosen = false;
     },
     /* Another house type, other dimensions, another angle, deeper setbacks: any
        of them can push a house that was inside out of the window, and with the
@@ -662,6 +793,14 @@ export default {
       if (target) this.$router.push({ name: "plot", params: { id: target.id } });
     },
     print() { window.print(); },
+    toggleNoise() {
+      this.noiseChosen = true;
+      this.locationOverlay = this.locationOverlay ? null : "laerm";
+    },
+    checksLoaded(result) {
+      this.siteCheckResult = result;
+      if (!this.noiseChosen) this.locationOverlay = noiseMapped(result) ? "laerm" : null;
+    },
 
     toggleMeasuring() {
       state.plan.measuring = !state.plan.measuring;
@@ -848,7 +987,38 @@ export default {
 .plot-page__map{ padding: var(--w2b-space-4); position: sticky; top: var(--w2b-space-3); }
 @media (max-width: 1140px){ .plot-page__map{ position: static; } }
 
+/* The location record: a small map beside the checks. The map is narrower
+   than the plan above it on purpose — it says where the noise is, not where
+   the house goes — and it holds still while the cards scroll past. */
+.location{
+  display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: var(--w2b-space-4); align-items: start;
+}
+@media (max-width: 1000px){ .location{ grid-template-columns: 1fr; } }
+.location__map{ position: sticky; top: var(--w2b-space-3); }
+@media (max-width: 1000px){ .location__map{ position: static; } }
+.location__layer{ display: inline-flex; align-items: center; gap: 6px; }
+.location__hint{
+  margin: 0; padding: 6px var(--w2b-space-3);
+  font-size: var(--w2b-text-xs); color: var(--w2b-muted);
+  border-top: 1px solid var(--w2b-line-faint);
+}
+
+.key{ padding: var(--w2b-space-3); border-top: 1px solid var(--w2b-line); }
+.key__head{ margin: 0 0 6px; font-size: var(--w2b-text-xs); color: var(--w2b-muted); }
+.key__bands{
+  display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; padding: 0; list-style: none;
+  font-family: var(--w2b-font-mono); font-size: 11px; font-variant-numeric: tabular-nums;
+}
+.key__bands li{ display: flex; align-items: center; gap: 6px; }
+.key__swatch{ width: 14px; height: 10px; border-radius: 2px; border: 1px solid var(--w2b-line); }
+.key__note{
+  margin: 8px 0 0; font-size: var(--w2b-text-xs); color: var(--w2b-muted);
+  max-width: 68ch; line-height: 1.5;
+}
+
 .tools{ display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--w2b-space-4); align-items: start; }
+.tools__column{ display: grid; gap: var(--w2b-space-4); align-content: start; min-width: 0; }
 .depth{ width: 72px; padding: 4px 7px; text-align: right; }
 .slider{ display: grid; grid-template-columns: 1fr auto; gap: 5px var(--w2b-space-3); align-items: center; padding: var(--w2b-space-3) var(--w2b-space-4); border-top: 1px solid var(--w2b-line-faint); }
 .slider label{ font-family: var(--w2b-font-display); font-weight: 600; font-size: var(--w2b-text-xs); letter-spacing: .09em; text-transform: uppercase; color: var(--w2b-muted); }
