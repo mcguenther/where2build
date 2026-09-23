@@ -323,3 +323,19 @@ that collapsed at 390 px. None of them threw.
   are `details.fold` with the verdict or the depths beside the title
   („rechteckig · 1 : 1,42", „3,0 m ringsum"), so a closed one is not a blank.
   `print.css` opens them through `::details-content`, like the soil wording.
+
+- **Enter in the search field only ever took a row, so most inputs went
+  nowhere.** `PlotSearch` handled Enter itself and took the highlighted row or
+  a sole one; a link, a pasted page, a bare number with its district unfolded,
+  or an address the geocoder answered with five rows (it does, even with the
+  postcode) all ignored the key, and the start page needed the mouse. Enter now
+  takes a highlighted row and otherwise hands on to the wrapper (`submit`),
+  which does exactly what its button does. Two details carry it: Enter pressed
+  before the lookup has answered waits for it instead of taking whatever row
+  the reading alone produced — „Lessingweg 44" typed fast was otherwise asked
+  for as a Gemarkung — and rows of *two* readings, parcel beside address, are
+  highlighted rather than taken, so the ambiguity is still put to the user.
+  The same rule reaches the other single-purpose forms (house type link and
+  manual entry, a destination's address, the read values, the plot's name,
+  price and note). Not the second confirmation of the red button, and not
+  „Trotzdem anlegen": overriding a doubt takes a click on the words that say so.
