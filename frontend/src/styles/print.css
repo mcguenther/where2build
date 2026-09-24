@@ -255,8 +255,12 @@
   #pane-building{ grid-column: 1; grid-row: 2; }
   .side-pane > *{ break-inside: avoid; }
   .site-plan__selection{ display: none !important; }
-  .caveat::details-content{ content-visibility: visible !important; }
-  .caveat > *{ display: block !important; }
+  /* Every hint fold on the page: paper has nothing to click. The count is
+     for a closed fold on screen and says nothing once it is open. */
+  .hint-fold::details-content{ content-visibility: visible !important; }
+  .hint-fold > .hint-fold__body{ display: grid !important; }
+  .hint-fold__count, .hint-fold__head::before{ display: none !important; }
+  .price-verdict{ background: none !important; }
 
   /* A depth reads as a measurement, like the length beside it — the input is
      only how it gets edited on screen. */

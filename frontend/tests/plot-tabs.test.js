@@ -6,7 +6,8 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { nextTick } from "vue";
 import PlotView from "../src/views/PlotView.vue";
-import { state } from "../src/lib/store.js";
+import { state, plotById } from "../src/lib/store.js";
+import { priceStage, PRICE_BAND } from "../src/lib/metrics.js";
 import { realState, mountWithRouter } from "./helpers.js";
 
 vi.mock("../src/lib/api.js", () => ({
@@ -94,7 +95,72 @@ describe("Reiter neben dem Plan", () => {
   it("führt den Hinweis zur Abstandsfläche im Kasten, nicht als Warnkasten", () => {
     const w = mountPlot();
     expect(w.find(".callout").exists()).toBe(false);
-    expect(w.find("#pane-plot .caveat summary").text()).toBe("Vereinfacht gerechnet, keine Prüfung");
+    expect(w.find("#pane-plot .hint-fold--caution summary").text()).toBe("Vereinfacht gerechnet, keine Prüfung");
     expect(w.find("#pane-plot").text()).toContain("§ 15 Abs. 2 ImmoWertV");
+  });
+});
+
+describe("Preis gegen Bodenrichtwert", () => {
+  it("teilt die Abweichung in drei Stufen am gezeichneten Band", () => {
+    expect(PRICE_BAND).toBe(0.15);
+    expect(priceStage(null)).toBeNull();
+    expect(priceStage(-20.9)).toBe("below");
+    expect(priceStage(-4.3)).toBe("within");
+    expect(priceStage(15)).toBe("within");
+    expect(priceStage(34.5)).toBe("above");
+  });
+
+  /** The plot's asking price set so the offer lands `share` off the land value. */
+  const priced = async share => {
+    const plot = plotById("plot-concave");
+    plot.askingPrice = Math.round(plot.officialArea * plot.bodenrichtwert * (1 + share));
+    const w = mountPlot();
+    await nextTick();
+    return w;
+  };
+
+  it("färbt Chip und Zeile grün, wenn das Angebot deutlich darunter liegt", async () => {
+    const w = await priced(-0.209);
+    expect(w.find("#pane-plot .panel__head .chip--good").text()).toBe("unter Richtwert");
+    const line = w.find(".price-verdict");
+    expect(line.classes()).toContain("price-verdict--below");
+    // The magnitude alone: "−20,9 % unter" said the direction twice.
+    expect(line.text()).toContain("20,9 % unter dem Bodenrichtwert");
+    expect(line.text()).not.toContain("−");
+  });
+
+  it("bleibt neutral im Rahmen der Zone", async () => {
+    const w = await priced(-0.043);
+    expect(w.find(".price-verdict").classes()).toContain("price-verdict--within");
+    expect(w.find(".price-verdict").text()).toContain("im Rahmen der Zone");
+    const head = w.findAll("#pane-plot .panel__head").find(h => h.text().startsWith("Preis"));
+    expect(head.text()).toContain("im Rahmen");
+  });
+
+  it("färbt Chip und Zeile rot, wenn das Angebot deutlich darüber liegt", async () => {
+    const w = await priced(0.345);
+    expect(w.find("#pane-plot .panel__head .chip--error").text()).toBe("über Richtwert");
+    expect(w.find(".price-verdict").classes()).toContain("price-verdict--above");
+  });
+
+  it("zeigt ohne Kaufpreis weder Chip noch Zeile, nur den Satz dazu", async () => {
+    const plot = plotById("plot-concave");
+    plot.askingPrice = null;
+    const w = mountPlot();
+    expect(w.find(".price-verdict").exists()).toBe(false);
+    expect(w.find("#pane-plot").text()).toContain("Ohne Kaufpreis");
+  });
+});
+
+describe("Hinweise hinter einer Klappe", () => {
+  it("klappt die Erklärtexte je Kasten weg und nennt ihre Zahl", () => {
+    const w = mountPlot();
+    const folds = w.findAll("#pane-plot .hint-fold");
+    folds.forEach(f => expect(f.element.open).toBe(false));
+    const heads = folds.map(f => f.find("summary").text().replace(/\s+/g, " "));
+    expect(heads).toContain("Hinweise 1");                               // Grundstück
+    expect(heads.some(h => /^Hinweise [12]$/.test(h))).toBe(true);       // Preis
+    expect(heads).toContain("Vereinfacht gerechnet, keine Prüfung");
+    expect(w.find("#pane-building .hint-fold summary").text()).toContain("So bedienen Sie den Baukörper");
   });
 });

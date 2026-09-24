@@ -45,11 +45,11 @@
           {{ group.checks.length }} {{ group.counted }}
         </li>
       </ul>
-      <p class="checks__no-score">
-        Kein Gesamtwert: eine Zahl aus {{ checks.length }} Prüfungen, von denen
-        {{ tally.counts.open }} keine Daten haben, beschriebe die Datenlage und sähe aus
-        wie eine Aussage über das Grundstück.
-      </p>
+      <HintFold class="checks__hints" :count="1">
+        <p>Kein Gesamtwert: eine Zahl aus {{ checks.length }} Prüfungen, von denen
+          {{ tally.counts.open }} keine Daten haben, beschriebe die Datenlage und sähe aus
+          wie eine Aussage über das Grundstück.</p>
+      </HintFold>
 
       <!-- Every group is rendered and the folded ones only hidden: paper has
            nothing to click, so the print sheet opens them all. -->
@@ -132,6 +132,7 @@ import { siteChecks } from "../lib/api.js";
 import { siteFindings, siteTally, GOOD, NOTE, OPEN } from "../lib/siteChecks.js";
 import { tallyText } from "../lib/findings.js";
 import { toWgs84 } from "../lib/projection.js";
+import HintFold from "./HintFold.vue";
 
 /** Gravest first. The mark repeats the colour in a shape, for anyone who
  *  cannot tell amber from green, and for paper printed in black. */
@@ -143,6 +144,7 @@ const GROUPS = [
 
 export default {
   name: "CheckList",
+  components: { HintFold },
   props: {
     plot: { type: Object, required: true },
     /** Ask as soon as the component appears, rather than on a button press. */
@@ -236,10 +238,10 @@ export default {
   background: var(--status-surface); color: var(--status-text);
   font-family: var(--w2b-font-display); font-weight: 600; font-size: var(--w2b-text-s);
 }
-.checks__no-score{
-  margin: var(--w2b-space-2) 0 0; font-size: var(--w2b-text-xs);
-  color: var(--w2b-muted); max-width: 52ch;
-}
+/* Inside the padded panel body rather than at a panel's edge. */
+.checks__hints{ border-top: 0; margin-top: var(--w2b-space-1); max-width: 52ch; }
+.checks__hints :deep(.hint-fold__head){ padding-inline: 0; }
+.checks__hints :deep(.hint-fold__body){ padding-right: 0; padding-left: 12px; }
 
 .checks__group{ margin-top: var(--w2b-space-4); }
 .checks__group--folded{ display: none; }

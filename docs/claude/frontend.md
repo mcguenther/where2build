@@ -342,6 +342,26 @@ that collapsed at 390 px. None of them threw.
   *and* a chip overflows it; the setback fold lost its § 6 chip to the
   caveat inside it, which is where the paragraph is explained.
 
+- **An explanation is read once; a state is read every time.** The plot page
+  carried seventeen paragraphs that said how something is meant rather than
+  what is true of this plot, and they were set as open footnotes under every
+  panel. They now sit in `HintFold` — one fold per panel, at its end, with a
+  count so a closed one still says there is something — and `print.css` opens
+  every one of them. What changes with the plot stays open: „Ohne Kaufpreis
+  …", „0,4 · H = 2,56 m", the estimated aspect ratio. A hint that only makes
+  sense on screen (dragging, the map's controls) carries `no-print` inside
+  the fold.
+
+- **The price verdict has three stages, and they come from the band the panel
+  already draws.** `priceStage` in `metrics.js` reads `PRICE_BAND` (± 15 %):
+  below is green, above is red, inside is neutral „im Rahmen" — the chip in
+  the panel head, the marker on the band and the coloured line all read the
+  same stage, so they cannot disagree with the drawing they sit on. Plain
+  green and red for any sign would call 4 % a bargain. The line says the
+  magnitude without a sign: „−4,2 % unter" said the direction twice.
+  `deviationClass`, which the plot cards and the comparison use, is an older
+  and different scale (± 5 % good) and has not been brought in line yet.
+
 - **Enter in the search field only ever took a row, so most inputs went
   nowhere.** `PlotSearch` handled Enter itself and took the highlighted row or
   a sole one; a link, a pasted page, a bare number with its district unfolded,

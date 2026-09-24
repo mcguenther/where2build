@@ -152,14 +152,18 @@
               <dt>Grenzpunkte</dt><dd>{{ plot.polygon.length }}</dd>
               <dt>Straßenfront</dt><dd>{{ metres(metrics.streetFrontage) }}</dd>
             </dl>
-            <p class="panel__footnote">
-              Für den Preisvergleich zählt die amtliche Fläche. Die aus dem Polygon
-              gerechnete weicht regelmäßig um ein paar Quadratmeter ab.
-            </p>
+            <HintFold :count="1">
+              <p>Für den Preisvergleich zählt die amtliche Fläche. Die aus dem Polygon
+                gerechnete weicht regelmäßig um ein paar Quadratmeter ab.</p>
+            </HintFold>
           </section>
 
           <section class="panel">
-            <div class="panel__head"><h3>Preis</h3><div class="spacer"></div><span class="chip">BORIS</span></div>
+            <div class="panel__head">
+              <h3>Preis</h3><div class="spacer"></div>
+              <span v-if="priceVerdict" class="chip" :class="priceVerdict.chipClass">{{ priceVerdict.chip }}</span>
+              <span class="chip">BORIS</span>
+            </div>
             <dl class="value-list">
               <dt>Kaufpreis</dt><dd>{{ euro(plot.askingPrice) }}</dd>
               <dt>Angebot je m²</dt><dd>{{ euroPerSqm(metrics.pricePerSqm) }}</dd>
@@ -172,9 +176,10 @@
             <div v-if="Number.isFinite(plot.bodenrichtwert)" class="price-band">
               <div class="price-band__scale">
                 <div class="price-band__axis"></div>
-                <div class="price-band__range" :style="{ left: pricePosition(plot.bodenrichtwert * .85) + '%', width: (pricePosition(plot.bodenrichtwert * 1.15) - pricePosition(plot.bodenrichtwert * .85)) + '%' }"></div>
+                <div class="price-band__range" :style="{ left: pricePosition(plot.bodenrichtwert * (1 - PRICE_BAND)) + '%', width: (pricePosition(plot.bodenrichtwert * (1 + PRICE_BAND)) - pricePosition(plot.bodenrichtwert * (1 - PRICE_BAND))) + '%' }"></div>
                 <div class="price-band__brw" :style="{ left: pricePosition(plot.bodenrichtwert) + '%' }"></div>
                 <div v-if="metrics.pricePerSqm !== null" class="price-band__marker"
+                     :class="priceVerdict && `price-band__marker--${priceVerdict.stage}`"
                      :style="{ left: pricePosition(metrics.pricePerSqm) + '%' }"
                      :title="`Angebot ${euroPerSqm(metrics.pricePerSqm)}/m²`"></div>
               </div>
@@ -183,27 +188,37 @@
                 <span>{{ Math.round(plot.bodenrichtwert) }} €</span>
                 <span>{{ Math.round(priceRange.hi) }} €</span>
               </div>
-              <p v-if="metrics.deviation !== null" class="price-band__statement">
-                Das Angebot liegt <b>{{ percent(metrics.deviation) }}
-                {{ metrics.deviation > 0 ? "über" : "unter" }} dem Bodenrichtwert</b> der Zone.
-              </p>
-              <p v-else class="price-band__statement">
+              <p v-if="!priceVerdict" class="price-band__statement">
                 Ohne Kaufpreis lässt sich das Angebot nicht mit dem Bodenrichtwert vergleichen.
                 Der Preis steht im Inserat und kann oben eingetragen werden.
               </p>
             </div>
-            <p v-if="conversionNeeded" class="panel__footnote">
-              Der Richtwert gilt für ein gedachtes Grundstück von
-              {{ area(plot.brwReferencePlotArea) }}. Für {{ area(plot.officialArea) }} ist er
-              nach der Umrechnungstabelle des Gutachterausschusses anzupassen. Das Produkt
-              aus Wert und Fläche ist also nicht der Bodenwert dieses Grundstücks.
-              <a v-if="plot.brwConversionUrl" :href="plot.brwConversionUrl"
-                 target="_blank" rel="noopener noreferrer">Umrechnungstabelle</a>
+            <!-- The magnitude without a sign: „−4,2 % unter" said the direction
+                 twice. The word carries it, and the colour follows the same
+                 three stages as the chip above. -->
+            <p v-if="priceVerdict" class="price-verdict" :class="`price-verdict--${priceVerdict.stage}`">
+              <span class="price-verdict__mark" aria-hidden="true">{{ priceVerdict.mark }}</span>
+              <span>
+                Das Angebot liegt <b>{{ num(Math.abs(metrics.deviation), 1) }} %
+                {{ metrics.deviation > 0 ? "über" : "unter" }} dem Bodenrichtwert</b>
+                <template v-if="priceVerdict.stage === 'within'">, im Rahmen der Zone (± {{ num(PRICE_BAND * 100, 0) }} %).</template>
+                <template v-else> der Zone, {{ priceVerdict.stage === "below" ? "unterhalb" : "oberhalb" }} des üblichen Rahmens.</template>
+              </span>
             </p>
-            <p v-if="Number.isFinite(plot.bodenrichtwert)" class="panel__footnote">
-              Nach § 15 Abs. 2 ImmoWertV kann ein einzelnes Grundstück innerhalb der
-              Richtwertzone eine abweichende Nutzungsart haben; dann gilt der Zonenwert nicht.
-            </p>
+            <HintFold v-if="priceHintCount" :count="priceHintCount">
+              <p v-if="conversionNeeded">
+                Der Richtwert gilt für ein gedachtes Grundstück von
+                {{ area(plot.brwReferencePlotArea) }}. Für {{ area(plot.officialArea) }} ist er
+                nach der Umrechnungstabelle des Gutachterausschusses anzupassen. Das Produkt
+                aus Wert und Fläche ist also nicht der Bodenwert dieses Grundstücks.
+                <a v-if="plot.brwConversionUrl" :href="plot.brwConversionUrl"
+                   target="_blank" rel="noopener noreferrer">Umrechnungstabelle</a>
+              </p>
+              <p v-if="Number.isFinite(plot.bodenrichtwert)">
+                Nach § 15 Abs. 2 ImmoWertV kann ein einzelnes Grundstück innerhalb der
+                Richtwertzone eine abweichende Nutzungsart haben; dann gilt der Zonenwert nicht.
+              </p>
+            </HintFold>
           </section>
           <!-- Folded: the shape figures are for the plot that looks odd, and the
                line on the fold already names the verdict. -->
@@ -250,15 +265,12 @@
                 <template v-else>. Maßgeblich, weil größer als das Mindestmaß von 3 m.</template>
               </p>
             </div>
-            <!-- Folded: it qualifies the numbers above it and is read by whoever
-                 looks at them, not by everyone who opens the page. -->
-            <details class="caveat">
-              <summary>Vereinfacht gerechnet, keine Prüfung</summary>
+            <HintFold title="Vereinfacht gerechnet, keine Prüfung" caution>
               <p>Die Abstandstiefe bemisst sich nach § 6 SächsBO grundsätzlich nach der Wandhöhe;
                 3 m sind der Mindestwert, nicht die Regel. Grenzgaragen sind privilegiert, ein
                 Bebauungsplan kann abweichende Baugrenzen festsetzen. Verbindlich entscheidet
                 die Bauaufsicht.</p>
-            </details>
+            </HintFold>
           </details>
         </div>
 
@@ -295,9 +307,9 @@
                 <template v-if="customSizeOutOfRange">
                   Beim Verlassen des Feldes wird auf 4 m bis 30 m gesetzt; gezeichnet ist weiter
                   {{ num(customSize.length, 1) }} × {{ num(customSize.width, 1) }} m.
+                  Kantenlängen unter 4 m oder über 30 m sind kein Haus, sondern ein Tippfehler.
                 </template>
                 <template v-else>Ergibt {{ area(customSize.length * customSize.width, 1) }} bebaute Fläche.</template>
-                Kantenlängen unter 4 m oder über 30 m sind kein Haus, sondern ein Tippfehler.
               </p>
               <button v-if="!naming" type="button" class="btn btn--secondary btn--small" @click="startNaming">
                 Als Haustyp in den Katalog
@@ -339,10 +351,6 @@
               <button type="button" class="btn btn--secondary" @click="alignToStreet">
                 An der Straße ausrichten
               </button>
-              <p class="slider__hint">
-                Dreht den Baukörper parallel zur Straßenfront ({{ degrees(streetAngle) }})
-                und schiebt ihn zurück ins Fenster, falls er dabei herausrutscht.
-              </p>
             </div>
 
             <div v-if="building.estimated" class="slider no-print">
@@ -358,19 +366,27 @@
               <output class="mono">{{ degrees(plot.house.rotation) }}</output>
               <input id="rotation" type="range" min="-90" max="90" step="1"
                      :value="plot.house.rotation" @input="setRotation($event.target.value)">
-              <p class="slider__hint">Haus mit der Maus ziehen, mit den Pfeiltasten fein verschieben.</p>
             </div>
 
             <div class="confine no-print">
               <button type="button" class="toggle" :aria-pressed="String(confineHouse)"
                       @click="toggleConfine">Im Bebauungsfenster halten</button>
-              <p class="slider__hint">
-                Der Baukörper lässt sich dann nicht über die Abstandsflächen hinausschieben:
-                Ziehen und Pfeiltasten enden an der Grenze des Fensters, an der er entlanggleitet.
-                Passt er überhaupt nirgends hinein, greift die Begrenzung nicht: er ist dann frei
-                verschiebbar, und die roten Ecken zeigen, wo er hinausragt.
-              </p>
             </div>
+
+            <!-- How the controls behave, not what the house is: on paper
+                 there is nothing to drag. -->
+            <HintFold title="So bedienen Sie den Baukörper" :count="3" class="no-print">
+              <p>Haus auf dem Plan anklicken, um es hier zu bearbeiten. Ziehen verschiebt es,
+                die Pfeiltasten verschieben es fein.</p>
+              <p>„An der Straße ausrichten“ dreht den Baukörper parallel zur Straßenfront
+                ({{ degrees(streetAngle) }}) und schiebt ihn zurück ins Fenster, falls er dabei
+                herausrutscht.</p>
+              <p>„Im Bebauungsfenster halten“: Der Baukörper lässt sich dann nicht über die
+                Abstandsflächen hinausschieben. Ziehen und Pfeiltasten enden an der Grenze des
+                Fensters, an der er entlanggleitet. Passt er überhaupt nirgends hinein, greift die
+                Begrenzung nicht: er ist dann frei verschiebbar, und die roten Ecken zeigen, wo er
+                hinausragt.</p>
+            </HintFold>
           </section>
         </div>
       </aside>
@@ -422,10 +438,6 @@
                     :backdrop="locationBackdrop" :overlay="locationOverlay" north-up
                     :show-dimensions="false" :show-setbacks="false"
                     :width="600" :height="470" />
-          <p class="location__hint no-print">
-            Ziehen verschiebt den Ausschnitt, Strg und Mausrad zoomen, ein Doppelklick
-            stellt ihn zurück.
-          </p>
 
           <div v-if="locationOverlay" class="key">
             <p class="key__head">Schallpegel L<sub>DEN</sub> über 24 Stunden, dB(A)</p>
@@ -434,12 +446,15 @@
                 <span class="key__swatch" :style="{ background: band.colour }"></span>{{ band.label }}
               </li>
             </ul>
-            <p class="key__note">
-              Die Karte zeichnet erst ab 50 dB(A). Das Band 45–49 dB(A) steckt in den Daten
-              und hat in der amtlichen Darstellung keine Farbe; die Prüfung liest die Daten,
-              nicht das Bild.
-            </p>
           </div>
+
+          <HintFold :count="locationOverlay ? 2 : 1">
+            <p class="no-print">Ziehen verschiebt den Ausschnitt, Strg und Mausrad zoomen, ein
+              Doppelklick stellt ihn zurück.</p>
+            <p v-if="locationOverlay">Die Karte zeichnet erst ab 50 dB(A). Das Band 45–49 dB(A)
+              steckt in den Daten und hat in der amtlichen Darstellung keine Farbe; die Prüfung
+              liest die Daten, nicht das Bild.</p>
+          </HintFold>
 
           <div class="plan-foot">
             <span>{{ locationOverlay ? "Isophonen: LfULG · " : "" }}Kataster und Luftbild: © GeoSN, dl-de/by-2-0</span>
@@ -532,6 +547,7 @@ import RouteCards from "../components/RouteCards.vue";
 import NearbyPanel from "../components/NearbyPanel.vue";
 import SurroundingsMap from "../components/SurroundingsMap.vue";
 import CheckList from "../components/CheckList.vue";
+import HintFold from "../components/HintFold.vue";
 import {
   state, plotById, placement, houseTypeById, houseFootprint, save, addHouseType,
   newId, setRoutes, CUSTOM_SIZE, DEFAULT_FOOTPRINT
@@ -541,12 +557,21 @@ import { zubringerOf, fastestMode, coordinatesOf, MODES } from "../lib/routes.js
 import { toLocal } from "../lib/projection.js";
 import { NOISE_BANDS } from "../lib/basemap.js";
 import { noiseMapped } from "../lib/siteChecks.js";
-import { plotMetrics } from "../lib/metrics.js";
+import { plotMetrics, priceStage, PRICE_BAND } from "../lib/metrics.js";
 import {
   polygonEdges, edgeCompass, buildableArea, cornersOutside, smallestSetback,
   alignToEdge, alignmentToEdge, findPlacement, neighbourSetbackDepths, hasNeighbourHint
 } from "../lib/geometry.js";
 import { area, euro, euroPerSqm, metres, num, percent, degrees, date, duration } from "../lib/format.js";
+
+/** What each price stage shows: the chip in the panel head and the mark in
+ *  front of the coloured line. „within" is deliberately neutral — a few per
+ *  cent either side of a zone value is noise, not a bargain. */
+const PRICE_STAGES = {
+  below: { chip: "unter Richtwert", chipClass: "chip--good", mark: "▼" },
+  within: { chip: "im Rahmen", chipClass: null, mark: "≈" },
+  above: { chip: "über Richtwert", chipClass: "chip--error", mark: "▲" }
+};
 
 /** Edge lengths a house can plausibly have, in metres. Anything outside is a typo. */
 const MIN_EDGE = 4;
@@ -554,14 +579,14 @@ const MAX_EDGE = 30;
 
 export default {
   name: "PlotView",
-  components: { SitePlan, SharePanel, SharedLinks, RouteCards, NearbyPanel, SurroundingsMap, CheckList },
+  components: { SitePlan, SharePanel, SharedLinks, RouteCards, NearbyPanel, SurroundingsMap, CheckList, HintFold },
   props: {
     /** The plot's id, straight out of the URL. */
     id: { type: String, required: true }
   },
   data() {
     return {
-      state, CUSTOM_SIZE, MIN_EDGE, MAX_EDGE,
+      state, CUSTOM_SIZE, MIN_EDGE, MAX_EDGE, PRICE_BAND,
       /** What stands in the two edge-length fields while they are being typed
        *  in. `null` means nobody is editing, so the stored size is shown. */
       sizeDraft: { length: null, width: null },
@@ -715,6 +740,15 @@ export default {
       return Math.max(m.width, m.height) / Math.min(m.width, m.height);
     },
     noiseBands() { return NOISE_BANDS.laerm; },
+    /** Where the offer sits against the land value, for the chip, the marker
+     *  and the coloured line. Null without an asking price. */
+    priceVerdict() {
+      const stage = priceStage(this.metrics.deviation);
+      return stage ? { stage, ...PRICE_STAGES[stage] } : null;
+    },
+    priceHintCount() {
+      return (this.conversionNeeded ? 1 : 0) + (Number.isFinite(this.plot?.bodenrichtwert) ? 1 : 0);
+    },
     /** Only worth a sentence when the two areas actually differ. */
     conversionNeeded() {
       const reference = this.plot?.brwReferencePlotArea;
@@ -1040,6 +1074,18 @@ export default {
 .price-band__axis-labels{ display: flex; justify-content: space-between; font-family: var(--w2b-font-mono); font-size: 10.5px; color: var(--w2b-muted); }
 .price-band__statement{ margin-top: var(--w2b-space-3); font-size: var(--w2b-text-s); color: var(--w2b-graphite); }
 .price-band__statement b{ color: var(--w2b-ink); }
+.price-band__marker--below{ background: var(--w2b-good); border-color: var(--w2b-good); }
+.price-band__marker--above{ background: var(--w2b-error); border-color: var(--w2b-error); }
+.price-verdict{
+  display: flex; align-items: flex-start; gap: var(--w2b-space-2); margin: 0;
+  padding: var(--w2b-space-3) var(--w2b-space-4); border-top: 1px solid var(--w2b-line-faint);
+  font-size: var(--w2b-text-s);
+}
+.price-verdict__mark{ flex: none; font-family: var(--w2b-font-display); font-weight: 700; line-height: 1.35; }
+.price-verdict--below{ background: var(--w2b-good-surface); color: var(--w2b-good); }
+.price-verdict--above{ background: var(--w2b-error-surface); color: var(--w2b-error); }
+.price-verdict--within{ background: var(--w2b-surface-sunken); color: var(--w2b-graphite); }
+.price-verdict--within b{ color: var(--w2b-ink); }
 
 /* Map and the list of what is nearby answer the same question from two sides,
    so on a wide screen they stand next to each other: where on the left, how far
@@ -1063,11 +1109,6 @@ export default {
 .location__map{ position: sticky; top: var(--w2b-space-3); }
 @media (max-width: 1000px){ .location__map{ position: static; } }
 .location__layer{ display: inline-flex; align-items: center; gap: 6px; }
-.location__hint{
-  margin: 0; padding: 6px var(--w2b-space-3);
-  font-size: var(--w2b-text-xs); color: var(--w2b-muted);
-  border-top: 1px solid var(--w2b-line-faint);
-}
 
 .key{ padding: var(--w2b-space-3); border-top: 1px solid var(--w2b-line); }
 .key__head{ margin: 0 0 6px; font-size: var(--w2b-text-xs); color: var(--w2b-muted); }
@@ -1077,10 +1118,6 @@ export default {
 }
 .key__bands li{ display: flex; align-items: center; gap: 6px; }
 .key__swatch{ width: 14px; height: 10px; border-radius: 2px; border: 1px solid var(--w2b-line); }
-.key__note{
-  margin: 8px 0 0; font-size: var(--w2b-text-xs); color: var(--w2b-muted);
-  max-width: 68ch; line-height: 1.5;
-}
 
 .side-pane{ display: flex; flex-direction: column; gap: var(--w2b-space-4); min-width: 0; }
 .side-tabs{
@@ -1122,9 +1159,6 @@ export default {
 .house-chip button[aria-pressed="true"]{ background: var(--w2b-secondary-light); box-shadow: inset 0 0 0 1px var(--w2b-secondary); }
 .house-chip button:focus-visible{ outline: 2px solid var(--w2b-primary); outline-offset: 2px; }
 
-.caveat{ padding: var(--w2b-space-3) var(--w2b-space-4); border-top: 1px solid var(--w2b-line-faint); font-size: var(--w2b-text-xs); }
-.caveat summary{ cursor: pointer; color: var(--w2b-warning-text); font-weight: 600; }
-.caveat p{ margin-top: var(--w2b-space-2); color: var(--w2b-muted); line-height: 1.5; }
 .depth{ width: 72px; padding: 4px 7px; text-align: right; }
 .slider{ display: grid; grid-template-columns: 1fr auto; gap: 5px var(--w2b-space-3); align-items: center; padding: var(--w2b-space-3) var(--w2b-space-4); border-top: 1px solid var(--w2b-line-faint); }
 .slider label{ font-family: var(--w2b-font-display); font-weight: 600; font-size: var(--w2b-text-xs); letter-spacing: .09em; text-transform: uppercase; color: var(--w2b-muted); }

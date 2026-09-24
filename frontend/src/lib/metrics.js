@@ -2,6 +2,20 @@
  *  the detail view and the comparison always agree on the same numbers. */
 import { polygonArea, minimumRotatedRectangle, rectangularity, shapeClass, polygonEdges } from "./geometry.js";
 
+/** Half the width of the band the price panel draws around the land value,
+ *  as a fraction. The chip, the marker and the coloured line all read their
+ *  stage off it, so they cannot disagree with the band they sit on. */
+export const PRICE_BAND = 0.15;
+
+/** "below", "within" or "above" the band, from a deviation in per cent; null
+ *  when there is no deviation because there is no asking price. */
+export function priceStage(deviation) {
+  if (!Number.isFinite(deviation)) return null;
+  if (deviation < -PRICE_BAND * 100) return "below";
+  if (deviation > PRICE_BAND * 100) return "above";
+  return "within";
+}
+
 export function plotMetrics(plot) {
   const computed = polygonArea(plot.polygon);
   const mrr = minimumRotatedRectangle(plot.polygon);
