@@ -16,7 +16,7 @@ import { describe, it, expect } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import answer from "./fixtures/standort-moelkau.json";
-import { siteFindings, siteTally, noiseMapped } from "../src/lib/siteChecks.js";
+import { siteFindings, siteTally, noiseOnPlot } from "../src/lib/siteChecks.js";
 import { GOOD, NOTE, OPEN } from "../src/lib/findings.js";
 import CheckList from "../src/components/CheckList.vue";
 import PlotView from "../src/views/PlotView.vue";
@@ -101,22 +101,23 @@ describe("siteFindings", () => {
     expect(air.text).toMatch(/nähere Stationen? liefer[nt] keine Messwerte/);
   });
 
-  it("distinguishes an unmapped plot from a quiet one", () => {
+  it("marks a plot without noise values as something to look at", () => {
     const unmapped = siteFindings(withBlock("laerm", {
       tag: { strasse: [], strassenbahn: [], flughafen: [] },
       nacht: { strasse: [] },
-      kartiert_umkreis: false
+      kartiert_umkreis: false,
+      umkreis_m: 2000
     }));
     const finding = find(unmapped, "laerm").finding;
-    expect(finding.status).toBe(OPEN);
-    expect(finding.value).toBe("nicht kartiert");
-    expect(finding.text).toContain("keine Aussage über die Ruhe");
+    expect(finding.status).toBe(NOTE);
+    expect(finding.value).toBe("keine Lärmdaten");
+    expect(finding.text).toContain("Im Umkreis von 2 km");
 
-    const quiet = siteFindings(withBlock("laerm", {
+    const nearby = siteFindings(withBlock("laerm", {
       tag: { strasse: [] }, nacht: { strasse: [] }, kartiert_umkreis: true
     }));
-    expect(find(quiet, "laerm").finding.status).toBe(GOOD);
-    expect(find(quiet, "laerm").finding.value).toBe("unter 45 dB(A)");
+    expect(find(nearby, "laerm").finding.status).toBe(NOTE);
+    expect(find(nearby, "laerm").finding.value).toBe("keine Lärmdaten");
   });
 
   it("shows a failed service as open, never as a clean result", () => {
@@ -146,23 +147,21 @@ describe("siteFindings", () => {
   });
 });
 
-describe("noiseMapped", () => {
+describe("noiseOnPlot", () => {
   it("says yes where the plot sits in a band", () => {
-    expect(noiseMapped(answer)).toBe(true);
+    expect(noiseOnPlot(answer)).toBe(true);
   });
 
-  it("says yes where the survey mapped the surroundings but not the plot", () => {
-    const quiet = withBlock("laerm", { tag: { strasse: [], strassenbahn: [], flughafen: [] } });
-    expect(noiseMapped(quiet)).toBe(true);
+  it("says no where the plot sits in no band, mapped surroundings or not", () => {
+    const nearby = withBlock("laerm", { tag: { strasse: [], strassenbahn: [], flughafen: [] }, kartiert_umkreis: true });
+    expect(noiseOnPlot(nearby)).toBe(false);
+    const unmapped = withBlock("laerm", { tag: { strasse: [], strassenbahn: [], flughafen: [] }, kartiert_umkreis: false });
+    expect(noiseOnPlot(unmapped)).toBe(false);
   });
 
-  it("says no where nothing is mapped, where the survey failed, and for no answer", () => {
-    const unmapped = withBlock("laerm", {
-      tag: { strasse: [], strassenbahn: [], flughafen: [] }, kartiert_umkreis: false
-    });
-    expect(noiseMapped(unmapped)).toBe(false);
-    expect(noiseMapped(withBlock("laerm", { fehler: "Der Lärmdienst antwortet nicht." }))).toBe(false);
-    expect(noiseMapped(null)).toBe(false);
+  it("does not know while there is no answer or the survey failed", () => {
+    expect(noiseOnPlot(withBlock("laerm", { fehler: "Der Lärmdienst antwortet nicht." }))).toBe(null);
+    expect(noiseOnPlot(null)).toBe(null);
   });
 });
 
@@ -231,7 +230,8 @@ describe("Prüfliste", () => {
 
   it("zeigt ohne Befund zum Beachten die sauberen Prüfungen, nicht die offenen", async () => {
     const clean = {
-      ...withBlock("laerm", { tag: { strasse: [], strassenbahn: [], flughafen: [] } }),
+      // A band below 55 dB(A): the one noise answer with nothing to note.
+      ...withBlock("laerm", { tag: { strasse: ["Lden5054"], strassenbahn: [], flughafen: [] } }),
       baugrund: { ...answer.baugrund, fehler: "Die Bodenkarte antwortet nicht." }
     };
     const list = mountList(realPlot("moelkau"), () =>
@@ -309,10 +309,10 @@ describe("Standort auf der Grundstücksseite", () => {
     const view = mountWithRouter(PlotView, { props: { id: plot.id } });
     const section = view.find("#standort");
     expect(section.exists()).toBe(true);
-    expect(section.text()).toContain("Was am Grundstück gilt");
+    expect(section.text()).toContain("Was der Standort mitbringt");
     expect(section.find(".checks").exists()).toBe(true);
     const headings = view.findAll("h2").map(h => h.text());
-    expect(headings.indexOf("Was am Grundstück gilt")).toBeLessThan(headings.indexOf("Wege von hier"));
+    expect(headings.indexOf("Was der Standort mitbringt")).toBeLessThan(headings.indexOf("Wege von hier"));
     view.unmount();
   });
 
@@ -342,6 +342,44 @@ describe("Standort auf der Grundstücksseite", () => {
     await flushPromises();
     expect(noise().attributes("aria-pressed")).toBe("true");
     view.unmount();
+  });
+
+  it("graut die Karte aus und sagt es, wenn am Grundstück kein Lärmwert liegt", async () => {
+    state.data = realState();
+    const plot = state.data.plots.find(p => p.anchor);
+    // Kartiert im Umkreis, aber kein Band am Grundstück: genau der Fall, der
+    // früher grün und ruhig aussah.
+    const nearby = withBlock("laerm", {
+      tag: { strasse: [], strassenbahn: [], flughafen: [] },
+      nacht: { strasse: [], strassenbahn: [], flughafen: [] },
+      kartiert_umkreis: true
+    });
+    let reply = nearby;
+    globalThis.fetch = () => Promise.resolve({ ok: true, json: () => Promise.resolve(reply) });
+
+    const view = mountWithRouter(PlotView, { props: { id: plot.id } });
+    // Vor der Antwort weiß niemand etwas: nichts ausgegraut, kein Hinweis.
+    expect(view.find(".location__no-noise").exists()).toBe(false);
+
+    await flushPromises();
+    await nextTick();
+    const frame = () => view.find(".location__frame");
+    expect(frame().classes()).toContain("location__frame--no-noise");
+    expect(view.find(".location__no-noise").text()).toContain("Keine Lärmwerte am Grundstück");
+
+    // Die Ebene von Hand an: Farbe zurück, der Hinweis bleibt.
+    await view.findAll("#standort button").find(b => b.text() === "Lärm").trigger("click");
+    expect(frame().classes()).not.toContain("location__frame--no-noise");
+    expect(view.find(".location__no-noise").exists()).toBe(true);
+    view.unmount();
+
+    reply = answer;
+    const loud = mountWithRouter(PlotView, { props: { id: plot.id } });
+    await flushPromises();
+    await nextTick();
+    expect(loud.find(".location__no-noise").exists()).toBe(false);
+    expect(loud.find(".location__frame").classes()).not.toContain("location__frame--no-noise");
+    loud.unmount();
   });
 
   it("sagt bei fehlender Koordinate, warum nichts gefragt werden kann", () => {
