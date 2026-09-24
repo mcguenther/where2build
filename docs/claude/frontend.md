@@ -324,6 +324,24 @@ that collapsed at 390 px. None of them threw.
   („rechteckig · 1 : 1,42", „3,0 m ringsum"), so a closed one is not a blank.
   `print.css` opens them through `::details-content`, like the soil wording.
 
+- **The plot and the house laid on it are two tabs, and the plan decides
+  which one shows.** The column beside the plan held the plot's figures, and
+  the building body stood below it at the same size as the setback table, so
+  what the cadastre says and what the user tried out read as one thing. Now
+  „Grundstück" and „Bebauung" share the column; a *click* on the footprint
+  opens „Bebauung" and draws the selection frame, a click anywhere else on the
+  plan goes back. `SitePlan` emits `select` ("house" or null) from the release,
+  within the same 4 px that separate a pick from a pan, so a drag moves the
+  house and switches nothing. The panes are `v-show`, never `v-if`: the tests
+  and the half-typed edge lengths need the fields to exist, and `print.css`
+  dissolves the column (`display: contents`) to print both — the plot's
+  figures beside the plan, the building body under it. That grid needs
+  `grid-template-rows: auto 1fr`, or the first row grows to the height of the
+  column that spans both and the building body prints a hand's width below
+  the drawing. The column is 336 px, and a `details.fold` head with a summary
+  *and* a chip overflows it; the setback fold lost its § 6 chip to the
+  caveat inside it, which is where the paragraph is explained.
+
 - **Enter in the search field only ever took a row, so most inputs went
   nowhere.** `PlotSearch` handled Enter itself and took the highlighted row or
   a sole one; a link, a pasted page, a bare number with its district unfolded,
