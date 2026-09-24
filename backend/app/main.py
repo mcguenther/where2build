@@ -572,8 +572,12 @@ def create_app() -> FastAPI:
                     hinweis=(
                         "Routing (/api/reachability) und in /api/geocode alles, was die "
                         "amtlichen Hauskoordinaten nicht beantworten: Haltestellen, Orte "
-                        "und Adressen außerhalb Sachsens. Öffentliche Instanz nur für "
-                        "den Prototyp."
+                        "und Adressen außerhalb Sachsens."
+                        + (
+                            " Öffentliche Instanz nur für den Prototyp."
+                            if "transitous.org" in current.motis.base_url
+                            else " Eigene Instanz."
+                        )
                     ),
                 ),
                 DienstStatus(

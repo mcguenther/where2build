@@ -68,7 +68,7 @@ def test_the_answer_says_the_coordinate_is_not_an_official_one(client: TestClien
     body = client.post("/api/geocode", json={"text": "Bahnhof Wurzen"}).json()
 
     assert "Hauskoordinaten" in body["hinweis"]
-    assert "Transitous" in body["quelle"]
+    assert "MOTIS" in body["quelle"]
 
 
 @respx.mock

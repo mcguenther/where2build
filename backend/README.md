@@ -290,7 +290,7 @@ coordinates for `/api/reachability`.
       "beschreibung": "04808 Wurzen, Kühren-Burkartshain, Sachsen", "art": "adresse" }
   ],
   "hinweis": "Die Koordinaten stammen aus dem Routing-Geocoder …",
-  "quelle": "MOTIS / Transitous (DELFI-GTFS, OpenStreetMap)"
+  "quelle": "MOTIS (DELFI-GTFS, OpenStreetMap)"
 }
 ```
 
@@ -388,7 +388,7 @@ routes from now.
       ]
     }
   ],
-  "quelle": "MOTIS / Transitous (DELFI-GTFS, OpenStreetMap)"
+  "quelle": "MOTIS (DELFI-GTFS, OpenStreetMap)"
 }
 ```
 
@@ -465,7 +465,7 @@ in between and the crossing there is a ferry.
       "hinweis": "Für diese Kategorie ist auf dem Server kein Datenbestand eingerichtet — …" }
   ],
   "datenstand": "2026-08-22T20:21:02Z",
-  "quelle": "OpenStreetMap (ODbL) und MOTIS / Transitous (DELFI-GTFS)",
+  "quelle": "OpenStreetMap (ODbL) und MOTIS (DELFI-GTFS)",
   "hinweis": "Die Gehzeiten stammen aus dem Fußwegenetz von OpenStreetMap …"
 }
 ```

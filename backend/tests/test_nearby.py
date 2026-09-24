@@ -498,7 +498,7 @@ def test_the_answer_carries_its_sources_and_a_note_on_what_the_numbers_are(clien
 
     body = client.post("/api/nearby", json={"origin": ORIGIN, "kategorien": ["bus"]}).json()
 
-    assert "OpenStreetMap" in body["quelle"] and "Transitous" in body["quelle"]
+    assert "OpenStreetMap" in body["quelle"] and "MOTIS" in body["quelle"]
     assert "Gehzeiten" in body["hinweis"]
     assert "Luftlinie" in body["hinweis"]
 

@@ -135,12 +135,11 @@
       </div>
     </section>
 
-    <div class="callout">
-      <h4>Im Prototyp läuft das gegen Transitous</h4>
-      <p>Öffentliche MOTIS-Instanz der Community. Ideal, um diesen Bereich zu bauen, ohne
-        vorher einen Server aufzusetzen. Für Produktionslast ungeeignet; die Betreiber weisen
-        selbst auf begrenzte Ressourcen hin. Die Umstellung auf eine eigene Instanz ändert
-        nur die Basis-Adresse.</p>
+    <div v-if="publicRouter" class="callout">
+      <h4>Die Wege berechnet Transitous</h4>
+      <p>Öffentliche MOTIS-Instanz der Community. Für Produktionslast ungeeignet; die Betreiber
+        weisen selbst auf begrenzte Ressourcen hin. Der mitgelieferte Docker-Stapel bringt eine
+        eigene Instanz mit.</p>
     </div>
   </div>
 </template>
@@ -150,7 +149,7 @@ import {
   state, addDestination, removeDestination, save, locateDestination, unlocateDestination,
   destinationName
 } from "../lib/store.js";
-import { geocode } from "../lib/api.js";
+import { geocode, backendHealth } from "../lib/api.js";
 import { ZUBRINGER, zubringerOf } from "../lib/routes.js";
 
 export default {
@@ -164,12 +163,21 @@ export default {
       /* id -> the fields as they are being typed. A located destination is a
        * stored record: its name and address are only written back when the
        * user says so, which is what makes leaving the editor free of cost. */
-      edits: {}
+      edits: {},
+      // The router the backend reports. Unknown until /api/health answers, and
+      // unknown means no claim about it either way.
+      routerEndpoint: null
     };
   },
   computed: {
+    publicRouter() { return Boolean(this.routerEndpoint?.includes("transitous.org")); },
     destinations() { return state.data.destinations; },
     referencePoint() { return state.data.plots.find(p => p.anchor)?.anchor || null; }
+  },
+  async mounted() {
+    const health = await backendHealth();
+    const motis = health?.dienste?.find(service => service.name === "motis");
+    this.routerEndpoint = motis?.endpunkt || null;
   },
   methods: {
     zubringerOf,

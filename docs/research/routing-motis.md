@@ -567,26 +567,29 @@ ohnehin nie betroffen; die kommen aus dem Straßengraphen.
 
 ### 5.7 Einbindung ins Repo
 
-`docker-compose.yml`, Profil `local-routing`, zwei Dienste:
+Seit 24.09.2026 Teil des Standard-Stapels in `docker-compose.yml`, drei Dienste:
 
+- `routing-data` — einmalig, Backend-Image, `scripts/fetch_routing_data.py`:
+  lädt OSM-Auszug und DELFI-GTFS in das Volume `routing-input`, behält eine
+  vorhandene Datei, ersetzt beide mit `--refresh`.
 - `motis-import` — einmalig, `restart: "no"`, schreibt in das Volume
   `motis-graph` und legt danach `/data/meta/import_done` an; ein weiterer
-  `up`-Aufruf überspringt den Import.
+  `up`-Aufruf importiert nur, wenn eine Eingabedatei neuer ist als diese Marke.
 - `motis` — `motis server -d /data`, `depends_on: service_completed_successfully`,
   Healthcheck über den Geocoder (der antwortet erst, wenn der Adressindex
   gemappt ist).
 
-Der Backend-Dienst bekommt `environment: - MOTIS_BASE_URL` **ohne Wert**:
-Compose reicht die Variable nur durch, wenn sie gesetzt ist, und lässt sie
-sonst ganz weg — `backend/.env` und der eingebaute Standard (Transitous)
-behalten also das letzte Wort, solange niemand etwas anderes verlangt.
+Das Backend bekommt `MOTIS_BASE_URL=http://motis:8080` fest gesetzt und wartet
+auf den Healthcheck. Zurück zu Transitous geht es nur über eine zweite Datei,
+die zugleich die drei Dienste abschaltet:
 
 ```bash
-./motis/fetch-data.sh
-docker compose -f docker-compose.yml -f docker-compose.local-routing.yml up --build
+docker compose -f docker-compose.yml -f docker-compose.transitous.yml up --build
 ```
 
-`docker compose up` ohne Profil bleibt unverändert bei zwei Containern.
+Vorher (bis 23.09.2026) war es umgekehrt: `docker-compose.local-routing.yml`
+schaltete den eigenen Router zu, und `motis/fetch-data.sh` lud die Eingaben auf
+dem Host.
 
 ⚠️ **Der Plattencache des Backends kennt die Basis-URL nicht.** Sein
 Schlüssel besteht nur aus den Anfrageparametern, also liefert ein Umschalten
