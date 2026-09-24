@@ -101,6 +101,44 @@ describe("QueryBox", () => {
     box.unmount();
   });
 
+  /* A link copied out of a browser, a mail or a chat usually carries
+   * `text/html` beside it — `<a href="…">…</a>`. That markup used to switch the
+   * reading to „Seite“, the link went to the server as pasted text, and the
+   * server found nothing in it: a 503 for an advert whose page answers
+   * perfectly well. Reported on 24.09.2026 with Firefox 156. */
+  it("liest einen eingefügten Link als Link, auch wenn HTML mitkommt", async () => {
+    const url = "https://www.kleinanzeigen.de/s-anzeige/ruhiges-grundstueck-fuer-ein-kleines-haus/3520842196-207-4244";
+    const box = mount(QueryBox);
+    const input = box.find(".search__field input");
+    await input.trigger("paste", {
+      clipboardData: { getData: type => (type === "text/html" ? `<a href="${url}">${url}</a>` : url) }
+    });
+    await type(box, url);
+
+    expect(chip(box, "Link zur Anzeige").attributes("data-state")).toBe("read");
+    await button(box).trigger("click");
+    const [payload] = box.emitted("read")[0];
+    expect(payload.kind).toBe("url");
+    expect(payload.text).toBe(url);
+    box.unmount();
+  });
+
+  it("liest eine eingefügte ganze Seite weiter als Seite", async () => {
+    const box = mount(QueryBox);
+    const input = box.find(".search__field input");
+    const page = "<html><body><h1>Baugrundstück</h1><p>Grundstücksfläche 590 m²</p></body></html>";
+    await input.trigger("paste", {
+      clipboardData: { getData: type => (type === "text/html" ? page : "Baugrundstück Grundstücksfläche 590 m²") }
+    });
+    await type(box, "Baugrundstück Grundstücksfläche 590 m²");
+
+    await button(box).trigger("click");
+    const [payload] = box.emitted("read")[0];
+    expect(payload.kind).toBe("page");
+    expect(payload.html).toBe(page);
+    box.unmount();
+  });
+
   it("klappt bei einer nackten Nummer das Feldpaar auf und übernimmt sie", async () => {
     const box = mount(QueryBox);
     await type(box, "85/1");

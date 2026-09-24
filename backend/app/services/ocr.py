@@ -99,6 +99,44 @@ _DISTRICT_RE = re.compile(
 # place read next to one of these is the authority, not the plot.
 _AUTHORITY = ("landesamt", "geobasisinformation", "olbrichtplatz", "geosn", "staatsbetrieb")
 
+# The seller's own marking. A Geoportal „Flurkarte“ printed with an empty title
+# carries no labelled number at all -- measured on advert 3520842196 (Leipzig-
+# Engelsdorf, 23.09.2026): „Titel: Flurkarte“, „Untertitel:“ blank, and the plot
+# is only a red frame drawn round the in-map label 166/17. The full-page pass
+# does not even return that label, and a bare number anywhere else on the sheet
+# is a neighbour. *Inside* the frame it is the plot: the frame is the statement.
+#
+# Red, strongly: the GeoSN sheet uses no saturated red of its own (its blues,
+# purples and greys are far from it), and on the site photographs of that advert
+# not one pixel passed.
+_MARK_MIN_RED = 170
+_MARK_MAX_OTHER = 90
+_MARK_MIN_CONTRAST = 110
+# Fewer red pixels than this is a speck, not a frame round a parcel. The frame
+# on the measured sheet has ~1 800 at 678 x 960.
+MARK_MIN_PIXELS = 200
+# An enclosed interior smaller than this is the hole in a red letter, not a
+# parcel. The measured frame encloses ~9 300.
+MARK_MIN_INTERIOR = 400
+# The in-map labels are ~9 px tall at the served size, which is why the page
+# pass turns them into garbage. Enlarged, they read -- but no single factor
+# reads every sheet: measured on the two real prints and on the Engelsdorf one
+# turned by -5..+3 degrees, x4 read „90111“ off the Großbothen frame, x6 read
+# „166/417“ off the turned Engelsdorf one, and x5 missed it at +3 degrees. Each
+# scale is wrong somewhere; no two were wrong *alike*. So the crop is read at
+# three, and a number counts only when two of them agree on it.
+MARK_SCALES = (4, 5, 6)
+MARK_AGREEMENT = 2
+# ``psm 11`` -- sparse text, no assumption of lines. The masked crop is a white
+# field with one label and a building in it; ``psm 6`` returned „Fi“ for the
+# measured frame, ``psm 11`` returned „166/17“.
+MARK_PAGE_MODE = "11"
+# Inside a frame only the fraction form is taken. A bare number there is as
+# likely a house number printed on the building (the ``10``, ``12`` beside the
+# measured plot) as a parcel without denominator, and a plausible wrong number
+# is the one failure this module exists to avoid.
+_MARKED_PARCEL_RE = re.compile(r"(?<![\d/])(\d{1,6})\s*/\s*(\d{1,5}|[a-zA-Z])(?![\w/])")
+
 # How much text an image has to yield before it is worth looking at. Below
 # this the reader found noise, and noise is where a garbled number comes from.
 MIN_CHARACTERS = 12
@@ -223,6 +261,9 @@ class ImageReading:
     parcels: list[str] = field(default_factory=list)
     districts: list[str] = field(default_factory=list)
     failed: str | None = None
+    # The parcels were read inside the seller's marking, not off a label.
+    # Said in the Indiz, because it is a different claim about the sheet.
+    marked: bool = False
 
     @property
     def useful(self) -> bool:
@@ -258,8 +299,132 @@ def patterns(text: str) -> tuple[list[str], list[str]]:
     return parcels, districts
 
 
+def marked_region(data: bytes) -> bytes | None:
+    """What lies inside a red frame drawn on the image, and nothing else.
+
+    Everything outside the frame is painted white, so the reader cannot see the
+    neighbours' labels at all -- a crop to the bounding box would still show
+    them, because a parcel is rarely an upright rectangle (the measured one is
+    turned by ~35 degrees and its box holds 166/16 and 166/c as well).
+
+    The interior is what a flood fill from outside cannot reach. Only the red
+    pixels' bounding box is filled: outside it nothing can be enclosed, and
+    Pillow's flood fill is Python -- the whole sheet cost 1,05 s, the box 0,05 s.
+    A solid red blob encloses nothing, which is what keeps a red car or a roof
+    from counting as a marking.
+    """
+
+    try:
+        import numpy as np
+        from PIL import Image, ImageDraw, ImageFilter, ImageOps
+    except ImportError:
+        return None
+    try:
+        with Image.open(io.BytesIO(data)) as opened:
+            image = opened.convert("RGB")
+    except Exception:
+        return None
+
+    pixels = np.asarray(image).astype(np.int16)
+    red, green, blue = pixels[..., 0], pixels[..., 1], pixels[..., 2]
+    frame = (
+        (red >= _MARK_MIN_RED)
+        & (green <= _MARK_MAX_OTHER)
+        & (blue <= _MARK_MAX_OTHER)
+        & (red - np.maximum(green, blue) >= _MARK_MIN_CONTRAST)
+    )
+    if int(frame.sum()) < MARK_MIN_PIXELS:
+        return None
+
+    rows, columns = np.nonzero(frame)
+    top, bottom = int(rows.min()), int(rows.max()) + 1
+    left, right = int(columns.min()), int(columns.max()) + 1
+    # One pixel of dilation closes the gaps JPEG leaves in a thin line.
+    mask = Image.fromarray((frame[top:bottom, left:right] * 255).astype(np.uint8))
+    mask = mask.filter(ImageFilter.MaxFilter(3))
+    padded = Image.new("L", (mask.width + 2, mask.height + 2), 0)
+    padded.paste(mask, (1, 1))
+    ImageDraw.floodfill(padded, (0, 0), 128)
+    inside = np.asarray(padded)[1:-1, 1:-1] == 0
+    if int(inside.sum()) < MARK_MIN_INTERIOR:
+        return None
+
+    region = pixels[top:bottom, left:right]
+    masked = np.full_like(region, 255)
+    masked[inside] = region[inside]
+    inner_rows, inner_columns = np.nonzero(inside)
+    crop = Image.fromarray(masked.astype(np.uint8)).crop(
+        (
+            int(inner_columns.min()),
+            int(inner_rows.min()),
+            int(inner_columns.max()) + 1,
+            int(inner_rows.max()) + 1,
+        )
+    )
+    # Grey and stretched: in colour the lavender ground and the grey building
+    # beside the label made the same crop read „166/17“ on one run and
+    # „4166/17“ on the next -- a plausible wrong number. In grey it read
+    # „166/17“ at 0, +3 and -5 degrees.
+    crop = ImageOps.autocontrast(crop.convert("L"))
+    buffer = io.BytesIO()
+    crop.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def _enlarged(data: bytes, factor: int) -> bytes:
+    from PIL import Image
+
+    with Image.open(io.BytesIO(data)) as crop:
+        bigger = crop.resize((crop.width * factor, crop.height * factor), Image.LANCZOS)
+    buffer = io.BytesIO()
+    bigger.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def marked_parcels(text: str) -> list[str]:
+    """Parcel numbers in the fraction form, as read inside a marking."""
+
+    parcels: list[str] = []
+    for match in _MARKED_PARCEL_RE.finditer(text):
+        parsed = normalise_parcel_number(f"{match.group(1)}/{match.group(2)}")
+        if parsed:
+            label = parcel_label(*parsed)
+            if label not in parcels:
+                parcels.append(label)
+    return parcels
+
+
+def _read_marking(data: bytes, reading: ImageReading) -> None:
+    """The second channel: the frame a seller drew, when no label named a parcel."""
+
+    region = marked_region(data)
+    if region is None:
+        return
+    votes: dict[str, int] = {}
+    texts: list[str] = []
+    for factor in MARK_SCALES:
+        text, failure = read(_enlarged(region, factor), MARK_PAGE_MODE)
+        reading.modes.append(f"markierung:x{factor}")
+        if failure:
+            reading.failed = failure
+            return
+        texts.append(text.strip())
+        for number in marked_parcels(text):
+            votes[number] = votes.get(number, 0) + 1
+    parcels = [number for number, count in votes.items() if count >= MARK_AGREEMENT]
+    if parcels:
+        reading.parcels = parcels
+        reading.marked = True
+        # Kept beside the page's text, whose Gemarkung line is a Beleg too.
+        reading.text = "\n".join([reading.text.strip(), *texts]).strip()
+
+
 def read_image(data: bytes, quelle: str = "Bild", url: str | None = None) -> ImageReading:
-    """The full ladder over one image: upscale, ``psm 6``, then ``psm 1``."""
+    """The full ladder over one image: upscale, ``psm 6``, then ``psm 1``.
+
+    When neither pass found a labelled parcel number, a red frame on the sheet
+    is read on its own. It costs nothing on a photograph -- no frame, no pass.
+    """
 
     reading = ImageReading(quelle=quelle, url=url)
     if not available():
@@ -278,8 +443,10 @@ def read_image(data: bytes, quelle: str = "Bild", url: str | None = None) -> Ima
         if parcels or districts:
             reading.text = text
             reading.parcels, reading.districts = parcels, districts
-            return reading
+            break
         reading.text = reading.text or text
+    if not reading.parcels:
+        _read_marking(data, reading)
     return reading
 
 
@@ -316,8 +483,14 @@ def as_indicia(readings: list[ImageReading], start: int = 0) -> list[Indiz]:
                     id=f"ocr{count}",
                     art="flurstueck",
                     wert=number,
-                    text=f"Flurstück {number} auf einem Bild der Anzeige",
-                    beleg=_excerpt(reading.text, number),
+                    text=(
+                        f"Flurstück {number} im rot umrandeten Bereich einer Karte in der Anzeige"
+                        if reading.marked
+                        else f"Flurstück {number} auf einem Bild der Anzeige"
+                    ),
+                    # Inside a frame the reader returns the label and nothing
+                    # around it, so the label is the verbatim Beleg.
+                    beleg=number if reading.marked else _excerpt(reading.text, number),
                     quelle="bild",
                     sicherheit=0.95,
                     bild_url=reading.url,

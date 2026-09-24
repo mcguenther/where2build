@@ -40,15 +40,20 @@ describe("noiseFinding", () => {
     expect(f.interpretation.label).toBe("deutlich hörbar");
   });
 
-  it("separates 'below the lowest band' from 'not surveyed'", () => {
-    const quiet = noiseFinding({ day: {}, night: {}, mappedNearby: true });
-    expect(quiet.status).toBe(GOOD);
-    expect(quiet.value).toBe("unter 45 dB(A)");
+  it("never calls a plot without a value quiet — mapped nearby or not", () => {
+    // Naunhof, Bahnhofstraße: no band on the plot, 30 main-road polygons
+    // within 2 km. That used to read "unter 45 dB(A)" in green.
+    const nearby = noiseFinding({ day: {}, night: {}, mappedNearby: true });
+    expect(nearby.status).toBe(NOTE);
+    expect(nearby.value).toBe("keine Lärmdaten");
+    expect(nearby.text).toContain("Hauptverkehrsstraßen");
+    expect(nearby.text).toContain("nur vor Ort");
+    expect(nearby.text).not.toMatch(/unter \d+ dB/);
 
-    const unmapped = noiseFinding({ day: {}, night: {}, mappedNearby: false });
-    expect(unmapped.status).toBe(OPEN);
-    expect(unmapped.value).toBe("nicht kartiert");
-    expect(unmapped.text).toContain("keine Aussage über die Ruhe");
+    const unmapped = noiseFinding({ day: {}, night: {}, mappedNearby: false, radius: "2 km" });
+    expect(unmapped.status).toBe(NOTE);
+    expect(unmapped.value).toBe("keine Lärmdaten");
+    expect(unmapped.text).toContain("Im Umkreis von 2 km ist nichts kartiert.");
   });
 
   it("flags a loud plot but not a quiet one", () => {

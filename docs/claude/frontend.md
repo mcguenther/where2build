@@ -339,3 +339,15 @@ that collapsed at 390 px. None of them threw.
   manual entry, a destination's address, the read values, the plot's name,
   price and note). Not the second confirmation of the red button, and not
   „Trotzdem anlegen": overriding a doubt takes a click on the words that say so.
+
+- **A copied link carries markup, and the markup made it a page.** `QueryBox`
+  lit „Eingefügte Anzeige“ whenever the paste event had `text/html` — and a
+  link copied out of Firefox, a mail or a chat has `<a href="…">` there. So the
+  Kleinanzeigen link went to `/api/listings/extract` as `{text: …}`, the server
+  read the address itself as the advert, found nothing and answered **503**
+  with the „weder eine Adresse noch eine Koordinate …“ sentence (559 bytes in
+  the nginx log, which is how it was told apart from the two other 503s), while
+  the same URL sent as `{url: …}` answered 200. Reported on 24.09.2026 from a
+  local compose stack; the container fetched the page fine. A text that reads
+  as a bare link now stays a link whatever markup came with it — a whole
+  pasted page never reads as one, so no real paste loses its markup.
