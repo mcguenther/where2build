@@ -38,10 +38,11 @@ export function plotMetrics(plot) {
        the two differ by a few square metres and only the official figure counts. */
     pricePerSqm: perSqm,
     deviation,
-    // The value is the modifier of a `chip--…` CSS class.
-    deviationClass: deviation === null
-      ? "unknown"
-      : Math.abs(deviation) <= 5 ? "good" : deviation > 15 ? "error" : "warn",
+    priceStage: priceStage(deviation),
+    /* The modifier of a `chip--…` CSS class, from the same three stages the
+       plot page draws, so a card and the page it opens never disagree.
+       "neutral" and "unknown" have no rule of their own: a plain chip. */
+    deviationClass: { below: "good", within: "neutral", above: "error" }[priceStage(deviation)] ?? "unknown",
     /* The edge the plot itself calls its street front, not the one the ring
        happens to start with: a union of two parcels starts wherever the two
        outlines meet, and that was a 2,04 m stub reported as the frontage. */

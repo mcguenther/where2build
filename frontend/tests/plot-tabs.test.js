@@ -5,7 +5,9 @@
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { nextTick } from "vue";
+import { mount } from "@vue/test-utils";
 import PlotView from "../src/views/PlotView.vue";
+import PlotCard from "../src/components/PlotCard.vue";
 import { state, plotById } from "../src/lib/store.js";
 import { priceStage, PRICE_BAND } from "../src/lib/metrics.js";
 import { realState, mountWithRouter } from "./helpers.js";
@@ -143,6 +145,27 @@ describe("Preis gegen Bodenrichtwert", () => {
     expect(w.find(".price-verdict").classes()).toContain("price-verdict--above");
   });
 
+  it("nennt die Quelle in der Klappe statt als Chip im Kopf", () => {
+    const w = mountPlot();
+    const head = w.findAll("#pane-plot .panel__head").find(h => h.text().startsWith("Preis"));
+    expect(head.text()).not.toContain("BORIS");
+    expect(w.find("#pane-plot").text()).toContain("stammen aus BORIS Sachsen");
+  });
+
+  it("färbt die Karte in der Übersicht nach denselben Stufen", () => {
+    const plot = plotById("plot-concave");
+    const card = share => {
+      plot.askingPrice = Math.round(plot.officialArea * plot.bodenrichtwert * (1 + share));
+      return mount(PlotCard, { props: { plot, selectable: false } }).find(".plot-card__chips .chip");
+    };
+    expect(card(-0.209).classes()).toContain("chip--good");
+    const within = card(-0.043).classes();
+    expect(within).not.toContain("chip--good");
+    expect(within).not.toContain("chip--warn");
+    expect(within).not.toContain("chip--error");
+    expect(card(0.345).classes()).toContain("chip--error");
+  });
+
   it("zeigt ohne Kaufpreis weder Chip noch Zeile, nur den Satz dazu", async () => {
     const plot = plotById("plot-concave");
     plot.askingPrice = null;
@@ -159,7 +182,7 @@ describe("Hinweise hinter einer Klappe", () => {
     folds.forEach(f => expect(f.element.open).toBe(false));
     const heads = folds.map(f => f.find("summary").text().replace(/\s+/g, " "));
     expect(heads).toContain("Hinweise 1");                               // Grundstück
-    expect(heads.some(h => /^Hinweise [12]$/.test(h))).toBe(true);       // Preis
+    expect(heads.some(h => /^Hinweise [23]$/.test(h))).toBe(true);       // Preis
     expect(heads).toContain("Vereinfacht gerechnet, keine Prüfung");
     expect(w.find("#pane-building .hint-fold summary").text()).toContain("So bedienen Sie den Baukörper");
   });

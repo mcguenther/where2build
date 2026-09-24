@@ -161,8 +161,7 @@
           <section class="panel">
             <div class="panel__head">
               <h3>Preis</h3><div class="spacer"></div>
-              <span v-if="priceVerdict" class="chip" :class="priceVerdict.chipClass">{{ priceVerdict.chip }}</span>
-              <span class="chip">BORIS</span>
+              <span v-if="priceVerdict" class="chip" :class="`chip--${metrics.deviationClass}`">{{ priceVerdict.chip }}</span>
             </div>
             <dl class="value-list">
               <dt>Kaufpreis</dt><dd>{{ euro(plot.askingPrice) }}</dd>
@@ -206,6 +205,10 @@
               </span>
             </p>
             <HintFold v-if="priceHintCount" :count="priceHintCount">
+              <p v-if="Number.isFinite(plot.bodenrichtwert)">
+                Bodenrichtwert, Zone und Stichtag stammen aus BORIS Sachsen, dem
+                Bodenrichtwertportal der Gutachterausschüsse.
+              </p>
               <p v-if="conversionNeeded">
                 Der Richtwert gilt für ein gedachtes Grundstück von
                 {{ area(plot.brwReferencePlotArea) }}. Für {{ area(plot.officialArea) }} ist er
@@ -557,7 +560,7 @@ import { zubringerOf, fastestMode, coordinatesOf, MODES } from "../lib/routes.js
 import { toLocal } from "../lib/projection.js";
 import { NOISE_BANDS } from "../lib/basemap.js";
 import { noiseMapped } from "../lib/siteChecks.js";
-import { plotMetrics, priceStage, PRICE_BAND } from "../lib/metrics.js";
+import { plotMetrics, PRICE_BAND } from "../lib/metrics.js";
 import {
   polygonEdges, edgeCompass, buildableArea, cornersOutside, smallestSetback,
   alignToEdge, alignmentToEdge, findPlacement, neighbourSetbackDepths, hasNeighbourHint
@@ -568,9 +571,9 @@ import { area, euro, euroPerSqm, metres, num, percent, degrees, date, duration }
  *  front of the coloured line. „within" is deliberately neutral — a few per
  *  cent either side of a zone value is noise, not a bargain. */
 const PRICE_STAGES = {
-  below: { chip: "unter Richtwert", chipClass: "chip--good", mark: "▼" },
-  within: { chip: "im Rahmen", chipClass: null, mark: "≈" },
-  above: { chip: "über Richtwert", chipClass: "chip--error", mark: "▲" }
+  below: { chip: "unter Richtwert", mark: "▼" },
+  within: { chip: "im Rahmen", mark: "≈" },
+  above: { chip: "über Richtwert", mark: "▲" }
 };
 
 /** Edge lengths a house can plausibly have, in metres. Anything outside is a typo. */
@@ -743,11 +746,12 @@ export default {
     /** Where the offer sits against the land value, for the chip, the marker
      *  and the coloured line. Null without an asking price. */
     priceVerdict() {
-      const stage = priceStage(this.metrics.deviation);
+      const stage = this.metrics.priceStage;
       return stage ? { stage, ...PRICE_STAGES[stage] } : null;
     },
     priceHintCount() {
-      return (this.conversionNeeded ? 1 : 0) + (Number.isFinite(this.plot?.bodenrichtwert) ? 1 : 0);
+      // The source and the ImmoWertV note both hang on a land value being there.
+      return (this.conversionNeeded ? 1 : 0) + (Number.isFinite(this.plot?.bodenrichtwert) ? 2 : 0);
     },
     /** Only worth a sentence when the two areas actually differ. */
     conversionNeeded() {

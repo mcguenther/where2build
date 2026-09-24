@@ -359,8 +359,12 @@ that collapsed at 390 px. None of them threw.
   same stage, so they cannot disagree with the drawing they sit on. Plain
   green and red for any sign would call 4 % a bargain. The line says the
   magnitude without a sign: „−4,2 % unter" said the direction twice.
-  `deviationClass`, which the plot cards and the comparison use, is an older
-  and different scale (± 5 % good) and has not been brought in line yet.
+  `deviationClass`, which the plot cards and the comparison use, reads the
+  same stage now; it used an older scale (± 5 % good, amber up to 15 %), and a
+  plot 21 % under the land value was amber on its card and green on its page.
+  The source chips in a panel head („ALKIS", „BORIS") read as a verdict next
+  to one: „BORIS" beside „unter Richtwert" looked like a second finding. The
+  price panel names its source as the first line of its hint fold instead.
 
 - **Enter in the search field only ever took a row, so most inputs went
   nowhere.** `PlotSearch` handled Enter itself and took the highlighted row or
