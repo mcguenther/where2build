@@ -176,7 +176,11 @@ class HaustypVorschlaege(BaseModel):
     preis_ab_eur: Vorschlag[int] = Vorschlag()
 
 
-Extraktionsweg = Literal["meta-tags", "llm", "eingefuegter-text"]
+# How a listing was read. „meta-tags“ is a fetched page whose coordinate came
+# out of its markup, „abgerufene-seite“ one read by our own parsers with no
+# coordinate and no model, „llm“ one a model read. None of them may claim a
+# model that did not run.
+Extraktionsweg = Literal["meta-tags", "abgerufene-seite", "llm", "eingefuegter-text"]
 
 
 class ListingExtractRequest(BaseModel):

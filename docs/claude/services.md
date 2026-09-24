@@ -100,6 +100,29 @@ of Overpass or a local extract, the listing portals, and the extraction model.
   allows `/expose/` and names ClaudeBot explicitly; the refusal happens before
   the server. Same shape as immobilienscout24.de, different vendor, same way
   in: the user's own browser, so the bookmarklet.
+  **Measured again on 24.09.2026** with two live exposés
+  (`/expose/c1fc6775-…` and `/expose/db412a8e-…`): `curl` with a browser
+  header set and `fetch_page` with its one retry both get the same 403, 771
+  bytes, `x-datadome: protected`, a `datadome` cookie and
+  `LambdaGeneratedResponse from cloudfront`. So `parse_page` never sees an
+  immowelt page from the server, and there is no fixture: nothing came back
+  to record. It is not in `BLOCKED_DOMAINS`, so the request still goes out and
+  the answer is the generic 502 „mit Status 403 abgelehnt“.
+
+- **ohne-makler.net serves a listing to the server, and answers 403 for one
+  that is gone.** Measured 24.09.2026: the Saxony plot list
+  (`/immobilien/grundstueck-kaufen/sachsen/`) and the eight exposés on it came
+  back 200 through `fetch_page`, behind `server: myracloud`. The recorded
+  fixture's own listing, `/immobilie/476452/`, now answers **403** with a
+  196 kB page titled „Immobilie nicht gefunden“: the listing is missing, not
+  blocked, though the status says otherwise. None of the eight carries a
+  coordinate. All eight carry postcode and town as `adresse`, `parse_page`
+  read the area of all eight, and it read a price off seven (Meißen states
+  none). What it does *not* read is the prose: the description falls through
+  to `og:description`, which is boilerplate („Wohnen in Brandis von privat zu
+  verkaufen || jetzt Grundstück provisionsfrei …“, about 100 characters). The
+  seller's text stands in `<div class="prose max-w-none mb-6">`, and
+  `_DESCRIPTION_PATTERNS` does not know it.
 
 - **`ave:KatasterBezirk` will not drop its geometry.** `PROPERTYNAME` without the
   `ave:` prefix is rejected outright (`ErrorInPropertyName`); with the prefix the
