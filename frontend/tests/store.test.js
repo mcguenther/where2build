@@ -454,3 +454,19 @@ describe("Haustyp eines Grundstücks", () => {
     expect([f.width, f.depth]).toEqual([DEFAULT_FOOTPRINT.length, DEFAULT_FOOTPRINT.width]);
   });
 });
+
+describe("Straßenseite im gespeicherten Stand", () => {
+  const withFront = front => {
+    const data = realState();
+    data.plots[0].streetFront = front;
+    return validate(data).plots[0];
+  };
+
+  it("behält eine gefundene Straße und eine leere Antwort, verwirft Unsinn", () => {
+    expect(withFront({ street: "Kirchstraße", length: 27.6 }).streetFront).toEqual({ street: "Kirchstraße", length: 27.6 });
+    expect(withFront(null).streetFront).toBeNull();
+    // Unset means "never asked", so the next load asks.
+    expect("streetFront" in withFront({ street: 4 })).toBe(false);
+    expect("streetFront" in withFront(undefined)).toBe(false);
+  });
+});

@@ -14,9 +14,17 @@ from ..schemas import (
     ParcelCollection,
     ParcelResolveRequest,
     ParcelsAroundRequest,
+    StreetParcelCollection,
+    StreetsAroundRequest,
     parse_flurstuecksnummer,
 )
-from ..services.alkis import AlkisService, Flurstueck, expand_gemarkung_key, to_collection
+from ..services.alkis import (
+    AlkisService,
+    Flurstueck,
+    expand_gemarkung_key,
+    street_collection,
+    to_collection,
+)
 from ..services.motis import MotisService
 
 router = APIRouter(prefix="/api/parcels", tags=["Flurstücke"])
@@ -184,3 +192,23 @@ async def nearby(
 
     parcels = await alkis.around(payload.lat, payload.lon, payload.umkreis_m)
     return to_collection(parcels, hinweis=NEARBY_HINT)
+
+
+@router.post("/streets", response_model=StreetParcelCollection, summary="Verkehrsflächen am Grundstück")
+async def streets(
+    payload: StreetsAroundRequest,
+    alkis: AlkisService = Depends(alkis_service),
+) -> StreetParcelCollection:
+    """The street, way and square parcels around a plot.
+
+    Which side of a plot faces the street was guessed as its longest edge, and
+    a plot that fronts its street with a short side -- Kirchstraße 4 in
+    Liebertwolkwitz -- was then drawn with a neighbour's garden fence at the
+    bottom. The cadastre knows better: a street is a parcel of its own there,
+    and the front is the boundary the plot shares with it. The browser
+    measures that against its own outline, so this only has to answer which
+    parcels are traffic land and what the street is called.
+    """
+
+    parcels = await alkis.streets_around(payload.lat, payload.lon, payload.umkreis_m)
+    return street_collection(parcels)

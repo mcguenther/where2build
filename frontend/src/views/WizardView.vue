@@ -122,7 +122,8 @@
             </span>
             <span class="suggestion__eingabe">
               <input type="text" v-model="f.value" :aria-label="f.label"
-                     :placeholder="f.value ? '' : 'steht nicht auf der Seite'">
+                     :placeholder="f.value ? '' : 'steht nicht auf der Seite'"
+                     @keydown.enter.exact.prevent="lookUpParcel">
               <span v-if="f.unit" class="suggestion__einheit" aria-hidden="true">{{ f.unit }}</span>
             </span>
             <span class="suggestion__source">{{ f.source }}</span>
@@ -235,17 +236,19 @@
           <div class="field-pair">
             <div class="field">
               <label for="q-name">Name in der Übersicht</label>
-              <input id="q-name" type="text" v-model="draft.name">
+              <input id="q-name" type="text" v-model="draft.name" @keydown.enter.exact.prevent="createByEnter">
             </div>
             <div class="field">
               <label for="q-price">Kaufpreis in Euro</label>
               <input id="q-price" type="number" min="0" step="1000" v-model.number="draft.askingPrice"
-                     placeholder="ohne Angabe kein €/m²-Vergleich">
+                     placeholder="ohne Angabe kein €/m²-Vergleich"
+                     @keydown.enter.exact.prevent="createByEnter">
             </div>
           </div>
           <div class="field">
             <label for="q-note">Notiz</label>
-            <input id="q-note" type="text" v-model="draft.note" placeholder="Optional: was auffiel">
+            <input id="q-note" type="text" v-model="draft.note" placeholder="Optional: was auffiel"
+                   @keydown.enter.exact.prevent="createByEnter">
           </div>
           <p v-if="!draft.bodenrichtwert" class="notice">
             Für dieses Grundstück ließ sich kein Bodenrichtwert abrufen. Die Preiseinordnung
@@ -274,6 +277,7 @@ import SitePlan from "../components/SitePlan.vue";
 import ParcelSearch from "../components/ParcelSearch.vue";
 import QueryBox from "../components/QueryBox.vue";
 import { state, addPlot, autoSeatHouse } from "../lib/store.js";
+import { settleStreetFront } from "../lib/streetFront.js";
 import { WIZARD_STAGES, wizardStage } from "../router/stages.js";
 import { takeHandoff } from "../lib/handoff.js";
 import {
@@ -435,7 +439,10 @@ export default {
     this.stopHandover();
   },
   watch: {
-    stage() { this.checkStage(); }
+    stage() { this.checkStage(); },
+    /* Every outline the Flurstück step settles on gets its street read off the
+     * cadastre, so the plan there is already turned to the right side. */
+    "draft.polygon"() { this.settleStreet(this.draft); }
   },
   methods: {
     area, euroPerSqm, num,
@@ -777,7 +784,25 @@ export default {
       await this.loadChoices(plot, extra);
     },
 
-    create() {
+    /** The street front for this draft. A failure keeps the longest-edge guess
+     *  and `create` asks once more; an answer for a draft that has since been
+     *  replaced lands on that old object and changes nothing on screen. */
+    async settleStreet(draft) {
+      if (!draft) return;
+      try { await settleStreetFront(draft); } catch { /* the guess stands */ }
+    },
+
+    /** Enter does what the button does, and only when the button is the plain
+     *  one: „Trotzdem anlegen" overrides a doubt, and overriding it should
+     *  take a click on the words that say so, not a key pressed in a field. */
+    createByEnter(event) {
+      if (event.isComposing || this.busy || this.detached.length || this.doubt) return;
+      this.create();
+    },
+
+    async create() {
+      // Before the house is seated: it is turned to the street edge.
+      if (this.draft.streetFront === undefined) await this.settleStreet(this.draft);
       // Seated here, not at the Flurstück step: until the plot exists nobody
       // has chosen a house type, so a footprint there is a placeholder the
       // user never asked for — and "no room for it" a finding about nothing.

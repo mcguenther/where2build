@@ -18,7 +18,9 @@ vi.mock("../src/lib/api.js", () => ({
   // which shows up as unrelated component errors.
   PAGE_LIMIT: 3000000,
   nearby: vi.fn(() => Promise.resolve(recorded)),
-  reachability: vi.fn(() => Promise.reject(new Error("nicht Teil dieses Tests")))
+  reachability: vi.fn(() => Promise.reject(new Error("nicht Teil dieses Tests"))),
+  // The location record on the same page; these tests are not about it.
+  siteChecks: vi.fn(() => new Promise(() => {}))
 }));
 const { nearby } = await import("../src/lib/api.js");
 

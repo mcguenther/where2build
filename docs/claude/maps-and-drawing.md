@@ -182,3 +182,120 @@ routines under it.
   an unhandled rejection against whichever test file happened to be running.
   `canRenderMap()` is asked first now. It is not only a test concern: a browser
   with WebGL switched off did the same thing.
+
+- **„Straßenparallel" put the street on top for half the plots.**
+  `alignmentToEdge` normalises to (-90°, 90°] so a *house* is never turned more
+  than a quarter; used for the drawing, it made the street edge horizontal and
+  left whether the street sat above or below to the winding of the cadastral
+  ring. The fixture plot `plot-concave` came out exactly 180° wrong and the old
+  test passed, because it compared against the same function.
+  `streetDownRotation` turns the edge's own direction to east on a
+  counter-clockwise ring (the interior is on its left, so above) and returns
+  (-180°, 180°]. Keep `alignmentToEdge` for the footprint.
+
+- **Fit the turned box, not the north-up one.** The drawing rotates about the
+  frame's centre, so the fit has to measure the outline *as turned*
+  (`turnedBox`): framing the unturned box let a long plot at 45° run off a
+  thumbnail once it lay flat along its street, and gave a diamond the frame of
+  a square half again as wide.
+
+- **A thumbnail's ground is `<image>` tiles, and one component draws it.**
+  `PlotThumbnail` is the only small plan — cards and the comparison both use
+  it — and it takes the `umgebung` layer (the web atlas without its lettering)
+  through `SitePlan`'s `tileGround` prop, the same way route cards do, so a list
+  of twenty plots starts no WebGL context. Measured over Liebertwolkwitz at z18:
+  the ALKIS render draws parcel numbers and boundary points at full size, and
+  the plain web atlas writes street names, which stand on their heads once the
+  thumbnail is turned by more than a quarter. The tile cover is asked for the
+  frame's diagonal on every side, since a turned drawing shows ground from past
+  the unturned frame's corners. Local metres and Web Mercator share one scale
+  factor around the anchor, so the placement is linear.
+
+- **The street side was the longest edge, and that was wrong on seven of eight
+  real plots.** Measured 23.09.2026 on every parcel fixture: only the 1 594 m
+  strip at the Tauchaer Straße fronts its street with its longest side. A deep
+  plot fronts it with its narrow end (Lessingweg 44: 13,5 m, not 47,9 m), and
+  Kirchstraße 4 with a short side — so the turned thumbnail showed some other
+  road at the bottom, correctly turned to the wrong edge. The side is now read
+  off the cadastre (`lib/streetFront.js`): a street is a parcel of its own in
+  ALKIS, so the front is the boundary the plot shares with traffic land, and the
+  street of the plot's own address wins at a corner. Plots stored before this
+  carry `streetFront` unset and are asked once on load; `null` means asked and
+  nothing borders a street, and the guess stays.
+
+- **A navigable plan in the middle of a long page takes the page's scroll.**
+  `onWheel` calls `preventDefault` on every wheel event over a navigable plan,
+  and `.site-plan` carries `touch-action: none` — right for the plan somebody
+  drags a house on, a trap for the small location map halfway down the plot
+  page: the cursor passes over it on the way down and the page stops. That map
+  is `cooperative`: the wheel zooms only with Ctrl or ⌘ (a trackpad pinch
+  arrives as exactly that), and `touch-action: pan-y` lets a vertical swipe
+  scroll the page while a sideways drag still pans.
+
+- **`data-map-ready` is per map, and a page can have three.** The plot page
+  carries the plan, the location map and the surroundings map, so a bare
+  `[data-map-ready="true"]` returns for whichever finished first.
+  `mapSettled()` in the screenshot run takes a scope for that reason.
+
+- **The surroundings map framed the plot, not the surroundings, whenever the
+  nearby answer was slower than the map style.** `frame()` ran once, on
+  `load`; with the stops not yet there it fitted the bare parcel at zoom 17,
+  and the `located` watcher only drew markers. Lessingweg 44 showed one of
+  seven stops. The watcher reframes now, unless the user has already panned or
+  zoomed (a `movestart` with an `originalEvent`). Reproduced by delaying
+  `/api/nearby` 5 s in Playwright: 1 of 7 markers in view before, 7 of 7 after.
+  A warm backend cache hides it — the answer then beats the style.
+
+- **The search map's cadastre was yellow, from zoom 15, and it buried the
+  answer.** The ground used the oversampled `flurstuecke` layer in the
+  service's „Gelb“ style, so over a district every hedge carried a yellow line
+  and an ambiguous run's two candidates were two outlines among a few hundred —
+  in a colour nothing else in the app uses. The ground now takes the site
+  plan's own `liegenschaftskarte` (default style, black line work) from
+  `PARCEL_OUTLINE_MIN_ZOOM = 17`; the numbers get legible at 18. Measured over
+  Mölkau on 23.09.2026: at 17 a plot is some forty pixels wide and its number
+  three pixels high. The backend's `flurstuecke` layer is no longer asked for.
+
+- **`focusOn` cannot close in on one candidate.** It frames the whole candidate
+  set around the evidence, which is right for a clue and does nothing for a
+  candidate — the set already contains it. The table's row click and „Zeigen"
+  go through `focusCandidate`, which frames that parcel with ~55 m around it.
+  The row numbers are drawn on the map as DOM markers, not a symbol layer: the
+  aerial ground is raster only and carries no glyphs. And a marker is
+  positioned through its own inline `transform`, so a CSS `transform` on it
+  (a scale for „shown") throws it off its parcel — the highlight grows the
+  badge's box instead.
+
+- **Two badges on one pixel read as one candidate.** At district scale 134/m
+  and 97/4 in Großbothen, 500 m apart, landed on the same spot and the „1" sat
+  under the „2" — the map said one, the table two. Badges that would come
+  within `MERGE_DISTANCE_PX` of each other are merged into one labelled with
+  what it holds („1, 2", „1–5", „1, 2, 4–7"; `lib/badges.js`), regrouped once a
+  frame while zooming, and a click on a merged badge zooms in until they part.
+
+- **Every frame the search map fitted ignored the HUD.** From 1000 px up the
+  verdict and the Verlauf float over the map's right 40 %, and `fitBounds`
+  with a plain 36 px padding centred the answer under them: after zooming in
+  on „1, 2", candidate 2 was behind the panel. `ParcelSearch` measures how much
+  of the map the HUD covers and `EvidenceMap.padding()` adds it on the right.
+  Measured rather than derived from the breakpoint, because whether the HUD
+  floats is the stylesheet's decision. jsdom has no `ResizeObserver`, so the
+  measurement is skipped there — without that guard thirty tests failed on
+  mount.
+
+- **An ambiguous result is cards, and each card's picture is not a map.** The
+  point of the picture is recognition — a roof or a hedge from the listing's
+  photographs — so it is fixed: `lib/candidateSketch.js` frames the parcel with
+  at least 60 m either side and draws the orthophoto and, from zoom 17, the
+  Liegenschaftskarte as `<image>` tiles in an SVG, the way the route cards do.
+  A MapLibre instance per card would run into the WebGL context limit at a
+  dozen candidates, and the maps past it go blank without a word. Twelve cards
+  are drawn before „Alle zeigen"; each is some six tiles of each layer from
+  the authority's WMS. The candidate's outline is drawn wider (3,6 over an 8 px
+  halo) than on the big map: among the cadastre's own lines at this size, a
+  contour of the same weight is one boundary more.
+
+- **„Is the map on screen" has to mean most of it.** The cards sit right under
+  the map, so after a click the map's lower edge was usually in view and the
+  check passed — while the pan happened in a strip at the top of the screen.
+  It scrolls unless 60 % of the map is visible.

@@ -73,17 +73,18 @@
         <EvidenceMap ref="karte" :candidates="candidates" :district-outline="districtOutline"
                      :areas="areas" :huelle="huelle" :refuted-pin="refutedPin" :pin="pin"
                      :status="status" :flight="flight" :height="mapHeight" :indicia="indicia"
-                     :ground="ground" :highlighted="highlighted" @select="pick" />
+                     :ground="ground" :highlighted="highlighted" :chosen="chosen"
+                     :shown="shownCandidate" :covered-right="hudCover" @select="pick" />
         <p v-if="ground === 'site'" class="panel__footnote">
-          Luftbild und Straßen vom GeoSN. Die amtlichen Flurstücksgrenzen zeichnet der
-          Dienst erst ab Zoomstufe {{ parcelOutlineZoom }}; darüber liefert er ein leeres Bild.
+          Luftbild und Straßen vom GeoSN. Flurstücksgrenzen ab Zoomstufe {{ parcelOutlineZoom }},
+          ihre Nummern ab {{ parcelOutlineZoom + 1 }}.
         </p>
       </div>
 
       <!-- The head-up display: what the run is doing, and under it what it
            has found. Newest first, because a run one is watching is read from
            the top — the older entries are the ones you scroll back for. -->
-      <div class="suche__hud">
+      <div ref="hud" class="suche__hud">
         <!-- The verdict, before anything else. Three outcomes and none of them
              is "probably": a search that always produces an answer eventually
              produces a wrong one. -->
@@ -185,26 +186,105 @@
         <div class="spacer"></div>
         <span class="chip">ALKIS</span>
       </div>
-      <table class="kandidaten">
+      <!-- One candidate or several: a settled answer reads as a row, a doubt
+           as pictures — the listing's photographs are compared against them. -->
+      <table v-if="candidates.length === 1" class="kandidaten">
         <thead>
-          <tr><th>Flurstück</th><th>Gemarkung</th><th class="num">Fläche</th><th>Lage</th><th>Nutzung</th><th></th></tr>
+          <tr><th class="num" aria-label="Nummer auf der Karte">#</th><th>Flurstück</th><th>Gemarkung</th><th class="num">Fläche</th><th>Lage</th><th>Nutzung</th><th></th></tr>
         </thead>
         <tbody>
-          <tr v-for="candidate in candidates" :key="candidate.id"
-              :class="{ 'kandidaten--gewaehlt': chosen === candidate.id }">
+          <!-- A click on the row only moves the map; choosing stays a button of
+               its own, so looking at a candidate never changes the answer. -->
+          <tr v-for="(candidate, index) in candidates" :key="candidate.id"
+              :class="{
+                'kandidaten--gewaehlt': chosen === candidate.id,
+                'kandidaten--gezeigt': shownCandidate === candidate.id
+              }"
+              @click="show(candidate.id)">
+            <td class="num"><span class="kandidaten__marke">{{ index + 1 }}</span></td>
             <td class="mono">{{ candidate.properties.flurstuecksnummer }}</td>
             <td>{{ candidate.properties.gemarkung }}</td>
             <td class="num mono">{{ area(candidate.properties.flaeche_amtlich_m2) }}</td>
             <td>{{ lage(candidate.properties.lagebezeichnung) }}</td>
             <td>{{ candidate.properties.nutzung || "—" }}</td>
-            <td class="num">
-              <button type="button" class="btn btn--quiet btn--small" @click="pick(candidate.id)">
+            <td class="num kandidaten__knoepfe">
+              <button type="button" class="btn btn--quiet btn--small"
+                      :aria-label="`Flurstück ${candidate.properties.flurstuecksnummer} auf der Karte zeigen`"
+                      @click.stop="show(candidate.id)">
+                Zeigen
+              </button>
+              <button type="button" class="btn btn--quiet btn--small" @click.stop="pick(candidate.id)">
                 {{ chosen === candidate.id ? "Gewählt" : "Wählen" }}
               </button>
             </td>
           </tr>
         </tbody>
       </table>
+
+      <!-- A card per candidate: the row it used to be, and a picture of the
+           parcel on the orthophoto. The picture is fixed — it is there to be
+           recognised, so a click on it is „that one": it chooses the parcel
+           and sends the big map there. „Zeigen" only looks. -->
+      <div v-else class="vorschlaege">
+        <article v-for="card in visibleCards" :key="card.candidate.id" class="vorschlag"
+                 :class="{
+                   'vorschlag--gewaehlt': chosen === card.candidate.id,
+                   'vorschlag--gezeigt': shownCandidate === card.candidate.id
+                 }">
+          <button type="button" class="vorschlag__bild" :disabled="!card.sketch"
+                  :aria-label="`Flurstück ${card.candidate.properties.flurstuecksnummer} wählen und auf der großen Karte zeigen`"
+                  @click="pick(card.candidate.id)">
+            <svg v-if="card.sketch" :viewBox="card.sketch.viewBox" role="img"
+                 :aria-label="`Luftbild um Flurstück ${card.candidate.properties.flurstuecksnummer}`">
+              <rect x="0" y="0" :width="card.sketch.width" :height="card.sketch.height" fill="var(--w2b-map-ground)" />
+              <image v-for="tile in card.sketch.photo" :key="`dop-${tile.key}`" :href="tile.href"
+                     :x="tile.left" :y="tile.top" :width="tile.size" :height="tile.size"
+                     preserveAspectRatio="none" />
+              <image v-for="tile in card.sketch.cadastre" :key="`alkis-${tile.key}`" :href="tile.href"
+                     :x="tile.left" :y="tile.top" :width="tile.size" :height="tile.size"
+                     preserveAspectRatio="none" opacity=".95" />
+              <path :d="card.sketch.path" class="vorschlag__umring-halo" />
+              <path :d="card.sketch.path" class="vorschlag__umring" />
+            </svg>
+            <span v-else class="vorschlag__ohne">Kein Umring geliefert</span>
+            <span class="kandidaten__marke vorschlag__marke">{{ card.number }}</span>
+          </button>
+          <p class="vorschlag__massstab">
+            {{ card.caption }}<template v-if="card.sketch"> · Luftbild GeoSN</template>
+          </p>
+          <div class="vorschlag__text">
+            <h4 class="vorschlag__titel">
+              <span class="mono">{{ card.candidate.properties.flurstuecksnummer }}</span>
+              <span class="vorschlag__gemarkung">{{ card.candidate.properties.gemarkung }}</span>
+            </h4>
+            <dl class="vorschlag__angaben">
+              <dt>Fläche</dt><dd class="mono">{{ area(card.candidate.properties.flaeche_amtlich_m2) }}</dd>
+              <dt>Lage</dt><dd>{{ lage(card.candidate.properties.lagebezeichnung) }}</dd>
+              <dt>Nutzung</dt><dd>{{ card.candidate.properties.nutzung || "—" }}</dd>
+            </dl>
+          </div>
+          <div class="vorschlag__knoepfe">
+            <button type="button" class="btn btn--quiet btn--small"
+                    :aria-label="`Flurstück ${card.candidate.properties.flurstuecksnummer} auf der Karte zeigen`"
+                    @click="show(card.candidate.id)">
+              Zeigen
+            </button>
+            <button type="button" class="btn btn--small"
+                    :class="chosen === card.candidate.id ? '' : 'btn--quiet'"
+                    @click="pick(card.candidate.id)">
+              {{ chosen === card.candidate.id ? "Gewählt" : "Wählen" }}
+            </button>
+          </div>
+        </article>
+      </div>
+      <div v-if="hiddenCards" class="vorschlaege__mehr">
+        <button type="button" class="btn btn--quiet btn--small" @click="allCards = true">
+          Alle {{ candidates.length }} zeigen
+        </button>
+        <span class="vorschlaege__mehrtext">
+          {{ hiddenCards }} weitere, gleich stark — die Reihenfolge ordnet nur.
+        </span>
+      </div>
       <p v-if="candidates.length > 1" class="panel__footnote">
         Die Reihenfolge ordnet nur; entschieden wird sie nicht. Ausgeschieden ist hier
         niemand: Was übrig bleibt, hat jede amtliche Prüfung bestanden.
@@ -243,6 +323,12 @@ import {
 import { runSearch, STATUS_LABEL, verdictSentence } from "../lib/search.js";
 import { PARCEL_OUTLINE_MIN_ZOOM } from "../lib/basemap.js";
 import { area } from "../lib/format.js";
+import { candidateSketch, sketchCaption } from "../lib/candidateSketch.js";
+
+/** How many cards are drawn before „Alle zeigen". Each is a handful of tiles
+ *  from the authority's WMS, and forty of them at once is a queue of two
+ *  hundred requests before the last one appears. */
+const CARD_LIMIT = 12;
 
 /** What each phase of the run is called in the course list. The backend names
  *  them; this is the German the reader sees next to the step. */
@@ -326,6 +412,12 @@ export default {
       // without saying which of the things on it was the reason.
       shownStep: null,
       highlighted: null,
+      // Which row of the candidate table the map was last moved to.
+      shownCandidate: null,
+      // Whether the cards past the first few are drawn; see CARD_LIMIT.
+      allCards: false,
+      // How many pixels of the map's right side the HUD lies over.
+      hudCover: 0,
       // The ground under the drawing. Remembered per visit only: which
       // backdrop helps depends on the plot in front of you.
       ground: "site",
@@ -360,6 +452,20 @@ export default {
         ? verdictSentence(this.status, this.candidates.length, this.huelle, this.hint)
         : "";
     },
+    /** A card per candidate, with its picture worked out once per result. */
+    cards() {
+      return this.candidates.map((candidate, index) => {
+        const sketch = candidateSketch(candidate.geometry);
+        return {
+          candidate,
+          number: index + 1,
+          sketch,
+          caption: sketch ? sketchCaption(sketch.groundWidthM) : "Ohne Umring kein Bild."
+        };
+      });
+    },
+    visibleCards() { return this.allCards ? this.cards : this.cards.slice(0, CARD_LIMIT); },
+    hiddenCards() { return this.cards.length - this.visibleCards.length; },
     chosenCandidate() { return this.candidates.find(c => c.id === this.chosen) ?? null; },
     /** Where „Zum Ergebnis“ goes: the parcel if there is one, else whatever
      *  the answer could still name. */
@@ -400,8 +506,17 @@ export default {
       return this.candidates.length ? this.pin : null;
     }
   },
-  mounted() { this.start(); },
+  mounted() {
+    this.start();
+    // The HUD floats over the map from 1000 px up and sits under it below
+    // that; which one it is, is the stylesheet's business, so it is measured.
+    if (typeof ResizeObserver === "undefined") return;
+    this._hudResizes = new ResizeObserver(() => this.measureHud());
+    if (this.$refs.hud) this._hudResizes.observe(this.$refs.hud);
+    if (this.$refs.karte?.$el instanceof Element) this._hudResizes.observe(this.$refs.karte.$el);
+  },
   beforeUnmount() {
+    this._hudResizes?.disconnect();
     this._queue?.stop();
     this._abort?.abort();
   },
@@ -427,7 +542,7 @@ export default {
         streaming: true, error: "", status: null, indicia: [], conflicts: [],
         candidates: [], huelle: null, districtOutline: null, areas: [],
         hint: "", requests: 0, steps: [], chosen: null,
-        shownStep: null, highlighted: null,
+        shownStep: null, highlighted: null, shownCandidate: null, allCards: false,
         phaseText: "Angaben werden gelesen …", phaseKey: "ernten"
       });
 
@@ -634,6 +749,7 @@ export default {
       const geometry = this.focusOf(step);
       if (!geometry) return;
       this.shownStep = step.n;
+      this.shownCandidate = null;
       this.highlighted = geometry;
       this.$refs.karte?.focusOn?.(geometry);
     },
@@ -642,6 +758,7 @@ export default {
       this.skip();
       if (!this.resultGeometry) return;
       this.shownStep = null;
+      this.shownCandidate = null;
       this.highlighted = this.resultGeometry;
       this.$refs.karte?.focusOn?.(this.resultGeometry);
     },
@@ -651,14 +768,47 @@ export default {
       if (!this.everything.length) return;
       // Showing everything is the opposite of pointing at one thing.
       this.shownStep = null;
+      this.shownCandidate = null;
       this.highlighted = null;
       this.$refs.karte?.focusOn?.(this.everything);
     },
 
+    measureHud() {
+      const hud = this.$refs.hud?.getBoundingClientRect?.();
+      const map = this.$refs.karte?.$el?.getBoundingClientRect?.();
+      if (!hud || !map) return;
+      const overlaps = hud.left < map.right && hud.top < map.bottom && hud.bottom > map.top;
+      this.hudCover = overlaps ? Math.max(0, Math.round(map.right - hud.left)) : 0;
+    },
+
+    /** Move the map to one candidate and mark it, without choosing it. */
+    show(id) {
+      this.skip();
+      const candidate = this.candidates.find(c => c.id === id);
+      if (!candidate?.geometry) return;
+      this.shownStep = null;
+      this.shownCandidate = id;
+      this.highlighted = candidate.geometry;
+      this.$refs.karte?.focusCandidate?.(candidate.geometry);
+      this.bringMapIntoView();
+    },
+
+    /** On a phone the table sits a screen below the map, and a pan nobody sees
+     *  is indistinguishable from a button that does nothing. */
+    bringMapIntoView() {
+      const element = this.$refs.karte?.$el;
+      if (!element?.getBoundingClientRect || !element.scrollIntoView) return;
+      const box = element.getBoundingClientRect();
+      // A strip of map at the top of the screen counts as not seen: the cards
+      // sit right under it, and a click there used to pan a sliver.
+      const seen = Math.min(box.bottom, window.innerHeight) - Math.max(box.top, 0);
+      if (box.height > 0 && seen / Math.min(box.height, window.innerHeight) >= 0.6) return;
+      element.scrollIntoView({ block: "nearest", behavior: prefersReducedMotion() ? "auto" : "smooth" });
+    },
+
     pick(id) {
       this.chosen = id;
-      const candidate = this.candidates.find(c => c.id === id);
-      if (candidate) this.$refs.karte?.focusOn?.(candidate.geometry);
+      this.show(id);
     }
   }
 };
@@ -896,6 +1046,64 @@ export default {
 }
 .grundwahl__knopf--an{ background: var(--w2b-primary); color: var(--w2b-on-primary); }
 
+.vorschlaege{
+  display: grid; gap: var(--w2b-space-4);
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  padding: var(--w2b-space-4);
+}
+.vorschlag{
+  display: flex; flex-direction: column; min-width: 0;
+  border: 1.5px solid var(--w2b-line); border-radius: var(--w2b-radius-m);
+  background: var(--w2b-surface); overflow: hidden;
+}
+.vorschlag--gezeigt{ border-color: var(--w2b-primary); }
+.vorschlag--gewaehlt{ border-color: var(--w2b-primary); box-shadow: 0 0 0 2px var(--w2b-primary-veil); }
+.vorschlag__bild{
+  position: relative; display: block; width: 100%; padding: 0; border: 0;
+  aspect-ratio: 320 / 200; background: var(--w2b-map-ground); cursor: pointer;
+}
+.vorschlag__bild:disabled{ cursor: default; }
+.vorschlag__bild:focus-visible{ outline: 2px solid var(--w2b-primary); outline-offset: -2px; }
+.vorschlag__bild svg{ display: block; width: 100%; height: 100%; }
+/* Wider than the cadastre's own lines, which it sits among: at this size a
+   contour of the same weight is one boundary more. */
+.vorschlag__umring-halo{ fill: none; stroke: var(--w2b-map-halo); stroke-width: 8; stroke-linejoin: round; opacity: .92; }
+.vorschlag__umring{
+  fill: color-mix(in srgb, var(--w2b-map-selection) 26%, transparent);
+  stroke: var(--w2b-map-selection); stroke-width: 3.6; stroke-linejoin: round;
+}
+.vorschlag__ohne{
+  position: absolute; inset: 0; display: grid; place-items: center;
+  color: var(--w2b-muted); font-size: var(--w2b-text-xs);
+}
+.vorschlag__marke{ position: absolute; top: 8px; left: 8px; box-shadow: 0 0 0 2px var(--w2b-map-halo); }
+.vorschlag__massstab{
+  margin: 0; padding: 4px var(--w2b-space-4) 0;
+  font-size: var(--w2b-text-xs); color: var(--w2b-muted);
+}
+.vorschlag__text{ padding: var(--w2b-space-2) var(--w2b-space-4) 0; flex: 1 1 auto; }
+.vorschlag__titel{
+  display: flex; align-items: baseline; gap: var(--w2b-space-3); flex-wrap: wrap;
+  margin: 0 0 var(--w2b-space-2); font-size: var(--w2b-text-l);
+}
+.vorschlag__titel .mono{ font-family: var(--w2b-font-mono); }
+.vorschlag__gemarkung{ font-size: var(--w2b-text-s); font-weight: 400; color: var(--w2b-muted); }
+.vorschlag__angaben{
+  display: grid; grid-template-columns: auto 1fr; gap: 2px var(--w2b-space-3);
+  margin: 0; font-size: var(--w2b-text-s);
+}
+.vorschlag__angaben dt{ color: var(--w2b-muted); }
+.vorschlag__angaben dd{ margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.vorschlag__angaben .mono{ font-family: var(--w2b-font-mono); font-variant-numeric: tabular-nums; }
+.vorschlag__knoepfe{
+  display: flex; gap: var(--w2b-space-2); justify-content: flex-end;
+  padding: var(--w2b-space-3) var(--w2b-space-4) var(--w2b-space-4);
+}
+.vorschlaege__mehr{
+  display: flex; align-items: center; gap: var(--w2b-space-3); flex-wrap: wrap;
+  padding: 0 var(--w2b-space-4) var(--w2b-space-3);
+}
+.vorschlaege__mehrtext{ font-size: var(--w2b-text-xs); color: var(--w2b-muted); }
 .kandidaten{ width: 100%; border-collapse: collapse; font-size: var(--w2b-text-s); }
 .kandidaten th, .kandidaten td{
   padding: 8px var(--w2b-space-4); text-align: left;
@@ -904,11 +1112,34 @@ export default {
 .kandidaten th{ font-size: var(--w2b-text-xs); color: var(--w2b-muted); font-weight: 600; }
 .kandidaten .num{ text-align: right; }
 .kandidaten .mono{ font-family: var(--w2b-font-mono); font-variant-numeric: tabular-nums; }
-.kandidaten--gewaehlt{ background: var(--w2b-primary-veil); }
+.kandidaten tbody tr{ cursor: pointer; }
+.kandidaten tbody tr:hover{ background: var(--w2b-line-faint); }
+.kandidaten--gewaehlt, .kandidaten tbody tr.kandidaten--gewaehlt:hover{ background: var(--w2b-primary-veil); }
+.kandidaten--gezeigt td:first-child{ box-shadow: inset 3px 0 0 var(--w2b-primary); }
+.kandidaten__knoepfe{ white-space: nowrap; }
+/* The same badge the map puts on the parcel, so row and outline are matched
+   by eye rather than by reading two parcel numbers. */
+.kandidaten__marke{
+  display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 5px;
+  border-radius: var(--w2b-radius-full); border: 2px solid var(--w2b-map-selection);
+  background: var(--w2b-surface); color: var(--w2b-ink);
+  font-family: var(--w2b-font-mono); font-size: var(--w2b-text-xs); font-weight: 700;
+}
+.kandidaten--gewaehlt .kandidaten__marke{ background: var(--w2b-map-selection); color: var(--w2b-map-halo); }
 .panel__footnote{ padding: var(--w2b-space-3) var(--w2b-space-4); font-size: var(--w2b-text-xs); color: var(--w2b-muted); }
 
+.kandidaten td.num{ white-space: nowrap; }
+
 @media (max-width: 700px){
-  .kandidaten th:nth-child(4), .kandidaten td:nth-child(4),
-  .kandidaten th:nth-child(5), .kandidaten td:nth-child(5){ display: none; }
+  .kandidaten th:nth-child(5), .kandidaten td:nth-child(5),
+  .kandidaten th:nth-child(6), .kandidaten td:nth-child(6){ display: none; }
+  .kandidaten th, .kandidaten td{ padding: 8px 6px; }
+  .kandidaten th:first-child, .kandidaten td:first-child{ padding-left: var(--w2b-space-4); }
+  .kandidaten th:last-child, .kandidaten td:last-child{ padding-right: var(--w2b-space-4); }
+}
+/* Two buttons a row do not fit beside the Gemarkung at phone width. The
+   Gemarkung is the column most likely to repeat itself down the table. */
+@media (max-width: 480px){
+  .kandidaten th:nth-child(3), .kandidaten td:nth-child(3){ display: none; }
 }
 </style>

@@ -258,6 +258,11 @@ export function cadastralDistricts() {
   return directoryRequest;
 }
 
+/* The street, way and square parcels in a box around a plot, which its street
+ * front is measured against — see lib/streetFront.js. */
+export const streetParcels = (lat, lon, umkreis_m) =>
+  request("/parcels/streets", { method: "POST", body: JSON.stringify({ lat, lon, umkreis_m }) });
+
 /* Mapped building outlines around a plot, for the neighbour hint. One question
  * per plot, and the backend caches the answer for a month — an outline moves
  * about as often as the house it belongs to. */

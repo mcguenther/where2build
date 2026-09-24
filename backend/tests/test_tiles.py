@@ -115,7 +115,7 @@ def test_geographic_crs_uses_latitude_first():
 
 def test_layer_configuration_covers_every_switchable_layer():
     assert set(tile_service().layers) == {
-        "dop", "webatlas", "alkis", "liegenschaftskarte", "flurstuecke", "strassen",
+        "dop", "webatlas", "alkis", "liegenschaftskarte", "flurstuecke", "strassen", "umgebung",
         "laerm", "laerm-nacht"
     }
 

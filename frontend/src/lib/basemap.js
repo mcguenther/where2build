@@ -75,18 +75,20 @@ export const GEOSN = "© GeoSN, dl-de/by-2-0";
 export const LFULG = "Umgebungslärmkartierung © LfULG";
 
 /**
- * The zoom the cadastral outlines stop being drawable at, measured.
+ * The zoom the search map starts drawing the cadastre at. Chosen, not a limit
+ * of the service.
  *
- * `adv_alkis_flurstuecke` carries `MaxScaleDenominator: 2000` and answers
- * HTTP 200 with a fully transparent PNG above it, which at a 256 px tile would
- * mean nothing below zoom 19. The proxy gets round that by rendering each tile
- * larger — the denominator is (bbox / image width) / 0,00028, so a bigger image
- * over the same box falls under the limit — and scaling it back to a tile. That
- * works down to zoom 15; zoom 14 would need 4368 px for one tile and the
- * service refuses anything over 4000. Below the floor the layer is left out,
- * because a transparent tile looks like a broken overlay rather than a scale.
+ * The proxy can make `adv_alkis_flurstuecke` draw from zoom 15 (see the
+ * `flurstuecke` layer in `services/tiles.py`), and the search map used to ask
+ * for it there. Over a district every hedge then carried a boundary, and an
+ * ambiguous run's candidates disappeared among a few hundred outlines drawn in
+ * the service's „Gelb“ style: the same colour as nothing the app means. So the
+ * search map now asks for the same black Liegenschaftskarte the site plan lays
+ * over its photograph, and only from 17, where a plot is some forty pixels wide.
+ * The numbers become legible one step further in, at 18 (measured over Mölkau
+ * on 23.09.2026; at 17 they are three pixels high).
  */
-export const PARCEL_OUTLINE_MIN_ZOOM = 15;
+export const PARCEL_OUTLINE_MIN_ZOOM = 17;
 
 /**
  * Raster layers that go *on top of* a backdrop rather than instead of one.
@@ -109,11 +111,11 @@ export const OVERLAYS = {
      line at 45 % over a photograph is a smudge — the veil setting below is for
      the noise bands, which are areas and must not hide what is under them.
 
-     Not the `flurstuecke` layer the search map's ground uses: that one is
-     rendered oversized so its outlines still draw across a district, and its
-     labels come back scaled down with it. Over one plot the numbers are the
-     whole point, so this asks for a plain tile and moves the scale limit
-     instead. */
+     Not the oversampled `flurstuecke` layer: that one is rendered large so
+     its outlines still draw across a district, and its labels come back
+     scaled down with it. Over one plot the numbers are the whole point, so
+     this asks for a plain tile and moves the scale limit instead. The search
+     map's ground uses this one as well, from `PARCEL_OUTLINE_MIN_ZOOM`. */
   liegenschaftskarte: { name: "Flurstücke", attribution: GEOSN, opacity: 0.95 }
 };
 
@@ -194,7 +196,9 @@ export function canRenderMap() {
  *
  * Three layers, and the order is the whole trick — the photo underneath, the
  * roads and their names over it, the parcel outlines on top. Both overlays are
- * the authority's own transparent renderings, so nothing is drawn by hand.
+ * the authority's own transparent renderings, so nothing is drawn by hand. The
+ * outlines are the Liegenschaftskarte, not the oversampled `flurstuecke`
+ * contours, so they read the same as on the site plan.
  *
  * The outlines carry a floor; see `PARCEL_OUTLINE_MIN_ZOOM`.
  */
@@ -211,16 +215,19 @@ export const aerialCadastreStyle = () => {
     sources: {
       dop: { ...source("dop"), maxzoom: 20 },
       strassen: { ...source("strassen"), maxzoom: 20 },
-      flurstuecke: { ...source("flurstuecke"), minzoom: PARCEL_OUTLINE_MIN_ZOOM, maxzoom: 20 }
+      liegenschaftskarte: {
+        ...source("liegenschaftskarte"), minzoom: PARCEL_OUTLINE_MIN_ZOOM, maxzoom: 20
+      }
     },
     layers: [
       { id: "dop", type: "raster", source: "dop" },
       { id: "strassen", type: "raster", source: "strassen", paint: { "raster-opacity": 0.9 } },
       {
-        id: "flurstuecke",
+        id: "liegenschaftskarte",
         type: "raster",
-        source: "flurstuecke",
-        minzoom: PARCEL_OUTLINE_MIN_ZOOM
+        source: "liegenschaftskarte",
+        minzoom: PARCEL_OUTLINE_MIN_ZOOM,
+        paint: { "raster-opacity": OVERLAYS.liegenschaftskarte.opacity }
       }
     ]
   };
