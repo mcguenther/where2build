@@ -92,6 +92,14 @@ _KLEINANZEIGEN_IMAGE = re.compile(
     r'\?rule=\$_\d+\.(?:JPG|AUTO)',
     re.IGNORECASE,
 )
+# The listing's own gallery. The same page carries „Ähnliche Anzeigen“ below it,
+# with their pictures in the same CDN and in its JSON-LD -- measured on two
+# adverts, three of nine and three of eleven URLs belonged to *other* listings,
+# one of them a plot in Großbothen. Read as this listing's evidence, a
+# Geoportal print among them hands the search another seller's parcel number.
+# Only the gallery's pictures carry `itemprop="image"`.
+_GALLERY_IMAGE_TAG = re.compile(r'<img\b[^>]*\bitemprop="image"[^>]*>', re.IGNORECASE)
+_IMAGE_IDENTIFIER = re.compile(r"prod-ads/images/[0-9a-f]{2}/([0-9a-f\-]+)", re.IGNORECASE)
 # Anything else: the ordinary picture URLs on the page. This is what makes the
 # paste field work for a portal that refuses a server-side fetch -- the user's
 # browser has the page, and the pictures usually sit on a CDN that does not
@@ -251,9 +259,18 @@ def parse_price(html: str) -> int | None:
 def parse_images(html: str) -> list[str]:
     """The listing's pictures, largest variant of each, in page order."""
 
+    gallery = {
+        identifier
+        for tag in _GALLERY_IMAGE_TAG.findall(html)
+        for identifier in _IMAGE_IDENTIFIER.findall(tag)
+    }
     largest: dict[str, tuple[int, str]] = {}
     for url in _KLEINANZEIGEN_IMAGE.findall(html):
         identifier = url.rsplit("/", 1)[-1].split("?")[0]
+        # A page saved without its gallery markup still yields its pictures;
+        # only where the gallery is visible does it decide.
+        if gallery and identifier not in gallery:
+            continue
         rule = int(re.search(r"rule=\$_(\d+)", url).group(1))
         if identifier not in largest or rule > largest[identifier][0]:
             largest[identifier] = (rule, url)

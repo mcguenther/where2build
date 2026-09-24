@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import io
 import json
+import re
 
 import httpx
 import pytest
@@ -99,6 +100,9 @@ DIRECTORY = GemarkungDirectory(
         # A name that begins with the word the column also puts in front of
         # it. The real register spells this one „Stadt Stadt Wehlen".
         GemarkungEntry("Wehlen", "122015", "Stadt Stadt Wehlen"),
+        # The Leipzig Ortsteil whose advert names no parcel and whose Flurkarte
+        # carries its number only inside a red frame.
+        GemarkungEntry("Engelsdorf", "145511", "Stadt Leipzig"),
     ],
     stand="2026-09-05",
 )
@@ -1437,6 +1441,292 @@ def test_the_borna_advert_answers_with_the_parcel_it_is_cut_from(client: TestCli
     assert "herausgemessen" in final["text"]
     # And the area mismatch is not reported as an objection — it is the point.
     assert "bitte die Flurstücksnummer prüfen" not in final["text"]
+
+
+# --------------------------------------------------------------------------
+# A Flurkarte whose only statement is the red frame round the plot
+# --------------------------------------------------------------------------
+
+ENGELSDORF_PAGE = "inserat-kleinanzeigen-engelsdorf.html"
+ENGELSDORF_URL = "https://www.kleinanzeigen.de/s-anzeige/x/3520842196-207-4244"
+
+
+def _engelsdorf_cadastre():
+    """ALKIS as it answered on 23.09.2026 for Gemarkung Engelsdorf (145511)."""
+
+    return _cadastre(
+        {"<fes:Literal>590<": 12, "145511": 2282},
+        {
+            "flstnrzae+<fes:Literal>166<+<fes:Literal>17<": "alkis_engelsdorf_166_17.gml",
+            "flstnrzae+<fes:Literal>166<+<fes:Literal>18<": "alkis_engelsdorf_166_18.gml",
+            "KatasterBezirk": "alkis_katasterbezirk_engelsdorf.gml",
+            "<fes:Literal>590<": "alkis_engelsdorf_590.gml",
+        },
+    )
+
+
+def _engelsdorf_payload(**changes) -> dict:
+    from app.services.portals import parse_page
+
+    seite = parse_page(ENGELSDORF_URL, fixture_text(ENGELSDORF_PAGE))
+    payload = {
+        "titel": seite.titel,
+        "text": seite.beschreibung,
+        "adresse": seite.adresse,
+        "lat": seite.lat,
+        "lon": seite.lon,
+        "flaeche_m2": 590,
+        "flaeche_text": seite.angaben["Grundstücksfläche"],
+        # The Flurkarte is the last of the eight pictures. The seven photographs
+        # before it read as nothing and cost ~4 s each, which is what the
+        # reading test above is for; here only the sheet is fetched.
+        "bilder": [seite.bilder[-1]],
+    }
+    payload.update(changes)
+    return payload
+
+
+def test_only_the_listing_s_own_gallery_is_read():
+    """Below the gallery sit the seller's other adverts, in the same CDN.
+
+    Measured on this page: 11 picture URLs, three of them another listing's --
+    one a plot in Großbothen. Read as this advert's evidence, a Geoportal print
+    among them would hand the search somebody else's parcel number.
+    """
+
+    from app.services.portals import parse_page
+
+    seite = parse_page(ENGELSDORF_URL, fixture_text(ENGELSDORF_PAGE))
+
+    assert len(seite.bilder) == 8
+    for foreign in ("7527c312", "17aba12a", "9540cb06"):
+        assert not any(foreign in url for url in seite.bilder), foreign
+    assert "b51236e5" in seite.bilder[-1]
+    # The older recording has the same shape: three of its six were foreign.
+    assert len(parse_page("https://www.kleinanzeigen.de/x",
+                          fixture_text("inserat-kleinanzeigen.html")).bilder) == 3
+
+
+def test_the_recorded_page_carries_nobody_s_contact_details():
+    page = fixture_text(ENGELSDORF_PAGE)
+
+    assert "Poschmann" not in page
+    assert "/pro/" not in page
+    assert "utm_" not in page
+    assert "2597239" not in page
+    assert "6020830" not in page
+    assert not re.search(r"[\w.+-]+@[\w-]+\.(?:de|com)\b", page)
+
+
+@_needs_tesseract
+def test_a_flurkarte_without_a_title_gives_up_the_number_inside_its_red_frame():
+    """„Titel: Flurkarte“, „Untertitel:“ blank — no labelled number anywhere.
+
+    The plot is a red frame round the in-map label 166/17, which the page pass
+    does not even return. Inside the frame it is the plot; outside it are
+    166/16 (the same 590 m²), 166/18, 166/c, 178/b — all painted out.
+    """
+
+    reading = ocr.read_image(fixture_bytes("inserat-flurkarte-engelsdorf.jpg"))
+
+    assert reading.parcels == ["166/17"]
+    assert reading.marked is True
+    assert any(mode.startswith("markierung:") for mode in reading.modes)
+
+
+@_needs_tesseract
+def test_a_labelled_title_block_still_wins_over_the_frame():
+    """The Großbothen print has a frame too; its title block answers first."""
+
+    reading = ocr.read_image(fixture_bytes("inserat-katasterauszug.jpg"))
+
+    assert reading.parcels == ["790/11"]
+    assert reading.marked is False
+    assert not any(mode.startswith("markierung:") for mode in reading.modes)
+
+
+def test_a_photograph_has_no_marking_to_read():
+    assert ocr.marked_region(fixture_bytes("inserat-grundstuecksfoto.jpg")) is None
+    # Nor has a Liegenschaftskarte printed without one.
+    assert ocr.marked_region(fixture_bytes("inserat-liegenschaftskarte.jpg")) is None
+
+
+def test_the_marking_masks_out_the_neighbours():
+    """Everything outside the frame is white, not merely cropped away."""
+
+    from PIL import Image
+
+    region = ocr.marked_region(fixture_bytes("inserat-flurkarte-engelsdorf.jpg"))
+
+    assert region is not None
+    with Image.open(io.BytesIO(region)) as image:
+        # The frame on the served 678 x 960 sheet is ~180 px across.
+        assert 100 < image.width < 260 and 100 < image.height < 260
+        # A turned rectangle inside its upright box: the corners are outside.
+        assert image.getpixel((0, 0)) == 255
+        assert image.getpixel((image.width - 1, image.height - 1)) == 255
+
+
+def test_inside_a_frame_only_the_fraction_form_counts():
+    """The house numbers beside the plot (10, 12) are not parcel numbers."""
+
+    assert ocr.marked_parcels("10\n166/17\n12") == ["166/17"]
+    assert ocr.marked_parcels("166 / 17") == ["166/17"]
+    assert ocr.marked_parcels("178/b") == ["178/b"]
+    assert ocr.marked_parcels("10\n12\nJS") == []
+    # A numerator wider than the AdV key is a misreading, not a parcel.
+    assert ocr.marked_parcels("1234567/1") == []
+
+
+def test_a_number_off_the_frame_counts_only_when_two_scales_agree(monkeypatch):
+    """Each enlargement was wrong somewhere; no two were wrong alike.
+
+    Measured: x6 read „166/417“ off the sheet turned by -5 degrees while x4 and
+    x5 read „166/17“ — and a garbled number is worse than none, because it
+    resolves to a real but foreign parcel.
+    """
+
+    data = fixture_bytes("inserat-flurkarte-engelsdorf.jpg")
+
+    def reader(texts):
+        answers = iter(texts)
+        return lambda _data, _mode="6": (next(answers), None)
+
+    monkeypatch.setattr(ocr, "read", reader(["166/17", "166/17", "166/417"]))
+    reading = ocr.ImageReading(quelle="Bild")
+    ocr._read_marking(data, reading)
+    assert reading.parcels == ["166/17"] and reading.marked
+
+    monkeypatch.setattr(ocr, "read", reader(["166/17", "90111", "166/417"]))
+    reading = ocr.ImageReading(quelle="Bild")
+    ocr._read_marking(data, reading)
+    assert reading.parcels == [] and not reading.marked
+
+
+def test_a_parcel_read_inside_a_frame_says_so():
+    reading = ocr.ImageReading(
+        quelle="Bild", url="https://bilder.example.org/8.jpg", text="166/17",
+        parcels=["166/17"], marked=True,
+    )
+
+    [indiz] = ocr.as_indicia([reading])
+
+    assert indiz.quelle == "bild" and indiz.art == "flurstueck"
+    assert "rot umrandeten" in indiz.text
+    assert indiz.bild_url == "https://bilder.example.org/8.jpg"
+    assert indiz.fundort == "bild:https://bilder.example.org/8.jpg"
+
+
+@respx.mock
+@_needs_tesseract
+def test_the_engelsdorf_advert_is_settled_by_the_frame_on_its_flurkarte(client: TestClient):
+    """The reported case, end to end, on the recorded page and answers.
+
+    The text reaches Gemarkung Engelsdorf and exactly 590 m² — twelve parcels,
+    among them 166/16 next door at the same size, so no area can tell them
+    apart. The frame on the Flurkarte can, and the run looks 166/17 up directly.
+    """
+
+    respx.post(ALKIS_URL).mock(side_effect=_engelsdorf_cadastre())
+    payload = _engelsdorf_payload()
+    respx.get(payload["bilder"][0]).mock(
+        return_value=httpx.Response(200, content=fixture_bytes("inserat-flurkarte-engelsdorf.jpg"))
+    )
+
+    events = _stream(client, payload)
+
+    before = next(e for e in events if e["art"] == "kandidaten")
+    numbers = {k["properties"]["flurstuecksnummer"] for k in before["kandidaten"]}
+    assert len(numbers) == 12 and {"166/16", "166/17"} <= numbers
+
+    read = [e["indiz"] for e in events if e["art"] == "indiz" and e["indiz"]["quelle"] == "bild"]
+    assert [i["wert"] for i in read] == ["166/17"]
+    assert read[0]["bild_url"] == payload["bilder"][0]
+    assert "rot umrandeten" in read[0]["text"]
+
+    final = events[-1]
+    assert final["status"] == "bestaetigt"
+    [found] = final["kandidaten"]
+    assert (found["properties"]["flurstuecksnummer"], found["properties"]["gemarkung"]) == (
+        "166/17", "Engelsdorf")
+    assert found["properties"]["flaeche_amtlich_m2"] == 590
+
+
+def _engelsdorf_with_a_rival(client: TestClient, **changes) -> list[dict]:
+    """The recorded advert, its body text naming 166/18 — the 997 m² next door."""
+
+    respx.post(ALKIS_URL).mock(side_effect=_engelsdorf_cadastre())
+    payload = _engelsdorf_payload(**changes)
+    payload["text"] += "\nFlurstück 166/18"
+    respx.get(payload["bilder"][0]).mock(
+        return_value=httpx.Response(200, content=fixture_bytes("inserat-flurkarte-engelsdorf.jpg"))
+    )
+    return _stream(client, payload)
+
+
+@respx.mock
+@_needs_tesseract
+def test_a_frame_against_the_body_text_is_a_question_not_a_quiet_choice(client: TestClient):
+    """The body names one parcel, the frame on the sheet another.
+
+    The body's 166/18 measures 997 m² against the listing's 590, so the area
+    sets it aside before any image is read. The contest was then never asked
+    about at all: conflicts were collected once, in phase 0, and the number off
+    the Flurkarte simply replaced the one in the text. It is a Konflikt now —
+    settled by the area, saying so, and with the other option still on offer.
+    """
+
+    events = _engelsdorf_with_a_rival(client)
+
+    by_id = {e["indiz"]["id"]: e["indiz"] for e in events if e["art"] == "indiz"}
+    conflicts = [e["konflikt"] for e in events
+                 if e["art"] == "konflikt" and e["konflikt"]["art"] == "flurstueck"]
+    assert conflicts, "an image reading against the body text must be put to the user"
+    conflict = conflicts[-1]
+    assert conflict["frage"] == "Welche Flurstücksnummer ist gemeint?"
+    options = {by_id[option]["wert"]: by_id[option] for option in conflict["optionen"]}
+    assert set(options) == {"166/17", "166/18"}
+    # Each option carries its Beleg; the image's carries the sheet itself.
+    assert options["166/17"]["quelle"] == "bild" and options["166/17"]["bild_url"]
+    assert options["166/18"]["fundort"] == "anzeigentext" and options["166/18"]["beleg"]
+    # Followed: the reading the stated area agrees with, and why.
+    assert by_id[conflict["gewaehlt"]]["wert"] == "166/17"
+    assert "997" in conflict["aufgeloest_durch"] and "590" in conflict["aufgeloest_durch"]
+
+    final = events[-1]
+    assert final["status"] == "bestaetigt"
+    assert [k["properties"]["flurstuecksnummer"] for k in final["kandidaten"]] == ["166/17"]
+
+
+@respx.mock
+@_needs_tesseract
+def test_choosing_the_text_s_number_is_what_the_search_then_follows(client: TestClient):
+    """A choice that the next run ignores is decoration.
+
+    Before, the re-run looked up both numbers again and the image's won as it
+    had the first time. Now the chosen one is looked up alone, it is not set
+    aside for its area — a person picked it knowing — and the disagreement goes
+    into the answer instead of into a silent swap.
+    """
+
+    first = _engelsdorf_with_a_rival(client)
+    conflict = [e["konflikt"] for e in first
+                if e["art"] == "konflikt" and e["konflikt"]["art"] == "flurstueck"][-1]
+    by_id = {e["indiz"]["id"]: e["indiz"] for e in first if e["art"] == "indiz"}
+    text_reading = next(o for o in conflict["optionen"] if by_id[o]["wert"] == "166/18")
+
+    respx.reset()
+    events = _engelsdorf_with_a_rival(client, entscheidungen={"flurstueck": text_reading})
+
+    final = events[-1]
+    assert [k["properties"]["flurstuecksnummer"] for k in final["kandidaten"]] == ["166/18"]
+    # 997 m² against the listing's 590: not „bestätigt“, and said.
+    assert final["status"] == "mehrdeutig"
+    assert "997" in final["text"]
+    again = [e["konflikt"] for e in events
+             if e["art"] == "konflikt" and e["konflikt"]["art"] == "flurstueck"]
+    assert again and again[-1]["gewaehlt"] == text_reading
+    assert again[-1].get("aufgeloest_durch") is None
 
 
 # --------------------------------------------------------------------------

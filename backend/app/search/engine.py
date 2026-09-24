@@ -275,6 +275,10 @@ class SearchEngine:
         # The parcel a contradicted number resolved to. Kept, not dropped: if
         # the area route finds nothing, it is the only answer there is.
         self._refuted: list[Flurstueck] = []
+        # The numbers the stated area set aside: Indiz id -> why, in the words
+        # the answer uses. Still readings of the listing: a rival read later off
+        # an image contests them.
+        self._set_aside_by_area: dict[str, str] = {}
         # District outlines already fetched, by key. Drawn once for the map and
         # reused for the wash under a confirmed parcel.
         self._district_outlines: dict[str, KatasterBezirk] = {}
@@ -322,6 +326,21 @@ class SearchEngine:
             # the map keeps showing what was contested.
             found.sort(key=lambda indiz: (indiz.id != chosen, -indiz.sicherheit))
         return found
+
+    def followed_numbers(self) -> list[Indiz]:
+        """The parcel numbers the search looks up: all of them, or the one picked.
+
+        ``active`` only reorders on a decision, so the map keeps showing what
+        was contested. The lookup must not: with a number off the Flurkarte and
+        another in the body text, choosing the text's re-ran the search, looked
+        up both again, and the image's won as before -- the choice was
+        decoration. A chosen district already restricts ``anchors``; this is
+        the same for a number.
+        """
+
+        found = self.active("flurstueck")
+        chosen = self.payload.entscheidungen.get("flurstueck")
+        return [indiz for indiz in found if indiz.id == chosen] or found
 
     async def _count(self, conditions: Sequence[str]) -> int:
         return await self.alkis.count(conditions)
@@ -809,13 +828,18 @@ class SearchEngine:
         # loop that is meanwhile fetching the other images.
         return await asyncio.to_thread(ocr.read_image, data, url, url)
 
-    def _conflicts(self) -> list[Konflikt]:
+    def _conflicts(self, with_set_aside: bool = False) -> list[Konflikt]:
         """Indicia of one kind that cannot all be true.
 
         The search never resolves this quietly. It follows the most trustworthy
         reading, says so, and offers the alternatives -- a map extract naming
         one district and a location field naming another can both be honest,
         because the seller may have attached the wrong extract.
+
+        ``with_set_aside`` counts a parcel number the stated area set aside as
+        a reading still. By the time the images are read that has often
+        happened already, and leaving it out would let the number off the image
+        replace the one in the text without anybody being asked.
         """
 
         questions = {
@@ -838,10 +862,20 @@ class SearchEngine:
                 if art != "gemarkung"
                 or (indiz.beziehung in ANCHORING and self._district_entries(indiz))
             ]
+            set_aside: list[Indiz] = []
+            if art == "flurstueck" and with_set_aside:
+                set_aside = [
+                    indiz
+                    for indiz in self.state.indicia
+                    if indiz.id in self._set_aside_by_area and indiz.verworfen
+                ]
+                usable = [*usable, *set_aside]
             values = {self._conflict_key(indiz) for indiz in usable}
             if len(values) < 2:
                 continue
-            if art == "flurstueck" and self.named_as_a_set():
+            if art == "flurstueck" and (
+                len({indiz.fundort or indiz.quelle for indiz in usable}) == 1
+            ):
                 # „Flurstück 790 sowie 706“ is not two readings of one parcel,
                 # it is one plot made of two -- which this project treats as the
                 # normal case, not the exception. Asking which one is meant
@@ -855,13 +889,21 @@ class SearchEngine:
                 # would call the listing contradictory when nothing in it
                 # contradicts.
                 continue
-            chosen = self.payload.entscheidungen.get(art) or usable[0].id
+            decided = self.payload.entscheidungen.get(art)
+            chosen = decided or usable[0].id
             out.append(
                 Konflikt(
                     art=art,  # type: ignore[arg-type]
                     frage=question,
                     optionen=[indiz.id for indiz in usable],
                     gewaehlt=chosen,
+                    # Settled by a hard filter, and said so -- the option stays
+                    # on offer, and choosing it re-runs the search on it.
+                    aufgeloest_durch=(
+                        None
+                        if decided or not set_aside or chosen in self._set_aside_by_area
+                        else " ".join(self._set_aside_by_area[indiz.id] for indiz in set_aside)
+                    ),
                 )
             )
         return out
@@ -904,6 +946,28 @@ class SearchEngine:
         numbers = self.active("flurstueck")
         places = {indiz.fundort or indiz.quelle for indiz in numbers}
         return len(numbers) > 1 and len(places) == 1
+
+    def _new_conflicts(self) -> list[Konflikt]:
+        """Contradictions that only exist since the images were read.
+
+        ``_conflicts`` runs in phase 0, and the images are read long after it --
+        so a number off a Flurkarte that the body text disagrees with was never
+        compared with it: whichever of the two the cadastre resolved won, and
+        nobody was told there had been a choice. The same question is asked
+        again here, and a contest that gained an option is sent again with it.
+        """
+
+        changed: list[Konflikt] = []
+        for conflict in self._conflicts(with_set_aside=True):
+            known = next((c for c in self.state.conflicts if c.art == conflict.art), None)
+            if known is None:
+                self.state.conflicts.append(conflict)
+                changed.append(conflict)
+            elif set(conflict.optionen) != set(known.optionen):
+                known.optionen, known.gewaehlt = conflict.optionen, conflict.gewaehlt
+                known.aufgeloest_durch = conflict.aufgeloest_durch
+                changed.append(known)
+        return changed
 
     @staticmethod
     def _conflict_key(indiz: Indiz) -> str:
@@ -1063,7 +1127,7 @@ class SearchEngine:
         the right one.
         """
 
-        numbers = self.active("flurstueck")
+        numbers = self.followed_numbers()
         anchors = self.anchors()
         if not numbers or not anchors:
             return
@@ -1613,7 +1677,7 @@ class SearchEngine:
         larger and the number says nothing on its own and is left alone.
         """
 
-        numbers = self.active("flurstueck")
+        numbers = self.followed_numbers()
         if not numbers or self.state.candidates:
             return
         parsed = normalise_parcel_number(numbers[0].wert)
@@ -1897,14 +1961,23 @@ class SearchEngine:
         nothing, the marked parcel is what the answer carries.
         """
 
-        if len(self.state.candidates) != 1 or not self.active("flurstueck"):
+        numbers = self.followed_numbers()
+        if len(self.state.candidates) != 1 or not numbers:
             return
         parcel = self.state.candidates[0]
         if not self._area_contradicts(parcel):
             return
+        if self.payload.entscheidungen.get("flurstueck") in {n.id for n in numbers}:
+            # A person picked this number knowing the listing's area disagrees.
+            # It stands, and the objection goes into the answer instead.
+            return
 
         official = parcel.flaeche_amtlich_m2 or 0.0
-        for number in self.active("flurstueck"):
+        for number in numbers:
+            self._set_aside_by_area[number.id] = (
+                f"Flurstück {number.wert} misst amtlich {official:g} m², das Inserat nennt "
+                f"{self._area.value:g} m² — die Fläche ist die verlässlichere Angabe."
+            )
             number.verworfen = True
             number.verworfen_grund = (
                 f"Das Flurstück dieser Nummer misst amtlich {official:g} m², das Inserat "
@@ -2007,6 +2080,8 @@ class SearchEngine:
             fresh = [i for i in self.state.indicia if i.id not in before]
             for indiz in fresh:
                 yield SuchEreignis(art="indiz", indiz=indiz)
+            for conflict in self._new_conflicts():
+                yield SuchEreignis(art="konflikt", konflikt=conflict)
             # A number off an image is an official statement about *this* plot
             # and outranks what the prose alone reached, so the narrowing runs
             # again rather than the reading being noted and ignored.
