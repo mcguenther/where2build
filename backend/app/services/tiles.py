@@ -7,8 +7,10 @@ an orthophoto does not change between two page views.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import io
+import logging
 import math
 from dataclasses import dataclass
 
@@ -17,7 +19,15 @@ from ..cache import DiskCache
 from ..errors import BadRequestError, UpstreamError
 from ..settings import AppSettings, TilesSettings
 
+logger = logging.getLogger(__name__)
+
 SERVICE_NAME = "Der Kartendienst des GeoSN"
+
+# How many tiles a warm-up fetches at once. The GeoSN answers one in 1-1.4 s
+# and caches nothing itself, so a warm-up of a whole list would otherwise be
+# dozens of simultaneous GetMaps from one address, for pictures nobody is
+# looking at yet.
+WARM_CONCURRENCY = 4
 
 ADVICE = (
     "Die Kartenebene bleibt leer; auf eine andere Ebene umschalten hilft meist. "
@@ -164,6 +174,9 @@ class TileService:
         self.settings = settings
         self.app_settings = app_settings
         self.cache = DiskCache(app_settings.cache_dir / "tiles", ttl_s=settings.cache_ttl_s)
+        # Keys a warm-up is fetching right now, so two overlapping warm-ups --
+        # the list and then the comparison -- do not both ask for a tile.
+        self._warming: set[str] = set()
 
     @property
     def layers(self) -> dict[str, LayerConfig]:
@@ -308,9 +321,7 @@ class TileService:
             "f": "image",
         }
 
-    async def tile(self, layer: str, z: int, x: int, y: int) -> tuple[bytes, bool]:
-        """Return the tile image and whether it came from the cache."""
-
+    def _validated(self, layer: str, z: int, x: int, y: int) -> LayerConfig:
         config = self._config(layer)
         self._check_tile(z, x, y)
         if z < config.min_zoom:
@@ -318,13 +329,66 @@ class TileService:
                 f"Die Ebene „{layer}“ zeichnet erst ab Zoomstufe {config.min_zoom}; "
                 f"darunter liefert der Dienst ein leeres Bild."
             )
+        return config
+
+    def _cache_key(self, layer: str, config: LayerConfig, z: int, x: int, y: int) -> str:
         crs = "EPSG:3857" if config.kind == "arcgis" else self.settings.crs
-        size = self.render_size(config, z)
         # The layer list is part of the key, not just the name: changing which
         # ALKIS layers "alkis" stands for kept serving the old picture until
         # someone deleted the cache by hand -- and a stale tile of the *previous*
         # configuration looks exactly like a change that did not work.
-        cache_key = f"{layer}/{_fingerprint(config)}/{crs}/{z}/{x}/{y}"
+        return f"{layer}/{_fingerprint(config)}/{crs}/{z}/{x}/{y}"
+
+    def missing(self, tiles: list[tuple[str, int, int, int]]) -> list[tuple[str, int, int, int]]:
+        """The tiles of this list that the disk cache cannot answer yet.
+
+        Validates every one first, so a warm-up with one bad entry is refused
+        whole instead of half-run.
+        """
+
+        keys = [self._cache_key(tile[0], self._validated(*tile), *tile[1:]) for tile in tiles]
+        return [
+            tile
+            for tile, key in zip(tiles, keys, strict=True)
+            if key not in self._warming and not self.cache.has(key)
+        ]
+
+    async def warm(self, tiles: list[tuple[str, int, int, int]]) -> int:
+        """Fetch these tiles into the disk cache and keep nothing else of them.
+
+        For pictures that will be drawn later: a plot's thumbnail on its card
+        and in the comparison. Failures are logged and dropped -- a tile that
+        did not warm is fetched when it is drawn, as it always was.
+        """
+
+        gate = asyncio.Semaphore(WARM_CONCURRENCY)
+        # Claimed before the first await, so a warm-up that starts a moment
+        # later already sees them as taken.
+        keys = {tile: self._cache_key(tile[0], self._config(tile[0]), *tile[1:]) for tile in tiles}
+        claimed = [tile for tile, key in keys.items() if key not in self._warming]
+        self._warming.update(keys[tile] for tile in claimed)
+
+        async def one(tile: tuple[str, int, int, int]) -> bool:
+            try:
+                async with gate:
+                    _, from_cache = await self.tile(*tile)
+                return not from_cache
+            except Exception as exc:  # noqa: BLE001 -- a warm-up must never raise
+                logger.info("Tile %s did not warm: %s", "/".join(map(str, tile)), exc)
+                return False
+            finally:
+                self._warming.discard(keys[tile])
+
+        results = await asyncio.gather(*(one(tile) for tile in claimed))
+        return sum(results)
+
+    async def tile(self, layer: str, z: int, x: int, y: int) -> tuple[bytes, bool]:
+        """Return the tile image and whether it came from the cache."""
+
+        config = self._validated(layer, z, x, y)
+        crs = "EPSG:3857" if config.kind == "arcgis" else self.settings.crs
+        size = self.render_size(config, z)
+        cache_key = self._cache_key(layer, config, z, x, y)
         cached = self.cache.get_bytes(cache_key)
         if cached is not None:
             return cached, True

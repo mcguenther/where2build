@@ -344,3 +344,95 @@ def test_the_photo_layer_has_no_scale_limit_and_is_asked_plainly(client: TestCli
     client.get("/api/tiles/dop/16/35081/21973.png")
 
     assert "MAP_RESOLUTION" not in route.calls[0].request.url.params
+
+
+# --------------------------------------------------------------------------
+# POST /api/tiles/warm -- the cache filled before anything draws
+# --------------------------------------------------------------------------
+
+WARM = "/api/tiles/warm"
+
+
+def _refs(*columns: int) -> dict:
+    return {"kacheln": [{"ebene": "dop", "z": 15, "x": x, "y": 10986} for x in columns]}
+
+
+@respx.mock
+def test_warming_fetches_the_missing_tiles_and_the_next_draw_is_a_hit(client: TestClient):
+    route = respx.get(DOP_URL).mock(return_value=_wms_answer())
+
+    answer = client.post(WARM, json=_refs(17540, 17541, 17542))
+
+    assert answer.status_code == 202
+    assert answer.json() == {"angefragt": 3, "geholt_werden": 3}
+    # The test client runs the background task before it returns.
+    assert route.call_count == 3
+    drawn = client.get("/api/tiles/dop/15/17541/10986.png")
+    assert drawn.headers["x-cache"] == "HIT"
+    assert route.call_count == 3
+
+
+@respx.mock
+def test_warming_skips_what_the_cache_already_has(client: TestClient):
+    route = respx.get(DOP_URL).mock(return_value=_wms_answer())
+    client.get("/api/tiles/dop/15/17540/10986.png")
+
+    answer = client.post(WARM, json=_refs(17540, 17540, 17541))
+
+    # Named twice, counted once; cached, not fetched again.
+    assert answer.json() == {"angefragt": 2, "geholt_werden": 1}
+    assert route.call_count == 2
+
+
+@respx.mock
+def test_one_bad_tile_refuses_the_whole_warm_up(client: TestClient):
+    route = respx.get(DOP_URL).mock(return_value=_wms_answer())
+    body = _refs(17540)
+    body["kacheln"].append({"ebene": "katasterX", "z": 15, "x": 17541, "y": 10986})
+
+    answer = client.post(WARM, json=body)
+
+    assert answer.status_code == 400
+    assert route.call_count == 0
+
+
+def test_a_warm_up_past_any_list_is_a_422(client: TestClient):
+    assert client.post(WARM, json=_refs(*range(17000, 17401))).status_code == 422
+    assert client.post(WARM, json={"kacheln": []}).status_code == 422
+
+
+@respx.mock
+def test_a_tile_that_fails_to_warm_is_fetched_when_drawn(client: TestClient):
+    route = respx.get(DOP_URL).mock(side_effect=httpx.ReadTimeout("langsam"))
+
+    answer = client.post(WARM, json=_refs(17540))
+
+    # The answer went out before the fetch, so the failure cannot reach it.
+    assert answer.status_code == 202
+    route.mock(side_effect=None, return_value=_wms_answer())
+    drawn = client.get("/api/tiles/dop/15/17540/10986.png")
+    assert drawn.status_code == 200
+    assert drawn.headers["x-cache"] == "MISS"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_overlapping_warm_ups_fetch_a_tile_once():
+    """The list warms, then a tick for the comparison warms again."""
+
+    import asyncio
+
+    async def slow(_request):
+        await asyncio.sleep(0.05)
+        return _wms_answer()
+
+    route = respx.get(DOP_URL).mock(side_effect=slow)
+    service = tile_service()
+    tile = ("dop", 15, 17540, 10986)
+
+    first = asyncio.create_task(service.warm([tile]))
+    await asyncio.sleep(0)
+    assert service.missing([tile]) == []
+    await asyncio.gather(first, service.warm([tile]))
+
+    assert route.call_count == 1

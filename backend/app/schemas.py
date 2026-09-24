@@ -2108,3 +2108,26 @@ class LoeschAnfrage(BaseModel):
 
 class LoeschErgebnis(BaseModel):
     geleert: dict[str, int] = Field(description="Tabelle → Anzahl gelöschter Zeilen.")
+
+
+# The most one warm-up may name. A list of twenty plots with their comparison
+# is some 200 tiles; anything far past that is not a list being drawn.
+MAX_WARM_TILES = 400
+
+
+class Kachel(BaseModel):
+    ebene: str = Field(description="Kartenebene, wie im Pfad von /api/tiles.")
+    z: int = Field(ge=0, le=24)
+    x: int = Field(ge=0)
+    y: int = Field(ge=0)
+
+
+class KachelnVorwaermen(BaseModel):
+    kacheln: list[Kachel] = Field(min_length=1, max_length=MAX_WARM_TILES)
+
+
+class VorwaermenErgebnis(BaseModel):
+    angefragt: int = Field(description="So viele Kacheln nannte die Anfrage.")
+    geholt_werden: int = Field(
+        description="So viele fehlten im Zwischenspeicher und werden jetzt im Hintergrund geholt."
+    )

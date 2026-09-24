@@ -313,6 +313,11 @@ class DiskCache:
             return True
         return (time.time() - path.stat().st_mtime) < self.ttl_s
 
+    def has(self, key: str) -> bool:
+        """Whether ``get_bytes`` would answer, without reading the file."""
+
+        return self._fresh(self._path(key))
+
     def get_bytes(self, key: str) -> bytes | None:
         path = self._path(key)
         if not self._fresh(path):

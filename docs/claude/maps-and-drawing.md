@@ -211,25 +211,32 @@ routines under it.
   the unturned frame's corners. Local metres and Web Mercator share one scale
   factor around the anchor, so the placement is linear.
 
-- **A thumbnail's tiles are asked for before anything draws them.** Measured
-  24.09.2026: the GeoSN web atlas takes 1–1,4 s per tile and caches nothing of
-  its own (the same GetMap twice, both slow). Our backend then serves it in
-  4 ms and the browser from its cache in 0, so the delay was only ever the
-  *first* sight of a plot — and that is every new plot, because the wizard's
-  preview is another ground at another zoom and warms none of them. `App.vue`
-  watches `wantedThumbnailTiles` (every card at `CARD_FRAME`, and the ticked
-  plots at the comparison's shared scale) and hands new URLs to
-  `prefetchTiles`, low priority. A watch, not a call in `addPlot`: the street
-  front settles after the plot is stored and turns the drawing, and ticking a
-  plot changes the scale all compared drawings share. The layout lives in
-  `lib/tileGround.js` so drawing and prefetch compute the same URLs; the test
-  compares against the mounted thumbnails *with positions*, because the cover
-  is the frame's diagonal on every side and a centre metres off still asks for
-  the same tiles — a URL-only check passed with the rotation deleted. After the
-  change, opening the list and the comparison of two new plots sent 0 tile
-  requests to the backend. Storing a stitched ground with the plot was weighed
-  and left: ~8 KB each, but the backend cache is shared by everyone and already
-  answers in milliseconds, so it would only help a new browser after 30 days.
+- **A thumbnail's tiles are in the backend's cache before anything draws
+  them.** Measured 24.09.2026: the GeoSN web atlas takes 1–1,4 s per tile and
+  caches nothing of its own (the same GetMap twice, both slow); our disk cache
+  answers in 4 ms. So the delay was only ever the *first* sight of a plot — and
+  that is every new plot, because the wizard's preview is another ground at
+  another zoom and warms none of them. `App.vue` watches `wantedThumbnailTiles`
+  (every card at `CARD_FRAME`, the ticked plots at the comparison's shared
+  scale) and names new tiles to `POST /api/tiles/warm`, which answers 202 in
+  ~12 ms and fetches the missing ones afterwards, four at a time. The browser
+  downloads nothing for it and its HTTP cache is not part of the plan: a first
+  attempt warmed with `new Image()`, and it was rejected for exactly that. The
+  warm-up pays one tile of the map budget per tile it sends *outward*, and a
+  warm-up over the budget is refused whole. A watch, not a call in `addPlot`:
+  the street front settles after the plot is stored and turns the drawing, and
+  ticking a plot changes the scale all compared drawings share. Tiles are
+  claimed before the first `await`, so the list's warm-up and the comparison's
+  a moment later do not both fetch one — claiming inside the task let both
+  through, and a test caught it. The layout lives in `lib/tileGround.js` so
+  drawing and warm-up name the same tiles; the test compares against the
+  mounted thumbnails *with positions*, because the cover is the frame's
+  diagonal on every side and a centre metres off still asks for the same tiles
+  — a URL-only check passed with the rotation deleted. Measured after: two new
+  plots, then the list and the comparison opened in a *fresh* browser with no
+  HTTP cache — 21 of 21 tiles `HIT`, slowest 118 ms. Storing a stitched ground
+  with the plot was weighed and left: ~8 KB each, but the disk cache is shared
+  by everyone for 30 days and already answers in milliseconds.
 
 - **The street side was the longest edge, and that was wrong on seven of eight
   real plots.** Measured 23.09.2026 on every parcel fixture: only the 1 594 m

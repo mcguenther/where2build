@@ -369,3 +369,30 @@ def test_health_says_when_there_is_no_budget(switched_off, client: TestClient):
     assert kontingent["konfiguriert"] is False
     assert "Einzelplatz" in kontingent["hinweis"]
     assert "RATELIMIT_ENABLED=true" in kontingent["hinweis"]
+
+
+@respx.mock
+def test_a_warm_up_pays_for_the_tiles_it_sends_outward(budget, client: TestClient):
+    """One call for the request, one per missing tile -- five in all here."""
+
+    route = respx.get(DOP_URL).mock(
+        return_value=httpx.Response(200, content=PNG, headers={"content-type": "image/png"})
+    )
+    tiles = {"kacheln": [{"ebene": "dop", "z": 15, "x": 17540 + x, "y": 10986} for x in range(4)]}
+
+    assert client.post("/api/tiles/warm", json=tiles).status_code == 202
+    assert route.call_count == 4
+    assert client.get("/api/tiles/dop/15/17550/10986.png").status_code == 429
+
+
+@respx.mock
+def test_a_warm_up_over_the_budget_is_refused_whole(budget, client: TestClient):
+    route = respx.get(DOP_URL).mock(
+        return_value=httpx.Response(200, content=PNG, headers={"content-type": "image/png"})
+    )
+    tiles = {"kacheln": [{"ebene": "dop", "z": 15, "x": 17540 + x, "y": 10986} for x in range(5)]}
+
+    assert client.post("/api/tiles/warm", json=tiles).status_code == 429
+    assert route.call_count == 0
+    # Refused whole means spent nothing beyond the request itself.
+    assert client.get("/api/tiles/dop/15/17540/10986.png").status_code == 200

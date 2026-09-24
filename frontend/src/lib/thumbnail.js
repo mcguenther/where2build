@@ -24,7 +24,7 @@ export const THUMBNAIL_MARGIN = 6;
 export const THUMBNAIL_GROUND = "umgebung";
 
 /** The two frames a plot is drawn small in: its card in the list, and its
- *  column in the comparison. Named here so the drawing and the prefetch below
+ *  column in the comparison. Named here so the drawing and the warm-up below
  *  cannot disagree about a pixel — a different frame is a different zoom and
  *  therefore different tiles. */
 export const CARD_FRAME = { width: 300, height: 196 };
@@ -66,23 +66,25 @@ export function thumbnailTiles(plot, { width, height }, scale = null) {
   return groundTileLayout(plot.anchor, thumbnailView(plot, width, height, scale), width, height, THUMBNAIL_GROUND);
 }
 
-/** The same, as the URLs a prefetch asks for. */
-export const thumbnailTileUrls = (plot, frame, scale = null) =>
-  thumbnailTiles(plot, frame, scale).map(tile => tile.href);
+/** The same, as the backend is told about them. */
+export const thumbnailTileRefs = (plot, frame, scale = null) =>
+  thumbnailTiles(plot, frame, scale).map(tile => tile.ref);
 
 /**
  * Every tile the list and the comparison will want for these plots: each card
  * at its own fit, and the ones ticked for comparison at the scale they will
  * share there. A freshly created plot is otherwise first drawn with all of its
- * tiles still to come from the GeoSN, at a second or more apiece.
+ * tiles still to come from the GeoSN, at a second or more apiece. As the
+ * backend is told about them: see `warmTiles`.
  */
 export function wantedThumbnailTiles(plots, selection = []) {
-  const urls = new Set();
-  for (const plot of plots) for (const url of thumbnailTileUrls(plot, CARD_FRAME)) urls.add(url);
+  const wanted = new Map();
+  const add = refs => refs.forEach(ref => wanted.set(`${ref.ebene}/${ref.z}/${ref.x}/${ref.y}`, ref));
+  for (const plot of plots) add(thumbnailTileRefs(plot, CARD_FRAME));
   // Outlines only: this runs on every page, and a plot without one must not
   // take the shell down with it.
   const compared = plots.filter(plot => selection.includes(plot.id) && plot.polygon?.length >= 3);
   const shared = sharedThumbnailScale(compared, COMPARE_FRAME.width, COMPARE_FRAME.height);
-  for (const plot of compared) for (const url of thumbnailTileUrls(plot, COMPARE_FRAME, shared)) urls.add(url);
-  return [...urls];
+  for (const plot of compared) add(thumbnailTileRefs(plot, COMPARE_FRAME, shared));
+  return [...wanted.values()];
 }
