@@ -143,7 +143,7 @@
         <div v-show="sidePane === 'plot'" id="pane-plot" class="side-pane" role="tabpanel"
              aria-labelledby="tab-plot">
           <section class="panel">
-            <div class="panel__head"><h3>Grundstück</h3><div class="spacer"></div><span class="chip">ALKIS</span></div>
+            <div class="panel__head"><h3>Grundstück</h3></div>
             <dl class="value-list">
               <dt>Gemarkung</dt><dd>{{ plot.gemarkung }}</dd>
               <dt>Flurstücke</dt><dd>{{ plot.flurstuecke.join(" · ") }}</dd>
@@ -152,7 +152,10 @@
               <dt>Grenzpunkte</dt><dd>{{ plot.polygon.length }}</dd>
               <dt>Straßenfront</dt><dd>{{ metres(metrics.streetFrontage) }}</dd>
             </dl>
-            <HintFold :count="1">
+            <HintFold :count="2">
+              <p>Gemarkung, Flurstücke und amtliche Fläche stammen aus dem Liegenschaftskataster
+                (ALKIS) von GeoSN. Grenzpunkte, gerechnete Fläche und Straßenfront sind aus dem
+                Umriss gemessen, den es liefert.</p>
               <p>Für den Preisvergleich zählt die amtliche Fläche. Die aus dem Polygon
                 gerechnete weicht regelmäßig um ein paar Quadratmeter ab.</p>
             </HintFold>
@@ -164,7 +167,12 @@
               <span v-if="priceVerdict" class="chip" :class="`chip--${metrics.deviationClass}`">{{ priceVerdict.chip }}</span>
             </div>
             <dl class="value-list">
-              <dt>Kaufpreis</dt><dd>{{ euro(plot.askingPrice) }}</dd>
+              <dt>Kaufpreis</dt>
+              <dd>
+                {{ euro(plot.askingPrice) }}
+                <button v-if="priceDraft === null" type="button" class="price-edit__open no-print"
+                        @click="startPriceEdit">{{ hasPrice ? "Ändern" : "Eintragen" }}</button>
+              </dd>
               <dt>Angebot je m²</dt><dd>{{ euroPerSqm(metrics.pricePerSqm) }}</dd>
               <dt>Bodenrichtwert</dt><dd>{{ euroPerSqm(plot.bodenrichtwert) }} <span class="faint">Zone {{ plot.brwZone }}</span></dd>
               <dt>Stichtag</dt><dd>{{ date(plot.brwReferenceDate) }}</dd>
@@ -172,6 +180,23 @@
                 <dt>Richtwertgrundstück</dt><dd>{{ area(plot.brwReferencePlotArea) }}</dd>
               </template>
             </dl>
+            <!-- The listing is where the price comes from, and the wizard is
+                 not the only way a plot arrives: a parcel picked by number
+                 has none, and a price changes after a phone call. -->
+            <div v-if="priceDraft !== null" class="price-edit no-print">
+              <label for="asking-price">Kaufpreis in Euro</label>
+              <input id="asking-price" ref="priceField" type="text" inputmode="decimal"
+                     autocomplete="off" placeholder="z. B. 249.000" v-model="priceDraft"
+                     :aria-invalid="String(Boolean(priceError))" aria-describedby="asking-price-hint"
+                     @keydown.enter.prevent="commitPrice" @keydown.esc.prevent="cancelPrice">
+              <div class="price-edit__buttons">
+                <button type="button" class="btn btn--small" @click="commitPrice">Übernehmen</button>
+                <button type="button" class="btn btn--quiet btn--small" @click="cancelPrice">Abbrechen</button>
+              </div>
+              <p id="asking-price-hint" class="price-edit__hint" :class="{ 'price-edit__hint--error': priceError }">
+                {{ priceError || "Wie im Inserat, mit oder ohne Tausenderpunkte. Ein leeres Feld entfernt den Preis." }}
+              </p>
+            </div>
             <div v-if="Number.isFinite(plot.bodenrichtwert)" class="price-band">
               <div class="price-band__scale">
                 <div class="price-band__axis"></div>
@@ -189,7 +214,9 @@
               </div>
               <p v-if="!priceVerdict" class="price-band__statement">
                 Ohne Kaufpreis lässt sich das Angebot nicht mit dem Bodenrichtwert vergleichen.
-                Der Preis steht im Inserat und kann oben eingetragen werden.
+                <button v-if="priceDraft === null && !hasPrice" type="button"
+                        class="btn btn--secondary btn--small price-band__action no-print"
+                        @click="startPriceEdit">Kaufpreis eintragen</button>
               </p>
             </div>
             <!-- The magnitude without a sign: „−4,2 % unter" said the direction
@@ -565,7 +592,7 @@ import {
   polygonEdges, edgeCompass, buildableArea, cornersOutside, smallestSetback,
   alignToEdge, alignmentToEdge, findPlacement, neighbourSetbackDepths, hasNeighbourHint
 } from "../lib/geometry.js";
-import { area, euro, euroPerSqm, metres, num, percent, degrees, date, duration } from "../lib/format.js";
+import { area, euro, euroPerSqm, metres, num, percent, degrees, date, duration, parseGermanNumber } from "../lib/format.js";
 
 /** What each price stage shows: the chip in the panel head and the mark in
  *  front of the coloured line. „within" is deliberately neutral — a few per
@@ -598,6 +625,9 @@ export default {
       /** Which tab the column beside the plan shows: "plot" or "building".
        *  The plot comes first — whether the house fits is the second question. */
       sidePane: "plot",
+      /** The price field's text while it is open; null while it is closed. */
+      priceDraft: null,
+      priceError: null,
       panes: [
         { id: "plot", name: "Grundstück" },
         { id: "building", name: "Bebauung" }
@@ -679,6 +709,7 @@ export default {
     hasAnchor() { return Boolean(this.plot?.anchor); },
     building() { return placement(this.plot); },
     houseType() { return houseTypeById(this.plot.houseTypeId); },
+    hasPrice() { return Number.isFinite(this.plot?.askingPrice); },
     isCustomSize() { return this.plot.houseTypeId === CUSTOM_SIZE; },
     /** The line on the chip over the plan. */
     houseLabel() {
@@ -884,6 +915,35 @@ export default {
     },
 
     showPane(pane) { this.sidePane = pane; },
+    startPriceEdit() {
+      this.priceDraft = this.hasPrice ? String(this.plot.askingPrice) : "";
+      this.priceError = null;
+      this.$nextTick(() => {
+        this.$refs.priceField?.focus();
+        this.$refs.priceField?.select();
+      });
+    },
+    /** An empty field removes the price; anything that is not a positive
+     *  amount keeps the field open and says why, rather than storing a
+     *  guess — a stored 0 would read as a free plot. */
+    commitPrice() {
+      const text = (this.priceDraft ?? "").trim();
+      if (!text) {
+        this.plot.askingPrice = null;
+      } else {
+        const amount = parseGermanNumber(text);
+        if (amount === null) { this.priceError = "Das ist kein Betrag. Bitte nur die Zahl eintragen, etwa 249.000."; return; }
+        if (amount <= 0) { this.priceError = "Ein Kaufpreis ist größer als null."; return; }
+        this.plot.askingPrice = Math.round(amount);
+      }
+      save();
+      this.priceDraft = null;
+      this.priceError = null;
+    },
+    cancelPrice() {
+      this.priceDraft = null;
+      this.priceError = null;
+    },
     /** A click on the house opens its tab, a click beside it closes it. */
     selectOnPlan(target) {
       this.showPane(target === "house" ? "building" : "plot");
@@ -1078,6 +1138,25 @@ export default {
 .price-band__axis-labels{ display: flex; justify-content: space-between; font-family: var(--w2b-font-mono); font-size: 10.5px; color: var(--w2b-muted); }
 .price-band__statement{ margin-top: var(--w2b-space-3); font-size: var(--w2b-text-s); color: var(--w2b-graphite); }
 .price-band__statement b{ color: var(--w2b-ink); }
+.price-band__action{ display: block; margin-top: var(--w2b-space-2); }
+.price-edit__open{
+  margin-left: var(--w2b-space-2); padding: 0; border: 0; background: none; cursor: pointer;
+  font-family: var(--w2b-font-body); font-size: var(--w2b-text-xs); font-weight: 600;
+  color: var(--w2b-primary); text-decoration: underline; text-underline-offset: 2px;
+}
+.price-edit__open:focus-visible{ outline: 2px solid var(--w2b-primary); outline-offset: 2px; }
+.price-edit{
+  display: grid; gap: var(--w2b-space-2); padding: var(--w2b-space-3) var(--w2b-space-4);
+  border-top: 1px solid var(--w2b-line-faint); background: var(--w2b-secondary-veil);
+}
+.price-edit label{
+  font-family: var(--w2b-font-display); font-weight: 600; font-size: var(--w2b-text-xs);
+  letter-spacing: .09em; text-transform: uppercase; color: var(--w2b-muted);
+}
+.price-edit input{ font-family: var(--w2b-font-mono); }
+.price-edit__buttons{ display: flex; flex-wrap: wrap; gap: var(--w2b-space-2); }
+.price-edit__hint{ margin: 0; font-size: var(--w2b-text-xs); color: var(--w2b-secondary-text); }
+.price-edit__hint--error{ color: var(--w2b-error); }
 .price-band__marker--below{ background: var(--w2b-good); border-color: var(--w2b-good); }
 .price-band__marker--above{ background: var(--w2b-error); border-color: var(--w2b-error); }
 .price-verdict{

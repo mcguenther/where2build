@@ -363,8 +363,18 @@ that collapsed at 390 px. None of them threw.
   same stage now; it used an older scale (± 5 % good, amber up to 15 %), and a
   plot 21 % under the land value was amber on its card and green on its page.
   The source chips in a panel head („ALKIS", „BORIS") read as a verdict next
-  to one: „BORIS" beside „unter Richtwert" looked like a second finding. The
-  price panel names its source as the first line of its hint fold instead.
+  to one: „BORIS" beside „unter Richtwert" looked like a second finding. Both
+  panels name their source as the first line of their hint fold instead. The
+  shared view, the wizard and the parcel search still carry an „ALKIS" chip.
+
+- **The asking price is edited on the plot page, in the price panel.** The
+  wizard was the only place to enter it, yet the panel told people it „kann
+  oben eingetragen werden" — there was nothing above to type into, and a plot
+  picked by parcel number never passes that field. The field is text with
+  `inputmode="decimal"`, not `type="number"`: „279.000 €" is how a listing
+  writes it, and `parseGermanNumber` reads it (dots in groups of three are
+  thousands). An empty field removes the price; 0 and non-numbers keep the
+  field open with a sentence, because a stored 0 would read as a free plot.
 
 - **Enter in the search field only ever took a row, so most inputs went
   nowhere.** `PlotSearch` handled Enter itself and took the highlighted row or

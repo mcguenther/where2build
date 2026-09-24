@@ -147,6 +147,9 @@ describe("Preis gegen Bodenrichtwert", () => {
 
   it("nennt die Quelle in der Klappe statt als Chip im Kopf", () => {
     const w = mountPlot();
+    const plotHead = w.findAll("#pane-plot .panel__head").find(h => h.text().startsWith("Grundstück"));
+    expect(plotHead.text()).toBe("Grundstück");
+    expect(w.find("#pane-plot").text()).toContain("Liegenschaftskataster (ALKIS) von GeoSN");
     const head = w.findAll("#pane-plot .panel__head").find(h => h.text().startsWith("Preis"));
     expect(head.text()).not.toContain("BORIS");
     expect(w.find("#pane-plot").text()).toContain("stammen aus BORIS Sachsen");
@@ -181,9 +184,70 @@ describe("Hinweise hinter einer Klappe", () => {
     const folds = w.findAll("#pane-plot .hint-fold");
     folds.forEach(f => expect(f.element.open).toBe(false));
     const heads = folds.map(f => f.find("summary").text().replace(/\s+/g, " "));
-    expect(heads).toContain("Hinweise 1");                               // Grundstück
+    expect(heads[0]).toBe("Hinweise 2");                                 // Grundstück
     expect(heads.some(h => /^Hinweise [23]$/.test(h))).toBe(true);       // Preis
     expect(heads).toContain("Vereinfacht gerechnet, keine Prüfung");
     expect(w.find("#pane-building .hint-fold summary").text()).toContain("So bedienen Sie den Baukörper");
+  });
+});
+
+describe("Kaufpreis auf der Seite eintragen", () => {
+  const openField = async w => {
+    const open = w.findAll("button").find(b => ["Eintragen", "Ändern", "Kaufpreis eintragen"].includes(b.text().trim()));
+    await open.trigger("click");
+    return w.find("#asking-price");
+  };
+
+  it("nimmt einen Preis wie im Inserat an und vergleicht sofort", async () => {
+    const plot = plotById("plot-concave");
+    plot.askingPrice = null;
+    const w = mountPlot();
+    expect(w.find(".price-verdict").exists()).toBe(false);
+    const field = await openField(w);
+    await field.setValue("279.000 €");
+    await field.trigger("keydown", { key: "Enter" });
+    expect(plot.askingPrice).toBe(279000);
+    expect(w.find("#asking-price").exists()).toBe(false);
+    expect(w.find(".price-verdict").exists()).toBe(true);
+    // Saved, not only shown: the document in storage carries it.
+    expect(localStorage.getItem("where2build.v1")).toContain("279000");
+  });
+
+  it("lässt den Preis bei Esc, wie er war", async () => {
+    const plot = plotById("plot-concave");
+    plot.askingPrice = 349000;
+    const w = mountPlot();
+    const field = await openField(w);
+    expect(field.element.value).toBe("349000");
+    await field.setValue("1");
+    await field.trigger("keydown", { key: "Escape" });
+    expect(plot.askingPrice).toBe(349000);
+    expect(w.find("#asking-price").exists()).toBe(false);
+  });
+
+  it("entfernt den Preis mit einem leeren Feld", async () => {
+    const plot = plotById("plot-concave");
+    plot.askingPrice = 349000;
+    const w = mountPlot();
+    const field = await openField(w);
+    await field.setValue("");
+    await field.trigger("keydown", { key: "Enter" });
+    expect(plot.askingPrice).toBeNull();
+    expect(w.find("#pane-plot").text()).toContain("Ohne Kaufpreis");
+  });
+
+  it("speichert keinen Betrag, der keiner ist, und sagt warum", async () => {
+    const plot = plotById("plot-concave");
+    plot.askingPrice = null;
+    const w = mountPlot();
+    const field = await openField(w);
+    await field.setValue("VB");
+    await field.trigger("keydown", { key: "Enter" });
+    expect(plot.askingPrice).toBeNull();
+    expect(w.find(".price-edit__hint--error").text()).toContain("kein Betrag");
+    await field.setValue("0");
+    await field.trigger("keydown", { key: "Enter" });
+    expect(plot.askingPrice).toBeNull();
+    expect(w.find(".price-edit__hint--error").text()).toContain("größer als null");
   });
 });

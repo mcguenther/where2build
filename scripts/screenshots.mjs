@@ -437,6 +437,13 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
     }
     await shotOf(page, ".plan-grid", "grundstueck-bebauung", mode);
     await page.getByRole("tab", { name: "Grundstück" }).click();
+
+    // The price field, open and empty. The run's plot comes from a typed parcel
+    // number, so it has no listing and no price — typing one in here would put
+    // an invented figure into the documentation.
+    await page.getByRole("button", { name: "Kaufpreis eintragen" }).click();
+    await shotOf(page, "#pane-plot section.panel >> nth=1", "grundstueck-preis", mode);
+    await page.locator("#asking-price").press("Escape");
   }
 
   /* The point of the addresses: the plot has one of its own, and reloading it

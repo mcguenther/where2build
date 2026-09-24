@@ -262,14 +262,14 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
   never run two suites at once here. Three Tesseract tests failed on a run
   sharing the machine with another pytest, and they failed exactly as a
   photograph of a lawn does: an empty reading, past the 30 s timeout.
-- `vitest`: 735 passed — plus the integration file, excluded by `npm run test`
+- `vitest`: 739 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
 - `scripts/bookmarklet.mjs`: the handover across two origins, against the built
   app and a backend on :8000. It asserts the coordinate, which is the field
   that separates a handed-over document from a pasted one, and it writes
   `assistent-uebergabe.png`.
-- `scripts/screenshots.mjs`: 95 images plus one print PDF — 74 and the PDF
-  without a session, as measured on 23.09.2026. The location record prints as
+- `scripts/screenshots.mjs`: 97 images plus one print PDF — 76 and the PDF
+  without a session, as measured on 24.09.2026. The location record prints as
   part of the plot sheet now, so there is no second PDF. Twenty-one of them
   need a session (`konto-*` and the administration area) and they are taken only
   with `W2B_ADMIN_COOKIE` set — see `docs/claude/tooling-and-tests.md` for how
@@ -291,7 +291,9 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
   longer a step of its own. The `assistent-einfuegen-*` images are the same
   step with the bookmarklet's fold open. The `grundstueck-bebauung-*` images are taken after a pointer click on the
   footprint, which is what opens the „Bebauung" tab — the run reports it if the
-  click did not. The `suche-band-*` images run the
+  click did not. The `grundstueck-preis-*` images show the
+  price field open and empty: the run's plot is a typed parcel number with no
+  listing, and typing a price in would put an invented figure into the docs. The `suche-band-*` images run the
   reference advert a second time with its area rounded to „ca. 1.100 m²", which
   is what keeps the run ambiguous — an exact area settles it in five requests
   and no distance band is ever resolved.
