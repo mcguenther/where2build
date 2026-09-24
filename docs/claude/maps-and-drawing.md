@@ -211,6 +211,26 @@ routines under it.
   the unturned frame's corners. Local metres and Web Mercator share one scale
   factor around the anchor, so the placement is linear.
 
+- **A thumbnail's tiles are asked for before anything draws them.** Measured
+  24.09.2026: the GeoSN web atlas takes 1–1,4 s per tile and caches nothing of
+  its own (the same GetMap twice, both slow). Our backend then serves it in
+  4 ms and the browser from its cache in 0, so the delay was only ever the
+  *first* sight of a plot — and that is every new plot, because the wizard's
+  preview is another ground at another zoom and warms none of them. `App.vue`
+  watches `wantedThumbnailTiles` (every card at `CARD_FRAME`, and the ticked
+  plots at the comparison's shared scale) and hands new URLs to
+  `prefetchTiles`, low priority. A watch, not a call in `addPlot`: the street
+  front settles after the plot is stored and turns the drawing, and ticking a
+  plot changes the scale all compared drawings share. The layout lives in
+  `lib/tileGround.js` so drawing and prefetch compute the same URLs; the test
+  compares against the mounted thumbnails *with positions*, because the cover
+  is the frame's diagonal on every side and a centre metres off still asks for
+  the same tiles — a URL-only check passed with the rotation deleted. After the
+  change, opening the list and the comparison of two new plots sent 0 tile
+  requests to the backend. Storing a stitched ground with the plot was weighed
+  and left: ~8 KB each, but the backend cache is shared by everyone and already
+  answers in milliseconds, so it would only help a new browser after 30 days.
+
 - **The street side was the longest edge, and that was wrong on seven of eight
   real plots.** Measured 23.09.2026 on every parcel fixture: only the 1 594 m
   strip at the Tauchaer Straße fronts its street with its longest side. A deep

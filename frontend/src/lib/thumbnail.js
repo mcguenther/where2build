@@ -7,7 +7,8 @@
  * the surroundings around it: the street and the neighbouring buildings, held
  * back in grey so the plot itself is the only coloured shape in the frame.
  */
-import { fitScale, streetDownRotation } from "./geometry.js";
+import { fitScale, streetDownRotation, turnedBox } from "./geometry.js";
+import { groundTileLayout } from "./tileGround.js";
 
 /** Relative room on every side of the outline: enough for the neighbours to
  *  read as neighbours, little enough that the plot stays the subject. */
@@ -22,6 +23,13 @@ export const THUMBNAIL_MARGIN = 6;
  *  noise, and upside down whenever the street lies to the north. */
 export const THUMBNAIL_GROUND = "umgebung";
 
+/** The two frames a plot is drawn small in: its card in the list, and its
+ *  column in the comparison. Named here so the drawing and the prefetch below
+ *  cannot disagree about a pixel — a different frame is a different zoom and
+ *  therefore different tiles. */
+export const CARD_FRAME = { width: 300, height: 196 };
+export const COMPARE_FRAME = { width: 220, height: 280 };
+
 /** How far the thumbnail of this plot is turned. */
 export const thumbnailRotation = plot => streetDownRotation(plot.polygon, plot.streetEdge ?? 0);
 
@@ -34,4 +42,47 @@ export function sharedThumbnailScale(plots, width, height) {
   if (!plots.length) return null;
   return Math.min(...plots.map(plot =>
     fitScale(plot.polygon, width, height, THUMBNAIL_MARGIN, THUMBNAIL_PADDING, thumbnailRotation(plot))));
+}
+
+/**
+ * The projection a thumbnail is drawn with: the plot's turned box centred and
+ * fitted, or held to a scale shared with its neighbours. The same arithmetic
+ * `SitePlan` runs for a compact plan with this padding, restated so the tiles
+ * can be known without mounting one.
+ */
+export function thumbnailView(plot, width, height, scale = null) {
+  const rotation = thumbnailRotation(plot);
+  const { centre } = turnedBox(plot.polygon, rotation);
+  const fitted = Number.isFinite(scale) && scale > 0
+    ? scale
+    : fitScale(plot.polygon, width, height, THUMBNAIL_MARGIN, THUMBNAIL_PADDING, rotation);
+  return { scale: fitted, mx: centre.x, my: centre.y };
+}
+
+/** The ground tiles the thumbnail of this plot draws, laid out as it lays
+ *  them out. */
+export function thumbnailTiles(plot, { width, height }, scale = null) {
+  if (!plot?.anchor || !(plot.polygon?.length >= 3)) return [];
+  return groundTileLayout(plot.anchor, thumbnailView(plot, width, height, scale), width, height, THUMBNAIL_GROUND);
+}
+
+/** The same, as the URLs a prefetch asks for. */
+export const thumbnailTileUrls = (plot, frame, scale = null) =>
+  thumbnailTiles(plot, frame, scale).map(tile => tile.href);
+
+/**
+ * Every tile the list and the comparison will want for these plots: each card
+ * at its own fit, and the ones ticked for comparison at the scale they will
+ * share there. A freshly created plot is otherwise first drawn with all of its
+ * tiles still to come from the GeoSN, at a second or more apiece.
+ */
+export function wantedThumbnailTiles(plots, selection = []) {
+  const urls = new Set();
+  for (const plot of plots) for (const url of thumbnailTileUrls(plot, CARD_FRAME)) urls.add(url);
+  // Outlines only: this runs on every page, and a plot without one must not
+  // take the shell down with it.
+  const compared = plots.filter(plot => selection.includes(plot.id) && plot.polygon?.length >= 3);
+  const shared = sharedThumbnailScale(compared, COMPARE_FRAME.width, COMPARE_FRAME.height);
+  for (const plot of compared) for (const url of thumbnailTileUrls(plot, COMPARE_FRAME, shared)) urls.add(url);
+  return [...urls];
 }

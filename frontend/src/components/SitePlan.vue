@@ -204,8 +204,8 @@ import {
   minimumRotatedRectangleCorners, constrainToEnvelope, hasNeighbourHint,
   polygonCentroid
 } from "../lib/geometry.js";
-import { cameraFor, metresPerDegreeLon, toLocal, toWgs84 } from "../lib/projection.js";
-import { tileCover, tileUrl } from "../lib/routes.js";
+import { cameraFor, toLocal, toWgs84 } from "../lib/projection.js";
+import { groundTileLayout } from "../lib/tileGround.js";
 import { outerRing } from "../lib/plots.js";
 import { num, area } from "../lib/format.js";
 import { BACKDROPS, canRenderMap, withOverlay } from "../lib/basemap.js";
@@ -384,32 +384,10 @@ export default {
     wantsBackdrop() { return this.backdrop !== "none" && Boolean(this.plot.anchor); },
     hasBackdrop() { return this.wantsBackdrop && !this.mapUnavailable; },
     /** Raster tiles under the drawing, placed in the rotated group so they
-     *  turn with it. Local metres and Web Mercator share one scale factor
-     *  around the anchor, which is what makes this a linear map. The cover is
-     *  asked for the frame's diagonal on every side, since a turned drawing
-     *  shows ground from beyond the unturned frame's corners. */
+     *  turn with it. See lib/tileGround.js. */
     groundTiles() {
       if (!this.tileGround || this.hasBackdrop || !this.plot.anchor) return [];
-      const { lat, lon } = this.plot.anchor;
-      const radians = Math.PI / 180;
-      const metresPerUnit = metresPerDegreeLon(lat) / radians;
-      const scale = this.view.scale * metresPerUnit;
-      const phi = lat * radians;
-      const pad = Math.hypot(this.width, this.height) / 2;
-      const padX = pad - this.width / 2, padY = pad - this.height / 2;
-      const fit = {
-        scale,
-        dx: this.width / 2 - this.view.mx * this.view.scale - lon * radians * scale + padX,
-        dy: this.height / 2 + this.view.my * this.view.scale
-          + Math.log(Math.tan(Math.PI / 4 + phi / 2)) * scale + padY
-      };
-      const cover = tileCover(fit, 2 * pad, 2 * pad);
-      if (!cover) return [];
-      // A hair of overlap, or the antialiased tile edges draw a lattice.
-      return cover.tiles.map(tile => ({
-        key: tile.key, href: tileUrl(tile, this.tileGround),
-        x: tile.left - padX, y: tile.top - padY, size: tile.size + 0.6
-      }));
+      return groundTileLayout(this.plot.anchor, this.view, this.width, this.height, this.tileGround);
     },
     backgroundFill() { return this.backdrop === "aerial" ? "var(--w2b-map-green)" : "var(--w2b-map-ground)"; },
     /** Which palette the vector backdrop should be drawn in. Deliberately not

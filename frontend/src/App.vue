@@ -112,6 +112,8 @@ import {
 } from "./lib/store.js";
 import { announcement, signInUrl, signOut } from "./lib/api.js";
 import { beginSignIn } from "./lib/signIn.js";
+import { wantedThumbnailTiles } from "./lib/thumbnail.js";
+import { prefetchTiles } from "./lib/tileGround.js";
 
 export default {
   name: "App",
@@ -140,6 +142,12 @@ export default {
     // Plots stored before the street was read off the cadastre. Not awaited:
     // the page stands without it, and each plot redraws when its answer lands.
     settleStoredStreetFronts();
+    // The thumbnails' ground, asked for before a list or a comparison draws
+    // it. A watch rather than a call in `addPlot`: the street front settles
+    // after the plot is stored and turns the drawing, and ticking a plot for
+    // comparison changes the scale every compared drawing shares.
+    this.$watch(() => wantedThumbnailTiles(state.data.plots, state.data.selection),
+      urls => prefetchTiles(urls), { immediate: true });
   },
   computed: {
     /** Two letters off the display name, for the round mark beside it. */
