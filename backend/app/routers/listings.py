@@ -28,10 +28,9 @@ from ..services import lehrbuch as lehrbuch_service
 from ..services.beleg import Urteil, refusal_note
 from ..services.llm import LLMClient, fingerprint, normalize_url
 from ..services.portals import (
-    PASTE_HINT,
     Seite,
+    blocked_hint,
     fetch_page,
-    is_blocked,
     is_kleinanzeigen,
     parse_page,
 )
@@ -345,9 +344,11 @@ def _without_a_model(seite: Seite, felder: InseratFelder, url: str) -> ListingEx
 
 
 async def _from_url(url: str, llm: LLMClient, settings: Settings) -> ListingExtractResponse:
-    if is_blocked(url):
-        # No request goes out at all -- the answer is known to be 401.
-        raise BadRequestError(PASTE_HINT)
+    hint = blocked_hint(url)
+    if hint:
+        # No request goes out at all, not even the model's fetch -- the
+        # portal's answer is known.
+        raise BadRequestError(hint)
 
     if is_kleinanzeigen(url):
         seite = await fetch_page(url, settings.app)

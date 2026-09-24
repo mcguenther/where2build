@@ -9,6 +9,7 @@ import respx
 from app.errors import BadRequestError
 from app.services.portals import (
     fetch_page,
+    blocked_hint,
     is_blocked,
     is_immoscout,
     is_kleinanzeigen,
@@ -51,6 +52,20 @@ def test_domain_classification():
     assert is_blocked(IMMOSCOUT_URL)
     assert is_blocked("https://immobilienscout24.de/expose/1")
     assert not is_blocked(KLEINANZEIGEN_URL)
+    assert is_blocked("https://www.immowelt.de/expose/c1fc6775-3423-4549-b881-424be15286ac")
+    # A suffix match on the domain, not on the string.
+    assert not is_blocked("https://www.nichtimmowelt.de/expose/1")
+
+
+def test_each_blocked_portal_names_itself_in_its_hint():
+    immoscout = blocked_hint(IMMOSCOUT_URL)
+    immowelt = blocked_hint("https://www.immowelt.de/expose/c1fc6775-3423-4549-b881-424be15286ac")
+
+    assert "immobilienscout24.de" in immoscout and "HTTP 401" in immoscout
+    assert "immowelt.de" in immowelt and "HTTP 403" in immowelt
+    assert "immobilienscout24" not in immowelt
+    assert all("Lesezeichen" in hint for hint in (immoscout, immowelt))
+    assert blocked_hint(KLEINANZEIGEN_URL) is None
 
 
 @respx.mock

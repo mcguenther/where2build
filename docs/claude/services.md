@@ -106,8 +106,11 @@ of Overpass or a local extract, the listing portals, and the extraction model.
   bytes, `x-datadome: protected`, a `datadome` cookie and
   `LambdaGeneratedResponse from cloudfront`. So `parse_page` never sees an
   immowelt page from the server, and there is no fixture: nothing came back
-  to record. It is not in `BLOCKED_DOMAINS`, so the request still goes out and
-  the answer is the generic 502 „mit Status 403 abgelehnt“.
+  to record. It is in `BLOCKED_DOMAINS` since then, with a hint of its own:
+  before that the request went out anyway and the answer was the generic 502
+  „mit Status 403 abgelehnt“, which advised copying and never named the
+  bookmarklet. Blocked means no request at all, the model's fetch included —
+  whether a provider's `web_fetch` gets past DataDome has not been measured.
 
 - **ohne-makler.net serves a listing to the server, and answers 403 for one
   that is gone.** Measured 24.09.2026: the Saxony plot list

@@ -81,6 +81,30 @@ def test_immobilienscout24_is_not_fetched_and_points_at_the_paste_field(client: 
 
 
 @respx.mock
+def test_immowelt_is_not_fetched_and_says_why(client: TestClient):
+    """DataDome answers every exposé with a 403 challenge, measured 24.09.2026.
+
+    Before it was blocked the request went out and came back as the generic
+    502, which advised copying and never named the bookmarklet.
+    """
+
+    url = "https://www.immowelt.de/expose/c1fc6775-3423-4549-b881-424be15286ac"
+    portal = respx.get(url__startswith="https://www.immowelt.de").mock(
+        return_value=httpx.Response(403, text="<html></html>")
+    )
+    llm = respx.post(CHAT_URL).mock(return_value=httpx.Response(200, json=completion("x")))
+
+    answer = client.post("/api/listings/extract", json={"url": url})
+
+    assert answer.status_code == 400
+    detail = answer.json()["detail"]
+    assert "immowelt.de" in detail
+    assert "Lesezeichen" in detail and "Seite einfügen" in detail
+    assert portal.call_count == 0
+    assert llm.call_count == 0
+
+
+@respx.mock
 def test_kleinanzeigen_coordinates_come_from_meta_tags_without_a_model_call(
     without_llm, client: TestClient
 ):

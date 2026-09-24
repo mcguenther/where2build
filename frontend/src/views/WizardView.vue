@@ -62,8 +62,8 @@
         führt neben dem Text auch das HTML mit, und daraus kommen Preis, Fläche und die
         Bilder ohne Modell. Der <i>Kopf</i> der Seite kommt dabei nicht mit —
         <span class="mono">Strg+A</span> wählt nur den Rumpf aus, also fehlen die
-        Meta-Angaben und mit ihnen die Koordinate. ImmoScout24 lässt außerdem keinen
-        Serverabruf zu; dort ist das Einfügen der Weg.
+        Meta-Angaben und mit ihnen die Koordinate. ImmoScout24 und immowelt lassen
+        außerdem keinen Serverabruf zu; dort ist das Einfügen der Weg.
       </p>
 
       <!-- Its own modifier, and that is not decoration: the search step has a

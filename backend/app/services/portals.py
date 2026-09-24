@@ -39,17 +39,30 @@ ADVICE = (
 )
 
 # Domains whose server-side retrieval is known to fail; the paste field (F-12)
-# is the only reliable way in.
-BLOCKED_DOMAINS = {"immobilienscout24.de"}
-
-PASTE_HINT = (
-    "immobilienscout24.de lässt keinen Serverabruf zu und antwortet mit „Ich bin "
-    "kein Roboter“ (HTTP 401, zuletzt bestätigt am 09.09.2026). Der Weg führt über "
-    "„Seite einfügen“: dort einmal das Lesezeichen einrichten, dann schickt ein "
-    "Klick auf der Anzeigenseite sie vollständig herüber. Ohne Lesezeichen die "
-    "Seite kopieren und einfügen — Fläche, Preis und Beschreibung kommen mit, die "
-    "Meta-Angaben nicht."
+# is the only reliable way in. Each carries its own hint, because what the
+# portal answers -- and when that was last measured -- is what makes the
+# refusal believable rather than a guess about our own server.
+_PASTE_WAY = (
+    "Der Weg führt über „Seite einfügen“: dort einmal das Lesezeichen einrichten, "
+    "dann schickt ein Klick auf der Anzeigenseite sie vollständig herüber. Ohne "
+    "Lesezeichen die Seite kopieren und einfügen — Fläche, Preis und Beschreibung "
+    "kommen mit, die Meta-Angaben nicht."
 )
+BLOCKED_DOMAINS = {
+    "immobilienscout24.de": (
+        "immobilienscout24.de lässt keinen Serverabruf zu und antwortet mit „Ich bin "
+        "kein Roboter“ (HTTP 401, zuletzt bestätigt am 09.09.2026). " + _PASTE_WAY
+    ),
+    # DataDome at the CloudFront edge, on the exposé pages only: the result
+    # lists answer 200. Measured 15.09.2026 and again on 24.09.2026 with two
+    # live exposés, see docs/claude/services.md.
+    "immowelt.de": (
+        "immowelt.de lässt die Anzeigenseite nicht vom Server abrufen: vor jedem "
+        "Exposé steht eine Browserprüfung („Please enable JS“, HTTP 403, zuletzt "
+        "bestätigt am 24.09.2026). " + _PASTE_WAY
+    ),
+}
+
 
 _META_PATTERN = re.compile(r"<meta\b[^>]*>", re.IGNORECASE)
 _ATTR_PATTERN = re.compile(
@@ -127,9 +140,18 @@ _PRICE_PATTERNS = (
 _THOUSANDS = re.compile(r"^-?\d{1,3}(\.\d{3})+$")
 
 
-def is_blocked(url: str) -> bool:
+def blocked_hint(url: str) -> str | None:
+    """What to tell somebody whose link no server request can read, if so."""
+
     domain = domain_of(url)
-    return any(domain == blocked or domain.endswith(f".{blocked}") for blocked in BLOCKED_DOMAINS)
+    for blocked, hint in BLOCKED_DOMAINS.items():
+        if domain == blocked or domain.endswith(f".{blocked}"):
+            return hint
+    return None
+
+
+def is_blocked(url: str) -> bool:
+    return blocked_hint(url) is not None
 
 
 def is_kleinanzeigen(url: str) -> bool:
@@ -592,8 +614,9 @@ async def fetch_page(url: str, app_settings: AppSettings) -> Seite:
     request goes out for those at all.
     """
 
-    if is_blocked(url):
-        raise BadRequestError(PASTE_HINT)
+    hint = blocked_hint(url)
+    if hint:
+        raise BadRequestError(hint)
 
     # Kleinanzeigen answers the *first* request with 403 and the second with
     # the page -- reproduced on three adverts on 05.09.2026, each time exactly
