@@ -203,6 +203,7 @@ class TileService:
                 max_scale_denominator=self.settings.parcel_max_scale_denominator,
             ),
             "strassen": LayerConfig(self.settings.webatlas_url, self.settings.street_layers),
+            "umgebung": LayerConfig(self.settings.webatlas_url, self.settings.surroundings_layers),
             "laerm": LayerConfig(
                 self.settings.noise_url,
                 self.settings.noise_layers,

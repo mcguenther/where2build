@@ -353,6 +353,11 @@ class TilesSettings(BaseSettings):
     parcel_min_zoom: int = 15
     # Roads and their names, transparent at every zoom measured (13 to 19).
     street_layers: str = "Verkehr,Beschriftung"
+    # The web atlas without its lettering: streets, buildings, green and water
+    # as a quiet ground under a plot's thumbnail. A thumbnail is turned to its
+    # street, often by more than a quarter turn, and street names would then
+    # stand on their heads -- at that size they are noise either way.
+    surroundings_layers: str = "Vegetation,Siedlung,Gewaesser,Verkehr"
     # The noise survey is not a WMS tile source: its service offers EPSG:4326
     # and 25833 but not 3857, so MapLibre's {bbox-epsg-3857} raster source gets
     # nothing at all. The ArcGIS ``export`` endpoint reprojects server-side.

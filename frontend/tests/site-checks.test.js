@@ -16,12 +16,12 @@ import { describe, it, expect } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import answer from "./fixtures/standort-moelkau.json";
-import { siteFindings, siteTally } from "../src/lib/siteChecks.js";
+import { siteFindings, siteTally, noiseMapped } from "../src/lib/siteChecks.js";
 import { GOOD, NOTE, OPEN } from "../src/lib/findings.js";
 import CheckList from "../src/components/CheckList.vue";
-import LocationView from "../src/views/LocationView.vue";
+import PlotView from "../src/views/PlotView.vue";
 import { state } from "../src/lib/store.js";
-import { realState, realPlot, mountWithRouter } from "./helpers.js";
+import { realState, realPlot, mountWithRouter, testRouter } from "./helpers.js";
 
 const find = (checks, id) => checks.find(c => c.id === id);
 const withBlock = (name, block) => ({ ...answer, [name]: { ...answer[name], ...block } });
@@ -146,6 +146,26 @@ describe("siteFindings", () => {
   });
 });
 
+describe("noiseMapped", () => {
+  it("says yes where the plot sits in a band", () => {
+    expect(noiseMapped(answer)).toBe(true);
+  });
+
+  it("says yes where the survey mapped the surroundings but not the plot", () => {
+    const quiet = withBlock("laerm", { tag: { strasse: [], strassenbahn: [], flughafen: [] } });
+    expect(noiseMapped(quiet)).toBe(true);
+  });
+
+  it("says no where nothing is mapped, where the survey failed, and for no answer", () => {
+    const unmapped = withBlock("laerm", {
+      tag: { strasse: [], strassenbahn: [], flughafen: [] }, kartiert_umkreis: false
+    });
+    expect(noiseMapped(unmapped)).toBe(false);
+    expect(noiseMapped(withBlock("laerm", { fehler: "Der Lärmdienst antwortet nicht." }))).toBe(false);
+    expect(noiseMapped(null)).toBe(false);
+  });
+});
+
 describe("Prüfliste", () => {
   const mountList = (plot, fetcher) => {
     globalThis.fetch = fetcher;
@@ -181,6 +201,62 @@ describe("Prüfliste", () => {
     expect(text).toMatch(/Kein Gesamtwert/);
     // No score anywhere, in any spelling.
     expect(text).not.toMatch(/\d+\s*\/\s*100/);
+    list.unmount();
+  });
+
+  it("öffnet nur die Gruppe mit dem schwersten Befund, die übrigen auf Klick", async () => {
+    const list = mountList(realPlot("moelkau"), () =>
+      Promise.resolve({ ok: true, json: () => Promise.resolve(answer) }));
+    await flushPromises();
+    await nextTick();
+
+    const groups = list.findAll(".checks__group");
+    expect(groups.map(g => g.attributes("data-status"))).toEqual([NOTE, GOOD, OPEN]);
+    const folded = () => list.findAll(".checks__group").map(g => g.classes("checks__group--folded"));
+    expect(folded()).toEqual([false, true, true]);
+    // Lärm und Baugrund sind die beiden, die etwas sagen.
+    expect(groups[0].findAll(".check").map(c => c.find(".check__name").text())).toEqual(["Lärm", "Baugrund"]);
+
+    const more = list.find(".checks__more button");
+    expect(more.text()).toBe("Alle 11 Prüfungen zeigen");
+    expect(more.attributes("aria-expanded")).toBe("false");
+    expect(list.find(".checks__more-hint").text()).toMatch(/ohne Befund · 3 offen/);
+
+    await more.trigger("click");
+    expect(folded()).toEqual([false, false, false]);
+    expect(more.text()).toBe("Nur „Zu beachten“ zeigen");
+    expect(more.attributes("aria-expanded")).toBe("true");
+    list.unmount();
+  });
+
+  it("zeigt ohne Befund zum Beachten die sauberen Prüfungen, nicht die offenen", async () => {
+    const clean = {
+      ...withBlock("laerm", { tag: { strasse: [], strassenbahn: [], flughafen: [] } }),
+      baugrund: { ...answer.baugrund, fehler: "Die Bodenkarte antwortet nicht." }
+    };
+    const list = mountList(realPlot("moelkau"), () =>
+      Promise.resolve({ ok: true, json: () => Promise.resolve(clean) }));
+    await flushPromises();
+    await nextTick();
+
+    const open = list.findAll(".checks__group:not(.checks__group--folded)");
+    expect(open.map(g => g.attributes("data-status"))).toEqual([GOOD]);
+    expect(list.find(".checks__more button").text()).toBe("Alle 11 Prüfungen zeigen");
+    list.unmount();
+  });
+
+  it("färbt jede Karte nach ihrem Befund und sagt ihn zusätzlich in Worten", async () => {
+    const list = mountList(realPlot("moelkau"), () =>
+      Promise.resolve({ ok: true, json: () => Promise.resolve(answer) }));
+    await flushPromises();
+    await nextTick();
+
+    // Die Farbe hängt am Status der Karte; die Überschrift der Gruppe sagt
+    // dasselbe für alle, die Amber nicht von Grün unterscheiden.
+    list.findAll(".check").forEach(card =>
+      expect([NOTE, GOOD, OPEN]).toContain(card.attributes("data-status")));
+    expect(list.findAll(".checks__group-head").map(h => h.text().replace(/\s+/g, " ")))
+      .toEqual(["! Zu beachten 2", "✓ Ohne Befund 6", "? Offen 3"]);
     list.unmount();
   });
 
@@ -224,26 +300,69 @@ describe("Prüfliste", () => {
   });
 });
 
-describe("Standortansicht", () => {
-  it("nennt ein Grundstück, das dieser Browser nicht kennt, beim Namen", () => {
+describe("Standort auf der Grundstücksseite", () => {
+  it("steht als Abschnitt auf der Grundstücksseite, vor den Wegen", () => {
     state.data = realState();
-    const view = mountWithRouter(LocationView, {
-      path: "/grundstueck/gibtsnicht/standort",
-      props: { id: "gibtsnicht" }
+    const plot = state.data.plots.find(p => p.anchor);
+    globalThis.fetch = () => new Promise(() => {});
+
+    const view = mountWithRouter(PlotView, { props: { id: plot.id } });
+    const section = view.find("#standort");
+    expect(section.exists()).toBe(true);
+    expect(section.text()).toContain("Was am Grundstück gilt");
+    expect(section.find(".checks").exists()).toBe(true);
+    const headings = view.findAll("h2").map(h => h.text());
+    expect(headings.indexOf("Was am Grundstück gilt")).toBeLessThan(headings.indexOf("Wege von hier"));
+    view.unmount();
+  });
+
+  it("legt den Lärm über die Karte, bis die Prüfung sagt, dass dort nichts kartiert ist", async () => {
+    state.data = realState();
+    const plot = state.data.plots.find(p => p.anchor);
+    const unmapped = withBlock("laerm", {
+      tag: { strasse: [], strassenbahn: [], flughafen: [] },
+      nacht: { strasse: [], strassenbahn: [], flughafen: [] },
+      kartiert_umkreis: false
     });
-    expect(view.text()).toContain("nicht in diesem Browser");
+    globalThis.fetch = () => Promise.resolve({ ok: true, json: () => Promise.resolve(unmapped) });
+
+    const view = mountWithRouter(PlotView, { props: { id: plot.id } });
+    const noise = () => view.findAll("#standort button").find(b => b.text() === "Lärm");
+    expect(noise().attributes("aria-pressed")).toBe("true");
+
+    await flushPromises();
+    await nextTick();
+    expect(noise().attributes("aria-pressed")).toBe("false");
+    expect(view.find("#standort .key").exists()).toBe(false);
+
+    // Von Hand eingeschaltet bleibt er an, auch nach einer erneuten Prüfung.
+    await noise().trigger("click");
+    expect(noise().attributes("aria-pressed")).toBe("true");
+    await view.findAll("#standort button").find(b => b.text() === "Neu prüfen").trigger("click");
+    await flushPromises();
+    expect(noise().attributes("aria-pressed")).toBe("true");
+    view.unmount();
   });
 
   it("sagt bei fehlender Koordinate, warum nichts gefragt werden kann", () => {
     const plot = realPlot("moelkau");
     delete plot.anchor;
     state.data = { ...realState(), plots: [plot] };
-    globalThis.fetch = () => Promise.resolve({ ok: true, json: () => Promise.resolve(answer) });
+    let asked = false;
+    globalThis.fetch = () => { asked = true; return new Promise(() => {}); };
 
-    const view = mountWithRouter(LocationView, {
-      path: `/grundstueck/${plot.id}/standort`,
-      props: { id: plot.id }
-    });
-    expect(view.text()).toContain("keine Koordinate hinterlegt");
+    const view = mountWithRouter(PlotView, { props: { id: plot.id } });
+    expect(view.find("#standort").text()).toContain("keine Koordinate hinterlegt");
+    expect(view.find("#standort .checks").exists()).toBe(false);
+    expect(asked).toBe(false);
+    view.unmount();
+  });
+
+  it("führt die alte Adresse der Standortseite zu ihrem Abschnitt", async () => {
+    const router = testRouter("/");
+    await router.push("/grundstueck/plot-moelkau/standort");
+    expect(router.currentRoute.value.name).toBe("plot");
+    expect(router.currentRoute.value.params.id).toBe("plot-moelkau");
+    expect(router.currentRoute.value.hash).toBe("#standort");
   });
 });

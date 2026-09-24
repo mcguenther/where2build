@@ -29,7 +29,7 @@
           </p>
           <div class="field">
             <label for="ht-url">Adresse der Haustyp-Seite</label>
-            <input id="ht-url" type="text" v-model="url">
+            <input id="ht-url" type="text" v-model="url" @keydown.enter.exact.prevent="!busy && read()">
           </div>
           <div class="row">
             <button type="button" class="btn" :disabled="busy" @click="read">
@@ -45,9 +45,9 @@
         <div class="panel__body stack">
           <p class="hint">Wenn kein Datenblatt vorliegt oder ihr einfach Maße durchprobieren wollt.</p>
           <div class="field-trio">
-            <div class="field"><label for="manual-name">Bezeichnung</label><input id="manual-name" type="text" v-model="custom.name"></div>
-            <div class="field"><label for="manual-length">Länge</label><input id="manual-length" type="number" min="4" max="30" step="0.1" v-model.number="custom.length"></div>
-            <div class="field"><label for="manual-width">Breite</label><input id="manual-width" type="number" min="4" max="30" step="0.1" v-model.number="custom.width"></div>
+            <div class="field"><label for="manual-name">Bezeichnung</label><input id="manual-name" type="text" v-model="custom.name" @keydown.enter.exact.prevent="customValid && addCustom()"></div>
+            <div class="field"><label for="manual-length">Länge</label><input id="manual-length" type="number" min="4" max="30" step="0.1" v-model.number="custom.length" @keydown.enter.exact.prevent="customValid && addCustom()"></div>
+            <div class="field"><label for="manual-width">Breite</label><input id="manual-width" type="number" min="4" max="30" step="0.1" v-model.number="custom.width" @keydown.enter.exact.prevent="customValid && addCustom()"></div>
           </div>
           <p class="hint">
             Ergibt {{ area(customArea, 1) }} bebaute Fläche.

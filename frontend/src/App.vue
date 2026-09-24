@@ -106,7 +106,10 @@
 </template>
 
 <script>
-import { state, applyTheme, loadAccount, loadFromAccount, adoptLocal, declineAdoption, isFresh } from "./lib/store.js";
+import {
+  state, applyTheme, loadAccount, loadFromAccount, adoptLocal, declineAdoption, isFresh,
+  settleStoredStreetFronts
+} from "./lib/store.js";
 import { announcement, signInUrl, signOut } from "./lib/api.js";
 import { beginSignIn } from "./lib/signIn.js";
 
@@ -134,6 +137,9 @@ export default {
     // Only after the answer: which document is in force depends on whether
     // there is an account behind this browser at all.
     await loadFromAccount();
+    // Plots stored before the street was read off the cadastre. Not awaited:
+    // the page stands without it, and each plot redraws when its answer lands.
+    settleStoredStreetFronts();
   },
   computed: {
     /** Two letters off the display name, for the round mark beside it. */

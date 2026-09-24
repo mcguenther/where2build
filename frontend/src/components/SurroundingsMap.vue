@@ -110,13 +110,17 @@ export default {
   beforeUnmount() { this.destroy(); },
   watch: {
     // A different plot is a different place: rebuild rather than pan.
-    "plot.id"() { this.rebuild(); },
+    "plot.id"() { this._userMoved = false; this.rebuild(); },
     // MapLibre cannot swap a style under its own custom layers, so a changed
     // palette is a rebuild. The camera is carried across it: a theme switch
     // must not throw away where the user had panned to.
     darkGround() { this.rebuild({ keepCamera: true }); },
-    located() { this.drawMarkers(); },
-    routedDestinations() { this.drawMarkers(); this.drawRoutes(); },
+    // The nearby answer arrives after the map has loaded and framed the bare
+    // plot at street scale, so the stops outside that first view were never
+    // on screen. Reframe when it lands -- unless the user has already moved
+    // the map, whose view is theirs from then on.
+    located() { this.drawMarkers(); this.reframe("nearby"); },
+    routedDestinations() { this.drawMarkers(); this.drawRoutes(); this.reframe("destinations"); },
     houseOutline() { this.setData("house", this.houseOutline); }
   },
   methods: {
@@ -157,7 +161,10 @@ export default {
           // that kept the camera has already been put back where it was.
           if (this._camera) this._camera = null;
           else this.frame();
+          this._framed = true;
         });
+        // Only a gesture carries an `originalEvent`; `fitBounds` does not.
+        this._map.on("movestart", e => { if (e.originalEvent) this._userMoved = true; });
         if (!this._resizes) {
           this._resizes = new ResizeObserver(() => this._map?.resize());
           this._resizes.observe(this.$refs.mapContainer);
@@ -183,6 +190,7 @@ export default {
       this._map = null;
       this._markers = [];
       this.ready = false;
+      this._framed = false;
       this.unavailable = null;
       this.$nextTick(() => this.build());
     },
@@ -190,6 +198,7 @@ export default {
       this._resizes?.disconnect();
       this._resizes = null;
       this.ready = false;
+      this._framed = false;
       (this._markers || []).forEach(m => m.remove());
       this._markers = [];
       this._map = null;
@@ -320,8 +329,14 @@ export default {
           .addTo(this._map);
       });
     },
+    reframe(framing) {
+      if (!this._framed || this.framing !== framing || this._userMoved) return;
+      this.ready = false;
+      this.frame();
+    },
     setFraming(framing) {
       this.framing = framing;
+      this._userMoved = false;
       this.ready = false;
       this.frame();
     },

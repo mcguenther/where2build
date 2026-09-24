@@ -10,6 +10,10 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 // The recorded run, verbatim: `?raw` keeps it the text a reader would see.
 import STREAM from "./fixtures/suche-grossbothen.ndjson?raw";
+// An ambiguous run, recorded on 23.09.2026 with the area rounded to „ca.
+// 1.100 m²": two parcels stand. Only its final event is kept -- the district
+// outlines of the earlier ones are a quarter megabyte the table never reads.
+import AMBIGUOUS from "./fixtures/suche-grossbothen-mehrdeutig.ndjson?raw";
 
 import {
   MIN_HALF_WIDTH_M, QUICK_MS, StepQueue, boundsOf, contains, contextOpacity,
@@ -582,6 +586,91 @@ describe("Die Suchansicht", () => {
 
     expect(map.props("highlighted")).toBeNull();
     expect(wrapper.find(".verlauf--gezeigt").exists()).toBe(false);
+  });
+
+  describe("bei mehreren Kandidaten", () => {
+    const outcome = JSON.parse(AMBIGUOUS.trim());
+
+    const openAmbiguous = async () => {
+      global.fetch = stubFetch(AMBIGUOUS);
+      const wrapper = mount(ParcelSearch, {
+        props: { query: { text: "x" }, paced: false },
+        global: { stubs: { EvidenceMap: true } }
+      });
+      await flushPromises();
+      await flushPromises();
+      const map = wrapper.findComponent({ name: "EvidenceMap" });
+      map.vm.focusCandidate = vi.fn();
+      return { wrapper, map };
+    };
+
+    it("ist ein mehrdeutiger Lauf mit zwei Flurstücken", () => {
+      expect(outcome.status).toBe("mehrdeutig");
+      expect(outcome.kandidaten).toHaveLength(2);
+    });
+
+    it("zeigt Kacheln statt einer Tabelle, jede mit ihrem Bild", async () => {
+      const { wrapper } = await openAmbiguous();
+
+      expect(wrapper.find("table.kandidaten").exists()).toBe(false);
+      const cards = wrapper.findAll(".vorschlag");
+      expect(cards).toHaveLength(2);
+      cards.forEach((card, i) => {
+        const props = outcome.kandidaten[i].properties;
+        expect(card.text()).toContain(props.flurstuecksnummer);
+        expect(card.text()).toContain(props.gemarkung);
+        expect(card.find(".vorschlag__bild svg path").attributes("d")).toMatch(/^M/);
+        // The photo and, this close in, the cadastre over it.
+        expect(card.findAll("image").some(i => i.attributes("href").includes("/dop/"))).toBe(true);
+        expect(card.findAll("image").some(i => i.attributes("href").includes("/liegenschaftskarte/"))).toBe(true);
+      });
+    });
+
+    it("wählt beim Klick auf das Kachelbild und schwenkt dorthin", async () => {
+      const { wrapper, map } = await openAmbiguous();
+      const second = outcome.kandidaten[1];
+
+      await wrapper.findAll(".vorschlag__bild")[1].trigger("click");
+
+      expect(map.vm.focusCandidate).toHaveBeenCalledTimes(1);
+      expect(map.vm.focusCandidate).toHaveBeenCalledWith(second.geometry);
+      expect(map.props("highlighted")).toEqual(second.geometry);
+      expect(map.props("shown")).toBe(second.id);
+      // The picture is where a parcel is recognised, so the click is the choice.
+      expect(map.props("chosen")).toBe(second.id);
+      const card = wrapper.findAll(".vorschlag")[1];
+      expect(card.classes()).toContain("vorschlag--gewaehlt");
+      expect(card.text()).toContain("Gewählt");
+    });
+
+    it("hat neben „Wählen“ einen Knopf, der nur dorthin schwenkt", async () => {
+      const { wrapper, map } = await openAmbiguous();
+      const card = wrapper.findAll(".vorschlag")[0];
+
+      await card.findAll("button").find(b => b.text() === "Zeigen").trigger("click");
+
+      expect(map.vm.focusCandidate).toHaveBeenCalledTimes(1);
+      expect(map.vm.focusCandidate).toHaveBeenCalledWith(outcome.kandidaten[0].geometry);
+      expect(map.props("chosen")).toBeNull();
+    });
+
+    it("wählt mit „Wählen“ und schwenkt dabei mit", async () => {
+      const { wrapper, map } = await openAmbiguous();
+      const card = wrapper.findAll(".vorschlag")[1];
+
+      await card.findAll("button").find(b => b.text() === "Wählen").trigger("click");
+
+      expect(map.props("chosen")).toBe(outcome.kandidaten[1].id);
+      expect(map.vm.focusCandidate).toHaveBeenCalledTimes(1);
+      expect(card.text()).toContain("Gewählt");
+      expect(card.classes()).toContain("vorschlag--gewaehlt");
+    });
+
+    it("nummeriert die Kacheln so, wie die Karte die Flurstücke beschriftet", async () => {
+      const { wrapper } = await openAmbiguous();
+
+      expect(wrapper.findAll(".vorschlag .kandidaten__marke").map(m => m.text())).toEqual(["1", "2"]);
+    });
   });
 
   it("sucht erneut, wenn ein Indiz abgewählt wird", async () => {
