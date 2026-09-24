@@ -38,6 +38,26 @@ of Overpass or a local extract, the listing portals, and the extraction model.
 - **kleinanzeigen.de carries `og:latitude`/`og:longitude`** in its meta tags —
   parse those instead of geocoding, and skip the model call entirely.
 
+- **ohne-makler.net serves the whole exposé to a plain `GET`, and its
+  `og:description` is boilerplate.** Measured 24.09.2026 on the eight plots
+  under `/immobilien/grundstueck-kaufen/sachsen/`: HTTP 200, ~300 kB each, no
+  challenge. The meta description is the same ~100 characters on every one
+  („Wohnen in Brandis von privat zu verkaufen || jetzt Grundstück provisionsfrei
+  auf ohne-makler verkaufen"), so a page whose prose is not found hands the
+  search nothing it can read a place out of. The prose has no id and no
+  `itemprop`, only the class `prose` — and that class stands on up to **three**
+  blocks: the seller's text, then „Lage" and „Sonstiges", each under an `<h2>`.
+  On all eight the seller's block is the one directly inside a bare
+  `<div class="mb-8">` and holds only `<p>`; `parse_description` anchors on
+  that. The „Lage" block must stay out: on 493995, a plot in Brandis, it names
+  „Bahnhöfe Beucha und Gerichshain" — two neighbouring Gemarkungen. What the
+  seller's block is worth: 452309 is nothing but „Flurstuecksnummern 57/12 mit
+  728 m² 57/2 mit 734 m² Gemarkungsschluessel 110" and a Bodenrichtwert, none
+  of which `og:description` shows. No coordinate anywhere,
+  and the JSON-LD is the portal's own `Organization` in Reinbek (see
+  `parcel-search.md`). Recorded, scrubbed:
+  `backend/tests/fixtures/inserat-ohne-makler-brandis.html`.
+
 - **The authority services DO send CORS headers** — checked with `GET` and an
   `Origin` header on 2026-08-29: the ALKIS WFS, the GeoSN WMS layers and the
   BORIS WMS all answer with `Access-Control-Allow-Origin`. The pre-project note

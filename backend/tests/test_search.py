@@ -1518,6 +1518,73 @@ def test_the_recorded_page_carries_nobody_s_contact_details():
     assert not re.search(r"[\w.+-]+@[\w-]+\.(?:de|com)\b", page)
 
 
+# --------------------------------------------------------------------------
+# ohne-makler.net: the seller's text in a `prose` block among three
+# --------------------------------------------------------------------------
+
+BRANDIS_PAGE = "inserat-ohne-makler-brandis.html"
+BRANDIS_URL = "https://www.ohne-makler.net/immobilie/493995/"
+
+
+def test_the_recorded_ohne_makler_page_carries_nobody_s_contact_details():
+    page = fixture_text(BRANDIS_PAGE)
+
+    assert "040 781 0206 10" not in page
+    assert "tel:" not in page
+    assert "g7T1VotV37X8aJtjMrCIh8xd9Q3WLp2BpB5GfabGnoNOeZ6NaPrSaqAmL1U3iuRn" not in page
+    assert "MoNehaWG0KWNhWNXRQmleg" not in page
+    assert "utm_" not in page
+    for tracker in ("1061463388", "968779218682374", "K8SuxcrSoYRMZNHy6kcFmr", "5712219"):
+        assert tracker not in page, tracker
+    assert not re.search(r'csrfmiddlewaretoken" value="[^\[]', page)
+    # The form's placeholder („ihre@mail-adresse.de") is the only address left.
+    addresses = set(re.findall(r"[\w.+-]+@[\w-]+\.(?:de|com|net)\b", page))
+    assert addresses <= {"ihre@mail-adresse.de"}
+
+
+def test_the_ohne_makler_description_is_the_seller_s_text():
+    """Without the pattern the search got `og:description` -- 104 characters of
+    „Wohnen in Brandis von privat zu verkaufen || …", the same on every plot."""
+
+    from app.services.portals import parse_page
+
+    seite = parse_page(BRANDIS_URL, fixture_text(BRANDIS_PAGE))
+    text = seite.beschreibung
+
+    assert text != seite.meta["og:description"]
+    assert text.startswith("Traumgrundstück in Brandis!")
+    assert "Ein 514 m² großes, teilerschlossenes Baugrundstück" in text
+    assert text.endswith("Gern senden wir Ihnen auf Anfrage ein detailliertes Exposé.")
+    assert "<" not in text
+
+
+def test_the_ohne_makler_location_and_closing_blocks_stay_out():
+    """„Lage" names the neighbouring villages, „Sonstiges" is the sales pitch.
+
+    Both are `prose` blocks of the same class; read as the listing's text, the
+    Lage block hands the search Beucha and Gerichshain for a plot in Brandis.
+    """
+
+    from app.services.portals import parse_description
+
+    page = fixture_text(BRANDIS_PAGE)
+    text = parse_description(page)
+
+    assert "Gerichshain" not in text
+    assert "Lebensqualität pur" not in text
+    assert "Rundum-Sorglos-Paket" not in text
+    assert "Makleranfragen" not in text
+
+    # Without the seller's block, the others must not step up in its place.
+    start = page.index('<div class="mb-8">\n\t\t\t\t\t\t<div class="prose')
+    end = page.index("</div>", start)
+    without = page[:start] + page[end:]
+    assert "Traumgrundstück in Brandis!" not in without
+    found = parse_description(without) or ""
+    assert "Gerichshain" not in found
+    assert "Rundum-Sorglos-Paket" not in found
+
+
 @_needs_tesseract
 def test_a_flurkarte_without_a_title_gives_up_the_number_inside_its_red_frame():
     """„Titel: Flurkarte“, „Untertitel:“ blank — no labelled number anywhere.

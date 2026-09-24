@@ -70,8 +70,20 @@ _TAG_PATTERN = re.compile(r"<[^>]+>")
 # matter („Ortsteil Plagwitz von Machern", „1.489 m²") sit in a paragraph of
 # their own that is trivially findable. The generic fallbacks cover portals
 # whose markup is not known here.
+#
+# ohne-makler.net has no id and no itemprop, only Tailwind classes, and the
+# class it uses -- `prose` -- stands on three blocks: the seller's text, then
+# „Lage" and „Sonstiges" under headings of their own. Measured on eight Saxon
+# exposés 24.09.2026: the seller's block is the only one in a bare
+# `<div class="mb-8">`, the others follow an `<h2>`. The „Lage" block is the
+# portal's location blurb and names the neighbouring villages („Bahnhöfe
+# Beucha und Gerichshain" on a plot in Brandis), so it must not be read as the
+# listing's own statement. The block holds only `<p>`, so the first `</div>`
+# closes it.
 _DESCRIPTION_PATTERNS = (
     re.compile(r'id="viewad-description-text"[^>]*>(.*?)</p>', re.IGNORECASE | re.DOTALL),
+    re.compile(r'<div class="mb-8">\s*<div class="prose\b[^"]*">(.*?)</div>',
+               re.IGNORECASE | re.DOTALL),
     re.compile(r'itemprop="description"[^>]*>(.*?)</(?:div|p|section)>', re.IGNORECASE | re.DOTALL),
     re.compile(r'class="[^"]*\bdescription\b[^"]*"[^>]*>(.*?)</(?:div|p|section)>',
                re.IGNORECASE | re.DOTALL),
