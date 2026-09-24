@@ -71,9 +71,10 @@ NOISE_LAYERS: dict[str, dict[str, int]] = {
     "tag": {"strasse": 4, "strassenbahn": 55, "flughafen": 37},
     "nacht": {"strasse": 5, "strassenbahn": 56, "flughafen": 36},
 }
-# The lowest band the road survey holds. Its own legend starts at 50-54, but
-# the data carries Lden4549 as well -- so "inside the mapped area and in no
-# band" is demonstrably below 45 dB(A), not below 50.
+# The lowest band the road survey holds anywhere. It proves nothing about a
+# plot in no band: Lden4549 exists only around Zwickau (4 266 polygons, all
+# inside 12.42-12.57 E, 50.65-50.80 N, measured 24.09.2026), and the survey
+# maps main roads only, so the street in front of such a plot is not in it.
 NOISE_LOWEST_BAND_DB = 45
 NOISE_SOURCE = "LfULG Umgebungslärmkartierung (Sachsen), Flurstücksumring"
 
@@ -276,11 +277,11 @@ class LuisService:
     async def _noise(self, ring) -> Laerm:
         """Noise, with the coverage question asked separately.
 
-        Three outcomes, not two. A hit gives the bands. No hit inside a mapped
-        area is demonstrably below the lowest band. No mapping at all is no
-        statement -- the plot is not quiet, it is unsurveyed, and a green light
-        there would be a lie. Measured: 109 road-noise polygons within 300 m in
-        Leipzig, 94 in Dresden, and 0 in Geithain with its 6 000 inhabitants.
+        A hit gives the bands. No hit is no value, whether or not the survey
+        mapped something within the radius -- the radius only says how far the
+        nearest mapped main road is. Measured: 109 road-noise polygons within
+        300 m in Leipzig, 94 in Dresden, 0 in Geithain, and for the
+        Bahnhofstraße in Naunhof none within 300 m but 30 within 2 km.
         """
 
         async def bands(period: str, source: str, layer: int) -> tuple[str, str, list[str]]:

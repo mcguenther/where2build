@@ -249,13 +249,18 @@ of Overpass or a local extract, the listing portals, and the extraction model.
   (`Lden5559` → "55–59 dB(A)"), never a single figure — "57 dB" would be
   invented.
 
-- **"No noise value" is not "quiet".** Umgebungslärm mapping is limited to
-  agglomerations and major routes: road-noise polygons within 300 m number 109
-  in Leipzig and 94 in Dresden, but **0 in Geithain** (6 000 inhabitants) and 0
-  in a village. So three outcomes, not two — a hit gives the range; no hit but
-  polygons within 2 km means below the lowest mapped band (< 45 dB(A)); nothing
-  within 2 km means "not mapped here", with no value and no colour. The
-  `Kartierungsgebiet` layer cannot serve as that mask: it is a polyline of
+- **"No noise value" is not "quiet" — not even with mapped roads nearby.**
+  The state survey is `Hauptverkehrsstraßen` (layer 3/4/5), the tram in
+  Leipzig, Dresden and Chemnitz, and the two airports; side streets are in none
+  of it. Road-noise polygons within 300 m number 109 in Leipzig and 94 in
+  Dresden, but 0 in Geithain, and the Bahnhofstraße in Naunhof has none within
+  300 m and 30 within 2 km — which the first version read as "below the lowest
+  band, 45 dB(A)" and showed in green. That was wrong twice: the plot's own
+  street is not surveyed, and `Lden4549` exists only around Zwickau (4 266
+  polygons inside 12.42–12.57 E, 50.65–50.80 N); everywhere else the lowest
+  band is 50–54. So a plot in no band is `note`, "keine Lärmdaten", mapped
+  surroundings or not, and the location map greys out and says so. The
+  `Kartierungsgebiet` layer cannot serve as a mask either: it is a polyline of
   4 637 mapped road segments carrying traffic counts, so a point query never
   hits it.
 
@@ -306,10 +311,10 @@ of Overpass or a local extract, the listing portals, and the extraction model.
 - **The noise layer's data and its own legend disagree at the bottom band.**
   `returnDistinctValues` on layer 4 gives seven categories including
   `Lden4549`; the renderer of that same layer has six, starting at
-  `Lden5054`. So the survey has measured 45 to 49 dB(A) and draws nothing for
-  it. The check text therefore reads the *data* ("below 45 dB(A)" is provable
-  inside a mapped area) and the map key shows the *drawn* bands from 50, saying
-  so. The six colours come from the renderer, not from taste.
+  `Lden5054`. The 45–49 band is Zwickau's alone (see above), so it is read
+  when a plot sits in it and never used to promise a floor anywhere else. The
+  map key shows the *drawn* bands from 50, saying so. The six colours come from
+  the renderer, not from taste.
 
 - **The `minScale` dpi clamp holds at every zoom, so the noise layer needs no
   minimum zoom.** Measured on real 256 px tiles over Mölkau:

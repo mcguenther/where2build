@@ -352,7 +352,7 @@
       <div class="page-head">
         <div>
           <p class="eyebrow">Standort</p>
-          <h2>Was am Grundstück gilt</h2>
+          <h2>Was der Standort mitbringt</h2>
           <p class="page-head__sub">
             Lärm, Hochwasser, Radon, Trinkwasserschutz, Schutzgebiete, Hangneigung, Baugrund
             und Luftqualität, gefragt mit dem Umriss des Flurstücks, nicht mit einem Punkt.
@@ -385,12 +385,24 @@
             </span>
           </div>
 
-          <!-- No house: this map is about the ground, and a footprint would be
-               the loudest thing on it. -->
-          <SitePlan :plot="plot" :building="null" :show-building="false" navigable cooperative
-                    :backdrop="locationBackdrop" :overlay="locationOverlay" north-up
-                    :show-dimensions="false" :show-setbacks="false"
-                    :width="600" :height="470" />
+          <!-- Where the survey has no value for the plot, a map without colour
+               on it reads as quiet. So it goes grey and says so; switching the
+               layer on brings the colour back, to show where the mapped roads
+               are. -->
+          <p v-if="noiseMissing" class="location__no-noise" role="note">
+            <strong>Keine Lärmwerte am Grundstück</strong>
+            Kartiert sind nur Hauptverkehrsstraßen, Straßenbahn und Flughäfen. Ruhig ist es
+            deshalb nicht unbedingt.
+          </p>
+          <div class="location__frame"
+               :class="{ 'location__frame--no-noise': noiseMissing && !locationOverlay }">
+            <!-- No house: this map is about the ground, and a footprint would be
+                 the loudest thing on it. -->
+            <SitePlan :plot="plot" :building="null" :show-building="false" navigable cooperative
+                      :backdrop="locationBackdrop" :overlay="locationOverlay" north-up
+                      :show-dimensions="false" :show-setbacks="false"
+                      :width="600" :height="470" />
+          </div>
           <p class="location__hint no-print">
             Ziehen verschiebt den Ausschnitt, Strg und Mausrad zoomen, ein Doppelklick
             stellt ihn zurück.
@@ -404,9 +416,9 @@
               </li>
             </ul>
             <p class="key__note">
-              Die Karte zeichnet erst ab 50 dB(A). Das Band 45–49 dB(A) steckt in den Daten
-              und hat in der amtlichen Darstellung keine Farbe; die Prüfung liest die Daten,
-              nicht das Bild.
+              Die Karte zeichnet erst ab 50 dB(A), und sie kennt nur Hauptverkehrsstraßen, die
+              Straßenbahn in Leipzig, Dresden und Chemnitz und die Flughäfen. Wo keine Farbe
+              liegt, fehlt der Wert; leise heißt das nicht.
             </p>
           </div>
 
@@ -509,7 +521,7 @@ import { reachability, neighbourBuildings as fetchNeighbourBuildings } from "../
 import { zubringerOf, fastestMode, coordinatesOf, MODES } from "../lib/routes.js";
 import { toLocal } from "../lib/projection.js";
 import { NOISE_BANDS } from "../lib/basemap.js";
-import { noiseMapped } from "../lib/siteChecks.js";
+import { noiseOnPlot } from "../lib/siteChecks.js";
 import { plotMetrics } from "../lib/metrics.js";
 import {
   polygonEdges, edgeCompass, buildableArea, cornersOutside, smallestSetback,
@@ -562,8 +574,8 @@ export default {
       /* The location map keeps its own ground: it is a second map with another
          job, and switching the plan to the aerial must not switch this one. */
       locationBackdrop: "map",
-      /** On by default, and off again once the checks say there is nothing
-       *  for it to draw — unless somebody chose it by hand. */
+      /** On by default, and off again once the checks say the plot sits in no
+       *  band — unless somebody chose it by hand. */
       locationOverlay: "laerm",
       noiseChosen: false,
       locationBackdrops: [
@@ -672,6 +684,8 @@ export default {
       return Math.max(m.width, m.height) / Math.min(m.width, m.height);
     },
     noiseBands() { return NOISE_BANDS.laerm; },
+    /** Only once the checks have answered: before that, nothing is known. */
+    noiseMissing() { return noiseOnPlot(this.siteCheckResult) === false; },
     /** Only worth a sentence when the two areas actually differ. */
     conversionNeeded() {
       const reference = this.plot?.brwReferencePlotArea;
@@ -799,7 +813,7 @@ export default {
     },
     checksLoaded(result) {
       this.siteCheckResult = result;
-      if (!this.noiseChosen) this.locationOverlay = noiseMapped(result) ? "laerm" : null;
+      if (!this.noiseChosen) this.locationOverlay = noiseOnPlot(result) === false ? null : "laerm";
     },
 
     toggleMeasuring() {
@@ -997,6 +1011,13 @@ export default {
 @media (max-width: 1000px){ .location{ grid-template-columns: 1fr; } }
 .location__map{ position: sticky; top: var(--w2b-space-3); }
 @media (max-width: 1000px){ .location__map{ position: static; } }
+.location__frame--no-noise :deep(.site-plan-shell){ filter: grayscale(1); opacity: .55; }
+.location__no-noise{
+  margin: var(--w2b-space-3); padding: var(--w2b-space-2) var(--w2b-space-3);
+  background: var(--w2b-warning-surface); border-left: 4px solid var(--w2b-warning);
+  border-radius: var(--w2b-radius-s); font-size: var(--w2b-text-s); line-height: 1.4;
+}
+.location__no-noise strong{ display: block; }
 .location__layer{ display: inline-flex; align-items: center; gap: 6px; }
 .location__hint{
   margin: 0; padding: 6px var(--w2b-space-3);
