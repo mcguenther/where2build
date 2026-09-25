@@ -307,6 +307,59 @@ kbd{font:12px var(--f-mono);border:1px solid var(--line);border-bottom-width:2px
   .mini .reihe i{height:26px}
 }
 .aus-tab td:nth-child(2){white-space:normal}
+
+/* ---------- start page frames ---------- */
+.rahmen-reihe{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,500px),1fr));gap:20px;margin-top:22px}
+.rahmen-fig{margin:0;display:flex;flex-direction:column;gap:10px;min-width:0}
+.rahmen-fig figcaption{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font:700 16px var(--f-display)}
+.rahmen-fig figcaption .tag{margin-left:auto}
+.rahmen{position:relative;height:520px;overflow:hidden;border:1px solid var(--line);border-radius:14px;background:var(--paper);box-shadow:var(--shadow)}
+.rahmen.rahmen-paar{height:auto}
+.r-kopf{display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--surface);border-bottom:1px solid var(--line);font:700 14px var(--f-display)}
+.r-logo{width:18px;height:18px;border-radius:4px;border:2px solid var(--primary);background:linear-gradient(135deg,var(--brass) 55%,transparent 55%)}
+.r-held{padding:22px 22px 18px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;background:linear-gradient(var(--surface),var(--paper))}
+.r-eyebrow{font:600 9.5px var(--f-display);letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.r-h1{font:700 26px/1.08 var(--f-display);letter-spacing:-.02em;max-width:16em}
+.r-h1.klein{font-size:19px}
+.r-h1 em{font-style:normal;color:var(--primary)}
+.r-sub{font-size:13px;color:var(--graphite);max-width:30em}
+.r-panel{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:left;display:flex;flex-direction:column;gap:8px}
+.r-feld{min-height:46px;padding:5px 5px 5px 12px}
+.r-feld .text{font-size:14.5px}
+.r-feld .btn{padding:8px 12px;font-size:13px;width:auto!important}
+.r-liste{margin:0}
+.r-liste.im-fluss{box-shadow:none}
+.r-liste.schwebt{position:absolute;left:10px;right:10px;top:60px;z-index:3}
+.r-chips{display:flex;flex-wrap:wrap;justify-content:center;gap:5px;padding:4px 0;position:relative}
+.r-chips i{width:62px;height:18px;border-radius:999px;border:1px solid var(--line);background:var(--surface)}
+.r-chips i:nth-child(3n){width:90px}
+.r-hinweis{font-size:12.5px;color:var(--muted);text-align:center;padding:4px 0}
+.r-feat{display:flex;flex-wrap:wrap;justify-content:center;gap:6px 16px;font:600 12px var(--f-display);color:var(--graphite)}
+.r-feat.senk{flex-direction:column;align-items:center}
+.verschoben{outline:1.5px dashed var(--error);outline-offset:3px;border-radius:6px}
+.pfeil{position:absolute;right:6px;top:-11px;z-index:4;font:600 11px var(--f-display);color:var(--error);background:var(--error-surface);border-radius:999px;padding:2px 8px;white-space:nowrap}
+.geist{position:absolute;left:10px;right:10px;top:62px;height:30px;border:1.5px dashed var(--error);border-radius:8px;display:grid;place-items:center;pointer-events:none;z-index:2}
+.geist span{font:600 10.5px var(--f-display);color:var(--error);letter-spacing:.04em;background:var(--error-surface);border-radius:999px;padding:1px 8px}
+.r-feld,.r-liste.im-fluss{position:relative;z-index:1}
+.r-platz{height:150px;border-radius:10px;border:1px dashed var(--line);overflow:hidden}
+.r-platz-leer{height:100%;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:4px;font-size:12.5px;color:var(--muted)}
+.r-platz-leer b{font:600 10px var(--f-display);letter-spacing:.12em;text-transform:uppercase}
+.r-trenn{font:600 10.5px var(--f-display);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);text-align:center;padding:6px;border-top:1px dashed var(--line);border-bottom:1px dashed var(--line);background:var(--sunken)}
+.telefone{display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap}
+.rahmen.tel{width:210px;height:420px;border-radius:22px}
+.rahmen.tel .r-held{padding:16px 12px}
+.rahmen.tel .r-feld .text{font-size:13px}
+.tel-pfeil{font:600 12px var(--f-display);color:var(--muted)}
+.blatt{background:var(--surface);padding:12px 10px}
+.blatt-kopf{display:flex;justify-content:flex-end;margin-bottom:8px;font-size:12px}
+.blatt .marke{font-size:9.5px;padding:2px 5px 2px 7px}
+.tastatur{position:absolute;left:0;right:0;bottom:0;height:120px;background:repeating-linear-gradient(90deg,var(--sunken) 0 16px,var(--line-faint) 16px 18px),var(--sunken);border-top:1px solid var(--line);opacity:.9}
+/* map preview under a coordinate pill */
+@media (max-width:460px){.r-feld{flex-wrap:nowrap!important}.r-feld .btn{display:none}.r-held{padding:16px 12px}}
+.kartenvorschau{position:relative;height:150px;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:var(--map-ground)}
+.kartenvorschau svg{width:100%;height:100%;display:block}
+.kartenvorschau .kv-leiste{position:absolute;left:8px;right:8px;bottom:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.kartenvorschau .kv-leiste .wert{background:var(--surface);box-shadow:var(--shadow)}
 </style>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -324,10 +377,10 @@ kbd{font:12px var(--f-mono);border:1px solid var(--line);border-bottom-width:2px
 
 <header class="kopf">
   <div>
-    <div class="eyebrow">Mockup · Suchfeld · zweite Runde</div>
+    <div class="eyebrow">Mockup · Suchfeld · dritte Runde</div>
     <h1>Was im Feld steht, <em>ohne</em> es lesen zu müssen</h1>
     <p class="lead">Eine Adresse ist im Feld gut aufgehoben: kurz, lesbar, überprüfbar. Ein Link zur Anzeige, eine eingefügte Anzeigenseite oder ein Beschreibungstext sind es nicht. Diese Seite sammelt für jeden Eingabetyp mehrere Arten, ihn darzustellen, und legt fest, <b>wann</b> aus getipptem Text ein Block wird.</p>
-    <p class="lead" style="font-size:14.5px;margin-top:10px">Neu in dieser Runde: die Lesart steht bei <em>jedem</em> Typ an derselben Stelle · Eingaben in beiden Reihenfolgen (erst Nummer, dann Gemarkung) · Varianten nummeriert statt mit Buchstaben · eine Miniatur der eingefügten Anzeigenseite.</p>
+    <p class="lead" style="font-size:14.5px;margin-top:10px">Neu in Runde drei: die Startseite mit aufgeklappter Liste (0) · Karte unter der Koordinate (3.2). Aus Runde zwei: die Lesart steht bei <em>jedem</em> Typ an derselben Stelle · Eingaben in beiden Reihenfolgen (erst Nummer, dann Gemarkung) · Varianten nummeriert statt mit Buchstaben · eine Miniatur der eingefügten Anzeigenseite.</p>
   </div>
   <div class="theme" role="group" aria-label="Farbschema">
     <button type="button" data-t="light">Hell</button>
@@ -337,6 +390,7 @@ kbd{font:12px var(--f-mono);border:1px solid var(--line);border-bottom-width:2px
 </header>
 
 <nav class="inhalt" aria-label="Inhalt">
+  <a href="#start">0 · Startseite</a>
   <a href="#bausteine">Bausteine</a>
   <a href="#lesart">Die Lesart-Marke</a>
   <a href="#block">Wann wird Text zum Block?</a>
@@ -352,7 +406,108 @@ kbd{font:12px var(--f-mono);border:1px solid var(--line);border-bottom-width:2px
 </nav>
 
 <!-- ============================================================ -->
-<section id="bausteine">
+<section class="typ" id="start" style="margin-top:8px">
+  <div class="typ-kopf"><span class="nr">00</span><h2>Startseite: was passiert, wenn die Liste aufklappt?</h2>
+    <p>Heute liegt die Vorschlagsliste <b>im Fluss</b> der Seite (<span class="mono">PlotSearch.vue</span>, <span class="mono">.search__hits</span>). Der Grund steht im Code: Eine schwebende Liste wurde vom Rahmen des Suchfelds abgeschnitten – <span class="mono">.panel</span> hat <span class="mono">overflow: hidden</span>, damit Kartenflächen die runden Ecken nicht überdecken. Die Folge: Beim Tippen schiebt die Liste alles darunter nach unten, bis zu ihrer Höchsthöhe von <span class="mono">19rem</span> (≈ 304 px), und bei jedem neuen Treffer ein Stück weiter. Genau dieses Ruckeln soll weg.</p></div>
+
+  <div class="rahmen-reihe">
+    <figure class="rahmen-fig">
+      <figcaption><span class="vnr">0.1</span><b>Heute: Liste im Fluss</b><span class="tag alt" style="background:var(--error-surface);color:var(--error);border-color:transparent">Ruckelt</span></figcaption>
+      <div class="rahmen">
+        <div class="r-kopf"><span class="r-logo"></span>where2build</div>
+        <div class="r-held">
+          <div class="r-eyebrow">Grundstück finden, Haus planen</div>
+          <div class="r-h1">Aus einer Anzeige wird ein <em>geprüftes Grundstück.</em></div>
+          <div class="r-sub">Link zur Anzeige, Adresse oder Flurstück eingeben und alles Wichtige zum Grundstück erhalten.</div>
+          <div class="r-panel" style="position:relative">
+            <div class="geist"><span>hier standen die Chips</span></div>
+            <div class="feld fokus r-feld"><svg class="lupe"><use href="#lupe"/></svg><span class="text">Lessingw<span class="caret"></span></span><button class="btn">Finden</button></div>
+            <div class="liste r-liste im-fluss"><div class="zeile an"><b>Lessingweg</b><span>Leipzig</span></div><div class="zeile"><b>Lessingweg</b><span>Markkleeberg</span></div><div class="zeile"><b>Lessingweg</b><span>Radebeul</span></div><div class="zeile"><b>Lessingweg</b><span>Zwickau</span></div></div>
+            <div class="r-chips verschoben"><span class="pfeil">↓ um die Listenhöhe verschoben</span><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          </div>
+          <div class="r-feat verschoben"><span>≡ Amtliche Flurstücke</span><span>§ Bodenrichtwert</span><span>◷ Wege nach Fahrplan</span></div>
+        </div>
+      </div>
+      <p class="cap">Chips, Merkmale und alles darunter springen nach unten, wenn die Liste erscheint, wächst oder verschwindet.</p>
+    </figure>
+
+    <figure class="rahmen-fig">
+      <figcaption><span class="vnr">0.2</span><b>Liste überlagert</b><span class="tag">Empfohlen</span></figcaption>
+      <div class="rahmen">
+        <div class="r-kopf"><span class="r-logo"></span>where2build</div>
+        <div class="r-held">
+          <div class="r-eyebrow">Grundstück finden, Haus planen</div>
+          <div class="r-h1">Aus einer Anzeige wird ein <em>geprüftes Grundstück.</em></div>
+          <div class="r-sub">Link zur Anzeige, Adresse oder Flurstück eingeben und alles Wichtige zum Grundstück erhalten.</div>
+          <div class="r-panel" style="position:relative">
+            <div class="feld fokus r-feld"><svg class="lupe"><use href="#lupe"/></svg><span class="text">Lessingw<span class="caret"></span></span><button class="marke">Adresse</button><button class="btn">Finden</button></div>
+            <div class="liste r-liste schwebt"><div class="zeile an"><b>Lessingweg</b><span>Leipzig</span></div><div class="zeile"><b>Lessingweg</b><span>Markkleeberg</span></div><div class="zeile"><b>Lessingweg</b><span>Radebeul</span></div><div class="zeile"><b>Lessingweg</b><span>Zwickau</span></div></div>
+            <div class="r-hinweis">Zum Beispiel <span class="mono">Lessingweg 44</span> · <span class="mono">Mölkau 204/3</span> · einen Link einfügen</div>
+          </div>
+          <div class="r-feat"><span>≡ Amtliche Flurstücke</span><span>§ Bodenrichtwert</span><span>◷ Wege nach Fahrplan</span></div>
+        </div>
+      </div>
+      <p class="cap">Die Liste liegt als Ebene über Hinweis und Merkmalen, mit Schatten. Darunter bewegt sich nichts. Was sie verdeckt, braucht man beim Tippen nicht.</p>
+    </figure>
+
+    <figure class="rahmen-fig">
+      <figcaption><span class="vnr">0.3</span><b>Fester Platz unter dem Feld</b></figcaption>
+      <div class="rahmen rahmen-paar">
+        <div class="r-kopf"><span class="r-logo"></span>where2build</div>
+        <div class="r-held">
+          <div class="r-h1 klein">Aus einer Anzeige wird ein <em>geprüftes Grundstück.</em></div>
+          <div class="r-panel">
+            <div class="feld r-feld"><svg class="lupe"><use href="#lupe"/></svg><span class="text leer">Adresse, Flurstück, Link …</span><button class="btn aus">Finden</button></div>
+            <div class="r-platz"><div class="r-platz-leer"><b>Zum Beispiel</b><span class="mono">Lessingweg 44</span><span class="mono">Mölkau 204/3</span><span>einen Link zur Anzeige einfügen</span></div></div>
+          </div>
+          <div class="r-feat"><span>≡ Amtliche Flurstücke</span><span>§ Bodenrichtwert</span></div>
+        </div>
+        <div class="r-trenn">beim Tippen</div>
+        <div class="r-held">
+          <div class="r-h1 klein">Aus einer Anzeige wird ein <em>geprüftes Grundstück.</em></div>
+          <div class="r-panel">
+            <div class="feld fokus r-feld"><svg class="lupe"><use href="#lupe"/></svg><span class="text">Lessingw<span class="caret"></span></span><button class="marke">Adresse</button></div>
+            <div class="r-platz"><div class="liste" style="margin:0;box-shadow:none"><div class="zeile an"><b>Lessingweg</b><span>Leipzig</span></div><div class="zeile"><b>Lessingweg</b><span>Markkleeberg</span></div><div class="zeile"><b>Lessingweg</b><span>Radebeul</span></div></div></div>
+          </div>
+          <div class="r-feat"><span>≡ Amtliche Flurstücke</span><span>§ Bodenrichtwert</span></div>
+        </div>
+      </div>
+      <p class="cap">Unter dem Feld ist immer gleich viel Platz: leer zeigt er Beispiele, beim Tippen die Liste, nach dem Einfügen die Vorschau (4.2, 5.3). Die Seite hat in jedem Zustand dieselbe Höhe.</p>
+    </figure>
+
+    <figure class="rahmen-fig">
+      <figcaption><span class="vnr">0.4</span><b>Telefon: Suchblatt</b></figcaption>
+      <div class="telefone">
+        <div class="rahmen tel">
+          <div class="r-kopf"><span class="r-logo"></span>where2build</div>
+          <div class="r-held">
+            <div class="r-h1 klein">Aus einer Anzeige wird ein <em>geprüftes Grundstück.</em></div>
+            <div class="feld r-feld"><svg class="lupe"><use href="#lupe"/></svg><span class="text leer">Adresse, Flurstück …</span></div>
+            <div class="r-feat senk"><span>≡ Amtliche Flurstücke</span><span>§ Bodenrichtwert</span><span>◷ Wege nach Fahrplan</span></div>
+          </div>
+        </div>
+        <div class="tel-pfeil">Tippen ins Feld →</div>
+        <div class="rahmen tel blatt">
+          <div class="blatt-kopf"><span class="lk">Abbrechen</span></div>
+          <div class="feld fokus r-feld"><svg class="lupe"><use href="#lupe"/></svg><span class="text">Lessingw<span class="caret"></span></span><button class="marke">Adresse</button></div>
+          <div class="liste" style="margin:8px 0 0;box-shadow:none"><div class="zeile an"><b>Lessingweg</b><span>Leipzig</span></div><div class="zeile"><b>Lessingweg</b><span>Markkleeberg</span></div><div class="zeile"><b>Lessingweg</b><span>Radebeul</span></div><div class="zeile"><b>Lessingweg</b><span>Zwickau</span></div></div>
+          <div class="tastatur"></div>
+        </div>
+      </div>
+      <p class="cap">Auf 390 px ist neben Tastatur und Liste kein Platz für die Seite. Das Feld rückt als eigenes Blatt nach oben, die Seite dahinter bleibt stehen, wo sie war.</p>
+    </figure>
+  </div>
+
+  <div class="regeln">
+    <div class="regel"><b>Was flüchtig ist, schwebt</b>Vorschlagsliste und Lesarten-Menü sind da, solange man tippt, und dann wieder weg. Sie dürfen nichts verschieben – sie liegen darüber (0.2) oder auf eigenem Blatt (0.4).</div>
+    <div class="regel"><b>Was bleibt, hat seinen Platz schon</b>Die Vorschau nach dem Einfügen (Karte bei 3.2, Anzeige bei 4.2, Miniatur bei 5.3) bleibt stehen. Sie gehört in einen Platz, der vorher schon da war (0.3), oder sie kommt nach einer Handlung, die man erwartet: Einfügen, <kbd>Enter</kbd>.</div>
+    <div class="regel"><b>Das Abschneiden anders lösen</b>Der Grund für die Liste im Fluss war <span class="mono">overflow: hidden</span> am <span class="mono">.panel</span>. Auf der Startseite liegt in dem Rahmen keine Karte, also braucht er es dort nicht. Allgemein hilft eine Liste in der obersten Ebene des Browsers (Popover), die kein Vorfahre abschneiden kann.</div>
+    <div class="regel"><b>Die Liste wächst nach unten, nie nach oben</b>Kommen Flurstückstreffer nach den Adressen an, wächst die schwebende Liste bis <span class="mono">19rem</span> und scrollt dann in sich. Oben bleibt die Zeile unter dem Mauszeiger, wo sie ist.</div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="bausteine" style="margin-top:64px">
   <div class="eyebrow">Fünf Darstellungen</div>
   <h2 style="font-size:26px;margin-top:8px">Aus diesen setzen sich alle Varianten zusammen</h2>
   <p class="cap" style="font-size:14px;margin-top:6px">Die Buchstaben benennen nur die Darstellung. Die Varianten unten sind je Typ nummeriert (5.1, 5.2 …) und tragen ihren Baustein als Etikett.</p>
@@ -560,8 +715,8 @@ kbd{font:12px var(--f-mono);border:1px solid var(--line);border-bottom-width:2px
     <div class="beispiel">51.33652, 12.44176</div></div>
   <div class="varianten">
 
-    <article class="var empfohlen">
-      <div class="var-kopf"><span class="vnr">3.1</span><h3>Pille mit Kartenausschnitt</h3><span class="bs">Baustein B</span><span class="tag">Empfohlen</span></div>
+    <article class="var">
+      <div class="var-kopf"><span class="vnr">3.1</span><h3>Pille mit Kartenausschnitt</h3><span class="bs">Baustein B</span></div>
       <div class="buehne">
         <div class="feld"><svg class="lupe"><use href="#lupe"/></svg>
           <span class="pille gross"><span class="ic foto" style="background:var(--map-ground)"><svg viewBox="0 0 30 24"><path d="M0 15 30 11" stroke="var(--map-street)" stroke-width="4"/><path d="M4 2h9v8H4zM17 1h10v7H17zM3 17h8v7H3zM18 16h9v8h-9z" fill="var(--map-surface)" stroke="var(--map-neighbour)" stroke-width=".6"/><circle cx="15" cy="12.5" r="2.6" fill="var(--primary)" stroke="#fff" stroke-width="1"/></svg></span><span class="lbl mono" style="font-size:13px">51,33652° N · 12,44176° O</span><button class="x" aria-label="Entfernen">✕</button></span>
@@ -571,8 +726,36 @@ kbd{font:12px var(--f-mono);border:1px solid var(--line);border-bottom-width:2px
         <div class="minus"><h4>Schwächen</h4><ul><li>Ausschnitt braucht eine Kachel, bevor gesucht ist</li></ul></div></div>
     </article>
 
+        <article class="var empfohlen">
+      <div class="var-kopf"><span class="vnr">3.2</span><h3>Pille + Karte darunter</h3><span class="bs">Baustein C</span><span class="tag">Empfohlen</span></div>
+      <div class="buehne">
+        <div class="feld"><svg class="lupe"><use href="#lupe"/></svg>
+          <span class="pille gewaehlt"><span class="ic"><svg><use href="#i-pin"/></svg></span><span class="lbl mono" style="font-size:13px">51,33652° N · 12,44176° O</span><button class="x" aria-label="Entfernen">✕</button></span>
+          <span class="text"></span><button class="marke">Koordinate</button></div>
+        <div class="kartenvorschau">
+          <svg viewBox="0 0 480 150" preserveAspectRatio="xMidYMid slice">
+            <rect width="480" height="150" fill="var(--map-ground)"/>
+            <path d="M-10 92 L490 70" stroke="var(--map-street)" stroke-width="16"/>
+            <path d="M300 -10 L320 160" stroke="var(--map-street)" stroke-width="11"/>
+            <g fill="var(--map-surface)" stroke="var(--map-neighbour)" stroke-width="1">
+              <path d="M20 8h70v66H24z"/><path d="M96 6h62v64H98z"/><path d="M164 4h64v62h-62z"/><path d="M234 2h58v62h-58z"/>
+              <path d="M26 104h72v50H28z"/><path d="M104 102h70v52h-70z"/><path d="M180 100h66v54h-66z"/><path d="M252 98h44v56h-44z"/>
+              <path d="M330 0h70v58h-68z"/><path d="M406 0h70v56h-70z"/><path d="M332 90h76v64h-76z"/><path d="M414 88h66v66h-66z"/>
+            </g>
+            <path d="M234 2h58v62h-58z" fill="var(--primary-veil)" stroke="var(--map-boundary)" stroke-width="2"/>
+            <g fill="var(--graphite)" opacity=".55"><rect x="40" y="24" width="26" height="20"/><rect x="112" y="22" width="24" height="22"/><rect x="186" y="18" width="22" height="24"/><rect x="46" y="116" width="26" height="20"/><rect x="348" y="14" width="30" height="22"/></g>
+            <circle cx="262" cy="34" r="7" fill="var(--primary)" stroke="#fff" stroke-width="2.5"/>
+          </svg>
+          <div class="kv-leiste"><span class="wert">Punkt liegt in <b>Mölkau 204/3</b></span><span class="wert mono">812 m²</span><button class="lk" style="margin-left:auto;background:var(--surface);padding:2px 8px;border-radius:6px">Punkt verschieben</button></div>
+        </div>
+        <p class="cap">Wie die Anzeigen-Vorschau in 4.2: die Pille bleibt kurz, die Karte darunter zeigt den Punkt, die Nachbarschaft und – sobald ALKIS geantwortet hat – das Flurstück darunter. Vorher: nur der Punkt, keine Umrandung.</p>
+      </div>
+      <div class="urteil"><div class="plus"><h4>Stärken</h4><ul><li>Groß genug, um zu sehen, ob der Punkt auf dem Grundstück oder auf der Straße liegt</li><li>Man kann den Punkt direkt korrigieren, statt Zahlen zu ändern</li><li>Dieselbe Form wie Link (4.2) und Anzeigenseite (5.3): Pille oben, Vorschau darunter</li></ul></div>
+        <div class="minus"><h4>Schwächen</h4><ul><li>Die Karte braucht Kacheln, bevor gesucht ist</li><li>Braucht einen festen Platz unter dem Feld, sonst schiebt sie die Seite (siehe 0.3)</li></ul></div></div>
+    </article>
+
     <article class="var">
-      <div class="var-kopf"><span class="vnr">3.2</span><h3>Pille mit Hinweis „getauscht“</h3><span class="bs">Baustein B</span></div>
+      <div class="var-kopf"><span class="vnr">3.3</span><h3>Pille mit Hinweis „getauscht“</h3><span class="bs">Baustein B</span></div>
       <div class="buehne">
         <div class="feld"><svg class="lupe"><use href="#lupe"/></svg>
           <span class="pille warn"><span class="ic brass"><svg><use href="#i-tausch"/></svg></span><span class="lbl mono" style="font-size:13px">51,33652° N · 12,44176° O</span><button class="x" aria-label="Entfernen">✕</button></span>
@@ -584,7 +767,7 @@ kbd{font:12px var(--f-mono);border:1px solid var(--line);border-bottom-width:2px
     </article>
 
     <article class="var">
-      <div class="var-kopf"><span class="vnr">3.3</span><h3>Klartext, Umrechnung darunter</h3><span class="bs">Baustein A</span></div>
+      <div class="var-kopf"><span class="vnr">3.4</span><h3>Klartext, Umrechnung darunter</h3><span class="bs">Baustein A</span></div>
       <div class="buehne">
         <div class="feld"><svg class="lupe"><use href="#lupe"/></svg>
           <span class="text mono" style="font-size:15px">322145 5690321</span><button class="marke">Koordinate · UTM</button></div>
@@ -942,7 +1125,7 @@ kbd{font:12px var(--f-mono);border:1px solid var(--line);border-bottom-width:2px
     <tbody>
       <tr><td>Adresse</td><td data-k="Wird Block bei">gewählter Hausnummer (oder nie)</td><td data-k="Im Feld">1.1 Klartext, Ort aus der Auswahl</td><td data-k="Darunter">Vorschlagsliste</td></tr>
       <tr><td>Flurstück</td><td data-k="Wird Block bei">gewählter Gemarkung · Leerzeichen nach Nummer · <kbd>Enter</kbd></td><td data-k="Im Feld">2.1 + 2.2 zweiteilige Pille, beide Reihenfolgen</td><td data-k="Darunter">Umriss + amtliche Fläche nach Abruf (2.4)</td></tr>
-      <tr><td>Koordinate</td><td data-k="Wird Block bei">Einfügen · <kbd>Enter</kbd></td><td data-k="Im Feld">3.1 Pille mit Kartenausschnitt</td><td data-k="Darunter">„getauscht“ in der Marke (3.2)</td></tr>
+      <tr><td>Koordinate</td><td data-k="Wird Block bei">Einfügen · <kbd>Enter</kbd></td><td data-k="Im Feld">3.2 Pille mit Koordinate</td><td data-k="Darunter">Kartenausschnitt mit Flurstück unter dem Punkt; „getauscht“ in der Marke (3.3)</td></tr>
       <tr><td>Link zur Anzeige</td><td data-k="Wird Block bei">Einfügen</td><td data-k="Im Feld">4.2 Pille Portal → Titel</td><td data-k="Darunter">Vorschaukarte mit Ladeschritten</td></tr>
       <tr><td>Eingefügte Anzeige</td><td data-k="Wird Block bei">Einfügen</td><td data-k="Im Feld">5.3 Dokument-Pille</td><td data-k="Darunter">Miniatur mit nummerierten Fundstellen; bis zur Antwort 5.2</td></tr>
       <tr><td>Beschreibungstext</td><td data-k="Wird Block bei">Einfügen</td><td data-k="Im Feld">6.3 eingeklappt, Angaben markiert</td><td data-k="Darunter">—</td></tr>
