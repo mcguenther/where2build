@@ -339,6 +339,7 @@ const PHASE_LABELS = {
   treppe: "Toleranz",
   gegenprobe: "Gegenprobe",
   gemeinde: "Gemeinde",
+  nutzung: "Nutzung",
   bewertung: "Bewertung",
   bilder: "Bilder",
   nummer: "Nummer",

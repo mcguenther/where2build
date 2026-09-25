@@ -80,7 +80,7 @@ from .indicia import (
     street_candidates,
 )
 from .ladder import Rung, confirmation_rung, tolerance_ladder
-from .scoring import clean_use, parcel_number, score
+from .scoring import clean_use, not_a_plot, parcel_number, score
 
 # Above this many survivors there is nothing left to score, and the interface
 # asks for the area instead of searching. The limit sits on the *candidate set
@@ -1452,6 +1452,18 @@ class SearchEngine:
                         limit=MAX_GEOMETRY,
                     )
                 )
+            found, set_aside = self._set_aside_roads(found)
+            if set_aside:
+                yield set_aside
+            if not found:
+                # Every parcel of this size is a road: the rung answered
+                # nothing a listing can mean, so it counts as an empty one.
+                if rung.hard:
+                    async for event in self._widen_the_place(anchors, rung):
+                        yield event
+                    if self.state.candidates:
+                        return
+                continue
             self.state.candidates = found
             for settled in self._settle_district_conflict(survivors):
                 yield SuchEreignis(art="konflikt", konflikt=settled)
@@ -1548,7 +1560,14 @@ class SearchEngine:
                 anzahl=total,
             )
             if 0 < total <= MAX_GEOMETRY:
-                self.state.candidates = await self._search(conditions, limit=MAX_GEOMETRY)
+                found, set_aside = self._set_aside_roads(
+                    await self._search(conditions, limit=MAX_GEOMETRY)
+                )
+                if set_aside:
+                    yield set_aside
+                if not found:
+                    continue
+                self.state.candidates = found
                 self.state.hint = (
                     f"Gesucht wurde in der ganzen Gemeinde {municipality.name}: in der "
                     f"Gemarkung {anchor.name}, die das Inserat nennt, gibt es kein "
@@ -1582,6 +1601,46 @@ class SearchEngine:
                 settled.append(conflict)
         return settled
 
+    def _set_aside_roads(
+        self, parcels: list[Flurstueck]
+    ) -> tuple[list[Flurstueck], SuchEreignis | None]:
+        """Take the parcels that are mostly traffic out of an area search.
+
+        Only ever for parcels an *area* found. A number the listing names is a
+        statement about that parcel, and a driveway recorded as „Weg" is often
+        part of the set being sold („790/11 sowie 238/3"). Said out loud, with
+        the numbers, because a candidate that vanishes without a line is one
+        nobody can go looking for.
+        """
+
+        kept: list[Flurstueck] = []
+        dropped: list[tuple[Flurstueck, str]] = []
+        for parcel in parcels:
+            use = not_a_plot(parcel.attributes.get("tntxt"))
+            if use:
+                dropped.append((parcel, use))
+            else:
+                kept.append(parcel)
+        if not dropped:
+            return parcels, None
+        uses = ", ".join(dict.fromkeys(use for _, use in dropped))
+        numbers = ", ".join(parcel_number(parcel) for parcel, _ in dropped[:8])
+        more = f" und {len(dropped) - 8} weitere" if len(dropped) > 8 else ""
+        event = SuchEreignis(
+            art="phase",
+            phase="nutzung",
+            text=(
+                (
+                    f"1 Flurstück scheidet aus, weil es überwiegend {uses} ist"
+                    if len(dropped) == 1
+                    else f"{len(dropped)} Flurstücke scheiden aus, weil sie überwiegend {uses} sind"
+                )
+                + f": {numbers}{more}"
+            ),
+            anzahl=len(dropped),
+        )
+        return kept, event
+
     async def _confirm(
         self,
         rungs: list[Rung],
@@ -1609,7 +1668,9 @@ class SearchEngine:
                 )
             )
         known = {p.attributes.get("flstkennz") for p in found}
-        neighbours = [p for p in extra if p.attributes.get("flstkennz") not in known]
+        neighbours, _ = self._set_aside_roads(
+            [p for p in extra if p.attributes.get("flstkennz") not in known]
+        )
         if not neighbours:
             return
         hard = rungs[stopped_at].hard

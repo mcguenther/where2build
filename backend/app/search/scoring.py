@@ -1,6 +1,7 @@
 """Ordering the candidates that survived the hard filters.
 
-Nothing here decides anything. The verdict is settled by the hard filters
+Nothing here decides anything, with one named exception -- `not_a_plot`,
+which the area search uses to take road parcels out. The verdict is settled by the hard filters
 alone -- a parcel number resolved against ALKIS, the cadastral district, an
 exactly stated ``ave:flaeche`` -- and this module only puts what is left into a
 useful order. That is what lets the weights ship uncalibrated: with no corpus
@@ -28,7 +29,7 @@ import re
 from dataclasses import dataclass
 from typing import Any, Sequence
 
-from ..services.alkis import Flurstueck
+from ..services.alkis import TRAFFIC_USES, Flurstueck, dominant_use
 
 # Below this a feature contributes nothing but never deletes anybody. It is the
 # whole difference between "ranks last" and "was never shown".
@@ -57,6 +58,17 @@ WEIGHTS = {
 # list ranks and never filters: an unbuilt plot can legitimately be recorded as
 # farmland or as a garden.
 BUILDING_LAND = ("wohnbau", "gemischte nutzung", "gartenland", "sport-, freizeit")
+
+# The one exception to "land use only ranks": a parcel whose *dominant* use is
+# traffic is taken out of an area search. A listing's figure matches road
+# parcels as readily as plots -- 400 of the 3 688 parcels in Großbothen, Mölkau
+# and Plagwitz are mostly Straßenverkehr, measured 24.09.2026 -- and none of
+# them is what an advert sells. Dominant, not any mention:
+# „Industrie- und Gewerbefläche …;2164|Straßenverkehr;0.00" is a works, and in
+# the B7 case „Weg;0.00|Landwirtschaft;577" was the plot. Flugverkehr and
+# Schiffsverkehr did not occur in those three districts; they are the other two
+# traffic kinds of the AAA catalogue.
+NOT_A_PLOT = (*TRAFFIC_USES, "Bahnverkehr", "Flugverkehr", "Schiffsverkehr")
 
 _STREET_NORMALISE = (
     ("straße", "str"), ("strasse", "str"), ("str.", "str"),
@@ -163,9 +175,19 @@ def land_use(tntxt: str | None) -> tuple[float, str | None]:
     lowered = first.lower()
     if any(marker in lowered for marker in BUILDING_LAND):
         return 1.0, first
-    # A carriageway or a watercourse is not a building plot -- but saying so is
-    # still an inference, so it sinks rather than disappears.
+    # A watercourse or a wood is not a building plot either -- but saying so is
+    # still an inference, so it sinks rather than disappears. Traffic is the
+    # exception, and it is made before scoring: see `NOT_A_PLOT`.
     return FLOOR, first
+
+
+def not_a_plot(tntxt: str | None) -> str | None:
+    """The dominant use when it rules a parcel out of an area search, else ``None``."""
+
+    use = dominant_use(tntxt)
+    if use is None:
+        return None
+    return use if use.split(" / ")[0].strip() in NOT_A_PLOT else None
 
 
 def street_match(

@@ -122,8 +122,12 @@ from the user directly. Reopen only if the user asks.
   reached only through a chosen tolerance is `mehrdeutig`. Everything
   inferential (a rounded area, a street, land use, a broker's distance) may
   only order the list, which is why the weights can ship uncalibrated: they
-  can produce an unhelpful ordering, never a wrong answer. See
-  `backend/app/search/`.
+  can produce an unhelpful ordering, never a wrong answer. One exception,
+  asked for by the user on 24.09.2026: a parcel an *area* search finds whose
+  dominant `tntxt` use is traffic (Straßenverkehr, Weg, Platz, Bahn-, Flug-,
+  Schiffsverkehr) is taken out, in a line of its own that names it. A parcel
+  the listing names by number is never taken out — a driveway recorded as Weg
+  is often part of the set. See `backend/app/search/`.
 - **The administration area is configuration first, database second.**
   `ADMIN_ACCOUNTS` names account keys and is the bootstrap; everybody else is
   promoted in the interface, where the flag lives on `users`. Configuration
@@ -253,7 +257,7 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 802 passed, 60 skipped (790 and 72 where Tesseract is missing). With `TEST_DATABASE_URL` pointed at a
+- `pytest`: 805 passed, 60 skipped (793 and 72 where Tesseract is missing). With `TEST_DATABASE_URL` pointed at a
   real Postgres the account store and the administration area run too; they are
   skipped rather than mocked because what they check is the database's own
   behaviour. Of the rest, one needs pyosmium, which only the index builder
