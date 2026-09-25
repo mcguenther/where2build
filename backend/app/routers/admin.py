@@ -758,7 +758,7 @@ async def job_list(
         if alive
         else (
             "Zurzeit läuft kein Scheduler. Angeforderte Läufe bleiben liegen, bis einer "
-            "startet — mit „docker compose --profile scheduled-jobs up -d“."
+            "startet — mit „docker compose up -d scheduler“."
         ),
     )
 

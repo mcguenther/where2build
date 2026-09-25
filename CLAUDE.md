@@ -212,11 +212,10 @@ scripts/setup-build-ca.sh
 docker compose up --build --remove-orphans     # http://localhost:8080
 docker compose down --remove-orphans           # volumes stay; -v throws them away
 
-# routing on this machine instead of Transitous -- opt-in, off by default.
-# fetch-data.sh pulls the OSM extract and the DELFI GTFS; the first start
-# imports for ~3.5 min into the motis-graph volume, after that it is seconds.
-./motis/fetch-data.sh
-docker compose -f docker-compose.yml -f docker-compose.local-routing.yml up --build
+# the stack routes on its own MOTIS: the first start downloads ~640 MB and
+# imports for ~7 min at 5.6 GiB peak, after that it is seconds. Where that
+# memory is not there, route against Transitous instead:
+docker compose -f docker-compose.yml -f docker-compose.transitous.yml up --build
 
 # reading a listing's attached cadastral extract -- optional, and the search
 # says so in /api/health when it is missing
@@ -262,7 +261,7 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
   never run two suites at once here. Three Tesseract tests failed on a run
   sharing the machine with another pytest, and they failed exactly as a
   photograph of a lawn does: an empty reading, past the 30 s timeout.
-- `vitest`: 724 passed — plus the integration file, excluded by `npm run test`
+- `vitest`: 727 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
 - `scripts/bookmarklet.mjs`: the handover across two origins, against the built
   app and a backend on :8000. It asserts the coordinate, which is the field

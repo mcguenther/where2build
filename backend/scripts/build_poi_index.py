@@ -44,9 +44,9 @@ if str(BACKEND_DIR) not in sys.path:
 # source (app/services/overpass.py) answers the same categories and must
 # read the same tags. See docs/research/poi.md § 4 for every exclusion.
 from app.poi_index import PoiEntry, categorise  # noqa: E402
+from app.settings import get_settings  # noqa: E402
 
 DEFAULT_EXTRACT_URL = "https://download.geofabrik.de/europe/germany/sachsen-latest.osm.pbf"
-DEFAULT_OUTPUT = BACKEND_DIR / "data" / "poi-sachsen.json"
 
 
 def _entry(
@@ -218,6 +218,9 @@ def write_index(entries: list[PoiEntry], out: Path, source: str, datenstand: str
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Where the API reads it, so a container that sets NEARBY_POI_INDEX_PATH
+    # builds into the same place without having to be told twice.
+    default_output = get_settings().nearby.poi_index_path
     parser = argparse.ArgumentParser(
         description="Build the POI index served by POST /api/nearby.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -236,7 +239,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--url", default=DEFAULT_EXTRACT_URL, help="Where --download fetches from.")
     parser.add_argument(
-        "--out", type=Path, default=DEFAULT_OUTPUT, help=f"Output file (default: {DEFAULT_OUTPUT})."
+        "--out", type=Path, default=default_output, help=f"Output file (default: {default_output})."
     )
     parser.add_argument(
         "--keep-download",

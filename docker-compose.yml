@@ -1,9 +1,24 @@
 # The whole app, ready to use: nginx serves the build and proxies /api, the
 # backend proxies and caches the official services, Postgres holds what a
-# signed-in person stores, and authentik is the identity provider that makes
-# signing in -- and registering -- possible at all.
+# signed-in person stores, authentik is the identity provider that makes
+# signing in -- and registering -- possible at all, MOTIS routes and geocodes
+# on this machine, and the scheduler runs the recurring jobs.
 #
 #   docker compose up --build      then open http://localhost:8080
+#
+# What stays outside is what cannot be anywhere else: the cadastre, the land
+# values, the map layers and the environmental data are the authorities' own
+# statements, and a copy would be a copy of an official answer with a date on
+# it. The basemap (OpenFreeMap) and the extraction model stay outside too; the
+# README says what bringing those in would cost.
+#
+# The first start downloads ~640 MB of routing input and address data and
+# imports it for about seven minutes at 5.6 GiB peak memory (measured
+# 24.09.2026, 4 cores); the app answers once that is done. After
+# that a start takes seconds. A machine that cannot spare the memory routes
+# against Transitous instead:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.transitous.yml up --build
 #
 # There is no demo account, because there is a „Konto anlegen" link on the
 # sign-in page and it works: the first visit creates a real account in the
@@ -54,12 +69,11 @@ services:
       - OIDC_PUBLIC_BASE_URL=http://localhost:8080
       # http on localhost: a Secure cookie would never be sent back.
       - OIDC_COOKIE_SECURE=false
-      # Declared without a value: compose passes it through only when it is set
-      # on the host, and leaves it unset otherwise -- so backend/.env and the
-      # built-in default (Transitous) keep their say when nobody asks for
-      # anything else. docker-compose.local-routing.yml sets it for the router
-      # that runs here, so it never has to be typed.
-      - MOTIS_BASE_URL
+      # The router below. Set here rather than left to backend/.env, because a
+      # stack that brings its own router and then asks Transitous anyway is
+      # indistinguishable from outside: the two agree to the last decimal.
+      # docker-compose.transitous.yml is the one way back.
+      - MOTIS_BASE_URL=http://motis:8080
       # Exactly one reverse proxy of ours stands in front here: the frontend
       # container's nginx, which sends `X-Forwarded-For
       # $proxy_add_x_forwarded_for`. Without this the request budget would
@@ -75,10 +89,10 @@ services:
       # Answers from the official services, kept between restarts. Losing it
       # costs time and other people's bandwidth, not correctness.
       - backend-cache:/cache
-      # A built OpenStreetMap directory, if there is one. Read-only: the
-      # backend only ever reads it. Absent, /api/nearby says so for those
-      # categories instead of answering with an empty list.
-      - ./backend/data:/app/data:ro
+      # The POI and address indexes, built by `indexes` below. Read-only: the
+      # backend only ever reads them. Absent, /api/nearby and /api/geocode say
+      # so instead of answering with an empty list.
+      - indexes:/indexes:ro
       # The job list and the model price list, read-only: the backend shows
       # them and never writes them. Refreshing the prices is a job, and jobs
       # run in the scheduler.
@@ -86,12 +100,18 @@ services:
       # The scheduler's records, shared. The administration area reads them to
       # say when a job last ran, and writes a request into the same directory
       # when somebody presses „Jetzt starten" -- which is why this one is not
-      # read-only. Without the scheduler profile the directory is simply empty
-      # and the page says nothing is there to pick a request up.
+      # read-only.
       - scheduler-state:/state
     depends_on:
       db:
         condition: service_healthy
+      # The graph is memory-mapped at startup, and a request before that
+      # answers 503 for the first minute of every cold start.
+      motis:
+        condition: service_healthy
+      # The indexes are read once at startup, so they have to exist by then.
+      indexes:
+        condition: service_completed_successfully
     healthcheck:
       # No curl in the slim image, and adding one for this would be the only
       # reason to have it.
@@ -218,23 +238,116 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  # Routing on this machine instead of Transitous lives in its own file, so
-  # naming that file is the whole opt-in and there is no variable to forget:
-  #
-  #   ./motis/fetch-data.sh
-  #   docker compose -f docker-compose.yml -f docker-compose.local-routing.yml up --build
+  # One-shot: the street network and the timetable the router is built from.
+  # The backend image, because it already carries an HTTP client and the
+  # build-time CA story; a file that is there is kept, so only the first start
+  # downloads. A new timetable is `--refresh`, see the README.
+  routing-data:
+    build:
+      context: ./backend
+    command: ["python", "scripts/fetch_routing_data.py", "/data-input"]
+    env_file:
+      - path: ./backend/.env
+        required: false
+    volumes:
+      - routing-input:/data-input
+    restart: "no"
 
-  # Recurring jobs. Opt-in like the routing, so `docker compose up` stays the
-  # two services it has always been:
-  #     docker compose --profile scheduled-jobs up -d
+  # One-shot: turns the OSM extract and the GTFS feed into the graph MOTIS
+  # serves. `motis server` never reads the inputs again, only /data.
+  motis-import:
+    image: ghcr.io/motis-project/motis:2.11.2
+    depends_on:
+      routing-data:
+        condition: service_completed_successfully
+    volumes:
+      - routing-input:/data-input:ro
+      # Not inside /data-input: docker cannot create a mountpoint inside a
+      # read-only mount.
+      - ./motis/config.yml:/config.yml:ro
+      - motis-graph:/data
+    # Re-importing unchanged inputs costs minutes and buys nothing, so the
+    # import runs only when there is no graph yet or an input is newer than the
+    # last successful one -- which is what a refreshed timetable looks like.
+    command: >
+      /bin/sh -c "if [ -f /data/meta/import_done ] &&
+        [ -z \"$$(find /data-input -maxdepth 1 -type f -newer /data/meta/import_done)\" ]; then
+        echo 'Graph is current -- nothing to import.';
+      else
+        /motis import -d /data -c /config.yml && touch /data/meta/import_done;
+      fi"
+    restart: "no"
+
+  # Routing, the stops around a plot and the geocoder, on this machine. The
+  # public Transitous is a volunteer service whose policy counts routing as
+  # resource-intensive and rules out commercial use
+  # (docs/research/routing-motis.md § 6); a stack handed to somebody should
+  # not lean on it.
+  motis:
+    image: ghcr.io/motis-project/motis:2.11.2
+    depends_on:
+      motis-import:
+        condition: service_completed_successfully
+    volumes:
+      - motis-graph:/data
+    command: ["/motis", "server", "-d", "/data"]
+    healthcheck:
+      # busybox wget; the geocoder only answers once the address index is
+      # mapped, so this is a real readiness check and not just an open port.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/api/v1/geocode?text=Leipzig"]
+      interval: 10s
+      timeout: 10s
+      retries: 6
+      start_period: 30s
+    restart: unless-stopped
+
+  # One-shot: the POI index behind /api/nearby, from the same street network
+  # the router was built from, and the official Saxon address index behind
+  # /api/geocode. Each is built only when it is missing; the scheduler keeps
+  # them current after that. A failure here does not stop the stack -- the
+  # app works without either and /api/health names what is missing -- but it
+  # is printed, not swallowed.
+  indexes:
+    build:
+      context: ./backend
+    command:
+      - sh
+      - -c
+      - |
+        if [ ! -f "$$NEARBY_POI_INDEX_PATH" ]; then
+          if [ -f /data-input/osm.pbf ]; then
+            python scripts/build_poi_index.py /data-input/osm.pbf
+          else
+            python scripts/build_poi_index.py --download
+          fi || echo 'POI index could not be built -- /api/nearby says so.'
+        fi
+        if [ ! -f "$$ADDRESSES_INDEX_PATH" ]; then
+          python scripts/build_address_index.py --download ||
+            echo 'Address index could not be built -- /api/geocode asks MOTIS alone.'
+        fi
+    env_file:
+      - path: ./backend/.env
+        required: false
+    volumes:
+      - indexes:/indexes
+      - routing-input:/data-input:ro
+      - backend-cache:/cache
+    depends_on:
+      routing-data:
+        condition: service_completed_successfully
+    restart: "no"
+
+  # Recurring jobs:
   #     docker compose exec scheduler python scripts/run_jobs.py list
   #     docker compose exec scheduler python scripts/run_jobs.py run cache-sweep
-  # Same image as the backend, so there is nothing extra to build and the job
-  # scripts are the ones already shipped. No Docker socket: every job here runs
-  # in this container against the shared volumes, and mounting the socket would
-  # hand it root on the host for the sake of four timed commands.
+  # Part of the stack, because the administration area's „Jetzt starten" is a
+  # request this container picks up, and without it the cache has no ceiling
+  # and the indexes never age out. Same image as the backend, so there is
+  # nothing extra to build and the job scripts are the ones already shipped. No
+  # Docker socket: every job here runs in this container against the shared
+  # volumes, and mounting the socket would hand it root on the host for the
+  # sake of a few timed commands.
   scheduler:
-    profiles: ["scheduled-jobs"]
     build:
       context: ./backend
     command: ["python", "scripts/run_jobs.py", "serve"]
@@ -246,7 +359,7 @@ services:
     volumes:
       - backend-cache:/cache
       # Writable, unlike the backend's mount: rebuilding an index is the job.
-      - ./backend/data:/app/data
+      - indexes:/indexes
       - ./ops:/ops:ro
       - scheduler-state:/state
     restart: unless-stopped
@@ -254,5 +367,12 @@ services:
 volumes:
   backend-cache:
   scheduler-state:
+  # The POI and address indexes. Rebuilt by the scheduler, never by hand.
+  indexes:
+  # The OSM extract and the GTFS timetable, ~420 MB.
+  routing-input:
+  # The built routing graph, ~3.4 GB. `docker volume rm where2build_motis-graph`
+  # forces a full re-import.
+  motis-graph:
   db-data:
   authentik-media:

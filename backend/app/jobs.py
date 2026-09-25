@@ -175,8 +175,8 @@ def beat(state_dir: Path | str) -> None:
 def scheduler_seen(state_dir: Path | str) -> str | None:
     """When a scheduler last said it was there, or ``None``.
 
-    ``None`` is the state a deployment without the ``scheduled-jobs`` profile
-    is in -- which is a complete deployment, and the reason the interface says
+    ``None`` is the state a deployment without the ``scheduler`` service is
+    in -- which is a complete deployment, and the reason the interface says
     "nothing will pick this up" rather than showing a button that does nothing.
     """
 
