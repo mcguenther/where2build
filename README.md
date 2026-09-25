@@ -304,7 +304,7 @@ nothing else.
 | `GET` | `/api/landvalue` | `?lat=&lon=` → €/m², zone, reference date, and the size of the notional plot the value is quoted for |
 | `POST` | `/api/site-checks` | one parcel outline → noise bands, flood, radon, water protection, protected areas, slope, ground and air quality; each check carries either data or its own German `fehler` |
 | `POST` | `/api/reachability` | origin + destinations + modes → durations and route geometry |
-| `GET` | `/api/tiles/{layer}/{z}/{x}/{y}.png` | cached proxy for the GeoSN WMS layers (`dop`, `webatlas`, `alkis` — parcel boundaries with their numbers, and the buildings — and `flurstuecke`, the same boundaries alone, for laying over the photograph) and, through the ArcGIS `export` endpoint, the noise survey (`laerm`, `laerm-nacht`) |
+| `GET` | `/api/tiles/{layer}/{z}/{x}/{y}.png` | cached proxy for the GeoSN WMS layers (`dop`, `webatlas`, `alkis` — parcel boundaries with their numbers, and the buildings — and `flurstuecke`, the same boundaries alone, for laying over the photograph), for `luftbild` — every Land's orthophoto composed into one tile over the BKG's Sentinel-2 mosaic — and `deutschland`, the basemap.de web map, and, through the ArcGIS `export` endpoint, the noise survey (`laerm`, `laerm-nacht`) |
 | `POST` | `/api/nearby` | one coordinate → the nearest school, park, tram stop and so on, ranked by walking time; `linien: true` also names the lines calling at each stop |
 | `GET` | `/api/gemarkungen` | `?q=` → the Saxon cadastral districts, served from a committed index; the WFS is never touched |
 | `POST` | `/api/geocode` | `{text, lat?, lon?}` → candidates, never one answer: the same street name matches in three states |

@@ -299,3 +299,16 @@ routines under it.
   the map, so after a click the map's lower edge was usually in view and the
   check passed — while the pan happened in a strip at the top of the screen.
   It scrolls unless 60 % of the map is visible.
+
+- **The search map's photograph is Germany's, and its overlays are Saxony's.**
+  `luftbild` is the proxy's composite of all sixteen Länder over Sentinel-2
+  (see `services.md`); the `strassen` and `liegenschaftskarte` overlays stay
+  GeoSN and simply go transparent at the border. The first view of a search,
+  the whole state at z7, used to be Saxony floating on paper. `dop` is still
+  served, as Saxony alone, for anything that wants exactly that.
+- **The route cards stand on basemap.de, not on the web atlas.** A route
+  leaves Saxony whenever its destination does, and `webatlas` is blank past
+  the border. `deutschland` is the AdV's Germany-wide raster web map
+  (`de_basemapde_web_raster_farbe`, CC BY 4.0); it too is transparent abroad.
+  Thumbnails keep `umgebung` — a plot is in Saxony by definition.
+

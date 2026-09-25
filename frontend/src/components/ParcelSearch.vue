@@ -76,7 +76,8 @@
                      :ground="ground" :highlighted="highlighted" :chosen="chosen"
                      :shown="shownCandidate" :covered-right="hudCover" @select="pick" />
         <p v-if="ground === 'site'" class="panel__footnote">
-          Luftbild und Straßen vom GeoSN. Flurstücksgrenzen ab Zoomstufe {{ parcelOutlineZoom }},
+          Luftbilder der Länder, in der Übersicht und jenseits der Grenze Sentinel-2;
+          Straßen vom GeoSN. Flurstücksgrenzen ab Zoomstufe {{ parcelOutlineZoom }},
           ihre Nummern ab {{ parcelOutlineZoom + 1 }}.
         </p>
       </div>
@@ -250,7 +251,7 @@
             <span class="kandidaten__marke vorschlag__marke">{{ card.number }}</span>
           </button>
           <p class="vorschlag__massstab">
-            {{ card.caption }}<template v-if="card.sketch"> · Luftbild GeoSN</template>
+            {{ card.caption }}<template v-if="card.sketch"> · Luftbild GeoBasis-DE</template>
           </p>
           <div class="vorschlag__text">
             <h4 class="vorschlag__titel">

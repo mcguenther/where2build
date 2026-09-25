@@ -31,7 +31,7 @@
              role="img" :aria-label="`Gefahrener Weg nach ${destination.name}`">
           <rect x="0" y="0" :width="destination.sketch.frame.width" :height="destination.sketch.frame.height"
                 fill="var(--w2b-map-ground)" />
-          <!-- The ground: the same proxied WMS tiles the site plan uses, as plain
+          <!-- The ground: proxied WMS tiles, as on the site plan, as plain
                <image> rather than a MapLibre instance. One card is a map; twenty
                cards are twenty WebGL contexts, which is past what a browser keeps
                alive. A tile that never arrives leaves the paper colour above. -->
@@ -53,7 +53,7 @@
              semi-transparent strip — the caption ran through the start marker
              whenever the frame was wide. Nothing overlaps if nothing overlaps. -->
         <p v-if="destination.sketch" class="route-card__scale">
-          {{ destination.sketch.scaleLabel }}<span v-if="destination.sketch.tiles.length" class="route-card__credit"> · Karte GeoSN</span>
+          {{ destination.sketch.scaleLabel }}<span v-if="destination.sketch.tiles.length" class="route-card__credit"> · Karte © GeoBasis-DE / BKG</span>
         </p>
       </div>
 
@@ -124,6 +124,10 @@ import {
  *  so the sketch says which mode actually wins for that destination.
  *  The three ÖPNV variants share one colour on purpose: they are one row, and
  *  only ever one of them is present. */
+/** The AdV's Germany-wide web map: a route leaves Saxony whenever its
+ *  destination does, and the Saxon web atlas is blank past the border. */
+const ROUTE_GROUND = "deutschland";
+
 const MODE_COLOURS = {
   car: "var(--w2b-graphite)",
   bike: "var(--w2b-secondary)",
@@ -321,7 +325,7 @@ export default {
         // frame — held at 3.4 they would be hairlines on a full-width card.
         stroke: Math.round((frame.width / 88) * 100) / 100,
         marker: Math.round((frame.width / 67) * 100) / 100,
-        tiles: cover ? cover.tiles.map(t => ({ ...t, href: tileUrl(t) })) : [],
+        tiles: cover ? cover.tiles.map(t => ({ ...t, href: tileUrl(t, ROUTE_GROUND) })) : [],
         // The fastest mode is drawn last so it lies on top of the others.
         lines: lines
           .map(l => ({ mode: l.mode, points: toPolyline(l.coordinates, fit) }))

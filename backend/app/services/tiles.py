@@ -1,4 +1,4 @@
-"""Raster tile proxy in front of the GeoSN WMS services.
+"""Raster tile proxy in front of the GeoSN WMS services, and the Länder's.
 
 The proxy exists for two reasons: a browser should not have to depend on an
 authority service's CORS behaviour, and every tile belongs in a disk cache --
@@ -7,17 +7,28 @@ an orthophoto does not change between two page views.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import io
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from .. import geo
 from ..cache import DiskCache
-from ..errors import BadRequestError, UpstreamError
-from ..settings import AppSettings, TilesSettings
+from ..errors import AppError, BadRequestError, UpstreamError, UpstreamTimeout
+from ..settings import AerialSource, AppSettings, TilesSettings
 
 SERVICE_NAME = "Der Kartendienst des GeoSN"
+GEOSN_ATTRIBUTION = "GeoSN, dl-de/by-2-0"
+AERIAL_LAYER = "luftbild"
+AERIAL_SERVICE = "Die Luftbilddienste der Länder"
+# A header value, so ASCII: an umlaut here breaks the response on the way out.
+# The full credit, per Land, is the map's own attribution in the browser.
+AERIAL_ATTRIBUTION = "GeoBasis-DE; EU, Copernicus Sentinel"
+OVERVIEW_SERVICE = "Das Sentinel-2-Mosaik des BKG"
+GERMANY_MAP_SERVICE = "Die basemap.de-Webkarte des BKG"
+# What one Land's silence may cost: its part of the picture, not the tile.
+_UPSTREAM_FAILURES = (UpstreamError, UpstreamTimeout)
 
 ADVICE = (
     "Die Kartenebene bleibt leer; auf eine andere Ebene umschalten hilft meist. "
@@ -57,6 +68,12 @@ class LayerConfig:
     # keeps the layer's own symbology at its intended size, `min_scale` keeps
     # the request to one tile. A layer sets whichever was measured for it.
     max_scale_denominator: float | None = None
+    # Whose picture this is: the name errors and the statistics use, and the
+    # credit the answer carries.
+    service: str = SERVICE_NAME
+    attribution: str = GEOSN_ATTRIBUTION
+    # Extra GetMap parameters, as a sorted tuple so the config stays hashable.
+    extra: tuple[tuple[str, str], ...] = field(default_factory=tuple)
 
 
 # ArcGIS' own maximum; asking for more only enlarges the symbology.
@@ -126,7 +143,7 @@ def _fingerprint(config: LayerConfig) -> str:
 
     seed = (
         f"{config.url}|{config.layers}|{config.kind}|{config.styles}"
-        f"|{config.min_scale}|{config.max_scale_denominator}"
+        f"|{config.min_scale}|{config.max_scale_denominator}|{config.extra}"
     )
     return hashlib.sha1(seed.encode("utf-8")).hexdigest()[:8]
 
@@ -159,11 +176,59 @@ def _downscale(data: bytes, target: int) -> bytes:
         return buffer.getvalue()
 
 
+def _intersects(bbox: tuple[float, float, float, float], z: int, x: int, y: int) -> bool:
+    west, south, east, north = bbox
+    minlon, minlat, maxlon, maxlat = geo.tile_bounds_4326(z, x, y)
+    return minlon < east and maxlon > west and minlat < north and maxlat > south
+
+
+def _stack(images: list[bytes], size: int) -> tuple[bytes, bool]:
+    """The images laid over one another, first at the bottom.
+
+    Returns the PNG and whether every pixel ended up opaque -- which is what
+    decides whether a ground is still needed under it. Each Land answers
+    transparent outside its border, so two neighbours' tiles over a border
+    compose into one picture with no seam to cut.
+    """
+
+    from PIL import Image
+
+    canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    for data in images:
+        with Image.open(io.BytesIO(data)) as layer:
+            layer = layer.convert("RGBA")
+            if layer.size != canvas.size:
+                layer = layer.resize(canvas.size, Image.BILINEAR)
+            canvas.alpha_composite(layer)
+    lowest_alpha, _ = canvas.getchannel("A").getextrema()
+    buffer = io.BytesIO()
+    canvas.save(buffer, format="PNG")
+    return buffer.getvalue(), lowest_alpha == 255
+
+
 class TileService:
     def __init__(self, settings: TilesSettings, app_settings: AppSettings) -> None:
         self.settings = settings
         self.app_settings = app_settings
         self.cache = DiskCache(app_settings.cache_dir / "tiles", ttl_s=settings.cache_ttl_s)
+
+    def _aerial_config(self, source: AerialSource) -> LayerConfig:
+        return LayerConfig(
+            source.url,
+            source.layers,
+            service=source.service,
+            attribution=AERIAL_ATTRIBUTION,
+            extra=tuple(sorted(source.params.items())),
+        )
+
+    @property
+    def aerial_overview(self) -> LayerConfig:
+        return LayerConfig(
+            self.settings.aerial_overview_url,
+            self.settings.aerial_overview_layers,
+            service=OVERVIEW_SERVICE,
+            attribution=AERIAL_ATTRIBUTION,
+        )
 
     @property
     def layers(self) -> dict[str, LayerConfig]:
@@ -204,6 +269,12 @@ class TileService:
             ),
             "strassen": LayerConfig(self.settings.webatlas_url, self.settings.street_layers),
             "umgebung": LayerConfig(self.settings.webatlas_url, self.settings.surroundings_layers),
+            "deutschland": LayerConfig(
+                self.settings.germany_map_url,
+                self.settings.germany_map_layers,
+                service=GERMANY_MAP_SERVICE,
+                attribution="GeoBasis-DE / BKG, CC BY 4.0",
+            ),
             "laerm": LayerConfig(
                 self.settings.noise_url,
                 self.settings.noise_layers,
@@ -218,11 +289,16 @@ class TileService:
             ),
         }
 
+    def attribution(self, layer: str) -> str:
+        if layer == AERIAL_LAYER:
+            return AERIAL_ATTRIBUTION
+        return self._config(layer).attribution
+
     def _config(self, layer: str) -> LayerConfig:
         try:
             return self.layers[layer]
         except KeyError:
-            known = ", ".join(sorted(self.layers))
+            known = ", ".join(sorted([*self.layers, AERIAL_LAYER]))
             raise BadRequestError(f"Unbekannte Ebene „{layer}“. Verfügbar: {known}.") from None
 
     def _check_tile(self, z: int, x: int, y: int) -> None:
@@ -270,6 +346,7 @@ class TileService:
             "HEIGHT": str(size),
             "FORMAT": self.settings.image_format,
             "TRANSPARENT": "TRUE" if self.settings.transparent else "FALSE",
+            **dict(config.extra),
         }
         resolution = self._map_resolution(config, z, x, y)
         if resolution is not None:
@@ -311,6 +388,9 @@ class TileService:
     async def tile(self, layer: str, z: int, x: int, y: int) -> tuple[bytes, bool]:
         """Return the tile image and whether it came from the cache."""
 
+        if layer == AERIAL_LAYER:
+            self._check_tile(z, x, y)
+            return await self._aerial_tile(z, x, y)
         config = self._config(layer)
         self._check_tile(z, x, y)
         if z < config.min_zoom:
@@ -319,7 +399,6 @@ class TileService:
                 f"darunter liefert der Dienst ein leeres Bild."
             )
         crs = "EPSG:3857" if config.kind == "arcgis" else self.settings.crs
-        size = self.render_size(config, z)
         # The layer list is part of the key, not just the name: changing which
         # ALKIS layers "alkis" stands for kept serving the old picture until
         # someone deleted the cache by hand -- and a stale tile of the *previous*
@@ -328,14 +407,21 @@ class TileService:
         cached = self.cache.get_bytes(cache_key)
         if cached is not None:
             return cached, True
+        image = await self._fetch(config, z, x, y)
+        self.cache.set_bytes(cache_key, image)
+        return image, False
 
+    async def _fetch(self, config: LayerConfig, z: int, x: int, y: int) -> bytes:
+        """One tile of one layer, straight from its service."""
+
+        size = self.render_size(config, z)
         # Imported here so tests can patch app.upstream.request in one place.
         from ..upstream import request
 
         response = await request(
             "GET",
             config.url,
-            service=SERVICE_NAME,
+            service=config.service,
             advice=ADVICE,
             timeout_s=self.app_settings.http_timeout_s,
             user_agent=self.app_settings.user_agent,
@@ -345,12 +431,63 @@ class TileService:
         if not content_type.startswith("image/"):
             # WMS reports errors as XML with HTTP 200.
             raise UpstreamError(
-                f"{SERVICE_NAME} hat statt einer Kachel eine Fehlermeldung geliefert. {ADVICE}"
+                f"{config.service} hat statt einer Kachel eine Fehlermeldung geliefert. {ADVICE}"
             )
-        image = (
-            response.content
-            if size == self.settings.tile_size
-            else _downscale(response.content, self.settings.tile_size)
+        if size == self.settings.tile_size:
+            return response.content
+        return _downscale(response.content, self.settings.tile_size)
+
+    async def _aerial_tile(self, z: int, x: int, y: int) -> tuple[bytes, bool]:
+        """The aerial photograph of Germany, one Land at a time.
+
+        Only the Länder whose box touches the tile are asked -- one inland, two
+        or three along a border. Where they leave a pixel uncovered, abroad or
+        in a sliver between two surveys, the Sentinel mosaic goes underneath.
+
+        One Land that does not answer must not blank its neighbours' half of a
+        border tile, so a failure drops that Land and the tile is served
+        without being cached; the next request asks again. Only when nothing at
+        all could be drawn is it an error.
+        """
+
+        sources = (
+            [s for s in self.settings.aerial_sources if _intersects(s.bbox, z, x, y)]
+            if z >= self.settings.aerial_states_min_zoom
+            else []
         )
-        self.cache.set_bytes(cache_key, image)
+        # Stable sort: the white-painting ones first, i.e. lowest in the stack.
+        sources.sort(key=lambda source: not source.white_outside)
+        members = [self._aerial_config(source) for source in sources]
+        seed = "|".join(_fingerprint(config) for config in [*members, self.aerial_overview])
+        digest = hashlib.sha1(seed.encode("utf-8")).hexdigest()[:8]
+        cache_key = f"{AERIAL_LAYER}/{digest}/{self.settings.crs}/{z}/{x}/{y}"
+        cached = self.cache.get_bytes(cache_key)
+        if cached is not None:
+            return cached, True
+
+        answers = await asyncio.gather(
+            *(self._fetch(config, z, x, y) for config in members), return_exceptions=True
+        )
+        drawn: list[bytes] = []
+        failures: list[AppError] = []
+        for answer in answers:
+            if isinstance(answer, _UPSTREAM_FAILURES):
+                failures.append(answer)
+            elif isinstance(answer, BaseException):
+                raise answer
+            else:
+                drawn.append(answer)
+
+        image, covered = _stack(drawn, self.settings.tile_size) if drawn else (b"", False)
+        if not covered:
+            try:
+                ground = await self._fetch(self.aerial_overview, z, x, y)
+            except _UPSTREAM_FAILURES as exc:
+                if not drawn:
+                    raise (failures[0] if failures else exc) from None
+                failures.append(exc)
+            else:
+                image, _ = _stack([ground, *drawn], self.settings.tile_size)
+        if not failures:
+            self.cache.set_bytes(cache_key, image)
         return image, False

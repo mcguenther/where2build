@@ -29,7 +29,7 @@ describe("Das Bild eines Vorschlags", () => {
     const sketch = candidateSketch(house.geometry);
 
     expect(sketch.photo.length).toBeGreaterThan(0);
-    expect(sketch.photo[0].href).toMatch(/^\/api\/tiles\/dop\/1[89]\//);
+    expect(sketch.photo[0].href).toMatch(/^\/api\/tiles\/luftbild\/1[89]\//);
     expect(sketch.cadastre.map(t => t.key)).toEqual(sketch.photo.map(t => t.key));
     expect(sketch.cadastre[0].href).toContain("/api/tiles/liegenschaftskarte/");
   });

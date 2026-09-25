@@ -72,6 +72,18 @@ export const rasterStyle = (layer, attribution) => ({
 });
 
 export const GEOSN = "© GeoSN, dl-de/by-2-0";
+/**
+ * The aerial photograph is every Land's own survey, composed by the proxy, over
+ * the BKG's Sentinel-2 mosaic. Several licences ask for the name *and* the
+ * year of retrieval; the tiles are cached for a month, so this year is it.
+ */
+const YEAR = new Date().getFullYear();
+export const AERIAL =
+  `Luftbilder © LGL-BW, LDBV, GDI Berlin, GeoBasis-DE/LGB, Landesamt GeoInformation Bremen, `
+  + `LGV Hamburg, HVBG, GeoBasis-DE/M-V, LGLN, Geobasis NRW, GeoBasis-DE/LVermGeoRP, LVGL, `
+  + `GeoSN, GeoBasis-DE/LVermGeo ST, GeoBasis-DE/LVermGeo SH, GDI-Th (${YEAR}), `
+  + `CC BY 4.0 und dl-de/by-2-0 · Übersicht: Europäische Union, enthält veränderte `
+  + `Copernicus Sentinel-Daten (${YEAR})`;
 export const LFULG = "Umgebungslärmkartierung © LfULG";
 
 /**
@@ -200,6 +212,11 @@ export function canRenderMap() {
  * outlines are the Liegenschaftskarte, not the oversampled `flurstuecke`
  * contours, so they read the same as on the site plan.
  *
+ * The photo is Germany's, not only Saxony's: the proxy composes every Land's
+ * survey over a Sentinel-2 mosaic, so the search's first view of the state is
+ * not an island on paper. The two overlays stay Saxon — outside, they are
+ * transparent and the photo shows through alone.
+ *
  * The outlines carry a floor; see `PARCEL_OUTLINE_MIN_ZOOM`.
  */
 export const aerialCadastreStyle = () => {
@@ -213,14 +230,14 @@ export const aerialCadastreStyle = () => {
   return {
     version: 8,
     sources: {
-      dop: { ...source("dop"), maxzoom: 20 },
+      luftbild: { ...source("luftbild"), maxzoom: 20, attribution: AERIAL },
       strassen: { ...source("strassen"), maxzoom: 20 },
       liegenschaftskarte: {
         ...source("liegenschaftskarte"), minzoom: PARCEL_OUTLINE_MIN_ZOOM, maxzoom: 20
       }
     },
     layers: [
-      { id: "dop", type: "raster", source: "dop" },
+      { id: "luftbild", type: "raster", source: "luftbild" },
       { id: "strassen", type: "raster", source: "strassen", paint: { "raster-opacity": 0.9 } },
       {
         id: "liegenschaftskarte",
@@ -236,7 +253,7 @@ export const aerialCadastreStyle = () => {
 /** What each backdrop offers. `none` keeps the drawing on plain paper. */
 export const BACKDROPS = {
   map: () => vectorStyle(),
-  aerial: async () => rasterStyle("dop", GEOSN),
+  aerial: async () => rasterStyle("luftbild", AERIAL),
   cadastre: async () => rasterStyle("alkis", GEOSN),
   /** Photo, streets and parcel outlines together — the search map's ground. */
   site: async () => aerialCadastreStyle()

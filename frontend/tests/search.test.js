@@ -621,7 +621,7 @@ describe("Die Suchansicht", () => {
         expect(card.text()).toContain(props.gemarkung);
         expect(card.find(".vorschlag__bild svg path").attributes("d")).toMatch(/^M/);
         // The photo and, this close in, the cadastre over it.
-        expect(card.findAll("image").some(i => i.attributes("href").includes("/dop/"))).toBe(true);
+        expect(card.findAll("image").some(i => i.attributes("href").includes("/luftbild/"))).toBe(true);
         expect(card.findAll("image").some(i => i.attributes("href").includes("/liegenschaftskarte/"))).toBe(true);
       });
     });

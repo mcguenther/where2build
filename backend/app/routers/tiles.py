@@ -17,7 +17,7 @@ router = APIRouter(prefix="/api/tiles", tags=["Karten"])
     responses={200: {"content": {"image/png": {}}, "description": "Kachelbild"}},
 )
 async def tile(
-    layer: str = Path(description="dop | webatlas | alkis"),
+    layer: str = Path(description="luftbild | dop | webatlas | deutschland | alkis | …"),
     z: int = Path(ge=0, le=24),
     x: int = Path(ge=0),
     y: int = Path(ge=0),
@@ -30,6 +30,6 @@ async def tile(
         headers={
             "Cache-Control": f"public, max-age={tiles.settings.cache_ttl_s}",
             "X-Cache": "HIT" if from_cache else "MISS",
-            "X-Attribution": "GeoSN, dl-de/by-2-0",
+            "X-Attribution": tiles.attribution(layer),
         },
     )

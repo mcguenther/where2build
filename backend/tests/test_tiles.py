@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import math
 
 import httpx
 import pytest
@@ -13,7 +14,15 @@ from app import geo
 from app.deps import tile_service
 from app.errors import BadRequestError
 
-from .conftest import ALKIS_WMS_URL, DOP_URL, NOISE_EXPORT_URL
+from .conftest import (
+    AERIAL_EAST_URL,
+    AERIAL_OVERVIEW_URL,
+    AERIAL_WEST_URL,
+    ALKIS_WMS_URL,
+    DOP_URL,
+    GERMANY_MAP_URL,
+    NOISE_EXPORT_URL,
+)
 
 # Smallest valid PNG, enough to prove the bytes travel through unchanged.
 PNG = bytes.fromhex(
@@ -116,7 +125,7 @@ def test_geographic_crs_uses_latitude_first():
 def test_layer_configuration_covers_every_switchable_layer():
     assert set(tile_service().layers) == {
         "dop", "webatlas", "alkis", "liegenschaftskarte", "flurstuecke", "strassen", "umgebung",
-        "laerm", "laerm-nacht"
+        "deutschland", "laerm", "laerm-nacht"
     }
 
 
@@ -344,3 +353,177 @@ def test_the_photo_layer_has_no_scale_limit_and_is_asked_plainly(client: TestCli
     client.get("/api/tiles/dop/16/35081/21973.png")
 
     assert "MAP_RESOLUTION" not in route.calls[0].request.url.params
+
+
+# --- The aerial photograph of Germany -------------------------------------------
+
+
+def _tile_at(lon: float, lat: float, z: int) -> tuple[int, int]:
+    n = 2**z
+    x = int((lon + 180.0) / 360.0 * n)
+    y = int((1.0 - math.asinh(math.tan(math.radians(lat))) / math.pi) / 2.0 * n)
+    return x, y
+
+
+def _png(colour: tuple[int, int, int, int], *, left_half_only: bool = False) -> bytes:
+    from PIL import Image
+
+    image = Image.new("RGBA", (256, 256), (0, 0, 0, 0) if left_half_only else colour)
+    if left_half_only:
+        image.paste(Image.new("RGBA", (128, 256), colour), (0, 0))
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def _image(colour: tuple[int, int, int, int], **kwargs) -> httpx.Response:
+    return httpx.Response(200, content=_png(colour, **kwargs), headers={"content-type": "image/png"})
+
+
+def _pixel(data: bytes, x: int, y: int) -> tuple[int, int, int, int]:
+    from PIL import Image
+
+    with Image.open(io.BytesIO(data)) as image:
+        return image.convert("RGBA").getpixel((x, y))
+
+
+RED = (200, 0, 0, 255)
+GREEN = (0, 200, 0, 255)
+BLUE = (0, 0, 200, 255)
+
+
+@respx.mock
+def test_an_inland_aerial_tile_asks_its_own_land_and_nothing_else(client: TestClient):
+    west = respx.get(AERIAL_WEST_URL).mock(return_value=_image(RED))
+    east = respx.get(AERIAL_EAST_URL).mock(return_value=_image(GREEN))
+    ground = respx.get(AERIAL_OVERVIEW_URL).mock(return_value=_image(BLUE))
+    x, y = _tile_at(11.5, 51.0, 14)
+
+    answer = client.get(f"/api/tiles/luftbild/14/{x}/{y}.png")
+
+    assert answer.status_code == 200
+    assert west.call_count == 1
+    # A Land that covers the whole tile leaves nothing for the ground to show.
+    assert east.call_count == 0 and ground.call_count == 0
+    assert _pixel(answer.content, 128, 128) == RED
+    assert "GeoBasis-DE" in answer.headers["x-attribution"]
+    assert "Copernicus" in answer.headers["x-attribution"]
+    assert client.get(f"/api/tiles/luftbild/14/{x}/{y}.png").headers["x-cache"] == "HIT"
+
+
+@respx.mock
+def test_a_border_tile_composes_both_lands_over_the_ground(client: TestClient):
+    """Each Land answers transparent past its border, so stacking is the cut."""
+
+    west = respx.get(AERIAL_WEST_URL).mock(return_value=_image(RED, left_half_only=True))
+    east = respx.get(AERIAL_EAST_URL).mock(
+        return_value=_image((0, 0, 0, 0))
+    )
+    respx.get(AERIAL_OVERVIEW_URL).mock(return_value=_image(BLUE))
+    x, y = _tile_at(12.0, 51.0, 12)
+
+    answer = client.get(f"/api/tiles/luftbild/12/{x}/{y}.png")
+
+    assert answer.status_code == 200
+    assert west.call_count == 1 and east.call_count == 1
+    assert east.calls[0].request.url.params["TIME"] == "2024"
+    assert _pixel(answer.content, 10, 128) == RED
+    # The half no Land drew is the Sentinel ground, not transparency.
+    assert _pixel(answer.content, 250, 128) == BLUE
+
+
+@respx.mock
+def test_a_land_that_paints_white_outside_lies_under_its_neighbour(client: TestClient):
+    """Thüringen answers opaque white past its border, in whole map sheets.
+
+    Laid on top, that white covered Saxony; laid underneath, the neighbour's own
+    survey covers it wherever the neighbour has land.
+    """
+
+    respx.get(AERIAL_WEST_URL).mock(return_value=_image(RED, left_half_only=True))
+    respx.get(AERIAL_EAST_URL).mock(return_value=_image((255, 255, 255, 255)))
+    ground = respx.get(AERIAL_OVERVIEW_URL).mock(return_value=_image(BLUE))
+    x, y = _tile_at(12.0, 51.0, 12)
+
+    answer = client.get(f"/api/tiles/luftbild/12/{x}/{y}.png")
+
+    assert _pixel(answer.content, 10, 128) == RED
+    assert _pixel(answer.content, 250, 128) == (255, 255, 255, 255)
+    assert ground.call_count == 0
+
+
+@respx.mock
+def test_below_the_states_zoom_only_the_overview_is_asked(client: TestClient):
+    west = respx.get(AERIAL_WEST_URL).mock(return_value=_image(RED))
+    ground = respx.get(AERIAL_OVERVIEW_URL).mock(return_value=_image(BLUE))
+    x, y = _tile_at(11.5, 51.0, 9)
+
+    answer = client.get(f"/api/tiles/luftbild/9/{x}/{y}.png")
+
+    assert answer.status_code == 200
+    assert west.call_count == 0 and ground.call_count == 1
+    assert ground.calls[0].request.url.params["LAYERS"] == "rgb"
+    assert _pixel(answer.content, 128, 128) == BLUE
+
+
+@respx.mock
+def test_abroad_the_ground_alone_answers(client: TestClient):
+    west = respx.get(AERIAL_WEST_URL).mock(return_value=_image(RED))
+    ground = respx.get(AERIAL_OVERVIEW_URL).mock(return_value=_image(BLUE))
+    x, y = _tile_at(14.43, 50.08, 15)  # Prague, east of both made-up Länder
+
+    answer = client.get(f"/api/tiles/luftbild/15/{x}/{y}.png")
+
+    assert answer.status_code == 200
+    assert west.call_count == 0 and ground.call_count == 1
+
+
+@respx.mock
+def test_one_silent_land_costs_its_half_and_the_tile_is_not_cached(client: TestClient):
+    west = respx.get(AERIAL_WEST_URL).mock(return_value=_image(RED, left_half_only=True))
+    east = respx.get(AERIAL_EAST_URL).mock(return_value=httpx.Response(503))
+    respx.get(AERIAL_OVERVIEW_URL).mock(return_value=_image(BLUE))
+    x, y = _tile_at(12.0, 51.0, 12)
+
+    first = client.get(f"/api/tiles/luftbild/12/{x}/{y}.png")
+    second = client.get(f"/api/tiles/luftbild/12/{x}/{y}.png")
+
+    assert first.status_code == second.status_code == 200
+    assert _pixel(first.content, 10, 128) == RED
+    # Asked again: a tile with a hole in it must not stay in the cache.
+    assert second.headers["x-cache"] == "MISS"
+    assert east.call_count >= 2
+
+
+@respx.mock
+def test_an_aerial_tile_nobody_could_draw_is_a_502_naming_the_service(client: TestClient):
+    respx.get(AERIAL_WEST_URL).mock(return_value=httpx.Response(503))
+    respx.get(AERIAL_OVERVIEW_URL).mock(return_value=httpx.Response(503))
+    x, y = _tile_at(11.5, 51.0, 14)
+
+    answer = client.get(f"/api/tiles/luftbild/14/{x}/{y}.png")
+
+    assert answer.status_code == 502
+    assert "Luftbilddienst West" in answer.json()["detail"]
+
+
+@respx.mock
+def test_the_germany_map_is_the_bkg_web_map(client: TestClient):
+    route = respx.get(GERMANY_MAP_URL).mock(return_value=_wms_answer())
+
+    answer = client.get("/api/tiles/deutschland/12/2180/1370.png")
+
+    assert answer.status_code == 200
+    assert route.calls[0].request.url.params["LAYERS"] == "de_basemapde_web_raster_farbe"
+    assert "BKG" in answer.headers["x-attribution"]
+
+
+def test_every_land_has_an_aerial_source_with_a_sane_box():
+    from app.settings import AERIAL_SOURCES
+
+    assert len(AERIAL_SOURCES) == 16
+    for source in AERIAL_SOURCES:
+        west, south, east, north = source.bbox
+        # Inside Germany's own box, and not inside out.
+        assert 5.5 < west < east < 15.1, source.service
+        assert 47.1 < south < north < 55.2, source.service

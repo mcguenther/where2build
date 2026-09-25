@@ -7,7 +7,7 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import {
-  PARCEL_OUTLINE_MIN_ZOOM, aerialCadastreStyle, vectorStyle, withOverlay, NOISE_BANDS
+  AERIAL, PARCEL_OUTLINE_MIN_ZOOM, aerialCadastreStyle, vectorStyle, withOverlay, NOISE_BANDS
 } from "../src/lib/basemap.js";
 import { state, darkTheme, watchSystemTheme } from "../src/lib/store.js";
 
@@ -169,8 +169,19 @@ describe("Luftbild mit Kataster", () => {
 
     // Die Reihenfolge ist der ganze Trick: das Foto unten, die Straßen
     // darüber, die Grenzen zuoberst.
-    expect(style.layers.map(l => l.id)).toEqual(["dop", "strassen", "liegenschaftskarte"]);
+    expect(style.layers.map(l => l.id)).toEqual(["luftbild", "strassen", "liegenschaftskarte"]);
     style.layers.forEach(layer => expect(layer.type).toBe("raster"));
+  });
+
+  it("nennt beim Luftbild jedes Land und die Sentinel-Übersicht", () => {
+    const style = aerialCadastreStyle();
+
+    expect(style.sources.luftbild.attribution).toBe(AERIAL);
+    // Namensnennung verlangen fast alle Lizenzen; fehlt ein Land, fehlt sie.
+    ["LGL-BW", "LDBV", "GDI Berlin", "LGB", "Bremen", "LGV Hamburg", "HVBG", "M-V", "LGLN",
+      "NRW", "LVermGeoRP", "LVGL", "GeoSN", "LVermGeo ST", "LVermGeo SH", "GDI-Th", "Copernicus"]
+      .forEach(name => expect(AERIAL).toContain(name));
+    expect(style.sources.strassen.attribution).toContain("GeoSN");
   });
 
   it("holt jede Ebene durch das eigene Backend", () => {
@@ -195,7 +206,7 @@ describe("Luftbild mit Kataster", () => {
     expect(style.sources.flurstuecke).toBeUndefined();
     expect(style.layers.find(l => l.id === "liegenschaftskarte").minzoom).toBe(PARCEL_OUTLINE_MIN_ZOOM);
     // Das Foto und die Straßen dagegen zeichnen auf jeder Stufe.
-    expect(style.sources.dop.minzoom).toBeUndefined();
+    expect(style.sources.luftbild.minzoom).toBeUndefined();
     expect(style.sources.strassen.minzoom).toBeUndefined();
   });
 });

@@ -211,7 +211,9 @@ describe("Grund unter der Wegskizze", () => {
   it("zeichnet den Grund in die Skizze und nennt die Quelle", () => {
     const w = mount(RouteCards, { props: { plot: plot() } });
     expect(w.findAll("image").length).toBeGreaterThan(0);
-    expect(w.text()).toContain("GeoSN");
+    // Deutschlandweit, weil ein Ziel außerhalb Sachsens liegen kann.
+    expect(w.find("image").attributes("href")).toContain("/api/tiles/deutschland/");
+    expect(w.text()).toContain("GeoBasis-DE / BKG");
   });
 
   it("lässt sich abschalten, ohne die Skizze mitzunehmen", () => {

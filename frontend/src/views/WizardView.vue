@@ -210,7 +210,7 @@
               jedes mit seiner Nummer.
               {{ composing ? "Ein Klick nimmt eines dazu oder heraus." : "Ein Klick wählt ein anderes." }}
             </template>
-            Luftbild und Kataster: © GeoSN, dl-de/by-2-0
+            Kataster: © GeoSN, dl-de/by-2-0 · Luftbild: © GeoBasis-DE / Länder
           </p>
         </div>
         <div class="panel">

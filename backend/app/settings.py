@@ -11,7 +11,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, SecretStr
+from pydantic import BaseModel, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Anchored to the backend package, not the working directory: the documented
@@ -300,6 +300,145 @@ class AirQualitySettings(BaseSettings):
     timeout_s: float = 30.0
 
 
+class AerialSource(BaseModel):
+    """One state's orthophoto WMS, as a member of the Germany-wide aerial layer.
+
+    ``bbox`` is west, south, east, north in WGS84, read from the layer's own
+    ``EX_GeographicBoundingBox``. It only decides whether a tile is worth asking
+    this service for: every one of these answers a fully transparent PNG
+    outside its state, so a generous box costs a request and never a wrong
+    picture.
+    """
+
+    service: str
+    url: str
+    layers: str
+    bbox: tuple[float, float, float, float]
+    # Extra GetMap parameters. Hamburg's service is a time series whose older
+    # years carry closed satellite licences; the year is pinned so the default
+    # cannot drift onto one of them.
+    params: dict[str, str] = Field(default_factory=dict)
+    # True for a service that paints *opaque white* past its own border rather
+    # than leaving it transparent. It is laid under every other Land, so each
+    # neighbour's own survey covers the white where the two overlap.
+    white_outside: bool = False
+
+
+# Every Land's open DOP, measured 25.09.2026: GetCapabilities read, one z17
+# tile per capital drawn, and a tile over Leipzig (Halle for Saxony) answered
+# fully transparent. Licences are CC BY 4.0, dl-de/by-2-0 or dl-de/zero-2-0;
+# the Bund's own DOP (`sgx.geodatenzentrum.de/wms_dop`) answers 403 without an
+# account. Saxony's entry is the same service `dop` has always used.
+AERIAL_SOURCES: list[AerialSource] = [
+    AerialSource(
+        service="Der Luftbilddienst Baden-Württembergs",
+        url="https://owsproxy.lgl-bw.de/owsproxy/ows/WMS_LGL-BW_ATKIS_DOP_20_C",
+        layers="IMAGES_DOP_20_RGB",
+        bbox=(7.2, 47.4, 10.7, 50.0),
+    ),
+    AerialSource(
+        service="Der Luftbilddienst Bayerns",
+        url="https://geoservices.bayern.de/od/wms/dop/v1/dop20",
+        layers="by_dop20c",
+        bbox=(8.957621, 47.162543, 14.032767, 50.587905),
+    ),
+    # Its certificate chains to "Telekom Security TLS RSA Root 2023", which
+    # certifi carries and some system stores do not yet.
+    AerialSource(
+        service="Der Luftbilddienst Berlins",
+        url="https://gdi.berlin.de/services/wms/truedop_2024",
+        layers="truedop_2024",
+        bbox=(13.047582, 52.316438, 13.767418, 52.685406),
+    ),
+    AerialSource(
+        service="Der Luftbilddienst Brandenburgs",
+        url="https://isk.geobasis-bb.de/mapproxy/dop20c/service/wms",
+        layers="bebb_dop20c",
+        bbox=(11.229126, 51.30631, 14.770193, 53.57262),
+    ),
+    # The group layer "DOP Luftbilder Land Bremen" draws a black-and-white
+    # historic flight; the current colour survey is its own layer.
+    AerialSource(
+        service="Der Luftbilddienst Bremens",
+        url="https://geodienste.bremen.de/wms_dop_lb",
+        layers="dop10_2025_HB",
+        bbox=(8.45982, 53.0062, 9.0139, 53.232),
+    ),
+    AerialSource(
+        service="Der Luftbilddienst Hamburgs",
+        url="https://geodienste.hamburg.de/wms_dop_zeitreihe_belaubt",
+        layers="wms_dop_zeitreihe_belaubt",
+        bbox=(9.721766, 53.385582, 10.349556, 53.750431),
+        params={"TIME": "2024"},
+    ),
+    AerialSource(
+        service="Der Luftbilddienst Hessens",
+        url="https://www.gds-srv.hessen.de/cgi-bin/lika-services/ogc-free-images.ows",
+        layers="he_dop20_rgb",
+        bbox=(7.69883, 49.3761, 10.2723, 51.667),
+    ),
+    # Stamps "© GeoBasis-DE/M-V" into every tile; that is the service, not us.
+    AerialSource(
+        service="Der Luftbilddienst Mecklenburg-Vorpommerns",
+        url="https://www.geodaten-mv.de/dienste/adv_dop",
+        layers="mv_dop",
+        bbox=(10.33942, 53.039183, 14.47699, 54.820921),
+    ),
+    AerialSource(
+        service="Der Luftbilddienst Niedersachsens",
+        url="https://opendata.lgln.niedersachsen.de/doorman/noauth/dop_wms",
+        layers="ni_dop20",
+        bbox=(6.505772, 51.153098, 11.754046, 54.148101),
+    ),
+    AerialSource(
+        service="Der Luftbilddienst Nordrhein-Westfalens",
+        url="https://www.wms.nrw.de/geobasis/wms_nw_dop",
+        layers="nw_dop_rgb",
+        bbox=(5.593338, 50.057798, 9.741582, 52.799797),
+    ),
+    AerialSource(
+        service="Der Luftbilddienst von Rheinland-Pfalz",
+        url="https://geo4.service24.rlp.de/wms/rp_dop20.fcgi",
+        layers="rp_dop20",
+        bbox=(6.037773, 48.897996, 8.617703, 51.000893),
+    ),
+    AerialSource(
+        service="Der Luftbilddienst des Saarlands",
+        url="https://geoportal.saarland.de/freewms/dop2023",
+        layers="sl_dop20_rgb",
+        bbox=(6.340597, 49.082884, 7.438171, 49.659757),
+    ),
+    AerialSource(
+        service="Der Luftbilddienst des GeoSN",
+        url="https://geodienste.sachsen.de/wms_geosn_dop-rgb/guest",
+        layers="sn_dop_020",
+        bbox=(11.788898, 50.150604, 15.08686, 51.72093),
+    ),
+    AerialSource(
+        service="Der Luftbilddienst Sachsen-Anhalts",
+        url="https://www.geodatenportal.sachsen-anhalt.de/wss/service/ST_LVermGeo_DOP_WMS_OpenData/guest",
+        layers="lsa_lvermgeo_dop20_2",
+        bbox=(10.50923, 50.892719, 13.323255, 53.076941),
+    ),
+    AerialSource(
+        service="Der Luftbilddienst Schleswig-Holsteins",
+        url="https://dienste.gdi-sh.de/WMS_SH_DOP20col_OpenGBD",
+        layers="sh_dop20_rgb",
+        bbox=(7.823156, 53.298791, 11.415539, 55.154323),
+    ),
+    AerialSource(
+        service="Der Luftbilddienst Thüringens",
+        url="https://www.geoproxy.geoportal-th.de/geoproxy/services/DOP",
+        layers="th_dop",
+        bbox=(9.85484, 50.154427, 12.711884, 51.66367),
+        # Measured 25.09.2026 over every z9 tile of every Land's box: the only
+        # one of sixteen with opaque white outside, up to 99 % of a tile, in
+        # whole map sheets reaching into Saxony and Saxony-Anhalt.
+        white_outside=True,
+    ),
+]
+
+
 class TilesSettings(BaseSettings):
     """WMS raster proxy (env prefix ``TILES_``).
 
@@ -358,6 +497,24 @@ class TilesSettings(BaseSettings):
     # street, often by more than a quarter turn, and street names would then
     # stand on their heads -- at that size they are noise either way.
     surroundings_layers: str = "Vegetation,Siedlung,Gewaesser,Verkehr"
+    # The aerial photograph beyond Saxony: every Land's open DOP, composed into
+    # one tile, over the BKG's Sentinel-2 mosaic wherever no Land draws (abroad,
+    # and every zoom below the one the states start at). A JSON list in
+    # TILES_AERIAL_SOURCES replaces the whole set.
+    aerial_sources: list[AerialSource] = Field(default_factory=lambda: list(AERIAL_SOURCES))
+    # Europe at 10 m, free under the Copernicus notice -- unlike EOX's
+    # s2cloudless, whose recent years are non-commercial only.
+    aerial_overview_url: str = "https://sgx.geodatenzentrum.de/wms_sen2europe"
+    aerial_overview_layers: str = "rgb"
+    # Below this the Länder are not asked. A z11 tile spans some 12 km of
+    # Saxony, 47 m to the pixel: the 10 m Sentinel mosaic is sharper than the
+    # screen there, and sixteen authorities' colour balances side by side
+    # would read as a patchwork.
+    aerial_states_min_zoom: int = 12
+    # The Germany-wide web map of the AdV, for the route cards: a route leaves
+    # Saxony as soon as its destination does, and the web atlas stops there.
+    germany_map_url: str = "https://sgx.geodatenzentrum.de/wms_basemapde"
+    germany_map_layers: str = "de_basemapde_web_raster_farbe"
     # The noise survey is not a WMS tile source: its service offers EPSG:4326
     # and 25833 but not 3857, so MapLibre's {bbox-epsg-3857} raster source gets
     # nothing at all. The ArcGIS ``export`` endpoint reprojects server-side.

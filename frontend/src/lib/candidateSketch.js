@@ -86,7 +86,7 @@ export function candidateSketch(geometry, { width = SKETCH_WIDTH, height = SKETC
     viewBox: `0 0 ${width} ${height}`,
     width,
     height,
-    photo: tiles.map(tile => ({ ...tile, href: tileUrl(tile, "dop") })),
+    photo: tiles.map(tile => ({ ...tile, href: tileUrl(tile, "luftbild") })),
     cadastre: cadastre ? tiles.map(tile => ({ ...tile, href: tileUrl(tile, "liegenschaftskarte") })) : [],
     path,
     groundWidthM

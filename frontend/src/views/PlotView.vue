@@ -423,7 +423,7 @@
           </div>
 
           <div class="plan-foot">
-            <span>{{ locationOverlay ? "Isophonen: LfULG · " : "" }}Kataster und Luftbild: © GeoSN, dl-de/by-2-0</span>
+            <span>{{ locationOverlay ? "Isophonen: LfULG · " : "" }}Kataster: © GeoSN, dl-de/by-2-0 · Luftbild: © GeoBasis-DE / Länder</span>
             <span v-if="siteCheckResult">Abgerufen {{ date(siteCheckResult.abgerufen_am) }}</span>
           </div>
         </section>

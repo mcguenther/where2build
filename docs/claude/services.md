@@ -5,7 +5,8 @@ specification. `docs/research/` holds the long form; this file holds the parts
 that cost time when they were not known.
 
 The services are the Saxon cadastre (ALKIS-WFS), the land values (BORIS), the
-GeoSN map layers, the Saxon environmental server (LUIS, ArcGIS REST), the
+GeoSN map layers, the sixteen Länder's orthophoto WMS and the BKG's web map and
+Sentinel-2 mosaic, the Saxon environmental server (LUIS, ArcGIS REST), the
 federal air-quality API (UBA), routing (MOTIS/Transitous), OpenStreetMap by way
 of Overpass or a local extract, the listing portals, and the extraction model.
 
@@ -389,6 +390,44 @@ of Overpass or a local extract, the listing portals, and the extraction model.
   *every* radius from 50 m up, and the same ring reversed returned 114
   boreholes; Flurstück 204 (650 m²) answered either way, which is what kept it
   hidden. `services/luis.py` orients every ring clockwise before it goes out.
+
+- **Every Land's DOP is an open WMS, and each answers *transparent* outside
+  its own border — which is what makes one Germany-wide photograph a stack
+  rather than a mosaic with cut lines.** Measured 25.09.2026: GetCapabilities
+  of all sixteen read, a z17 tile over each capital drawn, a tile over Leipzig
+  (Halle for Saxony) fully transparent, EPSG:3857 offered by all. The GeoSN
+  layers do the same, so the beige around Saxony on the search map was never
+  the service — it was our own `--w2b-map-ground` showing through. The
+  Bund's own DOP (`sgx.geodatenzentrum.de/wms_dop`) answers 403 without an
+  account; EOX's s2cloudless is sharp but CC BY-NC-SA from 2018 on; Esri's
+  imagery wants an ArcGIS account. The BKG's `wms_sen2europe` (layer `rgb`)
+  covers Europe at 10 m under the Copernicus notice, commercial use included,
+  and is the ground: under every Land, and alone below z12. It has no data
+  over open sea — the North Sea stays paper at z7.
+  `services/tiles.py` asks only the Länder whose capabilities box touches a
+  tile (one inland, two or three along a border) and lays them over one
+  another, first at the bottom.
+- **Thüringen paints opaque white past its border, in whole map sheets.** A
+  scan of every z9 tile of every Land's box found it the only one of sixteen:
+  up to 99 % of a tile, reaching well into Saxony and Saxony-Anhalt. On top of
+  the stack it covered Saxony in white rectangles; `white_outside` puts it at
+  the bottom, where each neighbour's own survey covers the white.
+- **The Länder's services each have one trap of their own.** Bremen's
+  top layer „DOP Luftbilder Land Bremen" draws a black-and-white historic
+  flight — the current survey is `dop10_2025_HB`. Hamburg's is a time series
+  (`TIME`, default 2024) whose Fees name closed satellite licences for some
+  years, so the year is pinned. Mecklenburg-Vorpommern stamps „© GeoBasis-DE/M-V"
+  into every tile. Niedersachsen reset 9 of 64 connections under eight parallel
+  requests. Berlin's certificate chains to „Telekom Security TLS RSA Root 2023",
+  which certifi carries and this sandbox's system bundle does not — `curl`
+  fails, the backend's httpx does not. And Thüringen's `th_dop20rgb` does not
+  exist; the colour layer is the group `th_dop`.
+- **One silent Land must not blank its neighbour's half of a border tile.** A
+  failure drops that Land from the stack and the tile is served *uncached*, so
+  the next request asks again; only a tile nothing could be drawn for is a 502.
+- **A response header is Latin-1.** `X-Attribution` with „Länder" in it made
+  Starlette's test client raise `UnicodeDecodeError` on every aerial tile. The
+  header is ASCII; the full credit, per Land, is the map's own attribution.
 
 - **`adv_alkis_flurstuecke` carries `MaxScaleDenominator: 2000` and answers 200
   with a transparent PNG above it — and a scale limit is *steerable*.** Same

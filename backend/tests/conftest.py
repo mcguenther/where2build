@@ -30,6 +30,11 @@ LUIS_URL = "https://luis.example.org/arcgis/rest/services"
 NOISE_EXPORT_URL = f"{LUIS_URL}/laerm/laermkartierung/MapServer/export"
 UBA_URL = "https://luftdaten.example.org/api/air-data/v3"
 BASEMAP_URL = "https://tiles.openfreemap.org"
+# Two made-up Länder that meet at 12° east, and the ground under both.
+AERIAL_WEST_URL = "https://wms.example.org/luftbild-west"
+AERIAL_EAST_URL = "https://wms.example.org/luftbild-ost"
+AERIAL_OVERVIEW_URL = "https://wms.example.org/sentinel"
+GERMANY_MAP_URL = "https://wms.example.org/basemapde"
 OIDC_ISSUER = "https://auth.example.org"
 
 
@@ -59,6 +64,29 @@ def isolated_settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("TILES_DOP_URL", DOP_URL)
     monkeypatch.setenv("TILES_ALKIS_URL", ALKIS_WMS_URL)
     monkeypatch.setenv("TILES_NOISE_URL", NOISE_EXPORT_URL)
+    monkeypatch.setenv(
+        "TILES_AERIAL_SOURCES",
+        json.dumps(
+            [
+                {
+                    "service": "Der Luftbilddienst West",
+                    "url": AERIAL_WEST_URL,
+                    "layers": "west_dop",
+                    "bbox": [11.0, 50.0, 12.0, 52.0],
+                },
+                {
+                    "service": "Der Luftbilddienst Ost",
+                    "url": AERIAL_EAST_URL,
+                    "layers": "ost_dop",
+                    "bbox": [12.0, 50.0, 13.0, 52.0],
+                    "params": {"TIME": "2024"},
+                    "white_outside": True,
+                },
+            ]
+        ),
+    )
+    monkeypatch.setenv("TILES_AERIAL_OVERVIEW_URL", AERIAL_OVERVIEW_URL)
+    monkeypatch.setenv("TILES_GERMANY_MAP_URL", GERMANY_MAP_URL)
     monkeypatch.setenv("LUIS_BASE_URL", LUIS_URL)
     monkeypatch.setenv("AIRQUALITY_BASE_URL", UBA_URL)
     monkeypatch.setenv("BASEMAP_UPSTREAM_URL", BASEMAP_URL)
