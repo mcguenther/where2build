@@ -38,11 +38,17 @@
     <rect v-if="!hasBackdrop" x="0" y="0" :width="width" :height="height" :fill="backgroundFill" />
 
     <g :transform="`rotate(${rotation}, ${width / 2}, ${height / 2})`">
-      <g v-if="groundTiles.length" class="site-plan__tile-ground"
+      <!-- One composed image, shown only once it has arrived whole: until then
+           the flat ground above stands, and a failed one leaves it standing. -->
+      <g v-if="groundImage" class="site-plan__tile-ground"
          :class="{ 'site-plan__tile-ground--dark': darkBackdrop }" aria-hidden="true">
-        <image v-for="tile in groundTiles" :key="tile.key" :href="tile.href"
-               :x="tile.x" :y="tile.y" :width="tile.size" :height="tile.size"
-               preserveAspectRatio="none" />
+        <image :key="groundImage.href" :href="groundImage.href"
+               :x="groundImage.x" :y="groundImage.y"
+               :width="groundImage.width" :height="groundImage.height"
+               preserveAspectRatio="none" class="site-plan__ground-image"
+               :class="{ 'is-loaded': groundLoaded === groundImage.href }"
+               :data-ground="groundLoaded === groundImage.href ? 'ready' : 'loading'"
+               @load="groundLoaded = groundImage.href" @error="groundFailed = groundImage.href" />
       </g>
 
       <polygon :points="path(plot.polygon)" fill="var(--w2b-map-surface)"
@@ -205,7 +211,7 @@ import {
   polygonCentroid
 } from "../lib/geometry.js";
 import { cameraFor, toLocal, toWgs84 } from "../lib/projection.js";
-import { groundTileLayout } from "../lib/tileGround.js";
+import { groundBlock } from "../lib/tileGround.js";
 import { outerRing } from "../lib/plots.js";
 import { num, area } from "../lib/format.js";
 import { BACKDROPS, canRenderMap, withOverlay } from "../lib/basemap.js";
@@ -351,7 +357,10 @@ export default {
       // CSS transform on the drawing.
       zoomFactor: 1,
       panMetres: { x: 0, y: 0 },
-      panning: null
+      panning: null,
+      // The ground image by its href: the one that has arrived, and the one
+      // that could not. Keyed by href so a changed frame starts hidden again.
+      groundLoaded: null, groundFailed: null
     };
   },
   computed: {
@@ -383,11 +392,12 @@ export default {
      *  was fetched again, forever. */
     wantsBackdrop() { return this.backdrop !== "none" && Boolean(this.plot.anchor); },
     hasBackdrop() { return this.wantsBackdrop && !this.mapUnavailable; },
-    /** Raster tiles under the drawing, placed in the rotated group so they
-     *  turn with it. See lib/tileGround.js. */
-    groundTiles() {
-      if (!this.tileGround || this.hasBackdrop || !this.plot.anchor) return [];
-      return groundTileLayout(this.plot.anchor, this.view, this.width, this.height, this.tileGround);
+    /** The raster ground under the drawing as one image, placed in the
+     *  rotated group so it turns with it. See lib/tileGround.js. */
+    groundImage() {
+      if (!this.tileGround || this.hasBackdrop || !this.plot.anchor) return null;
+      const block = groundBlock(this.plot.anchor, this.view, this.width, this.height, this.tileGround);
+      return block && block.href !== this.groundFailed ? block : null;
     },
     backgroundFill() { return this.backdrop === "aerial" ? "var(--w2b-map-green)" : "var(--w2b-map-ground)"; },
     /** Which palette the vector backdrop should be drawn in. Deliberately not
@@ -995,6 +1005,13 @@ export default {
    dark theme the render is inverted first, or it would be a pale sheet. */
 .site-plan__tile-ground{ opacity: .42; filter: grayscale(1); mix-blend-mode: multiply; }
 .site-plan__tile-ground--dark{ opacity: .45; filter: invert(1) grayscale(1); mix-blend-mode: screen; }
+/* The ground arrives as one image and appears in one go, rather than a
+   quilt filling in over a second or two. print.css shows it regardless. */
+.site-plan__ground-image{ opacity: 0; transition: opacity .24s ease-out; }
+.site-plan__ground-image.is-loaded{ opacity: 1; }
+@media (prefers-reduced-motion: reduce){
+  .site-plan__ground-image{ transition: none; }
+}
 /* The parcels on offer. Deliberately quiet: the plot itself keeps the halo and
    the drawn contour, and a candidate is a thin outline with its number — a
    choice, not a finding. */

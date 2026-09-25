@@ -211,32 +211,42 @@ routines under it.
   the unturned frame's corners. Local metres and Web Mercator share one scale
   factor around the anchor, so the placement is linear.
 
-- **A thumbnail's tiles are in the backend's cache before anything draws
-  them.** Measured 24.09.2026: the GeoSN web atlas takes 1–1,4 s per tile and
-  caches nothing of its own (the same GetMap twice, both slow); our disk cache
-  answers in 4 ms. So the delay was only ever the *first* sight of a plot — and
-  that is every new plot, because the wizard's preview is another ground at
-  another zoom and warms none of them. `App.vue` watches `wantedThumbnailTiles`
-  (every card at `CARD_FRAME`, the ticked plots at the comparison's shared
-  scale) and names new tiles to `POST /api/tiles/warm`, which answers 202 in
-  ~12 ms and fetches the missing ones afterwards, four at a time. The browser
-  downloads nothing for it and its HTTP cache is not part of the plan: a first
-  attempt warmed with `new Image()`, and it was rejected for exactly that. The
-  warm-up pays one tile of the map budget per tile it sends *outward*, and a
-  warm-up over the budget is refused whole. A watch, not a call in `addPlot`:
-  the street front settles after the plot is stored and turns the drawing, and
-  ticking a plot changes the scale all compared drawings share. Tiles are
-  claimed before the first `await`, so the list's warm-up and the comparison's
-  a moment later do not both fetch one — claiming inside the task let both
-  through, and a test caught it. The layout lives in `lib/tileGround.js` so
-  drawing and warm-up name the same tiles; the test compares against the
-  mounted thumbnails *with positions*, because the cover is the frame's
-  diagonal on every side and a centre metres off still asks for the same tiles
-  — a URL-only check passed with the rotation deleted. Measured after: two new
-  plots, then the list and the comparison opened in a *fresh* browser with no
-  HTTP cache — 21 of 21 tiles `HIT`, slowest 118 ms. Storing a stitched ground
-  with the plot was weighed and left: ~8 KB each, but the disk cache is shared
-  by everyone for 30 days and already answers in milliseconds.
+- **A thumbnail's ground is one composed image, built before anything draws
+  it, and shown only once it is whole.** Measured 24.09.2026: the GeoSN web
+  atlas takes 1–1,4 s per tile and caches nothing of its own; our disk cache
+  answers in 4 ms. Warming the tiles made the second sight fast — and in the
+  compose stack with Firefox each card still filled in tile by tile over
+  1–3 s, six to nine `<image>` elements per card arriving one after another,
+  which looked broken. The backend now stitches the card's whole cover into
+  one PNG (`GET /api/tiles/{layer}/block/{z}/{west}/{north}/{east}/{south}.png`,
+  cached whole under `tile-blocks/`, eviction tier 1 so it outlives the tiles
+  it was made of; at most 100 tiles, the frontend's cover stops at ~68) and
+  `SitePlan` draws that single image at `opacity: 0` until its `load` event,
+  then fades it in over 0,24 s — no fade under `prefers-reduced-motion`, and
+  `print.css` shows it regardless. A block with one failed tile is an error,
+  never a stored image with a hole; a failed image is removed, so the flat
+  ground stays and no broken-image icon appears. `App.vue` watches
+  `wantedThumbnailGrounds` (every card at `CARD_FRAME`, the ticked plots at the
+  comparison's shared scale) and names the blocks to `POST /api/tiles/warm`,
+  which answers 202 and composes them afterwards, four tiles at a time. It pays
+  one tile of the map budget per tile it sends *outward*, a warm-up over the
+  budget is refused whole, and blocks are claimed before the first `await`.
+  The block route pays the same way. Work in flight is shared by key
+  (`TileService._once`), so a card asking while the warm-up still builds its
+  block waits for that build instead of fetching the tiles a second time.
+  The layout lives in `lib/tileGround.js` (`groundBlock`), so drawing and
+  warm-up name the same block. The test compares the mounted thumbnails' x, y,
+  width and height, not just the href: the cover is the frame's diagonal on
+  every side, and a centre metres off still asks for the same block — a
+  URL-only check passed with the rotation deleted. Measured 25.09.2026 after
+  two new plots, list and comparison opened in a *fresh* browser: one request
+  per distinct block (the list's two cards two, the comparison's two neighbours
+  one shared block), all `HIT`, 8–14 ms. With both caches emptied it is one
+  `MISS` per block at ~2,2 s, and both cards appear together. The screenshot run waits for
+  `[data-ground="loading"]` to clear before every picture, or a cold cache
+  photographs flat paper and passes. And print.css had been hiding the
+  comparison's drawings since the first print: each sits inside a `<button>`,
+  and the blanket `button` rule swallowed it.
 
 - **The street side was the longest edge, and that was wrong on seven of eight
   real plots.** Measured 23.09.2026 on every parcel fixture: only the 1 594 m

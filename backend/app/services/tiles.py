@@ -29,6 +29,16 @@ SERVICE_NAME = "Der Kartendienst des GeoSN"
 # looking at yet.
 WARM_CONCURRENCY = 4
 
+# How many tiles a block somebody is waiting for fetches at once: what a
+# browser allows itself per host, which is what drew these tiles before they
+# were composed here.
+BLOCK_CONCURRENCY = 6
+
+# The largest block of tiles composed into one image. A thumbnail's cover is
+# the frame's diagonal on every side and `tileCover` gives up past ~68 tiles
+# for the two thumbnail frames; in practice it is 3x3 to 4x4.
+MAX_BLOCK_TILES = 100
+
 ADVICE = (
     "Die Kartenebene bleibt leer; auf eine andere Ebene umschalten hilft meist. "
     "Fläche, Bodenrichtwert und Bebauungsplanung sind davon nicht betroffen."
@@ -169,14 +179,70 @@ def _downscale(data: bytes, target: int) -> bytes:
         return buffer.getvalue()
 
 
+@dataclass(frozen=True)
+class TileBlock:
+    """A rectangle of tiles of one layer, west to east and north to south inclusive."""
+
+    layer: str
+    z: int
+    west: int
+    north: int
+    east: int
+    south: int
+
+    @property
+    def columns(self) -> int:
+        return self.east - self.west + 1
+
+    @property
+    def rows(self) -> int:
+        return self.south - self.north + 1
+
+    def tiles(self) -> list[tuple[str, int, int, int]]:
+        return [
+            (self.layer, self.z, x, y)
+            for y in range(self.north, self.south + 1)
+            for x in range(self.west, self.east + 1)
+        ]
+
+
+def _stitch(block: TileBlock, images: list[bytes], tile_size: int) -> bytes:
+    """The block's tiles pasted into one PNG, in the order ``block.tiles()`` names them."""
+
+    from PIL import Image
+
+    canvas = Image.new("RGBA", (block.columns * tile_size, block.rows * tile_size), (0, 0, 0, 0))
+    for (_, _, x, y), data in zip(block.tiles(), images, strict=True):
+        try:
+            with Image.open(io.BytesIO(data)) as tile:
+                tile = tile.convert("RGBA")
+        except OSError as exc:
+            raise UpstreamError(
+                f"{SERVICE_NAME} hat ein Bild geliefert, das sich nicht lesen lässt. {ADVICE}"
+            ) from exc
+        if tile.size != (tile_size, tile_size):
+            tile = tile.resize((tile_size, tile_size), Image.BOX)
+        canvas.paste(tile, ((x - block.west) * tile_size, (y - block.north) * tile_size))
+    buffer = io.BytesIO()
+    canvas.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
 class TileService:
     def __init__(self, settings: TilesSettings, app_settings: AppSettings) -> None:
         self.settings = settings
         self.app_settings = app_settings
         self.cache = DiskCache(app_settings.cache_dir / "tiles", ttl_s=settings.cache_ttl_s)
-        # Keys a warm-up is fetching right now, so two overlapping warm-ups --
-        # the list and then the comparison -- do not both ask for a tile.
+        # Finished thumbnail grounds, whole: one request per card instead of a
+        # dozen, and one image that appears at once instead of tile by tile.
+        self.blocks = DiskCache(app_settings.cache_dir / "tile-blocks", ttl_s=settings.cache_ttl_s)
+        # Blocks a warm-up is composing right now, so two overlapping warm-ups
+        # -- the list and then the comparison -- do not both build one.
         self._warming: set[str] = set()
+        # Work in progress by cache key, so a card asking for its ground while
+        # the warm-up is still building it waits for that instead of fetching
+        # the same tiles a second time.
+        self._in_flight: dict[str, asyncio.Future] = {}
 
     @property
     def layers(self) -> dict[str, LayerConfig]:
@@ -339,60 +405,161 @@ class TileService:
         # configuration looks exactly like a change that did not work.
         return f"{layer}/{_fingerprint(config)}/{crs}/{z}/{x}/{y}"
 
-    def missing(self, tiles: list[tuple[str, int, int, int]]) -> list[tuple[str, int, int, int]]:
-        """The tiles of this list that the disk cache cannot answer yet.
+    def _block_key(self, block: TileBlock, config: LayerConfig) -> str:
+        crs = "EPSG:3857" if config.kind == "arcgis" else self.settings.crs
+        return (
+            f"{block.layer}/{_fingerprint(config)}/{crs}/{self.settings.tile_size}"
+            f"/{block.z}/{block.west}/{block.north}/{block.east}/{block.south}"
+        )
 
-        Validates every one first, so a warm-up with one bad entry is refused
-        whole instead of half-run.
+    def validate_block(self, block: TileBlock) -> LayerConfig:
+        config = self._validated(block.layer, block.z, block.west, block.north)
+        self._validated(block.layer, block.z, block.east, block.south)
+        if block.east < block.west or block.south < block.north:
+            raise BadRequestError(
+                "Ein Kachelblock reicht von Westen nach Osten und von Norden nach Süden."
+            )
+        count = block.columns * block.rows
+        if count > MAX_BLOCK_TILES:
+            raise BadRequestError(
+                f"Ein Kachelblock darf höchstens {MAX_BLOCK_TILES} Kacheln umfassen, "
+                f"angefragt waren {count}."
+            )
+        return config
+
+    def tiles_to_fetch(self, blocks: list[TileBlock]) -> list[tuple[str, int, int, int]]:
+        """The tiles that building these blocks would have to fetch from the GeoSN.
+
+        Validates every block first, so a warm-up with one bad entry is refused
+        whole instead of half-run. A block that is finished, or being built
+        right now, costs nothing.
         """
 
-        keys = [self._cache_key(tile[0], self._validated(*tile), *tile[1:]) for tile in tiles]
+        wanted = dict.fromkeys(tile for block in self.blocks_to_build(blocks) for tile in block.tiles())
+        keys = {tile: self._cache_key(tile[0], self._config(tile[0]), *tile[1:]) for tile in wanted}
         return [
             tile
-            for tile, key in zip(tiles, keys, strict=True)
-            if key not in self._warming and not self.cache.has(key)
+            for tile, key in keys.items()
+            if key not in self._in_flight and not self.cache.has(key)
         ]
 
-    async def warm(self, tiles: list[tuple[str, int, int, int]]) -> int:
-        """Fetch these tiles into the disk cache and keep nothing else of them.
+    def _block_busy_or_done(self, key: str) -> bool:
+        return key in self._warming or key in self._in_flight or self.blocks.has(key)
+
+    def blocks_to_build(self, blocks: list[TileBlock]) -> list[TileBlock]:
+        """These blocks, once each, without the ones finished or in progress."""
+
+        unique = list(dict.fromkeys(blocks))
+        return [
+            block
+            for block in unique
+            if not self._block_busy_or_done(self._block_key(block, self.validate_block(block)))
+        ]
+
+    async def warm(self, blocks: list[TileBlock]) -> int:
+        """Build these blocks into the disk cache and keep nothing else of them.
 
         For pictures that will be drawn later: a plot's thumbnail on its card
-        and in the comparison. Failures are logged and dropped -- a tile that
-        did not warm is fetched when it is drawn, as it always was.
+        and in the comparison. Failures are logged and dropped -- a block that
+        did not warm is built when it is drawn, as it always was.
         """
 
         gate = asyncio.Semaphore(WARM_CONCURRENCY)
         # Claimed before the first await, so a warm-up that starts a moment
         # later already sees them as taken.
-        keys = {tile: self._cache_key(tile[0], self._config(tile[0]), *tile[1:]) for tile in tiles}
-        claimed = [tile for tile, key in keys.items() if key not in self._warming]
-        self._warming.update(keys[tile] for tile in claimed)
+        keys = {block: self._block_key(block, self._config(block.layer)) for block in blocks}
+        claimed = [block for block, key in keys.items() if key not in self._warming]
+        self._warming.update(keys[block] for block in claimed)
 
-        async def one(tile: tuple[str, int, int, int]) -> bool:
+        async def one(block: TileBlock) -> bool:
             try:
-                async with gate:
-                    _, from_cache = await self.tile(*tile)
+                _, from_cache = await self.block(block, gate)
                 return not from_cache
             except Exception as exc:  # noqa: BLE001 -- a warm-up must never raise
-                logger.info("Tile %s did not warm: %s", "/".join(map(str, tile)), exc)
+                logger.info("Tile block %s did not warm: %s", keys[block], exc)
                 return False
             finally:
-                self._warming.discard(keys[tile])
+                self._warming.discard(keys[block])
 
-        results = await asyncio.gather(*(one(tile) for tile in claimed))
+        results = await asyncio.gather(*(one(block) for block in claimed))
         return sum(results)
+
+    async def _once(self, key: str, work) -> tuple[bytes, bool]:
+        """Run ``work`` for this key unless it is already running; then share its answer."""
+
+        running = self._in_flight.get(key)
+        if running is not None:
+            # Shielded: a waiter that gives up must not cancel the owner's work.
+            return await asyncio.shield(running)
+        future: asyncio.Future = asyncio.get_running_loop().create_future()
+        self._in_flight[key] = future
+        try:
+            result = await work()
+        except asyncio.CancelledError:
+            future.cancel()
+            raise
+        except Exception as exc:
+            future.set_exception(exc)
+            # Nobody may be waiting; the exception is reported to this caller.
+            future.exception()
+            raise
+        else:
+            future.set_result(result)
+            return result
+        finally:
+            del self._in_flight[key]
+
+    async def block(
+        self, block: TileBlock, gate: asyncio.Semaphore | None = None
+    ) -> tuple[bytes, bool]:
+        """One PNG of the whole block, and whether it came from the cache.
+
+        Every tile goes through ``tile`` and so lands in the tile cache on its
+        own. A block with one failed tile is not an image: the failure is
+        raised and nothing of the block is stored, or a hole would be served
+        for a month.
+        """
+
+        config = self.validate_block(block)
+        key = self._block_key(block, config)
+        cached = self.blocks.get_bytes(key)
+        if cached is not None:
+            return cached, True
+
+        async def build() -> tuple[bytes, bool]:
+            limit = gate or asyncio.Semaphore(BLOCK_CONCURRENCY)
+
+            async def fetch(tile: tuple[str, int, int, int]) -> bytes:
+                async with limit:
+                    image, _ = await self.tile(*tile)
+                return image
+
+            results = await asyncio.gather(
+                *(fetch(tile) for tile in block.tiles()), return_exceptions=True
+            )
+            for result in results:
+                if isinstance(result, BaseException):
+                    raise result
+            image = await asyncio.to_thread(_stitch, block, results, self.settings.tile_size)
+            self.blocks.set_bytes(key, image)
+            return image, False
+
+        return await self._once(key, build)
 
     async def tile(self, layer: str, z: int, x: int, y: int) -> tuple[bytes, bool]:
         """Return the tile image and whether it came from the cache."""
 
         config = self._validated(layer, z, x, y)
-        crs = "EPSG:3857" if config.kind == "arcgis" else self.settings.crs
         size = self.render_size(config, z)
         cache_key = self._cache_key(layer, config, z, x, y)
         cached = self.cache.get_bytes(cache_key)
         if cached is not None:
             return cached, True
+        return await self._once(cache_key, lambda: self._fetch(config, cache_key, z, x, y, size))
 
+    async def _fetch(
+        self, config: LayerConfig, cache_key: str, z: int, x: int, y: int, size: int
+    ) -> tuple[bytes, bool]:
         # Imported here so tests can patch app.upstream.request in one place.
         from ..upstream import request
 

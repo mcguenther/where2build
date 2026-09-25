@@ -108,12 +108,13 @@
 
   .print-only{ display: block; }
 
-  /* Two of these are not controls but content that happens to be clickable, and
-     the blanket `button` rule above swallows them: a printed list of plots
-     without names or outlines is not a list of plots. The compare checkbox
-     beside them really is a control and stays gone. */
+  /* Three of these are not controls but content that happens to be clickable,
+     and the blanket `button` rule above swallows them: a printed list of plots
+     without names or outlines is not a list of plots, and the comparison's
+     „Drucken" printed its table and an empty panel where the drawings were.
+     The compare checkbox really is a control and stays gone. */
   .plot-card__title{ display: inline !important; }
-  .plot-card__plan{ display: block !important; }
+  .plot-card__plan, .plan-figure__button{ display: block !important; }
   .plot-card__select{ display: none !important; }
 
   /* ---------- Fields are values on paper, not controls ----------
@@ -189,6 +190,10 @@
   .site-plan__dimension{ font-size: 16px !important; stroke-width: 5px !important; }
   .site-plan__north{ font-size: 19px !important; }
   .site-plan__scale-bar{ font-size: 13px !important; }
+
+  /* A thumbnail's ground waits for its load event on screen; paper has no
+     fade, and a print taken mid-way must not come out with an empty frame. */
+  .site-plan__ground-image{ opacity: 1 !important; transition: none !important; }
 
   /* The north arrow and the scale bar stay: with the map rotated to the street
      they are the only orientation left on paper.

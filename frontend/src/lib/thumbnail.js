@@ -8,7 +8,7 @@
  * back in grey so the plot itself is the only coloured shape in the frame.
  */
 import { fitScale, streetDownRotation, turnedBox } from "./geometry.js";
-import { groundTileLayout } from "./tileGround.js";
+import { groundBlock } from "./tileGround.js";
 
 /** Relative room on every side of the outline: enough for the neighbours to
  *  read as neighbours, little enough that the plot stays the subject. */
@@ -26,7 +26,7 @@ export const THUMBNAIL_GROUND = "umgebung";
 /** The two frames a plot is drawn small in: its card in the list, and its
  *  column in the comparison. Named here so the drawing and the warm-up below
  *  cannot disagree about a pixel — a different frame is a different zoom and
- *  therefore different tiles. */
+ *  therefore a different block. */
 export const CARD_FRAME = { width: 300, height: 196 };
 export const COMPARE_FRAME = { width: 220, height: 280 };
 
@@ -59,32 +59,28 @@ export function thumbnailView(plot, width, height, scale = null) {
   return { scale: fitted, mx: centre.x, my: centre.y };
 }
 
-/** The ground tiles the thumbnail of this plot draws, laid out as it lays
- *  them out. */
-export function thumbnailTiles(plot, { width, height }, scale = null) {
-  if (!plot?.anchor || !(plot.polygon?.length >= 3)) return [];
-  return groundTileLayout(plot.anchor, thumbnailView(plot, width, height, scale), width, height, THUMBNAIL_GROUND);
+/** The ground image the thumbnail of this plot draws, placed as it places
+ *  it, or `null`. */
+export function thumbnailGround(plot, { width, height }, scale = null) {
+  if (!plot?.anchor || !(plot.polygon?.length >= 3)) return null;
+  return groundBlock(plot.anchor, thumbnailView(plot, width, height, scale), width, height, THUMBNAIL_GROUND);
 }
 
-/** The same, as the backend is told about them. */
-export const thumbnailTileRefs = (plot, frame, scale = null) =>
-  thumbnailTiles(plot, frame, scale).map(tile => tile.ref);
-
 /**
- * Every tile the list and the comparison will want for these plots: each card
- * at its own fit, and the ones ticked for comparison at the scale they will
- * share there. A freshly created plot is otherwise first drawn with all of its
- * tiles still to come from the GeoSN, at a second or more apiece. As the
- * backend is told about them: see `warmTiles`.
+ * Every ground block the list and the comparison will want for these plots:
+ * each card at its own fit, and the ones ticked for comparison at the scale
+ * they will share there. A freshly created plot is otherwise first drawn with
+ * its ground still to be fetched from the GeoSN, at a second or more per tile.
+ * As the backend is told about them: see `warmBlocks`.
  */
-export function wantedThumbnailTiles(plots, selection = []) {
+export function wantedThumbnailGrounds(plots, selection = []) {
   const wanted = new Map();
-  const add = refs => refs.forEach(ref => wanted.set(`${ref.ebene}/${ref.z}/${ref.x}/${ref.y}`, ref));
-  for (const plot of plots) add(thumbnailTileRefs(plot, CARD_FRAME));
+  const add = ground => { if (ground) wanted.set(ground.href, ground.ref); };
+  for (const plot of plots) add(thumbnailGround(plot, CARD_FRAME));
   // Outlines only: this runs on every page, and a plot without one must not
   // take the shell down with it.
   const compared = plots.filter(plot => selection.includes(plot.id) && plot.polygon?.length >= 3);
   const shared = sharedThumbnailScale(compared, COMPARE_FRAME.width, COMPARE_FRAME.height);
-  for (const plot of compared) add(thumbnailTileRefs(plot, COMPARE_FRAME, shared));
+  for (const plot of compared) add(thumbnailGround(plot, COMPARE_FRAME, shared));
   return [...wanted.values()];
 }

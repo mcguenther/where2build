@@ -112,8 +112,8 @@ import {
 } from "./lib/store.js";
 import { announcement, signInUrl, signOut } from "./lib/api.js";
 import { beginSignIn } from "./lib/signIn.js";
-import { wantedThumbnailTiles } from "./lib/thumbnail.js";
-import { warmTiles } from "./lib/tileGround.js";
+import { wantedThumbnailGrounds } from "./lib/thumbnail.js";
+import { warmBlocks } from "./lib/tileGround.js";
 
 export default {
   name: "App",
@@ -147,8 +147,8 @@ export default {
     // front settles after the plot is stored and turns the drawing, and
     // ticking a plot for comparison changes the scale every compared drawing
     // shares.
-    this.$watch(() => wantedThumbnailTiles(state.data.plots, state.data.selection),
-      refs => warmTiles(refs), { immediate: true });
+    this.$watch(() => wantedThumbnailGrounds(state.data.plots, state.data.selection),
+      refs => warmBlocks(refs), { immediate: true });
   },
   computed: {
     /** Two letters off the display name, for the round mark beside it. */

@@ -195,8 +195,8 @@ export const adminWipe = (schluessel, bestaetigung, umfang) =>
 export const plotsOnServer = () => request("/plots");
 
 /** Tiles the backend should fetch into its cache before anything draws them. */
-export const warmTilesOnServer = kacheln =>
-  request("/tiles/warm", { method: "POST", body: JSON.stringify({ kacheln }) });
+export const warmBlocksOnServer = bloecke =>
+  request("/tiles/warm", { method: "POST", body: JSON.stringify({ bloecke }) });
 export const putPlot = (id, dokument, geaendert_am) =>
   request(`/plots/${encodeURIComponent(id)}`, {
     method: "PUT",

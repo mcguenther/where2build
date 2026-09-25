@@ -65,6 +65,10 @@ _TEMP_SUFFIX = ".tmp"
 _EVICTION_TIERS = {
     "basemap": 0,
     "tiles": 0,
+    # A thumbnail's composed ground is 100-200 KB, and rebuilding it
+    # once its tiles are gone too is a dozen GetMaps at over a second each --
+    # so it outlives the tiles it was made of.
+    "tile-blocks": 1,
     # One small public document, one fast request from the provider. It frees
     # almost nothing, and holding on to it buys almost nothing either.
     "oidc": 0,

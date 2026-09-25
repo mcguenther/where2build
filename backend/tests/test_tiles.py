@@ -1,4 +1,4 @@
-"""GET /api/tiles/{layer}/{z}/{x}/{y}.png -- the WMS proxy and its disk cache."""
+"""GET /api/tiles/{layer}/{z}/{x}/{y}.png -- the WMS proxy and its disk cache -- and its blocks."""
 
 from __future__ import annotations
 
@@ -347,92 +347,238 @@ def test_the_photo_layer_has_no_scale_limit_and_is_asked_plainly(client: TestCli
 
 
 # --------------------------------------------------------------------------
-# POST /api/tiles/warm -- the cache filled before anything draws
+# GET /api/tiles/{layer}/block/... -- a thumbnail's whole ground as one image
+# --------------------------------------------------------------------------
+
+BLOCK = "/api/tiles/dop/block/15/17540/10986/17542/10987.png"
+BLOCK_TILES = [(x, y) for y in (10986, 10987) for x in (17540, 17541, 17542)]
+
+
+def _solid(colour: tuple[int, int, int]) -> bytes:
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.new("RGBA", (256, 256), (*colour, 255)).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def _colour_of(x: int, y: int) -> tuple[int, int, int]:
+    return (x - 17500, y - 10950, 200)
+
+
+def _answer_by_tile(request: httpx.Request) -> httpx.Response:
+    """Each tile a colour of its own, so a tile pasted in the wrong place shows."""
+
+    bbox = request.url.params["BBOX"]
+    for x, y in BLOCK_TILES:
+        if geo.wms_bbox("EPSG:3857", 15, x, y) == bbox:
+            return httpx.Response(
+                200, content=_solid(_colour_of(x, y)), headers={"content-type": "image/png"}
+            )
+    raise AssertionError(f"unexpected tile {bbox}")
+
+
+@respx.mock
+def test_a_block_is_its_tiles_stitched_in_place(client: TestClient):
+    from PIL import Image
+
+    route = respx.get(DOP_URL).mock(side_effect=_answer_by_tile)
+
+    answer = client.get(BLOCK)
+
+    assert answer.status_code == 200
+    assert answer.headers["content-type"] == "image/png"
+    assert answer.headers["x-cache"] == "MISS"
+    assert "GeoSN" in answer.headers["x-attribution"]
+    assert answer.headers["cache-control"].startswith("public, max-age=")
+    assert route.call_count == 6
+    with Image.open(io.BytesIO(answer.content)) as image:
+        assert image.size == (3 * 256, 2 * 256)
+        for x, y in BLOCK_TILES:
+            left, top = (x - 17540) * 256, (y - 10986) * 256
+            for dx, dy in ((1, 1), (254, 254), (128, 128)):
+                assert image.getpixel((left + dx, top + dy))[:3] == _colour_of(x, y)
+    # Every tile landed in the tile cache on its way through.
+    assert client.get("/api/tiles/dop/15/17542/10987.png").headers["x-cache"] == "HIT"
+    assert route.call_count == 6
+
+
+@respx.mock
+def test_a_block_comes_back_whole_from_its_own_cache(client: TestClient):
+    route = respx.get(DOP_URL).mock(side_effect=_answer_by_tile)
+    first = client.get(BLOCK)
+    # Tiles gone, block still there: it is cached as the finished picture.
+    import shutil
+
+    shutil.rmtree(tile_service().cache.directory)
+
+    again = client.get(BLOCK)
+
+    assert again.headers["x-cache"] == "HIT"
+    assert again.content == first.content
+    assert route.call_count == 6
+
+
+def test_a_block_past_the_cap_is_a_400(client: TestClient):
+    answer = client.get("/api/tiles/dop/block/15/17540/10980/17550/10989.png")
+
+    assert answer.status_code == 400
+    assert "höchstens 100 Kacheln" in answer.json()["detail"]
+
+
+def test_a_block_of_an_unknown_layer_is_a_400(client: TestClient):
+    answer = client.get("/api/tiles/katasterX/block/15/17540/10986/17542/10987.png")
+
+    assert answer.status_code == 400
+    assert "dop" in answer.json()["detail"]
+
+
+def test_a_block_the_wrong_way_round_is_a_400(client: TestClient):
+    assert client.get("/api/tiles/dop/block/15/17542/10986/17540/10987.png").status_code == 400
+
+
+@respx.mock
+def test_one_failed_tile_fails_the_block_and_stores_nothing_of_it(client: TestClient):
+    failing = geo.wms_bbox("EPSG:3857", 15, 17541, 10987)
+
+    def one_fails(request: httpx.Request) -> httpx.Response:
+        if request.url.params["BBOX"] == failing:
+            raise httpx.ReadTimeout("langsam")
+        return _answer_by_tile(request)
+
+    route = respx.get(DOP_URL).mock(side_effect=one_fails)
+
+    answer = client.get(BLOCK)
+
+    assert answer.status_code == 504
+    assert not any(path.is_file() for path in tile_service().blocks.directory.rglob("*"))
+    route.mock(side_effect=_answer_by_tile)
+    again = client.get(BLOCK)
+    assert again.status_code == 200
+    assert again.headers["x-cache"] == "MISS"
+
+
+# --------------------------------------------------------------------------
+# POST /api/tiles/warm -- the blocks built before anything draws them
 # --------------------------------------------------------------------------
 
 WARM = "/api/tiles/warm"
 
 
-def _refs(*columns: int) -> dict:
-    return {"kacheln": [{"ebene": "dop", "z": 15, "x": x, "y": 10986} for x in columns]}
+def _block(west: int, east: int, layer: str = "dop") -> dict:
+    return {"ebene": layer, "z": 15, "west": west, "nord": 10986, "ost": east, "sued": 10987}
 
 
 @respx.mock
-def test_warming_fetches_the_missing_tiles_and_the_next_draw_is_a_hit(client: TestClient):
-    route = respx.get(DOP_URL).mock(return_value=_wms_answer())
+def test_warming_builds_the_block_and_the_next_draw_is_a_hit(client: TestClient):
+    route = respx.get(DOP_URL).mock(side_effect=_answer_by_tile)
 
-    answer = client.post(WARM, json=_refs(17540, 17541, 17542))
+    answer = client.post(WARM, json={"bloecke": [_block(17540, 17542)]})
 
     assert answer.status_code == 202
-    assert answer.json() == {"angefragt": 3, "geholt_werden": 3}
+    assert answer.json() == {"angefragt": 1, "zusammengesetzt_werden": 1, "geholt_werden": 6}
     # The test client runs the background task before it returns.
-    assert route.call_count == 3
-    drawn = client.get("/api/tiles/dop/15/17541/10986.png")
+    assert route.call_count == 6
+    drawn = client.get(BLOCK)
     assert drawn.headers["x-cache"] == "HIT"
-    assert route.call_count == 3
+    assert route.call_count == 6
 
 
 @respx.mock
-def test_warming_skips_what_the_cache_already_has(client: TestClient):
-    route = respx.get(DOP_URL).mock(return_value=_wms_answer())
+def test_warming_fetches_only_the_tiles_the_cache_lacks(client: TestClient):
+    route = respx.get(DOP_URL).mock(side_effect=_answer_by_tile)
     client.get("/api/tiles/dop/15/17540/10986.png")
 
-    answer = client.post(WARM, json=_refs(17540, 17540, 17541))
+    body = {"bloecke": [_block(17540, 17541), _block(17540, 17541), _block(17541, 17542)]}
+    answer = client.post(WARM, json=body)
 
-    # Named twice, counted once; cached, not fetched again.
-    assert answer.json() == {"angefragt": 2, "geholt_werden": 1}
-    assert route.call_count == 2
+    # Named twice, counted once; a tile two blocks share is fetched once.
+    assert answer.json() == {"angefragt": 2, "zusammengesetzt_werden": 2, "geholt_werden": 5}
+    assert route.call_count == 6
+    again = client.post(WARM, json=body)
+    assert again.json() == {"angefragt": 2, "zusammengesetzt_werden": 0, "geholt_werden": 0}
 
 
 @respx.mock
-def test_one_bad_tile_refuses_the_whole_warm_up(client: TestClient):
-    route = respx.get(DOP_URL).mock(return_value=_wms_answer())
-    body = _refs(17540)
-    body["kacheln"].append({"ebene": "katasterX", "z": 15, "x": 17541, "y": 10986})
+def test_one_bad_block_refuses_the_whole_warm_up(client: TestClient):
+    route = respx.get(DOP_URL).mock(side_effect=_answer_by_tile)
 
-    answer = client.post(WARM, json=body)
+    unknown = client.post(WARM, json={"bloecke": [_block(17540, 17542), _block(17540, 17542, "katasterX")]})
+    too_big = client.post(WARM, json={"bloecke": [_block(17540, 17542), _block(17400, 17600)]})
 
-    assert answer.status_code == 400
+    assert unknown.status_code == 400
+    assert too_big.status_code == 400
     assert route.call_count == 0
 
 
 def test_a_warm_up_past_any_list_is_a_422(client: TestClient):
-    assert client.post(WARM, json=_refs(*range(17000, 17401))).status_code == 422
-    assert client.post(WARM, json={"kacheln": []}).status_code == 422
+    assert client.post(WARM, json={"bloecke": [_block(17000 + i, 17000 + i) for i in range(101)]}).status_code == 422
+    assert client.post(WARM, json={"bloecke": []}).status_code == 422
 
 
 @respx.mock
-def test_a_tile_that_fails_to_warm_is_fetched_when_drawn(client: TestClient):
+def test_a_block_that_fails_to_warm_is_built_when_drawn(client: TestClient):
     route = respx.get(DOP_URL).mock(side_effect=httpx.ReadTimeout("langsam"))
 
-    answer = client.post(WARM, json=_refs(17540))
+    answer = client.post(WARM, json={"bloecke": [_block(17540, 17542)]})
 
     # The answer went out before the fetch, so the failure cannot reach it.
     assert answer.status_code == 202
-    route.mock(side_effect=None, return_value=_wms_answer())
-    drawn = client.get("/api/tiles/dop/15/17540/10986.png")
+    route.mock(side_effect=_answer_by_tile)
+    drawn = client.get(BLOCK)
     assert drawn.status_code == 200
     assert drawn.headers["x-cache"] == "MISS"
 
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_overlapping_warm_ups_fetch_a_tile_once():
+async def test_overlapping_warm_ups_build_a_block_once():
     """The list warms, then a tick for the comparison warms again."""
 
     import asyncio
 
-    async def slow(_request):
+    from app.services.tiles import TileBlock
+
+    async def slow(request):
         await asyncio.sleep(0.05)
-        return _wms_answer()
+        return _answer_by_tile(request)
 
     route = respx.get(DOP_URL).mock(side_effect=slow)
     service = tile_service()
-    tile = ("dop", 15, 17540, 10986)
+    block = TileBlock("dop", 15, 17540, 10986, 17542, 10987)
 
-    first = asyncio.create_task(service.warm([tile]))
+    first = asyncio.create_task(service.warm([block]))
     await asyncio.sleep(0)
-    assert service.missing([tile]) == []
-    await asyncio.gather(first, service.warm([tile]))
+    assert service.blocks_to_build([block]) == []
+    assert service.tiles_to_fetch([block]) == []
+    await asyncio.gather(first, service.warm([block]))
 
-    assert route.call_count == 1
+    assert route.call_count == 6
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_a_card_asking_during_the_warm_up_waits_for_it():
+    """The browser's request arrives while the block is still being built."""
+
+    import asyncio
+
+    from app.services.tiles import TileBlock
+
+    async def slow(request):
+        await asyncio.sleep(0.05)
+        return _answer_by_tile(request)
+
+    route = respx.get(DOP_URL).mock(side_effect=slow)
+    service = tile_service()
+    block = TileBlock("dop", 15, 17540, 10986, 17542, 10987)
+
+    warming = asyncio.create_task(service.warm([block]))
+    await asyncio.sleep(0.01)
+    image, from_cache = await service.block(block)
+    await warming
+
+    assert image == service.blocks.get_bytes(service._block_key(block, service._config("dop")))
+    # It waited for the upstream like the warm-up did; that is not a cache hit.
+    assert not from_cache
+    assert route.call_count == 6

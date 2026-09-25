@@ -2111,23 +2111,28 @@ class LoeschErgebnis(BaseModel):
 
 
 # The most one warm-up may name. A list of twenty plots with their comparison
-# is some 200 tiles; anything far past that is not a list being drawn.
-MAX_WARM_TILES = 400
+# is some forty thumbnails; anything far past that is not a list being drawn.
+MAX_WARM_BLOCKS = 100
 
 
-class Kachel(BaseModel):
+class Kachelblock(BaseModel):
     ebene: str = Field(description="Kartenebene, wie im Pfad von /api/tiles.")
     z: int = Field(ge=0, le=24)
-    x: int = Field(ge=0)
-    y: int = Field(ge=0)
+    west: int = Field(ge=0, description="Erste Kachelspalte.")
+    nord: int = Field(ge=0, description="Erste Kachelzeile.")
+    ost: int = Field(ge=0, description="Letzte Kachelspalte, eingeschlossen.")
+    sued: int = Field(ge=0, description="Letzte Kachelzeile, eingeschlossen.")
 
 
-class KachelnVorwaermen(BaseModel):
-    kacheln: list[Kachel] = Field(min_length=1, max_length=MAX_WARM_TILES)
+class BloeckeVorwaermen(BaseModel):
+    bloecke: list[Kachelblock] = Field(min_length=1, max_length=MAX_WARM_BLOCKS)
 
 
 class VorwaermenErgebnis(BaseModel):
-    angefragt: int = Field(description="So viele Kacheln nannte die Anfrage.")
+    angefragt: int = Field(description="So viele verschiedene Kachelblöcke nannte die Anfrage.")
+    zusammengesetzt_werden: int = Field(
+        description="So viele fehlten im Zwischenspeicher und werden jetzt im Hintergrund zusammengesetzt."
+    )
     geholt_werden: int = Field(
-        description="So viele fehlten im Zwischenspeicher und werden jetzt im Hintergrund geholt."
+        description="So viele Einzelkacheln müssen dafür beim Kartendienst geholt werden."
     )
