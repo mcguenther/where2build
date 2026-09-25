@@ -30,6 +30,7 @@ import httpx
 from ..cache import DiskCache
 from ..errors import BadRequestError, NotFoundError, UpstreamError, UpstreamTimeout
 from ..settings import AppSettings, BasemapSettings
+from ..upstream import shared_client
 
 SERVICE_NAME = "Der Kartenhintergrund (OpenFreeMap)"
 
@@ -189,46 +190,16 @@ class BasemapService:
             "User-Agent": self.app_settings.user_agent,
             "Accept-Encoding": _ACCEPT_ENCODING,
         }
+        # One retry on a transport error, as in upstream.request: the client is
+        # pooled, and a reused connection the server has dropped fails on the
+        # first write. A timeout is not retried -- the browser asks again.
         try:
-            async with httpx.AsyncClient(
-                timeout=self.settings.timeout_s, follow_redirects=True
-            ) as client:
-                async with client.stream("GET", url, headers=headers) as response:
-                    # A redirect must not carry the request to a host we do not
-                    # proxy for: the path comes from the browser, and an open
-                    # redirect on the upstream would otherwise become ours.
-                    if (response.url.host or "").lower() not in self.rewrite_hosts:
-                        raise UpstreamError(
-                            f"{SERVICE_NAME} hat auf einen fremden Server verwiesen. {ADVICE}"
-                        )
-                    if response.status_code == 404:
-                        raise NotFoundError(
-                            f"{SERVICE_NAME} kennt diese Kachel nicht."
-                        )
-                    if response.status_code >= 400:
-                        raise UpstreamError(
-                            f"{SERVICE_NAME} hat die Anfrage mit Status "
-                            f"{response.status_code} abgelehnt. {ADVICE}"
-                        )
-                    chunks: list[bytes] = []
-                    size = 0
-                    # aiter_raw, not aiter_bytes: the compressed stream has to
-                    # stay compressed all the way to the browser.
-                    async for chunk in response.aiter_raw():
-                        size += len(chunk)
-                        if size > _MAX_BODY_BYTES:
-                            raise UpstreamError(
-                                f"{SERVICE_NAME} hat eine unerwartet große Antwort geliefert. {ADVICE}"
-                            )
-                        chunks.append(chunk)
-                    proxied = ProxiedBody(
-                        body=b"".join(chunks),
-                        content_type=response.headers.get(
-                            "content-type", "application/octet-stream"
-                        ),
-                        content_encoding=response.headers.get("content-encoding"),
-                        from_cache=False,
-                    )
+            try:
+                proxied = await self._fetch_once(url, headers)
+            except httpx.TimeoutException:
+                raise
+            except httpx.TransportError:
+                proxied = await self._fetch_once(url, headers)
         except httpx.TimeoutException as exc:
             raise UpstreamTimeout(
                 f"{SERVICE_NAME} hat nicht rechtzeitig geantwortet. {ADVICE}"
@@ -238,6 +209,49 @@ class BasemapService:
 
         self.cache.set_bytes(cache_key, _pack(proxied))
         return proxied
+
+    async def _fetch_once(self, url: str, headers: dict[str, str]) -> ProxiedBody:
+        """One GET through the shared client, the body kept compressed."""
+
+        async with shared_client().stream(
+            "GET", url, headers=headers, timeout=self.settings.timeout_s
+        ) as response:
+            # A redirect must not carry the request to a host we do not
+            # proxy for: the path comes from the browser, and an open
+            # redirect on the upstream would otherwise become ours.
+            if (response.url.host or "").lower() not in self.rewrite_hosts:
+                raise UpstreamError(
+                    f"{SERVICE_NAME} hat auf einen fremden Server verwiesen. {ADVICE}"
+                )
+            if response.status_code == 404:
+                raise NotFoundError(
+                    f"{SERVICE_NAME} kennt diese Kachel nicht."
+                )
+            if response.status_code >= 400:
+                raise UpstreamError(
+                    f"{SERVICE_NAME} hat die Anfrage mit Status "
+                    f"{response.status_code} abgelehnt. {ADVICE}"
+                )
+            chunks: list[bytes] = []
+            size = 0
+            # aiter_raw, not aiter_bytes: the compressed stream has to
+            # stay compressed all the way to the browser.
+            async for chunk in response.aiter_raw():
+                size += len(chunk)
+                if size > _MAX_BODY_BYTES:
+                    raise UpstreamError(
+                        f"{SERVICE_NAME} hat eine unerwartet große Antwort geliefert. {ADVICE}"
+                    )
+                chunks.append(chunk)
+            return ProxiedBody(
+                body=b"".join(chunks),
+                content_type=response.headers.get(
+                    "content-type", "application/octet-stream"
+                ),
+                content_encoding=response.headers.get("content-encoding"),
+                from_cache=False,
+            )
+
 
     def style_path(self, *, dark: bool = False) -> str:
         """Which upstream style document a variant asks for.

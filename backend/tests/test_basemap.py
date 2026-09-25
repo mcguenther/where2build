@@ -236,6 +236,37 @@ def test_an_unreachable_upstream_is_a_502_with_advice(client: TestClient):
 
 
 @respx.mock
+def test_a_connection_dropped_on_reuse_is_tried_once_more(client: TestClient):
+    """The client is pooled; a reused connection the server closed fails once."""
+    route = respx.get(TILE_URL).mock(
+        side_effect=[httpx.RemoteProtocolError("Server disconnected"), _tile_answer()]
+    )
+
+    answer = client.get(f"/api/basemap/{TILE_PATH}")
+
+    assert answer.status_code == 200
+    assert route.call_count == 2
+
+
+@respx.mock
+def test_a_second_transport_error_is_believed(client: TestClient):
+    route = respx.get(TILE_URL).mock(side_effect=httpx.ConnectError("kein Netz"))
+
+    answer = client.get(f"/api/basemap/{TILE_PATH}")
+
+    assert answer.status_code == 502
+    assert route.call_count == 2
+
+
+@respx.mock
+def test_a_slow_upstream_is_not_asked_twice(client: TestClient):
+    route = respx.get(TILE_URL).mock(side_effect=httpx.ReadTimeout("langsam"))
+
+    assert client.get(f"/api/basemap/{TILE_PATH}").status_code == 504
+    assert route.call_count == 1
+
+
+@respx.mock
 def test_a_slow_upstream_is_a_504(client: TestClient):
     respx.get(TILE_URL).mock(side_effect=httpx.ReadTimeout("langsam"))
 

@@ -233,7 +233,12 @@ of Overpass or a local extract, the listing portals, and the extraction model.
   that surfaces as `RemoteProtocolError: Server disconnected without sending a
   response`, and the one transport-error retry above runs it on a fresh
   connection. `tests/test_upstream.py` has a socket server for each case.
-  `services/basemap.py` still builds a client per fetch.
+  The basemap proxy (`services/basemap.py`) streams through the same client
+  and had the same stall: six cold OpenFreeMap tiles pushed `/api/health` to
+  213–378 ms, and to 6–31 ms once shared (six tiles: 1322 ms → 566 ms median).
+  It has no retry of its own for 5xx, but it does retry a transport error
+  once now, because before the pool no connection was ever reused and so none
+  could die on reuse; a timeout is still reported at once.
 
 - **The POI index's filename is a default, not a claim.** `poi-sachsen.json`
   built from a Leipzig-region BBBike box is still called that; the extract it
