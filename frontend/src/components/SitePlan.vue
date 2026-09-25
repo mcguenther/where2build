@@ -13,6 +13,7 @@
       'site-plan--panning': panning
     }"
     :viewBox="`0 0 ${width} ${height}`"
+    :aria-busy="groundSettled ? null : 'true'"
     role="img"
     :aria-label="ariaLabel"
     @pointerdown="pointerDown"
@@ -35,14 +36,32 @@
       </pattern>
     </defs>
 
-    <rect v-if="!hasBackdrop" x="0" y="0" :width="width" :height="height" :fill="backgroundFill" />
+    <!-- What stands while a tile ground is on its way: a placeholder with the
+         same pulse as every other one in the app, so the wait reads as alive
+         rather than as an empty frame. -->
+    <rect v-if="!hasBackdrop" x="0" y="0" :width="width" :height="height"
+          :fill="groundSettled ? backgroundFill : 'var(--w2b-line-faint)'"
+          :class="{ 'site-plan__placeholder': !groundSettled }" />
+
+    <!-- With a tile ground the whole drawing waits for it and then appears in
+         one go: an outline first and its surroundings a moment later reads as
+         something breaking. The paper is drawn again inside, because a group
+         fading in is isolated from what lies under it, and the ground's
+         multiply would have nothing to multiply into. -->
+    <g class="site-plan__content" :class="{ 'is-waiting': !groundSettled }"
+       :data-ground="groundSettled ? 'ready' : 'loading'">
+    <rect v-if="!hasBackdrop && groundImage" x="0" y="0" :width="width" :height="height" :fill="backgroundFill" />
 
     <g :transform="`rotate(${rotation}, ${width / 2}, ${height / 2})`">
-      <g v-if="groundTiles.length" class="site-plan__tile-ground"
+      <!-- One composed image. A failed one is dropped, the drawing appears on
+           the flat ground, and no broken-image icon is left behind. -->
+      <g v-if="groundImage" class="site-plan__tile-ground"
          :class="{ 'site-plan__tile-ground--dark': darkBackdrop }" aria-hidden="true">
-        <image v-for="tile in groundTiles" :key="tile.key" :href="tile.href"
-               :x="tile.x" :y="tile.y" :width="tile.size" :height="tile.size"
-               preserveAspectRatio="none" />
+        <image :key="groundImage.href" :href="groundImage.href"
+               :x="groundImage.x" :y="groundImage.y"
+               :width="groundImage.width" :height="groundImage.height"
+               preserveAspectRatio="none"
+               @load="groundLoaded = groundImage.href" @error="groundFailed = groundImage.href" />
       </g>
 
       <polygon :points="path(plot.polygon)" fill="var(--w2b-map-surface)"
@@ -182,6 +201,7 @@
               text-anchor="middle">{{ parcel.number }}</text>
       </g>
     </g>
+    </g>
 
     <!-- North arrow and scale bar stay upright and stay in print: with the map
          turned to the street they are the only orientation left. -->
@@ -213,8 +233,8 @@ import {
   minimumRotatedRectangleCorners, constrainToEnvelope, hasNeighbourHint,
   polygonCentroid
 } from "../lib/geometry.js";
-import { cameraFor, metresPerDegreeLon, toLocal, toWgs84 } from "../lib/projection.js";
-import { tileCover, tileUrl } from "../lib/routes.js";
+import { cameraFor, toLocal, toWgs84 } from "../lib/projection.js";
+import { groundBlock } from "../lib/tileGround.js";
 import { outerRing } from "../lib/plots.js";
 import { num, area } from "../lib/format.js";
 import { BACKDROPS, canRenderMap, withOverlay } from "../lib/basemap.js";
@@ -365,7 +385,10 @@ export default {
       // CSS transform on the drawing.
       zoomFactor: 1,
       panMetres: { x: 0, y: 0 },
-      panning: null
+      panning: null,
+      // The ground image by its href: the one that has arrived, and the one
+      // that could not. Keyed by href so a changed frame starts hidden again.
+      groundLoaded: null, groundFailed: null
     };
   },
   computed: {
@@ -397,34 +420,16 @@ export default {
      *  was fetched again, forever. */
     wantsBackdrop() { return this.backdrop !== "none" && Boolean(this.plot.anchor); },
     hasBackdrop() { return this.wantsBackdrop && !this.mapUnavailable; },
-    /** Raster tiles under the drawing, placed in the rotated group so they
-     *  turn with it. Local metres and Web Mercator share one scale factor
-     *  around the anchor, which is what makes this a linear map. The cover is
-     *  asked for the frame's diagonal on every side, since a turned drawing
-     *  shows ground from beyond the unturned frame's corners. */
-    groundTiles() {
-      if (!this.tileGround || this.hasBackdrop || !this.plot.anchor) return [];
-      const { lat, lon } = this.plot.anchor;
-      const radians = Math.PI / 180;
-      const metresPerUnit = metresPerDegreeLon(lat) / radians;
-      const scale = this.view.scale * metresPerUnit;
-      const phi = lat * radians;
-      const pad = Math.hypot(this.width, this.height) / 2;
-      const padX = pad - this.width / 2, padY = pad - this.height / 2;
-      const fit = {
-        scale,
-        dx: this.width / 2 - this.view.mx * this.view.scale - lon * radians * scale + padX,
-        dy: this.height / 2 + this.view.my * this.view.scale
-          + Math.log(Math.tan(Math.PI / 4 + phi / 2)) * scale + padY
-      };
-      const cover = tileCover(fit, 2 * pad, 2 * pad);
-      if (!cover) return [];
-      // A hair of overlap, or the antialiased tile edges draw a lattice.
-      return cover.tiles.map(tile => ({
-        key: tile.key, href: tileUrl(tile, this.tileGround),
-        x: tile.left - padX, y: tile.top - padY, size: tile.size + 0.6
-      }));
+    /** The raster ground under the drawing as one image, placed in the
+     *  rotated group so it turns with it. See lib/tileGround.js. */
+    groundImage() {
+      if (!this.tileGround || this.hasBackdrop || !this.plot.anchor) return null;
+      const block = groundBlock(this.plot.anchor, this.view, this.width, this.height, this.tileGround);
+      return block && block.href !== this.groundFailed ? block : null;
     },
+    /** Whether the drawing may show: no tile ground to wait for, or it has
+     *  arrived. A failed one drops out of `groundImage`, which settles it too. */
+    groundSettled() { return !this.groundImage || this.groundLoaded === this.groundImage.href; },
     backgroundFill() { return this.backdrop === "aerial" ? "var(--w2b-map-green)" : "var(--w2b-map-ground)"; },
     /** Which palette the vector backdrop should be drawn in. Deliberately not
      *  a function of whether the last build succeeded — see `rebuildMap`. */
@@ -1058,6 +1063,16 @@ export default {
    dark theme the render is inverted first, or it would be a pale sheet. */
 .site-plan__tile-ground{ opacity: .42; filter: grayscale(1); mix-blend-mode: multiply; }
 .site-plan__tile-ground--dark{ opacity: .45; filter: invert(1) grayscale(1); mix-blend-mode: screen; }
+/* Outline, house and surroundings appear together, once the ground has
+   arrived — not the outline first and a quilt filling in around it. print.css
+   shows the drawing regardless. */
+.site-plan__content{ transition: opacity .24s ease-out; }
+.site-plan__content.is-waiting{ opacity: 0; }
+.site-plan__placeholder{ animation: w2b-pulse 1.5s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce){
+  .site-plan__content{ transition: none; }
+  .site-plan__placeholder{ animation: none; opacity: .7; }
+}
 /* The parcels on offer. Deliberately quiet: the plot itself keeps the halo and
    the drawn contour, and a candidate is a thin outline with its number — a
    choice, not a finding. */

@@ -276,8 +276,8 @@ def map_limiter() -> RateLimiter:
     )
 
 
-def _spend(limiter: RateLimiter, request: Request, service: OidcService) -> None:
-    """Draw one call from whoever is calling, or refuse with a 429.
+def _spend(limiter: RateLimiter, request: Request, service: OidcService, cost: int = 1) -> None:
+    """Draw ``cost`` calls from whoever is calling, or refuse with a 429.
 
     The identity is read here rather than through ``current_account`` because
     being signed out is not an error on these routes: it only changes whose
@@ -292,7 +292,7 @@ def _spend(limiter: RateLimiter, request: Request, service: OidcService) -> None
     refuse_if_blocked(identity)
     if not settings.rate_limit.enabled:
         return
-    decision = limiter.check(client_key(request, identity, settings.app.proxy_hops))
+    decision = limiter.check(client_key(request, identity, settings.app.proxy_hops), cost)
     if not decision.allowed:
         raise RateLimitedError(denied_message(decision), retry_after_s=decision.retry_after_s)
 
@@ -303,6 +303,12 @@ def service_budget(request: Request, service: OidcService = Depends(oidc_service
 
 def map_budget(request: Request, service: OidcService = Depends(oidc_service)) -> None:
     _spend(map_limiter(), request, service)
+
+
+def spend_map_tiles(request: Request, service: OidcService, count: int) -> None:
+    """Draw tiles fetched on the caller's behalf without being requested one by one."""
+
+    _spend(map_limiter(), request, service, count)
 
 
 @lru_cache(maxsize=1)

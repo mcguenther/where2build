@@ -8,15 +8,15 @@
  * lib/thumbnail.js for what it shows and why. */
 import SitePlan from "./SitePlan.vue";
 import { placement } from "../lib/store.js";
-import { THUMBNAIL_GROUND, THUMBNAIL_PADDING } from "../lib/thumbnail.js";
+import { CARD_FRAME, THUMBNAIL_GROUND, THUMBNAIL_PADDING } from "../lib/thumbnail.js";
 
 export default {
   name: "PlotThumbnail",
   components: { SitePlan },
   props: {
     plot: { type: Object, required: true },
-    width: { type: Number, default: 300 },
-    height: { type: Number, default: 196 },
+    width: { type: Number, default: CARD_FRAME.width },
+    height: { type: Number, default: CARD_FRAME.height },
     /** Pixels per metre shared with the thumbnails beside it. */
     scale: { type: Number, default: null }
   },
