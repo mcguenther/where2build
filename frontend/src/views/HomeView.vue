@@ -2,9 +2,9 @@
   <div class="home">
     <section class="hero" :class="{ 'hero--slim': hasPlots }">
       <!-- The ground: a cadastral fabric carrying no labels at all. It shows
-           what this is about without wanting to be read, which is why it fades
-           out towards the middle, where the field stands. Decorative, so it is
-           hidden from anything that reads the page aloud.
+           what this is about without wanting to be read, which is why a veil
+           covers it behind the type. Decorative, so it is hidden from anything
+           that reads the page aloud.
            The parcels are a rectangular lattice turned by the street's own
            gradient: every edge on a street sits on its kerb, the side edges are
            square to it, and the widths come from a handful of values, so a run
@@ -14,12 +14,16 @@
            fronting the upper street and the row fronting the lower one share.
            That is what makes the two rows meet: both subdivide the same run
            between the same two kerbs, so a parcel can neither overlap the one
-           behind it nor leave a strip of paper between them. The box is 3840
-           wide because that is the widest monitor anyone brings; a window
-           narrower than that is served by `slice`, which crops the sides. -->
-      <div class="hero__art" aria-hidden="true">
-        <svg viewBox="0 0 3840 1200" preserveAspectRatio="xMidYMin slice">
-          <g opacity=".9">
+           behind it nor leave a strip of paper between them.
+           The drawing hangs off the headline, not off the window; the style
+           block says why and where its numbers come from. -->
+
+      <div class="hero__art" aria-hidden="true"></div>
+
+      <div class="hero__inner">
+        <div class="hero__headline">
+          <svg class="hero__fabric" viewBox="-220 -660 4260 2330" aria-hidden="true" focusable="false">
+            <g opacity=".9">
             <g fill="var(--w2b-map-ground)" stroke="var(--w2b-map-neighbour)" stroke-width="1.2" stroke-linejoin="round">
             <polygon points="-181.4,66.4 -32.3,50.7 -63.6,-247.7 -212.8,-232"></polygon>
             <polygon points="-32.3,50.7 79.1,39 55.1,-189.8 -56.3,-178.1"></polygon>
@@ -248,12 +252,6 @@
             <polygon points="3794.3,1002.9 3931.5,988.4 3959.1,1251 3821.9,1265.5"></polygon>
             <polygon points="3931.5,988.4 4007.1,980.5 4034.7,1243.1 3959.1,1251"></polygon>
             </g>
-            <polygon points="1336.9,446.7 1486.1,431 1456.3,147.6 1307.1,163.3" fill="var(--w2b-map-surface)"></polygon>
-            <path d="M1336.9,446.7 L1486.1,431 L1456.3,147.6 L1307.1,163.3 Z M1360,418.1 L1457.5,407.9 L1433.1,176.2 L1335.7,186.4 Z" fill="var(--w2b-map-setback)" fill-rule="evenodd"></path>
-            <polygon points="1336.9,446.7 1486.1,431 1456.3,147.6 1307.1,163.3" fill="none" stroke="var(--w2b-map-halo)" stroke-width="7" stroke-linejoin="round"></polygon>
-            <polygon points="1336.9,446.7 1486.1,431 1456.3,147.6 1307.1,163.3" fill="none" stroke="var(--w2b-map-boundary)" stroke-width="2.4" stroke-linejoin="round"></polygon>
-            <polygon points="1360,418.1 1457.5,407.9 1433.1,176.2 1335.7,186.4" fill="none" stroke="var(--w2b-map-envelope)" stroke-width="1.6" stroke-dasharray="8 6"></polygon>
-            <polygon points="1369.8,376.9 1443.4,369.2 1432.7,267.7 1359.1,275.4" fill="var(--w2b-map-design)" fill-opacity=".85" stroke="var(--w2b-map-design-edge)" stroke-width="1.8" stroke-linejoin="round"></polygon>
 
             <!-- A way out, drawn the way `RouteCards` draws a real one: the
                  mode's own colour over the halo every line here carries. It
@@ -275,22 +273,30 @@
               <path d="M1408.6,392 C1409,408 1405.5,424 1406,438 Q1409,468 1440,470 L3980,202.7"
                     stroke="var(--w2b-primary)" stroke-width="4.6"></path>
             </g>
-          </g>
-        </svg>
-      </div>
+            </g>
+          </svg>
+          <!-- The plot itself, in a layer of its own above the veil: the
+               fabric around it may fade, the one parcel this is about may not. -->
+          <svg class="hero__plot" viewBox="-220 -660 4260 2330" aria-hidden="true" focusable="false">
+            <polygon points="1336.9,446.7 1486.1,431 1456.3,147.6 1307.1,163.3" fill="var(--w2b-map-surface)"></polygon>
+            <path d="M1336.9,446.7 L1486.1,431 L1456.3,147.6 L1307.1,163.3 Z M1360,418.1 L1457.5,407.9 L1433.1,176.2 L1335.7,186.4 Z" fill="var(--w2b-map-setback)" fill-rule="evenodd"></path>
+            <polygon points="1336.9,446.7 1486.1,431 1456.3,147.6 1307.1,163.3" fill="none" stroke="var(--w2b-map-halo)" stroke-width="7" stroke-linejoin="round"></polygon>
+            <polygon points="1336.9,446.7 1486.1,431 1456.3,147.6 1307.1,163.3" fill="none" stroke="var(--w2b-map-boundary)" stroke-width="2.4" stroke-linejoin="round"></polygon>
+            <polygon points="1360,418.1 1457.5,407.9 1433.1,176.2 1335.7,186.4" fill="none" stroke="var(--w2b-map-envelope)" stroke-width="1.6" stroke-dasharray="8 6"></polygon>
+            <polygon points="1369.8,376.9 1443.4,369.2 1432.7,267.7 1359.1,275.4" fill="var(--w2b-map-design)" fill-opacity=".85" stroke="var(--w2b-map-design-edge)" stroke-width="1.8" stroke-linejoin="round"></polygon>
+          </svg>
 
-      <div class="hero__inner">
-        <p class="eyebrow hero__eyebrow">{{ greeting }}</p>
-        <h1 v-if="hasPlots">Woran heute weiterarbeiten?</h1>
-        <h1 v-else>Aus einer Anzeige wird ein <em>geprüftes Grundstück</em>.</h1>
+          <p class="eyebrow hero__eyebrow">{{ greeting }}</p>
+          <h1 v-if="hasPlots">Woran heute weiterarbeiten?</h1>
+          <h1 v-else>Aus einer Anzeige wird ein <em>geprüftes Grundstück</em>.</h1>
+        </div>
 
         <p class="hero__sub" v-if="hasPlots">
           Ein neuer Fall beginnt hier. Unten steht, was zuletzt dazukam.
         </p>
         <p class="hero__sub" v-else>
-          Link einfügen: gesucht wird das Flurstück im Liegenschaftskataster, gemessen wird
-          amtlich, der Preis geht gegen den Bodenrichtwert, und das Haus stellt sich in die
-          Abstandsflächen.
+          Link zur Anzeige, Adresse oder Flurstück eingeben und alles Wichtige zum
+          Grundstück erhalten.
         </p>
 
         <QueryBox class="hero__query panel" :busy="busy" @resolve="startResolve" @read="startRead" />
@@ -425,7 +431,7 @@ export default {
     /** Named where the provider gave a name, and never claiming a return for
      *  someone who has not been here before. */
     greeting() {
-      if (!this.hasPlots) return "Sachsen · Liegenschaftskataster, Bodenrichtwert, Fahrplan";
+      if (!this.hasPlots) return "Grundstück finden, Haus planen";
       const name = state.account.angemeldet ? state.account.name : null;
       return name ? `Willkommen zurück, ${name}` : "Willkommen zurück";
     },
@@ -492,7 +498,7 @@ export default {
    what reaches the window's own edges; the overshoot of a classic scrollbar
    is clipped by `.shell`, which is why that element carries `overflow-x`. */
 .hero{
-  position: relative; overflow: hidden;
+  position: relative; overflow: hidden; isolation: isolate;
   display: flex; align-items: center;
   width: 100vw;
   margin: calc(-1 * var(--w2b-space-5)) calc(50% - 50vw) 0;
@@ -510,38 +516,57 @@ export default {
 /* With a stand, the reception steps aside for the cards below it: the page is
    then about what is already here, not about the invitation. */
 .hero--slim{ min-height: 0; padding-top: var(--w2b-space-5); padding-bottom: var(--w2b-space-5); }
-.hero--slim h1{ font-size: clamp(26px, 3.2vw, 34px); }
 .hero--slim .hero__sub{ font-size: var(--w2b-text-m); }
 .hero--slim .hero__query{ margin-top: var(--w2b-space-5); }
-/* The cards below carry the picture; here the fabric is only texture. */
-.hero--slim .hero__art{ opacity: .34; }
+/* The cards below carry the picture; here the fabric is only texture, at the
+   scale of the full reception rather than of the smaller headline. */
+.hero--slim .hero__fabric{ opacity: .34; font-size: 68px; }
+.hero--slim .hero__plot{ display: none; }
 
-.hero__art{ position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
-/* Fixed box, anchored at the top: the suggestion list makes the reception
-   taller, and a ground that rescales with it reads as slipped. Tall enough
-   that growing never reaches its lower edge, so nothing looks cut off either.
-   With `slice` the scale is `max(width/3840, height/1200)`, so up to 4160 px
-   of window the height is what sets it: a parcel is the same size on a 1366
-   laptop and on a 4K monitor, and a wider window shows more of the fabric
-   rather than a magnified piece of it. The plot keeps its distance from the
-   middle for the same reason -- the box is centred, so a fixed offset in the
-   drawing is a fixed offset on screen. */
-.hero__art svg{ display: block; width: 100%; height: max(100%, 1300px); }
-/* Towards the middle the fabric gives way to paper: a drawing behind a field
-   is a background, and a background must not be read. What has to stay
-   readable is the 860 px column of type, and what has to stay legible is the
-   plot to the left of it -- both are fixed sizes, so the quiet core is one
-   too. Left as a bare 34% it grew with the window until it swallowed the plot;
-   470 px is 34% of the width this was drawn at. */
-.hero__art::after{
-  content: ""; position: absolute; inset: 0;
+/* The veil: paper over the fabric behind the type. The size is `min()` of two
+   lengths on purpose -- Chromium drops a radial size that mixes a percentage
+   with a length (`min(34%, 470px)`, `calc(30% + 10px)`), and with it the whole
+   declaration, which left the headline standing on bare fabric. `vw` is the
+   reception's own width, since it bleeds to both edges. The core sits a
+   little above the middle because the headline and the sentence do. */
+.hero__art{
+  position: absolute; inset: 0; z-index: -1; pointer-events: none;
   background:
-    radial-gradient(min(34%, 470px) 42% at 50% 50%,
+    radial-gradient(min(40vw, 580px) 46% at 50% 40%,
       var(--w2b-surface) 0 42%,
       color-mix(in srgb, var(--w2b-surface) 84%, transparent) 72%,
       transparent 100%),
     linear-gradient(180deg, transparent 68%, var(--w2b-paper));
 }
+
+/* The drawing is anchored to the headline rather than to the window. Anchored
+   to the middle of the window, the plot sat a fixed 664 px left of it: cut off
+   below 1330 px of width, gone below 940, and -- the drawing hung from the top
+   while the type was centred -- further below the headline the taller the
+   window got. Here it stands beside the headline at its height, and both
+   are sized in the headline's own `em`, so the plot shrinks exactly as the
+   type does and the room beside a 20ch headline always holds it.
+   The numbers, in drawing units at 3.4em per 299 units (the plot's height):
+     box      4260 x 2330 units from (-220, -660), the fabric's full extent
+              = 48.44em x 26.49em -- wide enough to reach the right edge of a
+              window up to about 3100 px
+     plot     centre (1396.6, 297), half width 89.5
+              = 18.383em from the box's left edge, 10.882em from its top,
+                half width 1.018em
+     gap      .65em between the plot and the headline's box.
+   Behind the veil sits the fabric, above it the plot: both in the reception's
+   stacking context, which `isolation` on `.hero` makes. */
+.hero__headline{ position: relative; margin-bottom: var(--w2b-space-4); font-size: clamp(34px, 4.8vw, 68px); }
+.hero--slim .hero__headline{ font-size: clamp(26px, 3.2vw, 34px); }
+.hero__fabric, .hero__plot{
+  position: absolute; pointer-events: none; overflow: visible;
+  width: 48.44em; height: 26.49em;
+  left: calc(-.65em - 1.018em - 18.383em);
+  top: calc(50% - 10.882em);
+}
+.hero__fabric{ z-index: -2; }
+.hero__plot{ z-index: -1; }
+
 .hero__inner{
   position: relative; display: flex; flex-direction: column; align-items: center;
   text-align: center; width: 100%; max-width: 860px; margin: 0 auto;
@@ -549,7 +574,7 @@ export default {
 .hero__eyebrow{ margin-bottom: var(--w2b-space-3); }
 /* Bigger than the page's own h1: this one is the only thing above the field,
    and at the body scale it read as a section heading rather than as a claim. */
-.hero h1{ margin-bottom: var(--w2b-space-4); max-width: 20ch; font-size: clamp(34px, 4.8vw, 68px); line-height: 1.06; }
+.hero h1{ max-width: 20ch; font-size: 1em; line-height: 1.06; }
 .hero h1 em{ font-style: normal; color: var(--w2b-primary); }
 .hero__sub{ color: var(--w2b-graphite); font-size: var(--w2b-text-l); max-width: 56ch; text-wrap: balance; }
 .hero__query{ width: 100%; max-width: 760px; margin-top: var(--w2b-space-6); padding: var(--w2b-space-4); text-align: left; }
@@ -584,32 +609,41 @@ export default {
 }
 .home__storage a{ color: var(--w2b-primary); font-weight: 600; }
 
+/* Below 700 px there is no room beside the headline, so the plot moves into
+   the top right corner and the eyebrow runs beside it. The type goes flush
+   left, which a phone reads better than a centred block, and the reception
+   starts at the top rather than in the middle of a box nobody sees whole.
+   The plot is cut off by the upper edge on purpose: it reads as a piece of a
+   map, and costs less height than a whole one. At 44px to the em the plot is
+   drawn at .5 px per unit, its top edge 38 px above the reception, its right
+   edge 22 px inside it; the way out reaches the street 123 px down, which is
+   where the headline may start (48 px padding + 79 px eyebrow + 12 px gap).
+   The veil opens that corner and covers the rest, so the fabric no longer has
+   to be faded to keep it out of the type. */
 @media (max-width: 700px){
-  /* At phone widths the fixed box would crop the fabric to a few huge
-     parcels; a lower one keeps it readable as what it is. */
-  .hero__art svg{ height: max(100%, 820px); }
-  /* On a phone the text fills the reception in both directions: the headline
-     and the sentence take nearly the whole width, and the field, the three
-     lines and the account note take the whole height. A radial core cannot
-     rescue that -- widened enough to clear the text it wipes the drawing out,
-     and anywhere it fades the fabric runs straight through a line of type,
-     which is where a backdrop stops being one.
-     So the drawing itself steps back here, and the core only has to soften the
-     middle. The opacity goes on the svg and not on `.hero__art`, because the
-     veil below is that element's own pseudo-element and would fade with it. */
-  .hero__art svg{ opacity: .42; }
-  .hero__art::after{
-    background:
-      radial-gradient(92% 56% at 50% 48%,
-        var(--w2b-surface) 0 46%,
-        color-mix(in srgb, var(--w2b-surface) 82%, transparent) 78%,
-        transparent 100%),
-      linear-gradient(180deg, transparent 76%, var(--w2b-paper));
+  .hero{ min-height: 0; align-items: flex-start; }
+  .hero:not(.hero--slim){ padding-top: var(--w2b-space-7); }
+  .hero__inner{ position: static; align-items: flex-start; text-align: left; }
+  .hero__headline{ position: static; }
+  .hero__fabric, .hero__plot{
+    font-size: 44px;
+    left: calc(100% - .5em - 1.018em - 18.383em);
+    top: -10.05em;
   }
+  .hero__fabric{ opacity: .85; }
+  .hero:not(.hero--slim) .hero__eyebrow{ max-width: 60%; min-height: 79px; text-wrap: balance; }
+  .hero__art{
+    background: radial-gradient(250px 190px at calc(100% - 55px) 0,
+      transparent 0 50%,
+      color-mix(in srgb, var(--w2b-surface) 80%, transparent) 78%,
+      var(--w2b-surface) 100%);
+  }
+  .hero--slim .hero__fabric{ font-size: 44px; opacity: .34; }
+  .trust{ justify-content: flex-start; }
 }
 
 @media (max-width: 560px){
-  .hero{ padding: var(--w2b-space-7) var(--w2b-space-4); min-height: 0; }
+  .hero{ padding: var(--w2b-space-7) var(--w2b-space-4); }
   .hero__sub{ font-size: var(--w2b-text-m); }
 }
 </style>

@@ -99,8 +99,17 @@
       <!-- The house: brass, because the user designed it -->
       <g v-if="houseVisible" :class="{ 'plan-handle': interactive }" :tabindex="interactive ? 0 : null"
          :role="interactive ? 'button' : null"
-         :aria-label="interactive ? 'Baukörper: ziehen oder mit den Pfeiltasten verschieben' : null"
+         :aria-label="interactive ? 'Baukörper: anklicken zum Bearbeiten, ziehen oder mit den Pfeiltasten verschieben' : null"
+         :aria-pressed="interactive ? String(houseSelected) : null"
          data-house>
+        <!-- Selected: the panel beside the plan is editing this footprint. A
+             frame a few pixels outside it, so the violation stroke stays readable. -->
+        <g v-if="houseSelected" class="site-plan__selection">
+          <polygon :points="selectionFrame.map(q => `${q.x.toFixed(1)},${q.y.toFixed(1)}`).join(' ')"
+                   fill="none" stroke="var(--w2b-map-selection)" stroke-width="1.5" stroke-dasharray="5 4" />
+          <circle v-for="(q, i) in selectionFrame" :key="`s${i}`" :cx="q.x" :cy="q.y" r="4"
+                  fill="var(--w2b-map-halo)" stroke="var(--w2b-map-selection)" stroke-width="1.5" />
+        </g>
         <polygon :points="path(houseCorners)" fill="var(--w2b-map-design)" fill-opacity=".85"
                  :stroke="violation ? 'var(--w2b-map-violation)' : 'var(--w2b-map-design-edge)'"
                  :stroke-width="violation ? 2.4 : (compact ? 1.2 : 1.7)" />
@@ -353,9 +362,14 @@ export default {
     /** Fixed pixels per metre. Without it each plan fits its own frame. */
     scale: { type: Number, default: null },
     /** Measuring mode: clicks add points, the run is measured segment by segment. */
-    measuring: { type: Boolean, default: false }
+    measuring: { type: Boolean, default: false },
+    /** Draws the footprint as the thing being edited. */
+    houseSelected: { type: Boolean, default: false }
   },
-  emits: ["move", "measured", "choose"],
+  /* `select` carries "house" for a click on the footprint and null for a click
+     anywhere else on the plan. A click, not a press: a drag moves the house
+     and must not also open or close anything. */
+  emits: ["move", "measured", "choose", "select"],
   data() {
     return {
       uid: ++instanceCount, dragging: null, mapUnavailable: false, heldFrame: null,
@@ -592,6 +606,18 @@ export default {
       return `M${outer}Z M${inner}Z`;
     },
     houseCorners() { return this.houseVisible ? rectangleCorners(this.building) : []; },
+    /** The footprint's corners in screen units, pushed 7 px outward along the
+     *  diagonals. */
+    selectionFrame() {
+      const corners = this.houseCorners.map(c => this.p(c));
+      if (!corners.length) return [];
+      const cx = corners.reduce((sum, q) => sum + q.x, 0) / corners.length;
+      const cy = corners.reduce((sum, q) => sum + q.y, 0) / corners.length;
+      return corners.map(q => {
+        const len = Math.hypot(q.x - cx, q.y - cy) || 1;
+        return { x: q.x + (q.x - cx) / len * 7, y: q.y + (q.y - cy) / len * 7 };
+      });
+    },
     outliers() {
       if (!this.envelope.length) return this.houseCorners;
       return this.houseCorners.filter(e => !pointInPolygon(e, this.envelope));
@@ -920,6 +946,7 @@ export default {
     /* Measuring and moving the house are what the pointer is for wherever they
        are switched on; panning only gets what is left over. */
     pointerDown(event) {
+      this._press = null;
       if (this.measuring) { this.measureClick(event); return; }
       /* A press on a parcel on offer. It cannot be a `click` handler: with
          `navigable` the pan below captures the pointer and calls
@@ -933,6 +960,9 @@ export default {
             y: event.clientY,
             parcel: this.choosableParcels.find(p => p.number === choice.dataset.number)
           }
+        : null;
+      this._press = this.interactive
+        ? { x: event.clientX, y: event.clientY, house: Boolean(this.houseVisible && event.target.closest?.("[data-house]")) }
         : null;
       if (this.interactive && this.houseVisible && event.target.closest("[data-house]")) {
         const point = this.toMetres(event);
@@ -971,9 +1001,14 @@ export default {
     },
     pointerUp(event) {
       const pressed = this._pressedChoice;
+      const press = this._press;
       this._pressedChoice = null;
+      this._press = null;
       this.dragging = null;
       this.panning = null;
+      if (press && event.type !== "pointercancel" && Math.hypot(event.clientX - press.x, event.clientY - press.y) <= CLICK_SLOP_PX) {
+        this.$emit("select", press.house ? "house" : null);
+      }
       if (!pressed?.parcel) return;
       const moved = Math.hypot(event.clientX - pressed.x, event.clientY - pressed.y);
       if (moved <= CLICK_SLOP_PX) this.$emit("choose", pressed.parcel.id);
@@ -1000,6 +1035,12 @@ export default {
     },
     onKeydown(event) {
       if (!this.interactive || !this.houseVisible || !event.target.closest("[data-house]")) return;
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        this.$emit("select", "house");
+        return;
+      }
+      if (event.key === "Escape") { this.$emit("select", null); return; }
       const step = event.shiftKey ? 1 : 0.25;
       const direction = {
         ArrowLeft: [-step, 0], ArrowRight: [step, 0],

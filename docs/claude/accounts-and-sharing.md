@@ -441,13 +441,13 @@ jetzt einmal je Verzeichnis und gibt auf.
   numbers, and a model asked the same question is reciting a page at best.
 
 - **The button that starts a job must not be the thing that runs it.** The
-  index rebuilds write into `backend/data`, which the API mounts read-only, and
+  index rebuilds write into the `indexes` volume, which the API mounts read-only, and
   they take minutes. So „Jetzt starten" writes a request file into the state
   directory both containers already share and the scheduler claims it on its
   next tick — in the container that has the writable mount and the lock against
   a second copy. Two consequences worth keeping: the request is *removed* when
   claimed, so a failing job is not restarted every twenty seconds; and a
-  deployment without the `scheduled-jobs` profile has nothing to claim it, so
+  deployment without the `scheduler` service has nothing to claim it, so
   the scheduler writes a heartbeat and the page says „kein Scheduler" instead
   of offering a button whose effect never arrives.
 

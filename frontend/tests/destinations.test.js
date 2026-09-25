@@ -8,6 +8,7 @@
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { nextTick } from "vue";
+import { flushPromises } from "@vue/test-utils";
 import DestinationsView from "../src/views/DestinationsView.vue";
 import {
   state, validate, exportJson, addDestination, locateDestination, destinationName, UNNAMED_DESTINATION
@@ -21,11 +22,12 @@ vi.mock("../src/lib/api.js", () => ({
   // that omits a named export makes every importer fail at *import* time,
   // which shows up as unrelated component errors.
   PAGE_LIMIT: 3000000,
+  backendHealth: vi.fn(() => Promise.resolve(null)),
   geocode: vi.fn(),
   nearby: vi.fn(() => Promise.reject(new Error("nicht Teil dieses Tests"))),
   reachability: vi.fn(() => Promise.reject(new Error("nicht Teil dieses Tests")))
 }));
-const { geocode } = await import("../src/lib/api.js");
+const { geocode, backendHealth } = await import("../src/lib/api.js");
 
 const HBF = "zl-hbf";
 /* The slot the document is stored in. Named here rather than imported: what a
@@ -47,7 +49,7 @@ const answerWith = (...destinations) => ({
     name: d.match, beschreibung: d.address, lat: d.lat, lon: d.lon, art: "sonstiges"
   })),
   hinweis: "Bitte den Treffer prüfen.",
-  quelle: "MOTIS / Transitous (DELFI-GTFS, OpenStreetMap)"
+  quelle: "MOTIS (DELFI-GTFS, OpenStreetMap)"
 });
 
 const open = (options = {}) => mountWithRouter(DestinationsView, { path: "/ziele", ...options });
@@ -300,5 +302,32 @@ describe("Zubringer zum ÖPNV", () => {
     const read = validate(JSON.parse(JSON.stringify(raw)));
     expect("zubringer" in read.destinations[0]).toBe(false);
     expect(zubringerOf(read.destinations[0])).toBe("automatic");
+  });
+});
+
+/* The two endpoints /api/health reported, measured 24.09.2026: the stack's own
+   router and the public one behind docker-compose.transitous.yml. */
+const healthWith = endpunkt => ({ dienste: [{ name: "motis", konfiguriert: true, endpunkt }] });
+
+describe("Der Hinweis auf den Routing-Dienst", () => {
+  it("nennt Transitous, wenn das Backend dorthin fragt", async () => {
+    backendHealth.mockResolvedValueOnce(healthWith("https://api.transitous.org/api/v6/plan"));
+    const w = open();
+    await flushPromises();
+    expect(w.text()).toContain("Die Wege berechnet Transitous");
+  });
+
+  it("schweigt bei der eigenen Instanz", async () => {
+    backendHealth.mockResolvedValueOnce(healthWith("http://motis:8080/api/v6/plan"));
+    const w = open();
+    await flushPromises();
+    expect(w.text()).not.toContain("Transitous");
+  });
+
+  it("behauptet nichts, wenn der Server nicht antwortet", async () => {
+    backendHealth.mockResolvedValueOnce(null);
+    const w = open();
+    await flushPromises();
+    expect(w.text()).not.toContain("Transitous");
   });
 });

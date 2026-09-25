@@ -9,7 +9,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     # Absolute: uvicorn's working directory is not the repository root here,
     # and a relative cache path would follow it.
     APP_CACHE_DIR=/cache \
-    NEARBY_POI_INDEX_PATH=/app/data/poi-sachsen.json
+    # The two indexes built from open data sit on a volume of their own, not
+    # under /app/data: that folder is the image's, and the Gemarkung directory
+    # in it must follow the image rather than whatever a volume kept.
+    NEARBY_POI_INDEX_PATH=/indexes/poi-sachsen.json \
+    ADDRESSES_INDEX_PATH=/indexes/hauskoordinaten-sachsen.json.gz
 
 WORKDIR /app
 
@@ -87,13 +91,14 @@ COPY scripts ./scripts
 COPY data ./data
 
 # The cache is written at runtime; the volume is mounted over it.
-# /state belongs to the scheduler and holds one small record per job. Both are
-# volume mount points: created here so they carry the right owner, because a
-# volume mounted over a path the image does not know arrives owned by root and
-# the unprivileged process cannot write its lock.
+# /state belongs to the scheduler and holds one small record per job, /indexes
+# holds the POI and address indexes, /data-input the routing inputs MOTIS is
+# built from. All are volume mount points: created here so they carry the right
+# owner, because a volume mounted over a path the image does not know arrives
+# owned by root and the unprivileged process cannot write to it.
 RUN useradd --system --uid 10001 app \
- && mkdir -p /cache /state \
- && chown -R app:app /cache /state
+ && mkdir -p /cache /state /indexes /data-input \
+ && chown -R app:app /cache /state /indexes /data-input
 USER app
 
 EXPOSE 8000

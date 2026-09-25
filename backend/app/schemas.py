@@ -773,7 +773,7 @@ class Ziel(Koordinate):
 Geocodeart = Literal["adresse", "haltestelle", "ort", "sonstiges"]
 
 GEOCODE_HINWEIS = (
-    "Die Koordinaten stammen aus dem Routing-Geocoder (Transitous, OpenStreetMap "
+    "Die Koordinaten stammen aus dem Routing-Geocoder (MOTIS: OpenStreetMap "
     "und Fahrplandaten), nicht aus den amtlichen Hauskoordinaten des GeoSN. Bitte "
     "den gefundenen Ort auf der Karte prüfen und gegebenenfalls einen anderen "
     "Treffer wählen."
@@ -821,10 +821,12 @@ class GeocodeTreffer(Koordinate):
 GEOCODE_HINWEIS_AMTLICH = (
     "Treffer mit dem Zusatz „amtliche Hauskoordinate“ stammen aus den Hauskoordinaten "
     "des GeoSN{stand} und sind die vom Kataster geführte Koordinate des Hauses. Die "
-    "übrigen kommen aus dem Routing-Geocoder (Transitous, OpenStreetMap und "
+    "übrigen kommen aus dem Routing-Geocoder (MOTIS: OpenStreetMap und "
     "Fahrplandaten) — die bitte auf der Karte prüfen."
 )
-GEOCODE_QUELLE = "MOTIS / Transitous (DELFI-GTFS, OpenStreetMap)"
+# The software and the data, not the operator: the same answer comes from the
+# stack's own MOTIS or from Transitous, and the data is what needs attributing.
+GEOCODE_QUELLE = "MOTIS (DELFI-GTFS, OpenStreetMap)"
 GEOCODE_QUELLE_AMTLICH = "Amtliche Hauskoordinaten (GeoSN, dl-de/by-2-0)"
 
 
@@ -872,7 +874,7 @@ class RouteErgebnis(BaseModel):
 
 class ReachabilityResponse(BaseModel):
     ergebnisse: list[RouteErgebnis]
-    quelle: str = "MOTIS / Transitous (DELFI-GTFS, OpenStreetMap)"
+    quelle: str = GEOCODE_QUELLE
 
 
 # --------------------------------------------------------------------------
@@ -1041,7 +1043,7 @@ class NearbyResponse(BaseModel):
     kategorien: list[KategorieStatus] = Field(default_factory=list)
     # Timestamp of the OSM extract the index was built from, when there is one.
     datenstand: str | None = None
-    quelle: str = "OpenStreetMap (ODbL) und MOTIS / Transitous (DELFI-GTFS)"
+    quelle: str = "OpenStreetMap (ODbL) und MOTIS (DELFI-GTFS)"
     hinweis: str = UMGEBUNG_HINWEIS
 
 
