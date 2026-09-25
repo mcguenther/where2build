@@ -37,6 +37,14 @@ services:
       - path: ./backend/.env
         required: false
     environment:
+      # Pinned here, not left to the image: `environment` outranks `env_file`,
+      # and the Dockerfile's `ENV` does not. backend/.env is a copy of
+      # .env.example, whose `APP_CACHE_DIR=.cache` is right for a checkout and
+      # wrong in here -- measured 25.09.2026, it sent every write to a
+      # directory the unprivileged user may not create, the volume at /cache
+      # stayed empty, and every tile, parcel and land value went out again on
+      # every request.
+      - APP_CACHE_DIR=/cache
       # The database in this stack. A deployment sets its own DATABASE_URL --
       # this one is reachable from nowhere but the compose network.
       - DATABASE_URL=postgresql://where2build:where2build@db:5432/where2build
@@ -242,6 +250,8 @@ services:
       - path: ./backend/.env
         required: false
     environment:
+      # See the backend: the cache sweep must look where the backend writes.
+      - APP_CACHE_DIR=/cache
       - JOBS_FILE=/ops/jobs.json
     volumes:
       - backend-cache:/cache

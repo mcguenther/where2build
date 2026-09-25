@@ -134,6 +134,14 @@ passed through to the plain `docker compose up` behind it, which is the
 untrusted build the script exists to avoid. The error arrives as a pip
 certificate failure, i.e. as though the script had not worked.
 
+**`env_file` beats the Dockerfile's `ENV`, and `backend/.env` is a copy of
+`.env.example`.** Any setting the image fixes to a container path and the
+template also names is silently the template's value in the stack. It hid
+for a week as `APP_CACHE_DIR=.cache`: no cache write ever succeeded in
+compose, which shows only as slowness and one warning line in the log.
+`docker compose config` with a copied template is the check; `environment:`
+is the fix. See `accounts-and-sharing.md`.
+
 `docker pull python:3.11-slim` answers **429** from Docker Hub often enough
 that one retry is routine.
 
