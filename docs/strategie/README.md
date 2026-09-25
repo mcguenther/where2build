@@ -14,6 +14,7 @@ their caveats are written up in `../research/flurstueck-identifikation.md`.
 | `extraktion-prompting.html` | The escalation ladder from HTML attribute to OCR to language model, three ready prompts, and the two traps that break the cheap paths. |
 | `suche-triangulation.html` | Filters ranked by discriminating power per cost, the soft trapezoid scoring, and a workbench that re-ranks the 25 real candidates live. |
 | `ui-indizienkarte.html` | The interface draft: indicia appear on the map as they arrive, the camera follows the live candidate set rather than the newest finding, opacity encodes confidence. |
+| `ui-nachbarn.html` | Three interface proposals for the plot page's „Nachbarn“ toggle (plan with markers, boundary by boundary, sections with three tiers), drawn from the recorded Mölkau 204 fixtures: the § 6 envelope stays, each neighbour is classified, only the real overlap is hatched, plus a § 34 orientation band. |
 | `suchalgorithmus.html` | The search itself in six phases, each with its cost and its abort condition: the tolerance staircase, the confirmation rung, and the OCR ladder. |
 | `inserat-pipeline.html` | The plan: every value read today and what it is allowed to decide, the six places the run breaks, an agenda of hypotheses in place of the fixed staircase, what a stated distance is worth (measured against Transitous: the reference point scatters wider than the detour), nineteen values worth extracting, and the model as a channel behind a citation gate. |
 
