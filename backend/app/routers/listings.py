@@ -27,7 +27,13 @@ from ..services import prompts
 from ..services import lehrbuch as lehrbuch_service
 from ..services.beleg import Urteil, refusal_note
 from ..services.llm import LLMClient, fingerprint, normalize_url
-from ..services.portals import PASTE_HINT, fetch_page, is_blocked, is_kleinanzeigen, parse_page
+from ..services.portals import (
+    Seite,
+    fetch_page,
+    is_kleinanzeigen,
+    parse_page,
+    refusing_portal,
+)
 from ..settings import Settings
 
 router = APIRouter(prefix="/api/listings", tags=["Inserate"])
@@ -58,6 +64,19 @@ EXTRACTION_VERSION = 3
 _NO_LOCATOR = (
     "Aus dieser Seite ließ sich weder eine Adresse noch eine Koordinate noch ein "
     "Flurstück lesen. Bitte den Seiteninhalt einfügen oder die Angaben von Hand eintragen."
+)
+
+
+# A fetched page with nothing to go on. Not „nicht konfiguriert“: that sent
+# people looking for a server setting, when what the page lacks is a place --
+# and what usually happened is that the server was served less than the
+# browser shows, which the bookmarklet gets round.
+_NOTHING_SEARCHABLE = (
+    "Auf dieser Seite steht weder eine Adresse noch eine Koordinate noch ein "
+    "Flurstück, und die Beschreibung nennt keinen Ort, von dem die "
+    "Flurstückssuche ausgehen könnte. Zeigt die Anzeige im Browser mehr, hilft "
+    "das Lesezeichen unter „Seite einfügen“: ein Klick auf der Anzeigenseite "
+    "schickt sie so herüber, wie der Browser sie zeigt."
 )
 
 
@@ -287,23 +306,54 @@ def _answer(
     )
 
 
-async def _from_url(url: str, llm: LLMClient, settings: Settings) -> ListingExtractResponse:
-    if is_blocked(url):
-        # No request goes out at all -- the answer is known to be 401.
-        raise BadRequestError(PASTE_HINT)
+def _read_off(seite: Seite) -> InseratFelder:
+    """What the page states in markup, before anybody reads its prose."""
 
+    return InseratFelder(
+        adresse=seite.adresse,
+        lat=seite.lat,
+        lon=seite.lon,
+        grundstuecksflaeche_m2=_area_from(seite.angaben),
+        kaufpreis_eur=seite.kaufpreis_eur,
+    )
+
+
+def _without_a_model(seite: Seite, felder: InseratFelder, url: str) -> ListingExtractResponse:
+    """A fetched page, read by our own parsers alone.
+
+    The same test the paste path makes: the search needs a place to start
+    from, not a coordinate. A portal's coordinate is the municipality's at
+    best, and requiring one refused as a link exactly the page that went
+    through when it was pasted.
+    """
+
+    # The description, not the whole page: without this the search reads a
+    # portal's navigation and cookie banner as evidence.
+    beschreibung = seite.beschreibung or seite.text
+    prose = " ".join(part for part in (seite.titel, beschreibung) if part)
+    if not _has_locator(felder) and not _is_searchable(prose):
+        raise NotConfiguredError(_NOTHING_SEARCHABLE)
+    return _answer(
+        felder,
+        url,
+        "meta-tags" if seite.has_coordinates else "abgerufene-seite",
+        titel=seite.titel,
+        beschreibung=beschreibung,
+        bilder=seite.bilder,
+    )
+
+
+async def _from_url(url: str, llm: LLMClient, settings: Settings) -> ListingExtractResponse:
     if is_kleinanzeigen(url):
         seite = await fetch_page(url, settings.app)
-        deterministic = InseratFelder(
-            adresse=seite.adresse, lat=seite.lat, lon=seite.lon,
-            grundstuecksflaeche_m2=_area_from(seite.angaben),
-            kaufpreis_eur=seite.kaufpreis_eur,
-        )
+        deterministic = _read_off(seite)
+        if not llm.settings.configured:
+            return _without_a_model(seite, deterministic, url)
         weg: Extraktionsweg = "meta-tags" if seite.has_coordinates else "llm"
         hinweis = None
         extracted: InseratFelder | None = None
         indizien: list[Indiz] = []
-        if llm.settings.configured and seite.text:
+        if seite.text:
             try:
                 extracted, indizien, hinweis = await _ask_the_model(
                     llm, seite.text, deterministic, quelle_url=url
@@ -312,11 +362,6 @@ async def _from_url(url: str, llm: LLMClient, settings: Settings) -> ListingExtr
                 if not seite.has_coordinates:
                     raise
                 hinweis = f"Nur die Meta-Angaben der Seite konnten gelesen werden: {exc.message}"
-        elif not seite.has_coordinates:
-            raise NotConfiguredError(
-                "Das Auslesen von Seiten ist nicht konfiguriert und die Seite trägt "
-                "keine Koordinaten. Bitte den Seiteninhalt einfügen."
-            )
         return _answer(
             _merge(deterministic, extracted),
             url,
@@ -334,7 +379,11 @@ async def _from_url(url: str, llm: LLMClient, settings: Settings) -> ListingExtr
     # JSON-LD from a direct request, then the full text to the model.
     seite = None
     text = ""
-    if llm.settings.configured:
+    # Not for a portal known to refuse servers: a provider's fetch is paid for
+    # either way, got ImmoScout's 401 when it was tried and was never tried on
+    # immowelt. The direct request below is free and says what the portal
+    # answers today.
+    if llm.settings.configured and not refusing_portal(url):
         try:
             text = await llm.fetch_page_text(url, _FETCH_TASK)
         except UpstreamError:
@@ -343,19 +392,7 @@ async def _from_url(url: str, llm: LLMClient, settings: Settings) -> ListingExtr
         seite = await fetch_page(url, settings.app)
         text = seite.text
         if not llm.settings.configured:
-            if seite.has_coordinates:
-                return _answer(
-                    InseratFelder(adresse=seite.adresse, lat=seite.lat, lon=seite.lon),
-                    url,
-                    "meta-tags",
-                    titel=seite.titel,
-                    beschreibung=seite.beschreibung or seite.text,
-                    bilder=seite.bilder,
-                )
-            raise NotConfiguredError(
-                "Das Auslesen von Seiten ist nicht konfiguriert. "
-                "Bitte den Seiteninhalt einfügen."
-            )
+            return _without_a_model(seite, _read_off(seite), url)
 
     deterministic = (
         InseratFelder(adresse=seite.adresse, lat=seite.lat, lon=seite.lon)
@@ -386,11 +423,10 @@ async def extract(
     if payload.url is not None:
         url = str(payload.url)
         # The model rides in the key too: a different one gives a different
-        # answer, and this cache has no expiry.
-        cache_key = (
-            f"inserat:v{EXTRACTION_VERSION}:{fingerprint(llm.settings.model)}"
-            f":{normalize_url(url)}"
-        )
+        # answer, and this cache has no expiry. So does its absence -- a page
+        # read without one must not outlive the key being set.
+        reader = fingerprint(llm.settings.model) if llm.settings.configured else "ohne-modell"
+        cache_key = f"inserat:v{EXTRACTION_VERSION}:{reader}:{normalize_url(url)}"
         cached = llm.cache.get_json(cache_key)
         if cached is not None:
             return ListingExtractResponse.model_validate(cached)

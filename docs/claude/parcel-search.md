@@ -424,6 +424,25 @@ also "Decisions that are settled" in `CLAUDE.md`.
   parcel in Saxony of that size is not a candidate set — so „Baugrundstück
   688 m²“ still gets the message that says what to paste instead.
 
+- **The link path had a stricter gate than the paste path.** Without a model,
+  `_from_url` wanted a coordinate. A Kleinanzeigen page without `og:latitude`
+  and every other portal's page got 503 „Das Auslesen von Seiten ist nicht
+  konfiguriert“, even though `parse_page` had read the description, area,
+  price and images, and the same page pasted went straight into the search.
+  It was reported on 24.09.2026, and the wording made it worse: „nicht
+  konfiguriert“ sends people looking for a server setting when all the page
+  lacks is a place. Both URL branches now go through `_without_a_model`,
+  which makes the paste path's test (a locator *or* prose with an anchor) and
+  answers `weg: "abgerufene-seite"`, never `"llm"`, because no model ran. The
+  one refusal left says that nothing on the page names a place, and it points
+  at the bookmarklet. Measured on a live ohne-makler link (Brandis, 514 m²,
+  170 000 €, no coordinate): 200, and the search runs to four candidates in
+  Stadt Brandis. A refused fetch is not cached, so each link measures the
+  portal again (see `services.md` on known refusals). The cache key now names
+  the reader, and „ohne-modell“ counts as one. Without that, an answer read
+  with no model would outlive the key being set, because this cache never
+  expires.
+
 - **The reader garbles the label, not only the digits.** On the Borna advert's
   Liegenschaftskarte Tesseract returns „**Fiurstück**: 107/60“ — the l as an i —
   so the one number on the sheet that means anything was thrown away, while

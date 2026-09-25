@@ -27,7 +27,7 @@ of Overpass or a local extract, the listing portals, and the extraction model.
   it is an AWS WAF challenge at the CloudFront edge (`x-cache: Error from
   cloudfront`), so the request never reaches an origin — a full browser header
   set, HTTP/1.1, a `ClaudeBot` UA and Anthropic's own fetch all answer 401
-  alike, while `robots.txt` (200) explicitly *allows* `ClaudeBot` and the two
+  alike (and on 25.09.2026 the app's own request still did), while `robots.txt` (200) explicitly *allows* `ClaudeBot` and the two
   exposé sitemaps it advertises answer 401. There is no header to fix. There
   *is* a documented API (`api.immobilienscout24.de`, search over two-legged
   OAuth, 2 000 req/min), but it is content-partner only, "not for data delivery
@@ -100,6 +100,44 @@ of Overpass or a local extract, the listing portals, and the extraction model.
   allows `/expose/` and names ClaudeBot explicitly; the refusal happens before
   the server. Same shape as immobilienscout24.de, different vendor, same way
   in: the user's own browser, so the bookmarklet.
+  **Measured again on 24.09.2026** with two live exposés
+  (`/expose/c1fc6775-…` and `/expose/db412a8e-…`): `curl` with a browser
+  header set and `fetch_page` with its one retry both get the same 403, 771
+  bytes, `x-datadome: protected`, a `datadome` cookie and
+  `LambdaGeneratedResponse from cloudfront`. So `parse_page` never sees an
+  immowelt page from the server, and there is no fixture: nothing came back
+  to record.
+
+- **A known refusal is asked again every time, never assumed.** Both portals
+  above used to sit in a `BLOCKED_DOMAINS` list that sent no request at all,
+  and a list like that cannot notice the day a portal lets servers in again.
+  Its hints also carried a „zuletzt bestätigt am …“ that went stale the day
+  after it was written. Since 25.09.2026 `fetch_page` asks every link, once
+  for a portal in `REFUSING_PORTALS` and twice for any other (the Kleinanzeigen
+  warm-up), and the answer decides. The list does two things only: it puts
+  the portal's name in the refusal, and it keeps the model's paid fetch away
+  from it. The status code goes to a separate `technisch` field that the
+  wizard sets small under the sentence. Before, the sentence led with it
+  („mit Status 403 abgelehnt“), and a code is nothing a user can act on.
+  Measured live the same day: immowelt 403 on both exposés, ImmoScout 401,
+  the vanished ohne-makler listing 403, and a live ohne-makler exposé 200.
+  A 403 from a portal nobody has measured therefore says it may be either a
+  gate or a listing that is gone, because ohne-makler uses it for both.
+
+- **ohne-makler.net serves a listing to the server, and answers 403 for one
+  that is gone.** Measured 24.09.2026: the Saxony plot list
+  (`/immobilien/grundstueck-kaufen/sachsen/`) and the eight exposés on it came
+  back 200 through `fetch_page`, behind `server: myracloud`. The recorded
+  fixture's own listing, `/immobilie/476452/`, now answers **403** with a
+  196 kB page titled „Immobilie nicht gefunden“: the listing is missing, not
+  blocked, though the status says otherwise. None of the eight carries a
+  coordinate. All eight carry postcode and town as `adresse`, `parse_page`
+  read the area of all eight, and it read a price off seven (Meißen states
+  none). What it does *not* read is the prose: the description falls through
+  to `og:description`, which is boilerplate („Wohnen in Brandis von privat zu
+  verkaufen || jetzt Grundstück provisionsfrei …“, about 100 characters). The
+  seller's text stands in `<div class="prose max-w-none mb-6">`, and
+  `_DESCRIPTION_PATTERNS` does not know it.
 
 - **`ave:KatasterBezirk` will not drop its geometry.** `PROPERTYNAME` without the
   `ave:` prefix is rejected outright (`ErrorInPropertyName`); with the prefix the

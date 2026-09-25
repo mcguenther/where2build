@@ -1691,7 +1691,9 @@ def test_the_engelsdorf_advert_is_settled_by_the_frame_on_its_flurkarte(client: 
 
     The text reaches Gemarkung Engelsdorf and exactly 590 m² — twelve parcels,
     among them 166/16 next door at the same size, so no area can tell them
-    apart. The frame on the Flurkarte can, and the run looks 166/17 up directly.
+    apart. One of the twelve, 187/13, is recorded as „Platz;590“ and is set
+    aside as a traffic parcel, which leaves eleven. The frame on the Flurkarte
+    tells 166/16 and 166/17 apart, and the run looks 166/17 up directly.
     """
 
     respx.post(ALKIS_URL).mock(side_effect=_engelsdorf_cadastre())
@@ -1704,7 +1706,8 @@ def test_the_engelsdorf_advert_is_settled_by_the_frame_on_its_flurkarte(client: 
 
     before = next(e for e in events if e["art"] == "kandidaten")
     numbers = {k["properties"]["flurstuecksnummer"] for k in before["kandidaten"]}
-    assert len(numbers) == 12 and {"166/16", "166/17"} <= numbers
+    assert len(numbers) == 11 and {"166/16", "166/17"} <= numbers
+    assert "187/13" not in numbers
 
     read = [e["indiz"] for e in events if e["art"] == "indiz" and e["indiz"]["quelle"] == "bild"]
     assert [i["wert"] for i in read] == ["166/17"]

@@ -1,4 +1,4 @@
-"""Portal adapters: meta tags first, and no request at all to a blocking portal."""
+"""Portal adapters: meta tags first, and a refusal said so that it can be acted on."""
 
 from __future__ import annotations
 
@@ -6,15 +6,15 @@ import httpx
 import pytest
 import respx
 
-from app.errors import BadRequestError
+from app.errors import UpstreamError
 from app.services.portals import (
     fetch_page,
-    is_blocked,
     is_immoscout,
     is_kleinanzeigen,
     parse_immoscout,
     parse_meta_tags,
     parse_page,
+    refusing_portal,
 )
 from app.settings import get_settings
 
@@ -46,28 +46,92 @@ def test_kleinanzeigen_page_yields_coordinates_without_a_model_call():
     assert "var tracking" not in seite.text
 
 
+IMMOWELT_URL = "https://www.immowelt.de/expose/c1fc6775-3423-4549-b881-424be15286ac"
+
+
 def test_domain_classification():
     assert is_kleinanzeigen(KLEINANZEIGEN_URL)
-    assert is_blocked(IMMOSCOUT_URL)
-    assert is_blocked("https://immobilienscout24.de/expose/1")
-    assert not is_blocked(KLEINANZEIGEN_URL)
+    assert refusing_portal(IMMOSCOUT_URL) == "ImmoScout24"
+    assert refusing_portal("https://immobilienscout24.de/expose/1") == "ImmoScout24"
+    assert refusing_portal(IMMOWELT_URL) == "immowelt"
+    assert refusing_portal(KLEINANZEIGEN_URL) is None
+    # A suffix match on the domain, not on the string.
+    assert refusing_portal("https://www.nichtimmowelt.de/expose/1") is None
 
 
 @respx.mock
-async def test_immobilienscout24_is_never_requested():
-    # Live-confirmed 401 through httpx and all three fetch engines -- so the
-    # adapter does not even try; the paste field is the way in.
-    route = respx.get(url__startswith="https://www.immobilienscout24.de").mock(
-        return_value=httpx.Response(200, text="<html></html>")
+@pytest.mark.parametrize(("url", "status", "name"), [
+    (IMMOSCOUT_URL, 401, "ImmoScout24"),
+    (IMMOWELT_URL, 403, "immowelt"),
+])
+async def test_a_refusing_portal_is_asked_and_its_refusal_said_plainly(url, status, name):
+    """Asked every time, and asked once.
+
+    It used to be skipped outright, which could never notice a portal letting
+    servers in again. The status goes to the technical line: the sentence says
+    what it means and what to do instead.
+    """
+
+    route = respx.get(url).mock(return_value=httpx.Response(status, text=""))
+
+    with pytest.raises(UpstreamError) as error:
+        await fetch_page(url, get_settings().app)
+
+    assert route.call_count == 1
+    message = error.value.message
+    assert message.startswith(f"{name} gibt die Anzeigenseite nicht an unseren Server heraus.")
+    assert "Lesezeichen" in message and "Seite einfügen" in message
+    assert "HTTP" not in message and str(status) not in message
+    assert error.value.technical == f"Antwort der Anzeigenseite: HTTP {status}"
+    assert error.value.body == {"detail": message, "technisch": error.value.technical}
+
+
+@respx.mock
+async def test_a_refusing_portal_that_serves_the_page_is_read():
+    """The day a portal lets a server in, the page is simply read."""
+
+    respx.get(IMMOSCOUT_URL).mock(
+        return_value=httpx.Response(
+            200,
+            text=fixture_text("inserat-immoscout.html"),
+            headers={"content-type": "text/html; charset=utf-8"},
+        )
     )
 
-    with pytest.raises(BadRequestError) as error:
-        await fetch_page(IMMOSCOUT_URL, get_settings().app)
+    seite = await fetch_page(IMMOSCOUT_URL, get_settings().app)
 
-    assert route.call_count == 0
-    # The refusal has to name the way that works, not only the one that does not.
-    assert "Seite einfügen" in error.value.message
+    assert seite.angaben["Grundstücksfläche"] == "742 m²"
+
+
+@respx.mock
+async def test_an_unknown_portal_is_asked_twice_before_its_refusal_counts():
+    """Kleinanzeigen's warm-up 403 is why, and it is no one's name to know."""
+
+    url = "https://www.beispielportal.de/objekt/18"
+    route = respx.get(url).mock(return_value=httpx.Response(403, text=""))
+
+    with pytest.raises(UpstreamError) as error:
+        await fetch_page(url, get_settings().app)
+
+    assert route.call_count == 2
+    # A 403 from a portal nobody has measured may be a gate or a listing that
+    # is gone -- ohne-makler answers a vanished one exactly so -- and the
+    # sentence says both rather than guessing.
+    assert error.value.message.startswith("Das Portal hat die Seite nicht herausgegeben.")
+    assert "nicht mehr online" in error.value.message
     assert "Lesezeichen" in error.value.message
+
+
+@respx.mock
+async def test_a_vanished_listing_is_called_that():
+    url = "https://www.beispielportal.de/objekt/18"
+    respx.get(url).mock(return_value=httpx.Response(404, text=""))
+
+    with pytest.raises(UpstreamError) as error:
+        await fetch_page(url, get_settings().app)
+
+    assert error.value.message.startswith("Unter diesem Link steht keine Anzeige (mehr).")
+    assert error.value.technical == "Antwort der Anzeigenseite: HTTP 404"
 
 
 @respx.mock

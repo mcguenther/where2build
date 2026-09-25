@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 
 import httpx
 import pytest
@@ -64,18 +65,48 @@ def _kleinanzeigen_page() -> httpx.Response:
     )
 
 
+IMMOWELT_URL = "https://www.immowelt.de/expose/c1fc6775-3423-4549-b881-424be15286ac"
+
+
 @respx.mock
-def test_immobilienscout24_is_not_fetched_and_points_at_the_paste_field(client: TestClient):
+def test_immobilienscout24_is_asked_and_its_refusal_points_at_the_paste_field(
+    without_llm, client: TestClient
+):
     portal = respx.get(url__startswith="https://www.immobilienscout24.de").mock(
-        return_value=httpx.Response(200, text="<html></html>")
+        return_value=httpx.Response(401, text="")
     )
-    llm = respx.post(CHAT_URL).mock(return_value=httpx.Response(200, json=completion("x")))
 
     answer = client.post("/api/listings/extract", json={"url": IMMOSCOUT_URL})
 
-    assert answer.status_code == 400
-    assert "Seite einfügen" in answer.json()["detail"]
-    assert portal.call_count == 0
+    assert answer.status_code == 502
+    body = answer.json()
+    assert body["detail"].startswith("ImmoScout24 gibt die Anzeigenseite nicht")
+    assert "Seite einfügen" in body["detail"] and "Lesezeichen" in body["detail"]
+    assert body["technisch"] == "Antwort der Anzeigenseite: HTTP 401"
+    assert portal.call_count == 1
+
+
+@respx.mock
+def test_immowelt_is_asked_directly_and_never_through_the_model(client: TestClient):
+    """DataDome answered every exposé with 403 on 24.09.2026.
+
+    Whether a provider's paid fetch gets past it was never measured, so the
+    model is not sent there; the free direct request says what immowelt
+    answers today, and is asked again next time rather than cached.
+    """
+
+    portal = respx.get(IMMOWELT_URL).mock(return_value=httpx.Response(403, text=""))
+    llm = respx.post(CHAT_URL).mock(return_value=httpx.Response(200, json=completion("x")))
+
+    first = client.post("/api/listings/extract", json={"url": IMMOWELT_URL})
+    second = client.post("/api/listings/extract", json={"url": IMMOWELT_URL})
+
+    assert first.status_code == second.status_code == 502
+    body = first.json()
+    assert body["detail"].startswith("immowelt gibt die Anzeigenseite nicht")
+    assert "403" not in body["detail"]
+    assert body["technisch"] == "Antwort der Anzeigenseite: HTTP 403"
+    assert portal.call_count == 2
     assert llm.call_count == 0
 
 
@@ -430,3 +461,154 @@ def test_a_paste_with_no_markup_at_all_is_read_too(without_llm, client: TestClie
     assert read["grundstuecksflaeche_m2"]["wert"] == 866
     assert read["kaufpreis_eur"]["wert"] == 199_000
     assert read["adresse"]["wert"] == "04178 Leipzig"
+
+
+# --------------------------------------------------------------------------
+# A link without a model: the same test as a paste
+# --------------------------------------------------------------------------
+
+LOBSTAEDT_URL = (
+    "https://www.kleinanzeigen.de/s-anzeige/baugrundstueck-ca-1-025qm-direkt-bebaubar/"
+    "3423861748-207-3935"
+)
+FOREIGN_URL = "https://www.ohne-makler.net/immobilie/476452/"
+_COORDINATE_TAGS = re.compile(r'<meta property="og:(?:latitude|longitude)"[^>]*>')
+
+
+def _without_coordinates(name: str) -> str:
+    """A recorded page with its coordinate taken out, and nothing added.
+
+    Kleinanzeigen leaves `og:latitude` off an advert whose seller withheld the
+    location; this is that page, made from a real one rather than written.
+    """
+
+    page = fixture_text(name)
+    stripped = _COORDINATE_TAGS.sub("", page)
+    assert stripped != page and "og:latitude" not in stripped
+    return stripped
+
+
+def _html(text: str) -> httpx.Response:
+    return httpx.Response(200, text=text, headers={"content-type": "text/html; charset=utf-8"})
+
+
+@respx.mock
+def test_a_kleinanzeigen_link_without_a_coordinate_is_read_without_a_model(
+    without_llm, client: TestClient
+):
+    """What went through as a paste was refused as a link.
+
+    The page names its Ortsteil — „Ortsteil Lobstädt bei Neukieritzsch“ — and
+    states its area and price in markup, which is everything the parcel search
+    runs on. The coordinate is the one thing missing, and the search only ever
+    used it to rule places out.
+    """
+
+    respx.get(LOBSTAEDT_URL).mock(
+        return_value=_html(_without_coordinates("inserat-kleinanzeigen.html"))
+    )
+    llm = respx.post(CHAT_URL).mock(return_value=httpx.Response(200, json=completion("x")))
+
+    answer = client.post("/api/listings/extract", json={"url": LOBSTAEDT_URL})
+
+    assert answer.status_code == 200
+    body = answer.json()
+    assert body["weg"] == "abgerufene-seite"
+    assert llm.call_count == 0
+    assert body["felder"]["lat"]["wert"] is None
+    assert body["felder"]["grundstuecksflaeche_m2"]["wert"] == 1025
+    assert body["felder"]["kaufpreis_eur"]["wert"] == 80000
+    assert "Ortsteil Lobstädt bei Neukieritzsch" in body["beschreibung"]
+    # The description, not the page around it.
+    assert "Cookie" not in body["beschreibung"]
+    assert body["bilder"]
+
+
+@respx.mock
+def test_another_portal_s_link_is_read_without_a_model(without_llm, client: TestClient):
+    """ohne-makler.net: no coordinate anywhere, and a place in its prose."""
+
+    respx.get(FOREIGN_URL).mock(return_value=_html(fixture_text("inserat-ohne-makler.html")))
+    llm = respx.post(CHAT_URL).mock(return_value=httpx.Response(200, json=completion("x")))
+
+    answer = client.post("/api/listings/extract", json={"url": FOREIGN_URL})
+
+    assert answer.status_code == 200
+    body = answer.json()
+    assert body["weg"] == "abgerufene-seite"
+    assert llm.call_count == 0
+    assert body["felder"]["lat"]["wert"] is None
+    # The deterministic fields travel as they do for Kleinanzeigen: they used to
+    # be dropped on this path even when the page carried them.
+    assert body["felder"]["grundstuecksflaeche_m2"]["wert"] == 5366
+    assert body["felder"]["kaufpreis_eur"]["wert"] == 115000
+    assert body["felder"]["adresse"]["wert"] == "Maschinenhausstraße, 01587 Riesa, Sachsen"
+    assert "Riesa" in body["beschreibung"]
+
+
+@respx.mock
+def test_a_link_to_a_page_that_names_nowhere_says_so(without_llm, client: TestClient):
+    """A recorded page with no locator and no place: a house, not a plot.
+
+    The refusal says what is missing and names the bookmarklet — never „nicht
+    konfiguriert“, which sent people looking for a server setting.
+    """
+
+    url = "https://www.beispielportal.de/objekt/18"
+    respx.get(url).mock(return_value=_html(fixture_text("hersteller_haustyp.html")))
+
+    answer = client.post("/api/listings/extract", json={"url": url})
+
+    assert answer.status_code == 503
+    detail = answer.json()["detail"]
+    assert "nicht konfiguriert" not in detail
+    assert "keinen Ort" in detail
+    assert "Lesezeichen unter „Seite einfügen“" in detail
+    # A refusal is not cached: the same link is asked again next time.
+    assert client.post("/api/listings/extract", json={"url": url}).status_code == 503
+    assert respx.calls.call_count >= 2
+
+
+@respx.mock
+def test_with_a_model_a_page_without_a_coordinate_still_goes_to_it(client: TestClient):
+    """Nothing changes when a model is configured: it reads the page."""
+
+    respx.get(KLEINANZEIGEN_URL).mock(
+        return_value=_html(_without_coordinates("kleinanzeigen_inserat.html"))
+    )
+    llm = respx.post(CHAT_URL).mock(
+        return_value=httpx.Response(200, json=completion(json.dumps(INSERAT_JSON)))
+    )
+
+    answer = client.post("/api/listings/extract", json={"url": KLEINANZEIGEN_URL})
+
+    assert answer.status_code == 200
+    body = answer.json()
+    assert llm.call_count == 1
+    assert body["weg"] == "llm"
+    assert body["felder"]["lat"]["wert"] is None
+    assert body["felder"]["kaufpreis_eur"]["wert"] == 89000
+
+
+@respx.mock
+def test_a_page_read_without_a_model_is_read_again_once_there_is_one(
+    monkeypatch: pytest.MonkeyPatch, client: TestClient
+):
+    """The cache never expires, so it has to know whether a model answered."""
+
+    from app.deps import reset_services
+
+    respx.get(KLEINANZEIGEN_URL).mock(return_value=_kleinanzeigen_page())
+    llm = respx.post(CHAT_URL).mock(
+        return_value=httpx.Response(200, json=completion(json.dumps(INSERAT_JSON)))
+    )
+
+    monkeypatch.setenv("LLM_API_KEY", "")
+    reset_services()
+    assert client.post("/api/listings/extract", json={"url": KLEINANZEIGEN_URL}).status_code == 200
+    assert llm.call_count == 0
+
+    monkeypatch.setenv("LLM_API_KEY", "test-key")
+    reset_services()
+    assert client.post("/api/listings/extract", json={"url": KLEINANZEIGEN_URL}).status_code == 200
+    assert llm.call_count == 1

@@ -21,7 +21,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from ..errors import BadRequestError, UpstreamError
+from ..errors import UpstreamError
 from ..settings import AppSettings
 from ..upstream import request
 from .llm import domain_of
@@ -33,23 +33,36 @@ from .portal_fields import (
 )
 
 SERVICE_NAME = "Die Anzeigenseite"
-ADVICE = (
-    "Bitte die Anzeige im Browser öffnen, den Seiteninhalt kopieren und in "
-    "das Einfügefeld einsetzen."
+# The way round every failure to fetch a page: the user's own browser has it.
+_PASTE_STEPS = (
+    "dort einmal das Lesezeichen einrichten, dann schickt ein Klick auf der "
+    "Anzeigenseite sie vollständig herüber. Ohne Lesezeichen die Seite kopieren "
+    "und einfügen — Fläche, Preis und Beschreibung kommen mit."
 )
+ADVICE = f"Über „Seite einfügen“ geht es trotzdem: {_PASTE_STEPS}"
 
-# Domains whose server-side retrieval is known to fail; the paste field (F-12)
-# is the only reliable way in.
-BLOCKED_DOMAINS = {"immobilienscout24.de"}
+# Portals measured to refuse a fetch from a server: ImmoScout with an AWS WAF
+# (401, 09.09.2026), immowelt with DataDome on its exposés (403, 15.09. and
+# 24.09.2026). Nothing is skipped because of this list. It used to be a block,
+# with no request going out at all, and a block cannot notice the day a portal
+# lets us in again; its hint then carried a date that went stale the day after
+# it was written. Now the request goes out and the answer decides. The list
+# only names the portal in the refusal, and spares it the model's paid fetch:
+# Anthropic's fetch got the same 401 from ImmoScout, and against immowelt no
+# provider's fetch has been tried.
+REFUSING_PORTALS = {
+    "immobilienscout24.de": "ImmoScout24",
+    "immowelt.de": "immowelt",
+}
 
-PASTE_HINT = (
-    "immobilienscout24.de lässt keinen Serverabruf zu und antwortet mit „Ich bin "
-    "kein Roboter“ (HTTP 401, zuletzt bestätigt am 09.09.2026). Der Weg führt über "
-    "„Seite einfügen“: dort einmal das Lesezeichen einrichten, dann schickt ein "
-    "Klick auf der Anzeigenseite sie vollständig herüber. Ohne Lesezeichen die "
-    "Seite kopieren und einfügen — Fläche, Preis und Beschreibung kommen mit, die "
-    "Meta-Angaben nicht."
-)
+# What a refusal means, not what it is called. 401 and 403 are a gate in front
+# of the page; 404 and 410 a listing that is gone -- except that ohne-makler
+# answers a vanished listing with 403 („Immobilie nicht gefunden“, measured
+# 24.09.2026), so the gate sentence must not claim to know which of the two it
+# was.
+_REFUSED = (401, 403)
+_GONE = (404, 410)
+
 
 _META_PATTERN = re.compile(r"<meta\b[^>]*>", re.IGNORECASE)
 _ATTR_PATTERN = re.compile(
@@ -127,9 +140,47 @@ _PRICE_PATTERNS = (
 _THOUSANDS = re.compile(r"^-?\d{1,3}(\.\d{3})+$")
 
 
-def is_blocked(url: str) -> bool:
+def refusing_portal(url: str) -> str | None:
+    """The name of a portal known to refuse a server, if the link is one."""
+
     domain = domain_of(url)
-    return any(domain == blocked or domain.endswith(f".{blocked}") for blocked in BLOCKED_DOMAINS)
+    for known, name in REFUSING_PORTALS.items():
+        if domain == known or domain.endswith(f".{known}"):
+            return name
+    return None
+
+
+def _refusal(url: str, status: int) -> UpstreamError:
+    """A failed fetch, said so that somebody can do something about it."""
+
+    technical = f"Antwort der Anzeigenseite: HTTP {status}"
+    if status in _GONE:
+        return UpstreamError(
+            "Unter diesem Link steht keine Anzeige (mehr). Bitte den Link prüfen "
+            "oder die Seite einfügen.",
+            technical,
+            status,
+        )
+    portal = refusing_portal(url)
+    if status in _REFUSED and portal:
+        return UpstreamError(
+            f"{portal} gibt die Anzeigenseite nicht an unseren Server heraus. {ADVICE}",
+            technical,
+            status,
+        )
+    if status in _REFUSED:
+        # Either a gate or a listing that is gone -- see _GONE.
+        return UpstreamError(
+            "Das Portal hat die Seite nicht herausgegeben. Entweder lässt es "
+            "keinen Abruf durch unseren Server zu, oder die Anzeige ist nicht "
+            "mehr online. Steht sie im Browser noch da, geht es über „Seite "
+            f"einfügen“: {_PASTE_STEPS}",
+            technical,
+            status,
+        )
+    return UpstreamError(
+        f"Die Anzeigenseite ließ sich gerade nicht abrufen. {ADVICE}", technical, status
+    )
 
 
 def is_kleinanzeigen(url: str) -> bool:
@@ -588,41 +639,42 @@ def parse_page(url: str, html: str) -> Seite:
 async def fetch_page(url: str, app_settings: AppSettings) -> Seite:
     """Fetch a listing page directly -- no model, no fetch fee.
 
-    Refuses domains that are known to block server-side retrieval, so no
-    request goes out for those at all.
+    Every link is tried, a known refusing portal's included: its answer is
+    measured on each request, so the day it lets a server in is the day this
+    reads it.
     """
 
-    if is_blocked(url):
-        raise BadRequestError(PASTE_HINT)
+    async def get() -> Any:
+        return await request(
+            "GET",
+            url,
+            service=SERVICE_NAME,
+            advice=ADVICE,
+            timeout_s=app_settings.http_timeout_s,
+            user_agent=app_settings.portal_user_agent,
+            headers={"Accept": "text/html,application/xhtml+xml"},
+        )
 
     # Kleinanzeigen answers the *first* request with 403 and the second with
     # the page -- reproduced on three adverts on 05.09.2026, each time exactly
     # once. Not a block: a warm-up. One retry costs a round trip and is the
-    # difference between "the portal refuses us" and a working read.
+    # difference between "the portal refuses us" and a working read. A portal
+    # known to refuse is not asked twice for the same answer.
     try:
-        response = await request(
-            "GET",
-            url,
-            service=SERVICE_NAME,
-            advice=ADVICE,
-            timeout_s=app_settings.http_timeout_s,
-            user_agent=app_settings.portal_user_agent,
-            headers={"Accept": "text/html,application/xhtml+xml"},
-        )
-    except UpstreamError:
-        response = await request(
-            "GET",
-            url,
-            service=SERVICE_NAME,
-            advice=ADVICE,
-            timeout_s=app_settings.http_timeout_s,
-            user_agent=app_settings.portal_user_agent,
-            headers={"Accept": "text/html,application/xhtml+xml"},
-        )
+        try:
+            response = await get()
+        except UpstreamError as exc:
+            if refusing_portal(url):
+                raise
+            response = await get()
+    except UpstreamError as exc:
+        if exc.upstream_status is None:
+            raise
+        raise _refusal(url, exc.upstream_status) from exc
     content_type = response.headers.get("content-type", "")
     if "html" not in content_type and "text" not in content_type:
         raise UpstreamError(
-            "Unter dieser Adresse liegt keine lesbare Seite "
-            f"({content_type or 'ohne Angabe'}). {ADVICE}"
+            f"Unter dieser Adresse liegt keine Anzeigenseite. {ADVICE}",
+            f"Inhaltstyp der Antwort: {content_type or 'ohne Angabe'}",
         )
     return parse_page(url, response.text)

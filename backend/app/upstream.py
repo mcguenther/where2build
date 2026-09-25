@@ -93,7 +93,8 @@ async def request(
                     (status_hints or {}).get(response.status_code)
                     or f"{service} hat die Anfrage mit Status {response.status_code} abgelehnt.",
                     advice,
-                )
+                ),
+                upstream_status=response.status_code,
             )
         if expect and expect not in response.headers.get("content-type", ""):
             raise UpstreamError(
