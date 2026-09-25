@@ -269,7 +269,7 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
   that separates a handed-over document from a pasted one, and it writes
   `assistent-uebergabe.png`.
 - `scripts/screenshots.mjs`: 95 images plus one print PDF — 74 and the PDF
-  without a session, as measured on 23.09.2026. The location record prints as
+  without a session, as measured on 25.09.2026. The location record prints as
   part of the plot sheet now, so there is no second PDF. Twenty-one of them
   need a session (`konto-*` and the administration area) and they are taken only
   with `W2B_ADMIN_COOKIE` set — see `docs/claude/tooling-and-tests.md` for how
