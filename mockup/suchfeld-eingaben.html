@@ -1,0 +1,777 @@
+<!doctype html>
+<html lang="de">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- Mockup only, not built. Opened straight from disk; fonts come from Google here because nothing in mockup/ goes through the bundler. -->
+<title>Eingaben im Suchfeld</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:wght@400;500;600&display=swap">
+<style>
+/* Tokens copied from frontend/src/styles/tokens.css. Brass marks what the user
+   designs, Loden what the tool computes, neutral what is official — the split
+   this mockup is about is already in the palette. */
+:root{
+  --primary:#2F4A3A; --primary-light:#456B52; --primary-veil:rgba(47,74,58,.10); --primary-on:#F7F4EE;
+  --brass:#B5813C; --brass-text:#7C5620; --brass-light:#E8D4B0; --brass-veil:rgba(181,129,60,.16);
+  --ink:#1E1A16; --graphite:#4A443C; --muted:#6F675C; --line:#DCD3C6; --line-faint:#EBE4D9;
+  --surface:#FAF7F1; --sunken:#F3EFE6; --paper:#F1EBE1;
+  --warn:#BE8524; --warn-text:#7C5620; --warn-surface:#F6E9CE;
+  --error:#A8402C; --error-surface:#F2DED8; --good:#2F4A3A; --good-surface:#DEE7DF;
+  --map-ground:#E6E3DC; --map-surface:#EFEDE7; --map-boundary:#1E1A16; --map-setback:rgba(47,74,58,.17);
+  --map-envelope:#2F4A3A; --map-design:#B5813C; --map-design-edge:#7C5620; --map-neighbour:#9A9184;
+  --map-street:#D6D2CA; --map-green:#DCE4DA; --map-selection:#456B52; --map-violation:#A8402C;
+  --shadow:0 1px 2px rgba(30,26,22,.05),0 10px 24px -18px rgba(30,26,22,.45);
+  --shadow-high:0 2px 6px rgba(30,26,22,.10),0 24px 48px -24px rgba(30,26,22,.55);
+  --f-display:"Archivo",system-ui,-apple-system,sans-serif;
+  --f-body:"Public Sans",system-ui,-apple-system,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --primary:#7FA98A; --primary-light:#9BC0A4; --primary-veil:rgba(127,169,138,.14); --primary-on:#12211A;
+    --brass:#D9A55E; --brass-text:#DBB273; --brass-light:#3E3021; --brass-veil:rgba(217,165,94,.18);
+    --ink:#F1EBE1; --graphite:#C4BCB0; --muted:#948B7E; --line:#3A342C; --line-faint:#2A2620;
+    --surface:#201C17; --sunken:#191510; --paper:#16130F;
+    --warn:#D8A340; --warn-text:#E3BC72; --warn-surface:#3A2E19;
+    --error:#E0705A; --error-surface:#3B211B; --good:#7FA98A; --good-surface:#1F2C24;
+    --map-ground:#1A1917; --map-surface:#23211D; --map-boundary:#F1EBE1; --map-setback:rgba(127,169,138,.34);
+    --map-envelope:#7FA98A; --map-design:#D9A55E; --map-design-edge:#F0C688; --map-neighbour:#5A544B;
+    --map-street:#2c2a27; --map-green:#26302A; --map-selection:#9BC0A4; --map-violation:#E0705A;
+    --shadow:0 1px 2px rgba(0,0,0,.5),0 12px 28px -20px rgba(0,0,0,.85);
+    --shadow-high:0 2px 8px rgba(0,0,0,.6),0 28px 56px -26px rgba(0,0,0,.95);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --primary:#7FA98A; --primary-light:#9BC0A4; --primary-veil:rgba(127,169,138,.14); --primary-on:#12211A;
+  --brass:#D9A55E; --brass-text:#DBB273; --brass-light:#3E3021; --brass-veil:rgba(217,165,94,.18);
+  --ink:#F1EBE1; --graphite:#C4BCB0; --muted:#948B7E; --line:#3A342C; --line-faint:#2A2620;
+  --surface:#201C17; --sunken:#191510; --paper:#16130F;
+  --warn:#D8A340; --warn-text:#E3BC72; --warn-surface:#3A2E19;
+  --error:#E0705A; --error-surface:#3B211B; --good:#7FA98A; --good-surface:#1F2C24;
+  --map-ground:#1A1917; --map-surface:#23211D; --map-boundary:#F1EBE1; --map-setback:rgba(127,169,138,.34);
+  --map-envelope:#7FA98A; --map-design:#D9A55E; --map-design-edge:#F0C688; --map-neighbour:#5A544B;
+  --map-street:#2c2a27; --map-green:#26302A; --map-selection:#9BC0A4; --map-violation:#E0705A;
+  --shadow:0 1px 2px rgba(0,0,0,.5),0 12px 28px -20px rgba(0,0,0,.85);
+  --shadow-high:0 2px 8px rgba(0,0,0,.6),0 28px 56px -26px rgba(0,0,0,.95);
+  color-scheme:dark;
+}
+
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 var(--f-body);padding:32px 16px 72px}
+h1,h2,h3,h4{font-family:var(--f-display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+p{margin:0}
+.wrap{max-width:1180px;margin:0 auto}
+.eyebrow{font:600 11.5px/1 var(--f-display);letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+
+/* ---------- page head ---------- */
+.kopf{display:flex;justify-content:space-between;gap:24px;align-items:flex-start;flex-wrap:wrap;margin-bottom:28px}
+.kopf h1{font-size:clamp(30px,5vw,46px);line-height:1.05;margin-top:10px}
+.kopf h1 em{font-style:normal;color:var(--primary)}
+.lead{max-width:70ch;color:var(--graphite);font-size:16.5px;margin-top:14px}
+.theme{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.theme button{font:600 13px var(--f-display);border:0;background:none;color:var(--graphite);padding:7px 13px;cursor:pointer}
+.theme button+button{border-left:1px solid var(--line)}
+.theme button[aria-pressed="true"]{background:var(--primary);color:var(--primary-on)}
+
+/* ---------- table of contents ---------- */
+.inhalt{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 40px}
+.inhalt a{font:600 13px var(--f-display);color:var(--graphite);text-decoration:none;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 13px}
+.inhalt a:hover{border-color:var(--primary);color:var(--primary)}
+
+/* ---------- patterns overview ---------- */
+.bausteine{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:14px 0 56px}
+.baustein{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.baustein b{font:700 14px var(--f-display);display:flex;gap:8px;align-items:center}
+.baustein p{color:var(--muted);font-size:13.5px;margin-top:6px}
+.baustein .skizze{height:42px;margin-top:10px;border-radius:8px;background:var(--sunken);border:1px solid var(--line-faint);position:relative;overflow:hidden}
+.sk{position:absolute;border-radius:999px}
+.letter{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:6px;background:var(--primary);color:var(--primary-on);font:700 12px var(--f-display);flex:none}
+
+/* ---------- sections per type ---------- */
+section.typ{margin-top:64px;scroll-margin-top:16px}
+.typ-kopf{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;align-items:baseline;border-top:2px solid var(--ink);padding-top:14px}
+.typ-kopf .nr{font:700 13px var(--f-mono);color:var(--muted)}
+.typ-kopf h2{font-size:clamp(22px,3.2vw,30px)}
+.typ-kopf p{grid-column:2;color:var(--graphite);max-width:78ch}
+.beispiel{grid-column:2;font:13px/1.45 var(--f-mono);color:var(--muted);background:var(--sunken);border:1px dashed var(--line);border-radius:8px;padding:8px 10px;margin-top:6px;overflow-wrap:anywhere;max-width:78ch}
+.varianten{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,520px),1fr));gap:16px;margin-top:22px}
+.var{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px;display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow);min-width:0}
+.var.empfohlen{border-color:var(--primary);box-shadow:0 0 0 1px var(--primary),var(--shadow)}
+.var-kopf{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.var-kopf h3{font-size:17px}
+.tag{font:600 11px var(--f-display);letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:999px;background:var(--primary);color:var(--primary-on);margin-left:auto}
+.tag.alt{background:var(--sunken);color:var(--muted);border:1px solid var(--line)}
+.buehne{background:var(--paper);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.urteil{display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13.5px;color:var(--graphite)}
+.urteil ul{margin:4px 0 0;padding-left:18px}
+.urteil li{margin:2px 0}
+.urteil h4{font:600 11.5px var(--f-display);letter-spacing:.1em;text-transform:uppercase}
+.urteil .plus h4{color:var(--primary)}
+.urteil .minus h4{color:var(--error)}
+@media (max-width:560px){.urteil{grid-template-columns:1fr}}
+.cap{font-size:12.5px;color:var(--muted)}
+
+/* ---------- the field itself, as in QueryBox ---------- */
+.feld{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:7px 7px 7px 14px;min-height:54px;min-width:0}
+.feld.fokus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-veil)}
+.feld .lupe{flex:none;width:15px;height:15px;color:var(--muted)}
+.feld .text{flex:1;min-width:0;font-size:16px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.feld .text.leer{color:var(--muted)}
+.feld .text.lang{color:var(--muted);font-size:14px}
+.caret{display:inline-block;width:1.5px;height:1.15em;background:var(--ink);vertical-align:-3px;animation:blink 1.1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.ghost{color:var(--muted);opacity:.75}
+.btn{flex:none;font:600 14px var(--f-display);border:0;border-radius:8px;background:var(--primary);color:var(--primary-on);padding:11px 16px;cursor:pointer;white-space:nowrap}
+.btn.aus{opacity:.45}
+.feld.wrap-feld{flex-wrap:wrap;align-items:center;padding:7px}
+.feld.wrap-feld .lupe{margin-left:7px}
+.feld.hoch{align-items:flex-start}
+.feld.hoch .lupe{margin-top:12px}
+.feld.hoch .btn{align-self:flex-end}
+/* Narrow: the button goes under the field, as in the app, so a pill gets the whole row. */
+@media (max-width:460px){
+  .feld{flex-wrap:wrap}
+  .feld .btn{width:100%;margin-left:0!important}
+  .feld.hoch .btn{align-self:stretch}
+  .pille .neben{display:none}
+  .feld .text:empty{display:none}
+  .karte{flex-wrap:wrap}
+  .karte .bild{width:100%!important;height:120px!important}
+  .karte .aktion{flex-direction:row}
+}
+
+/* ---------- pills ---------- */
+.pille{display:inline-flex;align-items:center;gap:7px;min-width:0;max-width:100%;border-radius:999px;border:1px solid var(--line);background:var(--sunken);padding:4px 6px 4px 5px;font-size:14px;color:var(--ink);white-space:nowrap}
+.pille .ic{flex:none;display:grid;place-items:center;width:24px;height:24px;border-radius:999px;background:var(--primary-veil);color:var(--primary)}
+.pille .ic svg{width:14px;height:14px}
+.pille .ic.brass{background:var(--brass-veil);color:var(--brass-text)}
+.pille .ic.foto{width:30px;height:24px;border-radius:6px;overflow:hidden;background:var(--map-green)}
+.pille .ic.foto svg{width:100%;height:100%;display:block}
+.pille .lbl{overflow:hidden;text-overflow:ellipsis;min-width:3em}
+.pille .neben{color:var(--muted);font-size:12.5px;overflow:hidden;text-overflow:ellipsis}
+.pille .x{flex:none;border:0;background:none;color:var(--muted);width:22px;height:22px;border-radius:999px;display:grid;place-items:center;cursor:pointer;font-size:13px}
+.pille .x:hover{background:var(--line-faint);color:var(--ink)}
+.pille.gewaehlt{border-color:var(--primary);box-shadow:0 0 0 2px var(--primary-veil)}
+.pille.laed .ic{animation:puls 1.2s ease-in-out infinite}
+@keyframes puls{50%{opacity:.35}}
+.pille.fertig{background:var(--good-surface);border-color:color-mix(in srgb,var(--primary) 30%,var(--line))}
+.pille.warn{background:var(--warn-surface);border-color:color-mix(in srgb,var(--warn) 40%,var(--line))}
+.pille.eckig{border-radius:8px}
+.pille.gross{padding:6px 8px 6px 6px}
+.pille .seg{display:inline-flex;align-items:center;gap:6px}
+.pille .seg small{font:600 10px var(--f-display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.pille .trenn{width:1px;align-self:stretch;background:var(--line);margin:0 2px}
+.art{font:600 10.5px var(--f-display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:2px 7px;background:var(--surface);flex:none;white-space:nowrap}
+.art.an{color:var(--primary);border-color:var(--primary);background:var(--primary-veil)}
+.art.knopf{cursor:pointer}
+.art.knopf::after{content:" ▾";font-size:9px}
+
+/* ---------- cards below / instead of the field ---------- */
+.karte{display:flex;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px;min-width:0}
+.karte .bild{flex:none;width:96px;height:72px;border-radius:8px;overflow:hidden;background:var(--map-green);position:relative}
+.karte .bild svg{width:100%;height:100%;display:block}
+.karte .koerper{min-width:0;flex:1;display:flex;flex-direction:column;gap:3px}
+.karte .quelle{font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:center;min-width:0}
+.karte .quelle span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.karte .titel{font:600 14.5px/1.3 var(--f-display);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.werte{display:flex;flex-wrap:wrap;gap:6px;margin-top:3px}
+.wert{font-size:12.5px;border-radius:6px;padding:2px 7px;background:var(--sunken);border:1px solid var(--line-faint);color:var(--graphite);white-space:nowrap}
+.wert b{font-weight:600;color:var(--ink)}
+.wert.fehlt{color:var(--warn-text);background:var(--warn-surface);border-color:transparent}
+.wert.ok::before{content:"✓ ";color:var(--primary);font-weight:700}
+.karte .aktion{flex:none;display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+.lk{font:600 13px var(--f-display);color:var(--primary);background:none;border:0;padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:3px;white-space:nowrap}
+.fav{flex:none;width:16px;height:16px;border-radius:4px;display:grid;place-items:center;font:700 9px var(--f-display);color:#fff;background:#1d4b00}
+.fav.big{width:24px;height:24px;border-radius:6px;font-size:11px}
+.fortschritt{height:3px;border-radius:3px;background:var(--line-faint);overflow:hidden}
+.fortschritt i{display:block;height:100%;width:62%;background:var(--primary);border-radius:3px}
+.schritte{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12.5px;color:var(--muted)}
+.schritte .ok{color:var(--primary)}
+.schritte .ok::before{content:"✓ "}
+.schritte .jetzt{color:var(--ink);font-weight:600}
+.schritte .jetzt::before{content:"◌ "}
+
+/* text quote */
+.zitat{font:14px/1.55 var(--f-body);color:var(--graphite);position:relative;max-height:4.65em;overflow:hidden}
+.zitat::after{content:"";position:absolute;inset:auto 0 0 0;height:1.6em;background:linear-gradient(transparent,var(--surface))}
+mark{background:var(--brass-veil);color:inherit;border-radius:3px;padding:0 2px;box-shadow:inset 0 -1.5px 0 var(--brass)}
+mark.ort{background:var(--primary-veil);box-shadow:inset 0 -1.5px 0 var(--primary)}
+.textfeld{flex:1;min-width:0;font-size:14.5px;line-height:1.55;color:var(--ink);padding:5px 0}
+.textfeld .zitat::after{background:linear-gradient(transparent,var(--surface))}
+.fusszeile{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;font-size:12.5px;color:var(--muted);border-top:1px solid var(--line-faint);padding-top:8px;margin-top:6px}
+
+/* dropdown / popover */
+.pop{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-high);padding:6px;font-size:14px;max-width:340px}
+.pop div{padding:7px 10px;border-radius:8px;display:flex;justify-content:space-between;gap:10px}
+.pop div.an{background:var(--primary-veil);color:var(--primary);font-weight:600}
+.pop small{color:var(--muted)}
+.pop hr{border:0;border-top:1px solid var(--line-faint);margin:4px 0}
+
+/* mini page thumbnail */
+.seite{flex:none;width:58px;height:74px;border-radius:6px;border:1px solid var(--line);background:var(--white);padding:6px 5px;display:flex;flex-direction:column;gap:3px;box-shadow:3px 3px 0 -1px var(--surface),3px 3px 0 0 var(--line)}
+.seite i{display:block;height:3px;border-radius:2px;background:#DCD3C6}
+.seite i.b{height:18px;background:#C9D6C5}
+.seite i.k{width:60%}
+.seite i.p{background:#B5813C;width:45%}
+
+/* segmented parcel key */
+.segs{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;font:14px var(--f-mono);background:var(--surface)}
+.segs span{padding:6px 9px;display:flex;flex-direction:column;align-items:center;line-height:1.1}
+.segs span+span{border-left:1px solid var(--line-faint)}
+.segs small{font:600 9px var(--f-display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:3px}
+
+/* conclusion table */
+.fazit{width:100%;border-collapse:collapse;margin-top:18px;font-size:14px;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.fazit th,.fazit td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line-faint);vertical-align:top}
+.fazit th{font:600 11.5px var(--f-display);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);background:var(--sunken)}
+.fazit tr:last-child td{border-bottom:0}
+.fazit td:first-child{font-weight:600;white-space:nowrap}
+.tabelle{overflow-x:auto;border-radius:12px}
+@media (max-width:640px){
+  .fazit thead{display:none}
+  .fazit,.fazit tbody,.fazit tr,.fazit td{display:block;width:100%}
+  .fazit tr{border-bottom:1px solid var(--line)}
+  .fazit td{border:0;padding:4px 12px}
+  .fazit td:first-child{padding-top:12px}
+  .fazit td:last-child{padding-bottom:12px}
+  .fazit td[data-k]::before{content:attr(data-k) ": ";color:var(--muted);font-size:12.5px}
+}
+.regeln{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:18px}
+.regel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;font-size:14px;color:var(--graphite)}
+.regel b{display:block;font:700 14.5px var(--f-display);color:var(--ink);margin-bottom:4px}
+kbd{font:12px var(--f-mono);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 4px;background:var(--sunken)}
+.fuss{margin-top:56px;color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:14px}
+</style>
+
+<body>
+<div class="wrap">
+
+<header class="kopf">
+  <div>
+    <div class="eyebrow">Mockup · Suchfeld</div>
+    <h1>Was im Feld steht, <em>ohne</em> es lesen zu müssen</h1>
+    <p class="lead">Eine Adresse ist im Feld gut aufgehoben: kurz, lesbar, überprüfbar. Ein Link zur Anzeige, eine eingefügte Anzeigenseite oder ein Beschreibungstext sind es nicht – sie laufen aus dem Feld heraus, und niemand prüft sie dort Zeichen für Zeichen. Diese Seite sammelt für jeden Eingabetyp mehrere Arten, ihn darzustellen: als Pille, als Vorschau, als Karte oder hervorgehoben. Werte aus der aufgezeichneten Kleinanzeigen-Seite in den Testdaten.</p>
+  </div>
+  <div class="theme" role="group" aria-label="Farbschema">
+    <button type="button" data-t="light">Hell</button>
+    <button type="button" data-t="dark">Dunkel</button>
+    <button type="button" data-t="" aria-pressed="true">System</button>
+  </div>
+</header>
+
+<nav class="inhalt" aria-label="Inhalt">
+  <a href="#bausteine">Bausteine</a>
+  <a href="#adresse">1 · Adresse</a>
+  <a href="#flurstueck">2 · Flurstück</a>
+  <a href="#koordinate">3 · Koordinate</a>
+  <a href="#link">4 · Link zur Anzeige</a>
+  <a href="#seite">5 · Eingefügte Anzeige</a>
+  <a href="#text">6 · Beschreibungstext</a>
+  <a href="#bild">7 · Bild / Katasterauszug</a>
+  <a href="#mehrere">8 · Mehrere Quellen</a>
+  <a href="#fazit">Empfehlung</a>
+</nav>
+
+<!-- ============================================================ -->
+<section id="bausteine">
+  <div class="eyebrow">Fünf Bausteine</div>
+  <h2 style="font-size:26px;margin-top:8px">Aus diesen setzen sich alle Varianten zusammen</h2>
+  <div class="bausteine">
+    <div class="baustein"><b><span class="letter">A</span>Klartext mit Lesart</b>
+      <p>Der Text bleibt im Feld, am Rand steht, wie er gelesen wurde.</p>
+      <div class="skizze"><div class="sk" style="left:10px;top:17px;width:55%;height:8px;background:var(--line)"></div><div class="sk" style="right:10px;top:13px;width:50px;height:16px;border:1px solid var(--primary);background:var(--primary-veil)"></div></div></div>
+    <div class="baustein"><b><span class="letter">B</span>Pille im Feld</b>
+      <p>Die Eingabe wird ein Stück: Symbol, Kurzname, ✕. Sie ist ein Ganzes.</p>
+      <div class="skizze"><div class="sk" style="left:10px;top:10px;width:58%;height:22px;background:var(--surface);border:1px solid var(--line)"></div><div class="sk" style="left:14px;top:14px;width:14px;height:14px;background:var(--primary-veil)"></div></div></div>
+    <div class="baustein"><b><span class="letter">C</span>Pille + Vorschau</b>
+      <p>Die Pille bleibt kurz, darunter klappt eine Karte mit dem, was dahintersteckt.</p>
+      <div class="skizze"><div class="sk" style="left:10px;top:6px;width:40%;height:12px;background:var(--surface);border:1px solid var(--line)"></div><div class="sk" style="left:10px;top:22px;right:10px;height:14px;border-radius:4px;background:var(--surface);border:1px solid var(--line)"></div></div></div>
+    <div class="baustein"><b><span class="letter">D</span>Feld wird Karte</b>
+      <p>Die Eingabe ersetzt das Feld ganz. „Ändern“ bringt das leere Feld zurück.</p>
+      <div class="skizze"><div class="sk" style="left:6px;top:5px;right:6px;bottom:5px;border-radius:6px;background:var(--surface);border:1px solid var(--primary)"></div><div class="sk" style="left:12px;top:10px;width:22px;height:22px;border-radius:4px;background:var(--map-green)"></div></div></div>
+    <div class="baustein"><b><span class="letter">E</span>Eingeklappt + markiert</b>
+      <p>Langer Text bleibt Text, aber zwei Zeilen hoch und mit markierten Angaben.</p>
+      <div class="skizze"><div class="sk" style="left:10px;top:10px;width:30%;height:6px;background:var(--line)"></div><div class="sk" style="left:36%;top:10px;width:16%;height:6px;background:var(--brass)"></div><div class="sk" style="left:10px;top:24px;width:70%;height:6px;background:var(--line)"></div></div></div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="typ" id="adresse">
+  <div class="typ-kopf"><span class="nr">01</span><h2>Adresse</h2>
+    <p>Kurz und lesbar – hier ist Klartext richtig. Offen ist nur, ob man sieht, <em>dass</em> sie als Adresse gelesen wurde und ob schon ein Treffer feststeht.</p>
+    <div class="beispiel">Lessingweg 44, Leipzig</div></div>
+  <div class="varianten">
+
+    <article class="var empfohlen">
+      <div class="var-kopf"><span class="letter">A</span><h3>Klartext, Lesart am Rand</h3><span class="tag">Empfohlen</span></div>
+      <div class="buehne">
+        <div class="feld fokus"><svg class="lupe" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="5"/><path d="m11 11 3.5 3.5"/></svg>
+          <span class="text">Lessingweg 44, Leipzig<span class="caret"></span></span>
+          <span class="art an">Adresse</span>
+          <button class="btn"><span class="lang">Grundstück </span>finden</button></div>
+      </div>
+      <div class="urteil"><div class="plus"><h4>Stärken</h4><ul><li>Bleibt editierbar wie jedes Feld</li><li>Die Lesart wandert aus der Chipreihe ins Feld – die Reihe darunter wird nur zum Überstimmen gebraucht</li></ul></div>
+        <div class="minus"><h4>Schwächen</h4><ul><li>Kein Hinweis, ob die Adresse schon eindeutig ist</li></ul></div></div>
+    </article>
+
+    <article class="var">
+      <div class="var-kopf"><span class="letter">B</span><h3>Nach Auswahl: Pille mit Ortsteil</h3></div>
+      <div class="buehne">
+        <div class="feld"><svg class="lupe" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="5"/><path d="m11 11 3.5 3.5"/></svg>
+          <span class="pille fertig"><span class="ic"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 14s5-4.3 5-8A5 5 0 0 0 3 6c0 3.7 5 8 5 8Z"/><circle cx="8" cy="6" r="1.7"/></svg></span><span class="lbl">Lessingweg 44</span><span class="neben">04318 Leipzig</span><button class="x" aria-label="Entfernen">✕</button></span>
+          <span class="text"></span>
+          <button class="btn"><span class="lang">Grundstück </span>finden</button></div>
+        <p class="cap">Erst wenn ein Vorschlag aus dem Adressverzeichnis gewählt ist, wird der Text zur Pille – vorher bleibt er Text (Variante A).</p>
+      </div>
+      <div class="urteil"><div class="plus"><h4>Stärken</h4><ul><li>Unterscheidet „getippt“ von „gefunden“</li><li>PLZ/Ort als Beleg, ohne das Feld zu verlängern</li></ul></div>
+        <div class="minus"><h4>Schwächen</h4><ul><li>Tippfehler korrigieren heißt: Pille auflösen</li></ul></div></div>
+    </article>
+
+    <article class="var">
+      <div class="var-kopf"><span class="letter">A</span><h3>Klartext mit Vervollständigung</h3><span class="tag alt">Ergänzung</span></div>
+      <div class="buehne">
+        <div class="feld fokus"><svg class="lupe" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="5"/><path d="m11 11 3.5 3.5"/></svg>
+          <span class="text">Lessingw<span class="caret"></span><span class="ghost">eg 44, 04318 Leipzig</span></span>
+          <kbd>Tab</kbd></div>
+      </div>
+      <div class="urteil"><div class="plus"><h4>Stärken</h4><ul><li>Spart die Liste, wenn es nur einen Treffer gibt</li></ul></div>
+        <div class="minus"><h4>Schwächen</h4><ul><li>Auf dem Telefon gibt es kein <kbd>Tab</kbd></li><li>Nur sinnvoll neben A oder B</li></ul></div></div>
+    </article>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="typ" id="flurstueck">
+  <div class="typ-kopf"><span class="nr">02</span><h2>Flurstück</h2>
+    <p>Zwei Hälften, die nur zusammen etwas bedeuten: Gemarkung und Nummer. Heute klappt dafür ein zweites Formular auf. Als Pille lassen sich beide Hälften in einem Stück zeigen.</p>
+    <div class="beispiel">Mölkau 204/3 &nbsp;·&nbsp; 145432001002040003__</div></div>
+  <div class="varianten">
+
+    <article class="var empfohlen">
+      <div class="var-kopf"><span class="letter">B</span><h3>Zweiteilige Pille, Stück für Stück</h3><span class="tag">Empfohlen</span></div>
+      <div class="buehne">
+        <div class="feld fokus"><svg class="lupe" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="5"/><path d="m11 11 3.5 3.5"/></svg>
+          <span class="pille eckig"><span class="seg"><small>Gemarkung</small>Mölkau</span></span>
+          <span class="text">204/3<span class="caret"></span></span>
+          <button class="btn"><span class="lang">Grundstück </span>finden</button></div>
+        <p class="cap">Die Gemarkung wird aus dem Vorschlag zur Pille, die Nummer tippt man dahinter. Mit <kbd>Enter</kbd> verschmilzt beides:</p>
+        <div class="feld"><svg class="lupe" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="5"/><path d="m11 11 3.5 3.5"/></svg>
+          <span class="pille eckig fertig"><span class="seg"><small>Gemarkung</small>Mölkau</span><span class="trenn"></span><span class="seg"><small>Flst.</small><span class="mono">204/3</span></span><button class="x" aria-label="Entfernen">✕</button></span>
+          <span class="text"></span>
+          <button class="btn"><span class="lang">Grundstück </span>finden</button></div>
+      </div>
+      <div class="urteil"><div class="plus"><h4>Stärken</h4><ul><li>Kein zweites Formular – das Feld bleibt eins</li><li>Weitere Nummern hängen sich an: „Mölkau 204/3 + 204/4“ (ein Grundstück ist eine Menge)</li></ul></div>
+        <div class="minus"><h4>Schwächen</h4><ul><li>Neue Bedienung, die man einmal sehen muss</li></ul></div></div>
+    </article>
+
+    <article class="var">
+      <div class="var-kopf"><span class="letter">C</span><h3>Pille mit Umriss und amtlicher Fläche</h3></div>
+      <div class="buehne">
+        <div class="feld"><svg class="lupe" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="5"/><path d="m11 11 3.5 3.5"/></svg>
+          <span class="pille gross fertig"><span class="ic foto" style="background:var(--map-ground)"><svg viewBox="0 0 30 24"><path d="M9 3 23 5 21 21 7 19Z" fill="var(--map-surface)" stroke="var(--map-boundary)" stroke-width="1.3"/></svg></span><span class="lbl">Mölkau <span class="mono">204/3</span></span><span class="neben mono">812 m²</span><button class="x" aria-label="Entfernen">✕</button></span>
+          <span class="text"></span>
+          <button class="btn"><span class="lang">Grundstück </span>finden</button></div>
+        <p class="cap">Sobald ALKIS geantwortet hat. Vorher: Pille ohne Umriss, Fläche „—“.</p>
+      </div>
+      <div class="urteil"><div class="plus"><h4>Stärken</h4><ul><li>Man sieht, ob es das richtige Stück Land ist, bevor man weiterklickt</li></ul></div>
+        <div class="minus"><h4>Schwächen</h4><ul><li>Braucht eine Abfrage, bevor die Pille vollständig ist</li></ul></div></div>
+    </article>
+
+    <article class="var">
+      <div class="var-kopf"><span class="letter">A</span><h3>Flurstückskennzeichen zerlegt</h3></div>
+      <div class="buehne">
+        <div class="feld"><svg class="lupe" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="5"/><path d="m11 11 3.5 3.5"/></svg>
+          <span class="text mono" style="font-size:14px">145432001002040003__</span><span class="art an">Kennzeichen</span></div>
+        <div class="segs" style="align-self:flex-start;max-width:100%;overflow-x:auto">
+          <span>14<small>Land</small></span><span>5432<small>Gemarkung</small></span><span>001<small>Flur</small></span><span>00204<small>Zähler</small></span><span>0003<small>Nenner</small></span></div>
+      </div>
+      <div class="urteil"><div class="plus"><h4>Stärken</h4><ul><li>Macht die 20 Zeichen überprüfbar</li></ul></div>
+        <div class="minus"><h4>Schwächen</h4><ul><li>Seltene Eingabe – nur für Leute, die ALKIS kennen</li></ul></div></div>
+    </article>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="typ" id="koordinate">
+  <div class="typ-kopf"><span class="nr">03</span><h2>Koordinate</h2>
+    <p>Zwei Zahlen, meist aus Google Maps kopiert, manchmal in UTM. Lesbar sind sie selten – ob sie vertauscht wurden, sieht man ihnen nicht an.</p>
+    <div class="beispiel">51.33652, 12.44176</div></div>
+  <div class="varianten">
+
+    <article class="var empfohlen">
+      <div class="var-kopf"><span class="letter">B</span><h3>Pille mit Kartenausschnitt</h3><span class="tag">Empfohlen</span></div>
+      <div class="buehne">
+        <div class="feld"><svg class="lupe" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="5"/><path d="m11 11 3.5 3.5"/></svg>
+          <span class="pille gross"><span class="ic foto" style="background:var(--map-ground)"><svg viewBox="0 0 30 24"><path d="M0 15 30 11" stroke="var(--map-street)" stroke-width="4"/><path d="M4 2h9v8H4zM17 1h10v7H17zM3 17h8v7H3zM18 16h9v8h-9z" fill="var(--map-surface)" stroke="var(--map-neighbour)" stroke-width=".6"/><circle cx="15" cy="12.5" r="2.6" fill="var(--primary)" stroke="#fff" stroke-width="1"/></svg></span><span class="lbl mono" style="font-size:13px">51,33652° N · 12,44176° O</span><button class="x" aria-label="Entfernen">✕</button></span>
+          <span class="text"></span>
+          <button class="btn"><span class="lang">Grundstück </span>finden</button></div>
+      </div>
+      <div class="urteil"><div class="plus"><h4>Stärken</h4><ul><li>Der Punkt sagt mehr als die Zahlen – ein Punkt im Acker fällt auf</li><li>Deutsche Schreibweise, egal wie eingefügt wurde</li></ul></div>
+        <div class="minus"><h4>Schwächen</h4><ul><li>Ausschnitt braucht eine Kachel, bevor gesucht ist</li></ul></div></div>
+    </article>
+
+    <article class="var">
+      <div class="var-kopf"><span class="letter">B</span><h3>Pille mit Hinweis „vertauscht“</h3></div>
+      <div class="buehne">
+        <div class="feld"><svg class="lupe" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="5"/><path d="m11 11 3.5 3.5"/></svg>
+          <span class="pille warn"><span class="ic brass"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 5h9l-2-2M13 11H4l2 2"/></svg></span><span class="lbl mono" style="font-size:13px">51,33652° N · 12,44176° O</span><span class="neben">getauscht</span><button class="x" aria-label="Entfernen">✕</button></span>
+          <span class="text"></span></div>
+        <p class="cap">Eingegeben war <span class="mono">12.44176, 51.33652</span>. Klick auf die Pille zeigt beide Lesarten.</p>
+      </div>
+      <div class="urteil"><div class="plus"><h4>Stärken</h4><ul><li>Die Korrektur passiert nicht leise – passt zur Regel „Widerspruch zeigen“</li></ul></div>
+        <div class="minus"><h4>Schwächen</h4><ul><li>Nur ein Sonderfall, keine eigene Darstellung</li></ul></div></div>
+    </article>
+
+    <article class="var">
+      <div class="var-kopf"><span class="letter">A</span><h3>Klartext, Umrechnung darunter</h3></div>
+      <div class="buehne">
+        <div class="feld"><svg class="lupe" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="5"/><path d="m11 11 3.5 3.5"/></svg>
+          <span class="text mono" style="font-size:15px">322145 5690321</span><span class="art an">UTM 33</span></div>
+        <p class="cap" style="padding-left:4px">= <span class="mono">51,3364° N · 12,4417° O</span> · Leipzig</p>
+      </div>
+      <div class="urteil"><div class="plus"><h4>Stärken</h4><ul><li>Am wenigsten Aufwand</li><li>Macht UTM für Laien lesbar</li></ul></div>
+        <div class="minus"><h4>Schwächen</h4><ul><li>Eine Zeile mehr unter dem Feld</li></ul></div></div>
+    </article>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="typ" id="link">
+  <div class="typ-kopf"><span class="nr">04</span><h2>Link zur Anzeige</h2>
+    <p>Lang, voller Schrägstriche und Kennungen, im Feld nur als Anfang sichtbar. Informativ ist der Link erst, wenn die Seite geholt ist – dann hat er Titel, Preis, Fläche und Bilder.</p>
+    <div class="beispiel">https://www.kleinanzeigen.de/s-anzeige/baugrundstueck-ca-1-025qm-direkt-bebaubar/3423861748-207-3935</div></div>
+  <div class="varianten">
+
+    <article class="var">
+      <div class="var-kopf"><span class="letter">B</span><h3>Kompakte Pille: Portal + Nummer</h3></div>
+      <div class="buehne">
+        <div class="feld"><svg class="lupe" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="5"/><path d="m11 11 3.5 3.5"/></svg>
+          <span class="pille"><span class="fav" style="margin-left:4px">k</span><span class="lbl">kleinanzeigen.de</span><span class="neben mono">3423861748</span><button class="x" aria-label="Entfernen">✕</button></span>
+          <span class="text"></span>
+          <button class="btn"><span class="lang">Grundstück </span>finden</button></div>
+        <p class="cap">Sofort beim Einfügen, ohne Abruf.</p>
+      </div>
+      <div class="urteil"><div class="plus"><h4>Stärken</h4><ul><li>Braucht nichts vom Server</li><li>Portal und Anzeigennummer sind genau die Teile, die man wiedererkennt</li></ul></div>
+        <div class="minus"><h4>Schwächen</h4><ul><li>Sagt nicht, worum es geht</li></ul></div></div>
+    </article>
+
+    <article class="var empfohlen">
+      <div class="var-kopf"><span class="letter">C</span><h3>Pille + aufklappende Vorschau</h3><span class="tag">Empfohlen</span></div>
+      <div class="buehne">
+        <div class="feld"><svg class="lupe" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="5"/><path d="m11 11 3.5 3.5"/></svg>
+          <span class="pille laed"><span class="fav" style="margin-left:4px">k</span><span class="lbl">kleinanzeigen.de</span><span class="neben">wird gelesen …</span><button class="x" aria-label="Entfernen">✕</button></span>
+          <span class="text"></span>
+          <button class="btn aus">Wird gelesen …</button></div>
+        <div class="fortschritt"><i></i></div>
+        <div class="schritte"><span class="ok">Seite geholt</span><span class="ok">6 Bilder</span><span class="jetzt">Angaben lesen</span><span>Flurstück suchen</span></div>
+        <p class="cap" style="margin-top:6px">… und wenn gelesen:</p>
+        <div class="feld"><svg class="lupe" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="5"/><path d="m11 11 3.5 3.5"/></svg>
+          <span class="pille fertig gewaehlt"><span class="fav" style="margin-left:4px">k</span><span class="lbl">Baugrundstück – ca. 1.025 qm</span><button class="x" aria-label="Entfernen">✕</button></span>
+          <span class="text"></span>
+          <button class="btn"><span class="lang">Grundstück </span>finden</button></div>
+        <div class="karte">
+          <div class="bild"><svg viewBox="0 0 96 72"><rect width="96" height="72" fill="#C9D6C5"/><path d="M0 44 C30 36 60 40 96 34 V72 H0Z" fill="#A9BC9F"/><path d="M0 22 C20 18 40 24 96 16 V0 H0Z" fill="#DCE4DA"/><path d="M62 30h14v10H62z" fill="#B5813C" opacity=".7"/></svg></div>
+          <div class="koerper">
+            <div class="quelle"><span class="fav">k</span><span>kleinanzeigen.de · Nr. 3423861748</span></div>
+            <div class="titel">Baugrundstück – ca. 1.025 qm – direkt bebaubar in Sachsen – Neukieritzsch</div>
+            <div class="werte"><span class="wert"><b>80.000 €</b></span><span class="wert"><b>ca. 1.025 m²</b></span><span class="wert">04575 Neukieritzsch</span><span class="wert">6 Bilder</span></div>
+          </div>
+          <div class="aktion"><button class="lk">Öffnen ↗</button></div>
+        </div>
+      </div>
+      <div class="urteil"><div class="plus"><h4>Stärken</h4><ul><li>Kurze Pille, alles Weitere als Vorschau – wie ein geteilter Link im Messenger</li><li>Der Ladezustand hat einen Ort; heute steht nur „Wird gelesen …“ auf dem Knopf</li><li>„ca.“ bleibt sichtbar – die Suche behandelt die Fläche dann als gerundet</li></ul></div>
+        <div class="minus"><h4>Schwächen</h4><ul><li>Doppelt sich mit „Gelesene Werte“ im nächsten Schritt – eins von beiden sollte weichen</li></ul></div></div>
+    </article>
+
+    <article class="var">
+      <div class="var-kopf"><span class="letter">B</span><h3>Reiche Pille mit Bild und Titel</h3></div>
+      <div class="buehne">
+        <div class="feld"><svg class="lupe" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="5"/><path d="m11 11 3.5 3.5"/></svg>
+          <span class="pille gross fertig"><span class="ic foto"><svg viewBox="0 0 30 24"><rect width="30" height="24" fill="#C9D6C5"/><path d="M0 15 C10 12 20 14 30 11 V24 H0Z" fill="#A9BC9F"/></svg></span><span class="lbl">Baugrundstück – ca. 1.025 qm – direkt bebaubar</span><span class="neben">80.000 €</span><button class="x" aria-label="Entfernen">✕</button></span>
+          <span class="text"></span></div>
+      </div>
+      <div class="urteil"><div class="plus"><h4>Stärken</h4><ul><li>Alles Wichtige in einer Zeile, keine Karte darunter</li></ul></div>
+        <div class="minus"><h4>Schwächen</h4><ul><li>Auf 390 px bleibt vom Titel ein Wort</li><li>Preis im Feld wirkt, als sei er schon geprüft</li></ul></div></div>
+    </article>
+
+    <article class="var">
+      <div class="var-kopf"><span class="letter">D</span><h3>Das Feld wird zur Anzeige</h3></div>
+      <div class="buehne">
+        <div class="karte" style="border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-veil);padding:12px">
+          <div class="bild" style="width:120px;height:90px"><svg viewBox="0 0 96 72" preserveAspectRatio="xMidYMid slice"><rect width="96" height="72" fill="#C9D6C5"/><path d="M0 44 C30 36 60 40 96 34 V72 H0Z" fill="#A9BC9F"/><path d="M0 22 C20 18 40 24 96 16 V0 H0Z" fill="#DCE4DA"/></svg></div>
+          <div class="koerper">
+            <div class="quelle"><span class="fav">k</span><span>Link zur Anzeige · kleinanzeigen.de</span></div>
+            <div class="titel" style="font-size:16px">Baugrundstück – ca. 1.025 qm – direkt bebaubar in Sachsen – Neukieritzsch</div>
+            <div class="werte"><span class="wert"><b>80.000 €</b></span><span class="wert"><b>ca. 1.025 m²</b></span></div>
+          </div>
+          <div class="aktion"><button class="lk">Ändern</button></div>
+        </div>
+        <button class="btn" style="align-self:flex-end">Grundstück finden</button>
+      </div>
+      <div class="urteil"><div class="plus"><h4>Stärken</h4><ul><li>Am deutlichsten: „diese Anzeige wird gesucht“</li><li>Viel Platz für ein Bild</li></ul></div>
+        <div class="minus"><h4>Schwächen</h4><ul><li>Kein Platz, noch etwas dazuzuschreiben (z. B. „Mölkau“ als Hinweis)</li><li>Seite springt in der Höhe</li></ul></div></div>
+    </article>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="typ" id="seite">
+  <div class="typ-kopf"><span class="nr">05</span><h2>Eingefügte Anzeige</h2>
+    <p>Mit <kbd>Strg</kbd>+<kbd>A</kbd>, <kbd>Strg</kbd>+<kbd>C</kbd> kopierte Seite: tausende Zeichen Text plus HTML mit Bildern. Im Feld ist davon nur Menü- und Cookie-Text zu sehen. Das Wertvolle ist unsichtbar – das HTML.</p>
+    <div class="beispiel">Kleinanzeigen – Anzeigen aufgeben · Meins · Nachrichten · Startseite › Immobilien › Grundstücke &amp; Gärten › Baugrundstück - ca. 1.025qm - direkt bebaubar … (≈ 9.000 Zeichen)</div></div>
+  <div class="varianten">
+
+    <article class="var">
+      <div class="var-kopf"><span class="letter">B</span><h3>Dokument-Pille</h3></div>
+      <div class="buehne">
+        <div class="feld"><svg class="lupe" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="5"/><path d="m11 11 3.5 3.5"/></svg>
+          <span class="pille eckig"><span class="ic"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 1.5h5.5L12 4v10.5H4Z"/><path d="M9.5 1.5V4H12M6 8h4M6 10.5h4"/></svg></span><span class="lbl">Anzeigenseite · kleinanzeigen.de</span><span class="neben">6 Bilder</span><button class="x" aria-label="Entfernen">✕</button></span>
+          <span class="text"></span>
+          <button class="btn"><span class="lang">Grundstück </span>finden</button></div>
+      </div>
+      <div class="urteil"><div class="plus"><h4>Stärken</h4><ul><li>Einfügen fühlt sich an wie Anhängen – das ist es auch</li><li>Portal aus dem HTML erkennbar</li></ul></div>
+        <div class="minus"><h4>Schwächen</h4><ul><li>Man sieht nicht, ob das Wichtige mitgekommen ist</li></ul></div></div>
+    </article>
+
+    <article class="var empfohlen">
+      <div class="var-kopf"><span class="letter">C</span><h3>Anhang mit Befund: was drin ist, was fehlt</h3><span class="tag">Empfohlen</span></div>
+      <div class="buehne">
+        <div class="feld"><svg class="lupe" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="5"/><path d="m11 11 3.5 3.5"/></svg>
+          <span class="pille eckig fertig gewaehlt"><span class="ic"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 1.5h5.5L12 4v10.5H4Z"/><path d="M9.5 1.5V4H12M6 8h4M6 10.5h4"/></svg></span><span class="lbl">Eingefügte Anzeige</span><button class="x" aria-label="Entfernen">✕</button></span>
+          <span class="text"></span>
+          <button class="btn"><span class="lang">Grundstück </span>finden</button></div>
+        <div class="karte">
+          <div class="seite"><i class="k"></i><i class="b"></i><i></i><i class="p"></i><i></i><i class="k"></i></div>
+          <div class="koerper">
+            <div class="quelle"><span class="fav">k</span><span>kleinanzeigen.de · Text und HTML</span></div>
+            <div class="titel">Baugrundstück – ca. 1.025 qm – direkt bebaubar</div>
+            <div class="werte"><span class="wert ok">Preis</span><span class="wert ok">Fläche</span><span class="wert ok">Ort</span><span class="wert ok">6 Bilder</span><span class="wert fehlt">Koordinate fehlt</span></div>
+          </div>
+        </div>
+        <p class="cap">„Koordinate fehlt“ ist ehrlich: <kbd>Strg</kbd>+<kbd>A</kbd> nimmt den Kopf der Seite nicht mit. Ein Link darunter führt zum Lesezeichen, das ihn mitnimmt.</p>
+      </div>
+      <div class="urteil"><div class="plus"><h4>Stärken</h4><ul><li>Beantwortet die einzige Frage, die man beim Einfügen hat: „Hat’s geklappt?“</li><li>Fehlendes steht da, bevor gesucht wird – nicht erst im Ergebnis</li></ul></div>
+        <div class="minus"><h4>Schwächen</h4><ul><li>Braucht einen schnellen Vorab-Blick ins HTML im Browser</li></ul></div></div>
+    </article>
+
+    <article class="var">
+      <div class="var-kopf"><span class="letter">C</span><h3>Pille mit Leseansicht zum Aufklappen</h3></div>
+      <div class="buehne">
+        <div class="feld"><svg class="lupe" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="5"/><path d="m11 11 3.5 3.5"/></svg>
+          <span class="pille eckig gewaehlt"><span class="ic"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 1.5h5.5L12 4v10.5H4Z"/><path d="M9.5 1.5V4H12M6 8h4M6 10.5h4"/></svg></span><span class="lbl">Anzeigenseite</span><span class="neben">▴</span></span>
+          <span class="text"></span></div>
+        <div class="karte" style="flex-direction:column;gap:8px">
+          <div class="titel" style="font-size:15px">Baugrundstück – ca. 1.025 qm – direkt bebaubar in Sachsen – Neukieritzsch</div>
+          <div style="display:flex;gap:6px"><div style="width:52px;height:38px;border-radius:6px;background:#C9D6C5"></div><div style="width:52px;height:38px;border-radius:6px;background:#A9BC9F"></div><div style="width:52px;height:38px;border-radius:6px;background:#DCE4DA"></div><div style="width:52px;height:38px;border-radius:6px;background:var(--sunken);display:grid;place-items:center;font-size:12px;color:var(--muted)">+3</div></div>
+          <div class="zitat">Hier könnte Ihr neues Eigenheim stehen … entsprechend §34 BauGB ist eine Bebauung entsprechend der umliegenden Bebauung möglich. Neukieritzsch bietet eine ideale Mischung aus ländlicher Ruhe …</div>
+          <p class="cap">Menü, Cookie-Hinweis und Fußzeile sind herausgeschnitten.</p>
+        </div>
+      </div>
+      <div class="urteil"><div class="plus"><h4>Stärken</h4><ul><li>Man sieht, <em>welche</em> Anzeige man erwischt hat (nicht versehentlich die Suchliste kopiert)</li></ul></div>
+        <div class="minus"><h4>Schwächen</h4><ul><li>Viel Fläche für etwas, das man selten prüft</li></ul></div></div>
+    </article>
+
+    <article class="var">
+      <div class="var-kopf"><span class="letter">D</span><h3>Einfügefläche statt Feld</h3></div>
+      <div class="buehne">
+        <div class="karte" style="border:1.5px dashed var(--primary);background:var(--primary-veil);align-items:center;padding:14px">
+          <div class="seite"><i class="k"></i><i class="b"></i><i></i><i class="p"></i><i></i></div>
+          <div class="koerper">
+            <div class="titel">Anzeigenseite eingefügt</div>
+            <div class="cap">kleinanzeigen.de · 9.140 Zeichen · 6 Bilder</div>
+          </div>
+          <div class="aktion"><button class="lk">Leeren</button></div>
+        </div>
+      </div>
+      <div class="urteil"><div class="plus"><h4>Stärken</h4><ul><li>Liest sich wie ein Upload – vertrautes Muster</li></ul></div>
+        <div class="minus"><h4>Schwächen</h4><ul><li>Zeichenzahl sagt dem Nutzer nichts</li><li>Nimmt dem Feld die Rolle, alles zu nehmen</li></ul></div></div>
+    </article>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="typ" id="text">
+  <div class="typ-kopf"><span class="nr">06</span><h2>Beschreibungstext</h2>
+    <p>Anders als die ganze Seite ist der Text <em>selbst</em> der Inhalt – und manchmal will man ihn noch ergänzen oder kürzen. Er soll also Text bleiben können, nur nicht das Feld sprengen.</p>
+    <div class="beispiel">Hier könnte Ihr neues Eigenheim stehen... entsprechend §34 BauGB ist eine Bebauung entsprechend der umliegenden Bebauung möglich. Das Grundstück hat ca. 1.025 qm … Neukieritzsch bietet eine ideale Mischung aus ländlicher Ruhe …</div></div>
+  <div class="varianten">
+
+    <article class="var">
+      <div class="var-kopf"><span class="letter">B</span><h3>Zitat-Pille</h3></div>
+      <div class="buehne">
+        <div class="feld"><svg class="lupe" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="5"/><path d="m11 11 3.5 3.5"/></svg>
+          <span class="pille"><span class="ic"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M3 9.5C3 6.5 4.5 4.5 7 4v1.6C5.8 6 5.2 7 5.1 8H7v4H3Zm6 0C9 6.5 10.5 4.5 13 4v1.6c-1.2.4-1.8 1.4-1.9 2.4H13v4H9Z"/></svg></span><span class="lbl">„Hier könnte Ihr neues Eigenheim stehen …“</span><span class="neben">82 Wörter</span><button class="x" aria-label="Entfernen">✕</button></span>
+          <span class="text"></span>
+          <button class="btn"><span class="lang">Grundstück </span>finden</button></div>
+      </div>
+      <div class="urteil"><div class="plus"><h4>Stärken</h4><ul><li>Der Anfang reicht, um den Text wiederzuerkennen</li><li>Wörter statt Zeichen – eine Zahl, die man einschätzen kann</li></ul></div>
+        <div class="minus"><h4>Schwächen</h4><ul><li>Bearbeiten nur nach Aufklappen</li></ul></div></div>
+    </article>
+
+    <article class="var">
+      <div class="var-kopf"><span class="letter">E</span><h3>Feld wächst, klappt auf zwei Zeilen zu</h3></div>
+      <div class="buehne">
+        <div class="feld hoch"><svg class="lupe" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="5"/><path d="m11 11 3.5 3.5"/></svg>
+          <div class="textfeld"><div class="zitat" style="max-height:3.1em">Hier könnte Ihr neues Eigenheim stehen … entsprechend §34 BauGB ist eine Bebauung entsprechend der umliegenden Bebauung möglich. Das Grundstück hat ca. 1.025 qm und liegt in Neukieritzsch …</div>
+            <div class="fusszeile"><span><span class="art an" style="margin-right:6px">Beschreibungstext</span>82 Wörter</span><button class="lk">Ganzen Text zeigen</button></div></div>
+          <button class="btn"><span class="lang">Grundstück </span>finden</button></div>
+      </div>
+      <div class="urteil"><div class="plus"><h4>Stärken</h4><ul><li>Bleibt Text, bleibt editierbar</li><li>Kein neues Bedienmuster</li></ul></div>
+        <div class="minus"><h4>Schwächen</h4><ul><li>Zeigt, dass es Text ist – nicht, was darin gefunden wurde</li></ul></div></div>
+    </article>
+
+    <article class="var empfohlen">
+      <div class="var-kopf"><span class="letter">E</span><h3>Eingeklappt, Angaben markiert</h3><span class="tag">Empfohlen</span></div>
+      <div class="buehne">
+        <div class="feld hoch"><svg class="lupe" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="5"/><path d="m11 11 3.5 3.5"/></svg>
+          <div class="textfeld"><div class="zitat">… entsprechend <mark>§34 BauGB</mark> ist eine Bebauung entsprechend der umliegenden Bebauung möglich. Das Grundstück hat <mark>ca. 1.025 qm</mark> und liegt in <mark class="ort">Neukieritzsch</mark>, ruhige Seitenstraße …</div>
+            <div class="fusszeile"><span><mark style="padding:0 4px">Fläche</mark> <mark style="padding:0 4px">Planungsrecht</mark> <mark class="ort" style="padding:0 4px">Ort</mark></span><button class="lk">Ganzen Text zeigen</button></div></div>
+          <button class="btn"><span class="lang">Grundstück </span>finden</button></div>
+        <p class="cap">Markiert wird, was der Browser selbst schon findet (Fläche, Ortsname aus dem Gemarkungsverzeichnis). Der Ausschnitt springt zur ersten Markierung, nicht zum Anfang.</p>
+      </div>
+      <div class="urteil"><div class="plus"><h4>Stärken</h4><ul><li>Zeigt, <em>warum</em> die Suche dort sucht, wo sie sucht – noch bevor sie läuft</li><li>Bleibt Text, bleibt überprüfbar</li></ul></div>
+        <div class="minus"><h4>Schwächen</h4><ul><li>Die Markierung darf nicht versprechen, was erst das Backend liest</li></ul></div></div>
+    </article>
+
+    <article class="var">
+      <div class="var-kopf"><span class="letter">C</span><h3>Text wird Angaben-Reihe</h3></div>
+      <div class="buehne">
+        <div class="feld wrap-feld"><svg class="lupe" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="5"/><path d="m11 11 3.5 3.5"/></svg>
+          <span class="pille"><span class="ic"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M3 9.5C3 6.5 4.5 4.5 7 4v1.6C5.8 6 5.2 7 5.1 8H7v4H3Zm6 0C9 6.5 10.5 4.5 13 4v1.6c-1.2.4-1.8 1.4-1.9 2.4H13v4H9Z"/></svg></span><span class="lbl">Text</span><span class="neben">82 Wörter</span></span>
+          <span class="wert">Fläche <b>ca. 1.025 m²</b></span><span class="wert">Ort <b>Neukieritzsch</b></span><span class="wert">§ 34 BauGB</span>
+          <button class="btn" style="margin-left:auto">Finden</button></div>
+      </div>
+      <div class="urteil"><div class="plus"><h4>Stärken</h4><ul><li>Kürzeste Form: nur, was die Suche verwendet</li></ul></div>
+        <div class="minus"><h4>Schwächen</h4><ul><li>Doppelt „Gelesene Werte“; der Text selbst verschwindet</li></ul></div></div>
+    </article>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="typ" id="bild">
+  <div class="typ-kopf"><span class="nr">07</span><h2>Bild / Katasterauszug <span class="art" style="vertical-align:middle">Ausblick</span></h2>
+    <p>Heute liest die Suche die Bilder einer Anzeige mit. Ein Screenshot vom Liegenschaftskataster, direkt ins Feld eingefügt, wäre der nächste Typ – und braucht zwingend eine Vorschau, denn Bild ist nicht Text.</p></div>
+  <div class="varianten">
+
+    <article class="var">
+      <div class="var-kopf"><span class="letter">B</span><h3>Bild-Pille mit Miniatur</h3></div>
+      <div class="buehne">
+        <div class="feld"><svg class="lupe" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="5"/><path d="m11 11 3.5 3.5"/></svg>
+          <span class="pille gross"><span class="ic foto" style="background:#fff;border:1px solid var(--line)"><svg viewBox="0 0 30 24"><path d="M2 3h12v9H2zM14 3h13v9H14zM2 12h9v10H2zM11 12h8v10h-8zM19 12h8v10h-8z" fill="none" stroke="#6F675C" stroke-width=".7"/><path d="M11 12h8v10h-8z" fill="rgba(181,129,60,.3)"/></svg></span><span class="lbl">Bild eingefügt</span><span class="neben">PNG · 1240 × 880</span><button class="x" aria-label="Entfernen">✕</button></span>
+          <span class="text"></span></div>
+      </div>
+      <div class="urteil"><div class="plus"><h4>Stärken</h4><ul><li>Einheitlich mit den anderen Pillen</li></ul></div>
+        <div class="minus"><h4>Schwächen</h4><ul><li>Miniatur zu klein, um eine Nummer zu erkennen</li></ul></div></div>
+    </article>
+
+    <article class="var empfohlen">
+      <div class="var-kopf"><span class="letter">C</span><h3>Pille + Lesestand der Texterkennung</h3><span class="tag">Empfohlen</span></div>
+      <div class="buehne">
+        <div class="feld"><svg class="lupe" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="5"/><path d="m11 11 3.5 3.5"/></svg>
+          <span class="pille eckig gewaehlt"><span class="ic"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="m2.5 11 3.5-3.5 3 3 2-2 2.5 2.5"/></svg></span><span class="lbl">Katasterauszug</span><button class="x" aria-label="Entfernen">✕</button></span>
+          <span class="text"></span>
+          <button class="btn"><span class="lang">Grundstück </span>finden</button></div>
+        <div class="karte">
+          <div class="bild" style="background:#fff;border:1px solid var(--line)"><svg viewBox="0 0 96 72"><path d="M4 6h40v28H4zM44 6h48v28H44zM4 34h30v34H4zM34 34h28v34H34zM62 34h30v34H62z" fill="none" stroke="#6F675C" stroke-width="1"/><path d="M34 34h28v34H34z" fill="rgba(181,129,60,.28)"/><text x="48" y="54" font-size="9" text-anchor="middle" font-family="IBM Plex Mono,monospace" fill="#1E1A16">204/3</text></svg></div>
+          <div class="koerper">
+            <div class="quelle"><span>Texterkennung</span></div>
+            <div class="titel">Flurstücksnummern im Bild</div>
+            <div class="werte"><span class="wert"><b class="mono">204/3</b></span><span class="wert mono">204/4</span><span class="wert mono">205</span><span class="wert fehlt">Gemarkung nicht im Bild</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="urteil"><div class="plus"><h4>Stärken</h4><ul><li>Zeigt, was im Bild gelesen wurde, statt es zu behaupten</li><li>Fehlende Gemarkung sichtbar – sie muss aus einer anderen Quelle kommen</li></ul></div>
+        <div class="minus"><h4>Schwächen</h4><ul><li>Texterkennung dauert Sekunden; die Karte braucht einen Ladezustand</li></ul></div></div>
+    </article>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="typ" id="mehrere">
+  <div class="typ-kopf"><span class="nr">08</span><h2>Mehrere Quellen zugleich</h2>
+    <p>Sind Eingaben Pillen, können mehrere nebeneinander stehen: der Link <em>und</em> ein Ortsteil, den man vom Makler am Telefon weiß. Das Feld wird zur Sammelstelle – und Text hinter den Pillen bleibt freier Hinweis.</p></div>
+  <div class="varianten">
+
+    <article class="var empfohlen">
+      <div class="var-kopf"><span class="letter">B</span><h3>Pillen-Reihe, Text dahinter</h3><span class="tag">Empfohlen</span></div>
+      <div class="buehne">
+        <div class="feld wrap-feld fokus"><svg class="lupe" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="5"/><path d="m11 11 3.5 3.5"/></svg>
+          <span class="pille fertig"><span class="fav" style="margin-left:4px">k</span><span class="lbl">Baugrundstück – ca. 1.025 qm</span><button class="x" aria-label="Entfernen">✕</button></span>
+          <span class="pille eckig"><span class="ic"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="m2.5 11 3.5-3.5 3 3 2-2 2.5 2.5"/></svg></span><span class="lbl">Katasterauszug</span><button class="x" aria-label="Entfernen">✕</button></span>
+          <span class="text" style="min-width:120px">Gemarkung Kieritzsch<span class="caret"></span></span>
+          <button class="btn" style="margin-left:auto"><span class="lang">Grundstück </span>finden</button></div>
+        <p class="cap"><kbd>⌫</kbd> im leeren Text markiert die letzte Pille, ein zweites <kbd>⌫</kbd> entfernt sie – wie bei Empfängern in einer Mail.</p>
+      </div>
+      <div class="urteil"><div class="plus"><h4>Stärken</h4><ul><li>Passt zur Suche, die ohnehin Quellen gegeneinander hält (Bild gegen Text → Konflikt)</li><li>Vertrautes Muster aus Mail-Empfängern</li></ul></div>
+        <div class="minus"><h4>Schwächen</h4><ul><li>Das Backend nimmt heute eine Quelle je Suche</li></ul></div></div>
+    </article>
+
+    <article class="var">
+      <div class="var-kopf"><span class="letter">C</span><h3>Quellen-Stapel unter dem Feld</h3></div>
+      <div class="buehne">
+        <div class="feld"><svg class="lupe" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="5"/><path d="m11 11 3.5 3.5"/></svg>
+          <span class="text leer">Weitere Angabe hinzufügen …</span>
+          <button class="btn"><span class="lang">Grundstück </span>finden</button></div>
+        <div class="karte" style="padding:8px 10px;align-items:center"><span class="fav big">k</span><div class="koerper"><div class="titel" style="font-size:14px;-webkit-line-clamp:1">Baugrundstück – ca. 1.025 qm – direkt bebaubar</div></div><span class="art">Link</span><button class="lk" aria-label="Entfernen">✕</button></div>
+        <div class="karte" style="padding:8px 10px;align-items:center"><span class="pille eckig" style="border:0;padding:0;background:none"><span class="ic"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="m2.5 11 3.5-3.5 3 3 2-2 2.5 2.5"/></svg></span></span><div class="koerper"><div class="titel" style="font-size:14px;-webkit-line-clamp:1">Katasterauszug · 204/3, 204/4, 205</div></div><span class="art">Bild</span><button class="lk" aria-label="Entfernen">✕</button></div>
+      </div>
+      <div class="urteil"><div class="plus"><h4>Stärken</h4><ul><li>Das Feld bleibt immer leer und bereit</li><li>Jede Quelle hat Platz für ihren Befund</li></ul></div>
+        <div class="minus"><h4>Schwächen</h4><ul><li>Wirkt wie ein Formular, nicht wie eine Suche</li></ul></div></div>
+    </article>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="typ" id="querschnitt">
+  <div class="typ-kopf"><span class="nr">∗</span><h2>Was für jede Pille gilt</h2>
+    <p>Unabhängig davon, welche Variante gewinnt – diese Regeln halten die Pillen bedienbar.</p></div>
+  <div class="regeln">
+    <div class="regel"><b>Die Lesart ist überstimmbar – an der Pille</b>Klick auf das Symbol öffnet die Lesarten. Die Chipreihe unter dem Feld kann dann entfallen oder bleibt als „Oder gezielt“.
+      <div class="pop" style="margin-top:10px"><div class="an">Link zur Anzeige <small>erkannt</small></div><div>Beschreibungstext</div><hr><div>Als Text bearbeiten</div></div></div>
+    <div class="regel"><b>Einfügen erzeugt die Pille sofort</b>Kein Moment, in dem 9.000 Zeichen im Feld stehen. Getipptes wird erst bei eindeutiger Lesart (Vorschlag gewählt, <kbd>Enter</kbd>) zur Pille.</div>
+    <div class="regel"><b>Der Originaltext geht nie verloren</b>„Als Text bearbeiten“ löst jede Pille zurück in das, was eingefügt wurde. Die Pille ist Darstellung, nicht Umwandlung.</div>
+    <div class="regel"><b>Tastatur und Vorleser</b>Jede Pille ist ein Knopf mit ganzem Namen im <span class="mono">aria-label</span> („Link zur Anzeige: kleinanzeigen.de, Baugrundstück …, entfernen mit Entf“). <kbd>←</kbd> <kbd>→</kbd> wandern zwischen Pillen.</div>
+    <div class="regel"><b>Nichts erfinden, bevor es gelesen ist</b>Eine Pille zeigt vor dem Abruf nur, was im Eingefügten selbst steht (Portal, Nummer, Wortzahl). Preis, Fläche, Umriss erscheinen erst mit der Antwort – bis dahin „—“ oder ein Ladezustand.</div>
+    <div class="regel"><b>Schmal: die Pille kürzt, das Feld nicht</b>Auf 390 px wird der Titel mit „…“ gekürzt, das Symbol und das ✕ bleiben. Vorschaukarten stapeln Bild über Text.</div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="typ" id="fazit">
+  <div class="typ-kopf"><span class="nr">→</span><h2>Empfehlung je Typ</h2>
+    <p>Ein durchgehender Gedanke: <b>kurz bleibt Text, lang wird Pille, und was erst gelesen werden muss, bekommt eine Vorschau darunter.</b></p></div>
+  <div class="tabelle"><table class="fazit">
+    <thead><tr><th>Typ</th><th>Im Feld</th><th>Darunter</th><th>Alternative</th></tr></thead>
+    <tbody>
+      <tr><td>Adresse</td><td data-k="Im Feld">Klartext + Lesart am Rand (A)</td><td data-k="Darunter">—</td><td data-k="Alternative">Pille nach gewähltem Vorschlag</td></tr>
+      <tr><td>Flurstück</td><td data-k="Im Feld">Zweiteilige Pille Gemarkung | Nr. (B)</td><td data-k="Darunter">Umriss + amtliche Fläche nach Abruf</td><td data-k="Alternative">Zerlegtes Kennzeichen</td></tr>
+      <tr><td>Koordinate</td><td data-k="Im Feld">Pille mit Kartenausschnitt (B)</td><td data-k="Darunter">Hinweis, wenn getauscht</td><td data-k="Alternative">Klartext + Umrechnung</td></tr>
+      <tr><td>Link zur Anzeige</td><td data-k="Im Feld">Pille Portal → Titel (C)</td><td data-k="Darunter">Vorschaukarte mit Ladeschritten</td><td data-k="Alternative">Feld wird Karte</td></tr>
+      <tr><td>Eingefügte Anzeige</td><td data-k="Im Feld">Dokument-Pille (C)</td><td data-k="Darunter">Befund: was drin ist, was fehlt</td><td data-k="Alternative">Leseansicht zum Aufklappen</td></tr>
+      <tr><td>Beschreibungstext</td><td data-k="Im Feld">Eingeklappt, Angaben markiert (E)</td><td data-k="Darunter">—</td><td data-k="Alternative">Zitat-Pille</td></tr>
+      <tr><td>Bild</td><td data-k="Im Feld">Bild-Pille (C)</td><td data-k="Darunter">Gelesene Nummern</td><td data-k="Alternative">—</td></tr>
+      <tr><td>Mehrere</td><td data-k="Im Feld">Pillen-Reihe, Text dahinter (B)</td><td data-k="Darunter">Je eine Vorschau pro Quelle</td><td data-k="Alternative">Quellen-Stapel</td></tr>
+    </tbody></table></div>
+</section>
+
+<p class="fuss">Mockup, nicht gebaut. Anzeigendaten aus <span class="mono">backend/tests/fixtures/inserat-kleinanzeigen.html</span>; Flurstück, Fläche und Katasterbild sind Platzhalter zur Darstellung.</p>
+</div>
+
+<script>
+// Same three-way switch as the app: "System" drops the attribute so the media query decides.
+const root = document.documentElement;
+document.querySelectorAll('.theme button').forEach(button => {
+  button.addEventListener('click', () => {
+    const theme = button.dataset.t;
+    if (theme) root.setAttribute('data-theme', theme); else root.removeAttribute('data-theme');
+    document.querySelectorAll('.theme button').forEach(b => b.setAttribute('aria-pressed', String(b === button)));
+  });
+});
+</script>
+</body>
+</html>
