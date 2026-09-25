@@ -1,0 +1,1290 @@
+<title>Nachbarschaft im Grundstück</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:wght@400;500;600&display=swap">
+<style>
+/* Tokens copied from frontend/src/styles/tokens.css; the few --mock-* ones
+   are derived for drawings this page needs and the app does not draw yet. */
+:root{
+  --w2b-primary:#2F4A3A; --w2b-primary-light:#456B52; --w2b-primary-dark:#1C2E23;
+  --w2b-primary-veil:rgba(47,74,58,.10); --w2b-primary-on:#F7F4EE;
+  --w2b-secondary:#B5813C; --w2b-secondary-text:#7C5620; --w2b-secondary-light:#E8D4B0; --w2b-secondary-veil:rgba(181,129,60,.16);
+  --w2b-sage:#9DB39A; --w2b-sage-light:#DCE4DA;
+  --w2b-ink:#1E1A16; --w2b-graphite:#4A443C; --w2b-muted:#6F675C; --w2b-line:#DCD3C6; --w2b-line-faint:#EBE4D9;
+  --w2b-surface:#FAF7F1; --w2b-surface-sunken:#F3EFE6; --w2b-paper:#F1EBE1; --w2b-white:#FFFFFF;
+  --w2b-warning:#BE8524; --w2b-warning-text:#7C5620; --w2b-warning-surface:#F6E9CE;
+  --w2b-error:#A8402C; --w2b-error-surface:#F2DED8; --w2b-good:#2F4A3A; --w2b-good-surface:#DEE7DF;
+  --w2b-map-ground:#E6E3DC; --w2b-map-surface:#EFEDE7; --w2b-map-boundary:#1E1A16; --w2b-map-halo:#FFFFFF;
+  --w2b-map-envelope:#2F4A3A; --w2b-map-setback:rgba(47,74,58,.17);
+  --w2b-map-existing:#4A443C; --w2b-map-neighbour:#9A9184; --w2b-map-street-surface:#D6D2CA;
+  --w2b-map-violation:#A8402C; --w2b-map-selection:#456B52; --w2b-map-green:#DCE4DA;
+  --w2b-radius-xs:5px; --w2b-radius-s:8px; --w2b-radius-m:12px; --w2b-radius-l:18px; --w2b-radius-full:999px;
+  --w2b-font-display:"Archivo",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --w2b-font-body:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --w2b-font-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --w2b-text-xs:11.5px; --w2b-text-s:13px; --w2b-text-m:15px; --w2b-text-l:17px; --w2b-text-xl:21px;
+  --w2b-shadow:0 1px 2px rgba(30,26,22,.05),0 10px 24px -18px rgba(30,26,22,.45);
+
+  --mock-nb-main:#C3BBAE; --mock-nb-main-edge:#7D7468;
+  --mock-nb-aux:#E0DBD2; --mock-nb-aux-edge:#B0A89B;
+  --mock-hint:#857C70;
+  --mock-grenz:#BE8524;
+  --mock-band:rgba(111,138,108,.13); --mock-band-strong:rgba(111,138,108,.26); --mock-band-line:#5E7A5B;
+  --mock-soil:#E2DDD3;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --w2b-primary:#7FA98A; --w2b-primary-light:#9BC0A4; --w2b-primary-dark:#24382C;
+    --w2b-primary-veil:rgba(127,169,138,.14); --w2b-primary-on:#12211A;
+    --w2b-secondary:#D9A55E; --w2b-secondary-text:#DBB273; --w2b-secondary-light:#3E3021; --w2b-secondary-veil:rgba(217,165,94,.18);
+    --w2b-sage:#6E8470; --w2b-sage-light:#26302A;
+    --w2b-ink:#F1EBE1; --w2b-graphite:#C4BCB0; --w2b-muted:#948B7E; --w2b-line:#3A342C; --w2b-line-faint:#2A2620;
+    --w2b-surface:#201C17; --w2b-surface-sunken:#191510; --w2b-paper:#16130F;
+    --w2b-warning:#D8A340; --w2b-warning-text:#E3BC72; --w2b-warning-surface:#3A2E19;
+    --w2b-error:#E0705A; --w2b-error-surface:#3B211B; --w2b-good:#7FA98A; --w2b-good-surface:#1F2C24;
+    --w2b-map-ground:#1A1917; --w2b-map-surface:#23211D; --w2b-map-boundary:#F1EBE1; --w2b-map-halo:#16130F;
+    --w2b-map-envelope:#7FA98A; --w2b-map-setback:rgba(127,169,138,.34);
+    --w2b-map-existing:#6B6459; --w2b-map-neighbour:#5A544B; --w2b-map-street-surface:#242220;
+    --w2b-map-violation:#E0705A; --w2b-map-selection:#9BC0A4; --w2b-map-green:#26302A;
+    --w2b-shadow:0 1px 2px rgba(0,0,0,.5),0 12px 28px -20px rgba(0,0,0,.85);
+    --mock-nb-main:#4A453E; --mock-nb-main-edge:#8E8578;
+    --mock-nb-aux:#2C2925; --mock-nb-aux-edge:#5C564D;
+    --mock-hint:#A39A8C;
+    --mock-grenz:#D8A340;
+    --mock-band:rgba(143,167,143,.10); --mock-band-strong:rgba(143,167,143,.22); --mock-band-line:#9BB59A;
+    --mock-soil:#2A2621;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --w2b-primary:#7FA98A; --w2b-primary-light:#9BC0A4; --w2b-primary-dark:#24382C;
+  --w2b-primary-veil:rgba(127,169,138,.14); --w2b-primary-on:#12211A;
+  --w2b-secondary:#D9A55E; --w2b-secondary-text:#DBB273; --w2b-secondary-light:#3E3021; --w2b-secondary-veil:rgba(217,165,94,.18);
+  --w2b-sage:#6E8470; --w2b-sage-light:#26302A;
+  --w2b-ink:#F1EBE1; --w2b-graphite:#C4BCB0; --w2b-muted:#948B7E; --w2b-line:#3A342C; --w2b-line-faint:#2A2620;
+  --w2b-surface:#201C17; --w2b-surface-sunken:#191510; --w2b-paper:#16130F;
+  --w2b-warning:#D8A340; --w2b-warning-text:#E3BC72; --w2b-warning-surface:#3A2E19;
+  --w2b-error:#E0705A; --w2b-error-surface:#3B211B; --w2b-good:#7FA98A; --w2b-good-surface:#1F2C24;
+  --w2b-map-ground:#1A1917; --w2b-map-surface:#23211D; --w2b-map-boundary:#F1EBE1; --w2b-map-halo:#16130F;
+  --w2b-map-envelope:#7FA98A; --w2b-map-setback:rgba(127,169,138,.34);
+  --w2b-map-existing:#6B6459; --w2b-map-neighbour:#5A544B; --w2b-map-street-surface:#242220;
+  --w2b-map-violation:#E0705A; --w2b-map-selection:#9BC0A4; --w2b-map-green:#26302A;
+  --w2b-shadow:0 1px 2px rgba(0,0,0,.5),0 12px 28px -20px rgba(0,0,0,.85);
+  --mock-nb-main:#4A453E; --mock-nb-main-edge:#8E8578;
+  --mock-nb-aux:#2C2925; --mock-nb-aux-edge:#5C564D;
+  --mock-hint:#A39A8C;
+  --mock-grenz:#D8A340;
+  --mock-band:rgba(143,167,143,.10); --mock-band-strong:rgba(143,167,143,.22); --mock-band-line:#9BB59A;
+  --mock-soil:#2A2621;
+  color-scheme:dark;
+}
+
+
+/* Tokens this page adds: the house (brass, as in the app) and the overlap zone. */
+:root{
+  --w2b-map-design:#B5813C; --w2b-map-design-edge:#7C5620;
+  --mock-zone:#C0561A; --mock-zone-veil:rgba(192,86,26,.12);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --w2b-map-design:#D9A55E; --w2b-map-design-edge:#F0C688;
+    --mock-zone:#F0904A; --mock-zone-veil:rgba(240,144,74,.14);
+  }
+}
+:root[data-theme="dark"]{
+  --w2b-map-design:#D9A55E; --w2b-map-design-edge:#F0C688;
+  --mock-zone:#F0904A; --mock-zone-veil:rgba(240,144,74,.14);
+}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--w2b-paper);color:var(--w2b-ink);font-family:var(--w2b-font-body);
+  font-size:var(--w2b-text-m);line-height:1.55;-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{font-family:var(--w2b-font-display);line-height:1.15;margin:0;text-wrap:balance}
+p{margin:0}
+button{font:inherit;color:inherit}
+a{color:var(--w2b-primary);text-underline-offset:3px}
+:focus-visible{outline:2px solid var(--w2b-primary);outline-offset:2px}
+code{font-family:var(--w2b-font-mono);font-size:.86em;background:var(--w2b-surface-sunken);border:1px solid var(--w2b-line-faint);border-radius:4px;padding:0 4px}
+.wrap{max-width:1360px;margin:0 auto;padding-inline:clamp(16px,3vw,40px);padding-block:0 64px}
+.eyebrow{font-family:var(--w2b-font-display);font-weight:600;font-size:var(--w2b-text-xs);letter-spacing:.14em;text-transform:uppercase;color:var(--w2b-muted)}
+.mono{font-family:var(--w2b-font-mono);font-variant-numeric:tabular-nums}
+.faint{color:var(--w2b-muted);font-size:var(--w2b-text-xs)}
+
+/* ---------- the designer's note: outside the app, marked as such ---------- */
+.notiz{margin-block:20px 18px;padding:12px 16px;border:1px dashed var(--w2b-secondary);border-radius:var(--w2b-radius-m);
+  background:var(--w2b-secondary-veil);display:grid;gap:6px;font-size:var(--w2b-text-s);color:var(--w2b-graphite);max-width:110ch}
+.notiz b{color:var(--w2b-ink);font-weight:600}
+.notiz .eyebrow{color:var(--w2b-secondary-text)}
+
+/* ---------- app furniture, mirrored from base.css and PlotView ---------- */
+.appbar{display:flex;align-items:center;gap:18px;padding-block:14px;border-bottom:1px solid var(--w2b-line);flex-wrap:wrap}
+.appbar__brand{display:flex;align-items:center;gap:9px;font-family:var(--w2b-font-display);font-weight:700;font-size:18px;letter-spacing:-.01em}
+.appbar__brand i{width:22px;height:22px;border-radius:5px;background:var(--w2b-primary);display:inline-block;position:relative}
+.appbar__brand i::after{content:"";position:absolute;inset:6px 5px 5px 6px;background:var(--w2b-secondary);border-radius:2px}
+.appbar nav{display:flex;gap:4px;flex-wrap:wrap}
+.appbar nav span{font-family:var(--w2b-font-display);font-weight:600;font-size:var(--w2b-text-s);padding:6px 11px;border-radius:var(--w2b-radius-s);color:var(--w2b-graphite)}
+.appbar nav span.an{background:var(--w2b-primary);color:var(--w2b-primary-on)}
+.stack{display:flex;flex-direction:column;gap:16px;padding-top:18px}
+.breadcrumb{display:flex;align-items:center;gap:8px;font-size:var(--w2b-text-xs);color:var(--w2b-muted)}
+.breadcrumb a{color:var(--w2b-primary);text-decoration:none}
+.page-head{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.page-head h1{font-size:clamp(28px,4vw,40px);font-weight:700;letter-spacing:-.028em;margin-top:4px}
+.page-head__sub{margin-top:8px;color:var(--w2b-graphite);font-size:var(--w2b-text-s);max-width:66ch}
+.page-head .spacer{flex:1}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.btn{font-family:var(--w2b-font-display);font-weight:600;font-size:14px;letter-spacing:.015em;border:1.5px solid transparent;padding:8px 15px;border-radius:var(--w2b-radius-s);cursor:pointer;background:var(--w2b-primary);color:var(--w2b-primary-on)}
+.btn--secondary{background:transparent;color:var(--w2b-primary);border-color:var(--w2b-primary)}
+.btn--quiet{background:transparent;color:var(--w2b-graphite);border-color:var(--w2b-line)}
+.btn--small{padding:4px 10px;font-size:var(--w2b-text-xs)}
+.btn:disabled{opacity:.42;cursor:not-allowed}
+.btn--quiet:hover:not(:disabled){background:var(--w2b-primary-veil);color:var(--w2b-ink);border-color:var(--w2b-muted)}
+.btn--secondary:hover:not(:disabled){background:var(--w2b-primary-veil)}
+
+.panel{background:var(--w2b-surface);border:1px solid var(--w2b-line);border-radius:var(--w2b-radius-m);overflow:hidden}
+.panel__head{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--w2b-line)}
+.panel__head h3{font-size:var(--w2b-text-l);font-weight:600}
+.panel__head .spacer{flex:1}
+.plan-grid{display:grid;grid-template-columns:minmax(0,1fr) 352px;gap:16px;align-items:start}
+@media (max-width:1100px){.plan-grid{grid-template-columns:minmax(0,1fr)}}
+.plan-frame{position:sticky;top:12px}
+@media (max-width:1100px){.plan-frame{position:static}}
+.plan-bar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--w2b-line)}
+.plan-bar__label{font-family:var(--w2b-font-display);font-weight:600;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--w2b-muted);margin-left:4px}
+.plan-bar .spacer{flex:1}
+.button-group{display:flex;border:1px solid var(--w2b-line);border-radius:var(--w2b-radius-s);overflow:hidden}
+.button-group button,.toggle{background:var(--w2b-surface);border:0;cursor:pointer;padding:5px 11px;font-family:var(--w2b-font-display);font-weight:600;font-size:var(--w2b-text-xs);color:var(--w2b-muted)}
+.button-group button + button{border-left:1px solid var(--w2b-line)}
+.toggle{border:1px solid var(--w2b-line);border-radius:var(--w2b-radius-s)}
+.button-group button[aria-pressed="true"],.toggle[aria-pressed="true"]{background:var(--w2b-primary);color:var(--w2b-primary-on)}
+.button-group button:disabled,.toggle:disabled{opacity:.45;cursor:not-allowed}
+.plan-foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:8px 12px;border-top:1px solid var(--w2b-line);font-family:var(--w2b-font-mono);font-size:10.5px;color:var(--w2b-muted)}
+.notice{display:flex;gap:8px;padding:10px 15px;font-size:var(--w2b-text-s);background:var(--w2b-good-surface);color:var(--w2b-good);border-bottom:1px solid var(--w2b-line)}
+.notice--zone{background:var(--w2b-warning-surface);color:var(--w2b-warning-text)}
+.notice--error{background:var(--w2b-error-surface);color:var(--w2b-error)}
+.notice b{font-weight:600}
+
+.plan-stage{position:relative;background:var(--w2b-map-ground);line-height:0}
+.plan-stage svg{display:block;width:100%;height:auto;touch-action:none;user-select:none}
+.house-chip{position:absolute;top:12px;left:12px;display:flex;align-items:center;gap:8px;max-width:calc(100% - 100px);line-height:1.3;
+  padding:4px 4px 4px 12px;border:1px solid var(--w2b-map-design);border-radius:var(--w2b-radius-full);background:var(--w2b-surface);box-shadow:var(--w2b-shadow);font-size:var(--w2b-text-s)}
+.house-chip__label{font-family:var(--w2b-font-display);font-weight:600;font-size:var(--w2b-text-xs);letter-spacing:.09em;text-transform:uppercase;color:var(--w2b-secondary-text)}
+.house-chip__name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.house-chip button{flex:none;border:0;border-radius:var(--w2b-radius-full);padding:6px 10px;cursor:pointer;background:var(--w2b-secondary-veil);color:var(--w2b-secondary-text);font-weight:600;font-size:var(--w2b-text-xs)}
+.zoom{position:absolute;right:12px;bottom:12px;display:flex;background:var(--w2b-surface);border:1px solid var(--w2b-line);border-radius:var(--w2b-radius-s);box-shadow:var(--w2b-shadow);overflow:hidden;line-height:1.2}
+.zoom button{border:0;background:transparent;padding:6px 10px;font-family:var(--w2b-font-display);font-weight:600;font-size:var(--w2b-text-xs);color:var(--w2b-muted);cursor:pointer}
+.zoom button + button{border-left:1px solid var(--w2b-line)}
+.zoom button[aria-pressed="true"]{background:var(--w2b-primary);color:var(--w2b-primary-on)}
+@media (max-width:520px){.zoom{left:12px;right:auto;bottom:auto;top:56px}}
+
+.facts{display:flex;flex-direction:column;gap:14px;min-width:0}
+.side-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px;padding:3px;background:var(--w2b-surface-sunken);border:1px solid var(--w2b-line);border-radius:var(--w2b-radius-s)}
+.side-tabs button{display:flex;align-items:center;justify-content:center;gap:5px;padding:9px 2px;border:0;border-radius:var(--w2b-radius-xs);background:transparent;font-family:var(--w2b-font-display);font-weight:600;font-size:12.5px;color:var(--w2b-graphite);cursor:pointer;white-space:nowrap}
+.side-tabs button[aria-selected="true"]{background:var(--w2b-surface);color:var(--w2b-ink);box-shadow:var(--w2b-shadow)}
+.side-tabs__mark{width:10px;height:10px;border-radius:2px;flex:none}
+.side-tabs__mark--plot{border:1.5px solid var(--w2b-map-boundary);border-radius:1px}
+.side-tabs__mark--building{background:var(--w2b-map-design);border:1px solid var(--w2b-map-design-edge)}
+.side-tabs__mark--nachbarschaft{background:var(--mock-nb-main);border:1px solid var(--mock-nb-main-edge)}
+.side-pane{display:flex;flex-direction:column;gap:14px}
+.value-list{margin:0;display:grid;grid-template-columns:auto 1fr}
+.value-list dt,.value-list dd{padding:8px 16px;border-bottom:1px solid var(--w2b-line-faint);margin:0;display:flex;align-items:center}
+.value-list dt{font-size:var(--w2b-text-s);color:var(--w2b-graphite)}
+.value-list dd{justify-content:flex-end;gap:6px;font-family:var(--w2b-font-mono);font-size:var(--w2b-text-s);font-variant-numeric:tabular-nums;text-align:right}
+.value-list dt:last-of-type,.value-list dd:last-of-type{border-bottom:0}
+.slider{display:grid;grid-template-columns:1fr auto;gap:5px 12px;align-items:center;padding:12px 16px;border-top:1px solid var(--w2b-line-faint)}
+.slider label{font-family:var(--w2b-font-display);font-weight:600;font-size:var(--w2b-text-xs);letter-spacing:.09em;text-transform:uppercase;color:var(--w2b-muted)}
+.slider input[type="range"]{grid-column:1/-1;accent-color:var(--w2b-primary);width:100%}
+.slider__hint{grid-column:1/-1;font-size:var(--w2b-text-xs);color:var(--w2b-muted)}
+.panel__foot{padding:10px 16px;border-top:1px solid var(--w2b-line-faint);font-size:var(--w2b-text-xs);color:var(--w2b-muted)}
+
+.chip{display:inline-block;padding:2px 9px;border-radius:var(--w2b-radius-full);font-family:var(--w2b-font-display);font-weight:600;font-size:var(--w2b-text-xs);letter-spacing:.02em;white-space:nowrap;line-height:1.5}
+.chip--frei{background:var(--w2b-good-surface);color:var(--w2b-good)}
+.chip--grenz,.chip--ueber{background:var(--w2b-warning-surface);color:var(--w2b-warning-text)}
+.chip--neben,.chip--bestand{background:var(--w2b-surface-sunken);color:var(--w2b-graphite);border:1px solid var(--w2b-line)}
+.chip--umgebung{background:var(--mock-band-strong);color:var(--w2b-ink)}
+.chip--offen{background:transparent;color:var(--w2b-muted);border:1px dashed var(--w2b-line)}
+.chip--recht{background:var(--w2b-primary-veil);color:var(--w2b-primary)}
+
+/* ---------- the key graphic at the top of the tab ---------- */
+.schluessel{padding:6px 10px 10px}
+.schluessel svg{display:block;width:100%;height:auto;max-width:360px;margin-inline:auto}
+.kg-seg{cursor:pointer}
+.kg-seg:focus{outline:none}
+.kg-hit{stroke:transparent;stroke-width:18;fill:none}
+.kg-base{stroke:var(--w2b-map-boundary);stroke-width:2;fill:none}
+.kg-mark{stroke-width:6;fill:none;stroke-linecap:butt}
+.kg-mark--frei{stroke:var(--w2b-good)}
+.kg-mark--grenz{stroke:var(--mock-grenz)}
+.kg-mark--ueber{stroke:var(--mock-zone);stroke-dasharray:5 3}
+.kg-mark--neben{stroke:var(--w2b-muted)}
+.kg-focus{fill:none;stroke:var(--w2b-map-selection);stroke-width:10;opacity:0;stroke-linecap:round}
+.kg-seg:hover .kg-focus{opacity:.25}
+.kg-seg:focus-visible .kg-focus,.kg-seg.is-open .kg-focus{opacity:.5}
+.kg-text{font-family:var(--w2b-font-mono);font-size:10px;fill:var(--w2b-graphite)}
+.kg-text b,.kg-strong{font-weight:600;fill:var(--w2b-ink)}
+.kg-plot{fill:var(--w2b-map-surface)}
+.kg-strip{fill:var(--w2b-map-setback)}
+
+/* ---------- findings in the tab ---------- */
+.befunde{display:flex;flex-direction:column}
+.befund{display:grid;grid-template-columns:26px minmax(0,1fr);gap:4px 10px;padding:12px 14px;border-top:1px solid var(--w2b-line-faint);position:relative}
+.befund:first-child{border-top:0}
+.befund.is-active{background:var(--w2b-primary-veil)}
+.befund__zeile{display:flex;align-items:baseline;gap:6px 8px;flex-wrap:wrap}
+.befund__titel{font-family:var(--w2b-font-display);font-weight:600;font-size:var(--w2b-text-m);background:none;border:0;padding:0;cursor:pointer;text-align:left}
+.befund__titel:hover{color:var(--w2b-primary)}
+.befund__wert{margin-left:auto;font-family:var(--w2b-font-mono);font-size:var(--w2b-text-xs);color:var(--w2b-muted);white-space:nowrap}
+.befund__text{grid-column:2;font-size:var(--w2b-text-s);color:var(--w2b-graphite);line-height:1.5}
+.befund__text p + p{margin-top:6px}
+.befund__knoepfe{grid-column:2;display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.knopf{border:1px solid var(--w2b-line);background:var(--w2b-surface);border-radius:var(--w2b-radius-full);padding:3px 10px;font-family:var(--w2b-font-display);font-weight:600;font-size:var(--w2b-text-xs);color:var(--w2b-primary);cursor:pointer}
+.knopf:hover{border-color:var(--w2b-primary)}
+.knopf[aria-expanded="true"]{background:var(--w2b-primary);border-color:var(--w2b-primary);color:var(--w2b-primary-on)}
+.nummer{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;border:1.5px solid var(--w2b-ink);font-family:var(--w2b-font-display);font-weight:600;font-size:12px;background:var(--w2b-surface);margin-top:1px;cursor:pointer;padding:0}
+.befund.is-active .nummer{background:var(--w2b-primary);border-color:var(--w2b-primary);color:var(--w2b-primary-on)}
+.glyph{width:24px;height:24px;display:block;margin-top:1px}
+.lesart{grid-column:2;display:grid;gap:6px;margin-top:6px;padding:8px 10px;border-radius:var(--w2b-radius-s);background:var(--w2b-surface-sunken);border:1px solid var(--w2b-line-faint)}
+.lesart__kopf{font-family:var(--w2b-font-display);font-weight:600;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--w2b-muted)}
+.lesart .button-group{align-self:start;flex-wrap:wrap;border-radius:var(--w2b-radius-s)}
+.lesart .button-group button{white-space:normal;text-align:left;line-height:1.3}
+.lesart p{font-size:var(--w2b-text-xs);color:var(--w2b-graphite)}
+.aufklapp{grid-column:1/-1;margin-top:8px;border:1px solid var(--w2b-line);border-radius:var(--w2b-radius-s);background:var(--w2b-surface);overflow:hidden}
+.aufklapp__kopf{display:flex;align-items:baseline;gap:8px;padding:7px 10px;border-bottom:1px solid var(--w2b-line-faint);font-size:var(--w2b-text-xs);color:var(--w2b-muted)}
+.aufklapp__kopf b{font-family:var(--w2b-font-display);color:var(--w2b-ink);font-size:var(--w2b-text-s)}
+.aufklapp__kopf button{margin-left:auto;border:0;background:none;color:var(--w2b-primary);cursor:pointer;font-weight:600;font-size:var(--w2b-text-xs)}
+.scroll-x{overflow-x:auto;overscroll-behavior-x:contain}
+.scroll-x svg{display:block;max-width:none;height:auto}
+.trenner{padding:8px 14px 4px;border-top:1px solid var(--w2b-line)}
+.slot{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.slot span{font-family:var(--w2b-font-mono);font-size:var(--w2b-text-xs);color:var(--w2b-muted);border:1px dashed var(--w2b-line);border-radius:var(--w2b-radius-s);padding:2px 8px;background:var(--w2b-surface-sunken)}
+.quelle-zeile{font-family:var(--w2b-font-mono);font-size:10.5px;color:var(--w2b-muted);margin-top:4px}
+.zum-detail{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid var(--w2b-line);font-size:var(--w2b-text-s)}
+.zum-detail a{font-family:var(--w2b-font-display);font-weight:600;text-decoration:none}
+.zum-detail a:hover{text-decoration:underline}
+
+/* ---------- the detail section below the plan ---------- */
+.abschnitt{padding-top:40px;display:flex;flex-direction:column;gap:18px}
+.abschnitt__kopf{display:grid;gap:8px;max-width:72ch}
+.abschnitt__kopf h2{font-size:clamp(24px,3vw,30px);font-weight:700;letter-spacing:-.02em}
+.abschnitt__kopf p{color:var(--w2b-graphite);font-size:var(--w2b-text-s)}
+.detail-grid{display:grid;gap:16px;grid-template-columns:minmax(0,1fr);align-items:start}
+@media (min-width:1100px){.detail-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+.grenzzeile{display:grid;gap:8px;padding:14px 16px;border-top:1px solid var(--w2b-line-faint)}
+.grenzzeile:first-of-type{border-top:0}
+.grenzzeile__kopf{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.grenzzeile__kopf h3{font-size:var(--w2b-text-m);font-weight:600}
+.grenzzeile__kopf .chip{margin-left:auto}
+.grenzzeile p{font-size:var(--w2b-text-s);color:var(--w2b-graphite)}
+.schnitt-block{padding:12px 16px;border-top:1px solid var(--w2b-line-faint);display:grid;gap:6px}
+.schnitt-block:first-of-type{border-top:0}
+.schnitt-block h3{font-size:var(--w2b-text-m);font-weight:600}
+.standort-stub{border:1px dashed var(--w2b-line);border-radius:var(--w2b-radius-m);padding:16px;color:var(--w2b-muted);font-size:var(--w2b-text-s)}
+
+/* ---------- annotations: legend and method ---------- */
+.anmerkung{margin-top:44px;padding-top:26px;border-top:2px dashed var(--w2b-line);display:grid;gap:18px}
+.anmerkung h2{font-size:22px;font-weight:700;letter-spacing:-.01em}
+.legende{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px 18px}
+.legende div{display:grid;grid-template-columns:34px minmax(0,1fr);gap:10px;align-items:center;font-size:var(--w2b-text-s);color:var(--w2b-graphite);line-height:1.35}
+.legende svg{width:34px;height:22px;display:block;border-radius:3px;background:var(--w2b-map-ground)}
+.messung{display:grid;gap:10px 28px;grid-template-columns:minmax(0,1fr)}
+@media (min-width:860px){.messung{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.messung div{font-size:var(--w2b-text-s);color:var(--w2b-graphite);padding-top:10px;border-top:1px solid var(--w2b-line-faint)}
+.messung b{display:block;font-family:var(--w2b-font-display);font-weight:600;color:var(--w2b-ink);margin-bottom:2px}
+.quellen{font-size:var(--w2b-text-xs);color:var(--w2b-muted);max-width:100ch}
+
+/* ---------- drawings ---------- */
+.p-ground{fill:var(--w2b-map-ground)}
+.p-street{fill:var(--w2b-map-street-surface)}
+.p-street-label{font-family:var(--w2b-font-display);font-weight:600;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;fill:var(--w2b-muted)}
+.p-parcel{fill:var(--w2b-map-surface)}
+.p-setback{fill:var(--w2b-map-setback)}
+.p-envelope{fill:none;stroke:var(--w2b-map-envelope);stroke-width:1.5;stroke-dasharray:6 4}
+.p-hint{stroke:var(--mock-hint);stroke-width:1.1}
+.p-hatch{fill:none;stroke:var(--mock-hint);stroke-width:.8}
+.p-zone-line{stroke:var(--mock-zone);stroke-width:1.1}
+.p-zone-veil{fill:var(--mock-zone-veil)}
+.p-zone-edge{fill:none;stroke:var(--mock-zone);stroke-width:1.2;stroke-dasharray:3 2}
+.p-possible{fill:var(--w2b-map-surface);stroke:var(--mock-grenz);stroke-width:1.4;stroke-dasharray:1.5 3;stroke-linecap:round}
+.p-halo{fill:none;stroke:var(--w2b-map-halo);stroke-width:6;stroke-linejoin:round}
+.p-boundary{fill:none;stroke:var(--w2b-map-boundary);stroke-width:2.2;stroke-linejoin:round}
+.p-vertex{fill:var(--w2b-map-halo);stroke:var(--w2b-map-boundary);stroke-width:1.4}
+.p-bld{stroke-linejoin:round}
+.p-bld--main{fill:var(--mock-nb-main);stroke:var(--mock-nb-main-edge);stroke-width:1}
+.p-bld--aux{fill:var(--mock-nb-aux);stroke:var(--mock-nb-aux-edge);stroke-width:.8}
+.p-bld--own{fill:var(--w2b-map-existing);stroke:var(--w2b-map-boundary);stroke-width:1}
+.p-bld--own-aux{fill:var(--w2b-map-existing);fill-opacity:.55;stroke:var(--w2b-map-boundary);stroke-width:.8}
+.p-bld--band{stroke:var(--mock-band-line);stroke-width:2}
+.p-bld.is-active{stroke:var(--w2b-map-selection);stroke-width:2.6}
+.p-grenz{fill:none;stroke:var(--mock-grenz);stroke-width:4.5}
+.p-grenz-tick{stroke:var(--mock-grenz);stroke-width:2}
+.p-band{fill:var(--mock-band)}
+.p-band-line{fill:none;stroke:var(--mock-band-line);stroke-width:1.2;stroke-dasharray:5 3}
+.p-ref-line{fill:none;stroke:var(--w2b-map-boundary);stroke-width:.9;stroke-dasharray:1.5 3;opacity:.7}
+.p-house{fill:var(--w2b-map-design);fill-opacity:.85;stroke:var(--w2b-map-design-edge);stroke-width:1.7;cursor:grab}
+.p-house--zone{stroke:var(--mock-zone);stroke-width:2.4}
+.p-house--out{stroke:var(--w2b-map-violation);stroke-width:2.4}
+.p-house-focus{fill:none;stroke:var(--w2b-primary);stroke-width:2;stroke-dasharray:4 3;opacity:0}
+.p-house-grp:focus{outline:none}
+.p-house-grp:focus-visible .p-house-focus{opacity:1}
+.p-corner{fill:none;stroke:var(--w2b-map-violation);stroke-width:1.7}
+.p-edge-hl{fill:none;stroke:var(--w2b-map-selection);stroke-width:8;stroke-linecap:round;stroke-linejoin:round;opacity:.55}
+.p-section{fill:none;stroke:var(--w2b-ink);stroke-width:1.6;stroke-dasharray:10 3 2 3}
+.p-section-cap{fill:var(--w2b-ink)}
+.p-section-name{font-family:var(--w2b-font-display);font-weight:700;font-size:12px;fill:var(--w2b-ink);paint-order:stroke fill;stroke:var(--w2b-map-halo);stroke-width:3px;text-anchor:middle;dominant-baseline:central}
+.p-label{font-family:var(--w2b-font-mono);font-size:10.5px;font-weight:500;fill:var(--w2b-map-boundary);paint-order:stroke fill;stroke:var(--w2b-map-halo);stroke-width:3.4px;stroke-linejoin:round}
+.p-label--quiet{fill:var(--w2b-muted);font-weight:400}
+.p-label--band{fill:var(--mock-band-line)}
+.p-label--zone{fill:var(--mock-zone)}
+.p-label--grenz{fill:var(--w2b-warning-text)}
+.p-north{font-family:var(--w2b-font-display);font-size:13px;font-weight:600;fill:var(--w2b-map-boundary);paint-order:stroke fill;stroke:var(--w2b-map-halo);stroke-width:3px}
+.p-north-disc{fill:var(--w2b-map-halo);opacity:.7}
+.p-north-arrow{fill:var(--w2b-map-boundary)}
+.p-scale-solid{fill:var(--w2b-map-boundary)}
+.p-scale-open{fill:none;stroke:var(--w2b-map-boundary);stroke-width:1.2}
+.p-scale-text{font-family:var(--w2b-font-mono);font-size:9.5px;fill:var(--w2b-map-boundary);paint-order:stroke fill;stroke:var(--w2b-map-halo);stroke-width:3px}
+.p-marker{cursor:pointer}
+.p-marker circle{fill:var(--w2b-surface);stroke:var(--w2b-ink);stroke-width:1.5}
+.p-marker text{font-family:var(--w2b-font-display);font-weight:600;font-size:12px;fill:var(--w2b-ink);text-anchor:middle;dominant-baseline:central}
+.p-marker:focus{outline:none}
+.p-marker:focus-visible circle{stroke:var(--w2b-primary);stroke-width:3}
+.p-marker.is-active circle{fill:var(--w2b-primary);stroke:var(--w2b-primary)}
+.p-marker.is-active text{fill:var(--w2b-primary-on)}
+
+.s-sky{fill:var(--w2b-surface)}
+.s-soil{fill:var(--mock-soil)}
+.s-plot{fill:var(--w2b-map-surface)}
+.s-ground{stroke:var(--w2b-map-boundary);stroke-width:1.6}
+.s-boundary{stroke:var(--w2b-map-boundary);stroke-width:1.2;stroke-dasharray:8 3 2 3}
+.s-wall-main stop{stop-color:var(--mock-nb-main)}
+.s-wall-own stop{stop-color:var(--w2b-map-existing)}
+.s-wall-edge-main{stroke:var(--mock-nb-main-edge);stroke-width:1.2}
+.s-wall-edge-own{stroke:var(--w2b-map-boundary);stroke-width:1.2}
+.s-break{fill:none;stroke:var(--w2b-muted);stroke-width:1}
+.s-env{stroke:var(--w2b-map-envelope);stroke-width:1.5;stroke-dasharray:6 4}
+.s-env-dim{stroke:var(--w2b-map-envelope);stroke-width:1}
+.s-strip{fill:var(--w2b-map-setback)}
+.s-possible{fill:var(--w2b-map-surface);stroke:var(--mock-grenz);stroke-width:1.4;stroke-dasharray:1.5 3}
+.s-their{fill:none;stroke:var(--mock-hint);stroke-width:1.1;stroke-dasharray:3 2}
+.s-dim{stroke:var(--w2b-map-boundary);stroke-width:1}
+.s-text{font-family:var(--w2b-font-mono);font-size:11px;fill:var(--w2b-map-boundary)}
+.s-text--muted{fill:var(--w2b-muted)}
+.s-text--env{fill:var(--w2b-map-envelope);font-weight:500}
+.s-text--grenz{fill:var(--w2b-warning-text);font-weight:500}
+.s-name{font-family:var(--w2b-font-display);font-weight:600;font-size:12px;fill:var(--w2b-ink)}
+.s-lane{font-family:var(--w2b-font-display);font-weight:600;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;fill:var(--w2b-muted)}
+.s-unknown{font-family:var(--w2b-font-mono);font-size:10px;fill:var(--w2b-ink);paint-order:stroke fill;stroke:var(--w2b-surface);stroke-width:3px}
+.s-halo{paint-order:stroke fill;stroke:var(--w2b-surface);stroke-width:3px}
+.bc-axis{stroke:var(--w2b-line);stroke-width:1}
+.bc-tick{font-family:var(--w2b-font-mono);font-size:9.5px;fill:var(--w2b-muted)}
+.bc-house{fill:var(--mock-nb-main);stroke:var(--mock-nb-main-edge);stroke-width:1}
+.bc-own{fill:var(--w2b-map-existing)}
+.bc-env{fill:none;stroke:var(--w2b-map-envelope);stroke-width:1.4;stroke-dasharray:5 3}
+.bc-plot{fill:var(--w2b-map-surface);stroke:var(--w2b-map-boundary);stroke-width:1}
+.bc-name{font-family:var(--w2b-font-mono);font-size:10px;fill:var(--w2b-graphite)}
+.p-band-front{fill:var(--mock-band-strong)}
+
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+</style>
+
+<div class="wrap">
+
+<aside class="notiz" aria-label="Entwurfsnotiz">
+  <p class="eyebrow">Entwurfsnotiz · Nachbarschaft auf der Grundstücksseite</p>
+  <p><b>Ein dritter Reiter, keine neue Seite:</b> so bleibt der Plan im Blick, während man die Befunde liest, und jeder
+    Befund zeigt auf dieselbe Zeichnung. <b>Die ausführliche Analyse ist ein Abschnitt der Seite</b> („Nachbarschaft im
+    Detail“ unter dem Plan): sie druckt mit, und der Reiter springt mit einem Klick dorthin.</p>
+  <p>Alles Gezeichnete stammt aus den aufgezeichneten Katasterantworten für Lessingweg 44 und aus dem Katalogeintrag
+    ELK All in One 159. Karten­kacheln sind weggelassen; der Grund sind die 71 Gebäudeumrisse aus ALKIS.</p>
+</aside>
+
+<header class="appbar" aria-label="Kopfzeile der Anwendung (Nachbildung)">
+  <span class="appbar__brand"><i aria-hidden="true"></i>where2build</span>
+  <nav aria-label="Bereiche (Nachbildung)"><span>Start</span><span class="an">Grundstücke</span><span>Haustypen</span><span>Ziele</span><span>Daten</span></nav>
+</header>
+
+<main class="stack">
+  <nav class="breadcrumb" aria-label="Pfad"><a href="#top">Grundstücke</a><span aria-hidden="true">›</span><span>Lessingweg 44</span></nav>
+
+  <div class="page-head">
+    <div>
+      <p class="eyebrow">Gemarkung Mölkau · 1 Flurstück</p>
+      <h1>Lessingweg 44</h1>
+      <p class="page-head__sub">Stadt Leipzig · Flurstück 204 · 650 m² · —</p>
+    </div>
+    <div class="spacer"></div>
+    <div class="row">
+      <button type="button" class="btn btn--quiet" disabled>‹ Voriges</button>
+      <button type="button" class="btn btn--quiet" disabled>Nächstes ›</button>
+      <button type="button" class="btn btn--secondary" disabled title="Im Entwurf nicht belegt">Teilen</button>
+      <button type="button" class="btn btn--secondary" disabled title="Im Entwurf nicht belegt">Drucken</button>
+    </div>
+  </div>
+
+  <div class="plan-grid">
+    <div class="plan-frame panel">
+      <div class="plan-bar">
+        <span class="plan-bar__label">Grund</span>
+        <div class="button-group" role="group" aria-label="Kartenhintergrund">
+          <button type="button" aria-pressed="true">Ohne</button>
+          <button type="button" disabled title="Im Entwurf ohne Kartenkacheln">Karte</button>
+          <button type="button" disabled title="Im Entwurf ohne Kartenkacheln">Luftbild</button>
+          <button type="button" disabled title="Im Entwurf ohne Kartenkacheln">Kataster</button>
+        </div>
+        <span class="plan-bar__label">Ausrichtung</span>
+        <div class="button-group" role="group" aria-label="Kartenausrichtung">
+          <button type="button" aria-pressed="true">Genordet</button>
+          <button type="button" disabled title="Im Entwurf nicht belegt">Straßenparallel</button>
+        </div>
+        <span class="spacer"></span>
+        <button type="button" class="toggle" id="t-masse" aria-pressed="false">Maße</button>
+        <button type="button" class="toggle" id="t-abstand" aria-pressed="true">Abstandsflächen</button>
+        <button type="button" class="toggle" disabled title="Im Entwurf nicht belegt">Messen</button>
+      </div>
+      <p class="notice" id="status" role="status"></p>
+      <div class="plan-stage" id="stage">
+        <svg id="plan" role="application" aria-label="Lageplan: Grundstück, Nachbarhäuser und Baukörper. Der Baukörper lässt sich ziehen oder, wenn er den Fokus hat, mit den Pfeiltasten verschieben."></svg>
+        <div class="house-chip"><span class="house-chip__label">Haus</span><span class="house-chip__name" id="house-name"></span>
+          <button type="button" id="house-edit">Bearbeiten</button></div>
+        <div class="zoom" role="group" aria-label="Ausschnitt">
+          <button type="button" data-frame="plot" aria-pressed="false">Grundstück</button>
+          <button type="button" data-frame="neighbours" aria-pressed="true">Nachbarn</button>
+          <button type="button" data-frame="street" aria-pressed="false">Straße</button>
+        </div>
+      </div>
+      <div class="plan-foot"><span>ETRS89 / UTM33N · EPSG:25833</span><span>© GeoSN, dl-de/by-2-0</span></div>
+    </div>
+
+    <aside class="facts">
+      <div class="side-tabs" role="tablist" aria-label="Spalte neben dem Plan">
+        <button type="button" role="tab" id="tab-plot" aria-controls="pane-plot" aria-selected="false" tabindex="-1" data-pane="plot"><span class="side-tabs__mark side-tabs__mark--plot" aria-hidden="true"></span>Grundstück</button>
+        <button type="button" role="tab" id="tab-building" aria-controls="pane-building" aria-selected="false" tabindex="-1" data-pane="building"><span class="side-tabs__mark side-tabs__mark--building" aria-hidden="true"></span>Bebauung</button>
+        <button type="button" role="tab" id="tab-nachbarschaft" aria-controls="pane-nachbarschaft" aria-selected="true" tabindex="0" data-pane="nachbarschaft"><span class="side-tabs__mark side-tabs__mark--nachbarschaft" aria-hidden="true"></span>Nachbarschaft</button>
+      </div>
+
+      <div class="side-pane" id="pane-plot" role="tabpanel" aria-labelledby="tab-plot" hidden>
+        <section class="panel">
+          <div class="panel__head"><h3>Grundstück</h3></div>
+          <dl class="value-list">
+            <dt>Gemarkung</dt><dd>Mölkau</dd>
+            <dt>Flurstücke</dt><dd>204</dd>
+            <dt>Fläche amtlich</dt><dd>650 m²</dd>
+            <dt>Fläche gerechnet</dt><dd>644,7 m²</dd>
+            <dt>Grenzpunkte</dt><dd>5</dd>
+            <dt>Straßenfront</dt><dd>13,50 m</dd>
+          </dl>
+          <p class="panel__foot">Preis, Form und Abstandsflächen stehen darunter wie heute; im Entwurf weggelassen.</p>
+        </section>
+      </div>
+
+      <div class="side-pane" id="pane-building" role="tabpanel" aria-labelledby="tab-building" hidden>
+        <section class="panel">
+          <div class="panel__head"><h3>Baukörper</h3></div>
+          <dl class="value-list">
+            <dt>Haustyp</dt><dd>ELK All in One 159</dd>
+            <dt>Bebaute Fläche</dt><dd>96,88 m²</dd>
+            <dt>Wohnfläche ges.</dt><dd>159,21 m²</dd>
+            <dt>Außenmaß</dt><dd id="b-size"></dd>
+            <dt>Drehung</dt><dd>-23,6°</dd>
+            <dt>GRZ</dt><dd>0,15</dd>
+          </dl>
+          <div class="slider">
+            <label for="ratio">Seitenverhältnis</label>
+            <output class="mono" id="ratio-out" for="ratio"></output>
+            <input id="ratio" type="range" min="1" max="2.2" step="0.01">
+            <p class="slider__hint">Aus der bebauten Fläche geschätzt; das Datenblatt liefert keine Außenmaße.
+              Bei 1 : 1,35, wie beim Einlesen geschätzt, wäre das Haus 8,47 m tief, das Fenster ist hier höchstens
+              7,50 m breit: es passt nirgends. Ab 1 : 1,73 passt es an einer Stelle, ab 1 : 1,75 auf ganzer Länge.
+              So steht es im Entwurf.</p>
+          </div>
+        </section>
+      </div>
+
+      <div class="side-pane" id="pane-nachbarschaft" role="tabpanel" aria-labelledby="tab-nachbarschaft">
+        <section class="panel">
+          <div class="panel__head"><h3>Nachbarschaft</h3><span class="spacer"></span><span class="faint" id="n-zaehler"></span></div>
+          <div class="schluessel" id="schluessel"></div>
+          <div class="befunde" id="befunde"></div>
+          <div class="zum-detail"><span class="faint">Alle vier Grenzen, beide Schnitte, die Umgebung</span><a href="#detail">Alle Grenzen und Schnitte ↓</a></div>
+        </section>
+        <section class="panel">
+          <div class="panel__head"><h3>Planungsrecht</h3></div>
+          <div class="befunde" id="recht"></div>
+        </section>
+      </div>
+    </aside>
+  </div>
+
+  <section class="abschnitt" id="detail" aria-labelledby="detail-titel">
+    <div class="abschnitt__kopf">
+      <p class="eyebrow">Nachbarschaft</p>
+      <h2 id="detail-titel">Nachbarschaft im Detail</h2>
+      <p>Jede Grenze gerade gezogen und im selben Maßstab, oben die Nachbarseite, unten unser Grundstück. Daneben zwei Schnitte
+        mit Blick von der Straße, jeweils dort, wo ein Nachbarhaus am nächsten steht, und die Häuser, aus denen das Band nach
+        § 34 gemessen ist. Wandhöhen sind unbekannt und bleiben es in der Zeichnung.</p>
+    </div>
+    <div class="detail-grid">
+      <section class="panel" aria-labelledby="d-grenzen"><div class="panel__head"><h3 id="d-grenzen">Grenze für Grenze</h3></div><div id="d-streifen"></div></section>
+      <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
+        <section class="panel" aria-labelledby="d-schnitte"><div class="panel__head"><h3 id="d-schnitte">Im Schnitt</h3><span class="spacer"></span><span class="faint" id="d-lesart"></span></div><div id="d-schnitt"></div></section>
+        <section class="panel" aria-labelledby="d-band"><div class="panel__head"><h3 id="d-band">Umgebung nach § 34 BauGB</h3></div>
+          <div class="schnitt-block"><div class="scroll-x" id="d-bandchart"></div><p class="faint">Meter hinter der Straße · Balken: Nachbarhäuser auf unserer Straßenseite, darunter unser Bestand und unser Grundstück mit Fenster</p><p id="d-bandtext" style="font-size:var(--w2b-text-s);color:var(--w2b-graphite)"></p></div></section>
+      </div>
+    </div>
+  </section>
+
+  <section class="abschnitt" aria-labelledby="standort-titel">
+    <div class="abschnitt__kopf"><p class="eyebrow">Standort</p><h2 id="standort-titel">Was der Standort mitbringt</h2></div>
+    <p class="standort-stub">Lärm, Hochwasser, Radon und die übrigen Prüfungen folgen hier wie heute; im Entwurf nicht nachgebildet.</p>
+  </section>
+</main>
+
+<section class="anmerkung" aria-labelledby="legende-titel">
+  <h2 id="legende-titel">Zeichenerklärung</h2>
+  <div class="legende" id="legende"></div>
+  <h2>Rechenweg</h2>
+  <div class="messung">
+    <div><b>Daten</b>Aufgezeichnete Antworten aus den Tests des Projekts: Flurstück (<code>parcel-moelkau.json</code>), 71
+      Gebäudeumrisse (<code>neighbours-moelkau-alkis.json</code>), Straßenflurstück (<code>verkehr-moelkau.json</code>), Haustyp
+      (<code>housetype-elk.json</code>). Lokale Meter um den Mittelpunkt der Flurstückspunkte, wie <code>plotFromCadastre</code> sie setzt.</div>
+    <div><b>Fenster</b><code>buildableArea</code> mit 3 m je Grenze: 312,9 m², 7,46 m bis 7,50 m breit. Es bewegt sich
+      nicht: Zonen und Lesarten liegen darüber.</div>
+    <div><b>Einordnung</b>Kürzester Abstand zwischen Umriss und unserer Grenze. Hauptgebäude ist, was ALKIS „Wohngebäude“ nennt.
+      Unter 0,5 m an der Grenze, 0,5 bis 3 m Überdeckung, ab 3 m ohne Befund. Grau schraffiert: 3 m um den Umriss von Nr. 46, auf
+      unserem Flurstück, 6,1 m².</div>
+    <div><b>6-m-Zone</b>Der Teil des Fensters, der näher als 6 m am Umriss eines Wohnhauses liegt, das unter 3 m an unserer Grenze steht.
+      Stünde unsere Wand dort, lägen beide Abstandsflächen im Mindestmaß übereinander (§ 6 Abs. 3). 6 m sind 3 + 3, keine eigene Regel.
+      Kontur auf einem 3-cm-Raster. Nr. 46: 5,7 m², bis 0,67 m ins Fenster. Nr. 42, Lesart „Abstand nötig“: 68,1 m²,
+      bis 2,95 m ins Fenster, 5,96 m von der Grenze.</div>
+    <div><b>Lesart „an die Grenze“</b>Der 3-m-Streifen längs der 15,8 m, an denen Nr. 42 steht: 47,4 m² möglicherweise
+      bebaubar. Das Fenster bleibt gezeichnet, wie es ist.</div>
+    <div><b>Haus</b>ELK All in One 159, 96,88 m² bebaut, parallel zur Seite zu Nr. 46 gedreht. Seitenverhältnis 1 : 1,75: die erste
+      Stufe des Reglers, bei der das Haus auf ganzer Fensterlänge passt (13,02 × 7,44 m). Start: von allen Lagen auf einem 5-cm-Raster
+      die mit der tiefsten Reichweite in die Zone zu Nr. 46, darunter die mit der geringsten zu Nr. 42 — 31,6–44,6 m hinter der Straße,
+      3,00 m von der Grenze zu Nr. 46.</div>
+    <div><b>Band nach § 34</b>6 Wohnhäuser mit gerader Nummer im Lessingweg, Mitte höchstens 60 m entlang der Straße.
+      Abstand senkrecht zur verlängerten Straßengrenze unseres Flurstücks; am Straßenflurstück gegengeprüft, höchstens 0,02 m Unterschied.</div>
+    <div><b>Planungsrecht</b>RAPIS Sachsen, Abfrage mit dem Flurstücksumriss am 25.09.2026 (Datenstand „ROK 21.09.2026“): kein Plan in Kraft
+      oder im Verfahren, FNP Wohnbaufläche. Baulasten: kein Datensatz; Stadt Leipzig, Amt für Bauordnung und Denkmalpflege.
+      Aus <code>docs/research/bebauungsplaene-sachsen.md</code>.</div>
+  </div>
+  <p class="quellen">Quellen: ALKIS (ave:GebaeudeBauwerk), GeoSN — dl-de/by-2-0. Flurstück und Straßenflurstück: Landesamt für Geobasisinformation Sachsen (GeoSN), dl-de/by-2-0. RAPIS Sachsen, 09/2026, dl-de/by-2-0
+    (<a href="https://rapis.sachsen.de">rapis.sachsen.de</a>). Haustyp: Katalogeintrag aus elkhaus.de, gelesen am 29.08.2026, Außenmaße geschätzt.
+    Ein Entwurf für die Oberfläche, keine bauordnungsrechtliche Prüfung.</p>
+</section>
+
+</div>
+
+<script type="application/json" id="nachbarschaft-daten">{"streetLabel":{"x":-33.46,"y":16.64,"angle":-113.49,"width":10.95},"distant":{"count":28,"nearest":9.94,"limit":42},"ownAux":[{"k":54,"area":12.44}],"meta":{"anchor":{"lon":12.441900107576787,"lat":51.33649066335928},"source":"ALKIS (ave:GebaeudeBauwerk), GeoSN — dl-de/by-2-0","parcelSource":"Landesamt für Geobasisinformation Sachsen (GeoSN), dl-de/by-2-0","trafficSource":"Landesamt für Geobasisinformation Sachsen (GeoSN), dl-de/by-2-0","hint":"Umrisse aus dem Liegenschaftskataster (ALKIS), ohne Wandhöhen — daraus lässt sich nur das Mindestmaß von 3 m nach § 6 Abs. 5 SächsBO rechnen, nie 0,4 H. Ein Hinweis, keine bauordnungsrechtliche Prüfung.","buildingsInAnswer":71,"parcelAktualitaet":"2019-07-09","buildingAktualitaet":"2015-03-28Z"},"parcel":{"ring":[[12.61,-10.75],[13.48,-8.91],[18.18,1.5],[-25.74,20.65],[-31.13,8.26]],"officialArea":650,"computedArea":644.65,"label":"Lessingweg 44","gemarkung":"Mölkau","number":"204","edges":[{"i":0,"a":[12.61,-10.75],"b":[13.48,-8.91],"length":2.04,"role":"rear"},{"i":1,"a":[13.48,-8.91],"b":[18.18,1.5],"length":11.42,"role":"rear"},{"i":2,"a":[18.18,1.5],"b":[-25.74,20.65],"length":47.92,"role":"sideB"},{"i":3,"a":[-25.74,20.65],"b":[-31.13,8.26],"length":13.5,"role":"street"},{"i":4,"a":[-31.13,8.26],"b":[12.61,-10.75],"length":47.69,"role":"sideA"}],"streetEdge":3,"sideA":4,"sideB":2,"rear":[0,1],"rearLength":13.46,"inward":[0.9170982629466838,-0.39866122974296725],"streetA":[-25.74,20.65],"streetMid":[-28.44,14.46],"frames":{"street":{"from":[-25.74,20.65],"to":[-31.13,8.26],"length":13.5},"sideA":{"from":[-31.13,8.26],"to":[12.61,-10.75],"length":47.69},"sideB":{"from":[-25.74,20.65],"to":[18.18,1.5],"length":47.92},"rear":{"from":[12.61,-10.75],"to":[18.18,1.5],"length":13.46}}},"envelope":{"ring":[[11.12,-6.83],[14.19,-0.03],[-24.19,16.7],[-27.18,9.82]],"area":312.88},"today":{"depths":[5.04,4.95,3.67,3,5.96],"distances":[0.96,1.05,2.33,12.3,0.04],"ring":[[10.52,-3.35],[11.65,-0.93],[12.13,0.13],[-24.46,16.08],[-26,12.53]],"area":153.72},"buildings":[{"k":0,"address":"Paunsdorfer Straße 65","funktion":"Wohngebäude","main":true,"own":false,"cls":"frei","band":false,"ring":[[50.21,-6.66],[53.51,1.64],[40.11,6.98],[36.81,-1.31]],"area":128.85,"gap":18.84,"centre":[45.16,0.16],"edgeRole":null,"spanFrom":null,"spanTo":null,"faceFrom":null,"faceTo":null,"faceLength":null,"depthFrom":null,"depthTo":null},{"k":1,"address":"Lessingweg 48","funktion":"Wohngebäude","main":true,"own":false,"cls":"frei","band":true,"ring":[[-0.49,27.56],[14.28,21.13],[17.36,28.11],[2.56,34.55],[1.42,31.94],[0.12,31.46],[-0.4,30.26],[0.1,28.91]],"area":125.31,"gap":16.42,"centre":[4.37,29.24],"edgeRole":null,"spanFrom":null,"spanTo":null,"faceFrom":null,"faceTo":null,"faceLength":null,"depthFrom":null,"depthTo":null},{"k":2,"address":null,"funktion":"Gebäude für Wirtschaft oder Gewerbe","main":false,"own":false,"cls":"frei","band":false,"ring":[[14.52,47.28],[18.02,45.81],[18.9,48.01],[15.4,49.47]],"area":8.96,"gap":40.5,"centre":[16.71,47.64],"edgeRole":null,"spanFrom":null,"spanTo":null,"faceFrom":null,"faceTo":null,"faceLength":null,"depthFrom":null,"depthTo":null},{"k":3,"address":"Lessingweg 50a","funktion":"Wohngebäude","main":true,"own":false,"cls":"frei","band":true,"ring":[[12.91,52.37],[12.52,51.45],[16.2,49.86],[18.46,55.16],[17.51,55.54],[19.58,60.33],[12.8,63.32],[10.72,58.54],[8.91,59.3],[7.03,54.92]],"area":92.32,"gap":43.52,"centre":[13.66,56.08],"edgeRole":null,"spanFrom":null,"spanTo":null,"faceFrom":null,"faceTo":null,"faceLength":null,"depthFrom":null,"depthTo":null},{"k":6,"address":null,"funktion":"Gebäude für Wirtschaft oder Gewerbe","main":false,"own":false,"cls":"frei","band":false,"ring":[[-23.06,-9.9],[-24.27,-12.6],[-18.8,-15.02],[-17.57,-12.34]],"area":17.69,"gap":13.44,"centre":[-20.93,-12.47],"edgeRole":null,"spanFrom":null,"spanTo":null,"faceFrom":null,"faceTo":null,"faceLength":null,"depthFrom":null,"depthTo":null},{"k":7,"address":"Lessingweg 33","funktion":"Wohngebäude","main":true,"own":false,"cls":"frei","band":false,"ring":[[-51.53,36.42],[-43.37,32.84],[-42.9,31.7],[-41.45,31.02],[-40.25,31.51],[-39.59,31.21],[-36.6,38.09],[-48.5,43.3]],"area":99.98,"gap":17.42,"centre":[-43.02,34.51],"edgeRole":null,"spanFrom":null,"spanTo":null,"faceFrom":null,"faceTo":null,"faceLength":null,"depthFrom":null,"depthTo":null},{"k":11,"address":"Lessingweg 27","funktion":"Wohngebäude","main":true,"own":false,"cls":"frei","band":false,"ring":[[-63.18,-25.42],[-57.38,-12.09],[-66.27,-8.19],[-72.07,-21.51]],"area":141.15,"gap":33.22,"centre":[-64.73,-16.8],"edgeRole":null,"spanFrom":null,"spanTo":null,"faceFrom":null,"faceTo":null,"faceLength":null,"depthFrom":null,"depthTo":null},{"k":12,"address":null,"funktion":"Gebäude für Wirtschaft oder Gewerbe","main":false,"own":false,"cls":"frei","band":false,"ring":[[-6.75,53.06],[-0.79,50.49],[0.4,53.24],[-5.56,55.8]],"area":19.41,"gap":37.3,"centre":[-3.17,53.15],"edgeRole":null,"spanFrom":null,"spanTo":null,"faceFrom":null,"faceTo":null,"faceLength":null,"depthFrom":null,"depthTo":null},{"k":18,"address":null,"funktion":"Gebäude für Wirtschaft oder Gewerbe","main":false,"own":false,"cls":"nebengebaeude","band":false,"ring":[[14.15,-9.71],[13.09,-12.42],[22.1,-16.55],[23.45,-13.58]],"area":30.81,"gap":0.96,"centre":[18.2,-13.06],"edgeRole":"rear","spanFrom":-1.35,"spanTo":1.92,"faceFrom":0,"faceTo":1.92,"faceLength":1.92,"depthFrom":48.69,"depthTo":58.76},{"k":19,"address":null,"funktion":"Gebäude für Wirtschaft oder Gewerbe","main":false,"own":false,"cls":"frei","band":false,"ring":[[1.41,-25.05],[0.14,-27.98],[3.48,-29.44],[4.75,-26.51]],"area":11.63,"gap":17.58,"centre":[2.44,-27.25],"edgeRole":null,"spanFrom":null,"spanTo":null,"faceFrom":null,"faceTo":null,"faceLength":null,"depthFrom":null,"depthTo":null},{"k":23,"address":"Lessingweg 29","funktion":"Wohngebäude","main":true,"own":false,"cls":"frei","band":false,"ring":[[-64.19,12.78],[-50.3,6.68],[-47.43,13.26],[-61.33,19.37]],"area":108.99,"gap":17.05,"centre":[-55.82,13.03],"edgeRole":null,"spanFrom":null,"spanTo":null,"faceFrom":null,"faceTo":null,"faceLength":null,"depthFrom":null,"depthTo":null},{"k":30,"address":"Lessingweg 42","funktion":"Wohngebäude","main":true,"own":false,"cls":"grenzbebauung","band":true,"ring":[[-16.91,-11.06],[-14.13,-4.64],[-7.37,-7.58],[-5.38,-2.98],[-19.87,3.31],[-24.64,-7.7]],"area":138.04,"gap":0.04,"centre":[-14.72,-5.11],"edgeRole":"sideA","spanFrom":12.3,"spanTo":28.1,"faceFrom":12.3,"faceTo":28.1,"faceLength":15.8,"depthFrom":12.3,"depthTo":28.1},{"k":39,"address":null,"funktion":"Wohngebäude","main":true,"own":false,"cls":"frei","band":false,"ring":[[-11.18,-44.61],[-16.24,-57.03],[-8.94,-60.21],[-4.22,-47.65]],"area":104.26,"gap":40.54,"centre":[-10.14,-52.37],"edgeRole":null,"spanFrom":null,"spanTo":null,"faceFrom":null,"faceTo":null,"faceLength":null,"depthFrom":null,"depthTo":null},{"k":40,"address":"Lessingweg 40","funktion":"Wohngebäude","main":true,"own":false,"cls":"frei","band":true,"ring":[[-32.95,-8.95],[-35.94,-15.84],[-28.18,-19.25],[-25.17,-12.37]],"area":63.78,"gap":16.51,"centre":[-30.56,-14.1],"edgeRole":null,"spanFrom":null,"spanTo":null,"faceFrom":null,"faceTo":null,"faceLength":null,"depthFrom":null,"depthTo":null},{"k":42,"address":"Lessingweg 31","funktion":"Wohngebäude","main":true,"own":false,"cls":"frei","band":false,"ring":[[-72.61,33.49],[-65.33,30.31],[-62.66,36.43],[-69.94,39.61]],"area":53.04,"gap":40.15,"centre":[-67.63,34.96],"edgeRole":null,"spanFrom":null,"spanTo":null,"faceFrom":null,"faceTo":null,"faceLength":null,"depthFrom":null,"depthTo":null},{"k":48,"address":null,"funktion":"Wohngebäude","main":true,"own":false,"cls":"frei","band":false,"ring":[[-10.79,-44.72],[-7.34,-46.22],[-7.28,-46.07],[-6.23,-46.52],[-5.75,-45.4],[-6.78,-44.96],[-5.58,-42.16],[-6.25,-41.87],[-5.72,-40.63],[-8.05,-39.61],[-8.59,-40.86],[-9.05,-40.66]],"area":21.52,"gap":34.7,"centre":[-7.29,-43.31],"edgeRole":null,"spanFrom":null,"spanTo":null,"faceFrom":null,"faceTo":null,"faceLength":null,"depthFrom":null,"depthTo":null},{"k":49,"address":null,"funktion":"Gebäude für Wirtschaft oder Gewerbe","main":false,"own":false,"cls":"frei","band":false,"ring":[[34.7,-43.37],[33.77,-45.65],[41.66,-48.88],[43.17,-45.18],[39.97,-43.87],[39.39,-45.29]],"area":26.28,"gap":39.39,"centre":[38.78,-45.37],"edgeRole":null,"spanFrom":null,"spanTo":null,"faceFrom":null,"faceTo":null,"faceLength":null,"depthFrom":null,"depthTo":null},{"k":50,"address":null,"funktion":"Wohngebäude","main":true,"own":false,"cls":"frei","band":false,"ring":[[4.94,-40.58],[6.89,-35.73],[2.93,-34.13],[0.98,-38.98]],"area":22.34,"gap":25.3,"centre":[3.94,-37.35],"edgeRole":null,"spanFrom":null,"spanTo":null,"faceFrom":null,"faceTo":null,"faceLength":null,"depthFrom":null,"depthTo":null},{"k":51,"address":null,"funktion":"Wohngebäude","main":true,"own":false,"cls":"frei","band":false,"ring":[[-2.33,-33.66],[-3.39,-33.2],[-4.78,-36.41],[-0.08,-38.46],[1.31,-35.24],[1.01,-35.11]],"area":17.93,"gap":26.96,"centre":[-1.38,-35.35],"edgeRole":null,"spanFrom":null,"spanTo":null,"faceFrom":null,"faceTo":null,"faceLength":null,"depthFrom":null,"depthTo":null},{"k":52,"address":"Lessingweg 50","funktion":"Wohngebäude","main":true,"own":false,"cls":"frei","band":true,"ring":[[1.95,42.78],[1.39,41.53],[1.89,40.28],[3.12,39.77],[4.21,40.28],[12.8,36.48],[15.83,43.37],[5.33,48.03],[3.13,43.22]],"area":90.57,"gap":29.04,"centre":[5.52,41.75],"edgeRole":null,"spanFrom":null,"spanTo":null,"faceFrom":null,"faceTo":null,"faceLength":null,"depthFrom":null,"depthTo":null},{"k":53,"address":"Lessingweg 27a","funktion":"Wohngebäude","main":true,"own":false,"cls":"frei","band":false,"ring":[[-67.47,4.35],[-65.74,8.3],[-76.17,12.87],[-78.39,7.79],[-77.36,7.34],[-78.16,5.51],[-68.76,1.38]],"area":83.65,"gap":34.62,"centre":[-73.15,6.79],"edgeRole":null,"spanFrom":null,"spanTo":null,"faceFrom":null,"faceTo":null,"faceLength":null,"depthFrom":null,"depthTo":null},{"k":54,"address":null,"funktion":"Gebäude für Wirtschaft oder Gewerbe","main":false,"own":true,"cls":"bestand","band":false,"ring":[[-6.43,8.93],[-5.24,11.66],[-9.08,13.33],[-10.27,10.6]],"area":12.44,"gap":0,"centre":[-7.75,11.13],"edgeRole":null,"spanFrom":null,"spanTo":null,"faceFrom":null,"faceTo":null,"faceLength":null,"depthFrom":null,"depthTo":null},{"k":55,"address":null,"funktion":"Gebäude für Wirtschaft oder Gewerbe","main":false,"own":false,"cls":"frei","band":false,"ring":[[32.19,5.96],[33.74,9.88],[27.9,12.2],[26.35,8.3]],"area":26.45,"gap":10.63,"centre":[30.04,9.09],"edgeRole":null,"spanFrom":null,"spanTo":null,"faceFrom":null,"faceTo":null,"faceLength":null,"depthFrom":null,"depthTo":null},{"k":58,"address":null,"funktion":"Gebäude für Wirtschaft oder Gewerbe","main":false,"own":false,"cls":"frei","band":false,"ring":[[-2.33,-33.66],[1.01,-35.11],[3.48,-29.44],[0.14,-27.98]],"area":22.52,"gap":20.77,"centre":[0.57,-31.55],"edgeRole":null,"spanFrom":null,"spanTo":null,"faceFrom":null,"faceTo":null,"faceLength":null,"depthFrom":null,"depthTo":null},{"k":59,"address":"Paunsdorfer Straße 63","funktion":"Wohngebäude","main":true,"own":false,"cls":"frei","band":false,"ring":[[34.14,-28.48],[45.27,-32.99],[47.98,-26.29],[36.85,-21.76]],"area":86.95,"gap":26.62,"centre":[41.06,-27.38],"edgeRole":null,"spanFrom":null,"spanTo":null,"faceFrom":null,"faceTo":null,"faceLength":null,"depthFrom":null,"depthTo":null},{"k":60,"address":"Paunsdorfer Straße 61","funktion":"Wohngebäude","main":true,"own":false,"cls":"frei","band":false,"ring":[[34.7,-43.37],[39.39,-45.29],[39.97,-43.87],[42.17,-38.48],[31.07,-33.93],[27.91,-41.66],[31.07,-42.97],[31.44,-42.03]],"area":91.68,"gap":29.63,"centre":[34.71,-41.45],"edgeRole":null,"spanFrom":null,"spanTo":null,"faceFrom":null,"faceTo":null,"faceLength":null,"depthFrom":null,"depthTo":null},{"k":61,"address":null,"funktion":"Gebäude für Wirtschaft oder Gewerbe","main":false,"own":false,"cls":"frei","band":false,"ring":[[1.41,-25.05],[4.75,-26.51],[6.35,-22.84],[3.01,-21.38]],"area":14.6,"gap":13.57,"centre":[3.88,-23.95],"edgeRole":null,"spanFrom":null,"spanTo":null,"faceFrom":null,"faceTo":null,"faceLength":null,"depthFrom":null,"depthTo":null},{"k":62,"address":null,"funktion":"Gebäude für Wirtschaft oder Gewerbe","main":false,"own":false,"cls":"frei","band":false,"ring":[[-8.22,27.54],[-2.9,25.23],[-2.47,25.01],[-1.42,27.47],[-2.39,27.89],[-1.68,29.49],[-6.54,31.65]],"area":26.07,"gap":13.3,"centre":[-3.66,27.75],"edgeRole":null,"spanFrom":null,"spanTo":null,"faceFrom":null,"faceTo":null,"faceLength":null,"depthFrom":null,"depthTo":null},{"k":63,"address":"Paunsdorfer Straße 67","funktion":"Wohngebäude","main":true,"own":false,"cls":"frei","band":false,"ring":[[30.25,16.25],[41.16,11.87],[45.1,21.77],[31.82,27.09],[28.59,19.01],[30.97,18.06]],"area":147.46,"gap":19.05,"centre":[34.65,19.01],"edgeRole":null,"spanFrom":null,"spanTo":null,"faceFrom":null,"faceTo":null,"faceLength":null,"depthFrom":null,"depthTo":null},{"k":64,"address":null,"funktion":"Gebäude für Wirtschaft oder Gewerbe","main":false,"own":false,"cls":"frei","band":false,"ring":[[-8.22,27.54],[-9.45,24.41],[-4.26,22.12],[-2.9,25.23]],"area":19.39,"gap":9.94,"centre":[-6.21,24.83],"edgeRole":null,"spanFrom":null,"spanTo":null,"faceFrom":null,"faceTo":null,"faceLength":null,"depthFrom":null,"depthTo":null},{"k":66,"address":null,"funktion":"Gebäude für Wirtschaft oder Gewerbe","main":false,"own":false,"cls":"frei","band":false,"ring":[[-67.47,4.35],[-61.47,1.71],[-59.73,5.67],[-65.74,8.3]],"area":28.32,"gap":28.72,"centre":[-63.6,5.01],"edgeRole":null,"spanFrom":null,"spanTo":null,"faceFrom":null,"faceTo":null,"faceLength":null,"depthFrom":null,"depthTo":null},{"k":67,"address":"Lessingweg 44","funktion":"Wohngebäude","main":true,"own":true,"cls":"bestand","band":false,"ring":[[-6.43,8.93],[-7.94,5.44],[-3.51,3.51],[-0.81,9.72],[-5.24,11.66]],"area":32.75,"gap":0,"centre":[-4.79,7.85],"edgeRole":null,"spanFrom":null,"spanTo":null,"faceFrom":null,"faceTo":null,"faceLength":null,"depthFrom":null,"depthTo":null},{"k":68,"address":"Lessingweg 46","funktion":"Wohngebäude","main":true,"own":false,"cls":"ueberdeckung","band":true,"ring":[[12.94,15.29],[9.79,7.7],[16.51,4.87],[19.63,12.54]],"area":59.87,"gap":2.33,"centre":[14.72,10.1],"edgeRole":"sideB","spanFrom":37.6,"spanTo":45.04,"faceFrom":37.6,"faceTo":45.04,"faceLength":7.43,"depthFrom":37.62,"depthTo":45.04},{"k":69,"address":null,"funktion":"Gebäude für Wirtschaft oder Gewerbe","main":false,"own":false,"cls":"frei","band":false,"ring":[[28.99,33.69],[32.14,32.3],[34.84,38.4],[31.69,39.79]],"area":22.96,"gap":33.81,"centre":[31.92,36.04],"edgeRole":null,"spanFrom":null,"spanTo":null,"faceFrom":null,"faceTo":null,"faceLength":null,"depthFrom":null,"depthTo":null}],"own":{"k":67,"gapToB":0.05,"gapToA":6.65,"depthFrom":22.38,"depthTo":27.22},"acrossStreet":{"k":23,"address":"Lessingweg 29","d":17.05},"hatches":[{"k":68,"ring":[[16.03,1.91],[15.71,1.98],[15.39,2.08],[8.47,5],[8.07,5.24],[7.71,5.53],[7.41,5.87],[7.15,6.27],[7.19,6.29],[17.15,1.95],[16.95,1.9],[16.63,1.87],[16.31,1.88],[16.03,1.91]],"area":6.1,"cellArea":6.13,"reach":0.67,"spanFrom":35.9,"spanTo":46.79}],"grenz":[{"k":30,"from":[-19.85,3.36],"to":[-5.36,-2.94],"faceFrom":12.3,"faceTo":28.1}],"band":{"alongLimit":60,"frontMin":5.19,"frontMax":37.62,"rearMin":13.69,"rearMax":45.04,"plotDepth":47.92,"kerbError":0.02,"houses":[{"k":40,"address":"Lessingweg 40","front":5.19,"rear":13.69,"along":27.04,"toKerb":5.17},{"k":30,"address":"Lessingweg 42","front":12.3,"rear":28.1,"along":12.47,"toKerb":12.3},{"k":68,"address":"Lessingweg 46","front":37.62,"rear":45.04,"along":-13.21,"toKerb":37.61},{"k":1,"address":"Lessingweg 48","front":19.41,"rear":36.55,"along":-26.64,"toKerb":19.4},{"k":52,"address":"Lessingweg 50","front":16.56,"rear":29.07,"along":-38.57,"toKerb":16.56},{"k":3,"address":"Lessingweg 50a","front":16.37,"rear":26.82,"along":-54.96,"toKerb":16.39}],"strip":[[15.55,2.65],[-20.99,18.58],[-26.37,6.19],[10.18,-9.7]],"frontZone":[[8.74,5.62],[-20.99,18.58],[-26.37,6.19],[3.37,-6.74]],"lines":{"frontMin":[[-20.99,18.58],[-26.37,6.19]],"frontMax":[[8.74,5.62],[3.37,-6.74]],"rearMax":[[15.55,2.65],[10.18,-9.7]]}},"sections":[{"name":"A","depth":26.8,"width":13.48,"reachOut":12,"p0":[-11.33,-13.43],"p1":[3.61,20.94],"envelope":[[3,10.48]],"todayEnvelope":[[5.96,9.81]],"buildings":[{"k":30,"iv":[[-5.05,-0.05]]},{"k":67,"iv":[[6.65,13.43]]}],"hatches":[]},{"name":"B","depth":38,"width":13.47,"reachOut":12,"p0":[-1.06,-17.89],"p1":[13.87,16.47],"envelope":[[3,10.47]],"todayEnvelope":[[5.96,9.8]],"buildings":[{"k":68,"iv":[[15.8,24.02]]}],"hatches":[{"k":68,"iv":[[12.8,13.47]]}]}],"streets":[{"name":"Lessingweg","ring":[[-86.82,-89.29],[-71.67,-96.24],[-65.28,-81.56],[-59.71,-68.72],[-59.89,-68.64],[-60.19,-68.48],[-60.45,-68.31],[-60.69,-68.13],[-60.9,-67.95],[-61.09,-67.77],[-61.26,-67.57],[-61.43,-67.35],[-61.6,-67.1],[-61.75,-66.82],[-61.89,-66.52],[-61.96,-66.33],[-62.04,-66.13],[-62.15,-65.79],[-62.22,-65.47],[-62.28,-65.16],[-62.31,-64.86],[-62.32,-64.58],[-62.31,-64.3],[-62.29,-64],[-62.24,-63.69],[-62.17,-63.37],[-62.06,-63.03],[-61.99,-62.83],[-58.2,-54.1],[-52.62,-41.26],[-47.24,-28.87],[-41.86,-16.48],[-36.48,-4.09],[-31.13,8.26],[-25.74,20.65],[-20.36,33.02],[-14.98,45.41],[-9.59,57.85],[-4.01,70.7],[1.57,83.55],[7.31,96.76],[7.39,96.93],[7.56,97.23],[7.74,97.51],[7.93,97.76],[8.13,97.98],[8.32,98.17],[8.53,98.36],[8.76,98.54],[9.02,98.71],[9.31,98.88],[9.62,99.03],[9.79,99.1],[15.1,112.79],[15.02,113.03],[14.93,113.36],[14.86,113.69],[14.82,114],[14.81,114.29],[14.81,114.57],[14.83,114.84],[14.87,115.13],[14.93,115.44],[15.02,115.76],[15.14,116.09],[15.24,116.32],[19.35,126],[25.93,141.5],[20.11,141.88],[14.34,142.3],[6.33,123.4],[6.2,123.13],[6.01,122.77],[5.81,122.44],[5.59,122.14],[5.37,121.86],[5.14,121.61],[4.92,121.39],[4.68,121.18],[4.42,120.97],[4.13,120.76],[3.82,120.57],[3.48,120.38],[3.1,120.22],[2.82,120.11],[-2.07,105.62],[-1.96,105.29],[-1.88,104.95],[-1.83,104.62],[-1.81,104.31],[-1.81,104.01],[-1.82,103.74],[-1.85,103.46],[-1.9,103.17],[-1.97,102.87],[-2.08,102.56],[-2.21,102.23],[-2.36,101.92],[-11.21,81.61],[-16.6,69.24],[-21.97,56.81],[-29.96,38.45],[-35.33,26.07],[-40.72,13.68],[-46.1,1.3],[-51.45,-11.06],[-59.73,-30.14],[-60.21,-31.25],[-65.79,-44.09],[-71.37,-56.94],[-76.94,-69.79],[-84.32,-86.79],[-84.41,-86.98],[-84.58,-87.29],[-84.76,-87.58],[-84.95,-87.84],[-85.14,-88.07],[-85.34,-88.28],[-85.54,-88.48],[-85.78,-88.67],[-86.04,-88.86],[-86.32,-89.04],[-86.64,-89.21]]}],"ground":[{"k":0,"main":true,"address":"Paunsdorfer Straße 65","ring":[[50.21,-6.66],[53.51,1.64],[40.11,6.98],[36.81,-1.31]]},{"k":1,"main":true,"address":"Lessingweg 48","ring":[[-0.49,27.56],[14.28,21.13],[17.36,28.11],[2.56,34.55],[1.42,31.94],[0.12,31.46],[-0.4,30.26],[0.1,28.91]]},{"k":2,"main":false,"address":null,"ring":[[14.52,47.28],[18.02,45.81],[18.9,48.01],[15.4,49.47]]},{"k":3,"main":true,"address":"Lessingweg 50a","ring":[[12.91,52.37],[12.52,51.45],[16.2,49.86],[18.46,55.16],[17.51,55.54],[19.58,60.33],[12.8,63.32],[10.72,58.54],[8.91,59.3],[7.03,54.92]]},{"k":4,"main":false,"address":null,"ring":[[-48.46,-38.82],[-49.97,-42.31],[-44.35,-44.76],[-42.84,-41.27]]},{"k":5,"main":true,"address":null,"ring":[[-81.81,25.63],[-80.75,27.85],[-83.12,28.98],[-82.04,31.25],[-84.29,32.41],[-84.46,32.06],[-85.79,32.7],[-89.02,25.96],[-85.37,24.12],[-85.7,23.44],[-82.3,21.76],[-80.7,25.1]]},{"k":6,"main":false,"address":null,"ring":[[-23.06,-9.9],[-24.27,-12.6],[-18.8,-15.02],[-17.57,-12.34]]},{"k":7,"main":true,"address":"Lessingweg 33","ring":[[-51.53,36.42],[-43.37,32.84],[-42.9,31.7],[-41.45,31.02],[-40.25,31.51],[-39.59,31.21],[-36.6,38.09],[-48.5,43.3]]},{"k":8,"main":false,"address":null,"ring":[[-74.42,52.02],[-75.4,52.47],[-75.85,51.41],[-77.86,52.28],[-79.65,48.13],[-76.56,46.79],[-75.79,48.58],[-72.44,47.07],[-69.91,52.54],[-73.43,54.17]]},{"k":9,"main":false,"address":null,"ring":[[26.93,-69.45],[25.82,-72.18],[30.38,-74.05],[31.1,-74.35],[32.28,-71.42],[31.13,-70.93],[31.04,-71.15]]},{"k":10,"main":false,"address":null,"ring":[[-10.57,-70.32],[-7.56,-71.52],[-5.79,-67.06],[-5.71,-66.88],[-8.72,-65.67]]},{"k":11,"main":true,"address":"Lessingweg 27","ring":[[-63.18,-25.42],[-57.38,-12.09],[-66.27,-8.19],[-72.07,-21.51]]},{"k":12,"main":false,"address":null,"ring":[[-6.75,53.06],[-0.79,50.49],[0.4,53.24],[-5.56,55.8]]},{"k":13,"main":false,"address":null,"ring":[[28.74,-78],[30.38,-74.05],[25.82,-72.18],[24.17,-76.09]]},{"k":14,"main":false,"address":null,"ring":[[44.56,56.37],[43.24,52.98],[46.85,51.58],[48.17,54.95]]},{"k":15,"main":false,"address":null,"ring":[[-5.79,-67.06],[-5.04,-67.36],[-4.12,-65.03],[-7.87,-63.54],[-8.72,-65.67],[-5.71,-66.88]]},{"k":16,"main":false,"address":null,"ring":[[-15.12,-79.4],[-11.84,-80.67],[-9.13,-73.62],[-12.41,-72.35]]},{"k":17,"main":true,"address":"Paunsdorfer Straße 55","ring":[[16.3,-64.95],[16.86,-66.3],[18.26,-66.88],[19.52,-66.3],[26.93,-69.45],[31.04,-71.15],[31.13,-70.93],[33.14,-66.03],[32.67,-65.84],[33.44,-63.97],[19.97,-58.36],[18.07,-62.97],[16.86,-63.54]]},{"k":18,"main":false,"address":null,"ring":[[14.15,-9.71],[13.09,-12.42],[22.1,-16.55],[23.45,-13.58]]},{"k":19,"main":false,"address":null,"ring":[[1.41,-25.05],[0.14,-27.98],[3.48,-29.44],[4.75,-26.51]]},{"k":20,"main":false,"address":null,"ring":[[24.57,62.25],[26.49,61.45],[28.19,65.49],[26.26,66.31]]},{"k":21,"main":false,"address":null,"ring":[[26.26,66.31],[27.93,70.44],[23.54,72.18],[20.97,65.81],[22.14,65.37],[19.58,60.33],[23.1,58.75],[24.57,62.25]]},{"k":22,"main":true,"address":"Paunsdorfer Straße 53","ring":[[8.74,-76.51],[19.1,-80.74],[21.91,-73.81],[11.56,-69.58]]},{"k":23,"main":true,"address":"Lessingweg 29","ring":[[-64.19,12.78],[-50.3,6.68],[-47.43,13.26],[-61.33,19.37]]},{"k":24,"main":false,"address":null,"ring":[[-3.75,-55.96],[-0.93,-57.1],[0.28,-54.24],[1.58,-54.79],[2.48,-52.57],[-1.68,-50.92]]},{"k":25,"main":false,"address":null,"ring":[[-75.93,-33.31],[-69.99,-35.91],[-66.72,-28.42],[-72.67,-25.82]]},{"k":26,"main":false,"address":null,"ring":[[-56.28,-82.25],[-54.89,-79.01],[-59.69,-76.92],[-61.09,-80.15]]},{"k":27,"main":false,"address":null,"ring":[[-67.69,75],[-66.73,74.54],[-62.7,72.66],[-60.76,76.95],[-65.76,79.01]]},{"k":28,"main":true,"address":"Lessingweg 35","ring":[[-66.73,74.54],[-67.72,72.42],[-65.9,71.57],[-69.32,64.21],[-62.73,61.14],[-58.32,70.63],[-62.7,72.66]]},{"k":29,"main":false,"address":null,"ring":[[-67.69,75],[-65.76,79.01],[-65.68,79.17],[-68.15,80.37],[-70.92,74.63],[-68.45,73.44]]},{"k":30,"main":true,"address":"Lessingweg 42","ring":[[-16.91,-11.06],[-14.13,-4.64],[-7.37,-7.58],[-5.38,-2.98],[-19.87,3.31],[-24.64,-7.7]]},{"k":31,"main":true,"address":"Lessingweg 34","ring":[[-49.28,-46],[-52.44,-53.33],[-43.21,-57.33],[-40.06,-50.01]]},{"k":32,"main":true,"address":null,"ring":[[-36.1,-48.65],[-37.17,-51.14],[-33.7,-52.64],[-32.62,-50.17]]},{"k":33,"main":true,"address":null,"ring":[[-15.29,-66.42],[-12.37,-67.6],[-10.47,-62.88],[-13.44,-61.67]]},{"k":34,"main":true,"address":"Uhlandweg 5","ring":[[44.1,78.32],[42.8,77.79],[40.12,78.89],[39.54,80.19],[36.35,81.51],[37.66,84.75],[34.39,86.09],[31,77.75],[33.99,76.53],[30.4,67.71],[37.35,64.87],[39.61,70.41],[44.22,68.53],[47.6,76.88]]},{"k":35,"main":true,"address":"Uhlandweg 3","ring":[[54.05,76],[50.05,66.01],[50.57,64.76],[53.88,63.46],[55.09,63.98],[55.9,66.01],[61.88,63.61],[65.06,71.58]]},{"k":36,"main":true,"address":"Uhlandweg 7","ring":[[15.39,80.82],[25.95,76.07],[30.3,85.74],[19.76,90.54],[17.19,84.96],[16.09,84.53],[15.74,85.61],[14.14,86.32],[12.87,85.82],[11.59,82.89],[12.63,80.19],[14.69,79.21]]},{"k":37,"main":true,"address":"Goetheweg 21","ring":[[-84.08,77.85],[-87.07,71.91],[-77.8,67.19],[-74.81,73.15]]},{"k":38,"main":true,"address":"Paunsdorfer Straße 73","ring":[[58.22,49.1],[65.69,46.12],[69.16,54.88],[61.69,57.86]]},{"k":39,"main":true,"address":null,"ring":[[-11.18,-44.61],[-16.24,-57.03],[-8.94,-60.21],[-4.22,-47.65]]},{"k":40,"main":true,"address":"Lessingweg 40","ring":[[-32.95,-8.95],[-35.94,-15.84],[-28.18,-19.25],[-25.17,-12.37]]},{"k":41,"main":true,"address":"Lessingweg 37","ring":[[-65.76,79.01],[-60.76,76.95],[-59.26,80.28],[-52.86,77.54],[-48.86,86.86],[-59.85,91.68],[-61.57,88.28],[-65.68,79.17]]},{"k":42,"main":true,"address":"Lessingweg 31","ring":[[-72.61,33.49],[-65.33,30.31],[-62.66,36.43],[-69.94,39.61]]},{"k":43,"main":false,"address":null,"ring":[[31.12,85.36],[28.52,79.46],[30.91,78.41],[33.51,84.31]]},{"k":44,"main":true,"address":"Lessingweg 23","ring":[[-90.18,-51.29],[-78.83,-56.25],[-72.36,-41.38],[-81.98,-37.18],[-86.85,-48.38],[-88.58,-47.62]]},{"k":45,"main":true,"address":"Lessingweg 21","ring":[[-90.18,-51.29],[-92.51,-56.65],[-88.85,-58.25],[-88.4,-57.21],[-80.71,-60.58],[-78.83,-56.25]]},{"k":46,"main":false,"address":null,"ring":[[-17.76,84.33],[-11.39,81.56],[-9.57,85.79],[-15.93,88.55],[-17.53,84.85]]},{"k":47,"main":false,"address":null,"ring":[[-17.76,84.33],[-20.81,77.26],[-14.47,74.5],[-11.39,81.56]]},{"k":48,"main":true,"address":null,"ring":[[-10.79,-44.72],[-7.34,-46.22],[-7.28,-46.07],[-6.23,-46.52],[-5.75,-45.4],[-6.78,-44.96],[-5.58,-42.16],[-6.25,-41.87],[-5.72,-40.63],[-8.05,-39.61],[-8.59,-40.86],[-9.05,-40.66]]},{"k":49,"main":false,"address":null,"ring":[[34.7,-43.37],[33.77,-45.65],[41.66,-48.88],[43.17,-45.18],[39.97,-43.87],[39.39,-45.29]]},{"k":50,"main":true,"address":null,"ring":[[4.94,-40.58],[6.89,-35.73],[2.93,-34.13],[0.98,-38.98]]},{"k":51,"main":true,"address":null,"ring":[[-2.33,-33.66],[-3.39,-33.2],[-4.78,-36.41],[-0.08,-38.46],[1.31,-35.24],[1.01,-35.11]]},{"k":52,"main":true,"address":"Lessingweg 50","ring":[[1.95,42.78],[1.39,41.53],[1.89,40.28],[3.12,39.77],[4.21,40.28],[12.8,36.48],[15.83,43.37],[5.33,48.03],[3.13,43.22]]},{"k":53,"main":true,"address":"Lessingweg 27a","ring":[[-67.47,4.35],[-65.74,8.3],[-76.17,12.87],[-78.39,7.79],[-77.36,7.34],[-78.16,5.51],[-68.76,1.38]]},{"k":54,"main":false,"address":null,"ring":[[-6.43,8.93],[-5.24,11.66],[-9.08,13.33],[-10.27,10.6]]},{"k":55,"main":false,"address":null,"ring":[[32.19,5.96],[33.74,9.88],[27.9,12.2],[26.35,8.3]]},{"k":56,"main":false,"address":null,"ring":[[-81.01,45.5],[-84.28,38.19],[-79.59,36.08],[-77.02,41.87],[-80.15,43.27],[-79.48,44.84]]},{"k":57,"main":false,"address":null,"ring":[[-21.07,-74.66],[-15.52,-77.05],[-13.97,-73.4],[-19.63,-70.98]]},{"k":58,"main":false,"address":null,"ring":[[-2.33,-33.66],[1.01,-35.11],[3.48,-29.44],[0.14,-27.98]]},{"k":59,"main":true,"address":"Paunsdorfer Straße 63","ring":[[34.14,-28.48],[45.27,-32.99],[47.98,-26.29],[36.85,-21.76]]},{"k":60,"main":true,"address":"Paunsdorfer Straße 61","ring":[[34.7,-43.37],[39.39,-45.29],[39.97,-43.87],[42.17,-38.48],[31.07,-33.93],[27.91,-41.66],[31.07,-42.97],[31.44,-42.03]]},{"k":61,"main":false,"address":null,"ring":[[1.41,-25.05],[4.75,-26.51],[6.35,-22.84],[3.01,-21.38]]},{"k":62,"main":false,"address":null,"ring":[[-8.22,27.54],[-2.9,25.23],[-2.47,25.01],[-1.42,27.47],[-2.39,27.89],[-1.68,29.49],[-6.54,31.65]]},{"k":63,"main":true,"address":"Paunsdorfer Straße 67","ring":[[30.25,16.25],[41.16,11.87],[45.1,21.77],[31.82,27.09],[28.59,19.01],[30.97,18.06]]},{"k":64,"main":false,"address":null,"ring":[[-8.22,27.54],[-9.45,24.41],[-4.26,22.12],[-2.9,25.23]]},{"k":65,"main":true,"address":"Lessingweg 32","ring":[[-53.35,-68.26],[-42.09,-73.12],[-38.88,-65.65],[-50.14,-60.79]]},{"k":66,"main":false,"address":null,"ring":[[-67.47,4.35],[-61.47,1.71],[-59.73,5.67],[-65.74,8.3]]},{"k":67,"main":true,"address":"Lessingweg 44","ring":[[-6.43,8.93],[-7.94,5.44],[-3.51,3.51],[-0.81,9.72],[-5.24,11.66]]},{"k":68,"main":true,"address":"Lessingweg 46","ring":[[12.94,15.29],[9.79,7.7],[16.51,4.87],[19.63,12.54]]},{"k":69,"main":false,"address":null,"ring":[[28.99,33.69],[32.14,32.3],[34.84,38.4],[31.69,39.79]]},{"k":70,"main":true,"address":"Lessingweg 30","ring":[[-56.28,-82.25],[-55.6,-82.55],[-55,-83.59],[-52.8,-84.53],[-51.64,-84.27],[-45.69,-86.85],[-42.58,-79.66],[-53.18,-75.05],[-54.89,-79.01]]}],"zone":{"metres":6,"n46":{"k":68,"ring":[[13.95,-0.56],[7.44,2.18],[7.08,2.35],[6.54,2.66],[6.05,3.01],[5.58,3.42],[5.17,3.88],[5.19,3.89],[14.17,-0.02],[14.18,-0.05],[13.95,-0.56]],"area":5.7,"cellArea":5.73,"depthInEnvelope":0.67,"depthFromBoundary":3.67},"n42":{"k":30,"ring":[[0.57,-2.24],[-23.38,8.17],[-23.13,8.35],[-22.83,8.53],[-22.53,8.69],[-22.23,8.83],[-21.93,8.95],[-21.6,9.06],[-21.27,9.14],[-20.94,9.21],[-20.61,9.26],[-20.28,9.3],[-19.95,9.31],[-19.59,9.3],[-19.26,9.28],[-18.93,9.24],[-18.6,9.17],[-18.27,9.09],[-17.88,8.97],[-17.49,8.82],[-3,2.53],[-2.64,2.36],[-2.3,2.17],[-1.97,1.96],[-1.65,1.72],[-1.35,1.47],[-1.08,1.2],[-0.81,0.91],[-0.57,0.61],[-0.34,0.28],[-0.14,-0.05],[0.03,-0.38],[0.19,-0.74],[0.32,-1.1],[0.43,-1.49],[0.52,-1.91],[0.57,-2.24]],"area":68.12,"cellArea":68.14,"depthInEnvelope":2.95,"depthFromBoundary":5.96}},"possible":{"ring":[[-18.65,6.11],[-19.85,3.36],[-5.36,-2.94],[-4.16,-0.19]],"area":47.4,"length":15.8},"sectionZones":[{"z46":[],"z42":[[3,5.96]],"possible":[[0,3]]},{"z46":[[9.8,10.47]],"z42":[],"possible":[]}],"house":{"manufacturer":"ELK","name":"All in One 159","builtArea":96.88,"livingArea":159.21,"estimatedRatio":1.35,"estimated":{"width":11.44,"depth":8.47},"fixtureDerived":{"length":11.44,"width":8.47},"ratio":1.75,"width":13.020752666416792,"depth":7.4404300950953095,"rotation":-23.55816631053989,"windowWidth":7.5,"narrowest":7.46,"firstFit":1.73,"start":{"cx":6.47,"cy":-0.73,"o46":0.67,"o42":1.37,"depthFrom":31.55,"depthTo":44.58,"toSideB":3},"placements":{"legal":92,"freeUnderB":0,"freeUnderA":69}},"frames":{"plot":{"minX":-36.129999999999995,"maxX":23.18,"minY":-15.75,"maxY":25.65},"neighbours":{"minX":-40.129999999999995,"maxX":32.45,"minY":-25.55,"maxY":29.65},"street":{"minX":-64.19925322943429,"maxX":42.16898722140827,"minY":-62.37528370937058,"maxY":76.14615697913783}}}</script>
+<script>
+(() => {
+"use strict";
+const DATA = JSON.parse(document.getElementById("nachbarschaft-daten").textContent);
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ---------- formatting ---------- */
+const NNBSP = " ";
+const num = (v, d) => v.toLocaleString("de-DE", { minimumFractionDigits: d, maximumFractionDigits: d });
+const metres = (v, d = 2) => `${num(v, d)}${NNBSP}m`;
+const sqm = (v, d = 1) => `${num(v, d)}${NNBSP}m²`;
+const span = (a, b, d = 1) => `${num(a, d)}–${num(b, d)}${NNBSP}m`;
+const esc = t => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const f1 = v => v.toFixed(1);
+
+/* ---------- geometry ---------- */
+const P = a => ({ x: a[0], y: a[1] });
+function pointIn(p, r) {
+  let inside = false;
+  for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+    const yi = r[i][1], yj = r[j][1];
+    if ((yi > p[1]) !== (yj > p[1]) && p[0] < ((r[j][0] - r[i][0]) * (p[1] - yi)) / (yj - yi) + r[i][0]) inside = !inside;
+  }
+  return inside;
+}
+function segPoint(p, a, b) {
+  const dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy;
+  const t = l2 ? Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l2)) : 0;
+  return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy);
+}
+function crosses(a1, a2, b1, b2) {
+  const o = (p, q, r) => Math.sign((q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]));
+  return o(a1, a2, b1) !== o(a1, a2, b2) && o(b1, b2, a1) !== o(b1, b2, a2);
+}
+function ringGap(r, q) {
+  if (r.some(p => pointIn(p, q)) || q.some(p => pointIn(p, r))) return 0;
+  let best = Infinity;
+  for (let i = 0; i < r.length; i++) for (let j = 0; j < q.length; j++) {
+    const a1 = r[i], a2 = r[(i + 1) % r.length], b1 = q[j], b2 = q[(j + 1) % q.length];
+    if (crosses(a1, a2, b1, b2)) return 0;
+    best = Math.min(best, segPoint(a1, b1, b2), segPoint(a2, b1, b2), segPoint(b1, a1, a2), segPoint(b2, a1, a2));
+  }
+  return best;
+}
+const distToRing = (p, r) => Math.min(...r.map((a, i) => segPoint(p, a, r[(i + 1) % r.length])));
+function corners(h) {
+  const r = (h.rotation * Math.PI) / 180, c = Math.cos(r), s = Math.sin(r);
+  return [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sy]) => {
+    const x = (sx * h.width) / 2, y = (sy * h.depth) / 2;
+    return [h.cx + x * c - y * s, h.cy + x * s + y * c];
+  });
+}
+const centroid = r => r.reduce((s, p) => [s[0] + p[0] / r.length, s[1] + p[1] / r.length], [0, 0]);
+const edgeInward = e => { const dx = e.b[0] - e.a[0], dy = e.b[1] - e.a[1], l = Math.hypot(dx, dy); return [-dy / l, dx / l]; };
+
+/* ---------- data ---------- */
+const byKey = new Map(DATA.buildings.map(b => [b.k, b]));
+const ofClass = c => DATA.buildings.filter(b => b.cls === c);
+const n42 = ofClass("grenzbebauung")[0], n46 = ofClass("ueberdeckung")[0], shed = ofClass("nebengebaeude")[0];
+const ownHouse = byKey.get(DATA.own.k), ownAux = DATA.ownAux.map(o => byKey.get(o.k));
+const hatch46 = DATA.hatches.find(h => h.k === n46.k);
+const houseNumber = a => (/^Lessingweg (\S+)$/.exec(a ?? "") || [])[1] ?? null;
+const edgeLength = role => DATA.parcel.frames[role].length;
+const bandKeys = new Set(DATA.band.houses.map(h => h.k));
+
+/* ---------- state ---------- */
+const state = {
+  pane: "nachbarschaft", frame: "neighbours", view: null, reading: "b",
+  dims: false, setbacks: true, active: null, pinned: null, open: null,
+  house: { cx: DATA.house.start.cx, cy: DATA.house.start.cy, rotation: DATA.house.rotation, ratio: DATA.house.ratio }
+};
+const houseSize = ratio => { const w = Math.sqrt(DATA.house.builtArea * ratio); return { width: w, depth: DATA.house.builtArea / w }; };
+const housePlacement = () => ({ ...state.house, ...houseSize(state.house.ratio) });
+
+/* ---------- the house check: three states ---------- */
+function houseCheck() {
+  const c = corners(housePlacement());
+  const env = DATA.envelope.ring;
+  const outside = c.filter(p => !pointIn(p, env)).length;
+  const toBoundary = Math.min(...c.map(p => distToRing(p, DATA.parcel.ring)));
+  const zones = [];
+  const o46 = Math.max(0, 6 - ringGap(c, n46.ring));
+  if (o46 > 0.005) zones.push({ address: n46.address, reach: o46 });
+  if (state.reading === "b") {
+    const o42 = Math.max(0, 6 - ringGap(c, n42.ring));
+    if (o42 > 0.005) zones.push({ address: n42.address, reach: o42 });
+  }
+  return { outside, toBoundary, zones, corners: c };
+}
+function statusText(chk) {
+  if (chk.outside) {
+    return { cls: "notice--error", html: `<span><b>${chk.outside} Gebäudeecke${chk.outside > 1 ? "n liegen" : " liegt"} außerhalb des Bebauungsfensters.</b> Geringster Grenzabstand ${metres(chk.toBoundary)}.</span>` };
+  }
+  if (chk.zones.length) {
+    const first = chk.zones[0];
+    const more = chk.zones.slice(1).map(z => ` und ${metres(z.reach)} in die zu ${esc(z.address)}`).join("");
+    return { cls: "notice--zone", html: `<span><b>Baukörper liegt im Bebauungsfenster,</b> reicht aber ${metres(first.reach)} in die 6-m-Zone zu ${esc(first.address)}${more} – eine Frage an die Bauaufsicht.</span>` };
+  }
+  return { cls: "", html: `<span><b>Baukörper liegt im Bebauungsfenster.</b> Geringster Grenzabstand ${metres(chk.toBoundary)}.</span>` };
+}
+
+/* ---------- findings: fixed templates, structured input ---------- */
+const Z = DATA.zone, POS = DATA.possible;
+const findings = {
+  boundaryBuilt(b, reading) {
+    const base = `Wohngebäude, ${metres(b.gap)} vor unserer Grenze, auf ${metres(b.faceLength, 1)} Länge ${span(b.faceFrom, b.faceTo)} hinter der Straße. Ob hier an die Grenze gebaut werden darf, sagt das Planungsrecht; bis das geklärt ist, gelten zwei Lesarten.`;
+    const readingText = reading === "b"
+      ? `Abstand nötig: Die 6-m-Zone reicht hier bis ${metres(Z.n42.depthFromBoundary)} von der Grenze, ${metres(Z.n42.depthInEnvelope)} ins Fenster (${sqm(Z.n42.area)}). Hier stünden die Häuser näher als 6${NNBSP}m – das klärt die Bauaufsicht.`
+        + (DATA.house.placements.freeUnderB === 0 ? ` Für das Haus ${DATA.house.manufacturer} ${DATA.house.name} bleibt so keine Stelle im Fenster ohne 6-m-Zone.` : "")
+      : `An die Grenze darf gebaut werden: Dann braucht eine Wand an der Grenze keine Abstandsfläche (§ 6 Abs. 1 Satz 3 SächsBO), auch unsere nicht. Der 3-m-Streifen auf diesen ${metres(POS.length, 1)} wäre möglicherweise bebaubar (${sqm(POS.area)}); das Fenster bleibt gezeichnet, wie es ist.`
+        + (DATA.house.placements.freeUnderA > 0 ? ` Weiter vorn stünde das Haus dann ohne 6-m-Zone.` : "");
+    return { key: `b${b.k}`, k: b.k, kind: "grenz", role: "sideA", section: 0, title: b.address, chip: "an der Grenze", value: metres(b.gap), paragraphs: [base, readingText], reading: true };
+  },
+  overlap(b, h) {
+    return { key: `b${b.k}`, k: b.k, kind: "ueber", role: "sideB", section: 1, title: b.address, chip: "Überdeckung", value: metres(b.gap), paragraphs: [
+      `Wohngebäude, ${metres(b.gap)} vor unserer Grenze, ${span(b.faceFrom, b.faceTo)} hinter der Straße. Sein Mindestabstand von 3${NNBSP}m reicht ${metres(h.reach)} auf unser Grundstück (grau schraffiert, ${sqm(h.area)}).`,
+      `Im Fenster liegt dort die 6-m-Zone, ${sqm(Z.n46.area)}, bis ${metres(Z.n46.depthInEnvelope)} tief: Hier stünden die Häuser näher als 6${NNBSP}m, die Abstandsflächen würden sich überdecken (§ 6 Abs. 3 SächsBO). Ob das unser Grundstück belastet, klärt die Bauaufsicht; das Fenster bleibt.`] };
+  },
+  outbuilding(b) {
+    const beyond = Math.max(0, -b.spanFrom, b.spanTo - edgeLength(b.edgeRole));
+    return { key: `b${b.k}`, k: b.k, kind: "neben", role: "rear", section: null, title: "Nebengebäude hinten", chip: "zählt nicht", value: metres(b.gap), paragraphs: [
+      `ALKIS: ${b.funktion}, ${sqm(b.area)}, nach Größe eine Garage oder ein Schuppen; ${metres(b.gap)} hinter unserer Grenze, an ihr ${metres(b.spanTo - b.spanFrom, 1)} lang, davon ${metres(beyond, 1)} hinter unserer Ecke. Solche Gebäude haben bis 3${NNBSP}m mittlerer Wandhöhe und 9${NNBSP}m je Grenze keine eigene Abstandsfläche (§ 6 Abs. 8 Nr. 1 SächsBO).`] };
+  },
+  existing(own, aux) {
+    return { key: `b${own.k}`, k: own.k, kind: "bestand", role: "sideB", section: 0, title: `${own.address} (Bestand)`, chip: "Bestand", value: metres(DATA.own.gapToB), paragraphs: [
+      `Auf dem Grundstück stehen ein Wohngebäude mit ${sqm(own.area)}${aux.length ? ` und ein Nebengebäude mit ${sqm(aux[0].area)}` : ""}. Das Wohnhaus steht ${metres(DATA.own.gapToB)} vor der Grenze zu Nr.${NNBSP}46, ${span(DATA.own.depthFrom, DATA.own.depthTo)} hinter der Straße. Das Fenster gilt für das, was neu gebaut wird.`] };
+  },
+  street(across) {
+    return { key: "street", k: null, kind: "frei", role: "street", section: null, title: "Zum Lessingweg", chip: "frei", value: metres(across.d, 1), paragraphs: [
+      `${metres(edgeLength("street"), 1)} Grenze zur Straße. Das nächste Gebäude jenseits der Straße, ${across.address}, steht ${metres(across.d, 1)} entfernt.`] };
+  },
+  surroundings(band) {
+    const low = houseNumber(band.houses[0].address), high = houseNumber(band.houses[band.houses.length - 1].address);
+    return { key: "band", k: null, kind: "umgebung", role: null, section: null, title: "Umgebung (§ 34 BauGB)", chip: "Orientierung", value: span(band.frontMin, band.frontMax), paragraphs: [
+      `Die ${band.houses.length} Nachbarhäuser auf unserer Straßenseite (Lessingweg ${low} bis ${high}, bis ${metres(band.alongLimit, 0)} entlang der Straße) stehen ${span(band.frontMin, band.frontMax)} hinter der Straße und reichen bis ${metres(band.rearMax, 1)} tief. Ein Anhalt dafür, was sich einfügt, keine Grenze.`] };
+  },
+  distant(dd) {
+    return { key: "distant", k: null, kind: "frei", role: null, section: null, title: "Übrige Gebäude", chip: "ohne Befund", value: `ab ${metres(dd.nearest, 1)}`, paragraphs: [
+      `Die übrigen ${dd.count} Gebäude bis ${metres(dd.limit, 0)} stehen mindestens 3${NNBSP}m von unseren Grenzen weg, das nächste ${metres(dd.nearest, 1)}.`] };
+  },
+  plan() {
+    return { key: "rapis", k: null, kind: "recht", title: "Bebauungsplan", chip: "wahrscheinlich § 34", value: "RAPIS", paragraphs: [
+      "In RAPIS kein Bebauungsplan verzeichnet – wahrscheinlich § 34 BauGB. Verbindlich ist die städtebauliche Auskunft der Stadt.",
+      "Flächennutzungsplan: Wohnbaufläche (wirksam seit 16.05.2015). Nächster Plan in Kraft: B-Pl. E-217, 863 m entfernt."],
+      source: "RAPIS Sachsen, 09/2026" };
+  },
+  easement() {
+    return { key: "baulast", k: null, kind: "offen", title: "Baulasten", chip: "nicht öffentlich", value: "—", paragraphs: [
+      "Nicht im Kataster und nicht öffentlich. Auskunft gibt die Stadt Leipzig, Amt für Bauordnung und Denkmalpflege, bei berechtigtem Interesse: 22–70 € je Grundstück, etwa vier Wochen. Eine Abstandsflächen-Baulast (§ 6 Abs. 2 SächsBO) stünde nur dort."] };
+  },
+  unknown() {
+    return { key: "unknown", k: null, kind: "offen", title: "Wandhöhen", chip: "offen", value: "—", paragraphs: [
+      `ALKIS führt keine Wandhöhen. Gerechnet ist überall das Mindestmaß von 3${NNBSP}m, nie 0,4${NNBSP}H; ein höheres Nachbarhaus hätte eine tiefere Abstandsfläche.`] };
+  }
+};
+const numbered = () => [findings.boundaryBuilt(n42, state.reading), findings.overlap(n46, hatch46), findings.outbuilding(shed), findings.existing(ownHouse, ownAux)]
+  .map((f, i) => ({ ...f, marker: i + 1 }));
+const STREET = findings.street(DATA.acrossStreet), BAND = findings.surroundings(DATA.band), DISTANT = findings.distant(DATA.distant);
+
+/* ---------- plan frames and the camera ---------- */
+const stage = document.getElementById("stage"), svg = document.getElementById("plan");
+let VW = 800, VH = 580;
+function fitFrame(f) {
+  const w = f.maxX - f.minX, h = f.maxY - f.minY, aspect = VW / VH;
+  const cx = (f.minX + f.maxX) / 2, cy = (f.minY + f.maxY) / 2;
+  const W = Math.max(w, h * aspect), H = W / aspect;
+  return { cx, cy, w: W, h: H };
+}
+const target = key => fitFrame(DATA.frames[key]);
+let anim = null;
+function flyTo(key) {
+  state.frame = key;
+  document.querySelectorAll(".zoom button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.frame === key)));
+  const to = target(key);
+  if (!state.view || reduceMotion) { state.view = to; render(); return; }
+  const from = { ...state.view }, t0 = performance.now(), dur = 560;
+  cancelAnimationFrame(anim);
+  // Zooming is geometric: interpolate the width on a log scale so the motion reads even.
+  const step = now => {
+    const t = Math.min(1, (now - t0) / dur), e = t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    const w = Math.exp(Math.log(from.w) + (Math.log(to.w) - Math.log(from.w)) * e);
+    state.view = { cx: from.cx + (to.cx - from.cx) * e, cy: from.cy + (to.cy - from.cy) * e, w, h: w * VH / VW };
+    render();
+    if (t < 1) anim = requestAnimationFrame(step);
+  };
+  anim = requestAnimationFrame(step);
+}
+function cam() {
+  const v = state.view, s = VW / v.w;
+  return { s, x: x => (x - v.cx) * s + VW / 2, y: y => VH / 2 - (y - v.cy) * s };
+}
+const pts = (c, r) => r.map(p => `${f1(c.x(p[0]))},${f1(c.y(p[1]))}`).join(" ");
+const pathOf = (c, r) => `M${r.map(p => `${f1(c.x(p[0]))},${f1(c.y(p[1]))}`).join("L")}Z`;
+
+function patterns(id) {
+  return `<pattern id="${id}-hint" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line class="p-hint" x1="0" y1="0" x2="0" y2="7"/></pattern>`
+    + `<pattern id="${id}-zone" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect class="p-zone-veil" width="6" height="6"/><line class="p-zone-line" x1="0" y1="0" x2="0" y2="6"/><line class="p-zone-line" x1="0" y1="0" x2="6" y2="0"/></pattern>`;
+}
+
+/* ---------- the plan ---------- */
+function render() {
+  const c = cam();
+  const o = [];
+  o.push(`<defs>${patterns("pl")}</defs><rect class="p-ground" width="${VW}" height="${VH}"/>`);
+  DATA.streets.forEach(st => o.push(`<path class="p-street" d="${pathOf(c, st.ring)}"/>`));
+  const street = state.frame === "street";
+  DATA.ground.forEach(g => {
+    const b = byKey.get(g.k);
+    if (b && b.own) return;
+    const cls = g.main ? "p-bld--main" : "p-bld--aux";
+    const band = street && bandKeys.has(g.k) ? " p-bld--band" : "";
+    const active = state.active != null && String(g.k) === String(state.active) ? " is-active" : "";
+    o.push(`<polygon class="p-bld ${cls}${band}${active}" data-k="${g.k}" points="${pts(c, g.ring)}"><title>${esc(g.address ?? (g.main ? "Wohngebäude" : "Nebengebäude"))}</title></polygon>`);
+  });
+  o.push(`<polygon class="p-parcel" points="${pts(c, DATA.parcel.ring)}"/>`);
+
+  if (street) {
+    // The band, and the three depths it was measured at, along the street edge extended.
+    const bd = DATA.band, st = DATA.parcel.edges[DATA.parcel.streetEdge];
+    const dir = [(st.b[0] - st.a[0]) / st.length, (st.b[1] - st.a[1]) / st.length], n = DATA.parcel.inward, m = DATA.parcel.streetMid;
+    const line = dep => [[m[0] - dir[0] * 64 + n[0] * dep, m[1] - dir[1] * 64 + n[1] * dep], [m[0] + dir[0] * 64 + n[0] * dep, m[1] + dir[1] * 64 + n[1] * dep]];
+    o.push(`<polygon class="p-band" points="${pts(c, bd.strip)}"/>`);
+    const ref = line(0);
+    o.push(`<line class="p-ref-line" x1="${f1(c.x(ref[0][0]))}" y1="${f1(c.y(ref[0][1]))}" x2="${f1(c.x(ref[1][0]))}" y2="${f1(c.y(ref[1][1]))}"/>`);
+    [[bd.frontMin, `${metres(bd.frontMin, 1)}`], [bd.frontMax, metres(bd.frontMax, 1)], [bd.rearMax, `bis ${metres(bd.rearMax, 1)}`]].forEach(([dep, label]) => {
+      const L = line(dep);
+      o.push(`<line class="p-band-line" x1="${f1(c.x(L[0][0]))}" y1="${f1(c.y(L[0][1]))}" x2="${f1(c.x(L[1][0]))}" y2="${f1(c.y(L[1][1]))}"/>`);
+      const end = L[0][1] > L[1][1] ? L[0] : L[1];
+      o.push(`<text class="p-label p-label--band" x="${f1(c.x(end[0]) + 4)}" y="${f1(c.y(end[1]) + 12)}">${label}</text>`);
+    });
+    const refEnd = ref[0][1] < ref[1][1] ? ref[0] : ref[1];
+    o.push(`<text class="p-label p-label--quiet" x="${f1(c.x(refEnd[0]) + 6)}" y="${f1(c.y(refEnd[1]) - 8)}">Straßengrenze, verlängert</text>`);
+  }
+
+  if (state.setbacks) {
+    o.push(`<path class="p-setback" fill-rule="evenodd" d="${pathOf(c, DATA.parcel.ring)} ${pathOf(c, DATA.envelope.ring)}"/>`);
+    if (state.reading === "a") o.push(`<polygon class="p-possible" points="${pts(c, POS.ring)}"/>`);
+  }
+  o.push(`<g data-k="${n46.k}"><polygon points="${pts(c, hatch46.ring)}" fill="url(#pl-hint)"/><polygon class="p-hatch" points="${pts(c, hatch46.ring)}"/></g>`);
+  if (state.setbacks) o.push(`<polygon class="p-envelope" points="${pts(c, DATA.envelope.ring)}"/>`);
+
+  o.push(`<polygon class="p-halo" points="${pts(c, DATA.parcel.ring)}"/><polygon class="p-boundary" points="${pts(c, DATA.parcel.ring)}"/>`);
+  DATA.parcel.ring.forEach(p => o.push(`<rect class="p-vertex" x="${f1(c.x(p[0]) - 2.5)}" y="${f1(c.y(p[1]) - 2.5)}" width="5" height="5"/>`));
+
+  // What an open analysis points at: the boundary, or the section line.
+  if (state.open?.kind === "strip") {
+    const idx = state.open.role === "rear" ? DATA.parcel.rear : [DATA.parcel[state.open.role === "street" ? "streetEdge" : state.open.role]];
+    o.push(`<path class="p-edge-hl" d="${idx.map(i => { const e = DATA.parcel.edges[i]; return `M${f1(c.x(e.a[0]))},${f1(c.y(e.a[1]))}L${f1(c.x(e.b[0]))},${f1(c.y(e.b[1]))}`; }).join("")}"/>`);
+  }
+  if (state.open?.kind === "section") {
+    const sec = DATA.sections[state.open.section];
+    const a = [c.x(sec.p0[0]), c.y(sec.p0[1])], b = [c.x(sec.p1[0]), c.y(sec.p1[1])];
+    const dir = [DATA.parcel.inward[0] * 8, -DATA.parcel.inward[1] * 8];
+    o.push(`<line class="p-section" x1="${f1(a[0])}" y1="${f1(a[1])}" x2="${f1(b[0])}" y2="${f1(b[1])}"/>`);
+    [a, b].forEach(q => {
+      o.push(`<path class="p-section-cap" d="M${f1(q[0] - dir[1] * .6)},${f1(q[1] + dir[0] * .6)} L${f1(q[0] + dir[0])},${f1(q[1] + dir[1])} L${f1(q[0] + dir[1] * .6)},${f1(q[1] - dir[0] * .6)} Z"/>`);
+      o.push(`<text class="p-section-name" x="${f1(q[0] - dir[0] * 1.6)}" y="${f1(q[1] - dir[1] * 1.6)}">${state.open.section + 1}</text>`);
+    });
+  }
+
+  [ownHouse, ...ownAux].forEach(b => o.push(`<polygon class="p-bld ${b.main ? "p-bld--own" : "p-bld--own-aux"}${String(state.active) === String(b.k) ? " is-active" : ""}" data-k="${b.k}" points="${pts(c, b.ring)}"><title>${esc(b.address ?? "Nebengebäude")} (Bestand)</title></polygon>`));
+  DATA.grenz.forEach(g => {
+    const e = DATA.parcel.edges[DATA.parcel.sideA], n = edgeInward(e), off = 3.2 / c.s, tick = 6 / c.s;
+    const a = [g.from[0] + n[0] * off, g.from[1] + n[1] * off], b = [g.to[0] + n[0] * off, g.to[1] + n[1] * off];
+    o.push(`<g data-k="${g.k}"><line class="p-grenz" x1="${f1(c.x(a[0]))}" y1="${f1(c.y(a[1]))}" x2="${f1(c.x(b[0]))}" y2="${f1(c.y(b[1]))}"/>`
+      + [a, b].map(q => `<line class="p-grenz-tick" x1="${f1(c.x(q[0] - n[0] * tick * .6))}" y1="${f1(c.y(q[1] - n[1] * tick * .6))}" x2="${f1(c.x(q[0] + n[0] * tick))}" y2="${f1(c.y(q[1] + n[1] * tick))}"/>`).join("") + `</g>`);
+  });
+
+  // The house, brass, draggable; its outline says which state it is in.
+  const chk = houseCheck();
+  const hcls = chk.outside ? " p-house--out" : chk.zones.length ? " p-house--zone" : "";
+  o.push(`<g class="p-house-grp" id="house" tabindex="0" role="button" aria-label="Baukörper ${esc(DATA.house.manufacturer)} ${esc(DATA.house.name)}: ziehen oder mit den Pfeiltasten verschieben">`
+    + `<polygon class="p-house${hcls}" data-house="1" points="${pts(c, chk.corners)}"/><polygon class="p-house-focus" points="${pts(c, chk.corners)}"/>`
+    + chk.corners.filter(p => !pointIn(p, DATA.envelope.ring)).map(p => `<circle class="p-corner" cx="${f1(c.x(p[0]))}" cy="${f1(c.y(p[1]))}" r="4.5"/>`).join("") + `</g>`);
+
+  // The zones lie over the house, so the part of it standing in one shows.
+  [Z.n46, ...(state.reading === "b" ? [Z.n42] : [])].forEach(z => o.push(`<g pointer-events="none"><polygon points="${pts(c, z.ring)}" fill="url(#pl-zone)"/><polygon class="p-zone-edge" points="${pts(c, z.ring)}"/></g>`));
+
+  // Labels.
+  const sl = DATA.streetLabel;
+  let ang = -sl.angle; while (ang > 90) ang -= 180; while (ang <= -90) ang += 180;
+  o.push(`<text class="p-street-label" x="${f1(c.x(sl.x))}" y="${f1(c.y(sl.y))}" text-anchor="middle" dominant-baseline="central" transform="rotate(${f1(ang)} ${f1(c.x(sl.x))} ${f1(c.y(sl.y))})">Lessingweg</text>`);
+  const marked = new Set([n42.k, n46.k, shed.k, ownHouse.k]);
+  DATA.ground.filter(g => g.main && houseNumber(g.address) && !marked.has(g.k)).forEach(g => {
+    const m = centroid(g.ring), x = c.x(m[0]), y = c.y(m[1]);
+    if (x < 10 || x > VW - 10 || y < 10 || y > VH - 10) return;
+    const inBand = street && bandKeys.has(g.k);
+    o.push(`<text class="p-label${inBand ? " p-label--band" : " p-label--quiet"}" x="${f1(x)}" y="${f1(y + 3.5)}" text-anchor="middle">${esc(houseNumber(g.address))}</text>`);
+  });
+  if (state.frame !== "street") {
+    // Beside the zone, towards the house that casts it, where nothing else is written.
+    const zc = centroid(Z.n46.ring), hc = centroid(n46.ring), at = [zc[0] + (hc[0] - zc[0]) * .42, zc[1] + (hc[1] - zc[1]) * .42];
+    o.push(`<text class="p-label p-label--zone" x="${f1(c.x(at[0]))}" y="${f1(c.y(at[1]) + 4)}" text-anchor="middle">6-m-Zone</text>`);
+    if (state.reading === "a") {
+      const pc = centroid(POS.ring);
+      o.push(`<text class="p-label p-label--grenz" x="${f1(c.x(pc[0]))}" y="${f1(c.y(pc[1]) + 20)}" text-anchor="middle">möglicherweise bebaubar</text>`);
+    }
+  }
+  if (state.dims) {
+    DATA.parcel.edges.forEach(e => {
+      if (e.length < 4) return;
+      const n = edgeInward(e), m = [(e.a[0] + e.b[0]) / 2 - n[0] * 14 / c.s, (e.a[1] + e.b[1]) / 2 - n[1] * 14 / c.s];
+      o.push(`<text class="p-label" x="${f1(c.x(m[0]))}" y="${f1(c.y(m[1]) + 3.5)}" text-anchor="middle">${metres(e.length)}</text>`);
+    });
+  }
+  numbered().forEach(f => {
+    const b = byKey.get(f.k), m = centroid(b.ring);
+    const on = state.active != null && String(state.active) === String(f.k);
+    o.push(`<g class="p-marker${on ? " is-active" : ""}" data-k="${f.k}" tabindex="0" role="button" aria-label="${f.marker}: ${esc(f.title)}"><circle cx="${f1(c.x(m[0]))}" cy="${f1(c.y(m[1]))}" r="11"/><text x="${f1(c.x(m[0]))}" y="${f1(c.y(m[1]))}">${f.marker}</text></g>`);
+  });
+
+  // North arrow and scale bar.
+  const nx = VW - 30;
+  o.push(`<g aria-hidden="true"><circle class="p-north-disc" cx="${nx}" cy="32" r="17"/><path class="p-north-arrow" d="M${nx},18 L${nx + 5},40 L${nx},35 L${nx - 5},40 Z"/><text class="p-north" x="${nx}" y="62" text-anchor="middle">N</text></g>`);
+  const stepM = [1, 2, 5, 10, 20, 50].find(m => m * c.s >= 34) ?? 50, w = stepM * c.s;
+  o.push(`<g aria-hidden="true" transform="translate(16,${VH - 22})"><rect class="p-scale-solid" x="0" y="-4" width="${f1(w)}" height="4"/><rect class="p-scale-open" x="${f1(w)}" y="-4" width="${f1(w)}" height="4"/>`
+    + `<text class="p-scale-text" x="0" y="12" text-anchor="middle">0</text><text class="p-scale-text" x="${f1(w)}" y="12" text-anchor="middle">${stepM}</text><text class="p-scale-text" x="${f1(2 * w)}" y="12" text-anchor="middle">${2 * stepM}${NNBSP}m</text></g>`);
+  svg.innerHTML = o.join("");
+
+  const st = statusText(chk);
+  const status = document.getElementById("status");
+  status.className = `notice ${st.cls}`;
+  status.innerHTML = st.html;
+}
+
+function sizePlan() {
+  const w = Math.max(320, Math.round(stage.clientWidth || 800));
+  VW = w; VH = Math.round(w * (w < 600 ? 0.9 : 0.7));
+  svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+  if (state.view) state.view = { ...state.view, h: state.view.w * VH / VW };
+}
+
+/* ---------- dragging and arrow keys ---------- */
+let drag = null;
+svg.addEventListener("pointerdown", e => {
+  if (!e.target.closest("[data-house]")) return;
+  e.preventDefault();
+  const rect = svg.getBoundingClientRect();
+  drag = { x: e.clientX, y: e.clientY, cx: state.house.cx, cy: state.house.cy, k: VW / rect.width };
+  svg.setPointerCapture(e.pointerId);
+  svg.style.cursor = "grabbing";
+});
+svg.addEventListener("pointermove", e => {
+  if (!drag) return;
+  const s = cam().s;
+  state.house.cx = drag.cx + (e.clientX - drag.x) * drag.k / s;
+  state.house.cy = drag.cy - (e.clientY - drag.y) * drag.k / s;
+  render();
+});
+const endDrag = () => { if (drag) { drag = null; svg.style.cursor = ""; document.getElementById("house")?.focus({ preventScroll: true }); } };
+svg.addEventListener("pointerup", endDrag);
+svg.addEventListener("pointercancel", endDrag);
+svg.addEventListener("keydown", e => {
+  if (e.target.closest("#house")) {
+    const step = e.shiftKey ? 1 : 0.1;
+    const move = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, step], ArrowDown: [0, -step] }[e.key];
+    if (!move) return;
+    e.preventDefault();
+    state.house.cx += move[0]; state.house.cy += move[1];
+    render();
+    document.getElementById("house").focus({ preventScroll: true });
+    return;
+  }
+  const m = e.target.closest(".p-marker");
+  if (m && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); pin(m.dataset.k); }
+});
+
+/* ---------- linking plan and list ---------- */
+function setActive(k) {
+  state.active = k;
+  document.querySelectorAll("#befunde .befund").forEach(el => el.classList.toggle("is-active", k != null && el.dataset.k === String(k)));
+  if (!drag) render();
+}
+function pin(k) { state.pinned = state.pinned === String(k) ? null : String(k); setActive(state.pinned); }
+svg.addEventListener("pointerover", e => { const t = e.target.closest("[data-k]"); if (t && !drag && state.pinned == null && t.dataset.k !== state.active) setActive(t.dataset.k); });
+svg.addEventListener("pointerleave", () => { if (state.pinned == null && state.active != null) setActive(null); });
+svg.addEventListener("click", e => { const t = e.target.closest(".p-marker"); if (t) pin(t.dataset.k); });
+
+/* ---------- B: a boundary straightened out, true to scale ---------- */
+function stripFrame(role) {
+  const f = DATA.parcel.frames[role], from = f.from, to = f.to;
+  const chord = Math.hypot(to[0] - from[0], to[1] - from[1]), dir = [(to[0] - from[0]) / chord, (to[1] - from[1]) / chord];
+  const cc = centroid(DATA.parcel.ring);
+  let n = [-dir[1], dir[0]];
+  if ((cc[0] - from[0]) * n[0] + (cc[1] - from[1]) * n[1] > 0) n = [-n[0], -n[1]];
+  const k = f.length / chord;
+  return { f, u: p => ((p[0] - from[0]) * dir[0] + (p[1] - from[1]) * dir[1]) * k, w: p => (p[0] - from[0]) * n[0] + (p[1] - from[1]) * n[1] };
+}
+function stripSvg(role, id, S) {
+  const fr = stripFrame(role), up = 5.2, down = 7.2, left = 18;
+  const top = 22, lineY = top + up * S, height = Math.round(lineY + down * S + 30);
+  const width = Math.round(left + (fr.f.length + 3.2) * S + 14);
+  const X = u => left + u * S, Y = w => lineY - w * S;
+  const tr = r => r.map(p => `${f1(X(fr.u(p)))},${f1(Y(fr.w(p)))}`).join(" ");
+  const trP = r => `M${r.map(p => `${f1(X(fr.u(p)))},${f1(Y(fr.w(p)))}`).join("L")}Z`;
+  const o = [`<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="Grenze gerade gezogen, ${esc(metres(fr.f.length, 1))}">`];
+  o.push(`<defs>${patterns(id)}<clipPath id="${id}-clip"><rect x="0" y="${top}" width="${width}" height="${f1((up + down) * S)}"/></clipPath></defs>`);
+  o.push(`<g clip-path="url(#${id}-clip)"><rect class="p-ground" x="0" y="${top}" width="${width}" height="${f1((up + down) * S)}"/>`);
+  DATA.streets.forEach(st => o.push(`<path class="p-street" d="${trP(st.ring)}"/>`));
+  DATA.ground.forEach(g => { const b = byKey.get(g.k); if (b && b.own) return; o.push(`<polygon class="p-bld ${g.main ? "p-bld--main" : "p-bld--aux"}" points="${tr(g.ring)}"/>`); });
+  o.push(`<polygon class="p-parcel" points="${tr(DATA.parcel.ring)}"/>`);
+  o.push(`<path class="p-setback" fill-rule="evenodd" d="${trP(DATA.parcel.ring)} ${trP(DATA.envelope.ring)}"/>`);
+  if (state.reading === "a") o.push(`<polygon class="p-possible" points="${tr(POS.ring)}"/>`);
+  o.push(`<polygon points="${tr(hatch46.ring)}" fill="url(#${id}-hint)"/><polygon class="p-hatch" points="${tr(hatch46.ring)}"/>`);
+  [Z.n46, ...(state.reading === "b" ? [Z.n42] : [])].forEach(z => o.push(`<polygon points="${tr(z.ring)}" fill="url(#${id}-zone)"/><polygon class="p-zone-edge" points="${tr(z.ring)}"/>`));
+  o.push(`<polygon class="p-envelope" points="${tr(DATA.envelope.ring)}"/>`);
+  o.push(`<polygon class="p-halo" points="${tr(DATA.parcel.ring)}"/><polygon class="p-boundary" points="${tr(DATA.parcel.ring)}"/>`);
+  [ownHouse, ...ownAux].forEach(b => o.push(`<polygon class="p-bld ${b.main ? "p-bld--own" : "p-bld--own-aux"}" points="${tr(b.ring)}"/>`));
+  if (role === "sideA") DATA.grenz.forEach(g => {
+    o.push(`<line class="p-grenz" x1="${f1(X(g.faceFrom))}" y1="${f1(lineY + 3.4)}" x2="${f1(X(g.faceTo))}" y2="${f1(lineY + 3.4)}"/>`);
+    [g.faceFrom, g.faceTo].forEach(t => o.push(`<line class="p-grenz-tick" x1="${f1(X(t))}" y1="${lineY - 3}" x2="${f1(X(t))}" y2="${lineY + 9}"/>`));
+  });
+  o.push(`</g>`);
+  const L = [];
+  DATA.buildings.filter(b => !b.own && b.edgeRole === role && b.cls !== "frei").forEach(b => {
+    const mid = (Math.max(b.spanFrom, -3) + Math.min(b.spanTo, fr.f.length + 3)) / 2;
+    const name = houseNumber(b.address) ? `Nr.${NNBSP}${houseNumber(b.address)}` : "Nebengebäude";
+    L.push(`<text class="p-label" x="${f1(Math.max(4, X(mid) - 52))}" y="${top - 7}">${name} · ${metres(b.gap)}</text>`);
+  });
+  if (role === "sideB") {
+    L.push(`<text class="p-label p-label--zone" x="${f1(X((hatch46.spanFrom + hatch46.spanTo) / 2))}" y="${f1(lineY + 3 * S + 16)}" text-anchor="middle">6-m-Zone · ${metres(Z.n46.depthInEnvelope)}</text>`);
+    L.push(`<text class="p-label" x="${f1(X((DATA.own.depthFrom + DATA.own.depthTo) / 2))}" y="${f1(lineY + down * S - 6)}" text-anchor="middle">Bestand 44 · ${metres(DATA.own.gapToB)}</text>`);
+  }
+  if (role === "sideA") {
+    const g = DATA.grenz[0], mid = X((g.faceFrom + g.faceTo) / 2);
+    L.push(state.reading === "b"
+      ? `<text class="p-label p-label--zone" x="${f1(mid)}" y="${f1(lineY + 4.6 * S + 4)}" text-anchor="middle">6-m-Zone · bis ${metres(Z.n42.depthFromBoundary)}</text>`
+      : `<text class="p-label p-label--grenz" x="${f1(mid)}" y="${f1(lineY + 1.5 * S + 4)}" text-anchor="middle">möglicherweise bebaubar · ${sqm(POS.area)}</text>`);
+  }
+  if (role === "street") L.push(`<text class="p-label p-label--quiet" x="${f1(X(fr.f.length / 2))}" y="${top - 7}" text-anchor="middle">Lessingweg</text>`);
+  o.push(L.join(""));
+  for (let t = 0; t <= fr.f.length + 1e-6; t += 5) {
+    const x = f1(X(t)), major = t % 10 === 0;
+    o.push(`<line class="bc-axis" x1="${x}" y1="${height - 24}" x2="${x}" y2="${height - (major ? 18 : 21)}"/>`);
+    if (major) o.push(`<text class="bc-tick" x="${x}" y="${height - 7}" text-anchor="middle">${t}</text>`);
+  }
+  o.push(`<line class="bc-axis" x1="${X(0)}" y1="${height - 24}" x2="${f1(X(fr.f.length))}" y2="${height - 24}"/><text class="bc-tick" x="${f1(X(fr.f.length) + 4)}" y="${height - 7}">${metres(fr.f.length, 1)}</text>`);
+  o.push(`</svg>`);
+  return o.join("");
+}
+const stripCaption = { street: "Meter ab der Ecke zu Nr. 46", sideA: "Meter ab der Straßenecke", sideB: "Meter ab der Straßenecke", rear: "Meter ab der Ecke zu Nr. 42" };
+
+/* ---------- C: a cross-section, looking from the street ---------- */
+function sectionSvg(index, id, k) {
+  const sec = DATA.sections[index], zs = DATA.sectionZones[index];
+  const W = sec.width, R = sec.reachOut, padL = 16, width = Math.round((W + 2 * R) * k + 2 * padL);
+  const groundY = 132, wallH = 80, height = 250;
+  const U = x => padL + (W + R - x) * k;
+  const o = [`<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="Schnitt ${index + 1}, ${esc(metres(sec.depth, 1))} hinter der Straße">`];
+  o.push(`<defs>${patterns(id)}`
+    + `<linearGradient id="${id}-main" class="s-wall-main" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-opacity="1"/><stop offset=".72" stop-opacity=".85"/><stop offset="1" stop-opacity="0"/></linearGradient>`
+    + `<linearGradient id="${id}-own" class="s-wall-own" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-opacity="1"/><stop offset=".72" stop-opacity=".85"/><stop offset="1" stop-opacity="0"/></linearGradient>`
+    + `<linearGradient id="${id}-edge" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="white"/><stop offset=".7" stop-color="white"/><stop offset="1" stop-color="black"/></linearGradient>`
+    + `<mask id="${id}-fade" maskUnits="userSpaceOnUse"><rect x="0" y="${groundY - wallH}" width="${width}" height="${wallH}" fill="url(#${id}-edge)"/></mask></defs>`);
+  o.push(`<rect class="s-sky" width="${width}" height="${height}"/><rect class="s-soil" x="0" y="${groundY}" width="${width}" height="74"/><rect class="s-plot" x="${f1(U(W))}" y="${groundY}" width="${f1(W * k)}" height="74"/>`);
+  const lane1 = groundY + 8, lane2 = groundY + 30, lane3 = groundY + 52, laneH = 14;
+  // Lane 1: our 3 m. Lane 2: a neighbour's 3 m where it is needed. Lane 3: the 6-m-Zone.
+  if (index === 0 && state.reading === "a") o.push(`<rect class="s-possible" x="${f1(U(3))}" y="${lane1}" width="${f1(3 * k)}" height="${laneH}"/>`);
+  else o.push(`<rect class="s-strip" x="${f1(U(3))}" y="${lane1}" width="${f1(3 * k)}" height="${laneH}"/>`);
+  o.push(`<rect class="s-strip" x="${f1(U(W))}" y="${lane1}" width="${f1(3 * k)}" height="${laneH}"/>`);
+  o.push(`<text class="s-text" x="${f1(U(W - 1.5))}" y="${lane1 + 11}" text-anchor="middle">3${NNBSP}m</text><text class="s-text" x="${f1(U(1.5))}" y="${lane1 + 11}" text-anchor="middle">${index === 0 && state.reading === "a" ? "?" : `3${NNBSP}m`}</text>`);
+  if (k >= 13) o.push(`<text class="s-lane" x="${f1(U(W + R) + 2)}" y="${lane1 + 10}">unsere Abstandsfläche</text><text class="s-lane" x="${f1(U(W + R) + 2)}" y="${lane2 + 10}">die der Nachbarn</text><text class="s-lane" x="${f1(U(W + R) + 2)}" y="${lane3 + 10}">6-m-Zone</text>`);
+  const cut42 = sec.buildings.find(cb => cb.k === n42.k), cut46 = sec.buildings.find(cb => cb.k === n46.k);
+  if (cut42) o.push(`<text class="s-text s-text--grenz" x="${f1(U(3) + 4)}" y="${lane2 + 11}">Nr.${NNBSP}42: an der Grenze</text>`);
+  if (cut46) {
+    const wall = cut46.iv[0][0];
+    o.push(`<rect class="s-their" x="${f1(U(wall))}" y="${lane2}" width="${f1(3 * k)}" height="${laneH}"/>`);
+    const h = sec.hatches.find(hh => hh.k === n46.k);
+    if (h) { const [a, b] = h.iv[0]; o.push(`<rect x="${f1(U(b))}" y="${lane2}" width="${f1((b - a) * k)}" height="${laneH}" fill="url(#${id}-hint)"/>`); }
+    o.push(`<text class="s-text s-text--muted" x="${f1(U(wall) + 3 * k + 5)}" y="${lane2 + 11}">3${NNBSP}m von Nr.${NNBSP}46</text>`);
+  }
+  const zoneIv = [...zs.z46, ...(state.reading === "b" ? zs.z42 : [])];
+  zoneIv.forEach(([a, b]) => {
+    o.push(`<rect x="${f1(U(b))}" y="${lane3}" width="${f1((b - a) * k)}" height="${laneH}" fill="url(#${id}-zone)"/><rect class="p-zone-edge" x="${f1(U(b))}" y="${lane3}" width="${f1((b - a) * k)}" height="${laneH}"/>`);
+    o.push(`<text class="s-text s-text--grenz s-halo" x="${f1(U(a) + 5)}" y="${lane3 + 11}">${metres(b - a)} ins Fenster</text>`);
+  });
+  sec.buildings.forEach(cb => {
+    const b = byKey.get(cb.k), cls = b.own ? "own" : "main";
+    cb.iv.forEach(([a, bb]) => {
+      const x1 = Math.min(U(a), U(bb)), x2 = Math.max(U(a), U(bb)), L = Math.max(x1, 0), Rr = Math.min(x2, width);
+      if (Rr - L < 2) return;
+      o.push(`<rect x="${f1(L)}" y="${groundY - wallH}" width="${f1(Rr - L)}" height="${wallH}" fill="url(#${id}-${cls})"/>`);
+      [x1, x2].filter(x => x > 0 && x < width).forEach(x => o.push(`<line class="s-wall-edge-${cls}" x1="${f1(x)}" y1="${groundY}" x2="${f1(x)}" y2="${groundY - wallH}" mask="url(#${id}-fade)"/>`));
+      const cx = (L + Rr) / 2;
+      o.push(`<text class="s-name" x="${f1(cx)}" y="${groundY - wallH - 6}" text-anchor="middle">${esc(b.own ? "44 · Bestand" : (b.address ?? b.funktion))}</text>`);
+      o.push(`<text class="s-unknown" x="${f1(cx)}" y="${groundY - 26}" text-anchor="middle">Höhe unbekannt</text>`);
+    });
+  });
+  sec.envelope.forEach(([a, b]) => {
+    [a, b].forEach(x => o.push(`<line class="s-env" x1="${f1(U(x))}" y1="${groundY + 2}" x2="${f1(U(x))}" y2="${groundY - wallH - 22}"/>`));
+    const y = groundY - wallH - 16;
+    o.push(`<line class="s-env-dim" x1="${f1(U(b))}" y1="${y}" x2="${f1(U(a))}" y2="${y}"/><text class="s-text s-text--env" x="${f1(U((a + b) / 2))}" y="${y - 6}" text-anchor="middle">Fenster ${metres(b - a, 1)}</text>`);
+  });
+  o.push(`<line class="s-ground" x1="0" y1="${groundY}" x2="${width}" y2="${groundY}"/>`);
+  [0, W].forEach(x => o.push(`<line class="s-boundary" x1="${f1(U(x))}" y1="${groundY - 18}" x2="${f1(U(x))}" y2="${groundY + 74}"/>`));
+  if (cut46) {
+    const y = groundY - 10, x1 = U(W), x2 = U(cut46.iv[0][0]);
+    o.push(`<line class="s-dim" x1="${f1(x1)}" y1="${y}" x2="${f1(x2)}" y2="${y}"/><text class="s-text s-halo" x="${f1((x1 + x2) / 2)}" y="${y - 6}" text-anchor="middle">${metres(cut46.iv[0][0] - W)}</text>`);
+  }
+  o.push(`<text class="s-lane" x="${padL}" y="14">← Nr.${NNBSP}46 · Norden</text><text class="s-lane" x="${width - padL}" y="14" text-anchor="end">Süden · Nr.${NNBSP}42 →</text>`);
+  o.push(`</svg>`);
+  return o.join("");
+}
+const sectionTitle = i => {
+  const sec = DATA.sections[i];
+  const through = sec.buildings.map(cb => byKey.get(cb.k)).filter(b => b.main).map(b => (b.own ? "unser Bestandshaus" : b.address));
+  return `Schnitt ${i + 1} · ${metres(sec.depth, 1)} hinter der Straße, durch ${through.join(" und ")}`;
+};
+
+/* ---------- the § 34 chart ---------- */
+function bandChartSvg(s = 11) {
+  const bd = DATA.band, rowH = 16, left = 50, top = 12;
+  const rows = [...bd.houses.map(h => ({ kind: "house", label: houseNumber(h.address), from: h.front, to: h.rear })),
+    { kind: "own", label: "44", from: DATA.own.depthFrom, to: DATA.own.depthTo }, { kind: "plot", label: "unser", from: 0, to: bd.plotDepth }];
+  const maxD = Math.max(bd.plotDepth, bd.rearMax), width = Math.round(left + maxD * s + 30), height = top + rows.length * rowH + 28;
+  const X = v => left + v * s;
+  const o = [`<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="Wie weit die Nachbarhäuser hinter der Straße stehen">`];
+  o.push(`<rect class="p-band" x="${f1(X(bd.frontMin))}" y="${top - 6}" width="${f1((bd.rearMax - bd.frontMin) * s)}" height="${rows.length * rowH + 6}"/><rect class="p-band-front" x="${f1(X(bd.frontMin))}" y="${top - 6}" width="${f1((bd.frontMax - bd.frontMin) * s)}" height="${rows.length * rowH + 6}"/>`);
+  rows.forEach((r, i) => {
+    const y = top + i * rowH;
+    o.push(`<text class="bc-name" x="${left - 8}" y="${y + rowH / 2 + 3.5}" text-anchor="end">${esc(r.label)}</text>`);
+    if (r.kind === "plot") o.push(`<rect class="bc-plot" x="${X(0)}" y="${y + 3}" width="${f1(r.to * s)}" height="${rowH - 6}"/><rect class="bc-env" x="${f1(X(3))}" y="${y + 4.5}" width="${f1((bd.plotDepth - 6) * s)}" height="${rowH - 9}"/>`);
+    else o.push(`<rect class="${r.kind === "own" ? "bc-own" : "bc-house"}" x="${f1(X(r.from))}" y="${y + 3}" width="${f1((r.to - r.from) * s)}" height="${rowH - 6}" rx="2"/>`);
+  });
+  const base = top + rows.length * rowH + 4;
+  for (let v = 0; v <= maxD + .01; v += 5) {
+    o.push(`<line class="bc-axis" x1="${f1(X(v))}" y1="${base}" x2="${f1(X(v))}" y2="${base + (v % 10 === 0 ? 6 : 3)}"/>`);
+    if (v % 10 === 0) o.push(`<text class="bc-tick" x="${f1(X(v))}" y="${base + 17}" text-anchor="middle">${v}</text>`);
+  }
+  o.push(`<line class="bc-axis" x1="${X(0)}" y1="${base}" x2="${f1(X(maxD))}" y2="${base}"/><text class="bc-tick" x="${left - 8}" y="${base + 17}" text-anchor="end">m</text></svg>`);
+  return o.join("");
+}
+
+/* ---------- key graphic: the four boundaries, coloured where something stands ---------- */
+const BOUNDARIES = {
+  street: { name: "Zur Straße", status: "frei", label: ["Straße", "frei"] },
+  sideA: { name: "Seite zu Nr. 42", status: "grenz", label: [`Nr.${NNBSP}42 · an der Grenze · ${metres(n42.faceLength, 1)}`] },
+  sideB: { name: "Seite zu Nr. 46", status: "ueber", label: [`Nr.${NNBSP}46 · ${metres(n46.gap)} · 6-m-Zone`] },
+  rear: { name: "Hinten", status: "neben", label: ["hinten", "Neben-", "gebäude"] }
+};
+function keyGraphic() {
+  const L = 58, T = 30, len = edgeLength("sideA"), s = 212 / len, H = edgeLength("street") * s, R = L + len * s, B = T + H;
+  const X = u => L + u * s;
+  const seg = (role, d, marks, labelSvg) => `<g class="kg-seg${state.open?.role === role && state.open.kind === "strip" ? " is-open" : ""}" data-role="${role}" tabindex="0" role="button" aria-label="${BOUNDARIES[role].name}: Grenze ansehen">`
+    + `<path class="kg-focus" d="${d}"/><path class="kg-base" d="${d}"/>${marks}<path class="kg-hit" d="${d}"/>${labelSvg}</g>`;
+  const g42 = DATA.grenz[0];
+  const o = [`<svg viewBox="0 0 358 128" role="group" aria-label="Unsere vier Grenzen; eine Grenze wählen öffnet ihre Ansicht">`];
+  o.push(`<rect class="kg-plot" x="${L}" y="${T}" width="${f1(len * s)}" height="${f1(H)}"/><rect class="kg-strip" x="${L}" y="${T}" width="${f1(len * s)}" height="${f1(H)}"/><rect class="kg-plot" x="${f1(L + 3 * s)}" y="${f1(T + 3 * s)}" width="${f1((len - 6) * s)}" height="${f1(H - 6 * s)}"/>`);
+  // Top: side B, measured from the street (left). Bottom: side A.
+  o.push(seg("sideB", `M${L},${T}H${f1(R)}`, `<path class="kg-mark kg-mark--ueber" d="M${f1(X(hatch46.spanFrom))},${T - 3}H${f1(X(hatch46.spanTo))}"/>`,
+    `<rect class="p-bld--main" x="${f1(X(n46.faceFrom))}" y="${f1(T - 3 - n46.gap * s - 8)}" width="${f1((n46.faceTo - n46.faceFrom) * s)}" height="8"/><text class="kg-text" x="${L}" y="${T - 17}">${esc(BOUNDARIES.sideB.label[0])}</text>`));
+  o.push(seg("sideA", `M${L},${f1(B)}H${f1(R)}`, `<path class="kg-mark kg-mark--grenz" d="M${f1(X(g42.faceFrom))},${f1(B + 3)}H${f1(X(g42.faceTo))}"/>`,
+    `<rect class="p-bld--main" x="${f1(X(n42.faceFrom))}" y="${f1(B + 6)}" width="${f1((n42.faceTo - n42.faceFrom) * s)}" height="9"/><text class="kg-text" x="${L}" y="${f1(B + 28)}">${esc(BOUNDARIES.sideA.label[0])}</text>`));
+  o.push(seg("street", `M${L},${T}V${f1(B)}`, `<path class="kg-mark kg-mark--frei" d="M${L - 3},${T}V${f1(B)}"/>`,
+    `<text class="kg-text" x="${L - 9}" y="${f1(T + H / 2 - 2)}" text-anchor="end"><tspan class="kg-strong">Straße</tspan></text><text class="kg-text" x="${L - 9}" y="${f1(T + H / 2 + 11)}" text-anchor="end">frei</text>`));
+  const rear0 = shed.faceFrom, rear1 = shed.faceTo;
+  o.push(seg("rear", `M${f1(R)},${T}V${f1(B)}`, `<path class="kg-mark kg-mark--neben" d="M${f1(R + 3)},${f1(B - rear1 * s)}V${f1(B - rear0 * s)}"/>`,
+    `<rect class="p-bld--aux" x="${f1(R + 3 + shed.gap * s + 2)}" y="${f1(B - shed.spanTo * s)}" width="10" height="${f1((shed.spanTo - shed.spanFrom) * s)}"/><text class="kg-text" x="${f1(R + 22)}" y="${f1(T + H / 2 - 2)}"><tspan class="kg-strong">hinten</tspan></text><text class="kg-text" x="${f1(R + 22)}" y="${f1(T + H / 2 + 11)}">Neben­geb.</text>`));
+  o.push(`</svg>`);
+  return o.join("");
+}
+
+/* ---------- the tab content ---------- */
+const glyph = kind => `<svg class="glyph" viewBox="0 0 24 24" aria-hidden="true">${{
+  frei: `<rect x="3" y="6" width="18" height="12" rx="2" class="p-parcel" stroke="var(--w2b-map-boundary)" stroke-width="1.4"/><path d="M7 12.5l3 3 6-6" fill="none" stroke="var(--w2b-good)" stroke-width="1.8"/>`,
+  umgebung: `<rect x="2" y="7" width="20" height="10" class="p-band-front"/><line x1="5" y1="5" x2="5" y2="19" class="p-band-line"/><line x1="19" y1="5" x2="19" y2="19" class="p-band-line"/>`,
+  recht: `<rect x="5" y="3" width="14" height="18" rx="1.5" fill="none" stroke="var(--w2b-primary)" stroke-width="1.5"/><line x1="8" y1="8" x2="16" y2="8" stroke="var(--w2b-primary)" stroke-width="1.4"/><line x1="8" y1="12" x2="16" y2="12" stroke="var(--w2b-primary)" stroke-width="1.4"/><line x1="8" y1="16" x2="13" y2="16" stroke="var(--w2b-primary)" stroke-width="1.4"/>`,
+  offen: `<circle cx="12" cy="12" r="8.5" fill="none" stroke="var(--w2b-muted)" stroke-width="1.4" stroke-dasharray="3 2.5"/><text x="12" y="16" text-anchor="middle" font-family="var(--w2b-font-display)" font-weight="600" font-size="11" fill="var(--w2b-muted)">?</text>`
+}[kind]}</svg>`;
+
+function expansionHtml(f) {
+  if (!state.open || state.open.key !== f.key) return "";
+  if (state.open.kind === "strip") {
+    return `<div class="aufklapp" id="auf-${f.key}"><div class="aufklapp__kopf"><b>${esc(BOUNDARIES[f.role].name)}</b><span>${stripCaption[f.role]}</span><button type="button" data-close="1">Schließen</button></div>`
+      + `<div class="scroll-x" data-focus="${f1(18 + ({ sideA: 20, sideB: (hatch46.spanFrom + hatch46.spanTo) / 2 }[f.role] ?? 0) * 8.6)}">${stripSvg(f.role, `x-${f.key}`, 8.6)}</div></div>`;
+  }
+  return `<div class="aufklapp" id="auf-${f.key}"><div class="aufklapp__kopf"><b>Schnitt ${f.section + 1}</b><span>${metres(DATA.sections[f.section].depth, 1)} hinter der Straße · Blick von der Straße</span><button type="button" data-close="1">Schließen</button></div>`
+    + `<div class="scroll-x">${sectionSvg(f.section, `xs-${f.key}`, 11)}</div><p class="faint" style="padding:6px 10px">Unter dem Boden, von oben: unsere 3${NNBSP}m · die 3${NNBSP}m der Nachbarn · 6-m-Zone</p></div>`;
+}
+function findingHtml(f, lead) {
+  const buttons = [];
+  if (f.role) buttons.push(`<button type="button" class="knopf" data-open="strip" data-key="${f.key}" aria-expanded="${state.open?.key === f.key && state.open.kind === "strip"}">Grenze ansehen</button>`);
+  if (f.section != null) buttons.push(`<button type="button" class="knopf" data-open="section" data-key="${f.key}" aria-expanded="${state.open?.key === f.key && state.open.kind === "section"}">Im Schnitt</button>`);
+  if (f.key === "band") buttons.push(`<button type="button" class="knopf" data-frame-go="street">Auf der Straße zeigen</button>`);
+  const reading = f.reading ? `<div class="lesart"><span class="lesart__kopf">Lesart</span><div class="button-group" role="group" aria-label="Lesart für Lessingweg 42">`
+    + `<button type="button" data-reading="b" aria-pressed="${state.reading === "b"}">Abstand nötig</button><button type="button" data-reading="a" aria-pressed="${state.reading === "a"}">An die Grenze darf gebaut werden</button></div>`
+    + `<p>Voreingestellt ist „Abstand nötig“: die vorsichtige Lesart zeigt nie mehr bebaubare Fläche, als es geben könnte.</p></div>` : "";
+  const active = state.active != null && String(state.active) === String(f.k) ? " is-active" : "";
+  const title = f.k != null ? `<button type="button" class="befund__titel" data-pin="${f.k}">${esc(f.title)}</button>` : `<span class="befund__titel" style="cursor:default">${esc(f.title)}</span>`;
+  return `<div class="befund${active}" data-k="${f.k}" data-key="${f.key}">${lead}<span class="befund__zeile">${title}<span class="chip chip--${f.kind}">${esc(f.chip)}</span><span class="befund__wert">${esc(f.value)}</span></span>`
+    + `<div class="befund__text"><p>${esc(f.paragraphs[0])}</p>${f.reading ? "" : f.paragraphs.slice(1).map(p => `<p>${esc(p)}</p>`).join("")}${f.source ? `<p class="quelle-zeile">${esc(f.source)}</p>` : ""}</div>`
+    + reading + (f.reading ? `<div class="befund__text"><p>${esc(f.paragraphs[1])}</p></div>` : "")
+    + (buttons.length ? `<div class="befund__knoepfe">${buttons.join("")}</div>` : "") + expansionHtml(f) + `</div>`;
+}
+function renderTab() {
+  const list = numbered();
+  document.getElementById("n-zaehler").textContent = `${list.length} eingeordnet · ${DATA.distant.count} ohne Befund`;
+  document.getElementById("schluessel").innerHTML = keyGraphic();
+  document.getElementById("befunde").innerHTML = list.map(f => findingHtml(f, `<button type="button" class="nummer" data-pin="${f.k}" aria-label="Im Plan zeigen: ${esc(f.title)}">${f.marker}</button>`)).join("")
+    + `<div class="trenner eyebrow">Ohne Marke</div>` + [STREET, BAND, DISTANT].map(f => findingHtml(f, glyph(f.kind === "frei" ? "frei" : f.kind))).join("");
+  document.getElementById("recht").innerHTML = [findings.plan(), findings.easement(), findings.unknown()].map(f => findingHtml(f, glyph(f.kind))).join("");
+}
+function renderDetail() {
+  document.getElementById("d-streifen").innerHTML = ["street", "sideA", "sideB", "rear"].map(role => {
+    const f = role === "street" ? STREET : numbered().find(x => x.role === role && x.kind !== "bestand");
+    return `<div class="grenzzeile"><div class="grenzzeile__kopf"><h3>${BOUNDARIES[role].name}</h3><span class="faint mono">${metres(edgeLength(role), 1)}</span><span class="chip chip--${f.kind}">${esc(f.chip)}</span></div>`
+      + `<div class="scroll-x">${stripSvg(role, `d-${role}`, 10.2)}</div><span class="faint">${stripCaption[role]} · oben Nachbarseite, unten unser Grundstück</span><p>${esc(f.paragraphs.join(" "))}</p></div>`;
+  }).join("");
+  document.getElementById("d-schnitt").innerHTML = [0, 1].map(i => `<div class="schnitt-block"><h3>${esc(sectionTitle(i))}</h3><div class="scroll-x">${sectionSvg(i, `ds-${i}`, 14)}</div></div>`).join("");
+  document.getElementById("d-lesart").textContent = state.reading === "b" ? "Lesart: Abstand nötig" : "Lesart: an die Grenze";
+}
+document.getElementById("d-bandchart").innerHTML = bandChartSvg(11);
+document.getElementById("d-bandtext").textContent = BAND.paragraphs[0];
+
+/* ---------- tab interactions ---------- */
+function openAnalysis(kind, key) {
+  const same = state.open && state.open.kind === kind && state.open.key === key;
+  if (same) { state.open = null; }
+  else {
+    const f = [...numbered(), STREET].find(x => x.key === key);
+    state.open = { kind, key, role: f.role, section: f.section };
+  }
+  renderTab(); render();
+  const el = state.open && document.getElementById(`auf-${state.open.key}`);
+  if (el) {
+    // A long boundary opens at the stretch that matters, not at its street corner.
+    const box = el.querySelector(".scroll-x[data-focus]");
+    if (box) box.scrollLeft = Math.max(0, Number(box.dataset.focus) - box.clientWidth / 2);
+    el.scrollIntoView({ block: "nearest", behavior: reduceMotion ? "auto" : "smooth" });
+  }
+}
+const facts = document.querySelector(".facts");
+facts.addEventListener("click", e => {
+  const t = e.target;
+  const open = t.closest("[data-open]"); if (open) { openAnalysis(open.dataset.open, open.dataset.key); return; }
+  if (t.closest("[data-close]")) { state.open = null; renderTab(); render(); return; }
+  const rd = t.closest("[data-reading]"); if (rd) { state.reading = rd.dataset.reading; renderTab(); renderDetail(); render(); return; }
+  const pn = t.closest("[data-pin]"); if (pn) { pin(pn.dataset.pin); return; }
+  const fr = t.closest("[data-frame-go]"); if (fr) { flyTo(fr.dataset.frameGo); return; }
+  const seg = t.closest(".kg-seg"); if (seg) { openBoundary(seg.dataset.role); }
+});
+facts.addEventListener("keydown", e => {
+  const seg = e.target.closest(".kg-seg");
+  if (seg && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openBoundary(seg.dataset.role); }
+});
+facts.addEventListener("pointerover", e => { const b = e.target.closest(".befund[data-k]"); if (b && b.dataset.k !== "null" && state.pinned == null && state.active !== b.dataset.k) setActive(b.dataset.k); });
+facts.addEventListener("pointerleave", () => { if (state.pinned == null && state.active != null) setActive(null); });
+function openBoundary(role) {
+  const f = role === "street" ? STREET : numbered().find(x => x.role === role && x.kind !== "bestand");
+  openAnalysis("strip", f.key);
+  document.querySelector(`.kg-seg[data-role="${role}"]`)?.focus({ preventScroll: true });
+}
+
+function showPane(pane) {
+  state.pane = pane;
+  document.querySelectorAll(".side-tabs [role=tab]").forEach(t => {
+    const on = t.dataset.pane === pane;
+    t.setAttribute("aria-selected", String(on)); t.tabIndex = on ? 0 : -1;
+  });
+  document.querySelectorAll(".side-pane").forEach(p => { p.hidden = p.id !== `pane-${pane}`; });
+  flyTo(pane === "nachbarschaft" ? "neighbours" : "plot");
+}
+const tablist = document.querySelector(".side-tabs");
+tablist.addEventListener("click", e => { const t = e.target.closest("[role=tab]"); if (t) showPane(t.dataset.pane); });
+tablist.addEventListener("keydown", e => {
+  const order = ["plot", "building", "nachbarschaft"], i = order.indexOf(state.pane);
+  const next = { ArrowRight: order[(i + 1) % 3], ArrowLeft: order[(i + 2) % 3] }[e.key];
+  if (next) { e.preventDefault(); showPane(next); document.getElementById(`tab-${next}`).focus(); }
+});
+document.querySelectorAll(".zoom button").forEach(b => b.addEventListener("click", () => flyTo(b.dataset.frame)));
+document.getElementById("house-edit").addEventListener("click", () => showPane("building"));
+const toggle = (id, key) => document.getElementById(id).addEventListener("click", e => { state[key] = !state[key]; e.currentTarget.setAttribute("aria-pressed", String(state[key])); render(); });
+toggle("t-masse", "dims"); toggle("t-abstand", "setbacks");
+
+// Bebauung: the ratio slider is the app's own; the house follows it.
+const ratio = document.getElementById("ratio");
+function showSize() {
+  const sz = houseSize(state.house.ratio);
+  document.getElementById("ratio-out").textContent = num(state.house.ratio, 2);
+  document.getElementById("b-size").innerHTML = `${num(sz.width, 1)} × ${num(sz.depth, 1)} m <span class="faint" title="aus der bebauten Fläche geschätzt">≈</span>`;
+  document.getElementById("house-name").textContent = `${DATA.house.manufacturer} ${DATA.house.name} · ${num(sz.width, 1)} × ${num(sz.depth, 1)} m`;
+}
+ratio.value = String(state.house.ratio);
+ratio.addEventListener("input", () => { state.house.ratio = Number(ratio.value); showSize(); render(); });
+showSize();
+
+// Legend
+const swatch = inner => `<svg viewBox="0 0 34 22" aria-hidden="true"><defs>${patterns("lg")}</defs>${inner}</svg>`;
+document.getElementById("legende").innerHTML = [
+  [`<rect width="34" height="22" class="p-parcel"/><line x1="4" y1="11" x2="30" y2="11" class="p-halo"/><line x1="4" y1="11" x2="30" y2="11" class="p-boundary"/>`, "Unsere Flurstücksgrenze (ALKIS)"],
+  [`<rect width="34" height="22" class="p-parcel"/><rect width="34" height="8" class="p-setback"/><line x1="0" y1="8" x2="34" y2="8" class="p-envelope"/>`, "Abstandsfläche 3 m und Bebauungsfenster nach § 6; es bewegt sich nicht"],
+  [`<rect x="6" y="4" width="22" height="14" class="p-bld p-bld--main"/>`, "Nachbarhaus (ALKIS: Wohngebäude)"],
+  [`<rect x="9" y="6" width="16" height="10" class="p-bld p-bld--aux"/>`, "Nebengebäude, zählt für § 6 nicht"],
+  [`<rect width="34" height="22" class="p-parcel"/><rect x="8" y="5" width="18" height="12" class="p-bld p-bld--own"/>`, "Bestand auf unserem Grundstück"],
+  [`<rect width="34" height="22" class="p-parcel"/><rect x="7" y="4" width="20" height="14" class="p-house"/>`, "Baukörper: amber umrandet in der 6-m-Zone, rot außerhalb des Fensters"],
+  [`<rect width="34" height="22" class="p-parcel"/><rect width="34" height="9" fill="url(#lg-hint)"/><rect width="34" height="9" class="p-hatch"/>`, "Mindestabstand eines Nachbarhauses, der herüberreicht"],
+  [`<rect width="34" height="22" class="p-parcel"/><rect x="0" y="4" width="34" height="12" fill="url(#lg-zone)"/><rect x="0" y="4" width="34" height="12" class="p-zone-edge"/>`, "6-m-Zone: hier stünden die Häuser näher als 6 m; das klärt die Bauaufsicht"],
+  [`<rect width="34" height="22" class="p-parcel"/><line x1="0" y1="6" x2="34" y2="6" class="p-boundary"/><line x1="6" y1="9.5" x2="28" y2="9.5" class="p-grenz"/>`, "Grenzbebauung: Abschnitt unserer Grenze"],
+  [`<rect width="34" height="22" class="p-setback"/><rect x="3" y="3" width="28" height="16" class="p-possible"/>`, "Lesart „an die Grenze“: möglicherweise bebaubar"],
+  [`<rect width="34" height="22" class="p-parcel"/><rect x="5" y="0" width="22" height="22" class="p-band"/><line x1="5" y1="0" x2="5" y2="22" class="p-band-line"/><line x1="27" y1="0" x2="27" y2="22" class="p-band-line"/>`, "Umgebung nach § 34, im Ausschnitt „Straße“"]
+].map(([s, t]) => `<div>${swatch(s)}<span>${t}</span></div>`).join("");
+
+/* ---------- start ---------- */
+sizePlan();
+state.view = target(state.frame);
+renderTab(); renderDetail(); render();
+let resizeTimer = null;
+const onResize = () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { const before = VW; sizePlan(); if (VW !== before) { state.view = target(state.frame); render(); } }, 100); };
+if (typeof ResizeObserver === "function") new ResizeObserver(onResize).observe(stage); else window.addEventListener("resize", onResize);
+window.__mock = { state, flyTo, openAnalysis, render, showPane };
+})();
+</script>
