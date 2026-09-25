@@ -142,7 +142,15 @@ export default {
   computed: {
     reading() { return classifyQuery(this.text); },
     /** What lit up on its own, before anyone overruled it. */
-    readChips() { return this.pastedHtml ? ["page"] : chipsFor(this.reading); },
+    /* A link wins over the markup that came with it. Copying a link out of a
+     * browser, a mail or a chat puts `<a href="…">` on the clipboard as well,
+     * and read as a pasted page that is a page with nothing in it: the server
+     * answered 503 for an advert it fetches without trouble. A whole page never
+     * reads as a bare link, so nothing a real paste carries is lost here. */
+    readChips() {
+      if (this.pastedHtml && this.reading.kind !== "url") return ["page"];
+      return chipsFor(this.reading);
+    },
     kind() { return this.fixedKind || this.readChips[0] || null; },
     kindsLabel() {
       if (this.fixedKind) return "Festgelegt als";

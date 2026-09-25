@@ -30,7 +30,7 @@ from ..schemas import (
 from ..settings import AppSettings, MotisSettings
 from ..upstream import request
 
-SERVICE_NAME = "Der Routing-Dienst (MOTIS/Transitous)"
+SERVICE_NAME = "Der Routing-Dienst (MOTIS)"
 # Routing is the one part of the appraisal nothing else depends on.
 ADVICE = (
     "Die Erreichbarkeiten lassen sich später erneut berechnen; Fläche, "

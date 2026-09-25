@@ -8,7 +8,6 @@ __pycache__/
 .pytest_cache/
 .env
 .cache/
-motis/data-input/
 
 # Build artefact: the official Saxon address coordinates, rebuilt quarterly.
 backend/data/hauskoordinaten-sachsen.json.gz
@@ -19,3 +18,6 @@ backend/data/hauskoordinaten-sachsen.json.gz
 # them and an absent directory fails the build.
 backend/ca/*.crt
 frontend/ca/*.crt
+
+# The sandbox-only runtime CA override, see docs/claude/tooling-and-tests.md.
+.sandbox-ca.yml

@@ -122,8 +122,12 @@ from the user directly. Reopen only if the user asks.
   reached only through a chosen tolerance is `mehrdeutig`. Everything
   inferential (a rounded area, a street, land use, a broker's distance) may
   only order the list, which is why the weights can ship uncalibrated: they
-  can produce an unhelpful ordering, never a wrong answer. See
-  `backend/app/search/`.
+  can produce an unhelpful ordering, never a wrong answer. One exception,
+  asked for by the user on 24.09.2026: a parcel an *area* search finds whose
+  dominant `tntxt` use is traffic (Straßenverkehr, Weg, Platz, Bahn-, Flug-,
+  Schiffsverkehr) is taken out, in a line of its own that names it. A parcel
+  the listing names by number is never taken out — a driveway recorded as Weg
+  is often part of the set. See `backend/app/search/`.
 - **The administration area is configuration first, database second.**
   `ADMIN_ACCOUNTS` names account keys and is the bootstrap; everybody else is
   promoted in the interface, where the flag lives on `users`. Configuration
@@ -212,11 +216,10 @@ scripts/setup-build-ca.sh
 docker compose up --build --remove-orphans     # http://localhost:8080
 docker compose down --remove-orphans           # volumes stay; -v throws them away
 
-# routing on this machine instead of Transitous -- opt-in, off by default.
-# fetch-data.sh pulls the OSM extract and the DELFI GTFS; the first start
-# imports for ~3.5 min into the motis-graph volume, after that it is seconds.
-./motis/fetch-data.sh
-docker compose -f docker-compose.yml -f docker-compose.local-routing.yml up --build
+# the stack routes on its own MOTIS: the first start downloads ~640 MB and
+# imports for ~7 min at 5.6 GiB peak, after that it is seconds. Where that
+# memory is not there, route against Transitous instead:
+docker compose -f docker-compose.yml -f docker-compose.transitous.yml up --build
 
 # reading a listing's attached cadastral extract -- optional, and the search
 # says so in /api/health when it is missing
@@ -254,15 +257,15 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 790 passed, 60 skipped (783 and 67 where Tesseract is missing). With `TEST_DATABASE_URL` pointed at a
+- `pytest`: 805 passed, 60 skipped (793 and 72 where Tesseract is missing). With `TEST_DATABASE_URL` pointed at a
   real Postgres the account store and the administration area run too; they are
   skipped rather than mocked because what they check is the database's own
   behaviour. Of the rest, one needs pyosmium, which only the index builder
-  wants, and seven need Tesseract — this sandbox has it, and for that reason
+  wants, and twelve need Tesseract — this sandbox has it, and for that reason
   never run two suites at once here. Three Tesseract tests failed on a run
   sharing the machine with another pytest, and they failed exactly as a
   photograph of a lawn does: an empty reading, past the 30 s timeout.
-- `vitest`: 739 passed — plus the integration file, excluded by `npm run test`
+- `vitest`: 745 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
 - `scripts/bookmarklet.mjs`: the handover across two origins, against the built
   app and a backend on :8000. It asserts the coordinate, which is the field

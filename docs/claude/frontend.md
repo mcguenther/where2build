@@ -176,18 +176,24 @@ that collapsed at 390 px. None of them threw.
   finished feature as missing, which is worse than saying nothing. It reads
   `state.sync.active` instead of asserting anything.
 
-- **On a phone a radial veil cannot rescue a backdrop, because the text fills
-  the box in both directions.** The reception's quiet core is a
-  `radial-gradient` at 34% of the width, which works on a desktop where the
-  field sits in the middle of a wide drawing. At 390 px the headline and the
-  sentence take nearly the whole width and the field, the three lines and the
-  account note take the whole height: widened enough to clear the type it
-  wipes the drawing out entirely, and anywhere it fades the fabric runs
-  straight through a line of text — the route crossed one, which is where a
-  backdrop stops being one. So the *drawing* steps back there
-  (`.hero__art svg{ opacity: .42 }`) and the core only softens the middle.
-  The opacity goes on the svg, never on `.hero__art`: the veil is that
-  element's own `::after` and would fade with it.
+- **A backdrop anchored to the window loses whatever it anchors off-centre.**
+  The reception's plot was part of a drawing centred on the window, 664 px
+  left of the middle: cut off below 1330 px of width, gone below 940, never
+  seen on a phone. And the drawing hung from the top while the type was
+  centred vertically, so a taller window pushed the headline away from it.
+  The drawing now hangs off `.hero__headline` and is sized in its `em`, so it
+  shrinks with the type and the room beside a 20ch headline always holds it;
+  below 700 px it moves into the top right corner, cut off by the upper edge.
+  The plot is a second svg above the veil, so the fabric can fade around it
+  without the one parcel that matters fading too.
+
+- **Chromium drops a `radial-gradient` whose size mixes a percentage with a
+  length** -- `min(34%, 470px)`, `calc(30% + 10px)` -- and with it the whole
+  `background` declaration. Nothing in the console. The reception's veil was
+  written that way and never painted on a desktop, which is why the fabric ran
+  straight through the headline. `min(40vw, 580px)` is accepted; test a
+  gradient with `el.style.backgroundImage = …` and read it back, an empty
+  string means it was rejected.
 
 - **`handoff` and `handover` are one letter apart and different things.**
   `lib/handoff.js` is what the start page leaves behind for the wizard — an
@@ -391,3 +397,15 @@ that collapsed at 390 px. None of them threw.
   manual entry, a destination's address, the read values, the plot's name,
   price and note). Not the second confirmation of the red button, and not
   „Trotzdem anlegen": overriding a doubt takes a click on the words that say so.
+
+- **A copied link carries markup, and the markup made it a page.** `QueryBox`
+  lit „Eingefügte Anzeige“ whenever the paste event had `text/html` — and a
+  link copied out of Firefox, a mail or a chat has `<a href="…">` there. So the
+  Kleinanzeigen link went to `/api/listings/extract` as `{text: …}`, the server
+  read the address itself as the advert, found nothing and answered **503**
+  with the „weder eine Adresse noch eine Koordinate …“ sentence (559 bytes in
+  the nginx log, which is how it was told apart from the two other 503s), while
+  the same URL sent as `{url: …}` answered 200. Reported on 24.09.2026 from a
+  local compose stack; the container fetched the page fine. A text that reads
+  as a bare link now stays a link whatever markup came with it — a whole
+  pasted page never reads as one, so no real paste loses its markup.

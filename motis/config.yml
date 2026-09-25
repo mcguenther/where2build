@@ -1,8 +1,9 @@
-# MOTIS 2.11 configuration for the optional local routing service.
+# MOTIS 2.11 configuration for the routing service in docker-compose.yml.
 #
-# Paths are the ones `fetch-data.sh` writes into `motis/data-input/`, which
-# docker compose mounts read-only at /data-input. `motis import` copies this
-# file into the built graph, so `motis server` never reads the inputs again.
+# Paths are the ones `backend/scripts/fetch_routing_data.py` writes into the
+# `routing-input` volume, which docker compose mounts read-only at /data-input.
+# `motis import` copies this file into the built graph, so `motis server` never
+# reads the inputs again.
 #
 # What is deliberately absent: `tiles` (the app brings its own basemap, and the
 # tile import is the expensive half of a MOTIS build) and `elevators`/`gbfs`

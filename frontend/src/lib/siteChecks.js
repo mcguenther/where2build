@@ -73,7 +73,9 @@ const WITHOUT_SOURCE = [
 const failed = block => Boolean(block?.fehler);
 
 const radiusText = metres =>
-  metres === 1000 ? "eines Kilometers" : `${Math.round(metres)} m`;
+  metres === 1000 ? "eines Kilometers"
+    : metres > 1000 && metres % 1000 === 0 ? `${metres / 1000} km`
+    : `${Math.round(metres)} m`;
 
 /**
  * One designation, as the templates want it.
@@ -114,7 +116,7 @@ export function siteFindings(answer) {
         day: rename(answer.laerm?.tag, NOISE_SOURCES),
         night: rename(answer.laerm?.nacht, NOISE_SOURCES),
         mappedNearby: Boolean(answer.laerm?.kartiert_umkreis),
-        lowestBand: answer.laerm?.unterste_stufe_db ?? 45
+        radius: radiusText(answer.laerm?.umkreis_m ?? 2000)
       });
 
   const ground = failed(answer.baugrund)
@@ -207,17 +209,17 @@ export function siteTally(checks) {
 }
 
 /**
- * Whether the noise layer has anything to draw around this plot.
+ * Whether the noise survey has a value for the plot itself.
  *
  * The tiles cannot say: where the survey mapped nothing they answer 200 with a
  * transparent image, so an empty layer looks exactly like a quiet one. The
- * check can — it asked the same survey, with the plot's outline and a radius.
+ * check can — it asked the same survey with the plot's outline. `null` while
+ * there is no answer to go by, so a map does not grey out before it knows.
  */
-export function noiseMapped(answer) {
+export function noiseOnPlot(answer) {
   const noise = answer?.laerm;
-  if (!noise || failed(noise)) return false;
-  const onThePlot = Object.values(noise.tag ?? {}).some(bands => (bands ?? []).length);
-  return onThePlot || Boolean(noise.kartiert_umkreis);
+  if (!noise || failed(noise)) return null;
+  return Object.values(noise.tag ?? {}).some(bands => (bands ?? []).length);
 }
 
 /* Re-exported so a view can colour a row without importing the templates. */

@@ -133,34 +133,39 @@ export function noiseInterpretation(daySpan, nightSpan, source = "road") {
 /**
  * Noise.
  *
- * Three outcomes, not two. A hit gives the range. No hit inside a mapped area
- * means below the lowest band the survey draws. No mapping at all means no
- * statement — the plot is not quiet, it is unsurveyed, and the difference is
- * the whole point.
+ * A hit gives the range. Anything else is no value, and no value is never
+ * quiet: the state survey maps main roads, trams in three cities and two
+ * airports, so the street in front of a plot in no band is simply not in it —
+ * a Bahnhofstraße in Naunhof, with a mapped Bundesstraße 1,5 km away, looked
+ * as green as a meadow. Both no-value cases are therefore something to look at,
+ * and they differ only in what can be said about the surroundings.
  *
  * @param {{day: Object<string,string[]>, night: Object<string,string[]>,
- *          mappedNearby: boolean, lowestBand: number}} data
+ *          mappedNearby: boolean, radius: string}} data
  */
 export function noiseFinding(data) {
-  const { day = {}, night = {}, mappedNearby = false, lowestBand = 45 } = data ?? {};
+  const { day = {}, night = {}, mappedNearby = false, radius = "2 km" } = data ?? {};
   const sources = Object.keys(day).filter(key => (day[key] ?? []).length);
   const daySpan = bandSpan(sources.flatMap(key => day[key]));
 
   if (!daySpan) {
+    const unknown = "Wie laut es am Grundstück ist, sagt die Karte damit nicht — "
+      + "das lässt sich nur vor Ort hören, am besten zur Hauptverkehrszeit.";
     if (!mappedNearby) {
       return {
-        status: OPEN,
-        value: "nicht kartiert",
-        text: "Für diesen Ort liegt keine Umgebungslärmkartierung vor. Die Kartierung "
-          + "erfasst Ballungsräume und Hauptverkehrswege; das Grundstück liegt außerhalb. "
-          + "Das ist keine Aussage über die Ruhe am Ort."
+        status: NOTE,
+        value: "keine Lärmdaten",
+        text: `Im Umkreis von ${radius} ist nichts kartiert. Die Umgebungslärmkartierung `
+          + "erfasst nur Hauptverkehrsstraßen, die Straßenbahn in Leipzig, Dresden und Chemnitz "
+          + `und die Flughäfen. ${unknown}`
       };
     }
     return {
-      status: GOOD,
-      value: `unter ${lowestBand} dB(A)`,
-      text: `Das Grundstück liegt im kartierten Gebiet, aber in keinem Lärmband. `
-        + `Damit liegt der Pegel unter der untersten kartierten Stufe von ${lowestBand} dB(A).`
+      status: NOTE,
+      value: "keine Lärmdaten",
+      text: "Das Grundstück liegt in keinem Lärmband. Kartiert sind nur Hauptverkehrsstraßen, "
+        + "Straßenbahn und Flughäfen; die Straßen am Grundstück selbst sind darin nicht "
+        + `erfasst. ${unknown}`
     };
   }
 

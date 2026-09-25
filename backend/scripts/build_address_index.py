@@ -30,6 +30,7 @@ import csv
 import gzip
 import io
 import json
+import os
 import re
 import sys
 import time
@@ -51,8 +52,6 @@ from app.address_index import (  # noqa: E402
     house_number,
 )
 from app.settings import get_settings  # noqa: E402
-
-DEFAULT_OUTPUT = BACKEND_DIR / "data" / "hauskoordinaten-sachsen.json.gz"
 
 # Columns of hk_sn_adressen_*.txt, verified against the file's own header row.
 # `zone` is read only to be checked: the whole state is UTM zone 33, and a row
@@ -290,8 +289,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--out",
         type=Path,
-        default=DEFAULT_OUTPUT,
-        help=f"Output file (default: {DEFAULT_OUTPUT}).",
+        # Where the API reads it (ADDRESSES_INDEX_PATH), so a container builds
+        # into the same place without having to be told twice.
+        default=settings.addresses.index_path,
+        help=f"Output file (default: {settings.addresses.index_path}).",
     )
     parser.add_argument(
         "--keep-download",
@@ -306,7 +307,10 @@ def main(argv: list[str] | None = None) -> int:
     downloaded: Path | None = None
     archive = args.archive
     if args.download:
-        downloaded = archive or (BACKEND_DIR / ".cache" / "hauskoordinaten" / Path(args.url).name)
+        # APP_CACHE_DIR when it is set: in the image the package directory
+        # belongs to root, and this runs as the unprivileged user.
+        cache_root = Path(os.environ.get("APP_CACHE_DIR") or (BACKEND_DIR / ".cache"))
+        downloaded = archive or (cache_root / "hauskoordinaten" / Path(args.url).name)
         archive = download(args.url, downloaded, user_agent=settings.app.user_agent)
 
     if not archive.is_file():

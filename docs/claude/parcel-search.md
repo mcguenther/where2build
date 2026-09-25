@@ -109,6 +109,20 @@ also "Decisions that are settled" in `CLAUDE.md`.
   Wohnbaufläche" is an inference, not an official fact. The same field is where
   street surfaces come from: no OSM request needed to draw a carriageway.
 
+- **Traffic is the one land use that excludes, and only by its dominant
+  share.** Measured 24.09.2026 over Großbothen, Mölkau and Plagwitz (3 688
+  parcels): 400 are mostly Straßenverkehr, 28 Weg, 19 Platz, 15 Bahnverkehr —
+  and an exact area matches them as readily as a plot. 456 m² in Großbothen is
+  32/1 (Wohnbaufläche) and 856/21 (Straßenverkehr); before the road was set
+  aside that run ended „mehrdeutig“. `scoring.not_a_plot` reads the *dominant*
+  use, because a mention says nothing: `Weg;0.00|Landwirtschaft;577` was the
+  B7 plot. Only area routes apply it (staircase, municipality widening,
+  Gegenprobe); a number the listing names is kept whatever it is. The counts of
+  the staircase still include the roads — the filter would need a negated
+  `PropertyIsLike`, which matches any mention and so is the wrong rule.
+  Everything else in the vocabulary — Wald, Landwirtschaft, Gehölz, Unland,
+  Gewerbe, Grünanlage, even water and Friedhof — still only ranks.
+
 - **For OCR, upscaling beats rotation handling.** Measured on the ad's Geoportal
   print: a 2x Lanczos upscale (long edge ≥ 1500 px) fixed `--psm 1`'s blindness
   to a 180° flip, fixed a 7° tilt with no deskewing at all, and lifted the
@@ -436,8 +450,54 @@ also "Decisions that are settled" in `CLAUDE.md`.
   So an Indiz from an image carries `bild_url` and the conflict block shows the
   sheet: the choice is made against the document rather than against a
   transcription of it. A Geoportal print carries dozens of neighbouring numbers
-  on the map body — only the labelled one in the title block is ever read, which
-  is what keeps that safe.
+  on the map body — only the labelled one in the title block is ever read, or
+  the one inside a red frame the seller drew (below), which is what keeps that
+  safe.
+
+- **A Flurkarte can carry its number only inside the seller's red frame.**
+  Advert 3520842196 (Leipzig-Engelsdorf, 23.09.2026) attaches a Geoportal
+  „Flurkarte“ printed with an empty title: `Titel: Flurkarte`, `Untertitel:`
+  blank, no „Flurstück“ anywhere. The plot is a red frame round the in-map
+  label 166/17, and the page pass does not even return that label — so the run
+  ended `mehrdeutig` on twelve parcels of exactly 590 m², among them **166/16
+  next door at the same size**, which no area can separate. `ocr.marked_region`
+  finds strongly red pixels, flood-fills from outside *within their bounding
+  box* (the whole sheet took 1,05 s in Pillow's Python fill, the box 0,05 s),
+  paints everything outside the frame white — a crop to the box would still
+  show 166/16, 166/c and 178/b, because the parcel is turned ~35° — and reads
+  the grey, autocontrasted crop with `--psm 11`. Four things measured on it:
+  `--psm 6` returns „Fi“ for the same crop; in colour the crop read „166/17“ on
+  one run and „4166/17“ on the next; no single enlargement reads every sheet
+  (x4 read „90111“ off the Großbothen frame, x6 read „166/417“ off the
+  Engelsdorf one turned by −5°, x5 missed it at +3°), so the crop is read at
+  x4, x5 and x6 and a number counts only when two agree; and only the fraction
+  form is taken inside a frame, because the house numbers 10 and 12 sit right
+  beside it. It runs only when no labelled number was found, costs ~0,7 s on a
+  sheet with a frame and nothing on a photograph (no frame, no pass). The
+  Großbothen print has a frame too and it reads 790/11 — agreeing with its
+  title block, which answers first. Below ~0,75 of the served size the label
+  is ~7 px tall and nothing reads; that is an empty answer, not a wrong one.
+
+- **The images on a Kleinanzeigen page are not all the listing's.** Below the
+  gallery sit the seller's other adverts, same CDN, same JSON-LD shape — three
+  of eleven picture URLs on the Engelsdorf page, one of them a plot in
+  Großbothen, and three of six on the older Neukieritzsch recording. Every one
+  of them was read as this listing's evidence. Only the gallery's `<img>` tags
+  carry `itemprop="image"`, and `parse_images` now keeps what they name.
+
+- **Conflicts were collected once, before the images were read.** So a number
+  off a Flurkarte was never compared with the body text: whichever of the two
+  the cadastre resolved replaced the other, and nobody was asked. Worse, a text
+  number whose parcel has the wrong area is set aside (`verworfen`) *before*
+  the images, so it was not even a rival any more. `_new_conflicts()` asks
+  again after the images and counts a number the area set aside as a reading
+  still; the Konflikt then comes marked as settled by the area, with the
+  reason, and the other option stays on offer. Choosing it used to be
+  decoration — a Flurstück decision only reordered `active()`, the re-run
+  looked both numbers up again and the image's won as before. The lookup now
+  follows the choice (`followed_numbers()`, as `anchors()` already does for a
+  district), and a number a person picked is not set aside for its area: it
+  stands, and the answer says 997 against 590 m² instead.
 
 - **A jump that only moves the camera does not say what it jumped to.** The
   map arrived somewhere and left the reader to guess which of the things on it
