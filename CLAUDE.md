@@ -262,7 +262,7 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
   never run two suites at once here. Three Tesseract tests failed on a run
   sharing the machine with another pytest, and they failed exactly as a
   photograph of a lawn does: an empty reading, past the 30 s timeout.
-- `vitest`: 735 passed — plus the integration file, excluded by `npm run test`
+- `vitest`: 736 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
 - `scripts/bookmarklet.mjs`: the handover across two origins, against the built
   app and a backend on :8000. It asserts the coordinate, which is the field

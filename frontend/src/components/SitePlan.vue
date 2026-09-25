@@ -13,6 +13,7 @@
       'site-plan--panning': panning
     }"
     :viewBox="`0 0 ${width} ${height}`"
+    :aria-busy="groundSettled ? null : 'true'"
     role="img"
     :aria-label="ariaLabel"
     @pointerdown="pointerDown"
@@ -35,8 +36,12 @@
       </pattern>
     </defs>
 
-    <!-- What stands while a tile ground is on its way: the paper alone. -->
-    <rect v-if="!hasBackdrop" x="0" y="0" :width="width" :height="height" :fill="backgroundFill" />
+    <!-- What stands while a tile ground is on its way: a placeholder with the
+         same pulse as every other one in the app, so the wait reads as alive
+         rather than as an empty frame. -->
+    <rect v-if="!hasBackdrop" x="0" y="0" :width="width" :height="height"
+          :fill="groundSettled ? backgroundFill : 'var(--w2b-line-faint)'"
+          :class="{ 'site-plan__placeholder': !groundSettled }" />
 
     <!-- With a tile ground the whole drawing waits for it and then appears in
          one go: an outline first and its surroundings a moment later reads as
@@ -1022,8 +1027,10 @@ export default {
    shows the drawing regardless. */
 .site-plan__content{ transition: opacity .24s ease-out; }
 .site-plan__content.is-waiting{ opacity: 0; }
+.site-plan__placeholder{ animation: w2b-pulse 1.5s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce){
   .site-plan__content{ transition: none; }
+  .site-plan__placeholder{ animation: none; opacity: .7; }
 }
 /* The parcels on offer. Deliberately quiet: the plot itself keeps the halo and
    the drawn contour, and a candidate is a thin outline with its number — a

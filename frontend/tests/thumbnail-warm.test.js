@@ -161,6 +161,16 @@ describe("Einblenden des Vorschaubilds", () => {
     expect(contentOf(wrapper).attributes("data-ground")).toBe("ready");
   });
 
+  it("zeigt beim Warten einen pulsierenden Platzhalter und danach die Fläche", async () => {
+    const wrapper = mount(PlotThumbnail, { props: { plot: state.data.plots[0] } });
+    expect(wrapper.find(".site-plan__placeholder").exists()).toBe(true);
+    expect(wrapper.find("svg").attributes("aria-busy")).toBe("true");
+
+    await groundOf(wrapper).trigger("load");
+    expect(wrapper.find(".site-plan__placeholder").exists()).toBe(false);
+    expect(wrapper.find("svg").attributes("aria-busy")).toBeUndefined();
+  });
+
   it("wartet von vorn, wenn sich der Ausschnitt ändert", async () => {
     const wrapper = mount(PlotThumbnail, { props: { plot: state.data.plots[0] } });
     await groundOf(wrapper).trigger("load");

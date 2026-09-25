@@ -230,7 +230,10 @@ routines under it.
   the fading group, because a group below opacity 1 is isolated and the
   ground's `multiply`/`screen` would otherwise blend against nothing and flash
   white during the fade. Measured cold: 0 of 796 sampled frames showed a
-  drawing whose ground was still loading. A block with one failed tile is an error,
+  drawing whose ground was still loading. While it waits, the paper under the
+  group is a `.site-plan__placeholder` with the app's own `w2b-pulse` — the
+  same pulse as the check list and the route cards — and the svg carries
+  `aria-busy`; a static blank frame read as a layout that had failed. A block with one failed tile is an error,
   never a stored image with a hole; a failed image is removed, so the flat
   ground stays and no broken-image icon appears. `App.vue` watches
   `wantedThumbnailGrounds` (every card at `CARD_FRAME`, the ticked plots at the
