@@ -109,6 +109,20 @@ also "Decisions that are settled" in `CLAUDE.md`.
   Wohnbaufläche" is an inference, not an official fact. The same field is where
   street surfaces come from: no OSM request needed to draw a carriageway.
 
+- **Traffic is the one land use that excludes, and only by its dominant
+  share.** Measured 24.09.2026 over Großbothen, Mölkau and Plagwitz (3 688
+  parcels): 400 are mostly Straßenverkehr, 28 Weg, 19 Platz, 15 Bahnverkehr —
+  and an exact area matches them as readily as a plot. 456 m² in Großbothen is
+  32/1 (Wohnbaufläche) and 856/21 (Straßenverkehr); before the road was set
+  aside that run ended „mehrdeutig“. `scoring.not_a_plot` reads the *dominant*
+  use, because a mention says nothing: `Weg;0.00|Landwirtschaft;577` was the
+  B7 plot. Only area routes apply it (staircase, municipality widening,
+  Gegenprobe); a number the listing names is kept whatever it is. The counts of
+  the staircase still include the roads — the filter would need a negated
+  `PropertyIsLike`, which matches any mention and so is the wrong rule.
+  Everything else in the vocabulary — Wald, Landwirtschaft, Gehölz, Unland,
+  Gewerbe, Grünanlage, even water and Friedhof — still only ranks.
+
 - **For OCR, upscaling beats rotation handling.** Measured on the ad's Geoportal
   print: a 2x Lanczos upscale (long edge ≥ 1500 px) fixed `--psm 1`'s blindness
   to a 180° flip, fixed a 7° tilt with no deskewing at all, and lifted the

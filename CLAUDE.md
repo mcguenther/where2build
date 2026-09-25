@@ -122,8 +122,12 @@ from the user directly. Reopen only if the user asks.
   reached only through a chosen tolerance is `mehrdeutig`. Everything
   inferential (a rounded area, a street, land use, a broker's distance) may
   only order the list, which is why the weights can ship uncalibrated: they
-  can produce an unhelpful ordering, never a wrong answer. See
-  `backend/app/search/`.
+  can produce an unhelpful ordering, never a wrong answer. One exception,
+  asked for by the user on 24.09.2026: a parcel an *area* search finds whose
+  dominant `tntxt` use is traffic (Straßenverkehr, Weg, Platz, Bahn-, Flug-,
+  Schiffsverkehr) is taken out, in a line of its own that names it. A parcel
+  the listing names by number is never taken out — a driveway recorded as Weg
+  is often part of the set. See `backend/app/search/`.
 - **The administration area is configuration first, database second.**
   `ADMIN_ACCOUNTS` names account keys and is the bootstrap; everybody else is
   promoted in the interface, where the flag lives on `users`. Configuration
@@ -212,11 +216,10 @@ scripts/setup-build-ca.sh
 docker compose up --build --remove-orphans     # http://localhost:8080
 docker compose down --remove-orphans           # volumes stay; -v throws them away
 
-# routing on this machine instead of Transitous -- opt-in, off by default.
-# fetch-data.sh pulls the OSM extract and the DELFI GTFS; the first start
-# imports for ~3.5 min into the motis-graph volume, after that it is seconds.
-./motis/fetch-data.sh
-docker compose -f docker-compose.yml -f docker-compose.local-routing.yml up --build
+# the stack routes on its own MOTIS: the first start downloads ~640 MB and
+# imports for ~7 min at 5.6 GiB peak, after that it is seconds. Where that
+# memory is not there, route against Transitous instead:
+docker compose -f docker-compose.yml -f docker-compose.transitous.yml up --build
 
 # reading a listing's attached cadastral extract -- optional, and the search
 # says so in /api/health when it is missing
@@ -254,7 +257,7 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 812 passed, 60 skipped (800 and 72 where Tesseract is missing). With `TEST_DATABASE_URL` pointed at a
+- `pytest`: 823 passed, 60 skipped (811 and 72 where Tesseract is missing). With `TEST_DATABASE_URL` pointed at a
   real Postgres the account store and the administration area run too; they are
   skipped rather than mocked because what they check is the database's own
   behaviour. Of the rest, one needs pyosmium, which only the index builder
@@ -262,14 +265,14 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
   never run two suites at once here. Three Tesseract tests failed on a run
   sharing the machine with another pytest, and they failed exactly as a
   photograph of a lawn does: an empty reading, past the 30 s timeout.
-- `vitest`: 725 passed — plus the integration file, excluded by `npm run test`
+- `vitest`: 757 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
 - `scripts/bookmarklet.mjs`: the handover across two origins, against the built
   app and a backend on :8000. It asserts the coordinate, which is the field
   that separates a handed-over document from a pasted one, and it writes
   `assistent-uebergabe.png`.
-- `scripts/screenshots.mjs`: 95 images plus one print PDF — 74 and the PDF
-  without a session, as measured on 25.09.2026. The location record prints as
+- `scripts/screenshots.mjs`: 97 images plus one print PDF — 76 and the PDF
+  without a session, as measured on 24.09.2026. The location record prints as
   part of the plot sheet now, so there is no second PDF. Twenty-one of them
   need a session (`konto-*` and the administration area) and they are taken only
   with `W2B_ADMIN_COOKIE` set — see `docs/claude/tooling-and-tests.md` for how
@@ -289,7 +292,11 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
   `/api/listings/extract`, which needs the same backend and no LLM key, and
   then open the „Gelesene Werte" fold inside the search step — that list is no
   longer a step of its own. The `assistent-einfuegen-*` images are the same
-  step with the bookmarklet's fold open. The `suche-band-*` images run the
+  step with the bookmarklet's fold open. The `grundstueck-bebauung-*` images are taken after a pointer click on the
+  footprint, which is what opens the „Bebauung" tab — the run reports it if the
+  click did not. The `grundstueck-preis-*` images show the
+  price field open and empty: the run's plot is a typed parcel number with no
+  listing, and typing a price in would put an invented figure into the docs. The `suche-band-*` images run the
   reference advert a second time with its area rounded to „ca. 1.100 m²", which
   is what keeps the run ambiguous — an exact area settles it in five requests
   and no distance band is ever resolved.

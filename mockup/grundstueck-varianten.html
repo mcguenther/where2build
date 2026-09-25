@@ -1,0 +1,870 @@
+<!doctype html>
+<html lang="de">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- Mockup only, not built. Opened straight from disk; fonts come from Google here because nothing in mockup/ goes through the bundler. -->
+<title>Grundstücksansicht neu geordnet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:wght@400;500;600&display=swap">
+<style>
+/* Tokens copied from frontend/src/styles/tokens.css. Brass marks what the user
+   designs, Loden what the tool computes, neutral what is official — the split
+   this mockup is about is already in the palette. */
+:root{
+  --primary:#2F4A3A; --primary-light:#456B52; --primary-veil:rgba(47,74,58,.10); --primary-on:#F7F4EE;
+  --brass:#B5813C; --brass-text:#7C5620; --brass-light:#E8D4B0; --brass-veil:rgba(181,129,60,.16);
+  --ink:#1E1A16; --graphite:#4A443C; --muted:#6F675C; --line:#DCD3C6; --line-faint:#EBE4D9;
+  --surface:#FAF7F1; --sunken:#F3EFE6; --paper:#F1EBE1;
+  --warn:#BE8524; --warn-text:#7C5620; --warn-surface:#F6E9CE;
+  --error:#A8402C; --error-surface:#F2DED8; --good:#2F4A3A; --good-surface:#DEE7DF;
+  --map-ground:#E6E3DC; --map-surface:#EFEDE7; --map-boundary:#1E1A16; --map-setback:rgba(47,74,58,.17);
+  --map-envelope:#2F4A3A; --map-design:#B5813C; --map-design-edge:#7C5620; --map-neighbour:#9A9184;
+  --map-street:#D6D2CA; --map-green:#DCE4DA; --map-selection:#456B52; --map-violation:#A8402C;
+  --shadow:0 1px 2px rgba(30,26,22,.05),0 10px 24px -18px rgba(30,26,22,.45);
+  --shadow-high:0 2px 6px rgba(30,26,22,.10),0 24px 48px -24px rgba(30,26,22,.55);
+  --f-display:"Archivo",system-ui,-apple-system,sans-serif;
+  --f-body:"Public Sans",system-ui,-apple-system,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --primary:#7FA98A; --primary-light:#9BC0A4; --primary-veil:rgba(127,169,138,.14); --primary-on:#12211A;
+    --brass:#D9A55E; --brass-text:#DBB273; --brass-light:#3E3021; --brass-veil:rgba(217,165,94,.18);
+    --ink:#F1EBE1; --graphite:#C4BCB0; --muted:#948B7E; --line:#3A342C; --line-faint:#2A2620;
+    --surface:#201C17; --sunken:#191510; --paper:#16130F;
+    --warn:#D8A340; --warn-text:#E3BC72; --warn-surface:#3A2E19;
+    --error:#E0705A; --error-surface:#3B211B; --good:#7FA98A; --good-surface:#1F2C24;
+    --map-ground:#1A1917; --map-surface:#23211D; --map-boundary:#F1EBE1; --map-setback:rgba(127,169,138,.34);
+    --map-envelope:#7FA98A; --map-design:#D9A55E; --map-design-edge:#F0C688; --map-neighbour:#5A544B;
+    --map-street:#2c2a27; --map-green:#26302A; --map-selection:#9BC0A4; --map-violation:#E0705A;
+    --shadow:0 1px 2px rgba(0,0,0,.5),0 12px 28px -20px rgba(0,0,0,.85);
+    --shadow-high:0 2px 8px rgba(0,0,0,.6),0 28px 56px -26px rgba(0,0,0,.95);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --primary:#7FA98A; --primary-light:#9BC0A4; --primary-veil:rgba(127,169,138,.14); --primary-on:#12211A;
+  --brass:#D9A55E; --brass-text:#DBB273; --brass-light:#3E3021; --brass-veil:rgba(217,165,94,.18);
+  --ink:#F1EBE1; --graphite:#C4BCB0; --muted:#948B7E; --line:#3A342C; --line-faint:#2A2620;
+  --surface:#201C17; --sunken:#191510; --paper:#16130F;
+  --warn:#D8A340; --warn-text:#E3BC72; --warn-surface:#3A2E19;
+  --error:#E0705A; --error-surface:#3B211B; --good:#7FA98A; --good-surface:#1F2C24;
+  --map-ground:#1A1917; --map-surface:#23211D; --map-boundary:#F1EBE1; --map-setback:rgba(127,169,138,.34);
+  --map-envelope:#7FA98A; --map-design:#D9A55E; --map-design-edge:#F0C688; --map-neighbour:#5A544B;
+  --map-street:#2c2a27; --map-green:#26302A; --map-selection:#9BC0A4; --map-violation:#E0705A;
+  --shadow:0 1px 2px rgba(0,0,0,.5),0 12px 28px -20px rgba(0,0,0,.85);
+  --shadow-high:0 2px 8px rgba(0,0,0,.6),0 28px 56px -26px rgba(0,0,0,.95);
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--paper);color:var(--ink);font:15px/1.5 var(--f-body);padding-inline:16px;padding-block:32px 72px}
+.wrap{max-width:1180px;margin:0 auto;display:grid;gap:48px}
+h1,h2,h3,h4{font-family:var(--f-display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+h1{font-size:clamp(28px,4vw,40px);font-weight:700;line-height:1.1}
+h2{font-size:26px;font-weight:700}
+h3{font-size:17px;font-weight:600}
+h4{font-size:15px;font-weight:600}
+p{margin:0}
+.eyebrow{font:600 11.5px/1 var(--f-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.lede{max-width:68ch;color:var(--graphite);font-size:17px}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.intro{display:grid;gap:14px}
+.findings{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;margin-top:8px}
+.finding{border-top:2px solid var(--line);padding-top:12px;display:grid;gap:4px}
+.finding b{font-family:var(--f-display);font-weight:600}
+.finding p{color:var(--graphite);font-size:14px}
+
+/* ---- variant switcher ---- */
+.switch{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--paper);padding-block:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;border-bottom:1px solid var(--line)}
+.switch a{font:600 14px/1 var(--f-body);color:var(--graphite);text-decoration:none;padding:9px 14px;border-radius:999px;border:1px solid var(--line);background:var(--surface)}
+.switch a:hover{border-color:var(--primary)}
+.switch a b{font-family:var(--f-mono);color:var(--brass-text);margin-right:6px}
+
+.variant{display:grid;gap:18px;scroll-margin-top:70px}
+.variant__head{display:grid;gap:6px}
+.variant__head .lede{font-size:15.5px}
+.letter{display:inline-grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--ink);color:var(--paper);font:700 17px/1 var(--f-display);margin-right:10px;vertical-align:middle}
+
+/* ---- the simulated app ---- */
+.app{background:var(--paper);border:1px solid var(--line);border-radius:18px;padding:20px;display:grid;gap:14px;box-shadow:var(--shadow)}
+.app__head{display:flex;flex-wrap:wrap;gap:4px 16px;align-items:end;justify-content:space-between}
+.app__title{display:grid;gap:4px}
+.app__title h3{font-size:26px;font-weight:700}
+.app__title span{color:var(--muted);font-size:13px}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}
+.grid--wide-aside{grid-template-columns:minmax(0,1fr) 360px}
+@media (max-width:860px){.grid,.grid--wide-aside{grid-template-columns:1fr}}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.panel__head{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line-faint)}
+.panel__head h4{flex:1}
+.chip{font:600 11px/1 var(--f-body);letter-spacing:.04em;padding:5px 8px;border-radius:999px;background:var(--sunken);color:var(--muted);white-space:nowrap}
+.chip--warn{background:var(--warn-surface);color:var(--warn-text)}
+.chip--brass{background:var(--brass-veil);color:var(--brass-text)}
+.chip--good{background:var(--good-surface);color:var(--good)}
+.chip--bad{background:var(--error-surface);color:var(--error)}
+dl.vals{margin:0;display:grid;grid-template-columns:auto 1fr}
+dl.vals dt,dl.vals dd{padding:8px 14px;border-bottom:1px solid var(--line-faint);font-size:14px}
+dl.vals dt{color:var(--graphite)}
+dl.vals dd{margin:0;text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:13.5px}
+dl.vals dt:nth-last-of-type(1),dl.vals dd:last-child{border-bottom:0}
+.foot{padding:10px 14px;font-size:12.5px;color:var(--muted);border-top:1px solid var(--line-faint)}
+
+details.fold > summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;padding:12px 14px}
+details.fold > summary::-webkit-details-marker{display:none}
+details.fold > summary h4{flex:0 0 auto}
+details.fold > summary .sum{flex:1;text-align:right;font:13px var(--f-mono);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+details.fold > summary::after{content:"";width:8px;height:8px;border-right:1.5px solid var(--muted);border-bottom:1.5px solid var(--muted);transform:rotate(45deg);margin:0 2px 3px 4px;transition:transform .15s}
+details.fold[open] > summary::after{transform:rotate(-135deg);margin-bottom:-3px}
+details.fold[open] > summary{border-bottom:1px solid var(--line-faint)}
+
+.caveat{margin:0;padding:10px 14px;border-top:1px solid var(--line-faint);font-size:12.5px;color:var(--graphite);display:grid;gap:4px}
+.caveat summary{cursor:pointer;color:var(--warn-text);font-weight:600;list-style:none}
+.caveat summary::-webkit-details-marker{display:none}
+.caveat summary::before{content:"ⓘ  "}
+.caveat p{color:var(--muted)}
+
+/* map frame */
+.plan{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden;position:relative}
+.bar{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line-faint)}
+.bar__label{font:600 10.5px/1 var(--f-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.bar__spacer{flex:1}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;background:transparent;color:var(--graphite);font:500 12.5px/1 var(--f-body);padding:6px 9px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--primary);color:var(--primary-on)}
+.tog{border:1px solid var(--line);background:transparent;color:var(--graphite);font:500 12.5px/1 var(--f-body);padding:6px 10px;border-radius:999px;cursor:pointer}
+.tog[aria-pressed="true"]{background:var(--primary);border-color:var(--primary);color:var(--primary-on)}
+.notice{margin:0;padding:8px 12px;font-size:13px;border-bottom:1px solid var(--line-faint)}
+.notice--good{background:var(--good-surface);color:var(--good)}
+.notice--bad{background:var(--error-surface);color:var(--error)}
+.stage{position:relative}
+.stage svg{display:block;width:100%;height:auto;touch-action:none}
+.plan-foot{display:flex;justify-content:space-between;padding:6px 10px;font:11px var(--f-mono);color:var(--muted);border-top:1px solid var(--line-faint)}
+
+.house{cursor:grab;outline:none}
+.house:active{cursor:grabbing}
+.house rect.body{fill:var(--map-design);stroke:var(--map-design-edge);stroke-width:1.5}
+.house.bad rect.body{stroke:var(--map-violation);stroke-width:2.5}
+.house .sel{fill:none;stroke:var(--map-selection);stroke-width:1.5;stroke-dasharray:4 3;opacity:0}
+.house .handle{fill:var(--surface);stroke:var(--map-selection);stroke-width:1.5;opacity:0}
+.house.selected .sel,.house.selected .handle,.house:focus-visible .sel{opacity:1}
+.house:hover rect.body{filter:brightness(1.06)}
+.hide-setbacks .setbacks,.hide-dims .dims{display:none}
+.hint-bubble{position:absolute;right:12px;bottom:12px;font-size:12px;color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:5px 8px;pointer-events:none;max-width:calc(100% - 24px)}
+
+/* design (brass) side */
+.design{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden;border-top:3px solid var(--brass)}
+.panel__head h4 small{display:block;font:500 12px var(--f-body);color:var(--brass-text);letter-spacing:0}
+.field{display:grid;gap:5px;padding:12px 14px}
+.field label{font:600 10.5px/1 var(--f-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+select,input[type=number]{font:14px var(--f-mono);color:var(--ink);background:var(--sunken);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%}
+select:focus-visible,input:focus-visible,button:focus-visible,summary:focus-visible,a:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.slider{display:grid;grid-template-columns:1fr auto;gap:4px 10px;padding:10px 14px;border-top:1px solid var(--line-faint)}
+.slider label{font:600 10.5px/1 var(--f-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);align-self:center}
+.slider input{grid-column:1/-1;accent-color:var(--primary);width:100%}
+.hint{grid-column:1/-1;font-size:12.5px;color:var(--muted)}
+.actions{display:flex;flex-wrap:wrap;gap:8px;padding:10px 14px;border-top:1px solid var(--line-faint)}
+.btn{font:600 13px/1 var(--f-body);border-radius:8px;padding:8px 12px;border:1px solid var(--primary);background:transparent;color:var(--primary);cursor:pointer}
+.btn--solid{background:var(--primary);color:var(--primary-on)}
+.btn--brass{border-color:var(--brass);color:var(--brass-text)}
+.btn--quiet{border-color:transparent;color:var(--muted);padding-inline:6px}
+.iconbtn{border:0;background:transparent;color:var(--muted);font-size:20px;line-height:1;cursor:pointer;padding:2px 6px;border-radius:6px}
+
+/* Variant A: tabs */
+.tabs{display:grid;grid-template-columns:1fr 1fr;background:var(--sunken);border:1px solid var(--line);border-radius:10px;padding:3px;gap:3px;margin-bottom:12px}
+.tabs button{border:0;background:transparent;border-radius:8px;padding:9px 8px;font:600 13.5px/1.2 var(--f-body);color:var(--graphite);cursor:pointer;display:flex;justify-content:center;align-items:center;gap:7px}
+.tabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+.tabs .dot{width:9px;height:9px;border-radius:2px;background:var(--brass)}
+.tabs .dot--plot{background:transparent;border:1.5px solid var(--map-boundary);border-radius:1px}
+.stack{display:grid;gap:12px}
+.map-chip{position:absolute;bottom:10px;left:10px;display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--brass);border-radius:999px;padding:5px 6px 5px 12px;font-size:12.5px;box-shadow:var(--shadow);max-width:calc(100% - 20px)}
+.map-chip b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.map-chip button{border:0;background:var(--brass-veil);color:var(--brass-text);font:600 12px/1 var(--f-body);padding:6px 9px;border-radius:999px;cursor:pointer;white-space:nowrap}
+
+/* Variant B: design strip + inspector */
+.strip{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:8px 10px;background:var(--brass-veil);border-bottom:1px solid var(--line-faint)}
+.strip .bar__label{color:var(--brass-text)}
+.strip select{width:auto;min-width:0;max-width:260px;padding:5px 8px;font-size:13px;background:var(--surface)}
+.strip .facts{font:12.5px var(--f-mono);color:var(--graphite)}
+.inspector{position:absolute;top:10px;right:10px;bottom:10px;width:300px;max-width:calc(100% - 20px);background:var(--surface);border:1px solid var(--line);border-top:3px solid var(--brass);border-radius:12px;box-shadow:var(--shadow-high);overflow:auto;transform-origin:top right;transition:opacity .15s,transform .15s}
+.inspector[hidden]{display:block!important;opacity:0;transform:scale(.97);pointer-events:none;visibility:hidden}
+@media (max-width:620px){
+  .inspector{top:auto;left:8px;right:8px;bottom:8px;width:auto;max-height:70%;transform-origin:bottom center}
+}
+
+/* Variant C: grouped accordion */
+.group{display:grid;gap:0}
+.group__label{display:flex;align-items:baseline;gap:8px;padding:0 2px 6px}
+.group__label .eyebrow{color:var(--ink)}
+.group__label span{font-size:12px;color:var(--muted)}
+.acc{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.acc > details + details{border-top:1px solid var(--line-faint)}
+.acc--design{border-top:3px solid var(--brass)}
+.always{display:flex;align-items:center;gap:8px;padding:0 14px 12px}
+.always select{flex:1;min-width:0}
+.aside-c{display:grid;gap:18px}
+
+/* discussion */
+.discuss{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px 24px}
+.discuss h4{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-family:var(--f-body);margin-bottom:6px}
+.discuss ul{margin:0;padding-left:18px;display:grid;gap:4px;font-size:14px;color:var(--graphite)}
+.pro li::marker{content:"+  ";color:var(--good)}
+.con li::marker{content:"–  ";color:var(--error)}
+
+.table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+table.cmp{border-collapse:collapse;width:100%;min-width:640px;font-size:14px}
+table.cmp th,table.cmp td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line-faint);vertical-align:top}
+table.cmp thead th{font:600 11px var(--f-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+table.cmp tbody th{font-weight:600;color:var(--graphite);width:26%}
+table.cmp tr:last-child td,table.cmp tr:last-child th{border-bottom:0}
+
+.warnbox{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.before{border-left:3px solid var(--error);background:var(--surface);border-radius:4px 12px 12px 4px;padding:14px 16px;display:grid;gap:8px;font-size:13.5px;color:var(--graphite)}
+.before h4{color:var(--ink)}
+.split{display:grid;gap:10px}
+.split .panel p{padding:10px 14px;font-size:13px;color:var(--graphite)}
+mark{background:var(--warn-surface);color:var(--warn-text);padding:0 3px;border-radius:3px}
+.rec{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--primary);border-radius:4px 12px 12px 4px;padding:18px 20px;display:grid;gap:8px;max-width:80ch}
+.rec p{color:var(--graphite)}
+@media (max-width:620px){[data-variant="a"] .hint-bubble{display:none}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+</style>
+
+<div class="wrap">
+
+<header class="intro">
+  <span class="eyebrow">where2build · Mockup · Grundstücksansicht</span>
+  <h1>Grundstück und Probebebauung trennen</h1>
+  <p class="lede">Drei Vorschläge für die Ansicht eines einzelnen Grundstücks. In jedem kann man das braune
+    Haus auf dem Plan <b>anklicken</b>, dann öffnet sich das Baukörper-Panel. Beim <b>Ziehen</b> wird es nur
+    verschoben. Die Pfeiltasten verschieben es ebenfalls, sobald es den Fokus hat.</p>
+  <div class="findings">
+    <div class="finding"><b>Heute gemischt</b><p>Grundstück, Preis und Form stehen neben der Karte. Baukörper und
+      Abstandsflächen stehen darunter, gleich groß nebeneinander. Was amtlich feststeht und was nur zum Probieren
+      daraufgelegt ist, sieht gleich aus.</p></div>
+    <div class="finding"><b>Baukörper zu präsent</b><p>Das Baukörper-Panel ist immer ganz ausgeklappt und
+      erklärt jeden Regler mit einem Absatz. Wer nur den Preis prüfen will, scrollt an 700 px Hausformular vorbei.</p></div>
+    <div class="finding"><b>Warnkasten ohne Ort</b><p>„Keine bauordnungsrechtliche Prüfung“ vermischt zwei Themen:
+      Abstandsflächen (§ 6 SächsBO) und Bodenrichtwert (§ 15 ImmoWertV). Er gehört in die beiden Kästen, um die es geht.</p></div>
+  </div>
+  <p class="lede" style="font-size:14.5px">Die Farben sind schon heute nach Rolle vergeben: neutral für Amtliches,
+    Loden für Berechnetes, <span style="color:var(--brass-text);font-weight:600">Messing für das, was man selbst
+    entwirft</span>. Alle drei Varianten nutzen diese Regel, um das Haus sichtbar vom Grundstück abzusetzen.</p>
+</header>
+
+<nav class="switch" aria-label="Varianten">
+  <a href="#variante-a"><b>A</b>Reiter neben der Karte</a>
+  <a href="#variante-b"><b>B</b>Entwurfsleiste und schwebendes Panel</a>
+  <a href="#variante-c"><b>C</b>Eine Spalte, zwei Gruppen</a>
+  <a href="#vergleich">Vergleich</a>
+</nav>
+
+<!-- =================================================================== A -->
+<section class="variant" id="variante-a">
+  <div class="variant__head">
+    <h2><span class="letter">A</span>Reiter neben der Karte</h2>
+    <p class="lede">Die Spalte neben der Karte bekommt zwei Reiter: <b>Grundstück</b> und <b>Entwurf</b>.
+      Unter „Grundstück“ stehen nur amtliche und berechnete Werte, darunter die Abstandsflächen. Unter „Entwurf“ steht
+      der Baukörper. Ein Chip auf der Karte zeigt den gewählten Haustyp. Ein Klick auf das Haus wechselt zum Reiter
+      „Entwurf“.</p>
+  </div>
+
+  <div class="app" data-variant="a">
+    <div class="app__head">
+      <div class="app__title"><span class="eyebrow">Gemarkung Liebertwolkwitz · 1 Flurstück</span><h3>Kirchstraße</h3>
+        <span>Stadt Leipzig · Flurstück 85/1 · 1.685 m²</span></div>
+    </div>
+    <div class="grid">
+      <div class="plan">
+        <div class="bar" data-bar></div>
+        <p class="notice notice--good" data-status></p>
+        <div class="stage" data-stage>
+          <div class="map-chip">
+            <span class="eyebrow" style="color:var(--brass-text)">Haus</span>
+            <b data-typename></b>
+            <button type="button" data-open>Bearbeiten</button>
+          </div>
+        </div>
+        <div class="plan-foot"><span>ETRS89 / UTM33N</span><span>© GeoSN, dl-de/by-2-0</span></div>
+      </div>
+
+      <aside>
+        <div class="tabs" role="tablist" aria-label="Spalte neben der Karte">
+          <button role="tab" id="a-tab-plot" aria-selected="true" aria-controls="a-plot"><span class="dot dot--plot"></span>Grundstück</button>
+          <button role="tab" id="a-tab-design" aria-selected="false" aria-controls="a-design"><span class="dot"></span>Entwurf</button>
+        </div>
+        <div id="a-plot" role="tabpanel" aria-labelledby="a-tab-plot" class="stack">
+          <!-- plot facts -->
+          <section class="panel" data-plot-panel></section>
+          <section class="panel" data-price-panel></section>
+          <details class="panel fold" data-form-fold></details>
+          <details class="panel fold" data-setback-fold data-caveat="inline"></details>
+        </div>
+        <div id="a-design" role="tabpanel" aria-labelledby="a-tab-design" hidden>
+          <section class="design" data-design-panel></section>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <div class="discuss">
+    <div><h4>Dafür</h4><ul class="pro">
+      <li>Die Trennung ist eindeutig: zwei Reiter mit zwei Namen.</li>
+      <li>Das Baukörper-Panel steht immer neben der Karte, auch beim Ziehen.</li>
+      <li>Unter der Karte bleibt nichts übrig. Die Seite wird ca. 900 px kürzer.</li>
+      <li>Schmal: Die Reiter rutschen unter die Karte, der Klick aufs Haus scrollt dorthin.</li></ul></div>
+    <div><h4>Dagegen</h4><ul class="pro con">
+      <li>Beim Entwerfen sind Preis und Fläche ausgeblendet. Sie werden dabei aber auch nicht gebraucht.</li>
+      <li>Ein Reiter versteckt Inhalt. Wer nie auf „Entwurf“ klickt, übersieht das Haus womöglich. Der Chip auf der Karte fängt das auf.</li>
+      <li>Druck: Beide Reiter müssen untereinander gedruckt werden. Das ist in <code>print.css</code> leicht zu lösen.</li></ul></div>
+  </div>
+</section>
+
+<!-- =================================================================== B -->
+<section class="variant" id="variante-b">
+  <div class="variant__head">
+    <h2><span class="letter">B</span>Entwurfsleiste und schwebendes Panel</h2>
+    <p class="lede">Die Spalte neben der Karte gehört nur dem Grundstück. Das Haus bekommt eine schmale
+      <b>Messingleiste</b> direkt unter der Werkzeugleiste mit Haustyp, bebauter Fläche, GRZ und dem Knopf
+      „Anpassen“. Das ausführliche Panel <b>schwebt über der Karte</b>, wie ein Inspektor in einem Zeichenprogramm.
+      Es öffnet sich über „Anpassen“ oder per Klick aufs Haus, und „×“ oder Esc schließen es wieder.</p>
+  </div>
+
+  <div class="app" data-variant="b">
+    <div class="app__head">
+      <div class="app__title"><span class="eyebrow">Gemarkung Liebertwolkwitz · 1 Flurstück</span><h3>Kirchstraße</h3>
+        <span>Stadt Leipzig · Flurstück 85/1 · 1.685 m²</span></div>
+    </div>
+    <div class="grid">
+      <div class="plan">
+        <div class="bar" data-bar></div>
+        <div class="strip">
+          <span class="bar__label">Probehaus</span>
+          <select data-typeselect aria-label="Haustyp"></select>
+          <span class="facts" data-stripfacts></span>
+          <span class="bar__spacer"></span>
+          <button type="button" class="btn btn--brass" data-open aria-expanded="false">Anpassen</button>
+        </div>
+        <p class="notice notice--good" data-status></p>
+        <div class="stage" data-stage>
+          <section class="inspector" data-inspector hidden aria-label="Baukörper"></section>
+        </div>
+        <div class="plan-foot"><span>ETRS89 / UTM33N</span><span>© GeoSN, dl-de/by-2-0</span></div>
+      </div>
+      <aside class="stack">
+        <section class="panel" data-plot-panel></section>
+        <section class="panel" data-price-panel></section>
+        <details class="panel fold" data-form-fold></details>
+        <details class="panel fold" data-setback-fold data-caveat="chip"></details>
+      </aside>
+    </div>
+  </div>
+
+  <div class="discuss">
+    <div><h4>Dafür</h4><ul class="pro">
+      <li>Grundstücksfakten und Haus sehen sich nie ähnlich: Die Spalte zeigt Fakten, das Haus liegt auf der Karte.</li>
+      <li>Der Haustyp ist ohne Klick wählbar und steht dort, wo man das Haus sieht.</li>
+      <li>Der Inspektor erscheint neben dem Haus. Die Werte ändern sich beim Ziehen sichtbar mit.</li>
+      <li>Schmal: Der Inspektor wird zum Blatt, das von unten über die Karte kommt.</li></ul></div>
+    <div><h4>Dagegen</h4><ul class="pro con">
+      <li>Das offene Panel verdeckt ein Drittel der Karte. Liegt das Haus rechts, muss man es erst schließen.</li>
+      <li>Ein schwebendes Panel ist das aufwendigste der drei Muster: Fokusführung, Esc, Kollision mit dem MapLibre-Attributionsfeld.</li>
+      <li>Druck: Der Inspektor wird ausgeblendet, die Leiste bleibt. Das funktioniert, braucht aber eigene Regeln.</li></ul></div>
+  </div>
+</section>
+
+<!-- =================================================================== C -->
+<section class="variant" id="variante-c">
+  <div class="variant__head">
+    <h2><span class="letter">C</span>Eine Spalte, zwei Gruppen</h2>
+    <p class="lede">Alles steht in der Spalte neben der Karte, als Klappkästen in <b>zwei beschrifteten Gruppen</b>:
+      „Grundstück · amtlich und berechnet“ und „Probebebauung · Ihr Entwurf“. Jeder zugeklappte Kasten nennt sein
+      Ergebnis in einer Zeile. Es ist immer nur einer offen. Der Haustyp ist auch zugeklappt wählbar. Ein Klick aufs
+      Haus öffnet den Baukörper und klappt den Rest zu.</p>
+  </div>
+
+  <div class="app" data-variant="c">
+    <div class="app__head">
+      <div class="app__title"><span class="eyebrow">Gemarkung Liebertwolkwitz · 1 Flurstück</span><h3>Kirchstraße</h3>
+        <span>Stadt Leipzig · Flurstück 85/1 · 1.685 m²</span></div>
+    </div>
+    <div class="grid grid--wide-aside">
+      <div class="plan">
+        <div class="bar" data-bar></div>
+        <p class="notice notice--good" data-status></p>
+        <div class="stage" data-stage></div>
+        <div class="plan-foot"><span>ETRS89 / UTM33N</span><span>© GeoSN, dl-de/by-2-0</span></div>
+      </div>
+      <aside class="aside-c">
+        <div class="group">
+          <div class="group__label"><span class="eyebrow">Grundstück</span><span>amtlich und berechnet</span></div>
+          <div class="acc" data-acc>
+            <details class="fold" data-plot-fold open></details>
+            <details class="fold" data-price-fold></details>
+            <details class="fold" data-form-fold></details>
+            <details class="fold" data-setback-fold data-caveat="inline"></details>
+          </div>
+        </div>
+        <div class="group">
+          <div class="group__label"><span class="eyebrow" style="color:var(--brass-text)">Probebebauung</span><span>Ihr Entwurf, nicht amtlich</span></div>
+          <div class="acc acc--design" data-acc>
+            <details class="fold" data-design-fold></details>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <div class="discuss">
+    <div><h4>Dafür</h4><ul class="pro">
+      <li>Man sieht alles auf einen Blick: Fünf Zeilen nennen jeweils das Ergebnis, ohne dass etwas aufgeklappt sein muss.</li>
+      <li>Die Gruppenüberschriften sagen in Worten, was amtlich ist und was nicht.</li>
+      <li>Am wenigsten Umbau: Die bestehenden <code>details.fold</code>-Kästen wandern nur in die rechte Spalte.</li>
+      <li>Schmal: Die Spalte steht unter der Karte, der Klick aufs Haus klappt auf und scrollt hin.</li></ul></div>
+    <div><h4>Dagegen</h4><ul class="pro con">
+      <li>Die Spalte ändert beim Umklappen ihre Höhe. Neben einer hohen Karte fällt das kaum auf, bei einer niedrigen schon.</li>
+      <li>„Nur einer offen“ kann stören, wenn man Preis und Form vergleichen will. Man könnte das auf die untere Gruppe beschränken.</li>
+      <li>Die Spalte muss etwas breiter werden (360 statt 340 px), damit die Ergebniszeilen passen.</li></ul></div>
+  </div>
+</section>
+
+<!-- ============================================================ warn box -->
+<section class="variant" id="warnkasten">
+  <div class="variant__head">
+    <h2>Der Warnkasten</h2>
+    <p class="lede">Der Kasten ist heute rot umrandet, steht immer offen und behandelt zwei Themen, die mit dem Haus
+      nichts zu tun haben. Mein Vorschlag, gleich für alle drei Varianten: <b>aufteilen und dorthin stellen, wo die
+      Frage entsteht</b>. Den allgemeinen Hinweis trägt die Fußzeile ohnehin schon: „Keine bauordnungsrechtliche
+      Prüfung · keine Rechtsberatung“.</p>
+  </div>
+  <div class="warnbox">
+    <div class="before">
+      <span class="eyebrow">Heute</span>
+      <h4>Keine bauordnungsrechtliche Prüfung</h4>
+      <p><mark>Die Abstandstiefe bemisst sich nach § 6 SächsBO grundsätzlich nach der Wandhöhe; 3 m sind der Mindestwert,
+        nicht die Regel. Grenzgaragen sind privilegiert, ein Bebauungsplan kann abweichende Baugrenzen festsetzen.</mark></p>
+      <p><mark style="background:var(--brass-veil);color:var(--brass-text)">Nach § 15 Abs. 2 ImmoWertV kann ein einzelnes
+        Grundstück innerhalb der Richtwertzone eine abweichende Nutzungsart haben; dann gilt der Zonenwert nicht.</mark></p>
+    </div>
+    <div class="split">
+      <span class="eyebrow">Vorschlag</span>
+      <div class="panel">
+        <div class="panel__head"><h4>Abstandsflächen</h4><span class="chip chip--warn">§ 6 SächsBO</span></div>
+        <p><b>Vereinfacht gerechnet:</b> 3 m Mindestmaß oder 0,4 · Wandhöhe. Grenzgaragen und Bebauungsplan sind nicht
+          berücksichtigt. <a href="#warnkasten" style="color:var(--warn-text)">Mehr</a></p>
+      </div>
+      <div class="panel">
+        <div class="panel__head"><h4>Preis</h4><span class="chip">BORIS</span></div>
+        <p>Der Richtwert gilt für die Zone. Hat dieses Grundstück eine andere Nutzungsart, gilt er nicht
+          (§ 15 Abs. 2 ImmoWertV).</p>
+      </div>
+    </div>
+  </div>
+  <p class="lede" style="font-size:14.5px">Die Varianten zeigen drei Formen davon: <b>A</b> und <b>C</b> klappen den
+    Hinweis im Abstandsflächen-Kasten auf, <b>B</b> hängt ihn als ⓘ an den Paragraphen-Chip. Die Rechtsgrundlage
+    bleibt dabei vollständig nachlesbar. Sie drängt sich nur nicht mehr auf.</p>
+</section>
+
+<!-- ============================================================ compare -->
+<section class="variant" id="vergleich">
+  <div class="variant__head"><h2>Vergleich</h2></div>
+  <div class="table-wrap">
+    <table class="cmp">
+      <thead><tr><th></th><th>A · Reiter</th><th>B · Leiste und Panel</th><th>C · Zwei Gruppen</th></tr></thead>
+      <tbody>
+        <tr><th>Trennung Grundstück / Haus</th><td>zwei Reiter</td><td>Spalte gegen Karte</td><td>zwei beschriftete Gruppen</td></tr>
+        <tr><th>Haustyp ohne Klick wählbar</th><td>nein, nur angezeigt (Chip)</td><td>ja, in der Leiste</td><td>ja, im zugeklappten Kasten</td></tr>
+        <tr><th>Panel neben dem Haus beim Ziehen</th><td>ja</td><td>ja, über der Karte</td><td>ja</td></tr>
+        <tr><th>Alles auf einen Blick</th><td>nur ein Reiter</td><td>Fakten ja, Haus als Kurzzeile</td><td>ja, als Ergebniszeilen</td></tr>
+        <tr><th>Verdeckt die Karte</th><td>nie</td><td>wenn offen</td><td>nie</td></tr>
+        <tr><th>Umbauaufwand</th><td>mittel</td><td>hoch</td><td>gering</td></tr>
+        <tr><th>Schmale Ansicht</th><td>Reiter unter der Karte</td><td>Blatt von unten</td><td>Klappkästen unter der Karte</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="rec">
+    <span class="eyebrow">Meine Empfehlung</span>
+    <h3>C, mit der Messingleiste aus B</h3>
+    <p>C bringt mit dem wenigsten Umbau am meisten: Alles steht neben der Karte, und die beiden Gruppen benennen den
+      Unterschied zwischen Grundstück und Haus in Worten. Wer den Haustyp wechseln will, muss dafür nichts aufklappen.
+      Wirkt die rechte Spalte zu voll, lässt sich der Haustyp wie in B in eine Leiste über der Karte ziehen. Die
+      Baukörper-Gruppe bleibt dann nur für die Feinheiten. A ist die sauberste Trennung, versteckt aber das Haus
+      hinter einem Reiter, den man erst entdecken muss.</p>
+  </div>
+</section>
+
+</div>
+
+<script>
+(() => {
+  // --- shared mock data -------------------------------------------------
+  // Plan scale: 6 px per metre, so a 3 m setback is 18 px.
+  const PX = 6;
+  const PLOT = [[168,62],[262,44],[300,118],[478,296],[446,352],[300,374],[208,362],[148,300],[186,204]];
+  const TYPES = [
+    { id: "custom", name: "Eigene Maße", w: 11.4, d: 8.5 },
+    { id: "a", name: "Beispielhaus A · Stadtvilla", w: 10.5, d: 10.5 },
+    { id: "b", name: "Beispielhaus B · Bungalow", w: 14.0, d: 9.0 },
+    { id: "c", name: "Beispielhaus C · Doppelhaushälfte", w: 12.0, d: 6.5 },
+  ];
+  const fmt = (n, d = 2) => n.toLocaleString("de-DE", { minimumFractionDigits: d, maximumFractionDigits: d });
+  const deg = r => (r > 0 ? "+" : r < 0 ? "−" : "") + Math.abs(Math.round(r)) + "°";
+  const SVGNS = "http://www.w3.org/2000/svg";
+
+  function edgeLengths() {
+    return PLOT.map((p, i) => { const q = PLOT[(i + 1) % PLOT.length]; return Math.hypot(q[0] - p[0], q[1] - p[1]) / PX; });
+  }
+  function pointInPoly([x, y]) {
+    let inside = false;
+    for (let i = 0, j = PLOT.length - 1; i < PLOT.length; j = i++) {
+      const [xi, yi] = PLOT[i], [xj, yj] = PLOT[j];
+      if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+  }
+  function distToEdges([x, y]) {
+    let best = Infinity;
+    PLOT.forEach((a, i) => {
+      const b = PLOT[(i + 1) % PLOT.length];
+      const dx = b[0] - a[0], dy = b[1] - a[1];
+      const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / (dx * dx + dy * dy)));
+      best = Math.min(best, Math.hypot(x - a[0] - t * dx, y - a[1] - t * dy));
+    });
+    return best;
+  }
+
+  // --- one plan per variant --------------------------------------------
+  function makePlan(root, onSelect) {
+    const uid = root.dataset.variant;
+    const state = { x: 300, y: 250, rot: 22, type: TYPES[0], confine: true, selected: false, listeners: [] };
+    const stage = root.querySelector("[data-stage]");
+    const svg = document.createElementNS(SVGNS, "svg");
+    svg.setAttribute("viewBox", "0 0 640 420");
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", "Lageplan mit Grundstück, Abstandsflächen und Probehaus");
+    const pts = PLOT.map(p => p.join(",")).join(" ");
+    const lens = edgeLengths();
+    const dims = PLOT.map((p, i) => {
+      const q = PLOT[(i + 1) % PLOT.length];
+      if (lens[i] < 8) return "";
+      const mx = (p[0] + q[0]) / 2, my = (p[1] + q[1]) / 2;
+      // push the label outward from the plot centroid
+      const cx = 300, cy = 230, vx = mx - cx, vy = my - cy, l = Math.hypot(vx, vy);
+      return `<text x="${mx + vx / l * 16}" y="${my + vy / l * 16 + 4}" text-anchor="middle">${fmt(lens[i])} m</text>`;
+    }).join("");
+    svg.innerHTML = `
+      <defs><clipPath id="clip-${uid}"><polygon points="${pts}"/></clipPath></defs>
+      <rect width="640" height="420" fill="var(--map-ground)"/>
+      <path d="M-20 430 L660 250" stroke="var(--map-street)" stroke-width="46" fill="none"/>
+      <path d="M-20 430 L660 250" stroke="var(--map-ground)" stroke-width="1" stroke-dasharray="10 10" fill="none" opacity=".8"/>
+      <path d="M40 0 C120 60 90 170 40 240 L0 250 L0 0Z" fill="var(--map-green)"/>
+      <g fill="var(--map-neighbour)" opacity=".75">
+        <rect x="330" y="40" width="70" height="46" transform="rotate(38 365 63)"/>
+        <rect x="430" y="120" width="60" height="42" transform="rotate(40 460 141)"/>
+        <rect x="520" y="200" width="54" height="40" transform="rotate(-14 547 220)"/>
+        <rect x="70" y="300" width="56" height="44" transform="rotate(12 98 322)"/>
+        <rect x="200" y="0" width="40" height="30"/>
+      </g>
+      <polygon points="${pts}" fill="var(--map-surface)"/>
+      <g class="setbacks" clip-path="url(#clip-${uid})">
+        <polygon points="${pts}" fill="none" stroke="var(--map-setback)" stroke-width="${3 * PX * 2}" stroke-linejoin="miter"/>
+      </g>
+      <polygon points="${pts}" fill="none" stroke="var(--map-boundary)" stroke-width="1.6" stroke-linejoin="round"/>
+      ${PLOT.map(p => `<circle cx="${p[0]}" cy="${p[1]}" r="2.4" fill="var(--map-surface)" stroke="var(--map-boundary)" stroke-width="1.2"/>`).join("")}
+      <g class="dims" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="var(--graphite)"
+         paint-order="stroke" stroke="var(--map-ground)" stroke-width="3">${dims}</g>
+      <g class="house" tabindex="0" role="button" aria-label="Probehaus: klicken zum Bearbeiten, ziehen zum Verschieben">
+        <rect class="sel"/><rect class="body"/>
+        <circle class="handle" r="3.5"/><circle class="handle" r="3.5"/><circle class="handle" r="3.5"/><circle class="handle" r="3.5"/>
+      </g>
+      <g transform="translate(596 44)" fill="var(--ink)">
+        <path d="M0 -18 L7 8 L0 3 L-7 8Z"/><text y="24" text-anchor="middle" font-family="Archivo, sans-serif" font-size="11" font-weight="600">N</text>
+      </g>
+      <g transform="translate(24 28)" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--graphite)">
+        <rect width="${20 * PX}" height="4" fill="var(--ink)"/><rect x="${10 * PX}" width="${10 * PX}" height="4" fill="var(--map-surface)" stroke="var(--ink)" stroke-width=".8"/>
+        <text y="-5">0</text><text x="${10 * PX - 8}" y="-5">10</text><text x="${20 * PX - 12}" y="-5">20 m</text>
+      </g>`;
+    stage.prepend(svg);
+    const hint = document.createElement("div");
+    hint.className = "hint-bubble";
+    hint.textContent = "Haus anklicken: Panel öffnet sich · Ziehen: verschieben";
+    stage.appendChild(hint);
+
+    const house = svg.querySelector(".house");
+    const body = house.querySelector(".body"), sel = house.querySelector(".sel");
+    const handles = house.querySelectorAll(".handle");
+
+    function corners(s = state) {
+      const w = s.type.w * PX, d = s.type.d * PX, a = s.rot * Math.PI / 180;
+      return [[-w / 2, -d / 2], [w / 2, -d / 2], [w / 2, d / 2], [-w / 2, d / 2]].map(([u, v]) =>
+        [s.x + u * Math.cos(a) - v * Math.sin(a), s.y + u * Math.sin(a) + v * Math.cos(a)]);
+    }
+    function measure(s = state) {
+      const cs = corners(s);
+      const outside = cs.filter(c => !pointInPoly(c)).length;
+      const minGap = Math.min(...cs.map(c => (pointInPoly(c) ? 1 : -1) * distToEdges(c))) / PX;
+      const tooClose = cs.filter(c => pointInPoly(c) && distToEdges(c) < 3 * PX - .01).length;
+      return { outside: outside + tooClose, minGap };
+    }
+    function render() {
+      const w = state.type.w * PX, d = state.type.d * PX;
+      house.setAttribute("transform", `translate(${state.x} ${state.y}) rotate(${state.rot})`);
+      body.setAttribute("x", -w / 2); body.setAttribute("y", -d / 2); body.setAttribute("width", w); body.setAttribute("height", d);
+      sel.setAttribute("x", -w / 2 - 5); sel.setAttribute("y", -d / 2 - 5); sel.setAttribute("width", w + 10); sel.setAttribute("height", d + 10);
+      [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([sx, sy], i) => { handles[i].setAttribute("cx", sx * (w / 2 + 5)); handles[i].setAttribute("cy", sy * (d / 2 + 5)); });
+      const m = measure();
+      house.classList.toggle("bad", m.outside > 0);
+      house.classList.toggle("selected", state.selected);
+      const status = root.querySelector("[data-status]");
+      status.className = "notice " + (m.outside ? "notice--bad" : "notice--good");
+      status.innerHTML = m.outside
+        ? `<b>${m.outside} Gebäudeecke${m.outside > 1 ? "n liegen" : " liegt"} außerhalb des Bebauungsfensters.</b> Geringster Grenzabstand ${fmt(Math.max(m.minGap, 0))} m.`
+        : `<b>Baukörper liegt im Bebauungsfenster.</b> Geringster Grenzabstand ${fmt(m.minGap)} m.`;
+      state.listeners.forEach(fn => fn(state, m));
+    }
+    // Moves are clamped to the envelope when "Im Bebauungsfenster halten" is on
+    // and the house fits at all — the same rule the real SitePlan follows.
+    function tryMove(nx, ny) {
+      const next = { ...state, x: nx, y: ny };
+      if (state.confine && measure(state).outside === 0 && measure(next).outside > 0) {
+        const sx = { ...state, x: nx }, sy = { ...state, y: ny };
+        if (measure(sx).outside === 0) { state.x = nx; } else if (measure(sy).outside === 0) { state.y = ny; }
+      } else { state.x = nx; state.y = ny; }
+      render();
+    }
+    function toSvg(e) {
+      const p = svg.createSVGPoint(); p.x = e.clientX; p.y = e.clientY;
+      return p.matrixTransform(svg.getScreenCTM().inverse());
+    }
+    let drag = null;
+    house.addEventListener("pointerdown", e => {
+      e.preventDefault();
+      house.setPointerCapture(e.pointerId);
+      const p = toSvg(e);
+      drag = { sx: e.clientX, sy: e.clientY, ox: p.x - state.x, oy: p.y - state.y, moved: false };
+    });
+    house.addEventListener("pointermove", e => {
+      if (!drag) return;
+      if (!drag.moved && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 4) return;
+      drag.moved = true;
+      const p = toSvg(e);
+      tryMove(p.x - drag.ox, p.y - drag.oy);
+    });
+    house.addEventListener("pointerup", () => {
+      if (drag && !drag.moved) { state.selected = true; render(); onSelect(); }
+      drag = null;
+    });
+    house.addEventListener("keydown", e => {
+      const step = e.shiftKey ? 6 : 1.5;
+      const moves = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
+      if (moves[e.key]) { e.preventDefault(); tryMove(state.x + moves[e.key][0], state.y + moves[e.key][1]); }
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); state.selected = true; render(); onSelect(); }
+    });
+    svg.addEventListener("pointerdown", e => { if (!house.contains(e.target) && state.selected) { state.selected = false; render(); } });
+
+    return {
+      state, render, svg,
+      set(patch) { Object.assign(state, patch); render(); },
+      onChange(fn) { state.listeners.push(fn); },
+      alignToStreet() { state.rot = -14.8; render(); },
+    };
+  }
+
+  // --- shared chrome ----------------------------------------------------
+  function toolbar(root, plan) {
+    const bar = root.querySelector("[data-bar]");
+    bar.innerHTML = `
+      <span class="bar__label">Grund</span>
+      <div class="seg"><button type="button" aria-pressed="false">Ohne</button><button type="button" aria-pressed="true">Karte</button><button type="button" aria-pressed="false">Luftbild</button><button type="button" aria-pressed="false">Kataster</button></div>
+      <span class="bar__spacer"></span>
+      <button type="button" class="tog" aria-pressed="true" data-t="dims">Maße</button>
+      <button type="button" class="tog" aria-pressed="true" data-t="setbacks">Abstandsflächen</button>
+      <button type="button" class="tog" aria-pressed="false">Messen</button>
+      <button type="button" class="tog" aria-pressed="false">Nachbarn</button>`;
+    bar.querySelectorAll(".seg button").forEach(b => b.addEventListener("click", () => {
+      bar.querySelectorAll(".seg button").forEach(o => o.setAttribute("aria-pressed", String(o === b)));
+    }));
+    bar.querySelectorAll(".tog").forEach(b => b.addEventListener("click", () => {
+      const on = b.getAttribute("aria-pressed") !== "true";
+      b.setAttribute("aria-pressed", String(on));
+      if (b.dataset.t) plan.svg.classList.toggle("hide-" + b.dataset.t, !on);
+    }));
+  }
+
+  const plotVals = `<dl class="vals">
+      <dt>Gemarkung</dt><dd>Liebertwolkwitz</dd><dt>Flurstücke</dt><dd>85/1</dd>
+      <dt>Fläche amtlich</dt><dd>1.685 m²</dd><dt>Fläche gerechnet</dt><dd>1.680,2 m²</dd>
+      <dt>Straßenfront</dt><dd>29,64 m</dd></dl>`;
+  const priceVals = `<dl class="vals">
+      <dt>Kaufpreis</dt><dd>—</dd><dt>Angebot je m²</dt><dd>—</dd>
+      <dt>Bodenrichtwert</dt><dd>150,00 €</dd><dt>Stichtag</dt><dd>01.01.2026</dd></dl>
+      <p class="foot">Ohne Kaufpreis lässt sich das Angebot nicht vergleichen. Der Richtwert gilt für die Zone;
+        hat dieses Grundstück eine andere Nutzungsart, gilt er nicht (§ 15 Abs. 2 ImmoWertV).</p>`;
+  const formVals = `<dl class="vals"><dt>Rechteckigkeit</dt><dd>0,712</dd><dt>Einstufung</dt><dd>komplex</dd>
+      <dt>Seitenverhältnis</dt><dd>1 : 2,52</dd></dl>`;
+  function setbackBody(caveat) {
+    const rows = [["Süd · zur Straße", "29,64"], ["Nordost · Nachbar", "14,73"], ["Nordost · Nachbar", "60,54"], ["Nordwest · Nachbar", "16,54"], ["Südwest · Nachbar", "10,61"]]
+      .map(([n, l]) => `<dt>${n}</dt><dd>${l} m · 3,0</dd>`).join("");
+    return `<dl class="vals">${rows}<dt class="faint">… 8 weitere Grenzen</dt><dd></dd></dl>
+      <div class="slider"><label for="wh-${Math.random().toString(36).slice(2, 7)}">Wandhöhe</label><output class="mono">6,40 m</output>
+        <input type="range" min="2.5" max="12" step=".1" value="6.4" aria-label="Wandhöhe">
+        <span class="hint">0,4 · H = 2,56 m, unter dem Mindestmaß von 3 m, deshalb gilt der Mindestwert.</span></div>
+      ${caveat === "inline" ? `<details class="caveat"><summary>Vereinfacht gerechnet, keine Prüfung</summary>
+        <p>Die Tiefe bemisst sich nach § 6 SächsBO grundsätzlich nach der Wandhöhe; 3 m sind der Mindestwert.
+        Grenzgaragen sind privilegiert, ein Bebauungsplan kann abweichende Baugrenzen festsetzen. Verbindlich
+        entscheidet die Bauaufsicht.</p></details>` : ""}`;
+  }
+  function setbackSummary(caveat) {
+    return `<h4>Abstandsflächen</h4><span class="sum">3,0 m ringsum</span>` +
+      (caveat === "chip"
+        ? `<span class="chip chip--warn" title="Vereinfacht gerechnet: 3 m Mindestmaß oder 0,4 · Wandhöhe. Grenzgaragen und Bebauungsplan sind nicht berücksichtigt. Verbindlich entscheidet die Bauaufsicht.">§ 6 SächsBO ⓘ</span>`
+        : `<span class="chip chip--warn">§ 6 SächsBO</span>`);
+  }
+
+  // The complete house editor, written once and reused in all three variants.
+  function designBody(plan, opts = {}) {
+    const id = Math.random().toString(36).slice(2, 7);
+    const options = TYPES.map(t => `<option value="${t.id}">${t.name} · ${fmt(t.w * t.d, 0)} m²</option>`).join("");
+    return {
+      html: `
+        ${opts.noSelect ? "" : `<div class="field"><label for="ht-${id}">Haustyp</label><select id="ht-${id}" data-typeselect>${options}</select></div>`}
+        <div class="field row2" data-custom>
+          <div style="display:grid;gap:5px"><label for="len-${id}">Länge</label><input id="len-${id}" type="number" step=".1" min="4" max="30" data-len></div>
+          <div style="display:grid;gap:5px"><label for="wid-${id}">Breite</label><input id="wid-${id}" type="number" step=".1" min="4" max="30" data-wid></div>
+        </div>
+        <dl class="vals" data-dvals></dl>
+        <div class="slider"><label for="rot-${id}">Drehung</label><output class="mono" data-rotout></output>
+          <input id="rot-${id}" type="range" min="-90" max="90" step="1" data-rot>
+          <span class="hint">Mit der Maus ziehen, mit den Pfeiltasten fein verschieben.</span></div>
+        <div class="actions">
+          <button type="button" class="btn" data-align>An der Straße ausrichten</button>
+          <button type="button" class="tog" aria-pressed="true" data-confine title="Das Haus lässt sich nicht über die Abstandsflächen hinausschieben.">Im Fenster halten</button>
+        </div>`,
+      wire(el) {
+        const s = plan.state;
+        const selects = el.querySelectorAll("[data-typeselect]");
+        selects.forEach(sel => sel.addEventListener("change", () => plan.set({ type: TYPES.find(t => t.id === sel.value) })));
+        el.querySelector("[data-rot]").addEventListener("input", e => plan.set({ rot: +e.target.value }));
+        el.querySelector("[data-len]").addEventListener("change", e => { TYPES[0].w = Math.min(30, Math.max(4, +e.target.value || 4)); plan.render(); });
+        el.querySelector("[data-wid]").addEventListener("change", e => { TYPES[0].d = Math.min(30, Math.max(4, +e.target.value || 4)); plan.render(); });
+        el.querySelector("[data-align]").addEventListener("click", () => plan.alignToStreet());
+        const confine = el.querySelector("[data-confine]");
+        confine.addEventListener("click", () => { s.confine = !s.confine; confine.setAttribute("aria-pressed", String(s.confine)); });
+        plan.onChange((st) => {
+          selects.forEach(sel => { sel.value = st.type.id; });
+          el.querySelector("[data-custom]").hidden = st.type.id !== "custom";
+          el.querySelector("[data-len]").value = TYPES[0].w;
+          el.querySelector("[data-wid]").value = TYPES[0].d;
+          el.querySelector("[data-rot]").value = Math.round(st.rot);
+          el.querySelector("[data-rotout]").textContent = deg(st.rot);
+          const area = st.type.w * st.type.d;
+          el.querySelector("[data-dvals]").innerHTML = `
+            <dt>Bebaute Fläche</dt><dd>${fmt(area)} m²</dd>
+            <dt>Außenmaß</dt><dd>${fmt(st.type.w, 1)} × ${fmt(st.type.d, 1)} m</dd>
+            <dt>GRZ</dt><dd>${fmt(area / 1685)}</dd>`;
+        });
+      },
+    };
+  }
+  function typeOptions() { return TYPES.map(t => `<option value="${t.id}">${t.name}</option>`).join(""); }
+  function scrollIfNarrow(el) {
+    if (window.matchMedia("(max-width:860px)").matches) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  // --- Variant A --------------------------------------------------------
+  {
+    const root = document.querySelector('[data-variant="a"]');
+    const tabs = [root.querySelector("#a-tab-plot"), root.querySelector("#a-tab-design")];
+    const panes = [root.querySelector("#a-plot"), root.querySelector("#a-design")];
+    const show = i => {
+      tabs.forEach((t, j) => t.setAttribute("aria-selected", String(i === j)));
+      panes.forEach((p, j) => { p.hidden = i !== j; });
+    };
+    tabs.forEach((t, i) => t.addEventListener("click", () => show(i)));
+    const plan = makePlan(root, () => { show(1); scrollIfNarrow(root.querySelector(".tabs")); });
+    toolbar(root, plan);
+    root.querySelector("[data-plot-panel]").innerHTML = `<div class="panel__head"><h4>Grundstück</h4><span class="chip">ALKIS</span></div>${plotVals}`;
+    root.querySelector("[data-price-panel]").innerHTML = `<div class="panel__head"><h4>Preis</h4><span class="chip">BORIS</span></div>${priceVals}`;
+    root.querySelector("[data-form-fold]").innerHTML = `<summary><h4>Form</h4><span class="sum">komplex · 1 : 2,52</span></summary>${formVals}`;
+    root.querySelector("[data-setback-fold]").innerHTML = `<summary>${setbackSummary("inline")}</summary>${setbackBody("inline")}`;
+    const d = designBody(plan);
+    const dp = root.querySelector("[data-design-panel]");
+    dp.innerHTML = `<div class="panel__head"><h4>Baukörper<small>zum Ausprobieren daraufgelegt</small></h4>
+      <button type="button" class="btn btn--quiet" data-back>Zum Grundstück</button></div>${d.html}`;
+    d.wire(dp);
+    dp.querySelector("[data-back]").addEventListener("click", () => show(0));
+    root.querySelector("[data-open]").addEventListener("click", () => { show(1); plan.set({ selected: true }); });
+    plan.onChange(st => { root.querySelector("[data-typename]").textContent = `${st.type.name} · ${fmt(st.type.w * st.type.d, 0)} m²`; });
+    plan.render();
+  }
+
+  // --- Variant B --------------------------------------------------------
+  {
+    const root = document.querySelector('[data-variant="b"]');
+    const inspector = root.querySelector("[data-inspector]");
+    const openBtn = root.querySelector("[data-open]");
+    let plan;
+    const setOpen = open => {
+      inspector.hidden = !open;
+      openBtn.setAttribute("aria-expanded", String(open));
+      openBtn.textContent = open ? "Schließen" : "Anpassen";
+      plan.set({ selected: open });
+    };
+    plan = makePlan(root, () => setOpen(true));
+    toolbar(root, plan);
+    root.querySelector("[data-plot-panel]").innerHTML = `<div class="panel__head"><h4>Grundstück</h4><span class="chip">ALKIS</span></div>${plotVals}`;
+    root.querySelector("[data-price-panel]").innerHTML = `<div class="panel__head"><h4>Preis</h4><span class="chip">BORIS</span></div>${priceVals}`;
+    root.querySelector("[data-form-fold]").innerHTML = `<summary><h4>Form</h4><span class="sum">komplex · 1 : 2,52</span></summary>${formVals}`;
+    root.querySelector("[data-setback-fold]").innerHTML = `<summary>${setbackSummary("chip")}</summary>${setbackBody("chip")}`;
+    const stripSel = root.querySelector(".strip [data-typeselect]");
+    stripSel.innerHTML = typeOptions();
+    const d = designBody(plan, { noSelect: true });
+    inspector.innerHTML = `<div class="panel__head"><h4>Baukörper<small>zum Ausprobieren daraufgelegt</small></h4>
+      <button type="button" class="iconbtn" data-close aria-label="Schließen">×</button></div>${d.html}`;
+    d.wire(root); // wires the strip's select too, since it lives inside root
+    inspector.querySelector("[data-close]").addEventListener("click", () => setOpen(false));
+    openBtn.addEventListener("click", () => setOpen(inspector.hidden));
+    root.addEventListener("keydown", e => { if (e.key === "Escape" && !inspector.hidden) setOpen(false); });
+    plan.onChange(st => {
+      const a = st.type.w * st.type.d;
+      root.querySelector("[data-stripfacts]").textContent = `${fmt(a, 1)} m² · GRZ ${fmt(a / 1685)} · ${deg(st.rot)}`;
+    });
+    plan.render();
+  }
+
+  // --- Variant C --------------------------------------------------------
+  {
+    const root = document.querySelector('[data-variant="c"]');
+    let plan;
+    const folds = () => [...root.querySelectorAll("details.fold")];
+    const designFold = root.querySelector("[data-design-fold]");
+    plan = makePlan(root, () => { designFold.open = true; scrollIfNarrow(designFold); });
+    toolbar(root, plan);
+    root.querySelector("[data-plot-fold]").innerHTML = `<summary><h4>Grundstück</h4><span class="sum">85/1 · 1.685 m²</span><span class="chip">ALKIS</span></summary>${plotVals}`;
+    root.querySelector("[data-price-fold]").innerHTML = `<summary><h4>Preis</h4><span class="sum">BRW 150 €/m² · kein Kaufpreis</span><span class="chip">BORIS</span></summary>${priceVals}`;
+    root.querySelector("[data-form-fold]").innerHTML = `<summary><h4>Form</h4><span class="sum">komplex · 1 : 2,52</span></summary>${formVals}`;
+    root.querySelector("[data-setback-fold]").innerHTML = `<summary>${setbackSummary("inline")}</summary>${setbackBody("inline")}`;
+    const d = designBody(plan, { noSelect: true });
+    designFold.innerHTML = `<summary><h4>Baukörper</h4><span class="sum" data-dsum></span></summary>${d.html}`;
+    // The type picker sits outside the fold so it works while the fold is shut.
+    const always = document.createElement("div");
+    always.className = "always";
+    always.innerHTML = `<select data-typeselect aria-label="Haustyp">${typeOptions()}</select>`;
+    designFold.after(always);
+    d.wire(root.querySelector(".acc--design"));
+    // one fold open at a time
+    folds().forEach(f => f.addEventListener("toggle", () => {
+      if (f.open) folds().forEach(o => { if (o !== f) o.open = false; });
+      if (f === designFold) plan.set({ selected: f.open });
+    }));
+    plan.onChange(st => {
+      const a = st.type.w * st.type.d;
+      root.querySelector("[data-dsum]").textContent = `${fmt(a, 1)} m² · GRZ ${fmt(a / 1685)}`;
+    });
+    plan.render();
+  }
+})();
+</script>

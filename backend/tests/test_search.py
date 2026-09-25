@@ -41,7 +41,14 @@ from app.search import distance
 from app.search.blocks import split_blocks
 from app.search.distance import read_distances
 from app.search.ladder import tolerance_ladder
-from app.search.scoring import front_fit, front_interval, land_use, score, street_match
+from app.search.scoring import (
+    front_fit,
+    front_interval,
+    land_use,
+    not_a_plot,
+    score,
+    street_match,
+)
 from app.services import ocr
 from app.services.alkis import Flurstueck, parse_feature_collection
 
@@ -473,9 +480,23 @@ def test_land_use_ranks_and_never_excludes():
 
     assert building == 1.0 and kind == "Wohnbaufläche"
     assert road_kind == "Straßenverkehr"
-    # A carriageway sinks; it does not vanish, because "Baugrundstück means
-    # Wohnbaufläche" is an inference and only official facts may exclude.
+    # Scoring never excludes: a carriageway sinks. Taking roads out is the area
+    # search's job, before anything is scored -- see the tests below.
     assert 0 < road < building
+
+
+def test_a_parcel_is_ruled_out_by_its_dominant_use_and_not_by_a_mention():
+    assert not_a_plot("Straßenverkehr;4650|Landwirtschaft;0.00") == "Straßenverkehr"
+    assert not_a_plot("Bahnverkehr;208") == "Bahnverkehr"
+    # The B7 plot: a garage, a fence, and a zero-share Weg in the register.
+    assert not_a_plot("Weg;0.00|Landwirtschaft;577") is None
+    # A works that touches a kerb.
+    assert not_a_plot(
+        "Industrie- und Gewerbefläche / Industrie und Gewerbe;2164|Straßenverkehr;0.00"
+    ) is None
+    # Only traffic: a wood or a field may still be what an advert sells.
+    assert not_a_plot("Wald;1078") is None
+    assert not_a_plot(None) is None
 
 
 def test_the_right_parcel_outranks_its_neighbour_on_recorded_data():
@@ -655,6 +676,52 @@ def test_the_staircase_stops_at_the_first_rung_that_answers(client: TestClient):
     check = next(e for e in events if e.get("phase") == "gegenprobe")
     assert "können den Treffer nicht kippen" in check["text"]
     assert events[-1]["status"] == "bestaetigt"
+
+
+@respx.mock
+def test_a_road_of_the_same_size_does_not_keep_a_plot_ambiguous(client: TestClient):
+    """456 m² in Großbothen is 32/1, Wohnbaufläche, and 856/21, a road.
+
+    Recorded 24.09.2026. Before the road was set aside this run stopped at
+    „mehrdeutig" with a carriageway as the rival.
+    """
+
+    respx.post(ALKIS_URL).mock(
+        side_effect=_cadastre(
+            counts={"144241+456": 2, "144241": 1131},
+            features={"144241+456": "alkis_grossbothen_456_mit_strasse.gml",
+                      "KatasterBezirk": "alkis_katasterbezirk_grossbothen.gml"},
+        )
+    )
+
+    events = _stream(
+        client,
+        {"gemarkung": "144241", "text": "Baugrundstück in Großbothen, 456 m².",
+         "flaeche_m2": 456, "flaeche_text": "456 m²"},
+    )
+
+    set_aside = next(e for e in events if e.get("phase") == "nutzung")
+    assert set_aside["text"] == (
+        "1 Flurstück scheidet aus, weil es überwiegend Straßenverkehr ist: 856/21"
+    )
+    final = events[-1]
+    assert final["status"] == "bestaetigt"
+    assert [c["properties"]["flurstuecksnummer"] for c in final["kandidaten"]] == ["32/1"]
+
+
+@respx.mock
+def test_a_road_the_listing_names_by_number_is_kept(client: TestClient):
+    """A number is a statement about that parcel -- often the driveway of the set."""
+
+    respx.post(ALKIS_URL).mock(
+        side_effect=_cadastre({}, {"KatasterBezirk": "alkis_katasterbezirk_grossbothen.gml",
+                                   "flstnrzae": "alkis_grossbothen_856_21.gml"})
+    )
+
+    events = _stream(client, {"gemarkung": "Großbothen", "flurstuecksnummer": "856/21"})
+
+    assert not any(e.get("phase") == "nutzung" for e in events)
+    assert [c["properties"]["flurstuecksnummer"] for c in events[-1]["kandidaten"]] == ["856/21"]
 
 
 @respx.mock

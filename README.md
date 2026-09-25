@@ -81,9 +81,18 @@ and imports it as JSON.
 
 ## Deploying it
 
-Four containers: nginx with the built app, the backend, Postgres, and a local
-identity provider. Without an account everything a user enters stays in their
-browser; with one it is stored server-side and a plot can be shared by link.
+nginx with the built app, the backend, Postgres, a local identity provider,
+the router (MOTIS) and the scheduler — plus three one-shot containers that fetch
+the routing input and build the router's graph and the two local indexes.
+Without an account everything a user enters stays in their browser; with one it
+is stored server-side and a plot can be shared by link.
+
+**The first start takes about eight minutes and needs ~6 GiB of memory**, once:
+it downloads ~640 MB (the Saxony OSM extract, the DELFI timetable and the
+official address coordinates), imports the router's graph and builds the POI
+and address indexes. Every start after that takes seconds. Docker Desktop's
+default memory limit may be too low for the import; raise it, or route against
+Transitous instead (see [Routing](#routing)).
 
 ```bash
 cp backend/.env.example backend/.env    # optional — only LLM_API_KEY matters
@@ -101,8 +110,9 @@ docker compose down -v                  # and throw the volumes away with it
 docker image prune                      # images nothing points at any more
 ```
 
-`docker compose down` on its own keeps four volumes: the backend's cache of
-official answers, the scheduler's state, Postgres, and authentik's media. That
+`docker compose down` on its own keeps seven volumes: the backend's cache of
+official answers, the scheduler's state, Postgres, authentik's media, the
+routing input, the routing graph and the two indexes. That
 is the point of them — `up` again and the plots are still there. `-v` is what
 empties the database, and `docker system df` says what any of it costs.
 
@@ -136,10 +146,10 @@ if you want it separately.
 |---|---|
 | **Port** | `WHERE2BUILD_PORT=9000 docker compose up` to serve somewhere other than 8080. |
 | **Cache** | The named volume `backend-cache` holds what the official services answered. Losing it costs time and their bandwidth, not correctness. |
-| **POI directory** | `backend/data` is mounted read-only. Build the index with `python backend/scripts/build_poi_index.py --download` and `/api/nearby` will use it; without it that endpoint says so for the OpenStreetMap categories instead of answering with an empty list. The default extract is all of Saxony; `--url` and `--out` take any other region — see [Reach of the POI index](#reach-of-the-poi-index). |
+| **POI and address indexes** | Built on the first start into the volume `indexes` — the POI index from the same OSM extract the router uses, the address index from the GeoSN's Hauskoordinaten — and rebuilt quarterly by the scheduler. A failed build does not stop the stack: `/api/nearby` and `/api/geocode` then say what is missing instead of answering with an empty list. The backend reads both at startup, so restart it after a rebuild. See [Reach of the POI index](#reach-of-the-poi-index). |
 | **Extraction** | Without `LLM_API_KEY` in `backend/.env`, reading a listing page stays switched off. Everything else works. |
 | **Contact address** | Set `APP_CONTACT` before any real use: the Transitous usage policy requires one. |
-| **Own router** | `docker compose -f docker-compose.yml -f docker-compose.local-routing.yml up` runs MOTIS here instead of asking Transitous. See below. |
+| **Router** | MOTIS runs in the stack; `docker-compose.transitous.yml` switches to the public Transitous instead. See [Routing](#routing). |
 | **Accounts** | `docker compose down -v` throws the database away with the volume `db-data`. Point `DATABASE_URL` at your own Postgres and the `OIDC_*` variables at your own provider to deploy this for real, and drop the `db` and `auth` services. |
 
 `backend/.env` is read if it exists and skipped if it does not, so the stack
@@ -147,8 +157,9 @@ comes up either way.
 
 ### Recurring jobs
 
+The scheduler is part of the stack.
+
 ```bash
-docker compose --profile scheduled-jobs up -d
 docker compose exec scheduler python scripts/run_jobs.py list
 docker compose exec scheduler python scripts/run_jobs.py run cache-sweep
 ```
@@ -161,47 +172,47 @@ failures, and the next scheduled run is the retry.
 
 The scheduler runs from the backend image and touches only the shared volumes,
 so it needs no Docker socket — mounting that would hand a container root on the
-host for the sake of a few timed commands. Rebuilding an index writes into
-`backend/data`, and the API reads its indexes at startup, so the backend has to
-be restarted afterwards for a new one to take effect.
+host for the sake of a few timed commands. Rebuilding an index writes into the
+`indexes` volume, and the API reads its indexes at startup, so the backend has
+to be restarted afterwards for a new one to take effect.
 
-**The MOTIS refresh is deliberately not one of these jobs.** It stops a service
-and replaces a volume, which is a host-side operation, so it stays a host cron
-entry:
+**The timetable refresh is deliberately not one of these jobs.** It stops the
+router while the graph is rebuilt, which is a host-side operation, so it stays
+a host cron entry. `--refresh` replaces both inputs; the import then sees them
+newer than its last run and rebuilds:
 
 ```cron
-40 2 * * 1  cd /srv/where2build && ./motis/fetch-data.sh && docker compose -f docker-compose.yml -f docker-compose.local-routing.yml up -d --force-recreate motis-import motis
+40 2 * * 1  cd /srv/where2build && docker compose run --rm routing-data python scripts/fetch_routing_data.py /data-input --refresh && docker compose stop motis && docker compose up -d
 ```
 
-### Routing on your own machine
+### Routing
 
-Routing goes to [Transitous](https://api.transitous.org) by default. That is a
-volunteer service: its policy asks to be contacted before "many requests",
-counts routing itself as resource-intensive, and rules out commercial use
-(`docs/research/routing-motis.md` § 6). Anything past a prototype should bring
-its own router, and `docker-compose.local-routing.yml` is that router.
+Routing, the stops around a plot and the geocoder come from the MOTIS in the
+stack. The public [Transitous](https://api.transitous.org) answers the same —
+to the last decimal — but it is a volunteer service: its policy asks to be
+contacted before "many requests", counts routing itself as resource-intensive,
+and rules out commercial use (`docs/research/routing-motis.md` § 6). A stack
+handed to somebody should not lean on it.
+
+On a machine that cannot spare the memory for the import, name the second file:
 
 ```bash
-./motis/fetch-data.sh                                   # ~420 MB of input data
-docker compose -f docker-compose.yml -f docker-compose.local-routing.yml \
-  up --build                                           # first start imports
+docker compose -f docker-compose.yml -f docker-compose.transitous.yml up --build
 ```
 
-Without that second file nothing changes: `docker compose up` is still two
-containers and still talks to Transitous. Naming the file is the whole opt-in —
-it brings the router up *and* points the backend at it, so there is no
-`MOTIS_BASE_URL` to remember. Forgetting it used to start the local router and
-then route against Transitous anyway, with nothing to see: the two agree to the
-last decimal, so the only sign was whose bandwidth was being spent.
+That is the whole switch: it points the backend at Transitous *and* keeps the
+three routing services from starting. There is no `MOTIS_BASE_URL` to remember
+— forgetting that variable once started the local router and then routed
+against Transitous anyway, with nothing to see.
 
 | | |
 |---|---|
-| **Data** | An OSM extract (Saxony from Geofabrik, ODbL, © OpenStreetMap contributors) and the Germany-wide DELFI GTFS (349 MB, CC-BY 4.0, DELFI e. V.), taken from Transitous' own republished copy so no opendata-oepnv.de account is needed. Attribute both wherever routes are shown. |
-| **Import** | Once, into the `motis-graph` volume: **6 min** and **5.6 GiB peak RSS** for Germany's timetable on a 4-core machine, giving a **3.4 GB** graph. Re-runs are skipped; delete the volume to rebuild. |
+| **Data** | An OSM extract (Saxony from Geofabrik, 269 MB, ODbL, © OpenStreetMap contributors) and the Germany-wide DELFI GTFS (317 MB, CC-BY 4.0, DELFI e. V.), taken from Transitous' own republished copy so no opendata-oepnv.de account is needed. Both in 31 s on 24.09.2026, into the volume `routing-input`. Attribute both wherever routes are shown. |
+| **Import** | Once, into the `motis-graph` volume: **6 min 51 s** on a 4-core machine (24.09.2026) and **5.6 GiB peak RSS** for Germany's timetable, giving a **3.9 GB** graph. The POI index builds from the same extract alongside it, in about six minutes. Re-runs are skipped until an input is newer than the last import; delete the volume to force one. |
 | **Serving** | The graph is memory-mapped, so the server is ready seconds after start and holds **1.7 GiB**. |
 | **Same answers?** | Yes. Geocoding, `/plan`, `one-to-many` and `map/stops` agree with Transitous to the last decimal, and `/api/reachability` comes back character for character identical, route geometry included. Measured 01.09.2026, `docs/research/routing-motis.md` § 5.6. |
 | **Switching back** | The backend's disk cache is keyed on the request, not on which MOTIS answered it. After changing `MOTIS_BASE_URL`, clear `/cache/motis*` or you keep reading the old service's answers. |
-| **Currency** | DELFI publishes weekly, on Mondays. Re-run `fetch-data.sh`, `docker compose down`, `docker volume rm where2build_motis-graph`, and start again. |
+| **Currency** | DELFI publishes weekly, on Mondays. The cron line above picks that up; by hand it is the same three commands. |
 
 ### Reach of the POI index
 

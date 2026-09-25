@@ -312,6 +312,18 @@ gemountete Volume — und der Pfad im Fehler ist der relative Standardwert,
 also griff die Einstellung in dem laufenden Image nicht (ein Start ohne
 `--build` reicht dafür). Das ist die eine Hälfte.
 
+**Korrektur vom 25.09.2026:** Es war nicht das alte Image. `backend/.env` ist
+eine Kopie von `.env.example`, und die setzt `APP_CACHE_DIR=.cache`. Compose
+liest die Datei per `env_file`, und das schlägt das `ENV` aus dem Dockerfile —
+mit jedem Image, auch frisch gebaut. Gemessen beim Nutzer: `/cache` 4 KB groß
+und leer, das Log mit genau diesem `Permission denied: '.cache'`, und dieselbe
+Kachel zweimal hintereinander zweimal `MISS`. Der Cache hat im Stapel also nie
+etwas gehalten. `docker-compose.yml` setzt `APP_CACHE_DIR=/cache` jetzt unter
+`environment`, das Vorrang vor `env_file` hat, für Backend und Scheduler;
+`docker compose config` mit einer kopierten Vorlage zeigt vorher `.cache`,
+nachher `/cache`. Allgemein: was das Dockerfile per `ENV` setzt und in
+`.env.example` steht, gewinnt im Stapel die Vorlage.
+
 Die andere ist schlimmer und unabhängig davon: `DiskCache.get_bytes` hat einen
 `OSError` immer geschluckt, `set_bytes` hat ihn durchgelassen. Das ist die
 falsche Richtung — ein Cache, der nicht lesen kann, ist langsam, und einer,
@@ -429,13 +441,13 @@ jetzt einmal je Verzeichnis und gibt auf.
   numbers, and a model asked the same question is reciting a page at best.
 
 - **The button that starts a job must not be the thing that runs it.** The
-  index rebuilds write into `backend/data`, which the API mounts read-only, and
+  index rebuilds write into the `indexes` volume, which the API mounts read-only, and
   they take minutes. So „Jetzt starten" writes a request file into the state
   directory both containers already share and the scheduler claims it on its
   next tick — in the container that has the writable mount and the lock against
   a second copy. Two consequences worth keeping: the request is *removed* when
   claimed, so a failing job is not restarted every twenty seconds; and a
-  deployment without the `scheduled-jobs` profile has nothing to claim it, so
+  deployment without the `scheduler` service has nothing to claim it, so
   the scheduler writes a heartbeat and the page says „kein Scheduler" instead
   of offering a button whose effect never arrives.
 

@@ -777,7 +777,7 @@ class Ziel(Koordinate):
 Geocodeart = Literal["adresse", "haltestelle", "ort", "sonstiges"]
 
 GEOCODE_HINWEIS = (
-    "Die Koordinaten stammen aus dem Routing-Geocoder (Transitous, OpenStreetMap "
+    "Die Koordinaten stammen aus dem Routing-Geocoder (MOTIS: OpenStreetMap "
     "und Fahrplandaten), nicht aus den amtlichen Hauskoordinaten des GeoSN. Bitte "
     "den gefundenen Ort auf der Karte prüfen und gegebenenfalls einen anderen "
     "Treffer wählen."
@@ -825,10 +825,12 @@ class GeocodeTreffer(Koordinate):
 GEOCODE_HINWEIS_AMTLICH = (
     "Treffer mit dem Zusatz „amtliche Hauskoordinate“ stammen aus den Hauskoordinaten "
     "des GeoSN{stand} und sind die vom Kataster geführte Koordinate des Hauses. Die "
-    "übrigen kommen aus dem Routing-Geocoder (Transitous, OpenStreetMap und "
+    "übrigen kommen aus dem Routing-Geocoder (MOTIS: OpenStreetMap und "
     "Fahrplandaten) — die bitte auf der Karte prüfen."
 )
-GEOCODE_QUELLE = "MOTIS / Transitous (DELFI-GTFS, OpenStreetMap)"
+# The software and the data, not the operator: the same answer comes from the
+# stack's own MOTIS or from Transitous, and the data is what needs attributing.
+GEOCODE_QUELLE = "MOTIS (DELFI-GTFS, OpenStreetMap)"
 GEOCODE_QUELLE_AMTLICH = "Amtliche Hauskoordinaten (GeoSN, dl-de/by-2-0)"
 
 
@@ -876,7 +878,7 @@ class RouteErgebnis(BaseModel):
 
 class ReachabilityResponse(BaseModel):
     ergebnisse: list[RouteErgebnis]
-    quelle: str = "MOTIS / Transitous (DELFI-GTFS, OpenStreetMap)"
+    quelle: str = GEOCODE_QUELLE
 
 
 # --------------------------------------------------------------------------
@@ -1045,7 +1047,7 @@ class NearbyResponse(BaseModel):
     kategorien: list[KategorieStatus] = Field(default_factory=list)
     # Timestamp of the OSM extract the index was built from, when there is one.
     datenstand: str | None = None
-    quelle: str = "OpenStreetMap (ODbL) und MOTIS / Transitous (DELFI-GTFS)"
+    quelle: str = "OpenStreetMap (ODbL) und MOTIS (DELFI-GTFS)"
     hinweis: str = UMGEBUNG_HINWEIS
 
 
@@ -2112,3 +2114,31 @@ class LoeschAnfrage(BaseModel):
 
 class LoeschErgebnis(BaseModel):
     geleert: dict[str, int] = Field(description="Tabelle → Anzahl gelöschter Zeilen.")
+
+
+# The most one warm-up may name. A list of twenty plots with their comparison
+# is some forty thumbnails; anything far past that is not a list being drawn.
+MAX_WARM_BLOCKS = 100
+
+
+class Kachelblock(BaseModel):
+    ebene: str = Field(description="Kartenebene, wie im Pfad von /api/tiles.")
+    z: int = Field(ge=0, le=24)
+    west: int = Field(ge=0, description="Erste Kachelspalte.")
+    nord: int = Field(ge=0, description="Erste Kachelzeile.")
+    ost: int = Field(ge=0, description="Letzte Kachelspalte, eingeschlossen.")
+    sued: int = Field(ge=0, description="Letzte Kachelzeile, eingeschlossen.")
+
+
+class BloeckeVorwaermen(BaseModel):
+    bloecke: list[Kachelblock] = Field(min_length=1, max_length=MAX_WARM_BLOCKS)
+
+
+class VorwaermenErgebnis(BaseModel):
+    angefragt: int = Field(description="So viele verschiedene Kachelblöcke nannte die Anfrage.")
+    zusammengesetzt_werden: int = Field(
+        description="So viele fehlten im Zwischenspeicher und werden jetzt im Hintergrund zusammengesetzt."
+    )
+    geholt_werden: int = Field(
+        description="So viele Einzelkacheln müssen dafür beim Kartendienst geholt werden."
+    )

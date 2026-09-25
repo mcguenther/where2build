@@ -176,18 +176,24 @@ that collapsed at 390 px. None of them threw.
   finished feature as missing, which is worse than saying nothing. It reads
   `state.sync.active` instead of asserting anything.
 
-- **On a phone a radial veil cannot rescue a backdrop, because the text fills
-  the box in both directions.** The reception's quiet core is a
-  `radial-gradient` at 34% of the width, which works on a desktop where the
-  field sits in the middle of a wide drawing. At 390 px the headline and the
-  sentence take nearly the whole width and the field, the three lines and the
-  account note take the whole height: widened enough to clear the type it
-  wipes the drawing out entirely, and anywhere it fades the fabric runs
-  straight through a line of text — the route crossed one, which is where a
-  backdrop stops being one. So the *drawing* steps back there
-  (`.hero__art svg{ opacity: .42 }`) and the core only softens the middle.
-  The opacity goes on the svg, never on `.hero__art`: the veil is that
-  element's own `::after` and would fade with it.
+- **A backdrop anchored to the window loses whatever it anchors off-centre.**
+  The reception's plot was part of a drawing centred on the window, 664 px
+  left of the middle: cut off below 1330 px of width, gone below 940, never
+  seen on a phone. And the drawing hung from the top while the type was
+  centred vertically, so a taller window pushed the headline away from it.
+  The drawing now hangs off `.hero__headline` and is sized in its `em`, so it
+  shrinks with the type and the room beside a 20ch headline always holds it;
+  below 700 px it moves into the top right corner, cut off by the upper edge.
+  The plot is a second svg above the veil, so the fabric can fade around it
+  without the one parcel that matters fading too.
+
+- **Chromium drops a `radial-gradient` whose size mixes a percentage with a
+  length** -- `min(34%, 470px)`, `calc(30% + 10px)` -- and with it the whole
+  `background` declaration. Nothing in the console. The reception's veil was
+  written that way and never painted on a desktop, which is why the fabric ran
+  straight through the headline. `min(40vw, 580px)` is accepted; test a
+  gradient with `el.style.backgroundImage = …` and read it back, an empty
+  string means it was rejected.
 
 - **`handoff` and `handover` are one letter apart and different things.**
   `lib/handoff.js` is what the start page leaves behind for the wizard — an
@@ -323,6 +329,58 @@ that collapsed at 390 px. None of them threw.
   are `details.fold` with the verdict or the depths beside the title
   („rechteckig · 1 : 1,42", „3,0 m ringsum"), so a closed one is not a blank.
   `print.css` opens them through `::details-content`, like the soil wording.
+
+- **The plot and the house laid on it are two tabs, and the plan decides
+  which one shows.** The column beside the plan held the plot's figures, and
+  the building body stood below it at the same size as the setback table, so
+  what the cadastre says and what the user tried out read as one thing. Now
+  „Grundstück" and „Bebauung" share the column; a *click* on the footprint
+  opens „Bebauung" and draws the selection frame, a click anywhere else on the
+  plan goes back. `SitePlan` emits `select` ("house" or null) from the release,
+  within the same 4 px that separate a pick from a pan, so a drag moves the
+  house and switches nothing. The panes are `v-show`, never `v-if`: the tests
+  and the half-typed edge lengths need the fields to exist, and `print.css`
+  dissolves the column (`display: contents`) to print both — the plot's
+  figures beside the plan, the building body under it. That grid needs
+  `grid-template-rows: auto 1fr`, or the first row grows to the height of the
+  column that spans both and the building body prints a hand's width below
+  the drawing. The column is 336 px, and a `details.fold` head with a summary
+  *and* a chip overflows it; the setback fold lost its § 6 chip to the
+  caveat inside it, which is where the paragraph is explained.
+
+- **An explanation is read once; a state is read every time.** The plot page
+  carried seventeen paragraphs that said how something is meant rather than
+  what is true of this plot, and they were set as open footnotes under every
+  panel. They now sit in `HintFold` — one fold per panel, at its end, with a
+  count so a closed one still says there is something — and `print.css` opens
+  every one of them. What changes with the plot stays open: „Ohne Kaufpreis
+  …", „0,4 · H = 2,56 m", the estimated aspect ratio. A hint that only makes
+  sense on screen (dragging, the map's controls) carries `no-print` inside
+  the fold.
+
+- **The price verdict has three stages, and they come from the band the panel
+  already draws.** `priceStage` in `metrics.js` reads `PRICE_BAND` (± 15 %):
+  below is green, above is red, inside is neutral „im Rahmen" — the chip in
+  the panel head, the marker on the band and the coloured line all read the
+  same stage, so they cannot disagree with the drawing they sit on. Plain
+  green and red for any sign would call 4 % a bargain. The line says the
+  magnitude without a sign: „−4,2 % unter" said the direction twice.
+  `deviationClass`, which the plot cards and the comparison use, reads the
+  same stage now; it used an older scale (± 5 % good, amber up to 15 %), and a
+  plot 21 % under the land value was amber on its card and green on its page.
+  The source chips in a panel head („ALKIS", „BORIS") read as a verdict next
+  to one: „BORIS" beside „unter Richtwert" looked like a second finding. Both
+  panels name their source as the first line of their hint fold instead. The
+  shared view, the wizard and the parcel search still carry an „ALKIS" chip.
+
+- **The asking price is edited on the plot page, in the price panel.** The
+  wizard was the only place to enter it, yet the panel told people it „kann
+  oben eingetragen werden" — there was nothing above to type into, and a plot
+  picked by parcel number never passes that field. The field is text with
+  `inputmode="decimal"`, not `type="number"`: „279.000 €" is how a listing
+  writes it, and `parseGermanNumber` reads it (dots in groups of three are
+  thousands). An empty field removes the price; 0 and non-numbers keep the
+  field open with a sentence, because a stored 0 would read as a free plot.
 
 - **Enter in the search field only ever took a row, so most inputs went
   nowhere.** `PlotSearch` handled Enter itself and took the highlighted row or

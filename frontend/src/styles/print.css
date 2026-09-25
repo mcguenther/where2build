@@ -108,12 +108,13 @@
 
   .print-only{ display: block; }
 
-  /* Two of these are not controls but content that happens to be clickable, and
-     the blanket `button` rule above swallows them: a printed list of plots
-     without names or outlines is not a list of plots. The compare checkbox
-     beside them really is a control and stays gone. */
+  /* Three of these are not controls but content that happens to be clickable,
+     and the blanket `button` rule above swallows them: a printed list of plots
+     without names or outlines is not a list of plots, and the comparison's
+     „Drucken" printed its table and an empty panel where the drawings were.
+     The compare checkbox really is a control and stays gone. */
   .plot-card__title{ display: inline !important; }
-  .plot-card__plan{ display: block !important; }
+  .plot-card__plan, .plan-figure__button{ display: block !important; }
   .plot-card__select{ display: none !important; }
 
   /* ---------- Fields are values on paper, not controls ----------
@@ -190,6 +191,10 @@
   .site-plan__north{ font-size: 19px !important; }
   .site-plan__scale-bar{ font-size: 13px !important; }
 
+  /* A thumbnail waits for its ground on screen; paper has no fade, and a
+     print taken mid-way must not come out with an empty frame. */
+  .site-plan__content{ opacity: 1 !important; transition: none !important; }
+
   /* The north arrow and the scale bar stay: with the map rotated to the street
      they are the only orientation left on paper.
      Do NOT hide `.plan-handle` here — that class sits on the building footprint
@@ -241,23 +246,26 @@
   .check__detail > *{ display: block !important; content-visibility: visible !important; }
   .check__detail summary{ list-style: none; }
 
-  /* ---------- Setbacks, building body, disclaimer ----------
-     The setback table runs to one row per boundary and is by far the tallest
-     of the three, so it takes the left column on its own and the other two
-     stack beside it. */
-  .tools{
-    /* Flow, not grid. A grid container that has to fragment across a page
-       boundary is the one construct print engines disagree about most: Chromium
-       carries the tracks over, Firefox lays the items on top of each other, and
-       the sheet collapses on whichever page the break lands. Everything below
-       the first sheet therefore flows in one column, and each panel is kept
-       whole instead. A slightly longer document beats a wrong one. */
-    display: block !important;
-  }
-  .tools > *{ break-inside: avoid; margin-bottom: 4mm; }
-  /* The column that pairs the setback table with the caution flows too. */
-  .tools__column{ display: block !important; }
-  .tools__column > *{ break-inside: avoid; margin-bottom: 4mm; }
+  /* ---------- The column beside the plan ----------
+     On screen it is two tabs; paper has nothing to click, so both print. The
+     column dissolves into the sheet's grid: the plot's figures stay beside the
+     plan, and the building body goes under the drawing, where the left column
+     would otherwise be empty paper next to the setback table. */
+  .plan-grid > .facts{ display: contents !important; }
+  /* The plot's figures span both rows; without this the first row grows to
+     their height and the building body lands far below the drawing. */
+  .plan-grid.print-sheet{ grid-template-rows: auto 1fr !important; }
+  .side-pane{ display: flex !important; }
+  #pane-plot{ grid-column: 2; grid-row: 1 / span 2; }
+  #pane-building{ grid-column: 1; grid-row: 2; }
+  .side-pane > *{ break-inside: avoid; }
+  .site-plan__selection{ display: none !important; }
+  /* Every hint fold on the page: paper has nothing to click. The count is
+     for a closed fold on screen and says nothing once it is open. */
+  .hint-fold::details-content{ content-visibility: visible !important; }
+  .hint-fold > .hint-fold__body{ display: grid !important; }
+  .hint-fold__count, .hint-fold__head::before{ display: none !important; }
+  .price-verdict{ background: none !important; }
 
   /* A depth reads as a measurement, like the length beside it — the input is
      only how it gets edited on screen. */

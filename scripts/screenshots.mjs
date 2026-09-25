@@ -206,7 +206,18 @@ async function nav(page, name) {
   await page.waitForTimeout(150);
 }
 
+/* A thumbnail's ground is one image that stays invisible until it has loaded
+ * and then fades in, so a picture taken before that shows flat paper and
+ * passes. Waited for, bounded, and reported rather than photographed. */
+async function groundsSettled(page, name) {
+  const settled = await page.waitForFunction(
+    () => !document.querySelector('[data-ground="loading"]'), null, { timeout: 30000 }
+  ).then(() => true, () => false);
+  if (!settled) problems.push(`${name}: Umgebungsbild einer Vorschau kam nicht an`);
+}
+
 async function shot(page, name, mode, zusatz = "") {
+  await groundsSettled(page, `${name}/${mode}`);
   await page.waitForTimeout(340);
   // A layout that pushes the page sideways is a defect, and no screenshot shows it.
   const overflow = await page.evaluate(() =>
@@ -220,6 +231,7 @@ async function shot(page, name, mode, zusatz = "") {
 /** One section of a page rather than all of it — for a part that lives far
  *  down a long page, where a full-page picture is mostly everything else. */
 async function shotOf(page, selector, name, mode, zusatz = "") {
+  await groundsSettled(page, `${name}/${mode}`);
   await page.waitForTimeout(340);
   const overflow = await page.evaluate(() =>
     document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -423,11 +435,27 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
     await page.locator("#standort .checks__more button").click();
   }
   // The two panels that start folded, opened: what they hold has to read too.
+  // Then a click on the house, which is how the building tab is meant to be
+  // reached — a pointer press and release on the footprint, not the tab.
   if (!narrow) {
     await page.locator("details.fold > summary").evaluateAll(heads => heads.forEach(h => h.click()));
-    await shotOf(page, ".facts", "grundstueck-form", mode);
-    await shotOf(page, ".tools", "grundstueck-abstaende", mode);
+    // The column alone: the plan beside it is sticky, and a picture of the
+    // whole grid catches it halfway down.
+    await shotOf(page, ".facts", "grundstueck-abstaende", mode);
     await page.locator("details.fold > summary").evaluateAll(heads => heads.forEach(h => h.click()));
+    await page.locator(".plan-grid [data-house] polygon").first().click();
+    if (!await page.locator("#pane-building").isVisible()) {
+      problems.push(`${mode}/${width}: ein Klick auf das Haus hat den Reiter „Bebauung“ nicht geöffnet`);
+    }
+    await shotOf(page, ".plan-grid", "grundstueck-bebauung", mode);
+    await page.getByRole("tab", { name: "Grundstück" }).click();
+
+    // The price field, open and empty. The run's plot comes from a typed parcel
+    // number, so it has no listing and no price — typing one in here would put
+    // an invented figure into the documentation.
+    await page.getByRole("button", { name: "Kaufpreis eintragen" }).click();
+    await shotOf(page, "#pane-plot section.panel >> nth=1", "grundstueck-preis", mode);
+    await page.locator("#asking-price").press("Escape");
   }
 
   /* The point of the addresses: the plot has one of its own, and reloading it

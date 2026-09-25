@@ -134,6 +134,14 @@ passed through to the plain `docker compose up` behind it, which is the
 untrusted build the script exists to avoid. The error arrives as a pip
 certificate failure, i.e. as though the script had not worked.
 
+**`env_file` beats the Dockerfile's `ENV`, and `backend/.env` is a copy of
+`.env.example`.** Any setting the image fixes to a container path and the
+template also names is silently the template's value in the stack. It hid
+for a week as `APP_CACHE_DIR=.cache`: no cache write ever succeeded in
+compose, which shows only as slowness and one warning line in the log.
+`docker compose config` with a copied template is the check; `environment:`
+is the fix. See `accounts-and-sharing.md`.
+
 `docker pull python:3.11-slim` answers **429** from Docker Hub often enough
 that one retry is routine.
 
@@ -350,6 +358,50 @@ Both directions were then measured: without a CA the build fails with exit 1 at
 that step; with one it exits 0 and the image imports. **Check the image, not
 the exit code** — `docker run --rm <image> python -c "import fastapi"` is the
 whole test.
+
+**The CA in the build context helps the build, not the running container.**
+Measured 24.09.2026, when the stack started fetching its own routing input:
+the backend image, built fine, answered every HTTPS request at *run* time with
+`CERTIFICATE_VERIFY_FAILED: self-signed certificate in certificate chain` —
+the bundle is deliberately deleted from the image. Anything in the stack that
+downloads (`routing-data`, `indexes`, the scheduler, the backend's own calls to
+ALKIS) needs the bundle mounted in this sandbox. An uncommitted override does
+it; httpx reads `SSL_CERT_FILE`:
+
+```yaml
+# .sandbox-ca.yml -- never committed; only this sandbox re-terminates TLS
+x-ca: &ca
+  environment: [SSL_CERT_FILE=/sandbox-ca.crt]
+  volumes: ["/root/.ccr/ca-bundle.crt:/sandbox-ca.crt:ro"]
+services:
+  routing-data: *ca
+  indexes: *ca
+  backend: {environment: [SSL_CERT_FILE=/sandbox-ca.crt], volumes: ["/root/.ccr/ca-bundle.crt:/sandbox-ca.crt:ro"]}
+  scheduler: *ca
+```
+
+`docker compose -f docker-compose.yml -f .sandbox-ca.yml up`. On a real machine
+none of it is needed. The ghcr.io MOTIS image pulls without trouble here;
+Docker Hub (`python:3.11-slim`) answered 429 three times in a row before a
+retry loop got through.
+`mirror.gcr.io/library/<name>` serves the same images without the limit;
+pull from there and `docker tag` it to the Docker Hub name.
+
+**A folded YAML block (`>`) is not a shell script.** The `indexes` one-shot was
+first written as `command: [sh, -c, >…]` with `|| echo …` on a more-indented
+continuation line. Folding keeps the newline before a more-indented line, so
+`sh` saw a line starting with `||` and died with `Syntax error: "||"
+unexpected` — exit 2, and `depends_on: service_completed_successfully` would
+have held the backend back for good. Use a literal block (`|`) and end the line
+with the operator, not start the next one with it.
+
+**A build script run by the scheduler must not write next to itself.**
+`build_address_index.py --download` saved its ZIP under `backend/.cache`, which
+in the image is `/app/.cache` — root's, while the job runs as `app`. The job in
+`ops/jobs.json` could never have succeeded in a container. Both index scripts
+now download into `APP_CACHE_DIR` and write to the path the API reads
+(`NEARBY_POI_INDEX_PATH`, `ADDRESSES_INDEX_PATH`), so a container that sets
+those builds where it serves from.
 - **An export that is *read* at module level breaks five test files; one that
   is only called does not.** Five files mock `lib/api.js` by listing its
   surface, and `methods: { recordUrl: adminRecordUrl }` reads that binding the

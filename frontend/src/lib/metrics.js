@@ -2,6 +2,20 @@
  *  the detail view and the comparison always agree on the same numbers. */
 import { polygonArea, minimumRotatedRectangle, rectangularity, shapeClass, polygonEdges } from "./geometry.js";
 
+/** Half the width of the band the price panel draws around the land value,
+ *  as a fraction. The chip, the marker and the coloured line all read their
+ *  stage off it, so they cannot disagree with the band they sit on. */
+export const PRICE_BAND = 0.15;
+
+/** "below", "within" or "above" the band, from a deviation in per cent; null
+ *  when there is no deviation because there is no asking price. */
+export function priceStage(deviation) {
+  if (!Number.isFinite(deviation)) return null;
+  if (deviation < -PRICE_BAND * 100) return "below";
+  if (deviation > PRICE_BAND * 100) return "above";
+  return "within";
+}
+
 export function plotMetrics(plot) {
   const computed = polygonArea(plot.polygon);
   const mrr = minimumRotatedRectangle(plot.polygon);
@@ -24,10 +38,11 @@ export function plotMetrics(plot) {
        the two differ by a few square metres and only the official figure counts. */
     pricePerSqm: perSqm,
     deviation,
-    // The value is the modifier of a `chip--…` CSS class.
-    deviationClass: deviation === null
-      ? "unknown"
-      : Math.abs(deviation) <= 5 ? "good" : deviation > 15 ? "error" : "warn",
+    priceStage: priceStage(deviation),
+    /* The modifier of a `chip--…` CSS class, from the same three stages the
+       plot page draws, so a card and the page it opens never disagree.
+       "neutral" and "unknown" have no rule of their own: a plain chip. */
+    deviationClass: { below: "good", within: "neutral", above: "error" }[priceStage(deviation)] ?? "unknown",
     /* The edge the plot itself calls its street front, not the one the ring
        happens to start with: a union of two parcels starts wherever the two
        outlines meet, and that was a 2,04 m stub reported as the frontage. */
