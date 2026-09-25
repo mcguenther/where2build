@@ -202,6 +202,19 @@ export default {
           ...(this._camera || {})
         });
         this._map.addControl(new NavigationControl({ showCompass: false }), "top-right");
+        // MapLibre opens a compact attribution until the first drag. The aerial
+        // credit names sixteen Länder and filled a third of the map; folded it
+        // is one „i", and the footnote below says whose it is. It is filled —
+        // and opened — only once a source has reported its metadata, which is
+        // after `load`, so the fold waits for the moment it actually opens.
+        const foldCredit = () => {
+          const credit = this.$refs.mapContainer
+            ?.querySelector(".maplibregl-ctrl-attrib.maplibregl-compact-show");
+          if (!credit) return;
+          credit.classList.remove("maplibregl-compact-show");
+          this._map?.off("sourcedata", foldCredit);
+        };
+        this._map.on("sourcedata", foldCredit);
         // One missing icon or tile is not a broken map — the rule the site plan
         // learned. Only a style that never arrives counts as a failure.
         this._map.on("error", e => console.warn("Indizienkarte:", e?.error?.message || e));

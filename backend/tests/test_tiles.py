@@ -392,6 +392,21 @@ GREEN = (0, 200, 0, 255)
 BLUE = (0, 0, 200, 255)
 
 
+def _is_probe(request: httpx.Request) -> bool:
+    """Whether a request is the coarse "anything here?" look, not a tile."""
+
+    minx, _, maxx, _ = (float(v) for v in request.url.params["BBOX"].split(","))
+    return abs((maxx - minx) - geo.tile_width_3857_m(10)) < 1.0
+
+
+def _answering(*, probe: httpx.Response, tile: httpx.Response):
+    return lambda request: probe if _is_probe(request) else tile
+
+
+def _tile_calls(route) -> int:
+    return sum(1 for call in route.calls if not _is_probe(call.request))
+
+
 @respx.mock
 def test_an_inland_aerial_tile_asks_its_own_land_and_nothing_else(client: TestClient):
     west = respx.get(AERIAL_WEST_URL).mock(return_value=_image(RED))
@@ -402,7 +417,7 @@ def test_an_inland_aerial_tile_asks_its_own_land_and_nothing_else(client: TestCl
     answer = client.get(f"/api/tiles/luftbild/14/{x}/{y}.png")
 
     assert answer.status_code == 200
-    assert west.call_count == 1
+    assert _tile_calls(west) == 1
     # A Land that covers the whole tile leaves nothing for the ground to show.
     assert east.call_count == 0 and ground.call_count == 0
     assert _pixel(answer.content, 128, 128) == RED
@@ -412,12 +427,32 @@ def test_an_inland_aerial_tile_asks_its_own_land_and_nothing_else(client: TestCl
 
 
 @respx.mock
+def test_a_land_that_draws_nothing_near_the_tile_is_not_asked_for_it(client: TestClient):
+    """The boxes overlap far more than the Länder: Leipzig lies in four.
+
+    One look at the surrounding cell settles it for every tile inside, and is
+    remembered.
+    """
+
+    respx.get(AERIAL_WEST_URL).mock(return_value=_image(RED))
+    east = respx.get(AERIAL_EAST_URL).mock(return_value=_image((0, 0, 0, 0)))
+    x, y = _tile_at(12.0, 51.0, 14)
+
+    client.get(f"/api/tiles/luftbild/14/{x}/{y}.png")
+    client.get(f"/api/tiles/luftbild/14/{x}/{y + 1}.png")
+
+    assert east.call_count == 1
+    assert _is_probe(east.calls[0].request)
+    assert east.calls[0].request.url.params["TIME"] == "2024"
+
+
+@respx.mock
 def test_a_border_tile_composes_both_lands_over_the_ground(client: TestClient):
     """Each Land answers transparent past its border, so stacking is the cut."""
 
     west = respx.get(AERIAL_WEST_URL).mock(return_value=_image(RED, left_half_only=True))
     east = respx.get(AERIAL_EAST_URL).mock(
-        return_value=_image((0, 0, 0, 0))
+        side_effect=_answering(probe=_image(GREEN), tile=_image((0, 0, 0, 0)))
     )
     respx.get(AERIAL_OVERVIEW_URL).mock(return_value=_image(BLUE))
     x, y = _tile_at(12.0, 51.0, 12)
@@ -425,8 +460,7 @@ def test_a_border_tile_composes_both_lands_over_the_ground(client: TestClient):
     answer = client.get(f"/api/tiles/luftbild/12/{x}/{y}.png")
 
     assert answer.status_code == 200
-    assert west.call_count == 1 and east.call_count == 1
-    assert east.calls[0].request.url.params["TIME"] == "2024"
+    assert _tile_calls(west) == 1 and _tile_calls(east) == 1
     assert _pixel(answer.content, 10, 128) == RED
     # The half no Land drew is the Sentinel ground, not transparency.
     assert _pixel(answer.content, 250, 128) == BLUE
@@ -441,7 +475,9 @@ def test_a_land_that_paints_white_outside_lies_under_its_neighbour(client: TestC
     """
 
     respx.get(AERIAL_WEST_URL).mock(return_value=_image(RED, left_half_only=True))
-    respx.get(AERIAL_EAST_URL).mock(return_value=_image((255, 255, 255, 255)))
+    respx.get(AERIAL_EAST_URL).mock(
+        side_effect=_answering(probe=_image(GREEN), tile=_image((255, 255, 255, 255)))
+    )
     ground = respx.get(AERIAL_OVERVIEW_URL).mock(return_value=_image(BLUE))
     x, y = _tile_at(12.0, 51.0, 12)
 
@@ -450,6 +486,21 @@ def test_a_land_that_paints_white_outside_lies_under_its_neighbour(client: TestC
     assert _pixel(answer.content, 10, 128) == RED
     assert _pixel(answer.content, 250, 128) == (255, 255, 255, 255)
     assert ground.call_count == 0
+
+
+@respx.mock
+def test_white_is_nothing_only_for_a_land_that_paints_it_outside(client: TestClient):
+    """A cell that is nothing but Thüringen's white is a cell it does not draw in."""
+
+    respx.get(AERIAL_WEST_URL).mock(return_value=_image((255, 255, 255, 255)))
+    east = respx.get(AERIAL_EAST_URL).mock(return_value=_image((255, 255, 255, 255)))
+    respx.get(AERIAL_OVERVIEW_URL).mock(return_value=_image(BLUE))
+    x, y = _tile_at(12.0, 51.0, 12)
+
+    client.get(f"/api/tiles/luftbild/12/{x}/{y}.png")
+
+    # West's white is a picture (a roof, a snowfield); east's is its margin.
+    assert _tile_calls(east) == 0
 
 
 @respx.mock
@@ -490,9 +541,10 @@ def test_one_silent_land_costs_its_half_and_the_tile_is_not_cached(client: TestC
 
     assert first.status_code == second.status_code == 200
     assert _pixel(first.content, 10, 128) == RED
-    # Asked again: a tile with a hole in it must not stay in the cache.
+    # Asked again: a tile with a hole in it must not stay in the cache -- and a
+    # probe that failed is not remembered as "nothing here" either.
     assert second.headers["x-cache"] == "MISS"
-    assert east.call_count >= 2
+    assert _tile_calls(east) >= 2
 
 
 @respx.mock

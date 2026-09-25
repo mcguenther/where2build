@@ -422,6 +422,15 @@ of Overpass or a local extract, the listing portals, and the extraction model.
   which certifi carries and this sandbox's system bundle does not — `curl`
   fails, the backend's httpx does not. And Thüringen's `th_dop20rgb` does not
   exist; the colour layer is the group `th_dop`.
+- **The capabilities boxes overlap far more than the Länder do.** A tile over
+  Leipzig lies inside the boxes of Saxony, Saxony-Anhalt, Thüringen *and*
+  Brandenburg, so every tile asked four services and waited for the slowest;
+  the screenshot run then photographed the site plan with tiles still missing
+  at its rim. Each Land is now asked once per z10 cell (some 24 km, 94 m to a
+  pixel) whether it draws anything there — transparent, or for Thüringen pure
+  white, is no — and the answer is cached like a tile. Measured over
+  Liebertwolkwitz: the first tile of a cell 4,0 s, the next ones 1,5–2,2 s,
+  where the GeoSN alone took 1,7 s.
 - **One silent Land must not blank its neighbour's half of a border tile.** A
   failure drops that Land from the stack and the tile is served *uncached*, so
   the next request asks again; only a tile nothing could be drawn for is a 502.

@@ -27,6 +27,10 @@ AERIAL_SERVICE = "Die Luftbilddienste der Länder"
 AERIAL_ATTRIBUTION = "GeoBasis-DE; EU, Copernicus Sentinel"
 OVERVIEW_SERVICE = "Das Sentinel-2-Mosaik des BKG"
 GERMANY_MAP_SERVICE = "Die basemap.de-Webkarte des BKG"
+# The cell size a Land is asked "anything here?" at: some 24 km across in
+# Saxony, 94 m to a probe's pixel -- coarse enough to be one request per Land
+# for a whole district, fine enough that no strip of a Land slips through.
+_PROBE_ZOOM = 10
 # What one Land's silence may cost: its part of the picture, not the tile.
 _UPSTREAM_FAILURES = (UpstreamError, UpstreamTimeout)
 
@@ -206,11 +210,33 @@ def _stack(images: list[bytes], size: int) -> tuple[bytes, bool]:
     return buffer.getvalue(), lowest_alpha == 255
 
 
+def _draws_anything(data: bytes, *, ignore_white: bool) -> bool:
+    """Whether an answer holds any picture at all.
+
+    Transparent is nothing; for a Land that paints white past its border, pure
+    white is nothing too -- measured on Thüringen, where it is the whole of
+    what the service draws over western Saxony.
+    """
+
+    from PIL import Image
+
+    with Image.open(io.BytesIO(data)) as image:
+        rgba = image.convert("RGBA")
+    alpha = rgba.getchannel("A")
+    if not ignore_white:
+        return alpha.getextrema()[1] > 0
+    # Opaque pixels that are not pure white: the darkest channel below 255.
+    lowest = rgba.convert("RGB").point(lambda v: 255 if v < 255 else 0).convert("L")
+    visible = Image.composite(lowest, Image.new("L", rgba.size, 0), alpha.point(lambda v: 255 if v else 0))
+    return visible.getextrema()[1] > 0
+
+
 class TileService:
     def __init__(self, settings: TilesSettings, app_settings: AppSettings) -> None:
         self.settings = settings
         self.app_settings = app_settings
         self.cache = DiskCache(app_settings.cache_dir / "tiles", ttl_s=settings.cache_ttl_s)
+        self._probes: dict[str, asyncio.Future[bool]] = {}
 
     def _aerial_config(self, source: AerialSource) -> LayerConfig:
         return LayerConfig(
@@ -437,11 +463,52 @@ class TileService:
             return response.content
         return _downscale(response.content, self.settings.tile_size)
 
+    async def _draws_near(self, source: AerialSource, z: int, x: int, y: int) -> bool:
+        """Whether this Land draws anything in the coarse cell around the tile.
+
+        The capabilities boxes overlap far more than the Länder do: a tile over
+        Leipzig lies inside the boxes of Saxony, Saxony-Anhalt, Thüringen and
+        Brandenburg, and asking all four made every tile as slow as the slowest
+        of them. One look at the Land's own rendering of the surrounding
+        ``_PROBE_ZOOM`` cell settles it for every tile inside, and is kept as
+        long as a tile would be. A look that fails says yes, uncached: asking
+        in vain costs a request, skipping in vain costs a hole.
+        """
+
+        shift = z - _PROBE_ZOOM
+        if shift <= 0:
+            return True
+        cell = (x >> shift, y >> shift)
+        config = self._aerial_config(source)
+        key = f"{AERIAL_LAYER}-abdeckung/{_fingerprint(config)}/{_PROBE_ZOOM}/{cell[0]}/{cell[1]}"
+        known = self.cache.get_bytes(key)
+        if known is not None:
+            return known == b"1"
+        # Tiles of one screen arrive together and share their cell; they share
+        # the one look as well.
+        pending = self._probes.get(key)
+        if pending is None:
+            pending = asyncio.ensure_future(self._probe(config, source.white_outside, cell, key))
+            self._probes[key] = pending
+            pending.add_done_callback(lambda _: self._probes.pop(key, None))
+        return await asyncio.shield(pending)
+
+    async def _probe(
+        self, config: LayerConfig, white_outside: bool, cell: tuple[int, int], key: str
+    ) -> bool:
+        try:
+            image = await self._fetch(config, _PROBE_ZOOM, *cell)
+        except _UPSTREAM_FAILURES:
+            return True
+        drawn = _draws_anything(image, ignore_white=white_outside)
+        self.cache.set_bytes(key, b"1" if drawn else b"0")
+        return drawn
+
     async def _aerial_tile(self, z: int, x: int, y: int) -> tuple[bytes, bool]:
         """The aerial photograph of Germany, one Land at a time.
 
-        Only the Länder whose box touches the tile are asked -- one inland, two
-        or three along a border. Where they leave a pixel uncovered, abroad or
+        Only the Länder that draw anything near the tile are asked -- one
+        inland, two or three along a border. Where they leave a pixel uncovered, abroad or
         in a sliver between two surveys, the Sentinel mosaic goes underneath.
 
         One Land that does not answer must not blank its neighbours' half of a
@@ -457,13 +524,18 @@ class TileService:
         )
         # Stable sort: the white-painting ones first, i.e. lowest in the stack.
         sources.sort(key=lambda source: not source.white_outside)
-        members = [self._aerial_config(source) for source in sources]
-        seed = "|".join(_fingerprint(config) for config in [*members, self.aerial_overview])
+        seed = "|".join(
+            _fingerprint(config)
+            for config in [*(self._aerial_config(s) for s in sources), self.aerial_overview]
+        )
         digest = hashlib.sha1(seed.encode("utf-8")).hexdigest()[:8]
         cache_key = f"{AERIAL_LAYER}/{digest}/{self.settings.crs}/{z}/{x}/{y}"
         cached = self.cache.get_bytes(cache_key)
         if cached is not None:
             return cached, True
+
+        draws = await asyncio.gather(*(self._draws_near(s, z, x, y) for s in sources))
+        members = [self._aerial_config(s) for s, drawn in zip(sources, draws) if drawn]
 
         answers = await asyncio.gather(
             *(self._fetch(config, z, x, y) for config in members), return_exceptions=True
