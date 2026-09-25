@@ -158,6 +158,19 @@ from the user directly. Reopen only if the user asks.
 - **Keep the pull request description current.** After every push, the PR body
   must describe what is actually on the branch. A description that still talks
   about the previous step is worse than none.
+- **Never ask whether to open a pull request.** The user decides that on their
+  own; push the branch and leave it there.
+- **Replies in the chat have a fixed shape**, asked for by the user on
+  25.09.2026, so the result cannot be mistaken for working notes. Working notes
+  during the task stay short. Then a horizontal rule, and every block below it
+  is a blockquote (the vertical bar marks where the result begins), each with
+  its own heading:
+  1. `## ✅ Ergebnis` — what changed, measurements as a table, files touched,
+     test counts, what was skipped and why.
+  2. `## ⚠️ Entscheidung nötig` — only when something is genuinely the user's
+     to decide; one bolded question per item. Omitted when there is none.
+  3. `## Kurzfassung` — three bullets at most: what was done, whether it is
+     verified, where it is (pushed or not).
 - **Verify, do not relay.** Statements about an external service belong in the
   repo only after a request has been made and its answer read. `HEAD` is not a
   substitute for `GET` — several of these services answer 404 to a HEAD they
