@@ -171,7 +171,13 @@ line looks right and does not match.
 - **A dead upstream connection pool survives a container restart.** After the
   sandbox restarted, the running backend answered 502 for every Transitous call
   while the same request from `curl` returned 200. Restarting uvicorn fixed it;
-  do not go looking for the bug in the code first.
+  do not go looking for the bug in the code first. The name is a guess that
+  does not hold: when this happened `upstream.request` built a new client, and
+  so a new pool, for every call. Whatever the process kept across the restart
+  was older than any connection — the proxy settings and CA it read from the
+  environment at start are the likelier suspects. The shared client since
+  25.09.2026 does pool, and why that cannot outlive a restart is in
+  `services.md`.
 
 - **The sandbox browser has no route to the internet**, only the shell has.
   Basemap tiles therefore cannot be verified by screenshot here; the camera

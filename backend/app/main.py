@@ -54,6 +54,7 @@ from .deps import (
     storage_service,
 )
 from .ratelimit import allowance_text, tile_allowance_text, window_text
+from .upstream import close_shared_client
 from .telemetry import AREA_REQUEST, RESULT_ERROR, RESULT_LIMIT, RESULT_OK, recorder
 from .services import ocr
 from .services.storage import mib
@@ -376,6 +377,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
             # was still in memory.
             await flush_once(admin_store())
         await store.close()
+        await close_shared_client()
 
 
 def _note_error(request: Request, status: int, message: str) -> None:

@@ -215,6 +215,26 @@ of Overpass or a local extract, the listing portals, and the extraction model.
   504 and on a transport error; a second failure is believed. More attempts
   would turn a real outage into a minute of waiting per row.
 
+- **An `httpx.AsyncClient` per request blocks the event loop.** Building one
+  loads the CA bundle into a new SSL context, synchronously: 50–70 ms each,
+  measured on 25.09.2026. `upstream.request` built one per call, so six cold
+  GeoSN tiles fetched together held the loop for about 300 ms, and every other
+  request queued behind them — `/api/health` took 2 ms idle and up to 157–335 ms
+  per round of six cold `dop` tiles (8 rounds, `/api/tiles/dop/17/…`). With one
+  shared client per event loop (`upstream.shared_client()`, closed in the
+  lifespan) the same run peaks at 6–8 ms after the first round, whose 82 ms is
+  that one client being made; the six tiles themselves finished in a median
+  445 ms instead of 1885 ms, because the TLS connection is reused. Timeout and
+  User-Agent travel with each request, not with the client.
+  A pool keeps no dead connection for long: httpcore drops an idle one after the
+  keep-alive expiry (httpx' default 5 s — shorter than any container restart)
+  and one whose socket became readable while idle, i.e. the server hung up.
+  The case it cannot see is a connection that dies the moment it is reused;
+  that surfaces as `RemoteProtocolError: Server disconnected without sending a
+  response`, and the one transport-error retry above runs it on a fresh
+  connection. `tests/test_upstream.py` has a socket server for each case.
+  `services/basemap.py` still builds a client per fetch.
+
 - **The POI index's filename is a default, not a claim.** `poi-sachsen.json`
   built from a Leipzig-region BBBike box is still called that; the extract it
   really came from is in the file's own `quelle`, and its `datenstand` is the

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+import weakref
 from typing import Any
 
 import httpx
@@ -18,6 +19,42 @@ from .telemetry import AREA_SERVICE, RESULT_ERROR, RESULT_OK, recorder
 # outage take longer to report.
 _RETRY_ON = (500, 502, 503, 504)
 _RETRY_AFTER_S = 0.6
+
+# One client per event loop, made on first use. Building an AsyncClient loads
+# the CA bundle into a fresh SSL context -- 50 to 70 ms of synchronous work on
+# the event loop, measured here -- and a client per request did that six times
+# over while a block of tiles was fetched, stalling every other request behind
+# it. Per loop rather than per process because a client's pool is bound to the
+# loop it first ran on, and the test suite starts a loop per test; the weak
+# keys let a finished loop take its client with it.
+#
+# Pooling does not keep dead connections: httpcore drops an idle connection
+# after the keep-alive expiry (httpx' default, 5 s) and one whose socket turned
+# readable while idle, which is the server having hung up. What is left -- a
+# connection that dies in the few seconds it sits reused -- is a transport
+# error, and the retry below then runs on a new one.
+_clients: weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, httpx.AsyncClient] = (
+    weakref.WeakKeyDictionary()
+)
+
+
+def shared_client() -> httpx.AsyncClient:
+    """The running loop's client, created the first time it is asked for."""
+
+    loop = asyncio.get_running_loop()
+    client = _clients.get(loop)
+    if client is None or client.is_closed:
+        client = httpx.AsyncClient(follow_redirects=True)
+        _clients[loop] = client
+    return client
+
+
+async def close_shared_client() -> None:
+    """Close the running loop's client, if it has one. Called on shutdown."""
+
+    client = _clients.pop(asyncio.get_running_loop(), None)
+    if client is not None:
+        await client.aclose()
 
 
 def _sentence(*parts: str | None) -> str:
@@ -69,8 +106,9 @@ async def request(
         for attempt in range(2):
             last = attempt == 1
             try:
-                async with httpx.AsyncClient(timeout=timeout_s, follow_redirects=True) as client:
-                    response = await client.request(method, url, headers=headers, **kwargs)
+                response = await shared_client().request(
+                    method, url, headers=headers, timeout=timeout_s, **kwargs
+                )
             except httpx.TimeoutException as exc:
                 if last:
                     raise UpstreamTimeout(
