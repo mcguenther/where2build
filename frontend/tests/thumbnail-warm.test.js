@@ -9,6 +9,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import PlotThumbnail from "../src/components/PlotThumbnail.vue";
+import SitePlan from "../src/components/SitePlan.vue";
 import CompareView from "../src/views/CompareView.vue";
 import App from "../src/App.vue";
 import { state, addPlot } from "../src/lib/store.js";
@@ -144,31 +145,42 @@ describe("Vorwärmen der Vorschaubilder", () => {
 
 describe("Einblenden des Vorschaubilds", () => {
   const groundOf = wrapper => wrapper.find(".site-plan__tile-ground image");
+  const contentOf = wrapper => wrapper.find(".site-plan__content");
 
-  it("bleibt verborgen, bis das Bild ganz geladen ist, und erscheint dann auf einmal", async () => {
+  it("zeigt Umriss, Haus und Umgebung erst gemeinsam, wenn die Umgebung da ist", async () => {
     const wrapper = mount(PlotThumbnail, { props: { plot: state.data.plots[0] } });
-    expect(groundOf(wrapper).classes()).not.toContain("is-loaded");
-    expect(groundOf(wrapper).attributes("data-ground")).toBe("loading");
+    // The outline and the house sit inside the waiting group, not beside it:
+    // an outline first and its surroundings a moment later is what this avoids.
+    expect(contentOf(wrapper).find("polygon").exists()).toBe(true);
+    expect(contentOf(wrapper).find(".site-plan__tile-ground image").exists()).toBe(true);
+    expect(contentOf(wrapper).classes()).toContain("is-waiting");
+    expect(contentOf(wrapper).attributes("data-ground")).toBe("loading");
 
     await groundOf(wrapper).trigger("load");
-    expect(groundOf(wrapper).classes()).toContain("is-loaded");
-    expect(groundOf(wrapper).attributes("data-ground")).toBe("ready");
+    expect(contentOf(wrapper).classes()).not.toContain("is-waiting");
+    expect(contentOf(wrapper).attributes("data-ground")).toBe("ready");
   });
 
-  it("beginnt verborgen, wenn sich der Ausschnitt ändert", async () => {
+  it("wartet von vorn, wenn sich der Ausschnitt ändert", async () => {
     const wrapper = mount(PlotThumbnail, { props: { plot: state.data.plots[0] } });
     await groundOf(wrapper).trigger("load");
     const before = groundOf(wrapper).attributes("href");
 
     await wrapper.setProps({ width: COMPARE_FRAME.width, height: COMPARE_FRAME.height });
     expect(groundOf(wrapper).attributes("href")).not.toBe(before);
-    expect(groundOf(wrapper).classes()).not.toContain("is-loaded");
+    expect(contentOf(wrapper).classes()).toContain("is-waiting");
   });
 
-  it("lässt nach einem Fehler die flache Fläche stehen, ohne Bildsymbol", async () => {
+  it("zeigt die Zeichnung nach einem Fehler auf der flachen Fläche, ohne Bildsymbol", async () => {
     const wrapper = mount(PlotThumbnail, { props: { plot: state.data.plots[0] } });
     await groundOf(wrapper).trigger("error");
     expect(wrapper.find(".site-plan__tile-ground").exists()).toBe(false);
+    expect(contentOf(wrapper).classes()).not.toContain("is-waiting");
     expect(wrapper.find("svg > rect").exists()).toBe(true);
+  });
+
+  it("wartet nicht, wo es keine Umgebung gibt", () => {
+    const wrapper = mount(SitePlan, { props: { plot: state.data.plots[0], compact: true } });
+    expect(contentOf(wrapper).classes()).not.toContain("is-waiting");
   });
 });

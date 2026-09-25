@@ -221,9 +221,16 @@ routines under it.
   one PNG (`GET /api/tiles/{layer}/block/{z}/{west}/{north}/{east}/{south}.png`,
   cached whole under `tile-blocks/`, eviction tier 1 so it outlives the tiles
   it was made of; at most 100 tiles, the frontend's cover stops at ~68) and
-  `SitePlan` draws that single image at `opacity: 0` until its `load` event,
+  `SitePlan` holds the *whole* drawing — outline, house and that single image
+  — in `.site-plan__content` at `opacity: 0` until the image's `load` event,
   then fades it in over 0,24 s — no fade under `prefers-reduced-motion`, and
-  `print.css` shows it regardless. A block with one failed tile is an error,
+  `print.css` shows it regardless. Fading only the image was the first cut and
+  was rejected on sight: the outline stood alone for a moment and the
+  surroundings arrived after it. The paper rect is drawn a second time inside
+  the fading group, because a group below opacity 1 is isolated and the
+  ground's `multiply`/`screen` would otherwise blend against nothing and flash
+  white during the fade. Measured cold: 0 of 796 sampled frames showed a
+  drawing whose ground was still loading. A block with one failed tile is an error,
   never a stored image with a hole; a failed image is removed, so the flat
   ground stays and no broken-image icon appears. `App.vue` watches
   `wantedThumbnailGrounds` (every card at `CARD_FRAME`, the ticked plots at the

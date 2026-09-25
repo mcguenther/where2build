@@ -35,19 +35,27 @@
       </pattern>
     </defs>
 
+    <!-- What stands while a tile ground is on its way: the paper alone. -->
     <rect v-if="!hasBackdrop" x="0" y="0" :width="width" :height="height" :fill="backgroundFill" />
 
+    <!-- With a tile ground the whole drawing waits for it and then appears in
+         one go: an outline first and its surroundings a moment later reads as
+         something breaking. The paper is drawn again inside, because a group
+         fading in is isolated from what lies under it, and the ground's
+         multiply would have nothing to multiply into. -->
+    <g class="site-plan__content" :class="{ 'is-waiting': !groundSettled }"
+       :data-ground="groundSettled ? 'ready' : 'loading'">
+    <rect v-if="!hasBackdrop && groundImage" x="0" y="0" :width="width" :height="height" :fill="backgroundFill" />
+
     <g :transform="`rotate(${rotation}, ${width / 2}, ${height / 2})`">
-      <!-- One composed image, shown only once it has arrived whole: until then
-           the flat ground above stands, and a failed one leaves it standing. -->
+      <!-- One composed image. A failed one is dropped, the drawing appears on
+           the flat ground, and no broken-image icon is left behind. -->
       <g v-if="groundImage" class="site-plan__tile-ground"
          :class="{ 'site-plan__tile-ground--dark': darkBackdrop }" aria-hidden="true">
         <image :key="groundImage.href" :href="groundImage.href"
                :x="groundImage.x" :y="groundImage.y"
                :width="groundImage.width" :height="groundImage.height"
-               preserveAspectRatio="none" class="site-plan__ground-image"
-               :class="{ 'is-loaded': groundLoaded === groundImage.href }"
-               :data-ground="groundLoaded === groundImage.href ? 'ready' : 'loading'"
+               preserveAspectRatio="none"
                @load="groundLoaded = groundImage.href" @error="groundFailed = groundImage.href" />
       </g>
 
@@ -178,6 +186,7 @@
               class="site-plan__choice-label" :class="{ 'is-chosen': parcel.chosen }"
               text-anchor="middle">{{ parcel.number }}</text>
       </g>
+    </g>
     </g>
 
     <!-- North arrow and scale bar stay upright and stay in print: with the map
@@ -399,6 +408,9 @@ export default {
       const block = groundBlock(this.plot.anchor, this.view, this.width, this.height, this.tileGround);
       return block && block.href !== this.groundFailed ? block : null;
     },
+    /** Whether the drawing may show: no tile ground to wait for, or it has
+     *  arrived. A failed one drops out of `groundImage`, which settles it too. */
+    groundSettled() { return !this.groundImage || this.groundLoaded === this.groundImage.href; },
     backgroundFill() { return this.backdrop === "aerial" ? "var(--w2b-map-green)" : "var(--w2b-map-ground)"; },
     /** Which palette the vector backdrop should be drawn in. Deliberately not
      *  a function of whether the last build succeeded — see `rebuildMap`. */
@@ -1005,12 +1017,13 @@ export default {
    dark theme the render is inverted first, or it would be a pale sheet. */
 .site-plan__tile-ground{ opacity: .42; filter: grayscale(1); mix-blend-mode: multiply; }
 .site-plan__tile-ground--dark{ opacity: .45; filter: invert(1) grayscale(1); mix-blend-mode: screen; }
-/* The ground arrives as one image and appears in one go, rather than a
-   quilt filling in over a second or two. print.css shows it regardless. */
-.site-plan__ground-image{ opacity: 0; transition: opacity .24s ease-out; }
-.site-plan__ground-image.is-loaded{ opacity: 1; }
+/* Outline, house and surroundings appear together, once the ground has
+   arrived — not the outline first and a quilt filling in around it. print.css
+   shows the drawing regardless. */
+.site-plan__content{ transition: opacity .24s ease-out; }
+.site-plan__content.is-waiting{ opacity: 0; }
 @media (prefers-reduced-motion: reduce){
-  .site-plan__ground-image{ transition: none; }
+  .site-plan__content{ transition: none; }
 }
 /* The parcels on offer. Deliberately quiet: the plot itself keeps the halo and
    the drawn contour, and a candidate is a thin outline with its number — a

@@ -191,9 +191,9 @@
   .site-plan__north{ font-size: 19px !important; }
   .site-plan__scale-bar{ font-size: 13px !important; }
 
-  /* A thumbnail's ground waits for its load event on screen; paper has no
-     fade, and a print taken mid-way must not come out with an empty frame. */
-  .site-plan__ground-image{ opacity: 1 !important; transition: none !important; }
+  /* A thumbnail waits for its ground on screen; paper has no fade, and a
+     print taken mid-way must not come out with an empty frame. */
+  .site-plan__content{ opacity: 1 !important; transition: none !important; }
 
   /* The north arrow and the scale bar stay: with the map rotated to the street
      they are the only orientation left on paper.
