@@ -65,42 +65,48 @@ def _kleinanzeigen_page() -> httpx.Response:
     )
 
 
+IMMOWELT_URL = "https://www.immowelt.de/expose/c1fc6775-3423-4549-b881-424be15286ac"
+
+
 @respx.mock
-def test_immobilienscout24_is_not_fetched_and_points_at_the_paste_field(client: TestClient):
+def test_immobilienscout24_is_asked_and_its_refusal_points_at_the_paste_field(
+    without_llm, client: TestClient
+):
     portal = respx.get(url__startswith="https://www.immobilienscout24.de").mock(
-        return_value=httpx.Response(200, text="<html></html>")
+        return_value=httpx.Response(401, text="")
     )
-    llm = respx.post(CHAT_URL).mock(return_value=httpx.Response(200, json=completion("x")))
 
     answer = client.post("/api/listings/extract", json={"url": IMMOSCOUT_URL})
 
-    assert answer.status_code == 400
-    assert "Seite einfügen" in answer.json()["detail"]
-    assert portal.call_count == 0
-    assert llm.call_count == 0
+    assert answer.status_code == 502
+    body = answer.json()
+    assert body["detail"].startswith("ImmoScout24 gibt die Anzeigenseite nicht")
+    assert "Seite einfügen" in body["detail"] and "Lesezeichen" in body["detail"]
+    assert body["technisch"] == "Antwort der Anzeigenseite: HTTP 401"
+    assert portal.call_count == 1
 
 
 @respx.mock
-def test_immowelt_is_not_fetched_and_says_why(client: TestClient):
-    """DataDome answers every exposé with a 403 challenge, measured 24.09.2026.
+def test_immowelt_is_asked_directly_and_never_through_the_model(client: TestClient):
+    """DataDome answered every exposé with 403 on 24.09.2026.
 
-    Before it was blocked the request went out and came back as the generic
-    502, which advised copying and never named the bookmarklet.
+    Whether a provider's paid fetch gets past it was never measured, so the
+    model is not sent there; the free direct request says what immowelt
+    answers today, and is asked again next time rather than cached.
     """
 
-    url = "https://www.immowelt.de/expose/c1fc6775-3423-4549-b881-424be15286ac"
-    portal = respx.get(url__startswith="https://www.immowelt.de").mock(
-        return_value=httpx.Response(403, text="<html></html>")
-    )
+    portal = respx.get(IMMOWELT_URL).mock(return_value=httpx.Response(403, text=""))
     llm = respx.post(CHAT_URL).mock(return_value=httpx.Response(200, json=completion("x")))
 
-    answer = client.post("/api/listings/extract", json={"url": url})
+    first = client.post("/api/listings/extract", json={"url": IMMOWELT_URL})
+    second = client.post("/api/listings/extract", json={"url": IMMOWELT_URL})
 
-    assert answer.status_code == 400
-    detail = answer.json()["detail"]
-    assert "immowelt.de" in detail
-    assert "Lesezeichen" in detail and "Seite einfügen" in detail
-    assert portal.call_count == 0
+    assert first.status_code == second.status_code == 502
+    body = first.json()
+    assert body["detail"].startswith("immowelt gibt die Anzeigenseite nicht")
+    assert "403" not in body["detail"]
+    assert body["technisch"] == "Antwort der Anzeigenseite: HTTP 403"
+    assert portal.call_count == 2
     assert llm.call_count == 0
 
 

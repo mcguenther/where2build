@@ -28,7 +28,10 @@
       Der begonnene Entwurf ist nicht mehr vorhanden; beim Neuladen der Seite bleibt er
       nicht erhalten. Bitte noch einmal mit der Quelle beginnen.
     </p>
-    <p v-if="error" class="notice notice--error" role="alert">{{ error }}</p>
+    <p v-if="error" class="notice notice--error meldung" role="alert">
+      <span>{{ error }}</span>
+      <small v-if="errorTechnical" class="meldung__technisch">{{ errorTechnical }}</small>
+    </p>
 
     <!-- 1 · Quelle. Also what a stage without its data falls back to, so the
          redirect in `checkStage` never renders a step that has nothing.
@@ -347,6 +350,11 @@ export default {
       handoverWaiting: false,
       busy: false,
       error: "",
+      /* The error `error` was taken from, for its technical line. Compared by
+       * message rather than cleared alongside it: `error` is set in a dozen
+       * places, and a stale line under a newer sentence would be worse than
+       * none. */
+      failure: null,
       readFields: [],
       /* The listing's own prose. It is what the search reads the cadastral
        * district, the street and the relation between the named places out of
@@ -405,6 +413,9 @@ export default {
     };
   },
   computed: {
+    errorTechnical() {
+      return this.failure && this.failure.message === this.error ? this.failure.technical : "";
+    },
     stageIndex() { return WIZARD_STAGES.indexOf(this.stage); },
     /* What each stage needs in order to have anything to show. Only the first
      * one stands on its own: the read fields, the query and the draft live in
@@ -535,6 +546,7 @@ export default {
         await this.queryCadastre(query, { note: `Gesucht: ${label}` });
       } catch (error) {
         this.error = error.message;
+        this.failure = error;
       } finally {
         this.busy = false;
       }
@@ -566,6 +578,7 @@ export default {
         this.lookUpParcel();
       } catch (error) {
         this.error = error.message;
+        this.failure = error;
       } finally {
         this.busy = false;
       }
@@ -617,6 +630,7 @@ export default {
         );
       } catch (error) {
         this.error = error.message;
+        this.failure = error;
       } finally {
         this.busy = false;
       }
@@ -816,6 +830,12 @@ export default {
 </script>
 
 <style scoped>
+.meldung{ display: block; line-height: 1.5; }
+.meldung__technisch{
+  display: block; margin-top: 4px;
+  font-family: var(--w2b-font-mono); font-size: var(--w2b-text-xs);
+  opacity: .75;
+}
 .doubt-note{ display: block; line-height: 1.5; }
 .doubt-note b{ display: block; margin-bottom: 2px; }
 .subtitle{ color: var(--w2b-graphite); font-size: var(--w2b-text-s); max-width: 70ch; }

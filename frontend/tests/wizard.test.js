@@ -39,7 +39,7 @@ vi.mock("../src/lib/api.js", () => ({
   nearby: vi.fn(),
   nearbyParcels: vi.fn()
 }));
-const { cadastralDistricts, resolveParcel, landValue, readPage, nearbyParcels, geocode } =
+const { cadastralDistricts, resolveParcel, landValue, readListing, readPage, nearbyParcels, geocode } =
   await import("../src/lib/api.js");
 
 beforeEach(() => {
@@ -357,6 +357,32 @@ describe("Aufnahme — Absenden", () => {
     await flushPromises();
 
     expect(resolveParcel).not.toHaveBeenCalled();
+  });
+
+  it("setzt die Antwort des Portals klein unter den Satz, nicht hinein", async () => {
+    // The sentence and the technical line exactly as the backend composes
+    // them for immowelt's DataDome refusal, measured on 24.09.2026.
+    const refusal = Object.assign(
+      new Error("immowelt gibt die Anzeigenseite nicht an unseren Server heraus. Über „Seite einfügen“ geht es trotzdem."),
+      { technical: "Antwort der Anzeigenseite: HTTP 403" }
+    );
+    readListing.mockRejectedValueOnce(refusal);
+
+    const w = atSource();
+    await typeInto(w.find(".search__field input"), "https://www.immowelt.de/expose/c1fc6775-3423-4549-b881-424be15286ac");
+    await findButton(w, "Grundstück finden").trigger("click");
+    await flushPromises();
+
+    const notice = w.find(".meldung");
+    expect(notice.find("span").text()).toBe(refusal.message);
+    expect(notice.find(".meldung__technisch").text()).toBe("Antwort der Anzeigenseite: HTTP 403");
+
+    // A later failure without one must not inherit the line.
+    readListing.mockRejectedValueOnce(new Error("Das Backend ist nicht erreichbar. Läuft der Server?"));
+    await findButton(w, "Grundstück finden").trigger("click");
+    await flushPromises();
+    expect(w.find(".meldung span").text()).toBe("Das Backend ist nicht erreichbar. Läuft der Server?");
+    expect(w.find(".meldung__technisch").exists()).toBe(false);
   });
 
   it("nimmt das HTML aus der Zwischenablage mit, nicht nur den Text", async () => {

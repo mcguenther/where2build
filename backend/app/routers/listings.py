@@ -29,10 +29,10 @@ from ..services.beleg import Urteil, refusal_note
 from ..services.llm import LLMClient, fingerprint, normalize_url
 from ..services.portals import (
     Seite,
-    blocked_hint,
     fetch_page,
     is_kleinanzeigen,
     parse_page,
+    refusing_portal,
 )
 from ..settings import Settings
 
@@ -344,12 +344,6 @@ def _without_a_model(seite: Seite, felder: InseratFelder, url: str) -> ListingEx
 
 
 async def _from_url(url: str, llm: LLMClient, settings: Settings) -> ListingExtractResponse:
-    hint = blocked_hint(url)
-    if hint:
-        # No request goes out at all, not even the model's fetch -- the
-        # portal's answer is known.
-        raise BadRequestError(hint)
-
     if is_kleinanzeigen(url):
         seite = await fetch_page(url, settings.app)
         deterministic = _read_off(seite)
@@ -385,7 +379,11 @@ async def _from_url(url: str, llm: LLMClient, settings: Settings) -> ListingExtr
     # JSON-LD from a direct request, then the full text to the model.
     seite = None
     text = ""
-    if llm.settings.configured:
+    # Not for a portal known to refuse servers: a provider's fetch is paid for
+    # either way, got ImmoScout's 401 when it was tried and was never tried on
+    # immowelt. The direct request below is free and says what the portal
+    # answers today.
+    if llm.settings.configured and not refusing_portal(url):
         try:
             text = await llm.fetch_page_text(url, _FETCH_TASK)
         except UpstreamError:

@@ -15,8 +15,13 @@ class AppError(Exception):
     status_code = 500
     default_message = "Unerwarteter Fehler im Server."
 
-    def __init__(self, message: str | None = None) -> None:
+    def __init__(self, message: str | None = None, technical: str | None = None) -> None:
         self.message = message or self.default_message
+        # What a service actually answered („HTTP 403"), for whoever wants to
+        # know or has to report it. Kept out of the sentence: a status code is
+        # not something a user can act on, and it pushed the advice out of
+        # sight.
+        self.technical = technical
         super().__init__(self.message)
 
     @property
@@ -28,6 +33,8 @@ class AppError(Exception):
         travels in the same body -- see ``VersionConflictError``.
         """
 
+        if self.technical:
+            return {"detail": self.message, "technisch": self.technical}
         return {"detail": self.message}
 
     @property
@@ -62,6 +69,17 @@ class UpstreamError(AppError):
 
     status_code = 502
     default_message = "Ein externer Dienst hat nicht verwertbar geantwortet."
+
+    def __init__(
+        self,
+        message: str | None = None,
+        technical: str | None = None,
+        upstream_status: int | None = None,
+    ) -> None:
+        super().__init__(message, technical)
+        # The status the service answered with, where it answered at all -- so
+        # a caller can say what a refusal *means* instead of quoting it.
+        self.upstream_status = upstream_status
 
 
 class UpstreamTimeout(AppError):

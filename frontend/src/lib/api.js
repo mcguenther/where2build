@@ -19,6 +19,9 @@ export class ServiceError extends Error {
     this.name = "ServiceError";
     this.status = status;
     this.body = body;
+    /* What the service behind the backend actually answered („HTTP 403"),
+     * kept apart from the sentence: it is for reporting, not for acting on. */
+    this.technical = body?.technisch || "";
   }
 }
 

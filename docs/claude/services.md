@@ -27,7 +27,7 @@ of Overpass or a local extract, the listing portals, and the extraction model.
   it is an AWS WAF challenge at the CloudFront edge (`x-cache: Error from
   cloudfront`), so the request never reaches an origin — a full browser header
   set, HTTP/1.1, a `ClaudeBot` UA and Anthropic's own fetch all answer 401
-  alike, while `robots.txt` (200) explicitly *allows* `ClaudeBot` and the two
+  alike (and on 25.09.2026 the app's own request still did), while `robots.txt` (200) explicitly *allows* `ClaudeBot` and the two
   exposé sitemaps it advertises answer 401. There is no header to fix. There
   *is* a documented API (`api.immobilienscout24.de`, search over two-legged
   OAuth, 2 000 req/min), but it is content-partner only, "not for data delivery
@@ -106,11 +106,23 @@ of Overpass or a local extract, the listing portals, and the extraction model.
   bytes, `x-datadome: protected`, a `datadome` cookie and
   `LambdaGeneratedResponse from cloudfront`. So `parse_page` never sees an
   immowelt page from the server, and there is no fixture: nothing came back
-  to record. It is in `BLOCKED_DOMAINS` since then, with a hint of its own:
-  before that the request went out anyway and the answer was the generic 502
-  „mit Status 403 abgelehnt“, which advised copying and never named the
-  bookmarklet. Blocked means no request at all, the model's fetch included —
-  whether a provider's `web_fetch` gets past DataDome has not been measured.
+  to record.
+
+- **A known refusal is asked again every time, never assumed.** Both portals
+  above used to sit in a `BLOCKED_DOMAINS` list that sent no request at all,
+  and a list like that cannot notice the day a portal lets servers in again.
+  Its hints also carried a „zuletzt bestätigt am …“ that went stale the day
+  after it was written. Since 25.09.2026 `fetch_page` asks every link, once
+  for a portal in `REFUSING_PORTALS` and twice for any other (the Kleinanzeigen
+  warm-up), and the answer decides. The list does two things only: it puts
+  the portal's name in the refusal, and it keeps the model's paid fetch away
+  from it. The status code goes to a separate `technisch` field that the
+  wizard sets small under the sentence. Before, the sentence led with it
+  („mit Status 403 abgelehnt“), and a code is nothing a user can act on.
+  Measured live the same day: immowelt 403 on both exposés, ImmoScout 401,
+  the vanished ohne-makler listing 403, and a live ohne-makler exposé 200.
+  A 403 from a portal nobody has measured therefore says it may be either a
+  gate or a listing that is gone, because ohne-makler uses it for both.
 
 - **ohne-makler.net serves a listing to the server, and answers 403 for one
   that is gone.** Measured 24.09.2026: the Saxony plot list

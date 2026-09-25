@@ -423,9 +423,11 @@ also "Decisions that are settled" in `CLAUDE.md`.
   one refusal left says that nothing on the page names a place, and it points
   at the bookmarklet. Measured on a live ohne-makler link (Brandis, 514 m²,
   170 000 €, no coordinate): 200, and the search runs to four candidates in
-  Stadt Brandis. The cache key now names the reader, and „ohne-modell“
-  counts as one. Without that, an answer read with no model would outlive
-  the key being set, because this cache never expires.
+  Stadt Brandis. A refused fetch is not cached, so each link measures the
+  portal again (see `services.md` on known refusals). The cache key now names
+  the reader, and „ohne-modell“ counts as one. Without that, an answer read
+  with no model would outlive the key being set, because this cache never
+  expires.
 
 - **The reader garbles the label, not only the digits.** On the Borna advert's
   Liegenschaftskarte Tesseract returns „**Fiurstück**: 107/60“ — the l as an i —
