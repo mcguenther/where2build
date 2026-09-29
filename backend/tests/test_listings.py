@@ -314,8 +314,9 @@ def test_the_title_travels_as_a_field_of_its_own(without_llm, client: TestClient
     # reading, so runs of space are one.
     assert whole["titel"] == "Baugrundstück - ca. 1.025qm - direkt bebaubar"
     assert body_only["titel"] == "Baugrundstück - ca. 1.025qm - direkt bebaubar"
-    # `hinweis` goes on doing what it did: the title when nothing else is said.
-    assert whole["hinweis"] == "Baugrundstück -  ca. 1.025qm - direkt bebaubar"
+    # And only there: in `hinweis` it was shown as the source of every value
+    # read off the page, which a title is not.
+    assert whole["hinweis"] is None
 
 
 def test_text_without_a_heading_has_no_title(without_llm, client: TestClient):

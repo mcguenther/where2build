@@ -287,7 +287,9 @@ def _answer(
         felder=as_vorschlaege(inserat or felder, InseratVorschlaege, quelle_url),
         quelle_url=quelle_url,
         weg=weg,
-        hinweis=" ".join(part for part in (hinweis or titel, mismatch) if part) or None,
+        # The title has a field of its own now. In `hinweis` it read as the
+        # source of every value in „Gelesene Werte", which it is not.
+        hinweis=" ".join(part for part in (hinweis, mismatch) if part) or None,
         titel=" ".join((titel or "").split())[:TITLE_LIMIT] or None,
         beschreibung=text[:_DESCRIPTION_LIMIT] or None,
         bilder=bilder or [],
