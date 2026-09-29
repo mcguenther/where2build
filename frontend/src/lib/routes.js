@@ -150,6 +150,14 @@ export function toScreen(coordinate, fit) {
   return { x: m.x * fit.scale + fit.dx, y: fit.dy - m.y * fit.scale };
 }
 
+/** SVG user units back to `[lon, lat]` — the inverse of `toScreen`, for a
+ *  drawing somebody clicks into. */
+export function fromScreen(point, fit) {
+  const x = (point.x - fit.dx) / fit.scale;
+  const y = (fit.dy - point.y) / fit.scale;
+  return [x / RADIANS_PER_DEGREE, (2 * Math.atan(Math.exp(y)) - Math.PI / 2) / RADIANS_PER_DEGREE];
+}
+
 /** A LineString as an SVG points list, ready for <polyline>. */
 export function toPolyline(line, fit) {
   if (!line || line.length < 2) return "";
