@@ -27,7 +27,14 @@ from ..services import prompts
 from ..services import lehrbuch as lehrbuch_service
 from ..services.beleg import Urteil, refusal_note
 from ..services.llm import LLMClient, fingerprint, normalize_url
-from ..services.portals import PASTE_HINT, fetch_page, is_blocked, is_kleinanzeigen, parse_page
+from ..services.portals import (
+    PASTE_HINT,
+    TITLE_LIMIT,
+    fetch_page,
+    is_blocked,
+    is_kleinanzeigen,
+    parse_page,
+)
 from ..settings import Settings
 
 router = APIRouter(prefix="/api/listings", tags=["Inserate"])
@@ -53,7 +60,8 @@ _FETCH_TASK = prompts.FETCH
 #   2  asking price, plot area from the attribute list, description and images
 #   3  the model answers a Befund with a Beleg per value, and what passes the
 #      gate arrives as Indizien beside the fields
-EXTRACTION_VERSION = 3
+#   4  the advert's title travels as a field of its own, for the preview
+EXTRACTION_VERSION = 4
 
 _NO_LOCATOR = (
     "Aus dieser Seite ließ sich weder eine Adresse noch eine Koordinate noch ein "
@@ -280,6 +288,7 @@ def _answer(
         quelle_url=quelle_url,
         weg=weg,
         hinweis=" ".join(part for part in (hinweis or titel, mismatch) if part) or None,
+        titel=" ".join((titel or "").split())[:TITLE_LIMIT] or None,
         beschreibung=text[:_DESCRIPTION_LIMIT] or None,
         bilder=bilder or [],
         indizien=indizien or [],

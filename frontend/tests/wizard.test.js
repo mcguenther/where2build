@@ -19,6 +19,7 @@ import moelkau from "./fixtures/parcel-moelkau.json";
 import moelkauZwei from "./fixtures/parcel-moelkau-zwei.json";
 import moelkauGetrennt from "./fixtures/parcel-moelkau-getrennt.json";
 import moelkauNachbar from "./fixtures/parcel-moelkau-205.json";
+import pasted from "./fixtures/extract-kleinanzeigen-einfuegen.json";
 
 vi.mock("../src/lib/api.js", () => ({
   // The cap the module exports next to the call that sends it. A factory
@@ -630,5 +631,69 @@ describe("Aufnahme — Seite aus dem Browser übernommen", () => {
     await flushPromises();
 
     expect(w.findAll("details.gelesen:not(.gelesen--lesezeichen)")).toHaveLength(0);
+  });
+});
+
+
+/**
+ * The head of the search step: what was read, as the advert looked, with the
+ * editable values folded underneath — one box, not a preview and a list.
+ * The answer is the real extract of the recorded Kleinanzeigen page, copied
+ * with Strg+A (so without `<head>` and its coordinate).
+ */
+describe("Aufnahme — Vorschau der gelesenen Anzeige im Suchschritt", () => {
+  const read = async (payload, answer) => {
+    readPage.mockResolvedValue(answer);
+    const w = mountWithRouter(WizardView, {
+      path: "/aufnahme/quelle", props: { stage: "quelle" }, stubs: { ParcelSearch: true }
+    });
+    await flushPromises();
+    await w.vm.readPayload(payload);
+    await w.setProps({ stage: "suche" });
+    await flushPromises();
+    return w;
+  };
+
+  it("steht als Erstes im Schritt und trägt den Klappkasten mit den Werten", async () => {
+    const w = await read({ kind: "page", text: "", html: "<html><body>…</body></html>" }, pasted);
+
+    const section = w.find("section.stack");
+    expect(section.element.firstElementChild.classList.contains("listing-preview")).toBe(true);
+    expect(w.find(".listing-preview .mini").exists()).toBe(true);
+    const fold = w.find(".listing-preview details.gelesen");
+    expect(fold.exists()).toBe(true);
+    expect(fold.find(".gelesen__zahl").text()).toBe(w.vm.readSummary);
+    // Genau ein Klappkasten der Suche, und die Felder darin sind noch dieselben.
+    expect(w.findAll("details.gelesen:not(.gelesen--lesezeichen)")).toHaveLength(1);
+    expect(fold.findAll(".suggestion input")).toHaveLength(w.vm.readFields.length);
+    expect(w.text()).toContain("Koordinate fehlt");
+  });
+
+  it("startet die Suche aus dem Klappkasten neu, wie zuvor", async () => {
+    const w = await read({ kind: "page", text: "", html: "<html><body>…</body></html>" }, pasted);
+    const before = w.vm.searchRun;
+
+    await w.find(".listing-preview details.gelesen .suggestion input")
+      .trigger("keydown", { key: "Enter" });
+    expect(w.vm.searchRun).toBe(before + 1);
+
+    await findButton(w, "Suche mit diesen Werten neu starten").trigger("click");
+    expect(w.vm.searchRun).toBe(before + 2);
+  });
+
+  it("zeigt bei getipptem Text keine Vorschau, nur die Werte", async () => {
+    const w = await read({ kind: "prose", text: "Baugrundstück in Lobstädt", html: "" }, pasted);
+
+    expect(w.find(".listing-preview .mini").exists()).toBe(false);
+    expect(w.find(".listing-preview .karte").exists()).toBe(false);
+    expect(w.find(".listing-preview details.gelesen").exists()).toBe(true);
+  });
+
+  it("führt über „Lesezeichen nimmt ihn mit“ zurück zum Einstieg", async () => {
+    const w = await read({ kind: "page", text: "", html: "<html><body>…</body></html>" }, pasted);
+    const back = vi.spyOn(w.vm, "stepBack");
+
+    await findButton(w, "Lesezeichen nimmt ihn mit").trigger("click");
+    expect(back).toHaveBeenCalledWith("quelle");
   });
 });

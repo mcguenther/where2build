@@ -1,0 +1,49 @@
+{
+  "felder": {
+    "adresse": {
+      "wert": "04575 Neukieritzsch, Sachsen",
+      "quelle_url": null,
+      "bestaetigt": false
+    },
+    "lat": {
+      "wert": null,
+      "quelle_url": null,
+      "bestaetigt": false
+    },
+    "lon": {
+      "wert": null,
+      "quelle_url": null,
+      "bestaetigt": false
+    },
+    "flurstuecke": {
+      "wert": [],
+      "quelle_url": null,
+      "bestaetigt": false
+    },
+    "kaufpreis_eur": {
+      "wert": 80000,
+      "quelle_url": null,
+      "bestaetigt": false
+    },
+    "grundstuecksflaeche_m2": {
+      "wert": 1025,
+      "quelle_url": null,
+      "bestaetigt": false
+    }
+  },
+  "quelle_url": null,
+  "weg": "eingefuegter-text",
+  "hinweis": "Baugrundstück - ca. 1.025qm - direkt bebaubar",
+  "titel": "Baugrundstück - ca. 1.025qm - direkt bebaubar",
+  "bilder": [
+    "https://img.kleinanzeigen.de/api/v1/prod-ads/images/3f/3f1b49bc-03f7-45a7-974c-64b98935f8e7?rule=$_59.JPG",
+    "https://img.kleinanzeigen.de/api/v1/prod-ads/images/c5/c5cb06b7-5670-43e1-ae56-1f761b0cabb2?rule=$_59.JPG",
+    "https://img.kleinanzeigen.de/api/v1/prod-ads/images/a7/a7f8b55a-31c2-43f8-be30-7069390ad92f?rule=$_59.JPG"
+  ],
+  "beschreibung": "Baugrundstück - ca. 1.025qm - direkt bebaubar Hier könnte Ihr neues Eigenheim stehen... entsprechend §34 BauGB ist eine Bebauung entsprechend der Umgebungsbebauung möglich. Einem Einfamilien-/ Doppelhaus oder ggf. Mehrfamilienhaus sollte unter gewissen Auflagen nichts im Wege stehen.\n\nStrom, Wasser & Gas liegt in der Straße an.\n\nDas sonst ebene und größtenteils unbebaute Grundstück verfügt lediglich über Garagen/Lagergebäude, welche derzeit pauschal zu EUR 130,-/ Monat vermietet sind. Die Mietverträge hierzu könne eingesehen und kurzfristig gekündigt werden.\n\n\nWeitere Angebote unter www.GARANT-IMMO.de\n\n# Weitere Angaben\n- Verfügbar ab: sofort\n\n- Käuferprovision: 5,95 % (inkl. MwSt.)\n- Provisionshinweis: Die Maklercourtage für den Käufer beträgt 5 % aus dem Kaufpreis zuzüglich der gesetzlichen MwSt., somit gesamt 5,95 %.\n\n# Lagebeschreibung\nDieses ruhig gelegene Grundstück im charmanten Ortsteil Lobstädt bei Neukieritzsch bietet eine ideale Mischung aus ländlicher Idylle und guter Anbindung an Leipzig sowie das Leipziger Umland. Eingebettet in eine gewachsene Wohngegend mit familienfreundlichem Charakter, eignet sich das Grundstück perfekt für alle, die Ruhe und Natur schätzen, aber dennoch auf eine gute Infrastruktur nicht verzichten möchten.\nIn der näheren Umgebung finden Sie Geschäfte des täglichen Bedarfs, Kitas und Schulen sowie gastronomische Angebote. Für größere Besorgungen oder einen Stadtbummel ist das nahegelegene Borna schnell erreichbar und auch Leipzig ist dank der gut ausgebauten Verkehrsanbindung bequem erreichbar - sowohl mit dem Auto als auch mit der S-Bahn. Die Bahnstation in Lobstädt sorgt für eine direkte Verbindung ins Leipziger Stadtzentrum, was Pendlern zusätzlichen Komfort bietet.\n\nFreizeit- und Erholungsmöglichkeiten finden Sie direkt vor der Haustür: Das nahegelegene Hainer Seeufer lädt zu Spaziergängen, Radtouren oder entspannten Stunden am Wasser ein. Mit dem Leipziger Neuseenland in unmittelbarer Reichweite stehen Ihnen zahlreiche Angebote für Wassersport, Naturerlebnisse und Erholung zur Verfügung. Das Grundstück bietet damit eine einzigartige Kombination aus ländlicher Ruhe und moderner Anbindung ein Ort zum Ankommen und Wohlfühlen!\n\n# Sonstiges\n* Baugrundstück\n* Fläche: ca. 1.025qm\n* Bebauung mit Einfamilienhaus/Doppelhaushälfte möglich\n* vermieteter Altbestand: Garagen, pauschal EUR 130,-/Monat\n* Strom/Wasser/Gas in Straße\n\nAnbieter-Objekt-ID: 476035",
+  "indizien": [],
+  "angaben": {
+    "objekt_id": "476035",
+    "verfuegbar_ab": "sofort"
+  }
+}
