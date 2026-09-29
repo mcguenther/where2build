@@ -33,7 +33,7 @@
     <!-- 1 · Quelle. Also what a stage without its data falls back to, so the
          redirect in `checkStage` never renders a step that has nothing.
          One field for all five ways in: the reading decides which of them is
-         happening, and the chips let it be overruled. -->
+         happening, and the marker at the field's edge lets it be overruled. -->
     <section v-if="stage === 'quelle' || !reachable" class="stack">
       <p class="subtitle">
         Adresse, Flurstück, Koordinate, der Link einer Anzeige oder die eingefügte
@@ -54,8 +54,9 @@
         Was getippt wurde, wird zuerst gelesen und dann nachgeschlagen: eine deutsche
         Adresse beginnt nie mit einer Ziffer, eine Koordinate sind zwei Zahlen, und ein
         Nenner (<span class="mono">85/1</span>) kommt in keiner Adresse vor. Bleiben zwei
-        Lesarten möglich, werden beide Verzeichnisse gefragt statt eine geraten. Was
-        darunter steht, lässt sich anklicken, wenn es die falsche ist.
+        Lesarten möglich, werden beide Verzeichnisse gefragt statt eine geraten. Rechts
+        im Feld steht, wie es gelesen wurde; ein Klick darauf wählt eine andere Lesart.
+        Eine Flurstücksnummer darf vor oder nach der Gemarkung stehen.
         <br>
         <b>Eine Anzeigenseite</b> im Browser mit <span class="mono">Strg+A</span>,
         <span class="mono">Strg+C</span> kopieren und hier einfügen: die Zwischenablage

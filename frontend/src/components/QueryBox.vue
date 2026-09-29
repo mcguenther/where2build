@@ -10,7 +10,8 @@
                   @submit="go"
                   @paste="takePaste"
                   @district="takeDistrict"
-                  @backspace="takeBack">
+                  @backspace="takeBack"
+                  @unmatched="takeUnmatched">
         <template #lead>
           <!-- The halves of a parcel, whichever came first. The Gemarkung
                stands first either way: that is how the cadastre names it. -->
@@ -205,6 +206,9 @@ export default {
       /* The halves of a parcel that are blocks already. */
       district: null,
       numberBlock: "",
+      // Enter came while a Gemarkung was only typed: take the row it matches,
+      // and then ask the cadastre without a second press.
+      goAfterDistrict: false,
       proseOpen: false,
       directory: null,
       menuOpen: false,
@@ -320,7 +324,9 @@ export default {
     ready() {
       if (this.isReadable) return Boolean(this.pastedHtml || this.text.trim().length > 8);
       if (this.district) return Boolean(this.numberBlock || this.typedNumber);
-      if (this.numberBlock) return false;
+      // A Gemarkung being typed after the number: the top row, or failing
+      // that the name as typed, completes it.
+      if (this.numberBlock) return Boolean(this.text.trim());
       if (this.fixedKind === "parcel") return Boolean(this.parcelFromText);
       return this.text.trim().length > 1;
     },
@@ -448,6 +454,25 @@ export default {
       this.district = entry;
       this.text = "";
       this.$nextTick(() => this.$refs.search?.focus());
+      if (this.goAfterDistrict) {
+        this.goAfterDistrict = false;
+        this.go();
+      }
+    },
+
+    /** No row for what was typed after the number. The name goes to the
+     *  cadastre as typed: the directory is an aid, not a gate, and a service
+     *  that is down must not lock the field. */
+    takeUnmatched() {
+      if (!this.goAfterDistrict) return;
+      this.goAfterDistrict = false;
+      const typed = this.text.trim();
+      if (!this.numberBlock || !typed) return;
+      this.$emit("resolve", {
+        query: { gemarkung: typed, flurstuecksnummer: this.numberBlock },
+        label: `Flurstück: ${typed} ${this.numberBlock}`,
+        address: null
+      });
     },
 
     /** Backspace in an empty field takes back the last block. */
@@ -542,6 +567,10 @@ export default {
           text: this.text.trim(),
           html: this.pastedHtml
         });
+      }
+      if (this.numberBlock && !this.district) {
+        this.goAfterDistrict = true;
+        return this.$refs.search?.take();
       }
       if (this.district) {
         const number = this.numberBlock || this.typedNumber;

@@ -107,7 +107,7 @@ export default {
     /** Nothing is worth asking: the wrapper knows what the text is. */
     quiet: { type: Boolean, default: false }
   },
-  emits: ["select", "update:modelValue", "paste", "submit", "district", "backspace"],
+  emits: ["select", "update:modelValue", "paste", "submit", "district", "backspace", "unmatched"],
   data() {
     instances += 1;
     return {
@@ -381,7 +381,9 @@ export default {
       }
       const highlighted = this.hits[this.activeIndex];
       if (highlighted) return this.choose(highlighted);
-      if (!this.hits.length) return;
+      // Nothing to offer is the wrapper's to handle: a Gemarkung missing
+      // from the directory is still worth sending as typed.
+      if (!this.hits.length) return this.$emit("unmatched");
       const readings = new Set(this.hits.map(hit => (hit.kind === "Ort" ? "Adresse" : hit.kind)));
       if (readings.size === 1) return this.choose(this.hits[0]);
       this.open = true;

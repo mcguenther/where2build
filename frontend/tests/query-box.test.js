@@ -327,6 +327,32 @@ describe("QueryBox", () => {
       box.unmount();
     });
 
+    it("nimmt nach der Nummer mit Enter die Gemarkung und fragt gleich das Kataster", async () => {
+      const box = mount(QueryBox);
+      await type(box, "85/1 ");
+      await type(box, MOELKAU.name);
+      await enterKey(box.find(".search__field input"));
+      await flushPromises();
+
+      expect(box.emitted("resolve")[0][0].query)
+        .toEqual({ gemarkung: MOELKAU.schluessel, flurstuecksnummer: "85/1" });
+      box.unmount();
+    });
+
+    it("schickt eine Gemarkung, die nicht im Verzeichnis steht, so wie getippt", async () => {
+      // Moritzburg fehlt im Verzeichnisauszug; das Verzeichnis ist eine
+      // Hilfe, keine Sperre.
+      const box = mount(QueryBox);
+      await type(box, "85/1 ");
+      await type(box, "Moritzburg");
+      await findButton(box).trigger("click");
+      await flushPromises();
+
+      expect(box.emitted("resolve")[0][0].query)
+        .toEqual({ gemarkung: "Moritzburg", flurstuecksnummer: "85/1" });
+      box.unmount();
+    });
+
     it("liest „Mölkau 204/3“ in einem Zug als Flurstück", async () => {
       const box = mount(QueryBox);
       await type(box, `${MOELKAU.name} 204/3`);
