@@ -92,3 +92,57 @@ export const bookmarkletCode = origin => `
  * sentences, which a bookmark file would otherwise mangle.
  */
 export const bookmarkletHref = origin => `javascript:${encodeURI(bookmarkletCode(origin))}`;
+
+/** What the bookmark is called: the button's text, and the file's entry. */
+export const BOOKMARK_TITLE = "Grundstück prüfen";
+
+/** The icon the file carries, and what it is called when it is saved. */
+export const BOOKMARK_ICON = "/favicon-96x96.png";
+export const BOOKMARK_FILE = "where2build-lesezeichen.html";
+
+/**
+ * The bookmarklet as a bookmarks file, which is the one way it gets an icon.
+ *
+ * A bookmark's icon is not a property of the bookmark. The browser keeps one
+ * per *page*, recorded when that page loads, and a `javascript:` bookmark
+ * never loads one — so a dragged bookmarklet shows the browser's blank icon,
+ * and nothing on the dragged link can change that. The Netscape bookmarks file
+ * every browser imports carries an `ICON` data URL per entry, though, and
+ * Chromium's importer stores that picture against the entry's own URL.
+ *
+ * Chromium reads this format line by line, so the entry has to stay on one
+ * line; and the href is put into the attribute as it is, which is safe only
+ * because `encodeURI` leaves no quote, `&`, `<` or `>` in it — a test holds
+ * that. The folder is the bookmarks bar, which is where the bookmark belongs.
+ */
+export const bookmarkletFile = (origin, iconDataUrl) =>
+  [
+    "<!DOCTYPE NETSCAPE-Bookmark-file-1>",
+    '<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">',
+    "<TITLE>Bookmarks</TITLE>",
+    "<H1>Bookmarks</H1>",
+    "<DL><p>",
+    '    <DT><H3 PERSONAL_TOOLBAR_FOLDER="true">where2build</H3>',
+    "    <DL><p>",
+    `        <DT><A HREF="${bookmarkletHref(origin)}" ICON="${iconDataUrl}">${BOOKMARK_TITLE}</A>`,
+    "    </DL><p>",
+    "</DL><p>",
+    ""
+  ].join("\n");
+
+const ICON_MISSING = "Das Symbol für das Lesezeichen ließ sich nicht laden";
+
+/**
+ * The bookmarks file, ready to save. The icon is read from the app's own
+ * `public/` at the moment of saving rather than copied into the bundle, so the
+ * bookmark carries the picture the tab carries.
+ */
+export async function bookmarkletFileBlob(origin, fetcher = fetch) {
+  const response = await fetcher(BOOKMARK_ICON);
+  if (!response.ok) throw new Error(`${ICON_MISSING} (HTTP ${response.status}).`);
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  const icon = `data:image/png;base64,${btoa(binary)}`;
+  return new Blob([bookmarkletFile(origin, icon)], { type: "text/html;charset=utf-8" });
+}

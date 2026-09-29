@@ -734,6 +734,58 @@ describe("Aufnahme — Seite aus dem Browser übernommen", () => {
     expect(decodeURI(href)).toContain(JSON.stringify(window.location.origin));
   });
 
+  it("heißt als Lesezeichen so, wie der Knopf beschriftet ist, trotz des Zeichens darin", async () => {
+    // Gezogen wird der Name aus dem Text des Links. Das Zeichen ist ein SVG
+    // ohne Text; stünde darin einer, hieße das Lesezeichen danach.
+    const w = mountWithRouter(WizardView, { path: "/aufnahme/quelle", props: { stage: "quelle" } });
+    await flushPromises();
+
+    const link = w.find("details.gelesen--lesezeichen a.btn");
+    expect(link.find("svg").exists()).toBe(true);
+    expect(link.text()).toBe("Grundstück prüfen");
+  });
+
+  it("speichert das Lesezeichen mit Symbol als Datei", async () => {
+    const icon = new Uint8Array([137, 80, 78, 71]);
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(icon, { status: 200 })));
+    // jsdom has neither, so they are put there for this test and taken away.
+    let blob;
+    let name;
+    URL.createObjectURL = vi.fn(made => { blob = made; return "blob:lesezeichen"; });
+    URL.revokeObjectURL = vi.fn();
+    const clicks = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function () {
+      name = this.download;
+    });
+    const w = mountWithRouter(WizardView, { path: "/aufnahme/quelle", props: { stage: "quelle" } });
+    await flushPromises();
+
+    await w.find("details.gelesen--lesezeichen button").trigger("click");
+    await flushPromises();
+
+    expect(name).toBe("where2build-lesezeichen.html");
+    const file = await blob.text();
+    expect(file).toContain(`ICON="data:image/png;base64,${btoa("\x89PNG")}"`);
+    expect(file).toContain(JSON.stringify(window.location.origin).slice(1, -1));
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:lesezeichen");
+    expect(w.find("details.gelesen--lesezeichen .notice--error").exists()).toBe(false);
+    clicks.mockRestore();
+    delete URL.createObjectURL;
+    delete URL.revokeObjectURL;
+    vi.unstubAllGlobals();
+  });
+
+  it("sagt, wenn das Symbol fehlt, statt eine Datei ohne zu speichern", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 404 })));
+    const w = mountWithRouter(WizardView, { path: "/aufnahme/quelle", props: { stage: "quelle" } });
+    await flushPromises();
+
+    await w.find("details.gelesen--lesezeichen button").trigger("click");
+    await flushPromises();
+
+    expect(w.find("details.gelesen--lesezeichen .notice--error").text()).toContain("HTTP 404");
+    vi.unstubAllGlobals();
+  });
+
   it("verwechselt den eigenen Klappkasten nicht mit dem der Suche", async () => {
     // Beide heißen `details.gelesen`. Ein Skript, das auf einen wartet, würde
     // sonst den der Einstiegsseite treffen und auf eine Liste warten, die dort

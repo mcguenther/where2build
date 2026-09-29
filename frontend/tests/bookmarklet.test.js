@@ -14,9 +14,15 @@ import {
   HANDOVER_READY,
   HANDOVER_PAGE,
   HANDOVER_TIMEOUT_MS,
+  BOOKMARK_ICON,
+  BOOKMARK_TITLE,
   bookmarkletCode,
+  bookmarkletFile,
+  bookmarkletFileBlob,
   bookmarkletHref
 } from "../src/lib/bookmarklet.js";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 const ORIGIN = "https://where2build.example";
 
@@ -164,5 +170,52 @@ describe("the handover", () => {
     click();
     vi.advanceTimersByTime(HANDOVER_TIMEOUT_MS);
     expect(window.alert).not.toHaveBeenCalled();
+  });
+});
+
+/* The icon the app actually serves, not a stand-in: the file is only worth
+ * anything if the picture in it is the one the tab shows. */
+const iconBytes = readFileSync(resolve(__dirname, "../public", BOOKMARK_ICON.slice(1)));
+const iconDataUrl = `data:image/png;base64,${iconBytes.toString("base64")}`;
+
+describe("the bookmarks file", () => {
+  it("holds the bookmarklet unchanged, with the icon, on one line", () => {
+    // Chromium's importer reads the format line by line: an entry broken over
+    // two lines is no entry. Measured on 25.09.2026 in Chromium 141 — imported
+    // from this file, the bar shows the app's icon; the same entry without
+    // `ICON` shows the grey globe, which is what a dragged bookmarklet gets.
+    const line = bookmarkletFile(ORIGIN, iconDataUrl)
+      .split("\n")
+      .find(entry => entry.includes("<A "));
+
+    expect(line).toContain(`HREF="${bookmarkletHref(ORIGIN)}"`);
+    expect(line).toContain(`ICON="${iconDataUrl}"`);
+    expect(line).toContain(`>${BOOKMARK_TITLE}</A>`);
+  });
+
+  it("needs no escaping, because the href has nothing to escape", () => {
+    // The href goes into the attribute as it is. That is only right while
+    // `encodeURI` leaves no quote, ampersand or angle bracket in it.
+    expect(bookmarkletHref(ORIGIN)).not.toMatch(/["'&<>]/);
+  });
+
+  it("puts the bookmark into the bookmarks bar", () => {
+    expect(bookmarkletFile(ORIGIN, iconDataUrl)).toContain('PERSONAL_TOOLBAR_FOLDER="true"');
+  });
+
+  it("reads the icon the app serves and embeds it", async () => {
+    const fetcher = vi.fn(async () => new Response(iconBytes, { status: 200 }));
+
+    const blob = await bookmarkletFileBlob(ORIGIN, fetcher);
+
+    expect(fetcher).toHaveBeenCalledWith(BOOKMARK_ICON);
+    expect(blob.type).toBe("text/html;charset=utf-8");
+    expect(await blob.text()).toBe(bookmarkletFile(ORIGIN, iconDataUrl));
+  });
+
+  it("says so when the icon is not there, rather than saving a file without it", async () => {
+    const fetcher = async () => new Response("", { status: 404 });
+
+    await expect(bookmarkletFileBlob(ORIGIN, fetcher)).rejects.toThrow("HTTP 404");
   });
 });

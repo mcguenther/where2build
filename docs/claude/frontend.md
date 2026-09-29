@@ -209,6 +209,29 @@ that collapsed at 390 px. None of them threw.
   bookmarklet's carries `gelesen--lesezeichen` and the script asks for
   `:not(.gelesen--lesezeichen)`; a test asserts the entry step has no plain
   one.
+- **A dragged bookmarklet has no icon, and nothing on the link gives it one.**
+  A browser keeps icons per *page*, recorded when the page loads, and a
+  `javascript:` bookmark never loads one. Measured 25.09.2026 in Chromium 141
+  under Xvfb, with a fresh profile importing a bookmarks file on first run
+  (`initial_preferences` next to the binary, `import_bookmarks_from_file`):
+  the entry with an `ICON="data:image/png;base64,…"` attribute sits in the bar
+  with the app's icon, the same entry without it with the grey globe, and the
+  imported URL is character for character the one generated. Into a profile
+  that already has bookmarks the import lands in „Imported › where2build"
+  instead — hence the folder's name — and moved from there into the bar it
+  keeps its icon across a restart: Chromium stores it against the bookmark's
+  URL (`made-up-favicon:javascript:…` in `Favicons`), not against the entry.
+  So „Mit Symbol als Datei" hands out that file (`bookmarkletFile`), and the
+  draggable button stays for whoever does not mind the globe. **Close Chromium
+  cleanly when measuring this** (`Browser.close` over the DevTools port): a
+  run ended by `timeout` showed the icon while it ran and left `Favicons`
+  empty, and the next start drew the globe — which read exactly like „moving
+  the bookmark loses its icon", and is not true. Chromium reads the format **line
+  by line** — an entry split over two lines is no entry — and the href goes
+  into the attribute unescaped, which a test holds safe: `encodeURI` leaves no
+  quote, `&`, `<` or `>` in it. The icon on the button is drawn inline, not
+  the favicon as an `<img>`: the favicon's outline is the button's own Loden
+  and vanishes on it.
 
 
 - **A full-bleed section inside `.container` bleeds to 1360 px, not to the

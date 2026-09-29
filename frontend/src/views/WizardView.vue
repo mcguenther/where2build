@@ -81,12 +81,34 @@
           hierher. Vollständig, also mit allem, was das Kopieren verliert.
         </p>
         <p class="row">
-          <a class="btn" :href="bookmarkletLink" @click.prevent>Grundstück prüfen</a>
+          <!-- The mark is drawn, not an <img>: the favicon's outline is the
+               button's own Loden, so on the button it would vanish. Here it
+               takes the text colour. It takes no pointer events, so a drag
+               that starts on it still drags the link, named by its text. -->
+          <a class="btn lesezeichen-knopf" :href="bookmarkletLink" @click.prevent>
+            <svg viewBox="0 0 48 48" width="16" height="16" aria-hidden="true">
+              <rect x="5.5" y="5.5" width="37" height="37" rx="3.5" fill="none"
+                    stroke="currentColor" stroke-width="3.5" />
+              <rect x="14.5" y="14.5" width="19" height="19" rx="2"
+                    fill="var(--w2b-secondary)" transform="rotate(15 24 24)" />
+            </svg>{{ bookmarkTitle }}</a>
+          <button type="button" class="btn btn--quiet" :disabled="bookmarkSaving"
+                  @click="saveBookmark">Mit Symbol als Datei</button>
         </p>
         <p class="hint">
           Der Knopf tut hier nichts, er <i>ist</i> das Lesezeichen. Er öffnet
           <span class="mono">{{ appOrigin }}</span> in einem neuen Tab und übergibt die
           Seite dorthin; an das Portal geht dabei keine Anfrage.
+        </p>
+        <p class="hint">
+          Gezogen zeigt das Lesezeichen in der Leiste kein Symbol: der Browser merkt
+          sich Symbole pro geladener Seite, und dieses Lesezeichen lädt keine. Mit
+          Symbol kommt es über die Datei: im Browser unter „Lesezeichen importieren“
+          als HTML-Datei einlesen. Wohin der Browser Importiertes legt, entscheidet er
+          selbst; von dort lässt es sich in die Leiste ziehen, und das Symbol bleibt.
+        </p>
+        <p v-if="bookmarkError" class="notice notice--error" role="alert">
+          {{ bookmarkError }}
         </p>
       </details>
     </section>
@@ -289,7 +311,8 @@ import { polygonArea, polygonCentroid, pointInPolygon } from "../lib/geometry.js
 import { toLocal } from "../lib/projection.js";
 import { area, euroPerSqm, num, parseGermanNumber as numberFrom } from "../lib/format.js";
 import {
-  HANDOVER_QUERY, HANDOVER_READY, HANDOVER_PAGE, bookmarkletHref
+  HANDOVER_QUERY, HANDOVER_READY, HANDOVER_PAGE, BOOKMARK_TITLE, BOOKMARK_FILE,
+  bookmarkletHref, bookmarkletFileBlob
 } from "../lib/bookmarklet.js";
 
 /** The backend answers with {feld: {wert, quelle_url, bestaetigt}}. */
@@ -345,6 +368,8 @@ export default {
        * portal the user was looking at -- so the nonce stands in for it. */
       handoverNonce: "",
       handoverWaiting: false,
+      bookmarkSaving: false,
+      bookmarkError: "",
       busy: false,
       error: "",
       readFields: [],
@@ -429,6 +454,7 @@ export default {
      *  it runs on the portal's page and knows nothing else about us. */
     appOrigin() { return window.location.origin; },
     bookmarkletLink() { return bookmarkletHref(this.appOrigin); },
+    bookmarkTitle() { return BOOKMARK_TITLE; },
   },
   created() {
     this.checkStage();
@@ -491,6 +517,25 @@ export default {
         html: data.html.slice(0, PAGE_LIMIT)
       };
       this.readPayload({ kind: "paste", text: "", html: this.handover.html });
+    },
+
+    /** The bookmarklet as a bookmarks file with the app's icon in it —
+     *  the one way a `javascript:` bookmark gets one. */
+    async saveBookmark() {
+      this.bookmarkSaving = true;
+      this.bookmarkError = "";
+      try {
+        const url = URL.createObjectURL(await bookmarkletFileBlob(this.appOrigin));
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = BOOKMARK_FILE;
+        link.click();
+        URL.revokeObjectURL(url);
+      } catch (error) {
+        this.bookmarkError = error.message;
+      } finally {
+        this.bookmarkSaving = false;
+      }
     },
 
     stopHandover() {
@@ -885,6 +930,11 @@ export default {
 .gelesen .subtitle{ margin-top: 0; }
 .gelesen .suggestions{ margin-top: var(--w2b-space-3); }
 .gelesen .row{ margin-top: var(--w2b-space-3); }
+/* `line-height: normal` is what the <button> beside it has; inherited from
+   the body, the link stood 8 px taller than its neighbour. */
+.lesezeichen-knopf{ display: inline-flex; align-items: center; gap: var(--w2b-space-2); line-height: normal; text-decoration: none; }
+.lesezeichen-knopf svg{ flex: none; pointer-events: none; }
+.gelesen--lesezeichen .hint{ margin-top: var(--w2b-space-2); }
 
 .check-grid{ display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: var(--w2b-space-4); align-items: start; }
 @media (max-width: 900px){ .check-grid{ grid-template-columns: 1fr; } }
