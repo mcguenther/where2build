@@ -434,6 +434,9 @@ export default {
   flex: 1; min-width: 0; border: 0; background: none; outline: none;
   padding: 9px 0; font: inherit; font-size: 15px; color: var(--w2b-ink);
 }
+/* The row around the input shows the focus; the app-wide ring on every
+   focused input would draw a second box inside it. */
+.search__field input:focus{ box-shadow: none; }
 .search__badge{
   flex: none; font-family: var(--w2b-font-mono); font-size: 10.5px;
   padding: 2px 6px; border-radius: var(--w2b-radius-xs);

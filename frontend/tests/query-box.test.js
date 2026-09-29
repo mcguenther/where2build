@@ -378,6 +378,28 @@ describe("QueryBox", () => {
       box.unmount();
     });
 
+    it("zeigt unter der Pille die Karte und fragt nach dem Verschieben den neuen Punkt an", async () => {
+      const box = mount(QueryBox);
+      await paste(box, "51.33652, 12.44176");
+      const preview = box.findComponent({ name: "CoordinatePreview" });
+      expect(preview.exists()).toBe(true);
+      expect(preview.props()).toMatchObject({ lat: 51.33652, lon: 12.44176 });
+
+      preview.vm.$emit("move", { lat: 51.3366, lon: 12.4419 });
+      await flushPromises();
+      expect(box.find(".pill").text()).toContain("51,33660° N");
+      await findButton(box).trigger("click");
+      expect(box.emitted("resolve")[0][0].query).toEqual({ lat: 51.3366, lon: 12.4419 });
+      box.unmount();
+    });
+
+    it("zeigt vor Enter keine Karte, damit beim Tippen nichts springt", async () => {
+      const box = mount(QueryBox);
+      await type(box, "51.33652, 12.44176");
+      expect(box.findComponent({ name: "CoordinatePreview" }).exists()).toBe(false);
+      box.unmount();
+    });
+
     it("macht eine eingefügte Koordinate sofort zur Pille", async () => {
       const box = mount(QueryBox);
       await paste(box, "51.33652, 12.44176");

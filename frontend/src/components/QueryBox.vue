@@ -69,6 +69,7 @@
         </template>
 
         <template #action>
+          <div class="query-box__actions">
           <!-- How the input is read, in the same place for every kind of
                input. It is a button: the menu behind it overrules the reading. -->
           <div v-if="marker" class="reading">
@@ -101,9 +102,18 @@
           <button type="button" class="btn btn--large" :disabled="busy || !ready" @click="go">
             {{ busy ? "Wird gelesen …" : "Grundstück finden" }}
           </button>
+          </div>
         </template>
       </PlotSearch>
     </div>
+
+    <!-- Where the coordinate lands, before anything is looked up: the point,
+         its neighbourhood and the parcel under it. It appears after a paste or
+         an Enter, both of which someone did on purpose. UTM has no preview —
+         the projection lives in the backend, and the pill says what was read. -->
+    <CoordinatePreview v-if="previewPoint" class="query-box__preview"
+                       :lat="previewPoint.lat" :lon="previewPoint.lon"
+                       @move="movedPoint = $event" />
   </div>
 </template>
 
@@ -131,6 +141,7 @@
  * and leaves fetching and navigating to whoever placed it.
  */
 import PlotSearch from "./PlotSearch.vue";
+import CoordinatePreview from "./CoordinatePreview.vue";
 import { classifyQuery } from "../lib/queryInput.js";
 import { cadastralDistricts } from "../lib/api.js";
 import { markText, wordCount, MARK_LABELS } from "../lib/textMarks.js";
@@ -178,7 +189,7 @@ let instances = 0;
 
 export default {
   name: "QueryBox",
-  components: { PlotSearch },
+  components: { PlotSearch, CoordinatePreview },
   props: {
     /** The caller is fetching. The field stays readable, the button waits. */
     busy: { type: Boolean, default: false },
@@ -210,6 +221,8 @@ export default {
       // and then ask the cadastre without a second press.
       goAfterDistrict: false,
       proseOpen: false,
+      // Where the preview's point was moved to; null while it is where typed.
+      movedPoint: null,
       directory: null,
       menuOpen: false,
       menuStyle: null,
@@ -251,6 +264,7 @@ export default {
       return this.blockKind !== null || Boolean(this.district) || READ_KINDS.includes(this.fixedKind);
     },
     fieldPlaceholder() {
+      if (this.numberBlock && this.district) return "";
       if (this.numberBlock && !this.district) return "Gemarkung …";
       if (this.district && !this.numberBlock) return "Flurstücksnummer, etwa 204/3";
       return this.placeholder;
@@ -356,11 +370,18 @@ export default {
       const parts = best.split(".");
       return parts.length > 2 ? parts.slice(-2).join(".") : best;
     },
+    /** The point the preview shows, and the one the cadastre is asked for. */
+    previewPoint() {
+      const c = this.reading.coordinate;
+      if (this.blockKind !== "coordinate" || !c || c.system !== "wgs84") return null;
+      return this.movedPoint || { lat: c.lat, lon: c.lon };
+    },
     coordinateLabel() {
       const c = this.reading.coordinate;
       if (!c) return this.text.trim();
       if (c.system === "utm33") return `${num(c.easting, 0)} · ${num(c.northing, 0)}`;
-      return `${num(c.lat, 5)}° N · ${num(c.lon, 5)}° O`;
+      const point = this.movedPoint || c;
+      return `${num(point.lat, 5)}° N · ${num(point.lon, 5)}° O`;
     },
 
     marks() { return markText(this.blockKind === "prose" ? this.text : "", this.directory); },
@@ -390,6 +411,7 @@ export default {
      * read, and a wrong answer that looks exactly as official as the right
      * one is the one thing this app may not produce. */
     text(value) {
+      this.movedPoint = null;
       if (this.pasting) {
         this.pasting = false;
         this.blockText = value;
@@ -588,8 +610,9 @@ export default {
           return;
         }
         const c = this.reading.coordinate;
+        const point = this.previewPoint;
         return this.$emit("resolve", {
-          query: c.system === "utm33" ? { easting: c.easting, northing: c.northing } : { lat: c.lat, lon: c.lon },
+          query: c.system === "utm33" ? { easting: c.easting, northing: c.northing } : { lat: point.lat, lon: point.lon },
           label: `Koordinate: ${this.coordinateLabel}`,
           address: null
         });
@@ -630,6 +653,8 @@ export default {
 .query-box__field :deep(.search__field input){ font-size: 18px; padding: 12px 0; }
 .query-box--prose .query-box__field :deep(.search__field){ align-items: flex-start; }
 .query-box--prose .query-box__field :deep(.search__field > svg){ margin-top: 12px; }
+
+.query-box__preview{ margin-top: var(--w2b-space-3); }
 
 /* ---------- pills ---------- */
 .pill{
@@ -696,6 +721,8 @@ export default {
 }
 
 /* ---------- the reading marker ---------- */
+/* Pushed to the right edge even when a pill stands where the input was. */
+.query-box__actions{ margin-left: auto; flex: none; display: flex; align-items: center; }
 .reading{ position: relative; flex: none; display: flex; align-items: center; margin-right: 8px; }
 .marker{
   display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; cursor: pointer;
@@ -742,6 +769,7 @@ export default {
   .query-box__field{ padding: 10px 12px; }
   .query-box__field :deep(.search__field){ flex-wrap: wrap; row-gap: 8px; }
   .query-box__field :deep(.search__field input){ flex: 1 1 40%; font-size: 16px; padding: 6px 0; }
+  .query-box__actions{ display: contents; }
   .query-box__field .btn--large{ flex: 1 1 100%; }
   .reading{ margin-right: 0; }
   .prose{ flex-basis: 100%; }
