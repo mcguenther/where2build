@@ -221,27 +221,52 @@ def read_price_eur(html: str) -> int | None:
     return int(round(value))
 
 
-# A German location line, and the three portals write it three ways:
+# A German location line, and the portals write it four ways:
 #
 #   ohne-makler    „Maschinenhausstraße, | 01587 Riesa | – Sachsen"
 #   ImmoScout      „Grünau-Siedlung, 04207 Leipzig"
 #   Kleinanzeigen  „04668 Sachsen – Grimma"
+#   immowelt       „… zum Kauf Naunhof,Naunhof(04683)"  -- Ortsteil, Gemeinde,
+#                  and the postcode *behind* them in brackets
 #
 # The postcode is the anchor -- five digits are unambiguous in a German page in
 # a way no name is. What follows it is the place *unless* it is a Bundesland, in
 # which case the place is behind the dash: that is Kleinanzeigen's order, and
 # reading „Sachsen" as the town is how „600 m² in Brehna" once resolved to a
 # parcel 100 km away.
-_NAME = r"[A-ZÄÖÜ][\wäöüß.'-]*(?:[ -][A-ZÄÖÜ][\wäöüß.'-]*){0,3}"
+_WORD = r"[A-ZÄÖÜ][\wäöüß.'-]*"
+_NAME = rf"{_WORD}(?:[ -]{_WORD}){{0,3}}"
 _LOCATION_RE = re.compile(
     rf"(?<!\d)(?P<plz>\d{{5}})(?!\d)[\s|]*(?P<tail>{_NAME})?"
     rf"(?:[\s|]*[-–—][\s|]*(?P<behind>{_NAME}))?"
 )
-_STREET_RE = re.compile(
-    rf"(?P<street>{_NAME}(?:straße|strasse|str\.|weg|gasse|allee|platz|ring|damm|ufer|"
-    r"chaussee|steig|pfad|hof|berg|winkel|zeile|graben))(?=[\s|,]*\d{5}|[\s|]*,)",
-    re.IGNORECASE,
+# immowelt's order, measured on its exposé titles as the search index holds
+# them („Haus 49.34 m² 99000 € zum Kauf Naunhof,Naunhof(04683)") -- the page
+# itself answers every request of ours with DataDome's 403. With the postcode
+# in brackets behind the place, the pattern above finds it and nothing after
+# it, so the first postcode *with* a name was the broker's address further
+# down: „04463 Großpösna" for a plot in Naunhof.
+#
+# Scanned leftwards from the bracket, a name has no natural start -- German
+# nouns are capitalised too, and „Einfamilienhaus Bad Lausick (04651)" is
+# three capitalised words. So the place is at most two words and the Ortsteil
+# in front of the comma one: „Kauf Naunhof,Naunhof" gives Naunhof and Naunhof,
+# not „Kauf Naunhof". A multi-word Ortsteil loses its first word; the search
+# only takes that slot when the Gemarkung directory knows the name anyway.
+_PLACE_FIRST_RE = re.compile(
+    rf"(?:(?P<ortsteil>{_WORD})[\s|]*,[\s|]*)?(?P<ort>{_WORD}(?:[ -]{_WORD})?)"
+    r"[\s|]*\([\s|]*(?P<plz>\d{5})[\s|]*\)"
 )
+# Case-sensitive in the name, and only the suffix may be either case. With the
+# whole pattern case-insensitive, „[A-ZÄÖÜ]" matched lower case as well, and
+# „zum Kauf Naunhof," in that same immowelt title read as a street: three words
+# and a town ending in „-hof".
+_STREET_RE = re.compile(
+    rf"(?P<street>{_NAME}(?i:straße|strasse|str\.|weg|gasse|allee|platz|ring|damm|ufer|"
+    r"chaussee|steig|pfad|hof|berg|winkel|zeile|graben))[\s|,]*\Z"
+)
+# How far in front of the location line its street may begin.
+_STREET_LOOKBACK = 80
 
 
 def read_location(html: str) -> dict[str, str]:
@@ -259,10 +284,25 @@ def read_location(html: str) -> dict[str, str]:
     # Not the first postcode in the document: the first one on an ImmoScout
     # page sits inside the analytics block, where it is followed by the next
     # JSON key rather than by a town. So every postcode is tried and the first
-    # one that yields a *name* wins, with a bare postcode as the fallback.
-    matches = list(_LOCATION_RE.finditer(text))
-    match = next((m for m in matches if m.group("tail")), matches[0] if matches else None)
-    if match:
+    # one that yields a *name* wins, with a bare postcode as the fallback. Both
+    # orders are tried in one pass, in the order they stand in the page: the
+    # listing's own location comes before the broker's address on every portal
+    # recorded, and that holds only if neither order is asked first.
+    matches = sorted(
+        [*_LOCATION_RE.finditer(text), *_PLACE_FIRST_RE.finditer(text)],
+        key=lambda m: m.start(),
+    )
+    named = [m for m in matches if m.re is _PLACE_FIRST_RE or m.group("tail")]
+    match = named[0] if named else (matches[0] if matches else None)
+    if match and match.re is _PLACE_FIRST_RE:
+        found["plz"] = match.group("plz")
+        found["ort"] = match.group("ort")
+        ortsteil = match.group("ortsteil")
+        # „Naunhof,Naunhof(04683)": the portal names the Ortsteil even where it
+        # is the town itself, and saying it twice says nothing.
+        if ortsteil and ortsteil != found["ort"]:
+            found["ortsteil"] = ortsteil
+    elif match:
         found["plz"] = match.group("plz")
         tail, behind = match.group("tail"), match.group("behind")
         if tail and federal_state(tail) == tail:
@@ -280,9 +320,14 @@ def read_location(html: str) -> dict[str, str]:
         if state:
             found["bundesland"] = state
 
-    street = _STREET_RE.search(text)
-    if street:
-        found["strasse"] = street.group("street")
+    # The street of *this* line, standing directly in front of it. Searched
+    # anywhere, the first street-shaped phrase in the page won, and it was
+    # joined to whatever postcode the line above had picked -- a street from
+    # one address and a town from another.
+    if match:
+        street = _STREET_RE.search(text, max(0, match.start() - _STREET_LOOKBACK), match.start())
+        if street:
+            found["strasse"] = street.group("street")
 
     return found
 
@@ -311,5 +356,11 @@ def location_line(read: dict[str, str]) -> str | None:
     """
 
     head = " ".join(part for part in (read.get("plz"), read.get("ort")) if part)
-    parts = [part for part in (read.get("strasse"), head, read.get("bundesland")) if part]
+    # The Ortsteil in front of the postcode, which is ImmoScout's order and the
+    # slot the search reads a district out of.
+    parts = [
+        part
+        for part in (read.get("strasse"), read.get("ortsteil"), head, read.get("bundesland"))
+        if part
+    ]
     return ", ".join(parts) or None

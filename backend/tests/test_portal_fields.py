@@ -169,6 +169,70 @@ def test_the_portals_own_address_is_not_the_plots():
     assert read["bundesland"] == "Sachsen"
 
 
+# immowelt's exposé title exactly as the search index holds it (advert
+# 95c44acc-fac1-451c-a372-e7e32616539a, 25.09.2026) -- the page itself answers
+# every request of ours with DataDome's 403, so there is no recording. The
+# broker's line further down is the shape that won instead.
+IMMOWELT_TITLE = "Haus 49.34 m² 99000 € zum Kauf Naunhof,Naunhof(04683)"
+
+
+def test_the_postcode_may_stand_behind_the_place_in_brackets():
+    """immowelt writes „Ortsteil,Gemeinde(PLZ)", the postcode last.
+
+    The reader knew only „PLZ Ort", so it found the bracketed postcode with no
+    name after it and moved on to the first one that had one -- the broker's
+    address at the foot of the page. A plot in Naunhof became „04463
+    Großpösna", and the search anchored on the wrong municipality.
+    """
+
+    page = (
+        f"<html><head><title>{IMMOWELT_TITLE}</title></head><body>"
+        "<p>Sachsen</p><section><h2>Ihr Ansprechpartner</h2>"
+        "<p>04463 Großpösna</p></section></body></html>"
+    )
+
+    read = read_location(page)
+
+    assert read == {"plz": "04683", "ort": "Naunhof", "bundesland": "Sachsen"}
+    assert location_line(read) == "04683 Naunhof, Sachsen"
+
+
+def test_the_ortsteil_in_front_of_the_comma_is_kept():
+    """„Fuchshain,Naunhof(04683)": Fuchshain is a Gemarkung of its own, and it
+    goes in front of the postcode, the slot the search reads a district from."""
+
+    read = read_location("<p>Grundstück zum Kauf Fuchshain,Naunhof(04683)</p>")
+
+    assert read == {"plz": "04683", "ort": "Naunhof", "ortsteil": "Fuchshain"}
+    assert location_line(read) == "Fuchshain, 04683 Naunhof"
+
+
+def test_a_name_in_front_of_the_bracket_is_two_words_at_most():
+    """Scanned leftwards, a name has no natural start: nouns are capitalised."""
+
+    read = read_location("<p>Einfamilienhaus Bad Lausick (04651)</p>")
+
+    assert read["ort"] == "Bad Lausick"
+
+
+def test_a_phrase_ending_in_hof_is_not_a_street():
+    """„zum Kauf Naunhof," in immowelt's title read as a street.
+
+    The pattern was case-insensitive as a whole, so its capital initial matched
+    „zum" too, and „-hof" is a street suffix as well as the end of a town's
+    name. Nor may a street from anywhere on the page join the location line:
+    it has to stand directly in front of it.
+    """
+
+    assert "strasse" not in read_location(f"<title>{IMMOWELT_TITLE}</title>")
+    assert "strasse" not in read_location(
+        "<p>Am Mühlberg liegt ein Garten,</p><p>der Rest folgt.</p><p>04668 Grimma</p>"
+    )
+    assert read_location("<p>Lage: Muldentalstraße, 01589 Riesa</p>")["strasse"] == (
+        "Muldentalstraße"
+    )
+
+
 def test_the_state_may_stand_where_the_place_would():
     """Kleinanzeigen writes „04668 Sachsen – Grimma": state first, place behind.
 

@@ -682,6 +682,27 @@ also "Decisions that are settled" in `CLAUDE.md`.
   Ortsteil holds two. A street stands in that slot on one portal in three, so
   the head only counts when the Gemarkungsverzeichnis knows it.
 
+- **immowelt puts the postcode behind the place, in brackets — and then the
+  broker's address won.** Its exposé titles read „Haus 49.34 m² 99000 € zum
+  Kauf Naunhof,Naunhof(04683)" — Ortsteil, Gemeinde, postcode — as the search
+  index holds them; the page itself answers our requests with DataDome's 403
+  (see `services.md`), so there is no recording, only that title. The reader
+  knew „PLZ Ort" alone: it found „04683" with a bracket behind it, took the
+  first postcode that *was* followed by a name, which is the broker's at the
+  foot of the page, and composed „zum Kauf Naunhof, 04463 Großpösna, Sachsen"
+  (25.09.2026, reported off the bookmarklet). Two faults in one line. The
+  street pattern was case-insensitive as a whole, so its capital initial
+  matched „zum" too, and „-hof" ends street names and town names alike; and a
+  street was searched anywhere on the page and joined to whichever postcode
+  the line had picked. Now both orders are scanned in one pass in page order,
+  the street has to stand directly in front of the line it belongs to, and
+  „Fuchshain,Naunhof(04683)" composes to „Fuchshain, 04683 Naunhof", which
+  the search reads as Gemarkung Fuchshain 144230 in Gemeinde Naunhof.
+  Leftwards from a bracket a name has no natural start — nouns are
+  capitalised too — so the place there is two words at most and the Ortsteil
+  one. **A saved immowelt page would settle what the body says**; it is the
+  one portal the reader has met without a recording.
+
 - **A compound Ortsteil is two Gemarkungen, and the Gemeinde is what makes
   splitting it safe.** „Burghausen-Rückmarsdorf" is no Gemarkung; Burghausen
   145507 and Rückmarsdorf 145614 both are, both in Stadt Leipzig, and the plot

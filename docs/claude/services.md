@@ -99,7 +99,11 @@ of Overpass or a local extract, the listing portals, and the extraction model.
   project agent and with a full browser header set — identical. `robots.txt`
   allows `/expose/` and names ClaudeBot explicitly; the refusal happens before
   the server. Same shape as immobilienscout24.de, different vendor, same way
-  in: the user's own browser, so the bookmarklet.
+  in: the user's own browser, so the bookmarklet. Re-measured 25.09.2026 with
+  curl, with headless Chromium through the session proxy and with the fetch
+  tool: 403 each time, the challenge now `'rt':'c'`, a captcha. What the page
+  *is* is known only from its title in the search index, which is where its
+  „Ort(PLZ)" order was read (`parcel-search.md`).
 
 - **`ave:KatasterBezirk` will not drop its geometry.** `PROPERTYNAME` without the
   `ave:` prefix is rejected outright (`ErrorInPropertyName`); with the prefix the
