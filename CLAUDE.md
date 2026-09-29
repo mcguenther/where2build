@@ -115,6 +115,12 @@ from the user directly. Reopen only if the user asks.
   denominator (`85/1`) cannot occur in an address. Where two readings stay
   plausible — "Lessingweg 44" and "Mölkau 204" are the same shape — the answer
   says so and both local indexes are asked, rather than one being guessed.
+  How it was read is shown in the field itself, at its right edge, for every
+  kind of input — a marker whose menu overrules the reading; there is no chip
+  row. Long input becomes a pill, and only on an unmistakable signal (a paste,
+  a chosen suggestion, Enter, a space after a leading number). The suggestion
+  list and the menu open over the page, never in its flow: nothing may move
+  while someone types (the user, 26.09.2026). See `docs/claude/frontend.md`.
 - **The search decides with hard filters and orders with weights.**
   „Bestätigt“ means an *official* statement left exactly one parcel standing —
   a parcel number resolved against ALKIS, the Gemarkung, `ave:flaeche` when the
@@ -257,7 +263,8 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 805 passed, 60 skipped (793 and 72 where Tesseract is missing). With `TEST_DATABASE_URL` pointed at a
+- `pytest`: 796 passed, 72 skipped where Tesseract is missing, as measured on
+  29.09.2026 (805 and 60 with it before three extraction tests were added). With `TEST_DATABASE_URL` pointed at a
   real Postgres the account store and the administration area run too; they are
   skipped rather than mocked because what they check is the database's own
   behaviour. Of the rest, one needs pyosmium, which only the index builder
@@ -265,7 +272,7 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
   never run two suites at once here. Three Tesseract tests failed on a run
   sharing the machine with another pytest, and they failed exactly as a
   photograph of a lawn does: an empty reading, past the 30 s timeout.
-- `vitest`: 745 passed — plus the integration file, excluded by `npm run test`
+- `vitest`: 799 passed — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
 - `scripts/bookmarklet.mjs`: the handover across two origins, against the built
   app and a backend on :8000. It asserts the coordinate, which is the field

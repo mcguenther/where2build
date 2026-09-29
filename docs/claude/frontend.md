@@ -90,10 +90,19 @@ that collapsed at 390 px. None of them threw.
   from where the caret is. Name first, category small and grey on the right,
   context underneath.
 
-- **An absolutely positioned dropdown inside a `.panel` is clipped.** `.panel`
-  carries `overflow: hidden` to keep map canvases off its rounded corners, so
-  the search suggestions were cut after the first row. The list is in the flow
-  instead — it pushes the hint down, and no ancestor can cut it.
+- **An absolutely positioned dropdown inside a `.panel` is clipped — and one in
+  the flow makes the page jump.** `.panel` carries `overflow: hidden` to keep
+  map canvases off its rounded corners, so the search suggestions were first
+  cut after the first row, then moved into the flow, where they pushed
+  everything below the field down with every hit that arrived. The user ruled
+  that out on 26.09.2026: nothing may move while someone types. The list and
+  the reading menu now open in the browser's top layer (`popover="manual"`,
+  placed with fixed coordinates by `lib/floating.js`), which no ancestor clips —
+  the start page's reception has an `overflow: hidden` of its own. Without the
+  Popover API (jsdom) they fall back to absolute placement, and `QueryBox` sets
+  `overflow: visible` on itself for that case. What *stays* after an action — the
+  coordinate's map preview — may push the page, because it follows a paste or
+  an Enter somebody did on purpose.
   The same `overflow: hidden` eats a table that grew a column: at 390 px the
   surroundings table was 438 px wide inside a 340 px panel, so „Strecke“ was
   simply gone — with no scrollbar, and with the page's own `scrollWidth`
@@ -139,6 +148,25 @@ that collapsed at 390 px. None of them threw.
   a real parcel, a wrong answer, and nothing on screen to show the
   difference. Clearing now resets the number, the district and the insisted
   reading together.
+
+- **Text becomes a block only on an unmistakable signal.** `QueryBox` turns a
+  paste, a chosen suggestion, an Enter, or a space after a number at the very
+  start into a pill — never a space after a word, never an exact match while
+  typing. Measured in `backend/data/gemarkungen-sachsen.json`: 2 165 of the
+  5 339 Saxon Gemarkung names contain a space, and „Altstadt" is the start of
+  „Altstadt Borna", „Altstadt I" and „Altstadt II"; „Mölkau" can still become
+  „Mölkauer Straße". A number without a denominator waits for the letter after
+  the space: „3044 85/1" is a district key and a number.
+
+- **A value that goes "" → "x" → "" inside one flush never reaches a child's
+  watcher.** `QueryBox` cut the number off the text in the same watcher run in
+  which the text arrived, so `PlotSearch` saw its `modelValue` stay "" and kept
+  showing „85/1 " — and Backspace, which only acts on an empty field, did
+  nothing. The replacement text is set a tick later.
+
+- **A scoped `:global(a) b` compiles to just `a`.** The coordinate preview's
+  first dark-mode rule was written that way and inverted the whole page instead
+  of the map tiles; only a screenshot showed it.
 
 - **A button passed into another component's slot is not a flex child of your
   own box.** `QueryBox` puts its button into `PlotSearch`'s field through a
