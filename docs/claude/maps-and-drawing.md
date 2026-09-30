@@ -390,3 +390,20 @@ routines under it.
   `select(null)` for every release off the footprint, and `PlotView` used to
   answer that with the plot tab — so pinning a finding from the plan closed
   the list it was pinned in. Only the building tab closes on it now.
+- **A section is cut where the building is nearest, not through the middle
+  of its stretch.** Through the middle the Nr. 46 section read 2,37 m and
+  „0,63 m ins Fenster" right under a finding that said 2,33 and 0,67 — two
+  true numbers for two different places, and they read as a contradiction.
+  `sectionThrough` now cuts at the arc length of the nearest point pair,
+  clamped into the facing stretch; a test holds the section's gap and zone
+  depth to the finding's.
+- **An inline drawing is scaled to its column; only a phone scrolls it.** The
+  strips and sections carry their natural width in `--w` and `max-width:
+  100%` above 520 px, so the 336 px column never cuts „Fenster 7,5 m" or
+  „0,67 m ins Fenster" at its edge. Below that they keep their scale and
+  scroll, and a label beside an interval moves to its other side where it
+  would run off the drawing.
+- **The band's labels are placed, not pinned.** „Straßengrenze, verlängert"
+  sat on house 50a. Each band label offers positions along the street from
+  the ends inwards and takes the first that clears the house numbers, the
+  markers and the band's own houses; one that fits nowhere is left out.
