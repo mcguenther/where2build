@@ -882,8 +882,10 @@ export default {
         return { x1: a.x, y1: a.y, x2: b.x, y2: b.y, reference };
       };
       const depths = [band.front.min, band.front.max, band.rear.max];
+      // The deepest line is written at the other end: 37,6 and 45,0 m lie
+      // close enough together that two labels at one end run into each other.
       const labels = depths.map((depth, i) => {
-        const q = this.p(street.at(BAND_WINDOW_M - 6, depth));
+        const q = this.p(street.at(i === 2 ? -(BAND_WINDOW_M - 6) : BAND_WINDOW_M - 6, depth));
         return { x: q.x, y: q.y - 5, text: i === 2 ? `bis ${num(depth, 1)} m` : `${num(depth, 1)} m`, tone: "band" };
       });
       const q = this.p(street.at(-BAND_WINDOW_M + 14, 0));
