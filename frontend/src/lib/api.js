@@ -291,6 +291,15 @@ export const neighbourBuildings = (lat, lon, umkreis_m = 80) =>
 export const siteChecks = ring =>
   request("/site-checks", { method: "POST", body: JSON.stringify({ ring }) });
 
+/**
+ * The Bauleitplanung RAPIS Sachsen records for a parcel outline: plans in
+ * force or in procedure, § 34 statutes and the FNP. Same ring as
+ * `siteChecks`. An upstream failure throws with the backend's German
+ * `detail` — it must never read as „kein Bebauungsplan".
+ */
+export const planning = ring =>
+  request("/planning", { method: "POST", body: JSON.stringify({ ring }) });
+
 export const landValue = (lat, lon) =>
   request(`/landvalue?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`);
 

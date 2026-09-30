@@ -1,0 +1,38 @@
+{
+  "bebauungsplaene": [
+    {
+      "name": "V-BPlan Nr. 424 Handels- und Dienstleistungszentrum Mölkau-Mitte",
+      "status": "im Verfahren",
+      "verfahrensstand": "im Verfahren",
+      "rechtsgrundlage": "§12 BauGB",
+      "plantyp": "S",
+      "gemeinde": "Leipzig, Stadt",
+      "standort": "SB Ost, OT Mölkau",
+      "art_der_nutzung": [
+        "Sondergebiet Handel"
+      ],
+      "planstand": "Vorentwurf",
+      "genehmigt_am": null,
+      "bekanntgemacht_am": null,
+      "info": "vorhabebez. BPl., Flst.520 Gmrk. Mölkau, Lebenmittelmarkt 1200qm Vkfl, Backshop mit Bistro 180qm, Kiosk 35qm, Arztpraxen 450qm",
+      "rok_nr": 3230077
+    }
+  ],
+  "satzungen": [],
+  "fnp": [
+    {
+      "name": "FNP der Stadt Leipzig, Fortschreibung",
+      "darstellungen": [
+        "Straßenverkehrsfläche",
+        "Wohnbaufläche"
+      ],
+      "gemeinde": "Leipzig, Stadt",
+      "bekanntgemacht_am": "2015-05-16",
+      "info": "wirksam 16.05.2015, letzte Änd.Verfahren 2023"
+    }
+  ],
+  "datenstand": "2026-09-28",
+  "quelle": "RAPIS Sachsen 09/2026, Landesdirektion Sachsen — dl-de/by-2-0",
+  "quelle_url": "https://rapis.sachsen.de",
+  "hinweis": "RAPIS führt Bauleitpläne und Satzungen nach Kenntnisstand der Landesdirektion Sachsen und ist nachweislich nicht vollständig: ein fehlender Eintrag heißt „kein bekannter Plan“, nicht „kein Plan“. Keine rechtsverbindliche Auskunft — verbindlich ist die städtebauliche Auskunft der Gemeinde."
+}

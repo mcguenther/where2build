@@ -272,3 +272,51 @@ export function houseCheckFinding(check) {
   }
   return { ...base, sentences: ["Baukörper liegt im Bebauungsfenster.", nearest].filter(Boolean) };
 }
+
+/** Said beside the reading switch: why the default is the one it is. */
+export const READING_DEFAULT_REASON = "Voreingestellt ist „Abstand nötig“: die vorsichtige Lesart zeigt nie mehr "
+  + "bebaubare Fläche, als es geben könnte.";
+
+/** „Nr. 42" out of „Lessingweg 42"; null where the address carries no number. */
+function numberOf(address) {
+  const match = /\s(\d+\s*[a-zA-Z]?)$/.exec(String(address ?? "").split(",")[0].trim());
+  return match ? `Nr. ${match[1].replace(/\s+/g, "")}` : null;
+}
+
+/**
+ * A boundary's heading. A side is named after the house it faces where that
+ * house has a number — „Seite zu Nr. 42" says more than „linke Seite" —
+ * and after the side seen from the street otherwise.
+ */
+export function boundaryHeading(boundary, analysis) {
+  if (!boundary) return "—";
+  if (boundary.kind === "street") return "Zur Straße";
+  if (boundary.kind === "rear") return "Hinten";
+  const worst = boundary.facing.find(f => f.class === boundary.status) ?? boundary.facing[0];
+  const building = worst && analysis?.buildings?.find(b => b.id === worst.buildingId);
+  const number = building && building.class !== CLASS_ACCESSORY ? numberOf(building.address) : null;
+  if (number) return `Seite zu ${number}`;
+  return boundary.kind === "left" ? "Linke Seite (von der Straße gesehen)" : "Rechte Seite (von der Straße gesehen)";
+}
+
+/** The status of a boundary in the words of the building list. */
+export function boundaryStatusLabel(boundary) {
+  if (!boundary || boundary.status === CLASS_CLEAR) return "frei";
+  return NEIGHBOURHOOD_STATUS_LABELS[boundary.status];
+}
+
+/** The line under a boundary that nothing stands close to. */
+export function clearBoundarySentence(boundary) {
+  if (!boundary) return null;
+  return `Kein Gebäude steht näher als ${THREE} an dieser Grenze (${metres(boundary.length, 1)}).`;
+}
+
+/** „Schnitt 1 · Lessingweg 42, 20,2 m hinter der Straße". */
+export function sectionHeading(section, index, analysis) {
+  const building = analysis?.buildings?.find(b => b.id === section.buildingId);
+  const name = building?.address || noun(building ?? {});
+  const where = section.boundary === "left" || section.boundary === "right"
+    ? `, ${metres(section.at, 1)} hinter der Straße`
+    : section.boundary === "rear" ? ", an der hinteren Grenze" : ", an der Straßengrenze";
+  return `Schnitt ${index + 1} · ${name}${where}`;
+}
