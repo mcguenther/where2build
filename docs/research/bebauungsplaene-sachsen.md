@@ -149,6 +149,11 @@ layers, and the statutes. The same holds for all of `WFS_BPLAN` 2–8, among the
  'INFO_VG': 'Teile von 1.Änderung überplant (2014)'}
 ```
 
+The dates above were read as UTC and are one day early: the layers declare
+`Europe/Berlin` (the FNP's own text says „wirksam 16.05.2015“ for the same
+reading), so E-215 was approved on 08.03.1995 and published on 05.05.1995.
+`backend/app/services/rapis.py` converts accordingly (checked 30.09.2026).
+
 Layer 2 at the same point returns `THEMA_DET: 'Wohnbaufläche (W)'`, so the
 silence at Mölkau 204 is a statement, not an empty layer.
 
