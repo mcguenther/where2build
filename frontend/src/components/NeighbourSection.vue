@@ -5,7 +5,7 @@
        inventing one. Under the ground line, from the top: our setback, the
        neighbour's 3 m and the 6-m-Zone. -->
   <div class="scroll-x">
-    <svg :viewBox="`0 0 ${width} ${HEIGHT}`" :width="width" :height="HEIGHT" role="img"
+    <svg :viewBox="`0 0 ${width} ${HEIGHT}`" :style="{ '--w': `${width}px` }" role="img"
          :aria-label="`Schnitt ${index + 1} durch ${title}, Höhe unbekannt`">
       <defs>
         <pattern :id="`${id}-hint`" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
@@ -49,8 +49,8 @@
       <template v-for="(iv, i) in zone" :key="`z${i}`">
         <rect :x="left(iv[0], iv[1])" :y="LANE[2]" :width="span(iv[0], iv[1])" :height="LANE_H" :fill="`url(#${id}-zone)`" />
         <rect class="sc-zone-edge" :x="left(iv[0], iv[1])" :y="LANE[2]" :width="span(iv[0], iv[1])" :height="LANE_H" />
-        <text class="sc-text sc-text--zone sc-halo" :x="left(iv[0], iv[1]) + span(iv[0], iv[1]) + 5" :y="LANE[2] + 11"
-              text-anchor="start">{{ metres(iv[1] - iv[0]) }} ins Fenster</text>
+        <text class="sc-text sc-text--zone sc-halo" :x="beside(iv[0], iv[1], zoneText(iv)).x" :y="LANE[2] + 11"
+              :text-anchor="beside(iv[0], iv[1], zoneText(iv)).anchor">{{ zoneText(iv) }}</text>
       </template>
 
       <!-- The walls, schematic. -->
@@ -96,6 +96,8 @@ const LANE = [GROUND + 8, GROUND + 30, GROUND + 52];
 const LANE_H = 14;
 const PAD = 16;
 const GUTTER = 150;
+/* Roughly one character of the 10 px mono labels. */
+const CHAR_PX = 6.1;
 
 export default {
   name: "NeighbourSection",
@@ -163,7 +165,7 @@ export default {
     theirsLabel() {
       const t = this.theirs;
       if (!t) return { x: 0, anchor: "start" };
-      return this.flip ? { x: this.X(t.to) - 5, anchor: "end" } : { x: this.X(t.to) + 5, anchor: "start" };
+      return this.beside(t.from, t.to, `3 m von ${this.neighbourName}`);
     },
     zone() { return this.building?.zoneApplies ? this.section.zone : []; },
     walls() {
@@ -193,14 +195,27 @@ export default {
     },
     left(a, b) { return Math.min(this.X(a), this.X(b)); },
     span(a, b) { return Math.abs(this.X(b) - this.X(a)); },
-    mid(a, b) { return (this.X(a) + this.X(b)) / 2; }
+    mid(a, b) { return (this.X(a) + this.X(b)) / 2; },
+    zoneText(iv) { return `${metres(iv[1] - iv[0])} ins Fenster`; },
+    /** A label next to an interval: after it where it fits in the drawing,
+     *  before it where it would run off the edge and lose its number. */
+    beside(a, b, text) {
+      const room = text.length * CHAR_PX + 5;
+      const right = this.left(a, b) + this.span(a, b);
+      if (right + room <= this.width - 2) return { x: right + 5, anchor: "start" };
+      return { x: this.left(a, b) - 5, anchor: "end" };
+    }
   }
 };
 </script>
 
 <style scoped>
+/* Drawn at its own scale where there is room, scaled down to the column
+   where there is not — a label cut off at the edge hid its number. Only on a
+   phone does it keep its scale and scroll sideways in its own box. */
 .scroll-x{ overflow-x: auto; overscroll-behavior-x: contain; max-width: 100%; }
-.scroll-x svg{ display: block; max-width: none; height: auto; }
+.scroll-x svg{ display: block; width: var(--w); max-width: 100%; height: auto; }
+@media (max-width: 520px){ .scroll-x svg{ max-width: none; } }
 .sc-sky{ fill: var(--w2b-surface); }
 .sc-soil{ fill: var(--w2b-map-soil); }
 .sc-plot{ fill: var(--w2b-map-surface); }

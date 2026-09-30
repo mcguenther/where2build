@@ -856,14 +856,39 @@ export default {
           if (inFrame(q)) labels.push({ x: q.x, y: q.y + 4, text: "möglicherweise bebaubar", tone: "built" });
         }
       }
-      if (this.frame === "street" && this.bandShapes) labels.push(...this.bandShapes.labels);
-
       const markerList = this.neighbourMarkers.map(m => {
         const b = analysis.buildings.find(x => x.id === m.buildingId);
         if (!b) return null;
         const q = this.p(ringCentre(b.ring));
         return { id: b.id, marker: m.marker, title: m.title, x: q.x, y: q.y, active: this.activeBuilding === b.id };
       }).filter(Boolean);
+
+      /* The band's labels go where they clear the house numbers and the
+         markers already placed, trying each position a label offers; one that
+         fits nowhere is left out, the way the parcel numbers are.
+         „Straßengrenze, verlängert" sat on 50a before. */
+      if (this.frame === "street" && this.bandShapes) {
+        const box = l => ({ x: l.x - l.text.length * LABEL_CHAR_WIDTH / 2, y: l.y - 10,
+          w: l.text.length * LABEL_CHAR_WIDTH, h: 13 });
+        const outline = b => {
+          const q = b.ring.map(v => this.p(v));
+          const xs = q.map(v => v.x), ys = q.map(v => v.y);
+          return { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
+        };
+        const taken = [
+          ...labels.map(box), ...markerList.map(m => ({ x: m.x - 12, y: m.y - 12, w: 24, h: 24 })),
+          // The houses the band is measured from are what the lines point at.
+          ...analysis.buildings.filter(b => band.has(b.id)).map(outline)
+        ];
+        const clash = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+        for (const label of this.bandShapes.labels) {
+          const spot = label.candidates.map(c => ({ ...c, text: label.text }))
+            .find(c => inFrame(c) && !taken.some(t => clash(box(c), t)));
+          if (!spot) continue;
+          taken.push(box(spot));
+          labels.push({ x: spot.x, y: spot.y, text: label.text, tone: label.tone });
+        }
+      }
 
       return {
         ground: analysis.buildings.filter(b => b.class !== "own").map(shape),
@@ -884,12 +909,21 @@ export default {
       const depths = [band.front.min, band.front.max, band.rear.max];
       // The deepest line is written at the other end: 37,6 and 45,0 m lie
       // close enough together that two labels at one end run into each other.
-      const labels = depths.map((depth, i) => {
-        const q = this.p(street.at(i === 2 ? -(BAND_WINDOW_M - 6) : BAND_WINDOW_M - 6, depth));
-        return { x: q.x, y: q.y - 5, text: i === 2 ? `bis ${num(depth, 1)} m` : `${num(depth, 1)} m`, tone: "band" };
+      // Positions along the street, from the ends inwards: the first that
+      // clears the house numbers, the markers and the band's houses wins.
+      const along = [];
+      for (let a = BAND_WINDOW_M - 6; a >= 0; a -= 6) along.push(a, -a);
+      const at = (a, depth, lift) => { const q = this.p(street.at(a, depth)); return { x: q.x, y: q.y - lift }; };
+      // The deepest line starts at the other end: 37,6 and 45,0 m lie close
+      // enough together that two labels at one end run into each other.
+      const labels = depths.map((depth, i) => ({
+        candidates: (i === 2 ? along.map(a => -a) : along).map(a => at(a, depth, 5)),
+        text: i === 2 ? `bis ${num(depth, 1)} m` : `${num(depth, 1)} m`, tone: "band"
+      }));
+      labels.push({
+        candidates: along.map(a => -a).map(a => at(a, 0, 6)),
+        text: "Straßengrenze, verlängert", tone: "quiet"
       });
-      const q = this.p(street.at(-BAND_WINDOW_M + 14, 0));
-      labels.push({ x: q.x, y: q.y - 6, text: "Straßengrenze, verlängert", tone: "quiet" });
       return {
         strip: band.strip ? this.path(band.strip) : null,
         lines: [line(0, true), ...depths.map(d => line(d))],

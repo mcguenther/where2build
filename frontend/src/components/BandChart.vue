@@ -3,7 +3,7 @@
        each, and under them our Bestand and our plot with its envelope. The
        band is orientation for § 34, never a limit. -->
   <div class="scroll-x">
-    <svg :viewBox="`0 0 ${width} ${height}`" :width="width" :height="height" role="img"
+    <svg :viewBox="`0 0 ${width} ${height}`" :style="{ '--w': `${width}px` }" role="img"
          aria-label="Wie weit die Nachbarhäuser hinter der Straße stehen">
       <template v-if="band.front && band.rear">
         <rect class="bc-band" :x="X(band.front.min)" :y="TOP - 6"
@@ -73,8 +73,12 @@ export default {
 </script>
 
 <style scoped>
+/* Drawn at its own scale where there is room, scaled down to the column
+   where there is not — a label cut off at the edge hid its number. Only on a
+   phone does it keep its scale and scroll sideways in its own box. */
 .scroll-x{ overflow-x: auto; overscroll-behavior-x: contain; max-width: 100%; }
-.scroll-x svg{ display: block; max-width: none; height: auto; }
+.scroll-x svg{ display: block; width: var(--w); max-width: 100%; height: auto; }
+@media (max-width: 520px){ .scroll-x svg{ max-width: none; } }
 .bc-band{ fill: var(--w2b-map-band); }
 .bc-band-front{ fill: var(--w2b-map-band-strong); }
 .bc-name{ font-family: var(--w2b-font-mono); font-size: 10px; fill: var(--w2b-graphite); }

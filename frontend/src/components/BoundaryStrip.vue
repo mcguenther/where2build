@@ -4,7 +4,7 @@
        the 6-m-Zone and the envelope. Wider than a column, so it scrolls
        sideways in its own box. -->
   <div ref="box" class="scroll-x">
-    <svg v-if="frameOf" :viewBox="`0 0 ${width} ${height}`" :width="width" :height="height" role="img"
+    <svg v-if="frameOf" :viewBox="`0 0 ${width} ${height}`" :style="{ '--w': `${width}px` }" role="img"
          :aria-label="`${title}, gerade gezogen, ${metres(frameOf.length, 1)}`">
       <defs>
         <pattern :id="`${id}-hint`" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
@@ -67,6 +67,8 @@ const UP_M = 5.2;
 const DOWN_M = 7.2;
 const LEFT_PX = 18;
 const TOP_PX = 22;
+/* Roughly one character of the 10,5 px mono labels. */
+const CHAR_PX = 6.4;
 
 export default {
   name: "BoundaryStrip",
@@ -121,16 +123,18 @@ export default {
       const out = [];
       for (const b of this.facing) {
         const mid = (Math.max(b.facing.span.from, -3) + Math.min(b.facing.span.to, f.length + 3)) / 2;
-        out.push({ x: Math.max(4, this.X(mid) - 50), y: TOP_PX - 7, anchor: "start",
-          text: `${shortName(b)} · ${metres(b.gap)}` });
+        const name = `${shortName(b)} · ${metres(b.gap)}`;
+        out.push({ x: this.within(this.X(mid) - 50, name.length * CHAR_PX, false), y: TOP_PX - 7, anchor: "start", text: name });
         if (b.zoneApplies && b.zone) {
-          out.push({ x: this.X((b.facing.face.from + b.facing.face.to) / 2), y: this.lineY + 4.6 * this.scale + 4,
-            text: `6-m-Zone · bis ${metres(b.zone.depthFromBoundary)}`, tone: "zone" });
+          const text = `6-m-Zone · bis ${metres(b.zone.depthFromBoundary)}`;
+          out.push({ x: this.within(this.X((b.facing.face.from + b.facing.face.to) / 2), text.length * CHAR_PX, true),
+            y: this.lineY + 4.6 * this.scale + 4, text, tone: "zone" });
         }
         const strip = b.reading === READING_BOUNDARY ? this.analysis.maybeBuildable.find(m => m.buildingId === b.id) : null;
         if (strip) {
-          out.push({ x: this.X((b.facing.face.from + b.facing.face.to) / 2), y: this.lineY + 1.5 * this.scale + 4,
-            text: "möglicherweise bebaubar", tone: "built" });
+          const text = "möglicherweise bebaubar";
+          out.push({ x: this.within(this.X((b.facing.face.from + b.facing.face.to) / 2), text.length * CHAR_PX, true),
+            y: this.lineY + 1.5 * this.scale + 4, text, tone: "built" });
         }
       }
       return out;
@@ -153,6 +157,11 @@ export default {
   methods: {
     metres,
     X(u) { return LEFT_PX + u * this.scale; },
+    /** Keep a label of `length` px inside the drawing, centred or left-set. */
+    within(x, length, centred) {
+      const lo = centred ? length / 2 + 2 : 2, hi = this.width - (centred ? length / 2 : length) - 2;
+      return Math.max(lo, Math.min(hi, x));
+    },
     Y(w) { return this.lineY - w * this.scale; },
     tr(ring) {
       const f = this.frameOf;
@@ -168,8 +177,12 @@ export default {
 </script>
 
 <style scoped>
+/* Drawn at its own scale where there is room, scaled down to the column
+   where there is not — a label cut off at the edge hid its number. Only on a
+   phone does it keep its scale and scroll sideways in its own box. */
 .scroll-x{ overflow-x: auto; overscroll-behavior-x: contain; max-width: 100%; }
-.scroll-x svg{ display: block; max-width: none; height: auto; }
+.scroll-x svg{ display: block; width: var(--w); max-width: 100%; height: auto; }
+@media (max-width: 520px){ .scroll-x svg{ max-width: none; } }
 .st-ground{ fill: var(--w2b-map-ground); }
 .st-parcel{ fill: var(--w2b-map-surface); }
 .st-setback{ fill: var(--w2b-map-setback); }

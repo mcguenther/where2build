@@ -268,6 +268,10 @@ describe("Grenze ansehen und Im Schnitt", () => {
     expect(open()).toHaveLength(1);
     expect(finding(w, "Lessingweg 46").find(".aufklapp").text()).toContain("Schnitt");
     expect(finding(w, "Lessingweg 46").find(".aufklapp").text()).toContain("Höhe unbekannt");
+    // The section's figures are the finding's: 2,33 m gap, 0,67 m into the envelope.
+    expect(finding(w, "Lessingweg 46").find(".befund__text").text()).toContain("2,33 m vor unserer Grenze");
+    expect(finding(w, "Lessingweg 46").find(".aufklapp").text()).toContain("2,33 m");
+    expect(finding(w, "Lessingweg 46").find(".aufklapp").text()).toContain("0,67 m ins Fenster");
     expect(plan(w).props("neighbourHighlight")).toEqual({ section: expect.any(Number) });
     expect(w.find(".nb-section__line").exists()).toBe(true);
     // A section never states a height.
@@ -321,6 +325,17 @@ describe("Ausschnitt", () => {
     expect(plan(w).vm.view.scale).toBeLessThan(neighboursScale);
     expect(w.find(".nb-band").exists()).toBe(true);
     expect(w.findAll(".nb-building.is-band").length).toBe(6);
+    // The band's labels stay off the house numbers they would hide.
+    const labels = w.findAll(".nb-label").map(l => ({
+      text: l.text(), x: Number(l.attributes("x")), y: Number(l.attributes("y"))
+    }));
+    const reference = labels.find(l => l.text === "Straßengrenze, verlängert");
+    expect(reference).toBeTruthy();
+    for (const other of labels.filter(l => l !== reference && /^\d/.test(l.text) && !l.text.endsWith(" m"))) {
+      const apart = Math.abs(other.x - reference.x) > (reference.text.length + other.text.length) * 3.3
+        || Math.abs(other.y - reference.y) > 13;
+      expect(apart, `„${other.text}“ unter dem Straßenlabel`).toBe(true);
+    }
 
     await tab(w, "Bebauung").trigger("click");
     expect(plan(w).props("frame")).toBe("plot");
