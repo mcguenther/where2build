@@ -370,3 +370,23 @@ routines under it.
   so the § 34 band takes only houses on the plot's own street (by name) and on
   its side of the street edge's line (geometrically): six on the Lessingweg,
   5,2–37,6 m behind the street, as deep as 45,0 m.
+
+- **A change of frame is animated through the fit, not through a CSS
+  transform.** The „Nachbarschaft" tab frames the plot with its facing
+  buildings („Nachbarn") or ±60 m of street („Straße"); `SitePlan` interpolates
+  `tweenFit` (scale on a log scale, centre linearly, 560 ms) and everything —
+  drawing and MapLibre camera alike — projects through `view`, so the backdrop
+  follows frame by frame and the outline stays on its parcel (checked on the
+  „Karte" ground on 30.09.2026, both frames). Only a change of *frame key*
+  (frame plus whether an analysis is there) animates; a resize or another
+  reading refits and jumps, and so does everything under
+  `prefers-reduced-motion`. jsdom has no `matchMedia`, which reads as reduced
+  motion, so the view tests see the jump; the tween test stubs both
+  `matchMedia` and `requestAnimationFrame`.
+- **Dimension chains are for the plot frame.** Zoomed out to the neighbours
+  the chains wrote over the markers and the zones, and at ±60 m they were a
+  grey knot; `dimensionsVisible` is false outside `frame === "plot"`.
+- **A marker in the plan is a click beside the house.** `SitePlan` emits
+  `select(null)` for every release off the footprint, and `PlotView` used to
+  answer that with the plot tab — so pinning a finding from the plan closed
+  the list it was pinned in. Only the building tab closes on it now.
