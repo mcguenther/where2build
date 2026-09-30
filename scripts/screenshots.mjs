@@ -90,14 +90,18 @@ let vectorTiles = 0;
 const countTiles = page =>
   page.on("response", r => { if (/\/api\/basemap\/.*\.pbf/.test(r.url()) && r.status() < 400) vectorTiles++; });
 
-/* The Gemarkung is picked from the register now, not typed into a blank line:
- * the field carries a generated id, so it is addressed by its label, and the
- * entry only counts once one of the offered districts is chosen. */
-async function pickDistrict(page, name) {
-  // The label alone is ambiguous: the source radio and the result list carry it too.
-  await page.getByRole("combobox", { name: "Gemarkung" }).fill(name);
-  await page.waitForSelector(".gemarkung__treffer", { timeout: 30000 });
-  await page.locator(".gemarkung__treffer").first().click();
+/* A parcel is typed the way a person has it in front of them: the number,
+ * a space -- which turns a leading number into a block -- and then the
+ * Gemarkung, picked from the register the field offers. The row counts only
+ * once it is chosen; typing the full name makes no block by itself. */
+async function enterParcel(page, number, district) {
+  await page.fill(QUERY_FIELD, `${number} `);
+  await page.waitForSelector(".query-box .pill", { timeout: 10000 });
+  await page.fill(QUERY_FIELD, district);
+  const row = page.locator(".search__hits .hit", { has: page.locator(".hit__name", { hasText: district }) }).first();
+  await row.waitFor({ timeout: 30000 });
+  await row.click();
+  await page.waitForSelector(".query-box .pill--done", { timeout: 10000 });
 }
 
 /* The one field everything goes into. Named rather than repeated: it is the
@@ -107,14 +111,12 @@ const QUERY_FIELD = ".query-box input[role=\"combobox\"]";
 
 /* There is no example data any more: every screenshot needs a plot that was
  * really resolved through ALKIS first. This is the app's own way in, from the
- * start page: a bare parcel number is read as one, which unfolds the district
- * beside it, and the start page hands the pair to the wizard. Starting here
+ * start page: a parcel number and its Gemarkung, built as two blocks in the
+ * one field, and the start page hands the pair to the wizard. Starting here
  * rather than at „Grundstück hinzufügen" is not only shorter -- it is the
  * route a person takes, and it exercises the hand-off. */
 async function addPlot(page) {
-  await page.fill(QUERY_FIELD, "85/1");
-  await page.waitForSelector("#q-parcel-number", { timeout: 10000 });
-  await pickDistrict(page, "Liebertwolkwitz");
+  await enterParcel(page, "85/1", "Liebertwolkwitz");
   await page.getByRole("button", { name: "Grundstück finden" }).click();
   await page.waitForSelector(".wizard__preview, .site-plan", { timeout: 60000 });
 }
@@ -206,7 +208,18 @@ async function nav(page, name) {
   await page.waitForTimeout(150);
 }
 
+/* A thumbnail's ground is one image that stays invisible until it has loaded
+ * and then fades in, so a picture taken before that shows flat paper and
+ * passes. Waited for, bounded, and reported rather than photographed. */
+async function groundsSettled(page, name) {
+  const settled = await page.waitForFunction(
+    () => !document.querySelector('[data-ground="loading"]'), null, { timeout: 30000 }
+  ).then(() => true, () => false);
+  if (!settled) problems.push(`${name}: Umgebungsbild einer Vorschau kam nicht an`);
+}
+
 async function shot(page, name, mode, zusatz = "") {
+  await groundsSettled(page, `${name}/${mode}`);
   await page.waitForTimeout(340);
   // A layout that pushes the page sideways is a defect, and no screenshot shows it.
   const overflow = await page.evaluate(() =>
@@ -220,6 +233,7 @@ async function shot(page, name, mode, zusatz = "") {
 /** One section of a page rather than all of it — for a part that lives far
  *  down a long page, where a full-page picture is mostly everything else. */
 async function shotOf(page, selector, name, mode, zusatz = "") {
+  await groundsSettled(page, `${name}/${mode}`);
   await page.waitForTimeout(340);
   const overflow = await page.evaluate(() =>
     document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -266,7 +280,7 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
      needs no model — the text is read with patterns and the Gemarkung
      register — so it runs here even without an LLM key. */
   // Nothing is switched on first: a few sentences are read as a description
-  // text by themselves, and the chip says so. Typed prose goes through the
+  // text by themselves, and the marker says so. Typed prose goes through the
   // same reader as a pasted page, and straight on into the search: what was
   // read rides along folded shut inside that step.
   await page.fill(QUERY_FIELD, LISTING);
@@ -352,11 +366,9 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
 
   await page.click(".breadcrumb a");
   await page.click(".page-head .btn");
-  // A bare number is read as a parcel number, which is the one reading that
-  // unfolds a second field: without a district the number is not unique.
-  await page.fill(QUERY_FIELD, "85/1");
-  await page.waitForSelector("#q-parcel-number", { timeout: 10000 });
-  await pickDistrict(page, "Liebertwolkwitz");
+  // The number first, then its Gemarkung: the order a cadastral extract
+  // reads in, and the one that shows the half-built pill.
+  await enterParcel(page, "85/1", "Liebertwolkwitz");
   await shot(page, "assistent-2", mode, narrow ? "-schmal" : "");
   await page.getByRole("button", { name: "Grundstück finden" }).click();
   await page.waitForSelector(".site-plan", { timeout: 60000 });

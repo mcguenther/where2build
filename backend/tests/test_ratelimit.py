@@ -36,6 +36,18 @@ PNG = bytes.fromhex(
 )
 
 
+def _decodable_png() -> bytes:
+    """One Pillow can open: a block is stitched, not passed through."""
+
+    import io
+
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.new("RGBA", (256, 256), (0, 0, 0, 0)).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
 class Clock:
     """A clock the test winds forward itself."""
 
@@ -369,3 +381,70 @@ def test_health_says_when_there_is_no_budget(switched_off, client: TestClient):
     assert kontingent["konfiguriert"] is False
     assert "Einzelplatz" in kontingent["hinweis"]
     assert "RATELIMIT_ENABLED=true" in kontingent["hinweis"]
+
+
+@respx.mock
+def test_a_warm_up_pays_for_the_tiles_it_sends_outward(budget, client: TestClient):
+    """One call for the request, one per missing tile -- five in all here."""
+
+    route = respx.get(DOP_URL).mock(
+        return_value=httpx.Response(200, content=PNG, headers={"content-type": "image/png"})
+    )
+    tiles = {"bloecke": [{"ebene": "dop", "z": 15, "west": 17540, "nord": 10986, "ost": 17543, "sued": 10986}]}
+
+    assert client.post("/api/tiles/warm", json=tiles).status_code == 202
+    assert route.call_count == 4
+    assert client.get("/api/tiles/dop/15/17550/10986.png").status_code == 429
+
+
+@respx.mock
+def test_a_block_pays_for_the_tiles_it_sends_outward(budget, client: TestClient):
+    """One call for the request, one per tile missing from the cache -- five here."""
+
+    route = respx.get(DOP_URL).mock(
+        return_value=httpx.Response(200, content=_decodable_png(), headers={"content-type": "image/png"})
+    )
+
+    assert client.get("/api/tiles/dop/block/15/17540/10986/17543/10986.png").status_code == 200
+    assert route.call_count == 4
+    assert client.get("/api/tiles/dop/15/17550/10986.png").status_code == 429
+
+
+@respx.mock
+def test_a_cached_block_costs_one_call(budget, client: TestClient):
+    route = respx.get(DOP_URL).mock(
+        return_value=httpx.Response(200, content=_decodable_png(), headers={"content-type": "image/png"})
+    )
+    client.get("/api/tiles/dop/15/17540/10986.png")
+    client.get("/api/tiles/dop/15/17541/10986.png")
+
+    # Two calls above, then one for the block and one for the tile it lacked ...
+    assert client.get("/api/tiles/dop/block/15/17540/10986/17542/10986.png").status_code == 200
+    assert route.call_count == 3
+    # ... and the finished block again is the fifth and last.
+    assert client.get("/api/tiles/dop/block/15/17540/10986/17542/10986.png").status_code == 200
+    assert client.get("/api/tiles/dop/15/17550/10986.png").status_code == 429
+    assert route.call_count == 3
+
+
+@respx.mock
+def test_a_block_over_the_budget_fetches_nothing(budget, client: TestClient):
+    route = respx.get(DOP_URL).mock(
+        return_value=httpx.Response(200, content=_decodable_png(), headers={"content-type": "image/png"})
+    )
+
+    assert client.get("/api/tiles/dop/block/15/17540/10986/17544/10986.png").status_code == 429
+    assert route.call_count == 0
+
+
+@respx.mock
+def test_a_warm_up_over_the_budget_is_refused_whole(budget, client: TestClient):
+    route = respx.get(DOP_URL).mock(
+        return_value=httpx.Response(200, content=PNG, headers={"content-type": "image/png"})
+    )
+    tiles = {"bloecke": [{"ebene": "dop", "z": 15, "west": 17540, "nord": 10986, "ost": 17544, "sued": 10986}]}
+
+    assert client.post("/api/tiles/warm", json=tiles).status_code == 429
+    assert route.call_count == 0
+    # Refused whole means spent nothing beyond the request itself.
+    assert client.get("/api/tiles/dop/15/17540/10986.png").status_code == 200

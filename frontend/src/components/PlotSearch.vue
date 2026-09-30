@@ -7,7 +7,10 @@
            stroke-width="2" aria-hidden="true">
         <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
       </svg>
-      <input :id="fieldId" ref="input" type="text" autocomplete="off" spellcheck="false"
+      <!-- What the wrapper made of the text so far: a pill, a half of a
+           parcel. It sits where the text would, and the text goes on after it. -->
+      <slot name="lead"></slot>
+      <input v-show="!hideInput" :id="fieldId" ref="input" type="text" autocomplete="off" spellcheck="false"
              role="combobox" aria-autocomplete="list"
              :aria-controls="listId" :aria-expanded="open ? 'true' : 'false'"
              :aria-activedescendant="activeIndex >= 0 && open ? optionId(activeIndex) : null"
@@ -19,14 +22,22 @@
              @keydown.down.prevent="move(1)"
              @keydown.up.prevent="move(-1)"
              @keydown.enter.prevent="enter"
-             @keydown.esc="open = false">
+             @keydown.esc="open = false"
+             @keydown.backspace="backspace">
       <span v-if="badge && !bare" class="search__badge" :data-certain="String(reading.certain)">{{ badge }}</span>
       <!-- What sits beside the field is the wrapper's business: the wizard
            puts nothing there, the start page its button. -->
       <slot name="action"></slot>
     </div>
 
-    <ul v-show="open && hits.length" :id="listId" class="search__hits"
+    <!-- Over the page, never in it: a list in the flow pushed everything below
+         it down as the hits arrived, and the page jumped with every keystroke.
+         It sits in the browser's top layer where that exists, so no ancestor's
+         `overflow: hidden` can cut it off -- `.panel` has one, and so has the
+         start page's reception. -->
+    <ul v-show="showList" ref="list" :id="listId" class="search__hits"
+        :class="{ 'search__hits--floating': floating }" :style="listStyle"
+        :popover="floating ? 'manual' : null"
         role="listbox" aria-label="Vorschläge">
       <li v-for="(hit, i) in hits" :key="hit.key" :id="optionId(i)"
           class="hit" :class="{ 'is-active': i === activeIndex }"
@@ -66,6 +77,7 @@ import { geocode, cadastralDistricts } from "../lib/api.js";
 import { classifyQuery, queryKindLabel } from "../lib/queryInput.js";
 import { searchDistricts } from "../lib/districts.js";
 import { num } from "../lib/format.js";
+import { canFloat, placementUnder, toggleFloating } from "../lib/floating.js";
 
 /** Keystroke quiet before anything is looked up. */
 const DEBOUNCE_MS = 120;
@@ -85,9 +97,17 @@ export default {
     /** Without its own label, badge and hint — for a wrapper that carries
      *  those itself. The suggestions and the keyboard stay. */
     bare: { type: Boolean, default: false },
-    placeholder: { type: String, default: "Lessingweg 44 · Mölkau 204 · 51.33652, 12.44176" }
+    placeholder: { type: String, default: "Lessingweg 44 · Mölkau 204 · 51.33652, 12.44176" },
+    /** The wrapper shows the text as something else — a pill — and the
+     *  input steps aside. It stays mounted, so focus and the keyboard stay. */
+    hideInput: { type: Boolean, default: false },
+    /** Only the district directory is worth asking: the parcel number is
+     *  already there, and what is typed after it can only be its Gemarkung. */
+    onlyDistricts: { type: Boolean, default: false },
+    /** Nothing is worth asking: the wrapper knows what the text is. */
+    quiet: { type: Boolean, default: false }
   },
-  emits: ["select", "update:modelValue", "paste", "submit"],
+  emits: ["select", "update:modelValue", "paste", "submit", "district", "backspace", "unmatched"],
   data() {
     instances += 1;
     return {
@@ -102,23 +122,49 @@ export default {
       activeIndex: -1,
       /* Enter came before the answer it needs. Held until that answer lands,
        * and dropped by the next keystroke: it was meant for other text. */
-      takeWhenReady: false
+      takeWhenReady: false,
+      /* Where the floating list goes, measured off the field it belongs to.
+       * Without the Popover API the list falls back to an absolutely placed
+       * one, which is all a test environment needs. */
+      floating: canFloat(),
+      listStyle: null
     };
   },
   watch: {
     // The wrapper may reset or prefill the field; typing here reports back.
-    modelValue(value) { if (value !== this.text) this.text = value; }
+    modelValue(value) { if (value !== this.text) this.text = value; },
+    showList(shown) {
+      if (shown) {
+        window.addEventListener("scroll", this.place, true);
+        window.addEventListener("resize", this.place);
+        this.$nextTick(this.place);
+      } else {
+        this.unlisten();
+        toggleFloating(this.$refs.list, false);
+      }
+    },
+    // A new row changes nothing on the page, but the list may need a new cap.
+    hits() { if (this.showList) this.$nextTick(this.place); }
   },
   computed: {
     fieldId() { return `plot-search-${this.uid}`; },
     listId() { return `plot-search-${this.uid}-hits`; },
     reading() { return classifyQuery(this.text); },
     badge() { return queryKindLabel(this.reading); },
+    /** Which indexes the text is worth asking, after the wrapper had its say. */
+    wanted() {
+      if (this.quiet) return [];
+      if (this.onlyDistricts) return this.text.trim() ? ["district"] : [];
+      return this.reading.search ?? [];
+    },
+    showList() { return this.open && this.hits.length > 0; },
 
     /** The rows, in the order the reading makes plausible. */
     hits() {
       const rows = [];
       const reading = this.reading;
+      if (this.quiet) return rows;
+      if (this.onlyDistricts) return this.districts.map(entry => this.districtRow(entry));
 
       if (reading.kind === "coordinate" && reading.coordinate) {
         const c = reading.coordinate;
@@ -165,13 +211,7 @@ export default {
       }));
 
       // A district alone resolves nothing; it names the half that is missing.
-      this.districts.forEach(entry => rows.push({
-        key: `district-${entry.schluessel}`,
-        kind: "Gemarkung",
-        name: entry.name,
-        note: `${entry.schluessel} · ${entry.gemeinde}. Flurstücksnummer ergänzen`,
-        district: entry
-      }));
+      this.districts.forEach(entry => rows.push(this.districtRow(entry)));
 
       return rows;
     },
@@ -204,9 +244,45 @@ export default {
       return this.hits.length ? "" : "Nichts gefunden. Postleitzahl oder Ort ergänzen hilft oft.";
     }
   },
-  beforeUnmount() { clearTimeout(this._timer); },
+  beforeUnmount() {
+    clearTimeout(this._timer);
+    this.unlisten();
+  },
   methods: {
     optionId(index) { return `plot-search-${this.uid}-hit-${index}`; },
+
+    districtRow(entry) {
+      return {
+        key: `district-${entry.schluessel}`,
+        kind: "Gemarkung",
+        name: entry.name,
+        note: `${entry.schluessel} · ${entry.gemeinde}`,
+        district: entry
+      };
+    },
+
+    /** Put the floating list under the box the field sits in. */
+    place() {
+      const list = this.$refs.list;
+      if (!this.floating || !list || !this.showList) return;
+      const anchor = this.$el.closest("[data-list-anchor]") || this.$el;
+      this.listStyle = placementUnder(anchor.getBoundingClientRect());
+      toggleFloating(list, true);
+    },
+
+    unlisten() {
+      window.removeEventListener("scroll", this.place, true);
+      window.removeEventListener("resize", this.place);
+    },
+
+    /** Backspace in an empty field takes back what the wrapper built before
+     *  it, the way a mail client takes back the last recipient. */
+    backspace(event) {
+      if (!this.text) {
+        event.preventDefault();
+        this.$emit("backspace");
+      }
+    },
 
     type(value) {
       this.text = value;
@@ -219,8 +295,7 @@ export default {
     },
 
     async look() {
-      const reading = this.reading;
-      const wanted = reading.search ?? [];
+      const wanted = this.wanted;
       this.error = "";
       // A coordinate is answered by the reading itself; nothing to ask.
       if (!wanted.includes("address") && !wanted.includes("district")) {
@@ -306,7 +381,9 @@ export default {
       }
       const highlighted = this.hits[this.activeIndex];
       if (highlighted) return this.choose(highlighted);
-      if (!this.hits.length) return;
+      // Nothing to offer is the wrapper's to handle: a Gemarkung missing
+      // from the directory is still worth sending as typed.
+      if (!this.hits.length) return this.$emit("unmatched");
       const readings = new Set(this.hits.map(hit => (hit.kind === "Ort" ? "Adresse" : hit.kind)));
       if (readings.size === 1) return this.choose(this.hits[0]);
       this.open = true;
@@ -314,28 +391,29 @@ export default {
     },
 
     choose(hit) {
-      // A district is half an answer: it goes into the field so the parcel
-      // number can be typed after it, rather than resolving to nothing.
+      // A district is half an answer. The wrapper turns it into a block and
+      // the parcel number is typed after it; it resolves nothing on its own.
       if (hit.district) {
-        this.text = `${hit.district.schluessel} `;
-        // The field writes itself here, so the wrapper has to hear about it —
-        // otherwise it reasons about text the input no longer shows.
-        this.$emit("update:modelValue", this.text);
         this.activeIndex = -1;
+        this.districts = [];
+        this.$emit("district", hit.district);
         this.$refs.input?.focus();
         return;
       }
       this.open = false;
       this.$emit("select", {
-        query: hit.query, label: `${hit.kind}: ${hit.name}`, address: hit.address ?? null
+        query: hit.query, label: `${hit.kind}: ${hit.name}`, address: hit.address ?? null,
+        kind: hit.kind
       });
-    }
+    },
+
+    focus() { this.$refs.input?.focus(); }
   }
 };
 </script>
 
 <style scoped>
-.search{ display: flex; flex-direction: column; gap: 6px; }
+.search{ display: flex; flex-direction: column; gap: 6px; position: relative; }
 /* Without its own label the field sits inside whatever wraps it, and that
    wrapper brings the border and the padding. */
 .search--bare .search__field{ border: 0; background: none; padding: 0; }
@@ -356,6 +434,9 @@ export default {
   flex: 1; min-width: 0; border: 0; background: none; outline: none;
   padding: 9px 0; font: inherit; font-size: 15px; color: var(--w2b-ink);
 }
+/* The row around the input shows the focus; the app-wide ring on every
+   focused input would draw a second box inside it. */
+.search__field input:focus{ box-shadow: none; }
 .search__badge{
   flex: none; font-family: var(--w2b-font-mono); font-size: 10.5px;
   padding: 2px 6px; border-radius: var(--w2b-radius-xs);
@@ -363,15 +444,21 @@ export default {
 }
 .search__badge[data-certain="true"]{ background: var(--w2b-primary-veil); color: var(--w2b-primary-dark); }
 
-/* In the flow, not floating over it. A dropdown positioned absolutely is at
-   the mercy of every ancestor: `.panel` sets `overflow: hidden` to clip its
-   own rounded corners, which cut the list off after the first row. Pushing the
-   hint below it costs nothing here and cannot be clipped by anything. */
+/* Over the page, not in it. The list used to sit in the flow -- `.panel`
+   clips an absolutely placed one -- and pushed everything below it down with
+   every hit that arrived. In the top layer nothing clips it; without the
+   Popover API it is placed absolutely under the field, and the box it sits in
+   lets it out (see QueryBox). */
 .search__hits{
-  margin: 4px 0 0; padding: 4px; list-style: none; max-height: 19rem; overflow-y: auto;
+  position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 40;
+  margin: 0; padding: 4px; list-style: none; max-height: 19rem; overflow-y: auto;
   background: var(--w2b-surface); border: 1px solid var(--w2b-line);
-  border-radius: var(--w2b-radius-s);
+  border-radius: var(--w2b-radius-s); box-shadow: var(--w2b-shadow-high);
+  color: var(--w2b-ink);
 }
+.search__hits--floating{ position: fixed; inset: auto; right: auto; }
+/* The user agent centres a popover in the viewport; `place()` sets where. */
+.search__hits--floating:popover-open{ margin: 0; }
 .hit{
   display: grid; grid-template-columns: 1fr auto; gap: 1px var(--w2b-space-3);
   padding: 6px 9px; border-radius: var(--w2b-radius-xs); cursor: pointer;

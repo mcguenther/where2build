@@ -63,7 +63,7 @@
         <div class="plan-figures">
           <figure v-for="p in selectedPlots" :key="p.id" class="plan-figure">
             <button type="button" class="plan-figure__button" :aria-label="`${p.name} öffnen`" @click="open(p.id)">
-              <PlotThumbnail :plot="p" :width="220" :height="280" :scale="sharedScale" />
+              <PlotThumbnail :plot="p" :width="frame.width" :height="frame.height" :scale="sharedScale" />
             </button>
             <figcaption>
               <span>{{ p.gemarkung }}</span>
@@ -84,18 +84,21 @@
 import PlotThumbnail from "../components/PlotThumbnail.vue";
 import { state, destinationName } from "../lib/store.js";
 import { plotMetrics } from "../lib/metrics.js";
-import { sharedThumbnailScale } from "../lib/thumbnail.js";
+import { COMPARE_FRAME, sharedThumbnailScale } from "../lib/thumbnail.js";
 import { area, euro, euroPerSqm, percent, num, duration } from "../lib/format.js";
 
 export default {
   name: "CompareView",
   components: { PlotThumbnail },
+  data() {
+    return { frame: COMPARE_FRAME };
+  },
   computed: {
     selectedPlots() { return state.data.plots.filter(p => state.data.selection.includes(p.id)); },
     /** The smallest of the individual fits, so the largest plot still fits and
      *  every drawing shares one scale — which is what the panel claims. */
     sharedScale() {
-      return sharedThumbnailScale(this.selectedPlots, 220, 280);
+      return sharedThumbnailScale(this.selectedPlots, COMPARE_FRAME.width, COMPARE_FRAME.height);
     },
     scaleDenominator() {
       // A CSS pixel is about 0.2646 mm; the drawing renders near its viewBox width.

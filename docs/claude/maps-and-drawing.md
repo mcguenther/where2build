@@ -211,6 +211,53 @@ routines under it.
   the unturned frame's corners. Local metres and Web Mercator share one scale
   factor around the anchor, so the placement is linear.
 
+- **A thumbnail's ground is one composed image, built before anything draws
+  it, and shown only once it is whole.** Measured 24.09.2026: the GeoSN web
+  atlas takes 1–1,4 s per tile and caches nothing of its own; our disk cache
+  answers in 4 ms. Warming the tiles made the second sight fast — and in the
+  compose stack with Firefox each card still filled in tile by tile over
+  1–3 s, six to nine `<image>` elements per card arriving one after another,
+  which looked broken. The backend now stitches the card's whole cover into
+  one PNG (`GET /api/tiles/{layer}/block/{z}/{west}/{north}/{east}/{south}.png`,
+  cached whole under `tile-blocks/`, eviction tier 1 so it outlives the tiles
+  it was made of; at most 100 tiles, the frontend's cover stops at ~68) and
+  `SitePlan` holds the *whole* drawing — outline, house and that single image
+  — in `.site-plan__content` at `opacity: 0` until the image's `load` event,
+  then fades it in over 0,24 s — no fade under `prefers-reduced-motion`, and
+  `print.css` shows it regardless. Fading only the image was the first cut and
+  was rejected on sight: the outline stood alone for a moment and the
+  surroundings arrived after it. The paper rect is drawn a second time inside
+  the fading group, because a group below opacity 1 is isolated and the
+  ground's `multiply`/`screen` would otherwise blend against nothing and flash
+  white during the fade. Measured cold: 0 of 796 sampled frames showed a
+  drawing whose ground was still loading. While it waits, the paper under the
+  group is a `.site-plan__placeholder` with the app's own `w2b-pulse` — the
+  same pulse as the check list and the route cards — and the svg carries
+  `aria-busy`; a static blank frame read as a layout that had failed. A block with one failed tile is an error,
+  never a stored image with a hole; a failed image is removed, so the flat
+  ground stays and no broken-image icon appears. `App.vue` watches
+  `wantedThumbnailGrounds` (every card at `CARD_FRAME`, the ticked plots at the
+  comparison's shared scale) and names the blocks to `POST /api/tiles/warm`,
+  which answers 202 and composes them afterwards, four tiles at a time. It pays
+  one tile of the map budget per tile it sends *outward*, a warm-up over the
+  budget is refused whole, and blocks are claimed before the first `await`.
+  The block route pays the same way. Work in flight is shared by key
+  (`TileService._once`), so a card asking while the warm-up still builds its
+  block waits for that build instead of fetching the tiles a second time.
+  The layout lives in `lib/tileGround.js` (`groundBlock`), so drawing and
+  warm-up name the same block. The test compares the mounted thumbnails' x, y,
+  width and height, not just the href: the cover is the frame's diagonal on
+  every side, and a centre metres off still asks for the same block — a
+  URL-only check passed with the rotation deleted. Measured 25.09.2026 after
+  two new plots, list and comparison opened in a *fresh* browser: one request
+  per distinct block (the list's two cards two, the comparison's two neighbours
+  one shared block), all `HIT`, 8–14 ms. With both caches emptied it is one
+  `MISS` per block at ~2,2 s, and both cards appear together. The screenshot run waits for
+  `[data-ground="loading"]` to clear before every picture, or a cold cache
+  photographs flat paper and passes. And print.css had been hiding the
+  comparison's drawings since the first print: each sits inside a `<button>`,
+  and the blanket `button` rule swallowed it.
+
 - **The street side was the longest edge, and that was wrong on seven of eight
   real plots.** Measured 23.09.2026 on every parcel fixture: only the 1 594 m
   strip at the Tauchaer Straße fronts its street with its longest side. A deep

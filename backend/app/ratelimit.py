@@ -99,11 +99,13 @@ class RateLimiter:
         # end, so the front is what gets evicted.
         self._calls: OrderedDict[str, deque[float]] = OrderedDict()
 
-    def check(self, key: str) -> Decision:
-        """Count one call against ``key``, unless it would cross the line.
+    def check(self, key: str, cost: int = 1) -> Decision:
+        """Count ``cost`` calls against ``key``, unless they would cross the line.
 
         A refused call is not recorded. Otherwise a client that keeps trying
-        would keep pushing its own window forward and never get back in.
+        would keep pushing its own window forward and never get back in. A
+        cost above one is one request that sends several outward -- warming
+        tiles -- and is refused whole rather than let through in part.
         """
 
         now = self.clock()
@@ -117,16 +119,18 @@ class RateLimiter:
         while calls and calls[0] <= horizon:
             calls.popleft()
 
-        if len(calls) >= self.limit:
+        cost = max(0, cost)
+        if cost and len(calls) + cost > self.limit:
             return Decision(
                 allowed=False,
                 limit=self.limit,
                 window_s=self.window_s,
                 remaining=0,
-                retry_after_s=max(1, math.ceil(calls[0] + self.window_s - now)),
+                # Empty only for a cost above the whole limit, which no wait cures.
+                retry_after_s=max(1, math.ceil((calls[0] if calls else now) + self.window_s - now)),
             )
 
-        calls.append(now)
+        calls.extend([now] * cost)
         self._forget_idle_clients()
         return Decision(
             allowed=True,

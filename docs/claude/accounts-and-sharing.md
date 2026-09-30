@@ -312,6 +312,18 @@ gemountete Volume — und der Pfad im Fehler ist der relative Standardwert,
 also griff die Einstellung in dem laufenden Image nicht (ein Start ohne
 `--build` reicht dafür). Das ist die eine Hälfte.
 
+**Korrektur vom 25.09.2026:** Es war nicht das alte Image. `backend/.env` ist
+eine Kopie von `.env.example`, und die setzt `APP_CACHE_DIR=.cache`. Compose
+liest die Datei per `env_file`, und das schlägt das `ENV` aus dem Dockerfile —
+mit jedem Image, auch frisch gebaut. Gemessen beim Nutzer: `/cache` 4 KB groß
+und leer, das Log mit genau diesem `Permission denied: '.cache'`, und dieselbe
+Kachel zweimal hintereinander zweimal `MISS`. Der Cache hat im Stapel also nie
+etwas gehalten. `docker-compose.yml` setzt `APP_CACHE_DIR=/cache` jetzt unter
+`environment`, das Vorrang vor `env_file` hat, für Backend und Scheduler;
+`docker compose config` mit einer kopierten Vorlage zeigt vorher `.cache`,
+nachher `/cache`. Allgemein: was das Dockerfile per `ENV` setzt und in
+`.env.example` steht, gewinnt im Stapel die Vorlage.
+
 Die andere ist schlimmer und unabhängig davon: `DiskCache.get_bytes` hat einen
 `OSError` immer geschluckt, `set_bytes` hat ihn durchgelassen. Das ist die
 falsche Richtung — ein Cache, der nicht lesen kann, ist langsam, und einer,

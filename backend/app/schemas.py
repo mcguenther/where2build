@@ -201,8 +201,12 @@ class ListingExtractResponse(BaseModel):
     quelle_url: HttpUrl | None = None
     weg: Extraktionsweg
     hinweis: str | None = None
+    # The advert's own headline, as the page states it (`og:title`, else the
+    # first `<h1>`). Shown so the reader recognises *which* listing was read;
+    # nothing searches with it on its own -- it already rides in `beschreibung`.
+    titel: str | None = Field(default=None, max_length=500)
     # The listing's images, largest variant each. The search reads them for a
-    # cadastral extract; nothing else in the app uses them.
+    # cadastral extract; the wizard also shows them in its preview.
     bilder: list[str] = Field(default_factory=list)
     # The listing's own description, as the page carries it. Not an extracted
     # field and never part of a stored plot: it travels so the parcel search can
@@ -2110,3 +2114,31 @@ class LoeschAnfrage(BaseModel):
 
 class LoeschErgebnis(BaseModel):
     geleert: dict[str, int] = Field(description="Tabelle → Anzahl gelöschter Zeilen.")
+
+
+# The most one warm-up may name. A list of twenty plots with their comparison
+# is some forty thumbnails; anything far past that is not a list being drawn.
+MAX_WARM_BLOCKS = 100
+
+
+class Kachelblock(BaseModel):
+    ebene: str = Field(description="Kartenebene, wie im Pfad von /api/tiles.")
+    z: int = Field(ge=0, le=24)
+    west: int = Field(ge=0, description="Erste Kachelspalte.")
+    nord: int = Field(ge=0, description="Erste Kachelzeile.")
+    ost: int = Field(ge=0, description="Letzte Kachelspalte, eingeschlossen.")
+    sued: int = Field(ge=0, description="Letzte Kachelzeile, eingeschlossen.")
+
+
+class BloeckeVorwaermen(BaseModel):
+    bloecke: list[Kachelblock] = Field(min_length=1, max_length=MAX_WARM_BLOCKS)
+
+
+class VorwaermenErgebnis(BaseModel):
+    angefragt: int = Field(description="So viele verschiedene Kachelblöcke nannte die Anfrage.")
+    zusammengesetzt_werden: int = Field(
+        description="So viele fehlten im Zwischenspeicher und werden jetzt im Hintergrund zusammengesetzt."
+    )
+    geholt_werden: int = Field(
+        description="So viele Einzelkacheln müssen dafür beim Kartendienst geholt werden."
+    )

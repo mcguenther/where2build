@@ -140,7 +140,7 @@ describe("Suchfeld", () => {
     field.unmount();
   });
 
-  it("übernimmt eine Gemarkung ins Feld, statt sie aufzulösen", async () => {
+  it("meldet eine gewählte Gemarkung, statt sie aufzulösen", async () => {
     const field = mount(PlotSearch);
     await type(field, "Mölkau");
 
@@ -149,9 +149,41 @@ describe("Suchfeld", () => {
     await district.trigger("mousedown");
     await flushPromises();
 
-    // Half an answer stays in the field so the number can be typed after it.
+    // Half an answer: the wrapper turns it into a block and the number is
+    // typed after it. Nothing is resolved, and the text is not rewritten.
     expect(field.emitted("select")).toBeUndefined();
-    expect(field.find("input").element.value).toMatch(/^\d{6} $/);
+    expect(field.emitted("district")[0][0].name).toBe("Mölkau");
+    field.unmount();
+  });
+
+  it("fragt nach einer Nummer nur noch das Gemarkungsverzeichnis", async () => {
+    const field = mount(PlotSearch, { props: { onlyDistricts: true } });
+    await type(field, "Mölk");
+
+    expect(asked.some(url => url.includes("/geocode"))).toBe(false);
+    const kinds = field.findAll(".hit__kind").map(kind => kind.text());
+    expect(kinds.length).toBeGreaterThan(0);
+    expect(new Set(kinds)).toEqual(new Set(["Gemarkung"]));
+    field.unmount();
+  });
+
+  it("fragt nichts, solange der Wrapper weiß, was im Feld steht", async () => {
+    const field = mount(PlotSearch, { props: { quiet: true } });
+    await type(field, "Lessingweg 44");
+
+    expect(asked).toEqual([]);
+    expect(field.findAll(".hit")).toHaveLength(0);
+    field.unmount();
+  });
+
+  it("meldet Rückschritt im leeren Feld, damit der Block davor gehen kann", async () => {
+    const field = mount(PlotSearch);
+    await field.find("input").trigger("keydown", { key: "Backspace" });
+    expect(field.emitted("backspace")).toHaveLength(1);
+
+    await type(field, "M");
+    await field.find("input").trigger("keydown", { key: "Backspace" });
+    expect(field.emitted("backspace")).toHaveLength(1);
     field.unmount();
   });
 

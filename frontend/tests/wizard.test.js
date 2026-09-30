@@ -1,15 +1,13 @@
 /**
- * The Gemarkung field in the wizard: a searchable directory, not a blank line.
+ * The wizard: the one field of its first step, the search, and the parcel step.
  *
  * The directory is the one the service really answers with, recorded into
  * `fixtures/gemarkungen.json` — 61 of the 5 339 Saxon districts, Mölkau among
- * them. No names are invented here: a picker tested against made-up entries
- * would prove nothing about the umlaut or the key forms.
+ * them. The matching itself is tested in `districts.test.js`.
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
-import CadastralDistrictPicker from "../src/components/CadastralDistrictPicker.vue";
 import WizardView from "../src/views/WizardView.vue";
 import { state } from "../src/lib/store.js";
 import { realPlot, realState, mountWithRouter, testRouter } from "./helpers.js";
@@ -21,6 +19,7 @@ import moelkau from "./fixtures/parcel-moelkau.json";
 import moelkauZwei from "./fixtures/parcel-moelkau-zwei.json";
 import moelkauGetrennt from "./fixtures/parcel-moelkau-getrennt.json";
 import moelkauNachbar from "./fixtures/parcel-moelkau-205.json";
+import pasted from "./fixtures/extract-kleinanzeigen-einfuegen.json";
 
 vi.mock("../src/lib/api.js", () => ({
   // The cap the module exports next to the call that sends it. A factory
@@ -81,160 +80,43 @@ const settle = async () => {
 
 const findButton = (w, label) => w.findAll("button").find(b => b.text() === label);
 
-/** A chip by its German name; a fixed one carries the ✕ that takes it back. */
-const chip = (w, name) =>
-  w.findAll(".kind").find(b => b.text().replace("✕", "").trim() === name);
+/** Overrule the reading through the marker's menu, by the reading's name. */
+const fixReading = async (w, name) => {
+  await w.find(".marker").trigger("click");
+  const item = w.findAll(".menu__item").find(b => b.find("span").exists() && b.find("span").text() === name);
+  await item.trigger("click");
+};
 
-/** Look a parcel up the way the box does it: the bare number unfolds the pair,
- *  the district goes in beside it, and one button asks the cadastre. */
+/** Look a parcel up the way the field takes it: the number, a space that makes
+ *  it a block, then the Gemarkung — and one button asks the cadastre, taking
+ *  the directory's row for the name, or the name as typed when there is none. */
 const lookUpParcel = async (w, { district, number }) => {
-  await intoQuery(w, number);
-  await flushPromises();                 // the directory the picker fetches
-  await typeInto(w.findComponent(CadastralDistrictPicker).find("input"), district);
+  // With the first letter: a number without a denominator becomes a block
+  // only once a letter follows it.
+  await intoQuery(w, `${number} ${district.charAt(0)}`);
   await flushPromises();
+  await intoQuery(w, district);
+  await settle();
   await findButton(w, "Grundstück finden").trigger("click");
-  await flushPromises();
+  await settle();
 };
-
-/** A mounted picker with the directory already in hand. */
-const picker = async () => {
-  const w = mount(CadastralDistrictPicker);
-  await flushPromises();
-  return w;
-};
-
-const search = async (text) => {
-  const w = await picker();
-  await typeInto(w.find("input"), text);
-  return w;
-};
-
-const names = w => w.findAll("[role=option] .gemarkung__name").map(o => o.text());
-
-describe("Gemarkung — Verzeichnis durchsuchen", () => {
-  it("holt das Verzeichnis einmal und zeigt nichts, bevor getippt wird", async () => {
-    const w = await picker();
-    expect(cadastralDistricts).toHaveBeenCalledTimes(1);
-    expect(w.findAll("[role=option]")).toHaveLength(0);
-    expect(w.find("input").attributes("aria-expanded")).toBe("false");
-  });
-
-  it("filtert nach dem Namen und nennt Schlüssel und Gemeinde dazu", async () => {
-    const w = await search("Mölk");
-    const row = w.find("[role=option]");
-    expect(names(w)).toEqual(["Mölkau"]);
-    expect(row.text()).toContain("145592");
-    expect(row.text()).toContain("Stadt Leipzig");
-    expect(w.find("input").attributes("aria-expanded")).toBe("true");
-    expect(w.find("[role=listbox]").isVisible()).toBe(true);
-  });
-
-  it("verzeiht den fehlenden Umlaut", async () => {
-    expect(names(await search("Molkau"))).toEqual(["Mölkau"]);
-    expect(names(await search("Grossdubrau"))).toEqual([]);      // Gemeinde, nicht Gemarkung
-    expect(names(await search("Kronforstchen"))).toEqual(["Kronförstchen"]);
-  });
-
-  it("findet über die vierstellige wie über die sechsstellige Schreibweise", async () => {
-    expect(names(await search("5592"))).toEqual(["Mölkau"]);
-    expect(names(await search("145592"))).toEqual(["Mölkau"]);
-    // Die Kurzform ohne führende Null, wie sie eine Tabelle hinterlässt.
-    expect(names(await search("0419"))).toEqual(["Lauer"]);
-    expect(names(await search("419"))).toEqual(["Lauer"]);
-  });
-
-  it("stellt den passendsten Treffer nach vorn", async () => {
-    // "Wölkau Flur 7" beginnt damit, "Mölkau" enthält es nur.
-    expect(names(await search("ölkau"))).toEqual(["Wölkau Flur 7", "Mölkau"]);
-  });
-
-  it("begrenzt die Liste und sagt, wie viel sie verschweigt", async () => {
-    const w = await search("14");            // jeder sächsische Schlüssel beginnt so
-    expect(w.findAll("[role=option]")).toHaveLength(50);
-    expect(w.text()).toContain(`${directory.gemarkungen.length - 50} weitere Treffer`);
-  });
-});
-
-describe("Gemarkung — Bedienung", () => {
-  it("übernimmt einen Treffer mit Pfeiltaste und Enter", async () => {
-    const w = await search("Mölk");
-    const field = w.find("input");
-
-    await field.trigger("keydown", { key: "ArrowDown" });
-    expect(field.attributes("aria-activedescendant")).toBe(w.find("[role=option]").attributes("id"));
-    expect(w.find("[role=option]").attributes("aria-selected")).toBe("true");
-
-    await field.trigger("keydown", { key: "Enter" });
-    expect(field.element.value).toBe("Mölkau");
-    expect(w.emitted("update:modelValue").at(-1)).toEqual(["Mölkau"]);
-    expect(w.emitted("select").at(-1)[0].schluessel).toBe("145592");
-    expect(field.attributes("aria-expanded")).toBe("false");
-  });
-
-  it("übernimmt einen Treffer auch mit der Maus", async () => {
-    const w = await search("Mölk");
-    await w.find("[role=option]").trigger("mousedown");
-    expect(w.emitted("select").at(-1)[0].name).toBe("Mölkau");
-    expect(w.find("input").element.value).toBe("Mölkau");
-  });
-
-  it("schließt die Liste mit Escape, ohne das Getippte zu verwerfen", async () => {
-    const w = await search("Mölk");
-    await w.find("input").trigger("keydown", { key: "Escape" });
-    expect(w.find("input").attributes("aria-expanded")).toBe("false");
-    expect(w.find("[role=listbox]").isVisible()).toBe(false);
-    expect(w.find("input").element.value).toBe("Mölk");
-  });
-
-  it("erkennt den ausgeschriebenen Namen ohne Klick in die Liste", async () => {
-    const w = await search("Mölkau");
-    expect(w.emitted("select").at(-1)[0].schluessel).toBe("145592");
-    expect(w.text()).toContain("Verzeichnis: Mölkau");
-  });
-});
-
-describe("Gemarkung — freie Eingabe", () => {
-  it("hält fest, was nicht im Verzeichnis steht, und sperrt es nicht", async () => {
-    const w = await search("Moritzburg");   // im Verzeichnisauszug nicht enthalten
-    expect(w.findAll("[role=option]")).toHaveLength(0);
-    expect(w.find("input").element.value).toBe("Moritzburg");
-    expect(w.emitted("update:modelValue").at(-1)).toEqual(["Moritzburg"]);
-    expect(w.text()).toContain("Kein Eintrag im Verzeichnis");
-    expect(w.text()).toContain("Nachschlagen lässt sich das trotzdem");
-    expect(w.find("input").attributes("disabled")).toBeUndefined();
-  });
-
-  it("bleibt ein benutzbares Textfeld, wenn der Dienst ausfällt", async () => {
-    cadastralDistricts.mockRejectedValue(new Error("Das Gemarkungsverzeichnis ist nicht erreichbar."));
-    const w = await search("Moritzburg");
-
-    expect(w.text()).toContain("Das Gemarkungsverzeichnis ist nicht erreichbar.");
-    // Kein erfundener Ersatz und kein "es gibt nichts": die Liste bleibt fort,
-    // der Hinweis auf den fehlenden Eintrag auch.
-    expect(w.findAll("[role=option]")).toHaveLength(0);
-    expect(w.text()).not.toContain("Kein Eintrag im Verzeichnis");
-    expect(w.find("input").element.value).toBe("Moritzburg");
-    expect(w.emitted("update:modelValue").at(-1)).toEqual(["Moritzburg"]);
-  });
-});
 
 describe("Aufnahme — Schritt Quelle", () => {
   const atSource = () =>
     mountWithRouter(WizardView, { path: "/aufnahme/quelle", props: { stage: "quelle" } });
 
-  /* There are no ways in to choose between any more, so the old statement
-     ("only on the way „Flurstück direkt“") has nothing to name. What survives
-     of it is the cost: the directory is 490 kB, and it is fetched only once a
-     reading actually asks for a Gemarkung. */
-  it("lädt das Verzeichnis erst, wenn die Lesart eine Gemarkung verlangt", async () => {
+  /* The directory is 490 kB, and it is fetched only once what is typed can
+     be a Gemarkung: a bare number cannot be one, a letter after it can. */
+  it("lädt das Verzeichnis erst, wenn eine Gemarkung getippt wird", async () => {
     const w = atSource();
-    expect(w.findComponent(CadastralDistrictPicker).exists()).toBe(false);
     expect(cadastralDistricts).not.toHaveBeenCalled();
 
-    // Eine nackte Nummer ist ohne Gemarkung nichts — erst sie klappt das
-    // Feldpaar auf und holt das Verzeichnis.
-    await intoQuery(w, "85/1");
-    expect(w.findComponent(CadastralDistrictPicker).exists()).toBe(true);
+    await intoQuery(w, "85/1 ");
+    await settle();
+    expect(cadastralDistricts).not.toHaveBeenCalled();
+
+    await intoQuery(w, "Mölk");
+    await settle();
     expect(cadastralDistricts).toHaveBeenCalledTimes(1);
   });
 
@@ -243,20 +125,28 @@ describe("Aufnahme — Schritt Quelle", () => {
     landValue.mockRejectedValue(new Error("Kein Bodenrichtwert."));
 
     const w = atSource();
-    // Die Nummer wandert von selbst in das Feldpaar; getippt wird nur noch
-    // die Gemarkung daneben.
-    await intoQuery(w, "85/1");
-    await flushPromises();
-
-    const field = w.findComponent(CadastralDistrictPicker);
-    await typeInto(field.find("input"), "Mölk");
-    await field.find("[role=option]").trigger("mousedown");
+    await intoQuery(w, "85/1 ");
+    await intoQuery(w, "Mölk");
+    await settle();
+    const row = w.findAll(".hit").find(hit => hit.find(".hit__name").text() === "Mölkau");
+    await row.trigger("mousedown");
     await flushPromises();
 
     await findButton(w, "Grundstück finden").trigger("click");
     await flushPromises();
 
     expect(resolveParcel).toHaveBeenCalledWith({ gemarkung: "145592", flurstuecksnummer: "85/1" });
+  });
+
+  it("schlägt nach, wenn das Verzeichnis nicht erreichbar ist, statt das Feld zu sperren", async () => {
+    cadastralDistricts.mockRejectedValue(new Error("Das Gemarkungsverzeichnis ist nicht erreichbar."));
+    resolveParcel.mockResolvedValue(moelkau);
+    landValue.mockRejectedValue(new Error("Kein Bodenrichtwert."));
+
+    const w = atSource();
+    await lookUpParcel(w, { district: "Mölkau", number: "85/1" });
+
+    expect(resolveParcel).toHaveBeenCalledWith({ gemarkung: "Mölkau", flurstuecksnummer: "85/1" });
   });
 
   it("schlägt auch nach, was nur getippt und nicht gewählt wurde", async () => {
@@ -269,19 +159,18 @@ describe("Aufnahme — Schritt Quelle", () => {
     expect(resolveParcel).toHaveBeenCalledWith({ gemarkung: "Moritzburg", flurstuecksnummer: "85/1" });
   });
 
-  it("lässt die Lesart per Chip festlegen, wenn sie nicht abzulesen ist", async () => {
+  it("lässt die Lesart über die Marke festlegen, wenn sie nicht abzulesen ist", async () => {
     resolveParcel.mockResolvedValue(moelkau);
     landValue.mockRejectedValue(new Error("Kein Bodenrichtwert."));
 
-    // "Moritzburg 85" liest sich als Adresse wie als Flurstück; der Chip
-    // entscheidet, statt dass eine der beiden geraten wird.
+    // "Moritzburg 85" liest sich als Adresse wie als Flurstück; die Marke
+    // sagt es, und ihr Menü entscheidet, statt dass eine der beiden geraten wird.
     const w = atSource();
     await intoQuery(w, "Moritzburg 85");
-    await chip(w, "Gemarkung + Flurstück").trigger("click");
-    await flushPromises();
+    await settle();
+    expect(w.find(".marker").text()).toBe("2 Lesarten");
 
-    expect(w.find("#q-parcel-number").element.value).toBe("85");
-    await typeInto(w.findComponent(CadastralDistrictPicker).find("input"), "Moritzburg");
+    await fixReading(w, "Flurstück");
     await findButton(w, "Grundstück finden").trigger("click");
     await flushPromises();
 
@@ -371,8 +260,8 @@ describe("Aufnahme — Absenden", () => {
     await typeInto(field, "Baugrundstück in Lobstädt, 1.025 m²");
     await flushPromises();
 
-    // Dass die Seite und nicht bloß ihr Text angekommen ist, sagt der Chip.
-    expect(chip(w, "Eingefügte Anzeige").attributes("data-state")).toBe("read");
+    // Dass die Seite und nicht bloß ihr Text angekommen ist, sagt die Marke.
+    expect(w.find(".marker").text()).toBe("Anzeigenseite");
 
     await findButton(w, "Grundstück finden").trigger("click");
     await flushPromises();
@@ -393,11 +282,11 @@ describe("Aufnahme — Absenden", () => {
     await typeInto(field, "Ein ganz anderer Text, von Hand getippt und lang genug.");
     await flushPromises();
 
-    expect(chip(w, "Eingefügte Anzeige").attributes("data-state")).toBe("off");
+    expect(w.find(".marker").text()).not.toBe("Anzeigenseite");
 
     // Von Hand getippt und zu kurz, um sich selbst als Beschreibung zu
-    // verraten: der Chip legt die Lesart fest.
-    await chip(w, "Beschreibungstext").trigger("click");
+    // verraten: die Marke legt die Lesart fest.
+    await fixReading(w, "Beschreibungstext");
     await findButton(w, "Grundstück finden").trigger("click");
     await flushPromises();
 
@@ -576,7 +465,7 @@ describe("Aufnahme — beide Textwege enden im selben Schritt", () => {
 
     const w = atSource();
     await intoQuery(w, answer.beschreibung);
-    await chip(w, "Beschreibungstext").trigger("click");
+    await fixReading(w, "Beschreibungstext");
     await findButton(w, "Grundstück finden").trigger("click");
     await flushPromises();
 
@@ -594,7 +483,7 @@ describe("Aufnahme — beide Textwege enden im selben Schritt", () => {
 
     const w = atSource();
     await intoQuery(w, answer.beschreibung);
-    await chip(w, "Beschreibungstext").trigger("click");
+    await fixReading(w, "Beschreibungstext");
     await findButton(w, "Grundstück finden").trigger("click");
     await flushPromises();
 
@@ -742,5 +631,69 @@ describe("Aufnahme — Seite aus dem Browser übernommen", () => {
     await flushPromises();
 
     expect(w.findAll("details.gelesen:not(.gelesen--lesezeichen)")).toHaveLength(0);
+  });
+});
+
+
+/**
+ * The head of the search step: what was read, as the advert looked, with the
+ * editable values folded underneath — one box, not a preview and a list.
+ * The answer is the real extract of the recorded Kleinanzeigen page, copied
+ * with Strg+A (so without `<head>` and its coordinate).
+ */
+describe("Aufnahme — Vorschau der gelesenen Anzeige im Suchschritt", () => {
+  const read = async (payload, answer) => {
+    readPage.mockResolvedValue(answer);
+    const w = mountWithRouter(WizardView, {
+      path: "/aufnahme/quelle", props: { stage: "quelle" }, stubs: { ParcelSearch: true }
+    });
+    await flushPromises();
+    await w.vm.readPayload(payload);
+    await w.setProps({ stage: "suche" });
+    await flushPromises();
+    return w;
+  };
+
+  it("steht als Erstes im Schritt und trägt den Klappkasten mit den Werten", async () => {
+    const w = await read({ kind: "page", text: "", html: "<html><body>…</body></html>" }, pasted);
+
+    const section = w.find("section.stack");
+    expect(section.element.firstElementChild.classList.contains("listing-preview")).toBe(true);
+    expect(w.find(".listing-preview .mini").exists()).toBe(true);
+    const fold = w.find(".listing-preview details.gelesen");
+    expect(fold.exists()).toBe(true);
+    expect(fold.find(".gelesen__zahl").text()).toBe(w.vm.readSummary);
+    // Genau ein Klappkasten der Suche, und die Felder darin sind noch dieselben.
+    expect(w.findAll("details.gelesen:not(.gelesen--lesezeichen)")).toHaveLength(1);
+    expect(fold.findAll(".suggestion input")).toHaveLength(w.vm.readFields.length);
+    expect(w.text()).toContain("Koordinate fehlt");
+  });
+
+  it("startet die Suche aus dem Klappkasten neu, wie zuvor", async () => {
+    const w = await read({ kind: "page", text: "", html: "<html><body>…</body></html>" }, pasted);
+    const before = w.vm.searchRun;
+
+    await w.find(".listing-preview details.gelesen .suggestion input")
+      .trigger("keydown", { key: "Enter" });
+    expect(w.vm.searchRun).toBe(before + 1);
+
+    await findButton(w, "Suche mit diesen Werten neu starten").trigger("click");
+    expect(w.vm.searchRun).toBe(before + 2);
+  });
+
+  it("zeigt bei getipptem Text keine Vorschau, nur die Werte", async () => {
+    const w = await read({ kind: "prose", text: "Baugrundstück in Lobstädt", html: "" }, pasted);
+
+    expect(w.find(".listing-preview .mini").exists()).toBe(false);
+    expect(w.find(".listing-preview .karte").exists()).toBe(false);
+    expect(w.find(".listing-preview details.gelesen").exists()).toBe(true);
+  });
+
+  it("führt über „Lesezeichen nimmt ihn mit“ zurück zum Einstieg", async () => {
+    const w = await read({ kind: "page", text: "", html: "<html><body>…</body></html>" }, pasted);
+    const back = vi.spyOn(w.vm, "stepBack");
+
+    await findButton(w, "Lesezeichen nimmt ihn mit").trigger("click");
+    expect(back).toHaveBeenCalledWith("quelle");
   });
 });

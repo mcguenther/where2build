@@ -197,6 +197,25 @@ def parse_description(html: str) -> str | None:
     return None
 
 
+_HEADING_PATTERN = re.compile(r"<h1\b[^>]*>(.*?)</h1>", re.IGNORECASE | re.DOTALL)
+TITLE_LIMIT = 500
+
+
+def parse_heading(html: str) -> str | None:
+    """The page's first non-empty `<h1>`, which on a listing is its title.
+
+    Only a fallback for `og:title`: that tag lives in `<head>`, and `Strg+A`
+    selects the body alone, so a clipboard copy arrived with no title at all
+    while the heading stood right above the price.
+    """
+
+    for markup in _HEADING_PATTERN.findall(html):
+        text = _clean(markup)
+        if len(text) >= 3:
+            return text[:TITLE_LIMIT]
+    return None
+
+
 def parse_details(html: str) -> dict[str, str]:
     """The portal's own attribute list, as label -> value."""
 
@@ -544,7 +563,7 @@ def parse_page(url: str, html: str) -> Seite:
         json_ld=json_ld,
         lat=latitude,
         lon=longitude,
-        titel=meta.get("og:title"),
+        titel=meta.get("og:title") or parse_heading(html),
         adresse=", ".join(address_parts) if address_parts else None,
         beschreibung=parse_description(html) or meta.get("og:description") or None,
         angaben=parse_details(html),

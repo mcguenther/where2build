@@ -33,7 +33,7 @@
     <!-- 1 · Quelle. Also what a stage without its data falls back to, so the
          redirect in `checkStage` never renders a step that has nothing.
          One field for all five ways in: the reading decides which of them is
-         happening, and the chips let it be overruled. -->
+         happening, and the marker at the field's edge lets it be overruled. -->
     <section v-if="stage === 'quelle' || !reachable" class="stack">
       <p class="subtitle">
         Adresse, Flurstück, Koordinate, der Link einer Anzeige oder die eingefügte
@@ -54,8 +54,9 @@
         Was getippt wurde, wird zuerst gelesen und dann nachgeschlagen: eine deutsche
         Adresse beginnt nie mit einer Ziffer, eine Koordinate sind zwei Zahlen, und ein
         Nenner (<span class="mono">85/1</span>) kommt in keiner Adresse vor. Bleiben zwei
-        Lesarten möglich, werden beide Verzeichnisse gefragt statt eine geraten. Was
-        darunter steht, lässt sich anklicken, wenn es die falsche ist.
+        Lesarten möglich, werden beide Verzeichnisse gefragt statt eine geraten. Rechts
+        im Feld steht, wie es gelesen wurde; ein Klick darauf wählt eine andere Lesart.
+        Eine Flurstücksnummer darf vor oder nach der Gemarkung stehen.
         <br>
         <b>Eine Anzeigenseite</b> im Browser mit <span class="mono">Strg+A</span>,
         <span class="mono">Strg+C</span> kopieren und hier einfügen: die Zwischenablage
@@ -98,18 +99,8 @@
          is running on, so it belongs here, and it is a list nobody has to read
          before carrying on, so it starts closed. -->
     <section v-else-if="stage === 'suche'" class="stack">
-      <p class="subtitle">
-        Ein Inserat nennt fast nie sein Flurstück. Gesucht wird deshalb über das, was
-        dasteht (Ortsteil, Fläche, Straße), und die Karte zeigt dabei durchgehend, was
-        noch möglich ist. Reicht es nicht für ein einzelnes Flurstück, sagt die Antwort,
-        worauf sich die Lage eingrenzen lässt.
-      </p>
-
-      <details v-if="readSummary" class="gelesen">
-        <summary>
-          <span class="gelesen__titel">Gelesene Werte</span>
-          <span class="gelesen__zahl">{{ readSummary }}</span>
-        </summary>
+      <ListingPreview v-if="listingResponse" :response="listingResponse" :kind="listingKind"
+                      :url="listingUrl" :summary="readSummary" @bookmarklet="openBookmarklet">
         <p class="subtitle">
           Jedes Feld führt die Quelle mit, aus der es stammt. Was die Seite nicht hergibt,
           bleibt leer und wird nicht erfunden. Eine Änderung hier startet die Suche neu.
@@ -134,7 +125,14 @@
             Suche mit diesen Werten neu starten
           </button>
         </div>
-      </details>
+      </ListingPreview>
+
+      <p class="subtitle">
+        Ein Inserat nennt fast nie sein Flurstück. Gesucht wird deshalb über das, was
+        dasteht (Ortsteil, Fläche, Straße), und die Karte zeigt dabei durchgehend, was
+        noch möglich ist. Reicht es nicht für ein einzelnes Flurstück, sagt die Antwort,
+        worauf sich die Lage eingrenzen lässt.
+      </p>
 
       <ParcelSearch v-if="searchQuery" :query="searchQuery" :key="searchRun"
                     @confirm="takeCandidate" @manual="stepBack('quelle')" />
@@ -276,6 +274,7 @@
 import SitePlan from "../components/SitePlan.vue";
 import ParcelSearch from "../components/ParcelSearch.vue";
 import QueryBox from "../components/QueryBox.vue";
+import ListingPreview from "../components/ListingPreview.vue";
 import { state, addPlot, autoSeatHouse } from "../lib/store.js";
 import { settleStreetFront } from "../lib/streetFront.js";
 import { WIZARD_STAGES, wizardStage } from "../router/stages.js";
@@ -318,7 +317,7 @@ function fieldsFromResponse(response) {
 
 export default {
   name: "WizardView",
-  components: { SitePlan, ParcelSearch, QueryBox },
+  components: { SitePlan, ParcelSearch, QueryBox, ListingPreview },
   props: {
     /** The stage's URL segment; the route only matches the four known ones. */
     stage: { type: String, required: true }
@@ -348,6 +347,11 @@ export default {
       busy: false,
       error: "",
       readFields: [],
+      /* The last extract answer, and how the listing came in, for the
+       * preview at the head of the search step: "url", "page" or "prose". */
+      listingResponse: null,
+      listingKind: "",
+      listingUrl: "",
       /* The listing's own prose. It is what the search reads the cadastral
        * district, the street and the relation between the named places out of
        * — none of which is an attribute anywhere. It never reaches the stored
@@ -525,6 +529,19 @@ export default {
       this.$router.back();
     },
 
+    /** „Lesezeichen nimmt ihn mit": back to the entry step, with the
+     *  bookmarklet's fold open. That fold belongs to the entry step, so it is
+     *  found once that step has rendered rather than reached into from here. */
+    openBookmarklet() {
+      this.$watch("stage", () => this.$nextTick(() => {
+        const fold = document.querySelector("details.gelesen--lesezeichen");
+        if (!fold) return;
+        fold.open = true;
+        fold.scrollIntoView?.({ block: "center" });
+      }), { once: true });
+      this.stepBack("quelle");
+    },
+
     /** A suggestion was picked: it already carries the cadastral query. */
     async searchPicked({ query, label, address }) {
       this.busy = true;
@@ -554,6 +571,12 @@ export default {
         this.returnStage = "quelle";
         const response = kind === "url" ? await readListing(text) : await readPage(html || text);
         this.readFields = fieldsFromResponse(response);
+        this.listingResponse = response || null;
+        this.listingKind = kind === "url" || kind === "prose" ? kind : "page";
+        // A handed-over document knows where it came from; a clipboard does not.
+        this.listingUrl = kind === "url"
+          ? text
+          : (this.handover && html === this.handover.html ? this.handover.url : "");
         this.description = response?.beschreibung || text;
         this.images = response?.bilder || [];
         // What a model read, already through the Beleg gate on the server: each
