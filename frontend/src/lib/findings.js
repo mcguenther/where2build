@@ -19,6 +19,14 @@
 
 import { num } from "./format.js";
 
+/* The neighbourhood's templates live beside this file, because they read a
+   geometric analysis rather than one service's answer; they follow the same
+   rules and are re-exported so every finding is reached from here. */
+export {
+  neighbourhoodFindings, houseCheckFinding, bandFinding, clearFinding, wallHeightFinding,
+  boundaryReadingSentences, NEIGHBOURHOOD_STATUS_LABELS, HOUSE_STATUS_LABELS
+} from "./neighbourhoodFindings.js";
+
 /** The three states a check can end in. `open` never gets a colour. */
 export const GOOD = "good";
 export const NOTE = "note";

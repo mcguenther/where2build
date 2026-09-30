@@ -346,3 +346,27 @@ routines under it.
   the map, so after a click the map's lower edge was usually in view and the
   check passed — while the pan happened in a strip at the top of the screen.
   It scrolls unless 60 % of the map is visible.
+
+- **A neighbour is a building, not an edge.** The first neighbour hint
+  deepened the setback of every boundary edge by `3 − d` for the nearest
+  foreign building, and on Lessingweg 44 (Mölkau 204) the envelope fell from
+  312,9 to 153,7 m²: Lessingweg 42 stands 0,04 m from the boundary along
+  12–28 m of a 47,6 m edge and took the whole edge, a garage 1,3 m behind the
+  rear corner deepened three edges, and garages count for nothing anyway
+  (§ 6 Abs. 8 Nr. 1 SächsBO). Measured on 30.09.2026 against
+  `neighbours-moelkau-alkis.json`. `lib/neighbourhood.js` never touches the
+  envelope; it classifies each outline (`own` by centroid, `accessory` for a
+  non-residential ALKIS function up to 54 m² and 9 m along our boundary,
+  `boundary` under 0,5 m, `overlap` under 3 m, else `clear`), assigns it to the
+  *one* boundary it comes nearest to, and traces what follows only where it
+  stands: its 3 m on our plot (6,1 m² at Nr. 46) and the „6-m-Zone", the part
+  of the envelope within 6 m of it (5,7 m² at Nr. 46; 68,2 m² at Nr. 42 in the
+  cautious reading, which is the default). The round buffers are marching
+  squares at 4 cm with a two-level sweep — the field is 1-Lipschitz, so a block
+  whose corners are all further from zero than its diagonal is filled rather
+  than computed — which brought a cold analysis from 550 ms to about 40 ms; a
+  1 cm trace differs by at most 0,04 m². Depths come from the outlines, not
+  the grid. A house without an ALKIS address is an annex or a rear building,
+  so the § 34 band takes only houses on the plot's own street (by name) and on
+  its side of the street edge's line (geometrically): six on the Lessingweg,
+  5,2–37,6 m behind the street, as deep as 45,0 m.

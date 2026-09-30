@@ -585,6 +585,13 @@ export function neighbourDistances(ring, buildings, options = {}) {
 }
 
 /**
+ * @deprecated Deepens a *whole edge* for a neighbour that stands along a part
+ * of it, counts garages, and lets a building past an edge's end reach three
+ * edges: on Lessingweg 44 the envelope fell from 312,9 to 153,7 m². Replaced
+ * by `analyseNeighbourhood` in `lib/neighbourhood.js`, which classifies each
+ * building and never changes the envelope. Kept only until PlotView and
+ * SitePlan are moved over.
+ *
  * The setback depths as they would have to be for the neighbouring building's
  * own minimum setback to clear ours.
  *
@@ -609,7 +616,8 @@ export function neighbourSetbackDepths(ring, depths, buildings, options = {}) {
   });
 }
 
-/** Does any segment ask for more than the statutory setback? */
+/** @deprecated With `neighbourSetbackDepths`; see `lib/neighbourhood.js`.
+ *  Does any segment ask for more than the statutory setback? */
 export const hasNeighbourHint = (own, hint) =>
   Array.isArray(hint) && hint.some((depth, i) => depth > (Array.isArray(own) ? own[i] : own) + 1e-9);
 
