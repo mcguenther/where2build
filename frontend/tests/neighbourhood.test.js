@@ -198,11 +198,12 @@ describe("Grenze für Grenze", () => {
 });
 
 describe("Im Schnitt", () => {
-  it("schneidet quer durch das Grundstück in der Mitte von Nr. 42, ohne Höhen", () => {
+  it("schneidet quer durch das Grundstück, wo Nr. 42 der Grenze am nächsten kommt, ohne Höhen", () => {
     const n42 = byAddress(analysis, "Lessingweg 42");
     const cut = analysis.sections.find(s => s.buildingId === n42.id);
     expect(cut.ourBoundary).toBe(0);
-    expect(cut.at).toBeCloseTo(20.2, 1);
+    // Its nearest corner is at the far end of the stretch it faces.
+    expect(cut.at).toBeCloseTo(28.1, 1);
     expect(cut.neighbourWall).toBeLessThanOrEqual(0);
     expect(cut.neighbourWall).toBeGreaterThan(-0.2);
     expect(cut.envelope).toHaveLength(1);
@@ -219,11 +220,30 @@ describe("Im Schnitt", () => {
   it("zeigt bei Nr. 46 die Zone erst hinter unserem 3-m-Streifen", () => {
     const cut = analysis.sections.find(s => s.buildingId === byAddress(analysis, "Lessingweg 46").id);
     expect(cut.boundary).toBe("left");
-    expect(cut.neighbourWall).toBeCloseTo(-2.37, 1);
+    expect(cut.neighbourWall).toBeCloseTo(-2.33, 2);
     expect(cut.zone[0][0]).toBeCloseTo(3, 1);
-    expect(cut.zone[0][1]).toBeCloseTo(3.63, 1);
+    expect(cut.zone[0][1]).toBeCloseTo(3.67, 2);
     expect(cut.maybeBuildable).toEqual([]);
   });
+});
+
+describe("Schnitt und Befund sagen dasselbe", () => {
+  /* The cut lies where the building is nearest, so the section's gap and the
+     zone's reach are the finding's own figures, not those of some other spot. */
+  for (const reading of [READING_SETBACK, READING_BOUNDARY]) {
+    it(`misst Abstand und Zonentiefe wie der Befund (${reading})`, () => {
+      const a = analyseNeighbourhood(plot, buildings, { reading });
+      expect(a.sections.length).toBe(2);
+      for (const cut of a.sections) {
+        const b = a.buildings.find(x => x.id === cut.buildingId);
+        expect(-cut.neighbourWall).toBeCloseTo(b.gap, 2);
+        const zone = cut.zone.reduce((s, [from, to]) => s + (to - from), 0);
+        // The traced zone is a 4 cm contour; the finding's depth is exact.
+        expect(Math.abs(zone - b.zone.depth)).toBeLessThan(0.02);
+        expect(cut.zone[cut.zone.length - 1][1]).toBeCloseTo(b.zone.depthFromBoundary, 1);
+      }
+    });
+  }
 });
 
 describe("Band nach § 34 BauGB", () => {

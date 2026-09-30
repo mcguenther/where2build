@@ -845,15 +845,43 @@ function stripFacing(parcel, edge, outline, depth) {
 /* How far the section reaches past our boundary into the neighbour's side. */
 const SECTION_OUTSIDE_M = 20;
 
+/** The point on a boundary nearest to an outline, as arc length along it. */
+function nearestAlong(outline, group) {
+  let best = null;
+  const consider = (p, q) => {
+    const d = Math.hypot(p.x - q.x, p.y - q.y);
+    if (!best || d < best.d - 1e-9) best = { d, q };
+  };
+  const foot = (p, a, c) => {
+    const dx = c.x - a.x, dy = c.y - a.y, l2 = dx * dx + dy * dy;
+    const t = l2 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2)) : 0;
+    return { x: a.x + t * dx, y: a.y + t * dy };
+  };
+  for (const part of group.parts) {
+    for (let j = 0; j < outline.length; j++) {
+      const p = outline[j], r = outline[(j + 1) % outline.length];
+      consider(p, foot(p, part.a, part.b));
+      // A corner of ours nearest a wall of theirs: the boundary point is the corner.
+      for (const corner of [part.a, part.b]) consider(foot(corner, p, r), corner);
+    }
+  }
+  return projectOnBoundary(best.q, group);
+}
+
 /**
- * A cut across the plot through the middle of the stretch a neighbour faces,
- * square to that boundary. Positions only, in metres along the cut: 0 is our
- * boundary, positive runs into our plot, negative into the neighbour's.
+ * A cut across the plot, square to the boundary a neighbour faces, where the
+ * building comes nearest to it (kept within the stretch it faces). There the
+ * section shows the finding's own figures: the gap and how far the 6-m-Zone
+ * reaches. Through the middle of the stretch it showed 2,37 m and 0,63 m
+ * beside a finding that said 2,33 and 0,67. Positions only, in metres along
+ * the cut: 0 is our boundary, positive runs into our plot, negative into the
+ * neighbour's.
  */
 function sectionThrough(b, parcel, envelope, all, toInput) {
   const group = b._group;
-  const middle = (b.facing.face.from + b.facing.face.to) / 2;
-  const { point, part } = boundaryPointAt(group, middle);
+  const face = b.facing.face;
+  const at = Math.min(face.to, Math.max(face.from, nearestAlong(b.ring, group)));
+  const { point, part } = boundaryPointAt(group, at);
   // Inward normal of the stretch; for the reversed left side the ring's own
   // direction is the opposite of the part's.
   let nx = -(part.b.y - part.a.y) / part.length, ny = (part.b.x - part.a.x) / part.length;
@@ -872,7 +900,7 @@ function sectionThrough(b, parcel, envelope, all, toInput) {
     buildingId: b.id,
     boundary: group.kind,
     edge: toInput(b._edge),
-    at: middle,
+    at,
     origin: point,
     direction: { x: nx, y: ny },
     from: -SECTION_OUTSIDE_M,
