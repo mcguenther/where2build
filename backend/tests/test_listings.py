@@ -294,6 +294,54 @@ def test_a_clipboard_copy_keeps_the_body_and_loses_the_head(without_llm, client:
     assert read["lon"]["wert"] is None
 
 
+def test_the_title_travels_as_a_field_of_its_own(without_llm, client: TestClient):
+    """The preview has to say *which* advert was read, and it did not know.
+
+    The title used to ride only inside `hinweis`, where a mismatch warning or a
+    model's refusal note can stand in its place. A whole document states it in
+    `og:title`; a clipboard copy loses `<head>` and with it that tag, so the
+    `<h1>` above the price is what names the advert there.
+    """
+
+    page = fixture_text("inserat-kleinanzeigen.html")
+
+    whole = client.post("/api/listings/extract", json={"text": page}).json()
+    body_only = client.post(
+        "/api/listings/extract", json={"text": page[page.index("<body") :]}
+    ).json()
+
+    # `og:title` carries two spaces after the first dash; the field is for
+    # reading, so runs of space are one.
+    assert whole["titel"] == "Baugrundstück - ca. 1.025qm - direkt bebaubar"
+    assert body_only["titel"] == "Baugrundstück - ca. 1.025qm - direkt bebaubar"
+    # And only there: in `hinweis` it was shown as the source of every value
+    # read off the page, which a title is not.
+    assert whole["hinweis"] is None
+
+
+def test_text_without_a_heading_has_no_title(without_llm, client: TestClient):
+    """A paste of plain prose names no title, and none is made up for it."""
+
+    text = (
+        "Baugrundstück in der Gemarkung Mölkau, Grundstücksfläche ca. 866 m², "
+        "Kaufpreis 199.000 €. Ruhige Lage am Ortsrand, voll erschlossen."
+    )
+    answer = client.post("/api/listings/extract", json={"text": text})
+
+    assert answer.status_code == 200
+    assert answer.json()["titel"] is None
+
+
+@respx.mock
+def test_a_fetched_listing_carries_its_title(without_llm, client: TestClient):
+    respx.get(KLEINANZEIGEN_URL).mock(return_value=_kleinanzeigen_page())
+
+    answer = client.post("/api/listings/extract", json={"url": KLEINANZEIGEN_URL})
+
+    assert answer.status_code == 200
+    assert answer.json()["titel"].startswith("Wohnbaugrundstück")
+
+
 def test_a_handed_over_document_may_be_megabytes(without_llm, client: TestClient):
     """The cap has to hold a whole portal page, not a clipboard's worth.
 

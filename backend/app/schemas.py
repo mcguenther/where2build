@@ -201,8 +201,12 @@ class ListingExtractResponse(BaseModel):
     quelle_url: HttpUrl | None = None
     weg: Extraktionsweg
     hinweis: str | None = None
+    # The advert's own headline, as the page states it (`og:title`, else the
+    # first `<h1>`). Shown so the reader recognises *which* listing was read;
+    # nothing searches with it on its own -- it already rides in `beschreibung`.
+    titel: str | None = Field(default=None, max_length=500)
     # The listing's images, largest variant each. The search reads them for a
-    # cadastral extract; nothing else in the app uses them.
+    # cadastral extract; the wizard also shows them in its preview.
     bilder: list[str] = Field(default_factory=list)
     # The listing's own description, as the page carries it. Not an extracted
     # field and never part of a stored plot: it travels so the parcel search can
