@@ -1262,6 +1262,138 @@ class StandortPruefungen(BaseModel):
 
 
 # --------------------------------------------------------------------------
+# Bauleitplanung (RAPIS Sachsen)
+#
+# What RAPIS answers travels in its own words: the plan's name, its STATUS
+# ("rechtskräftig", "im Verfahren", "RO konform mit Maßgaben" ...), the legal
+# basis as written ("§34(4) Nr.3 BauGB"). The only thing this contract adds is
+# `status`, which says which of the two plan layers a record came from -- that
+# is the distinction the finding turns on, and RAPIS' own STATUS is too
+# fine-grained to carry it.
+# --------------------------------------------------------------------------
+
+PLANUNG_HINWEIS = (
+    "RAPIS führt Bauleitpläne und Satzungen nach Kenntnisstand der "
+    "Landesdirektion Sachsen und ist nachweislich nicht vollständig: ein "
+    "fehlender Eintrag heißt „kein bekannter Plan“, nicht „kein Plan“. Keine "
+    "rechtsverbindliche Auskunft — verbindlich ist die städtebauliche Auskunft "
+    "der Gemeinde."
+)
+
+PlanStatus = Literal["in Kraft", "im Verfahren"]
+
+
+class PlanungRequest(StandortRequest):
+    """One plot outline, in WGS84, as `[lon, lat]` pairs -- the same body as
+    `/api/site-checks`.
+
+    A ring rather than a point for the same reason: a plan boundary can run
+    through a plot, and a plot of several parcels is exactly the case where
+    the centre lands on the wrong side of it.
+    """
+
+
+class Bauleitplan(BaseModel):
+    """One Bebauungsplan or one statute under §§ 34/35 BauGB the plot touches."""
+
+    name: str = Field(description="Name des Plans, wie RAPIS ihn führt.")
+    status: PlanStatus = Field(
+        description="„in Kraft“ oder „im Verfahren“ — aus welcher RAPIS-Ebene der "
+        "Eintrag stammt (bei Satzungen: ob RAPIS ihn als rechtskräftig führt)."
+    )
+    verfahrensstand: str | None = Field(
+        default=None,
+        description="Das Feld STATUS in RAPIS' eigenem Wortlaut, z. B. „rechtskräftig“, "
+        "„im Verfahren“, „genehmigt“, „RO konform mit Maßgaben“.",
+    )
+    rechtsgrundlage: str | None = Field(
+        default=None,
+        description="Rechtsgrundlage laut RAPIS, z. B. „§12 BauGB“ (vorhabenbezogen) "
+        "oder „§34(4) Nr.3 BauGB“ (Ergänzungssatzung). Oft leer.",
+    )
+    plantyp: str | None = Field(
+        default=None,
+        description="RAPIS-Kürzel PLANTYP, ungedeutet weitergegeben. Vorkommende "
+        "Werte: „W“, „G“, „M“, „S“, „SATZ“, „sonst“ (z. B. E-215: „W“).",
+    )
+    gemeinde: str | None = Field(
+        default=None, description="Gemeinde, wie RAPIS sie schreibt („Leipzig, Stadt“)."
+    )
+    standort: str | None = Field(
+        default=None, description="Ortsteil oder Lage laut RAPIS, oft leer."
+    )
+    art_der_nutzung: list[str] = Field(
+        default_factory=list,
+        description="Art der Nutzung, soweit sie das Grundstück berührt — aus der "
+        "RAPIS-Ebene „Nutzungsarten“ (THEMA_DET, z. B. „Allgemeines Wohngebiet "
+        "(WA)“). Bei Satzungen die Teilflächen außer dem Satzungsgebiet selbst. "
+        "Keine GRZ, GFZ, Geschosse oder Baugrenzen: die führt RAPIS nicht.",
+    )
+    planstand: str | None = Field(
+        default=None,
+        description="Stand des Planwerks bei Plänen im Verfahren, z. B. „Vorentwurf“.",
+    )
+    genehmigt_am: date | None = Field(default=None, description="DAT_GENEHM.")
+    bekanntgemacht_am: date | None = Field(
+        default=None,
+        description="DAT_BEKANN — bei einem Plan in Kraft das Datum, seit dem er gilt.",
+    )
+    info: str | None = Field(
+        default=None,
+        description="Freitext INFO_VG aus RAPIS, z. B. „Teile von 1.Änderung überplant "
+        "(2014)“.",
+    )
+    rok_nr: int | None = Field(
+        default=None, description="Aktenzeichen der Raumordnungsbehörde (ROK_NR)."
+    )
+
+
+class Flaechennutzungsplan(BaseModel):
+    """The effective FNP at the plot, and what it shows there."""
+
+    name: str = Field(description="Name des FNP laut RAPIS.")
+    darstellungen: list[str] = Field(
+        default_factory=list,
+        description="Darstellung(en) auf dem Grundstück, z. B. „Wohnbaufläche“. "
+        "Mehrere, wenn eine Grenze durch das Grundstück läuft.",
+    )
+    gemeinde: str | None = None
+    bekanntgemacht_am: date | None = Field(default=None, description="dat_bekann.")
+    info: str | None = Field(
+        default=None,
+        description="Freitext info_vg, z. B. „wirksam 16.05.2015, letzte Änd.Verfahren 2023“.",
+    )
+
+
+class PlanungResponse(BaseModel):
+    """What RAPIS knows about the plot, layer by layer.
+
+    Every list is an answer: this endpoint either heard back from every layer
+    or fails as a whole with a German `detail`. An empty `bebauungsplaene`
+    therefore always means RAPIS was asked and knows none -- never that it
+    could not be asked.
+    """
+
+    bebauungsplaene: list[Bauleitplan] = Field(
+        description="Bebauungspläne, die das Grundstück schneiden — die in Kraft zuerst."
+    )
+    satzungen: list[Bauleitplan] = Field(
+        description="Satzungen nach § 34 Abs. 4 / § 35 Abs. 6 BauGB, die das Grundstück schneiden."
+    )
+    fnp: list[Flaechennutzungsplan] = Field(
+        description="Wirksame Flächennutzungspläne am Grundstück; leer, wenn RAPIS keinen führt."
+    )
+    datenstand: date | None = Field(
+        default=None,
+        description="Stand des letzten RAPIS-Uploads, gelesen aus DAT_RAPIS der "
+        "gelieferten Einträge. Leer, wenn keine Ebene einen Eintrag geliefert hat.",
+    )
+    quelle: str = Field(description="Quellenvermerk nach dl-de/by-2-0.")
+    quelle_url: str = Field(description="Wohin der Quellenvermerk verlinkt.")
+    hinweis: str = PLANUNG_HINWEIS
+
+
+# --------------------------------------------------------------------------
 # Cadastral districts
 # --------------------------------------------------------------------------
 

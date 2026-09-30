@@ -1,0 +1,19 @@
+{
+  "bebauungsplaene": [],
+  "satzungen": [],
+  "fnp": [
+    {
+      "name": "FNP der Stadt Leipzig, Fortschreibung",
+      "darstellungen": [
+        "Wohnbaufläche"
+      ],
+      "gemeinde": "Leipzig, Stadt",
+      "bekanntgemacht_am": "2015-05-16",
+      "info": "wirksam 16.05.2015, letzte Änd.Verfahren 2023"
+    }
+  ],
+  "datenstand": "2026-09-28",
+  "quelle": "RAPIS Sachsen 09/2026, Landesdirektion Sachsen — dl-de/by-2-0",
+  "quelle_url": "https://rapis.sachsen.de",
+  "hinweis": "RAPIS führt Bauleitpläne und Satzungen nach Kenntnisstand der Landesdirektion Sachsen und ist nachweislich nicht vollständig: ein fehlender Eintrag heißt „kein bekannter Plan“, nicht „kein Plan“. Keine rechtsverbindliche Auskunft — verbindlich ist die städtebauliche Auskunft der Gemeinde."
+}

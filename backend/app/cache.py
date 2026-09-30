@@ -78,6 +78,8 @@ _EVICTION_TIERS = {
     "overpass": 1,
     "alkis": 2,
     "boris": 2,
+    # Small answers from a slow authority, like BORIS.
+    "rapis": 2,
     "llm": 2,
 }
 _UNKNOWN_TIER = 1

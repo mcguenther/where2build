@@ -27,6 +27,7 @@ LLM_URL = "https://llm.example.org/v1"
 DOP_URL = "https://wms.example.org/dop"
 ALKIS_WMS_URL = "https://wms.example.org/alkis"
 LUIS_URL = "https://luis.example.org/arcgis/rest/services"
+RAPIS_URL = "https://rapis.example.org/arcgis/rest/services"
 NOISE_EXPORT_URL = f"{LUIS_URL}/laerm/laermkartierung/MapServer/export"
 UBA_URL = "https://luftdaten.example.org/api/air-data/v3"
 BASEMAP_URL = "https://tiles.openfreemap.org"
@@ -60,6 +61,7 @@ def isolated_settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("TILES_ALKIS_URL", ALKIS_WMS_URL)
     monkeypatch.setenv("TILES_NOISE_URL", NOISE_EXPORT_URL)
     monkeypatch.setenv("LUIS_BASE_URL", LUIS_URL)
+    monkeypatch.setenv("RAPIS_BASE_URL", RAPIS_URL)
     monkeypatch.setenv("AIRQUALITY_BASE_URL", UBA_URL)
     monkeypatch.setenv("BASEMAP_UPSTREAM_URL", BASEMAP_URL)
     # Named rather than inferred: the test endpoint is a made-up host, and the

@@ -270,6 +270,30 @@ class LuisSettings(BaseSettings):
     max_features: int = 200
 
 
+class RapisSettings(BaseSettings):
+    """RAPIS Sachsen, the Landesdirektion's planning register (env prefix ``RAPIS_``).
+
+    An open ArcGIS REST server with the plan areas of every Saxon municipality:
+    Bebauungspläne in force and in procedure, the §§ 34/35 statutes and the
+    effective FNP. Asked with ``/<layer>/query`` and the plot outline, like LUIS.
+    See docs/research/bebauungsplaene-sachsen.md.
+    """
+
+    model_config = SettingsConfigDict(env_prefix="RAPIS_", env_file=_ENV_FILE, extra="ignore")
+
+    base_url: str = "https://rapis.ipm-gis.de/arcgis/rest/services"
+    # Where the source credit links to, and where a user can look by hand.
+    portal_url: str = "https://rapis.sachsen.de"
+    srid: int = 25833
+    # A week, not the month the environmental layers get: RAPIS is uploaded
+    # weekly (DAT_RAPIS read "ROK 21.09.2026" on 25.09. and "ROK 28.09.2026" on
+    # 30.09.), and a plan that came into force is exactly the change this
+    # answer exists to report. Plan areas themselves change far more slowly, so
+    # a week of staleness costs nothing a user would notice.
+    cache_ttl_s: int = 7 * 24 * 3600
+    timeout_s: float = 30.0
+
+
 class AirQualitySettings(BaseSettings):
     """UBA air data (env prefix ``AIRQUALITY_``).
 
@@ -822,6 +846,7 @@ class Settings(BaseSettings):
     addresses: AddressSettings = Field(default_factory=AddressSettings)
     boris: BorisSettings = Field(default_factory=BorisSettings)
     luis: LuisSettings = Field(default_factory=LuisSettings)
+    rapis: RapisSettings = Field(default_factory=RapisSettings)
     air_quality: AirQualitySettings = Field(default_factory=AirQualitySettings)
     motis: MotisSettings = Field(default_factory=MotisSettings)
     nearby: NearbySettings = Field(default_factory=NearbySettings)
