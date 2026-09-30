@@ -205,6 +205,55 @@ describe("Schema-Fassungen", () => {
   });
 });
 
+describe("Nachbarschaft im Dokument", () => {
+  /* The „Nachbarn" switch was a stored flag; the tab that replaced it loads
+     when opened, so the flag is dropped on the way in. The readings chosen
+     per Grenzbebauung are the user's and survive a round trip. */
+  it("wirft den alten Schalter „Nachbarn“ weg", () => {
+    const raw = realState();
+    raw.plots[0].showNeighbours = true;
+    const d = validate(raw);
+    expect("showNeighbours" in d.plots[0]).toBe(false);
+  });
+
+  it("behält die gewählte Lesart je Gebäude und nur bekannte Werte", () => {
+    const raw = realState();
+    raw.plots[0].neighbourReadings = { DEBE01: "boundary", DEBE02: "setback", DEBE03: "vielleicht", "": "boundary" };
+    const p = validate(raw).plots[0];
+    expect(p.neighbourReadings).toEqual({ DEBE01: "boundary", DEBE02: "setback" });
+  });
+
+  it("legt kein leeres Feld an, wo niemand gewählt hat", () => {
+    const raw = realState();
+    raw.plots[0].neighbourReadings = { DEBE03: 42 };
+    raw.plots[1].neighbourReadings = "boundary";
+    const d = validate(raw);
+    expect("neighbourReadings" in d.plots[0]).toBe(false);
+    expect("neighbourReadings" in d.plots[1]).toBe(false);
+  });
+
+  it("übersteht Ausgeben und Einlesen samt Lesart", () => {
+    state.data.plots[0].neighbourReadings = { DEBE01: "boundary" };
+    state.data.plots[0].showNeighbours = true;
+    const text = exportJson();
+    importJson(text);
+    expect(state.data.plots[0].neighbourReadings).toEqual({ DEBE01: "boundary" });
+    expect(state.data.plots[0].showNeighbours).toBeUndefined();
+  });
+
+  it("holt einen gespeicherten Stand mit dem alten Schalter aus dem Browser herauf", () => {
+    const raw = realState();
+    raw.plots[0].showNeighbours = true;
+    raw.plots[0].neighbourReadings = { DEBE01: "boundary" };
+    save();
+    const key = Object.keys(localStorage)[0];
+    localStorage.setItem(key, JSON.stringify(raw));
+    load();
+    expect(state.data.plots[0].showNeighbours).toBeUndefined();
+    expect(state.data.plots[0].neighbourReadings).toEqual({ DEBE01: "boundary" });
+  });
+});
+
 describe("Ausgeben und Einlesen", () => {
   it("übersteht eine Runde ohne Verlust", () => {
     const before = exportJson();
