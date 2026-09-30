@@ -549,6 +549,53 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
   await ctx.close();
 }
 
+/* The „Nachbarschaft" tab, on a plot of its own rather than the run's
+ * Liebertwolkwitz 85/1: Mölkau 204 (Lessingweg 44) is the plot the approved
+ * mock-up was drawn on, and it carries every class the tab knows: a house on the
+ * boundary, one within 3 m, a shed at the rear and six houses for the § 34
+ * band. It is typed as district key and number, a certain parcel reading, in a
+ * context of its own so the rest of the run keeps one plot. Everything is
+ * real: ALKIS for the outlines, RAPIS for the planning lines. */
+for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunkel", 1440, 1000, false], ["hell", 402, 900, true]]) {
+  const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 2 });
+  const page = await ctx.newPage();
+  countTiles(page);
+  page.on("pageerror", e => problems.push(`nachbarschaft ${mode}/${width}: ${e.message}`));
+  page.on("console", m => {
+    if (m.type() === "error" && !/Failed to load resource/.test(m.text())) problems.push(`nachbarschaft ${mode}/${width}: ${m.text()}`);
+  });
+  await page.goto(address, { waitUntil: "load" });
+  await page.evaluate(() => document.fonts.ready);
+  await page.click(`.theme-switch button:nth-child(${mode === "hell" ? 1 : 2})`);
+  await page.fill(QUERY_FIELD, "145592 204");
+  await page.getByRole("button", { name: "Grundstück finden" }).click();
+  await page.waitForSelector("#q-name", { timeout: 60000 });
+  await page.getByRole("button", { name: "Anlegen und öffnen" }).click();
+  await page.waitForSelector(".plot-page", { timeout: 30000 });
+  await page.getByRole("tab", { name: "Nachbarschaft" }).click();
+  try {
+    await page.waitForSelector(".nb-marker", { timeout: 60000 });
+    await page.waitForSelector("#pane-neighbourhood [data-finding=easement]", { timeout: 60000 });
+  } catch {
+    problems.push(`nachbarschaft ${mode}/${width}: der Reiter hat keine Nachbarn gezeichnet`);
+  }
+  await mapSettled(page, `nachbarschaft ${mode}/${width}`, ".plan-grid");
+  await shotOf(page, ".plan-grid", "grundstueck-nachbarschaft", mode, narrow ? "-schmal" : "");
+  if (!narrow) {
+    const n46 = page.locator("#pane-neighbourhood .befund", { hasText: "Lessingweg 46" }).first();
+    await n46.getByRole("button", { name: "Im Schnitt" }).click();
+    await page.waitForTimeout(300);
+    await shotOf(page, ".plan-grid", "grundstueck-nachbarschaft-schnitt", mode);
+    await n46.getByRole("button", { name: "Schließen" }).click();
+    await page.locator(".plan-zoom").getByRole("button", { name: "Straße" }).click();
+    await page.waitForTimeout(900);
+    await mapSettled(page, `nachbarschaft Straße ${mode}/${width}`, ".plan-grid");
+    await shotOf(page, ".plan-frame", "grundstueck-nachbarschaft-strasse", mode);
+  }
+  await shotOf(page, "#nachbarschaft", "grundstueck-nachbarschaft-detail", mode, narrow ? "-schmal" : "");
+  await ctx.close();
+}
+
 /* The print rendering, as the browser would lay it out on paper. */
 /* A4 at 96 dpi. At the old 1240 px the shot was 1.76x the real 186 mm column,
    which flattered the layout and hid how tight it actually is. */
