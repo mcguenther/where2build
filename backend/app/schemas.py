@@ -2114,3 +2114,31 @@ class LoeschAnfrage(BaseModel):
 
 class LoeschErgebnis(BaseModel):
     geleert: dict[str, int] = Field(description="Tabelle → Anzahl gelöschter Zeilen.")
+
+
+# The most one warm-up may name. A list of twenty plots with their comparison
+# is some forty thumbnails; anything far past that is not a list being drawn.
+MAX_WARM_BLOCKS = 100
+
+
+class Kachelblock(BaseModel):
+    ebene: str = Field(description="Kartenebene, wie im Pfad von /api/tiles.")
+    z: int = Field(ge=0, le=24)
+    west: int = Field(ge=0, description="Erste Kachelspalte.")
+    nord: int = Field(ge=0, description="Erste Kachelzeile.")
+    ost: int = Field(ge=0, description="Letzte Kachelspalte, eingeschlossen.")
+    sued: int = Field(ge=0, description="Letzte Kachelzeile, eingeschlossen.")
+
+
+class BloeckeVorwaermen(BaseModel):
+    bloecke: list[Kachelblock] = Field(min_length=1, max_length=MAX_WARM_BLOCKS)
+
+
+class VorwaermenErgebnis(BaseModel):
+    angefragt: int = Field(description="So viele verschiedene Kachelblöcke nannte die Anfrage.")
+    zusammengesetzt_werden: int = Field(
+        description="So viele fehlten im Zwischenspeicher und werden jetzt im Hintergrund zusammengesetzt."
+    )
+    geholt_werden: int = Field(
+        description="So viele Einzelkacheln müssen dafür beim Kartendienst geholt werden."
+    )

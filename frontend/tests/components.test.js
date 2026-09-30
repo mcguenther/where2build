@@ -135,9 +135,9 @@ describe("Lageplan", () => {
     expect(plan.props("compact")).toBe(true);
     expect(plan.props("northUp")).toBe(false);
     expect(plan.props("tileGround")).toBe("umgebung");
-    const tiles = plan.findAll(".site-plan__tile-ground image");
-    expect(tiles.length).toBeGreaterThan(0);
-    expect(tiles[0].attributes("href")).toMatch(/^\/api\/tiles\/umgebung\/\d+\/\d+\/\d+\.png$/);
+    const ground = plan.findAll(".site-plan__tile-ground image");
+    expect(ground).toHaveLength(1);
+    expect(ground[0].attributes("href")).toMatch(/^\/api\/tiles\/umgebung\/block\/\d+\/\d+\/\d+\/\d+\/\d+\.png$/);
     // The ground lies under the plot, not over it.
     const html = plan.html();
     expect(html.indexOf("site-plan__tile-ground")).toBeLessThan(html.indexOf("var(--w2b-map-surface)"));

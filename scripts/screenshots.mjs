@@ -208,7 +208,18 @@ async function nav(page, name) {
   await page.waitForTimeout(150);
 }
 
+/* A thumbnail's ground is one image that stays invisible until it has loaded
+ * and then fades in, so a picture taken before that shows flat paper and
+ * passes. Waited for, bounded, and reported rather than photographed. */
+async function groundsSettled(page, name) {
+  const settled = await page.waitForFunction(
+    () => !document.querySelector('[data-ground="loading"]'), null, { timeout: 30000 }
+  ).then(() => true, () => false);
+  if (!settled) problems.push(`${name}: Umgebungsbild einer Vorschau kam nicht an`);
+}
+
 async function shot(page, name, mode, zusatz = "") {
+  await groundsSettled(page, `${name}/${mode}`);
   await page.waitForTimeout(340);
   // A layout that pushes the page sideways is a defect, and no screenshot shows it.
   const overflow = await page.evaluate(() =>
@@ -222,6 +233,7 @@ async function shot(page, name, mode, zusatz = "") {
 /** One section of a page rather than all of it — for a part that lives far
  *  down a long page, where a full-page picture is mostly everything else. */
 async function shotOf(page, selector, name, mode, zusatz = "") {
+  await groundsSettled(page, `${name}/${mode}`);
   await page.waitForTimeout(340);
   const overflow = await page.evaluate(() =>
     document.documentElement.scrollWidth - document.documentElement.clientWidth);

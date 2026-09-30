@@ -138,8 +138,12 @@ landete auf einem eigenen.
 ## Bewegung
 
 Sparsam. Übergänge nur dort, wo sie einen Zustandswechsel erklären: das
-Ausklappen eines Abschnitts, der Wechsel eines Assistentenschritts. Nichts
-bewegt sich beim Laden. `prefers-reduced-motion` schaltet alles ab.
+Ausklappen eines Abschnitts, der Wechsel eines Assistentenschritts. Beim Laden
+bewegt sich nur eines: ein Platzhalter an der Stelle des Kommenden pulsiert
+ruhig (`w2b-pulse`), damit das Warten nicht wie ein leerer Rahmen aussieht —
+in der Prüfliste, bei den Wegekarten und in den Vorschaubildern der
+Grundstücke. Was fertig ist, erscheint in einem Zug, nie Stück für Stück.
+`prefers-reduced-motion` schaltet alles ab.
 
 ## Sprache in der Oberfläche
 
