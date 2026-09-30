@@ -41,7 +41,7 @@ describe("Reiter neben dem Plan", () => {
   it("zeigt zuerst das Grundstück, und der Baukörper steht im zweiten Reiter", () => {
     const w = mountPlot();
     const tabs = w.findAll('[role="tab"]').map(t => t.text());
-    expect(tabs).toEqual(["Grundstück", "Bebauung"]);
+    expect(tabs).toEqual(["Grundstück", "Bebauung", "Nachbarschaft"]);
     expect(shown(pane(w, "plot"))).toBe(true);
     expect(shown(pane(w, "building"))).toBe(false);
     // Hidden, not removed: the fields exist for print and keep what is typed.

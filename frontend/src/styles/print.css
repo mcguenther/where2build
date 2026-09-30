@@ -78,6 +78,18 @@
     --w2b-map-violation:        #A8402C;
     --w2b-map-selection:         #456B52;
     --w2b-map-green:           #DCE4DA;
+    --w2b-map-neighbour-main:      #C3BBAE;
+    --w2b-map-neighbour-main-edge: #7D7468;
+    --w2b-map-neighbour-aux:       #E0DBD2;
+    --w2b-map-neighbour-aux-edge:  #B0A89B;
+    --w2b-map-reach:               #857C70;
+    --w2b-map-zone:                #C0561A;
+    --w2b-map-zone-veil:           rgba(192,86,26,.12);
+    --w2b-map-boundary-built:      #BE8524;
+    --w2b-map-band:                rgba(111,138,108,.13);
+    --w2b-map-band-strong:         rgba(111,138,108,.26);
+    --w2b-map-band-line:           #5E7A5B;
+    --w2b-map-soil:                #E2DDD3;
 
     /* Paper is not a screen: both scales come down a step. This is what turns
        seven loose sheets into one, and it costs nothing — every component
@@ -254,10 +266,16 @@
   .plan-grid > .facts{ display: contents !important; }
   /* The plot's figures span both rows; without this the first row grows to
      their height and the building body lands far below the drawing. */
-  .plan-grid.print-sheet{ grid-template-rows: auto 1fr !important; }
+  .plan-grid.print-sheet{ grid-template-rows: auto 1fr auto !important; }
   .side-pane{ display: flex !important; }
   #pane-plot{ grid-column: 2; grid-row: 1 / span 2; }
   #pane-building{ grid-column: 1; grid-row: 2; }
+  /* The neighbourhood's findings and the planning lines under both, at full
+     width: text reads there, and the drawings follow in their own section.
+     A tab never opened prints nothing — it carries `no-print` until then. */
+  #pane-neighbourhood{ grid-column: 1 / span 2; grid-row: 3; }
+  #pane-neighbourhood .nachbarschaft{ display: grid !important; grid-template-columns: 1.7fr 1fr; gap: 6mm; }
+  #pane-neighbourhood .nachbarschaft > .panel{ break-inside: auto; }
   .side-pane > *{ break-inside: avoid; }
   .site-plan__selection{ display: none !important; }
   /* Every hint fold on the page: paper has nothing to click. The count is
