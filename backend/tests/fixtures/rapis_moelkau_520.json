@@ -1,0 +1,1318 @@
+{
+ "_aufgezeichnet": "2026-09-30, POST <base>/<dienst>/MapServer/<ebene>/query mit dem Umring",
+ "ring": [
+  [
+   12.4395554,
+   51.3306234
+  ],
+  [
+   12.4402405,
+   51.3302059
+  ],
+  [
+   12.4402445,
+   51.3302035
+  ],
+  [
+   12.4407884,
+   51.3306741
+  ],
+  [
+   12.4407828,
+   51.3306762
+  ],
+  [
+   12.440854,
+   51.3307374
+  ],
+  [
+   12.4405826,
+   51.330859
+  ],
+  [
+   12.4407423,
+   51.3309748
+  ],
+  [
+   12.4406434,
+   51.3310318
+  ],
+  [
+   12.4405445,
+   51.3310888
+  ],
+  [
+   12.4404452,
+   51.3311462
+  ],
+  [
+   12.4403471,
+   51.3312027
+  ],
+  [
+   12.440194,
+   51.3310893
+  ],
+  [
+   12.4400449,
+   51.3309798
+  ],
+  [
+   12.4395554,
+   51.3306234
+  ]
+ ],
+ "antworten": {
+  "RO_FNP_wirksam/1": {
+   "displayFieldName": "NAME",
+   "fieldAliases": {
+    "OBJECTID": "OBJECTID",
+    "name": "NAME",
+    "status": "STATUS",
+    "aenderung": "AENDERUNG",
+    "kreis": "KREIS",
+    "gemeinde": "GEMEINDE",
+    "thema": "THEMA",
+    "thema_det": "THEMA_DET",
+    "info_vg": "INFO_VG",
+    "fnp_gmd": "FNP_GMD",
+    "fnp_ot": "FNP_OT",
+    "info_obj": "INFO_OBJ",
+    "plan": "PLAN",
+    "dat_plan": "DAT_PLAN",
+    "dat_genehm": "DAT_GENEHM",
+    "dat_bekann": "DAT_BEKANN",
+    "dat_quelle": "DAT_QUELLE",
+    "rok_nr": "ROK_NR",
+    "akte": "AKTE",
+    "dat_rapis": "DAT_RAPIS",
+    "Shape_Length": "Shape_Length",
+    "Shape_Area": "Shape_Area",
+    "dat_antrag": "dat_antrag",
+    "dat_ro": "dat_ro",
+    "pl_no": "pl_no"
+   },
+   "fields": [
+    {
+     "name": "OBJECTID",
+     "type": "esriFieldTypeOID",
+     "alias": "OBJECTID"
+    },
+    {
+     "name": "name",
+     "type": "esriFieldTypeString",
+     "alias": "NAME",
+     "length": 254
+    },
+    {
+     "name": "status",
+     "type": "esriFieldTypeString",
+     "alias": "STATUS",
+     "length": 254
+    },
+    {
+     "name": "aenderung",
+     "type": "esriFieldTypeString",
+     "alias": "AENDERUNG",
+     "length": 50
+    },
+    {
+     "name": "kreis",
+     "type": "esriFieldTypeString",
+     "alias": "KREIS",
+     "length": 254
+    },
+    {
+     "name": "gemeinde",
+     "type": "esriFieldTypeString",
+     "alias": "GEMEINDE",
+     "length": 254
+    },
+    {
+     "name": "thema",
+     "type": "esriFieldTypeString",
+     "alias": "THEMA",
+     "length": 254
+    },
+    {
+     "name": "thema_det",
+     "type": "esriFieldTypeString",
+     "alias": "THEMA_DET",
+     "length": 80
+    },
+    {
+     "name": "info_vg",
+     "type": "esriFieldTypeString",
+     "alias": "INFO_VG",
+     "length": 254
+    },
+    {
+     "name": "fnp_gmd",
+     "type": "esriFieldTypeString",
+     "alias": "FNP_GMD",
+     "length": 50
+    },
+    {
+     "name": "fnp_ot",
+     "type": "esriFieldTypeString",
+     "alias": "FNP_OT",
+     "length": 50
+    },
+    {
+     "name": "info_obj",
+     "type": "esriFieldTypeString",
+     "alias": "INFO_OBJ",
+     "length": 200
+    },
+    {
+     "name": "plan",
+     "type": "esriFieldTypeString",
+     "alias": "PLAN",
+     "length": 254
+    },
+    {
+     "name": "dat_plan",
+     "type": "esriFieldTypeString",
+     "alias": "DAT_PLAN",
+     "length": 20
+    },
+    {
+     "name": "dat_genehm",
+     "type": "esriFieldTypeDate",
+     "alias": "DAT_GENEHM",
+     "length": 8
+    },
+    {
+     "name": "dat_bekann",
+     "type": "esriFieldTypeDate",
+     "alias": "DAT_BEKANN",
+     "length": 8
+    },
+    {
+     "name": "dat_quelle",
+     "type": "esriFieldTypeString",
+     "alias": "DAT_QUELLE",
+     "length": 50
+    },
+    {
+     "name": "rok_nr",
+     "type": "esriFieldTypeInteger",
+     "alias": "ROK_NR"
+    },
+    {
+     "name": "akte",
+     "type": "esriFieldTypeString",
+     "alias": "AKTE",
+     "length": 254
+    },
+    {
+     "name": "dat_rapis",
+     "type": "esriFieldTypeString",
+     "alias": "DAT_RAPIS",
+     "length": 50
+    },
+    {
+     "name": "Shape_Length",
+     "type": "esriFieldTypeDouble",
+     "alias": "Shape_Length"
+    },
+    {
+     "name": "Shape_Area",
+     "type": "esriFieldTypeDouble",
+     "alias": "Shape_Area"
+    },
+    {
+     "name": "dat_antrag",
+     "type": "esriFieldTypeDate",
+     "alias": "dat_antrag",
+     "length": 8
+    },
+    {
+     "name": "dat_ro",
+     "type": "esriFieldTypeDate",
+     "alias": "dat_ro",
+     "length": 8
+    },
+    {
+     "name": "pl_no",
+     "type": "esriFieldTypeString",
+     "alias": "pl_no",
+     "length": 254
+    }
+   ],
+   "features": [
+    {
+     "attributes": {
+      "OBJECTID": 152612,
+      "name": "FNP der Stadt Leipzig, Fortschreibung",
+      "status": "rechtskräftig",
+      "aenderung": " ",
+      "kreis": "Leipzig, Stadt",
+      "gemeinde": "Leipzig, Stadt",
+      "thema": "P_01_1_FNP",
+      "thema_det": "Straßenverkehrsfläche",
+      "info_vg": "wirksam 16.05.2015, letzte Änd.Verfahren 2023",
+      "fnp_gmd": "Leipzig, Stadt",
+      "fnp_ot": " ",
+      "info_obj": "Straßennetz,",
+      "plan": " ",
+      "dat_plan": "22.07.2015",
+      "dat_genehm": 1417647600000,
+      "dat_bekann": 1431727200000,
+      "dat_quelle": " ",
+      "rok_nr": 3120026,
+      "akte": " ",
+      "dat_rapis": "LD Sachsen, ROK 28.09.2026, letzter RAPIS-Upload",
+      "Shape_Length": 835373.6469433522,
+      "Shape_Area": 13238503.645320252,
+      "dat_antrag": null,
+      "dat_ro": null,
+      "pl_no": "2a19beb9-5a1d-4fdb-9d54-9004dbc5fab4"
+     }
+    },
+    {
+     "attributes": {
+      "OBJECTID": 152955,
+      "name": "FNP der Stadt Leipzig, Fortschreibung",
+      "status": "rechtskräftig",
+      "aenderung": " ",
+      "kreis": "Leipzig, Stadt",
+      "gemeinde": "Leipzig, Stadt",
+      "thema": "P_01_1_FNP",
+      "thema_det": "Wohnbaufläche",
+      "info_vg": "wirksam 16.05.2015, letzte Änd.Verfahren 2023",
+      "fnp_gmd": "Leipzig, Stadt",
+      "fnp_ot": " ",
+      "info_obj": " ",
+      "plan": " ",
+      "dat_plan": "22.07.2015",
+      "dat_genehm": 1417647600000,
+      "dat_bekann": 1431727200000,
+      "dat_quelle": " ",
+      "rok_nr": 3120026,
+      "akte": " ",
+      "dat_rapis": "LD Sachsen, ROK 28.09.2026, letzter RAPIS-Upload",
+      "Shape_Length": 1982.4200744708517,
+      "Shape_Area": 120504.15035100067,
+      "dat_antrag": null,
+      "dat_ro": null,
+      "pl_no": "2a19beb9-5a1d-4fdb-9d54-9004dbc5fab4"
+     }
+    }
+   ]
+  },
+  "WMS_BPLAN/0": {
+   "displayFieldName": "NAME",
+   "fieldAliases": {
+    "OBJECTID": "OBJECTID",
+    "NAME": "NAME",
+    "STATUS": "STATUS",
+    "AENDERUNG": "AENDERUNG",
+    "KREIS": "KREIS",
+    "GEMEINDE": "GEMEINDE",
+    "STANDORT": "STANDORT",
+    "BETEILIG": "BETEILIG",
+    "RECHTSGRL": "RECHTSGRL",
+    "THEMA": "THEMA",
+    "THEMA_DET": "THEMA_DET",
+    "INFO_VG": "INFO_VG",
+    "INFO_PL": "INFO_PL",
+    "INFO_OBJ": "INFO_OBJ",
+    "DAT_ANTRAG": "DAT_ANTRAG",
+    "PLAN": "PLAN",
+    "DAT_PLAN": "DAT_PLAN",
+    "DAT_RO": "DAT_RO",
+    "DAT_GENEHM": "DAT_GENEHM",
+    "DAT_SATZ": "DAT_SATZ",
+    "DAT_BEKANN": "DAT_BEKANN",
+    "DAT_QUELLE": "DAT_QUELLE",
+    "ROK_NR": "ROK_NR",
+    "AKTE": "AKTE",
+    "PLANTYP": "PLANTYP",
+    "DAT_RAPIS": "DAT_RAPIS",
+    "pl_no": "pl_no",
+    "Shape_Length": "Shape_Length",
+    "Shape_Area": "Shape_Area"
+   },
+   "fields": [
+    {
+     "name": "OBJECTID",
+     "type": "esriFieldTypeOID",
+     "alias": "OBJECTID"
+    },
+    {
+     "name": "NAME",
+     "type": "esriFieldTypeString",
+     "alias": "NAME",
+     "length": 200
+    },
+    {
+     "name": "STATUS",
+     "type": "esriFieldTypeString",
+     "alias": "STATUS",
+     "length": 50
+    },
+    {
+     "name": "AENDERUNG",
+     "type": "esriFieldTypeString",
+     "alias": "AENDERUNG",
+     "length": 254
+    },
+    {
+     "name": "KREIS",
+     "type": "esriFieldTypeString",
+     "alias": "KREIS",
+     "length": 35
+    },
+    {
+     "name": "GEMEINDE",
+     "type": "esriFieldTypeString",
+     "alias": "GEMEINDE",
+     "length": 50
+    },
+    {
+     "name": "STANDORT",
+     "type": "esriFieldTypeString",
+     "alias": "STANDORT",
+     "length": 254
+    },
+    {
+     "name": "BETEILIG",
+     "type": "esriFieldTypeString",
+     "alias": "BETEILIG",
+     "length": 12
+    },
+    {
+     "name": "RECHTSGRL",
+     "type": "esriFieldTypeString",
+     "alias": "RECHTSGRL",
+     "length": 80
+    },
+    {
+     "name": "THEMA",
+     "type": "esriFieldTypeString",
+     "alias": "THEMA",
+     "length": 80
+    },
+    {
+     "name": "THEMA_DET",
+     "type": "esriFieldTypeString",
+     "alias": "THEMA_DET",
+     "length": 80
+    },
+    {
+     "name": "INFO_VG",
+     "type": "esriFieldTypeString",
+     "alias": "INFO_VG",
+     "length": 254
+    },
+    {
+     "name": "INFO_PL",
+     "type": "esriFieldTypeString",
+     "alias": "INFO_PL",
+     "length": 254
+    },
+    {
+     "name": "INFO_OBJ",
+     "type": "esriFieldTypeString",
+     "alias": "INFO_OBJ",
+     "length": 254
+    },
+    {
+     "name": "DAT_ANTRAG",
+     "type": "esriFieldTypeDate",
+     "alias": "DAT_ANTRAG",
+     "length": 8
+    },
+    {
+     "name": "PLAN",
+     "type": "esriFieldTypeString",
+     "alias": "PLAN",
+     "length": 30
+    },
+    {
+     "name": "DAT_PLAN",
+     "type": "esriFieldTypeString",
+     "alias": "DAT_PLAN",
+     "length": 20
+    },
+    {
+     "name": "DAT_RO",
+     "type": "esriFieldTypeDate",
+     "alias": "DAT_RO",
+     "length": 8
+    },
+    {
+     "name": "DAT_GENEHM",
+     "type": "esriFieldTypeDate",
+     "alias": "DAT_GENEHM",
+     "length": 8
+    },
+    {
+     "name": "DAT_SATZ",
+     "type": "esriFieldTypeDate",
+     "alias": "DAT_SATZ",
+     "length": 8
+    },
+    {
+     "name": "DAT_BEKANN",
+     "type": "esriFieldTypeDate",
+     "alias": "DAT_BEKANN",
+     "length": 8
+    },
+    {
+     "name": "DAT_QUELLE",
+     "type": "esriFieldTypeString",
+     "alias": "DAT_QUELLE",
+     "length": 50
+    },
+    {
+     "name": "ROK_NR",
+     "type": "esriFieldTypeInteger",
+     "alias": "ROK_NR"
+    },
+    {
+     "name": "AKTE",
+     "type": "esriFieldTypeString",
+     "alias": "AKTE",
+     "length": 254
+    },
+    {
+     "name": "PLANTYP",
+     "type": "esriFieldTypeString",
+     "alias": "PLANTYP",
+     "length": 5
+    },
+    {
+     "name": "DAT_RAPIS",
+     "type": "esriFieldTypeString",
+     "alias": "DAT_RAPIS",
+     "length": 50
+    },
+    {
+     "name": "pl_no",
+     "type": "esriFieldTypeString",
+     "alias": "pl_no",
+     "length": 254
+    },
+    {
+     "name": "Shape_Length",
+     "type": "esriFieldTypeDouble",
+     "alias": "Shape_Length"
+    },
+    {
+     "name": "Shape_Area",
+     "type": "esriFieldTypeDouble",
+     "alias": "Shape_Area"
+    }
+   ],
+   "features": [
+    {
+     "attributes": {
+      "OBJECTID": 2990,
+      "NAME": "V-BPlan Nr. 424 Handels- und Dienstleistungszentrum Mölkau-Mitte",
+      "STATUS": "im Verfahren",
+      "AENDERUNG": " ",
+      "KREIS": "Leipzig, Stadt",
+      "GEMEINDE": "Leipzig, Stadt",
+      "STANDORT": "SB Ost, OT Mölkau",
+      "BETEILIG": "§4(1) BauGB",
+      "RECHTSGRL": "§12 BauGB",
+      "THEMA": "P_01_2_BPLAN_Satzungen",
+      "THEMA_DET": "Sondergebiet Handel",
+      "INFO_VG": "vorhabebez. BPl., Flst.520 Gmrk. Mölkau, Lebenmittelmarkt 1200qm Vkfl, Backshop mit Bistro 180qm, Kiosk 35qm, Arztpraxen 450qm",
+      "INFO_PL": " ",
+      "INFO_OBJ": "SOH",
+      "DAT_ANTRAG": 1685484000000,
+      "PLAN": "Vorentwurf",
+      "DAT_PLAN": "20.01.2023",
+      "DAT_RO": 1688421600000,
+      "DAT_GENEHM": null,
+      "DAT_SATZ": null,
+      "DAT_BEKANN": null,
+      "DAT_QUELLE": "TöB, eMail 31.05.2023",
+      "ROK_NR": 3230077,
+      "AKTE": "34-2417/731/34",
+      "PLANTYP": "S",
+      "DAT_RAPIS": "LD Sachsen, ROK 28.09.2026, letzter RAPIS-Upload",
+      "pl_no": "00002378_0000002379_20230612150003",
+      "Shape_Length": 303.0931289000683,
+      "Shape_Area": 5059.566907917895
+     }
+    }
+   ]
+  },
+  "WMS_BPLAN/1": {
+   "displayFieldName": "NAME",
+   "fieldAliases": {
+    "OBJECTID": "OBJECTID",
+    "NAME": "NAME",
+    "STATUS": "STATUS",
+    "KREIS": "KREIS",
+    "GEMEINDE": "GEMEINDE",
+    "STANDORT": "STANDORT",
+    "RECHTSGRL": "RECHTSGRL",
+    "THEMA": "THEMA",
+    "PLAN": "PLAN",
+    "DAT_PLAN": "DAT_PLAN",
+    "DAT_GENEHM": "DAT_GENEHM",
+    "DAT_SATZ": "DAT_SATZ",
+    "DAT_BEKANN": "DAT_BEKANN",
+    "DAT_QUELLE": "DAT_QUELLE",
+    "ROK_NR": "ROK_NR",
+    "AKTE": "AKTE",
+    "DAT_RAPIS": "DAT_RAPIS",
+    "Shape_Length": "Shape_Length",
+    "Shape_Area": "Shape_Area",
+    "DAT_RO": "DAT_RO",
+    "AENDERUNG": "AENDERUNG",
+    "INFO_VG": "INFO_VG",
+    "PLANTYP": "PLANTYP"
+   },
+   "fields": [
+    {
+     "name": "OBJECTID",
+     "type": "esriFieldTypeOID",
+     "alias": "OBJECTID"
+    },
+    {
+     "name": "NAME",
+     "type": "esriFieldTypeString",
+     "alias": "NAME",
+     "length": 200
+    },
+    {
+     "name": "STATUS",
+     "type": "esriFieldTypeString",
+     "alias": "STATUS",
+     "length": 50
+    },
+    {
+     "name": "KREIS",
+     "type": "esriFieldTypeString",
+     "alias": "KREIS",
+     "length": 35
+    },
+    {
+     "name": "GEMEINDE",
+     "type": "esriFieldTypeString",
+     "alias": "GEMEINDE",
+     "length": 50
+    },
+    {
+     "name": "STANDORT",
+     "type": "esriFieldTypeString",
+     "alias": "STANDORT",
+     "length": 254
+    },
+    {
+     "name": "RECHTSGRL",
+     "type": "esriFieldTypeString",
+     "alias": "RECHTSGRL",
+     "length": 80
+    },
+    {
+     "name": "THEMA",
+     "type": "esriFieldTypeString",
+     "alias": "THEMA",
+     "length": 80
+    },
+    {
+     "name": "PLAN",
+     "type": "esriFieldTypeString",
+     "alias": "PLAN",
+     "length": 30
+    },
+    {
+     "name": "DAT_PLAN",
+     "type": "esriFieldTypeString",
+     "alias": "DAT_PLAN",
+     "length": 20
+    },
+    {
+     "name": "DAT_GENEHM",
+     "type": "esriFieldTypeDate",
+     "alias": "DAT_GENEHM",
+     "length": 8
+    },
+    {
+     "name": "DAT_SATZ",
+     "type": "esriFieldTypeDate",
+     "alias": "DAT_SATZ",
+     "length": 8
+    },
+    {
+     "name": "DAT_BEKANN",
+     "type": "esriFieldTypeDate",
+     "alias": "DAT_BEKANN",
+     "length": 8
+    },
+    {
+     "name": "DAT_QUELLE",
+     "type": "esriFieldTypeString",
+     "alias": "DAT_QUELLE",
+     "length": 50
+    },
+    {
+     "name": "ROK_NR",
+     "type": "esriFieldTypeInteger",
+     "alias": "ROK_NR"
+    },
+    {
+     "name": "AKTE",
+     "type": "esriFieldTypeString",
+     "alias": "AKTE",
+     "length": 254
+    },
+    {
+     "name": "DAT_RAPIS",
+     "type": "esriFieldTypeString",
+     "alias": "DAT_RAPIS",
+     "length": 50
+    },
+    {
+     "name": "Shape_Length",
+     "type": "esriFieldTypeDouble",
+     "alias": "Shape_Length"
+    },
+    {
+     "name": "Shape_Area",
+     "type": "esriFieldTypeDouble",
+     "alias": "Shape_Area"
+    },
+    {
+     "name": "DAT_RO",
+     "type": "esriFieldTypeDate",
+     "alias": "DAT_RO",
+     "length": 8
+    },
+    {
+     "name": "AENDERUNG",
+     "type": "esriFieldTypeString",
+     "alias": "AENDERUNG",
+     "length": 254
+    },
+    {
+     "name": "INFO_VG",
+     "type": "esriFieldTypeString",
+     "alias": "INFO_VG",
+     "length": 254
+    },
+    {
+     "name": "PLANTYP",
+     "type": "esriFieldTypeString",
+     "alias": "PLANTYP",
+     "length": 5
+    }
+   ],
+   "features": [
+    {
+     "attributes": {
+      "OBJECTID": 9543,
+      "NAME": "V-BPlan Nr. 424 Handels- und Dienstleistungszentrum Mölkau-Mitte",
+      "STATUS": "im Verfahren",
+      "KREIS": "Leipzig, Stadt",
+      "GEMEINDE": "Leipzig, Stadt",
+      "STANDORT": "SB Ost, OT Mölkau",
+      "RECHTSGRL": "§12 BauGB",
+      "THEMA": "P_01_2_BPLAN_Satzungen",
+      "PLAN": "Vorentwurf",
+      "DAT_PLAN": "20.01.2023",
+      "DAT_GENEHM": null,
+      "DAT_SATZ": null,
+      "DAT_BEKANN": null,
+      "DAT_QUELLE": "TöB, eMail 31.05.2023",
+      "ROK_NR": 3230077,
+      "AKTE": "34-2417/731/34",
+      "DAT_RAPIS": "LD Sachsen, ROK 28.09.2026, letzter RAPIS-Upload",
+      "Shape_Length": 303.0931289000683,
+      "Shape_Area": 5059.566907917895,
+      "DAT_RO": 1688421600000,
+      "AENDERUNG": " ",
+      "INFO_VG": "vorhabebez. BPl., Flst.520 Gmrk. Mölkau, Lebenmittelmarkt 1200qm Vkfl, Backshop mit Bistro 180qm, Kiosk 35qm, Arztpraxen 450qm",
+      "PLANTYP": "S"
+     }
+    }
+   ]
+  },
+  "WMS_BPLAN/2": {
+   "displayFieldName": "NAME",
+   "fieldAliases": {
+    "OBJECTID": "OBJECTID",
+    "NAME": "NAME",
+    "STATUS": "STATUS",
+    "AENDERUNG": "AENDERUNG",
+    "KREIS": "KREIS",
+    "GEMEINDE": "GEMEINDE",
+    "STANDORT": "STANDORT",
+    "BETEILIG": "BETEILIG",
+    "RECHTSGRL": "RECHTSGRL",
+    "THEMA": "THEMA",
+    "THEMA_DET": "THEMA_DET",
+    "INFO_VG": "INFO_VG",
+    "INFO_PL": "INFO_PL",
+    "INFO_OBJ": "INFO_OBJ",
+    "DAT_ANTRAG": "DAT_ANTRAG",
+    "PLAN": "PLAN",
+    "DAT_PLAN": "DAT_PLAN",
+    "DAT_RO": "DAT_RO",
+    "DAT_GENEHM": "DAT_GENEHM",
+    "DAT_SATZ": "DAT_SATZ",
+    "DAT_BEKANN": "DAT_BEKANN",
+    "DAT_QUELLE": "DAT_QUELLE",
+    "ROK_NR": "ROK_NR",
+    "AKTE": "AKTE",
+    "PLANTYP": "PLANTYP",
+    "DAT_RAPIS": "DAT_RAPIS",
+    "pl_no": "pl_no",
+    "Shape_Length": "Shape_Length",
+    "Shape_Area": "Shape_Area"
+   },
+   "fields": [
+    {
+     "name": "OBJECTID",
+     "type": "esriFieldTypeOID",
+     "alias": "OBJECTID"
+    },
+    {
+     "name": "NAME",
+     "type": "esriFieldTypeString",
+     "alias": "NAME",
+     "length": 200
+    },
+    {
+     "name": "STATUS",
+     "type": "esriFieldTypeString",
+     "alias": "STATUS",
+     "length": 50
+    },
+    {
+     "name": "AENDERUNG",
+     "type": "esriFieldTypeString",
+     "alias": "AENDERUNG",
+     "length": 254
+    },
+    {
+     "name": "KREIS",
+     "type": "esriFieldTypeString",
+     "alias": "KREIS",
+     "length": 35
+    },
+    {
+     "name": "GEMEINDE",
+     "type": "esriFieldTypeString",
+     "alias": "GEMEINDE",
+     "length": 50
+    },
+    {
+     "name": "STANDORT",
+     "type": "esriFieldTypeString",
+     "alias": "STANDORT",
+     "length": 254
+    },
+    {
+     "name": "BETEILIG",
+     "type": "esriFieldTypeString",
+     "alias": "BETEILIG",
+     "length": 12
+    },
+    {
+     "name": "RECHTSGRL",
+     "type": "esriFieldTypeString",
+     "alias": "RECHTSGRL",
+     "length": 80
+    },
+    {
+     "name": "THEMA",
+     "type": "esriFieldTypeString",
+     "alias": "THEMA",
+     "length": 80
+    },
+    {
+     "name": "THEMA_DET",
+     "type": "esriFieldTypeString",
+     "alias": "THEMA_DET",
+     "length": 80
+    },
+    {
+     "name": "INFO_VG",
+     "type": "esriFieldTypeString",
+     "alias": "INFO_VG",
+     "length": 254
+    },
+    {
+     "name": "INFO_PL",
+     "type": "esriFieldTypeString",
+     "alias": "INFO_PL",
+     "length": 254
+    },
+    {
+     "name": "INFO_OBJ",
+     "type": "esriFieldTypeString",
+     "alias": "INFO_OBJ",
+     "length": 254
+    },
+    {
+     "name": "DAT_ANTRAG",
+     "type": "esriFieldTypeDate",
+     "alias": "DAT_ANTRAG",
+     "length": 8
+    },
+    {
+     "name": "PLAN",
+     "type": "esriFieldTypeString",
+     "alias": "PLAN",
+     "length": 30
+    },
+    {
+     "name": "DAT_PLAN",
+     "type": "esriFieldTypeString",
+     "alias": "DAT_PLAN",
+     "length": 20
+    },
+    {
+     "name": "DAT_RO",
+     "type": "esriFieldTypeDate",
+     "alias": "DAT_RO",
+     "length": 8
+    },
+    {
+     "name": "DAT_GENEHM",
+     "type": "esriFieldTypeDate",
+     "alias": "DAT_GENEHM",
+     "length": 8
+    },
+    {
+     "name": "DAT_SATZ",
+     "type": "esriFieldTypeDate",
+     "alias": "DAT_SATZ",
+     "length": 8
+    },
+    {
+     "name": "DAT_BEKANN",
+     "type": "esriFieldTypeDate",
+     "alias": "DAT_BEKANN",
+     "length": 8
+    },
+    {
+     "name": "DAT_QUELLE",
+     "type": "esriFieldTypeString",
+     "alias": "DAT_QUELLE",
+     "length": 50
+    },
+    {
+     "name": "ROK_NR",
+     "type": "esriFieldTypeInteger",
+     "alias": "ROK_NR"
+    },
+    {
+     "name": "AKTE",
+     "type": "esriFieldTypeString",
+     "alias": "AKTE",
+     "length": 254
+    },
+    {
+     "name": "PLANTYP",
+     "type": "esriFieldTypeString",
+     "alias": "PLANTYP",
+     "length": 5
+    },
+    {
+     "name": "DAT_RAPIS",
+     "type": "esriFieldTypeString",
+     "alias": "DAT_RAPIS",
+     "length": 50
+    },
+    {
+     "name": "pl_no",
+     "type": "esriFieldTypeString",
+     "alias": "pl_no",
+     "length": 254
+    },
+    {
+     "name": "Shape_Length",
+     "type": "esriFieldTypeDouble",
+     "alias": "Shape_Length"
+    },
+    {
+     "name": "Shape_Area",
+     "type": "esriFieldTypeDouble",
+     "alias": "Shape_Area"
+    }
+   ],
+   "features": []
+  },
+  "WMS_BPLAN/3": {
+   "displayFieldName": "NAME",
+   "fieldAliases": {
+    "OBJECTID": "OBJECTID",
+    "NAME": "NAME",
+    "STATUS": "STATUS",
+    "KREIS": "KREIS",
+    "GEMEINDE": "GEMEINDE",
+    "STANDORT": "STANDORT",
+    "RECHTSGRL": "RECHTSGRL",
+    "THEMA": "THEMA",
+    "PLAN": "PLAN",
+    "DAT_PLAN": "DAT_PLAN",
+    "DAT_GENEHM": "DAT_GENEHM",
+    "DAT_SATZ": "DAT_SATZ",
+    "DAT_BEKANN": "DAT_BEKANN",
+    "DAT_QUELLE": "DAT_QUELLE",
+    "ROK_NR": "ROK_NR",
+    "AKTE": "AKTE",
+    "DAT_RAPIS": "DAT_RAPIS",
+    "Shape_Length": "Shape_Length",
+    "Shape_Area": "Shape_Area",
+    "DAT_RO": "DAT_RO",
+    "AENDERUNG": "AENDERUNG",
+    "INFO_VG": "INFO_VG",
+    "PLANTYP": "PLANTYP"
+   },
+   "fields": [
+    {
+     "name": "OBJECTID",
+     "type": "esriFieldTypeOID",
+     "alias": "OBJECTID"
+    },
+    {
+     "name": "NAME",
+     "type": "esriFieldTypeString",
+     "alias": "NAME",
+     "length": 200
+    },
+    {
+     "name": "STATUS",
+     "type": "esriFieldTypeString",
+     "alias": "STATUS",
+     "length": 50
+    },
+    {
+     "name": "KREIS",
+     "type": "esriFieldTypeString",
+     "alias": "KREIS",
+     "length": 35
+    },
+    {
+     "name": "GEMEINDE",
+     "type": "esriFieldTypeString",
+     "alias": "GEMEINDE",
+     "length": 50
+    },
+    {
+     "name": "STANDORT",
+     "type": "esriFieldTypeString",
+     "alias": "STANDORT",
+     "length": 254
+    },
+    {
+     "name": "RECHTSGRL",
+     "type": "esriFieldTypeString",
+     "alias": "RECHTSGRL",
+     "length": 80
+    },
+    {
+     "name": "THEMA",
+     "type": "esriFieldTypeString",
+     "alias": "THEMA",
+     "length": 80
+    },
+    {
+     "name": "PLAN",
+     "type": "esriFieldTypeString",
+     "alias": "PLAN",
+     "length": 30
+    },
+    {
+     "name": "DAT_PLAN",
+     "type": "esriFieldTypeString",
+     "alias": "DAT_PLAN",
+     "length": 20
+    },
+    {
+     "name": "DAT_GENEHM",
+     "type": "esriFieldTypeDate",
+     "alias": "DAT_GENEHM",
+     "length": 8
+    },
+    {
+     "name": "DAT_SATZ",
+     "type": "esriFieldTypeDate",
+     "alias": "DAT_SATZ",
+     "length": 8
+    },
+    {
+     "name": "DAT_BEKANN",
+     "type": "esriFieldTypeDate",
+     "alias": "DAT_BEKANN",
+     "length": 8
+    },
+    {
+     "name": "DAT_QUELLE",
+     "type": "esriFieldTypeString",
+     "alias": "DAT_QUELLE",
+     "length": 50
+    },
+    {
+     "name": "ROK_NR",
+     "type": "esriFieldTypeInteger",
+     "alias": "ROK_NR"
+    },
+    {
+     "name": "AKTE",
+     "type": "esriFieldTypeString",
+     "alias": "AKTE",
+     "length": 254
+    },
+    {
+     "name": "DAT_RAPIS",
+     "type": "esriFieldTypeString",
+     "alias": "DAT_RAPIS",
+     "length": 50
+    },
+    {
+     "name": "Shape_Length",
+     "type": "esriFieldTypeDouble",
+     "alias": "Shape_Length"
+    },
+    {
+     "name": "Shape_Area",
+     "type": "esriFieldTypeDouble",
+     "alias": "Shape_Area"
+    },
+    {
+     "name": "DAT_RO",
+     "type": "esriFieldTypeDate",
+     "alias": "DAT_RO",
+     "length": 8
+    },
+    {
+     "name": "AENDERUNG",
+     "type": "esriFieldTypeString",
+     "alias": "AENDERUNG",
+     "length": 254
+    },
+    {
+     "name": "INFO_VG",
+     "type": "esriFieldTypeString",
+     "alias": "INFO_VG",
+     "length": 254
+    },
+    {
+     "name": "PLANTYP",
+     "type": "esriFieldTypeString",
+     "alias": "PLANTYP",
+     "length": 5
+    }
+   ],
+   "features": []
+  },
+  "WMS_BPLAN/5": {
+   "displayFieldName": "NAME",
+   "fieldAliases": {
+    "OBJECTID": "OBJECTID",
+    "NAME": "NAME",
+    "STATUS": "STATUS",
+    "KREIS": "KREIS",
+    "GEMEINDE": "GEMEINDE",
+    "STANDORT": "STANDORT",
+    "RECHTSGRL": "RECHTSGRL",
+    "THEMA": "THEMA",
+    "THEMA_DET": "THEMA_DET",
+    "INFO_OBJ": "INFO_OBJ",
+    "PLAN": "PLAN",
+    "DAT_PLAN": "DAT_PLAN",
+    "DAT_RO": "DAT_RO",
+    "DAT_GENEHM": "DAT_GENEHM",
+    "DAT_SATZ": "DAT_SATZ",
+    "DAT_BEKANN": "DAT_BEKANN",
+    "DAT_QUELLE": "DAT_QUELLE",
+    "ROK_NR": "ROK_NR",
+    "AKTE": "AKTE",
+    "DAT_RAPIS": "DAT_RAPIS",
+    "Shape_Length": "Shape_Length",
+    "Shape_Area": "Shape_Area",
+    "AENDERUNG": "AENDERUNG",
+    "INFO_VG": "INFO_VG",
+    "INFO_PL": "INFO_PL",
+    "PLANTYP": "PLANTYP",
+    "BETEILIG": "BETEILIG",
+    "DAT_ANTRAG": "DAT_ANTRAG",
+    "pl_no": "pl_no"
+   },
+   "fields": [
+    {
+     "name": "OBJECTID",
+     "type": "esriFieldTypeOID",
+     "alias": "OBJECTID"
+    },
+    {
+     "name": "NAME",
+     "type": "esriFieldTypeString",
+     "alias": "NAME",
+     "length": 200
+    },
+    {
+     "name": "STATUS",
+     "type": "esriFieldTypeString",
+     "alias": "STATUS",
+     "length": 50
+    },
+    {
+     "name": "KREIS",
+     "type": "esriFieldTypeString",
+     "alias": "KREIS",
+     "length": 35
+    },
+    {
+     "name": "GEMEINDE",
+     "type": "esriFieldTypeString",
+     "alias": "GEMEINDE",
+     "length": 50
+    },
+    {
+     "name": "STANDORT",
+     "type": "esriFieldTypeString",
+     "alias": "STANDORT",
+     "length": 254
+    },
+    {
+     "name": "RECHTSGRL",
+     "type": "esriFieldTypeString",
+     "alias": "RECHTSGRL",
+     "length": 80
+    },
+    {
+     "name": "THEMA",
+     "type": "esriFieldTypeString",
+     "alias": "THEMA",
+     "length": 80
+    },
+    {
+     "name": "THEMA_DET",
+     "type": "esriFieldTypeString",
+     "alias": "THEMA_DET",
+     "length": 80
+    },
+    {
+     "name": "INFO_OBJ",
+     "type": "esriFieldTypeString",
+     "alias": "INFO_OBJ",
+     "length": 254
+    },
+    {
+     "name": "PLAN",
+     "type": "esriFieldTypeString",
+     "alias": "PLAN",
+     "length": 30
+    },
+    {
+     "name": "DAT_PLAN",
+     "type": "esriFieldTypeString",
+     "alias": "DAT_PLAN",
+     "length": 20
+    },
+    {
+     "name": "DAT_RO",
+     "type": "esriFieldTypeDate",
+     "alias": "DAT_RO",
+     "length": 8
+    },
+    {
+     "name": "DAT_GENEHM",
+     "type": "esriFieldTypeDate",
+     "alias": "DAT_GENEHM",
+     "length": 8
+    },
+    {
+     "name": "DAT_SATZ",
+     "type": "esriFieldTypeDate",
+     "alias": "DAT_SATZ",
+     "length": 8
+    },
+    {
+     "name": "DAT_BEKANN",
+     "type": "esriFieldTypeDate",
+     "alias": "DAT_BEKANN",
+     "length": 8
+    },
+    {
+     "name": "DAT_QUELLE",
+     "type": "esriFieldTypeString",
+     "alias": "DAT_QUELLE",
+     "length": 50
+    },
+    {
+     "name": "ROK_NR",
+     "type": "esriFieldTypeInteger",
+     "alias": "ROK_NR"
+    },
+    {
+     "name": "AKTE",
+     "type": "esriFieldTypeString",
+     "alias": "AKTE",
+     "length": 254
+    },
+    {
+     "name": "DAT_RAPIS",
+     "type": "esriFieldTypeString",
+     "alias": "DAT_RAPIS",
+     "length": 50
+    },
+    {
+     "name": "Shape_Length",
+     "type": "esriFieldTypeDouble",
+     "alias": "Shape_Length"
+    },
+    {
+     "name": "Shape_Area",
+     "type": "esriFieldTypeDouble",
+     "alias": "Shape_Area"
+    },
+    {
+     "name": "AENDERUNG",
+     "type": "esriFieldTypeString",
+     "alias": "AENDERUNG",
+     "length": 254
+    },
+    {
+     "name": "INFO_VG",
+     "type": "esriFieldTypeString",
+     "alias": "INFO_VG",
+     "length": 254
+    },
+    {
+     "name": "INFO_PL",
+     "type": "esriFieldTypeString",
+     "alias": "INFO_PL",
+     "length": 254
+    },
+    {
+     "name": "PLANTYP",
+     "type": "esriFieldTypeString",
+     "alias": "PLANTYP",
+     "length": 5
+    },
+    {
+     "name": "BETEILIG",
+     "type": "esriFieldTypeString",
+     "alias": "BETEILIG",
+     "length": 12
+    },
+    {
+     "name": "DAT_ANTRAG",
+     "type": "esriFieldTypeDate",
+     "alias": "DAT_ANTRAG",
+     "length": 8
+    },
+    {
+     "name": "pl_no",
+     "type": "esriFieldTypeString",
+     "alias": "pl_no",
+     "length": 254
+    }
+   ],
+   "features": []
+  }
+ }
+}

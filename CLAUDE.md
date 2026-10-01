@@ -32,8 +32,8 @@ Keep comments sparse and about *why*, not *what*.
 
 ```
 backend/     FastAPI. Proxy and disk cache in front of ALKIS, BORIS, GeoSN
-             WMS, MOTIS and the LLM. No database — PostGIS is in the plan, not
-             in the code.
+             WMS, RAPIS Sachsen (`/api/planning`), MOTIS and the LLM. No
+             database — PostGIS is in the plan, not in the code.
              `app/search/` is the exception: it asks the cadastre a series of
              narrow questions and answers NDJSON, so the map can grow while it
              runs — and it *measures* what comes back. See below.
@@ -87,11 +87,22 @@ from the user directly. Reopen only if the user asks.
   gives 0,4 H with a 3 m floor, Abs. 2 puts that area on one's own plot, Abs. 3
   forbids setback areas overlapping — so 6 m is the arithmetic of two minimal
   cases, not a norm, and a neighbour standing too close does **not** enlarge our
-  setback. The hatched strip in the plan therefore says where the two areas
-  would overlap and that this is a question for the Bauaufsicht; it must never
-  be worded as an obligation. OSM has the outlines but almost no wall heights
-  (11 of 59 around Mölkau 204 carry `building:levels`, none carries `height`),
-  so only the 3 m floor is computable.
+  setback. **The dashed § 6 envelope never moves.** What the „Nachbarschaft"
+  tab draws is per building, decided with the user on 30.09.2026
+  (`lib/neighbourhood.js`, mock-up `docs/strategie/ui-nachbarschaft.html`):
+  each outline is classified (Bestand, Nebengebäude that counts for nothing
+  under § 6 Abs. 8, Grenzbebauung under 0,5 m, Überdeckung under 3 m, ohne
+  Befund) and assigned to the one boundary it faces; a neighbour's own 3 m
+  onto us is a grey hatch; the part of our envelope within 6 m of it is the
+  amber cross-hatched „6-m-Zone", worded as a question for the Bauaufsicht and
+  never as an obligation, and a house reaching into it turns the house check
+  amber, not red. A Grenzbebauung has two readings — „Abstand nötig" (the
+  cautious default, which never shows more buildable land than there could be)
+  and „An die Grenze darf gebaut werden" (our strip along that stretch is
+  maybe buildable) — chosen per building and stored with the plot. OSM has the
+  outlines but almost no wall heights (11 of 59 around Mölkau 204 carry
+  `building:levels`, none carries `height`), and ALKIS none, so only the 3 m
+  floor is computable and no drawing states a height.
   See `docs/research/abstandsflaechen-nachbargebaeude.md`.
 - Region is Saxony only; ALKIS and BORIS are state-specific.
 - **A contradiction is shown, never resolved quietly.** Two Gemarkungen in one
@@ -272,14 +283,18 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
   never run two suites at once here. Three Tesseract tests failed on a run
   sharing the machine with another pytest, and they failed exactly as a
   photograph of a lawn does: an empty reading, past the 30 s timeout.
-- `vitest`: 811 passed — plus the integration file, excluded by `npm run test`
+- `vitest`: 871 passed (01.10.2026) — plus the integration file, excluded by `npm run test`
   and 8 passed / 2 skipped when a backend is up on :8000
 - `scripts/bookmarklet.mjs`: the handover across two origins, against the built
   app and a backend on :8000. It asserts the coordinate, which is the field
   that separates a handed-over document from a pasted one, and it writes
   `assistent-uebergabe.png`.
-- `scripts/screenshots.mjs`: 97 images plus one print PDF — 76 and the PDF
-  without a session, as measured on 24.09.2026. The location record prints as
+- `scripts/screenshots.mjs`: 108 images plus one print PDF — 87 and the PDF
+  without a session, as measured on 30.09.2026. Eleven of them are the
+  „Nachbarschaft" tab (`grundstueck-nachbarschaft-*`), taken on Mölkau 204 in
+  a context of its own, typed as „145592 204", with the ELK All in One 159
+  placed in the amber state by computation (the run prints house, ratio and
+  angle). The location record prints as
   part of the plot sheet now, so there is no second PDF. Twenty-one of them
   need a session (`konto-*` and the administration area) and they are taken only
   with `W2B_ADMIN_COOKIE` set — see `docs/claude/tooling-and-tests.md` for how

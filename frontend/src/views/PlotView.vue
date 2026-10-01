@@ -54,38 +54,14 @@
                   @click="state.plan.showSetbacks = !state.plan.showSetbacks">Abstandsflächen</button>
           <button type="button" class="toggle" :aria-pressed="String(state.plan.measuring)"
                   @click="toggleMeasuring">Messen</button>
-          <button type="button" class="toggle" :disabled="!hasAnchor"
-                  :title="hasAnchor ? null : 'Ohne Koordinate lassen sich keine Nachbargebäude finden.'"
-                  :aria-pressed="String(showNeighbours)"
-                  @click="toggleNeighbours">Nachbarn</button>
         </div>
 
-        <p class="notice" :class="violation ? 'notice--error' : 'notice--good'" role="status">
-          <span v-if="violation">
-            <b>{{ outliers }} Gebäudeecke{{ outliers > 1 ? 'n liegen' : ' liegt' }} außerhalb des Bebauungsfensters.</b>
-            Geringster Grenzabstand {{ metres(narrowestSetback) }}.
-          </span>
-          <span v-else>
-            <b>Baukörper liegt im Bebauungsfenster.</b>
-            Geringster Grenzabstand {{ metres(narrowestSetback) }}.
-          </span>
-        </p>
-
-        <p v-if="showNeighbours" class="notice neighbour-note" role="status">
-          <span v-if="neighboursBusy">Nachbargebäude werden geholt …</span>
-          <span v-else-if="neighboursError">{{ neighboursError }}</span>
-          <span v-else-if="neighbourHint">
-            <b>Schraffiert: hier reicht die Abstandsfläche des Nachbargebäudes herüber.</b>
-            § 6 SächsBO verlangt das nicht von uns: jedes Gebäude hält seine Abstandsfläche
-            auf dem eigenen Grundstück. Wo beide sich überdecken würden, ist das eine Frage
-            an die Bauaufsicht, keine Prüfung. Umrisse aus {{ neighbourSource }}, ohne
-            Wandhöhen, gerechnet mit dem Mindestmaß von 3 m.
-          </span>
-          <span v-else-if="neighbourBuildings.length">
-            <b>Kein Nachbargebäude steht näher als 3 m an der Grenze.</b>
-            {{ neighbourBuildings.length }} Umrisse aus {{ neighbourSource }} geprüft.
-          </span>
-          <span v-else>In der Umgebung ist dort kein Gebäude erfasst.</span>
+        <!-- Three states once the neighbours are known: inside, inside but
+             nearer a neighbour than 6 m, outside. Without them the two the
+             envelope alone can tell. -->
+        <p class="notice house-check" :class="`notice--${houseNotice.tone}`" role="status"
+           :data-house-status="houseNotice.status">
+          <span><b>{{ houseNotice.lead }}</b> {{ houseNotice.rest }}</span>
         </p>
 
         <p v-if="state.plan.measuring" class="notice measure-bar">
@@ -101,9 +77,14 @@
                     :measuring="state.plan.measuring" @measured="m => (measurement = m)"
                     :backdrop="state.plan.backdrop" :north-up="state.plan.northUp"
                     :show-dimensions="state.plan.showDimensions" :show-setbacks="state.plan.showSetbacks"
-                    :confine-to-envelope="confineHouse" :neighbour-depths="neighbourDepths"
+                    :confine-to-envelope="confineHouse"
                     :house-selected="sidePane === 'building'"
-                    @move="moveHouse" @select="selectOnPlan" />
+                    :neighbourhood="neighbourhoodShown ? neighbourhood : null"
+                    :neighbour-markers="neighbourMarkers" :active-building="activeBuilding"
+                    :neighbour-highlight="neighbourHighlight" :frame="planFrameShown"
+                    :house-status="houseCheck ? houseCheck.status : null"
+                    @move="moveHouse" @select="selectOnPlan"
+                    @neighbour-hover="hoverBuilding" @neighbour-pick="pickOnPlan" />
           <!-- The house is laid on the plot to try it out. Saying which one, on
                the drawing itself, keeps it findable while the column beside
                the plan shows the plot. -->
@@ -114,6 +95,13 @@
                     @click="showPane(sidePane === 'building' ? 'plot' : 'building')">
               {{ sidePane === "building" ? "Fertig" : "Bearbeiten" }}
             </button>
+          </div>
+          <!-- How much ground the plan frames, while the neighbourhood is open. -->
+          <div v-if="neighbourhoodShown" class="plan-zoom no-print" role="group" aria-label="Ausschnitt">
+            <button v-for="f in frames" :key="f.id" type="button" :aria-pressed="String(planFrameShown === f.id)"
+                    :disabled="f.id === 'street' && !streetFramePossible"
+                    :title="f.id === 'street' && !streetFramePossible ? 'Auf unserer Straßenseite steht kein Nachbarhaus, an dem sich ein Band ablesen ließe.' : null"
+                    @click="planFrame = f.id">{{ f.name }}</button>
           </div>
         </div>
 
@@ -419,8 +407,25 @@
             </HintFold>
           </section>
         </div>
+
+        <!-- Printed only once there is something in it: a tab nobody opened
+             has asked no service. -->
+        <div v-show="sidePane === 'neighbourhood'" id="pane-neighbourhood" class="side-pane"
+             :class="{ 'no-print': !neighbourhood }" role="tabpanel" aria-labelledby="tab-neighbourhood">
+          <NeighbourhoodPane ref="neighbourhoodPane" :analysis="neighbourhood" :findings="neighbourhoodList"
+                             :busy="neighboursBusy" :error="neighboursError" :source="neighbourSource"
+                             :has-anchor="hasAnchor" :planning="planningResult"
+                             :planning-busy="planningBusy" :planning-error="planningError"
+                             :municipality="plot.municipality" :active-building="activeBuilding"
+                             :open="openAnalysis"
+                             @hover="hoverBuilding" @pin="pinBuilding" @open="openNeighbourAnalysis"
+                             @reading="setReading" @frame="f => (planFrame = f)" />
+        </div>
       </aside>
     </div>
+
+    <NeighbourhoodDetail v-if="neighbourhood && neighbourhood.buildings.length"
+                         :analysis="neighbourhood" :findings="neighbourhoodList" />
 
     <!-- What holds at the plot. It used to be a page of its own, with the
          parcel and the land value repeated from this one; here it keeps only
@@ -582,6 +587,7 @@
 </template>
 
 <script>
+import { markRaw } from "vue";
 import SitePlan from "../components/SitePlan.vue";
 import SharePanel from "../components/SharePanel.vue";
 import SharedLinks from "../components/SharedLinks.vue";
@@ -590,19 +596,23 @@ import NearbyPanel from "../components/NearbyPanel.vue";
 import SurroundingsMap from "../components/SurroundingsMap.vue";
 import CheckList from "../components/CheckList.vue";
 import HintFold from "../components/HintFold.vue";
+import NeighbourhoodPane from "../components/NeighbourhoodPane.vue";
+import NeighbourhoodDetail from "../components/NeighbourhoodDetail.vue";
 import {
   state, plotById, placement, houseTypeById, houseFootprint, save, addHouseType,
   newId, setRoutes, CUSTOM_SIZE, DEFAULT_FOOTPRINT
 } from "../lib/store.js";
-import { reachability, neighbourBuildings as fetchNeighbourBuildings } from "../lib/api.js";
+import { reachability, neighbourBuildings as fetchNeighbourBuildings, planning as fetchPlanning } from "../lib/api.js";
 import { zubringerOf, fastestMode, coordinatesOf, MODES } from "../lib/routes.js";
-import { toLocal } from "../lib/projection.js";
+import { toWgs84 } from "../lib/projection.js";
+import { analyseNeighbourhood, localBuildings, checkHouse, READING_SETBACK } from "../lib/neighbourhood.js";
+import { neighbourhoodFindings, houseCheckFinding } from "../lib/findings.js";
 import { NOISE_BANDS } from "../lib/basemap.js";
 import { noiseOnPlot } from "../lib/siteChecks.js";
 import { plotMetrics, PRICE_BAND } from "../lib/metrics.js";
 import {
   polygonEdges, edgeCompass, buildableArea, cornersOutside, smallestSetback,
-  alignToEdge, alignmentToEdge, findPlacement, neighbourSetbackDepths, hasNeighbourHint
+  alignToEdge, alignmentToEdge, findPlacement
 } from "../lib/geometry.js";
 import { area, euro, euroPerSqm, metres, num, percent, degrees, date, duration, parseGermanNumber } from "../lib/format.js";
 
@@ -621,7 +631,10 @@ const MAX_EDGE = 30;
 
 export default {
   name: "PlotView",
-  components: { SitePlan, SharePanel, SharedLinks, RouteCards, NearbyPanel, SurroundingsMap, CheckList, HintFold },
+  components: {
+    SitePlan, SharePanel, SharedLinks, RouteCards, NearbyPanel, SurroundingsMap, CheckList, HintFold,
+    NeighbourhoodPane, NeighbourhoodDetail
+  },
   props: {
     /** The plot's id, straight out of the URL. */
     id: { type: String, required: true }
@@ -634,27 +647,51 @@ export default {
       sizeDraft: { length: null, width: null },
       measurement: { points: [], length: 0 },
       sharing: false,
-      /** Which tab the column beside the plan shows: "plot" or "building".
-       *  The plot comes first — whether the house fits is the second question. */
+      /** Which tab the column beside the plan shows: "plot", "building" or
+       *  "neighbourhood". The plot comes first — whether the house fits is the
+       *  second question. Not stored: a plot opens on its figures. */
       sidePane: "plot",
+      /** The plan's frame while the neighbourhood tab is open. */
+      planFrame: "neighbours",
+      frames: [
+        { id: "plot", name: "Grundstück" },
+        { id: "neighbours", name: "Nachbarn" },
+        { id: "street", name: "Straße" }
+      ],
       /** The price field's text while it is open; null while it is closed. */
       priceDraft: null,
       priceError: null,
       panes: [
         { id: "plot", name: "Grundstück" },
-        { id: "building", name: "Bebauung" }
+        { id: "building", name: "Bebauung" },
+        { id: "neighbourhood", name: "Nachbarschaft" }
       ],
       naming: false,
       typeName: "",
       /** Outlines are not stored with the plot: they are somebody else's data,
        *  they are large, and the backend keeps them for a month anyway. Only
-       *  the preference lives in the document. */
-      neighbourBuildings: [],
+       *  the readings chosen for them live in the document. Held raw: the
+       *  analysis copies them once, and a deep proxy over 70 rings costs a
+       *  trap per coordinate read. */
+      neighbourBuildings: markRaw([]),
+      /** The plot the outlines above belong to; null before the first answer. */
+      neighboursFor: null,
       /** Which register the outlines came from — the answer says so, and the
        *  sentence beside the drawing must not claim a different one. */
       neighbourSource: "dem Liegenschaftskataster",
       neighboursBusy: false,
       neighboursError: null,
+      /** The RAPIS answer for this plot, asked once when the tab opens. */
+      planningResult: null,
+      planningFor: null,
+      planningBusy: false,
+      planningError: null,
+      /** The building the pointer or the keyboard is on, and the one pinned by
+       *  a click; the pinned one wins until it is clicked again. */
+      hoveredBuilding: null,
+      pinnedBuilding: null,
+      /** The one analysis open inline: `{ kind, findingId, boundary, section }`. */
+      openAnalysis: null,
       routesBusy: false,
       routesError: null,
       /** The last /api/nearby answer, as the panel reports it — the map draws
@@ -754,19 +791,61 @@ export default {
        written before the setting existed carry no field, and those plots have
        always been dragged with the house kept inside as of this version. */
     confineHouse() { return this.plot?.confineHouse !== false; },
-    showNeighbours() { return Boolean(this.plot?.showNeighbours) && this.hasAnchor; },
-    /** The outlines in this plot's own metre frame. */
-    neighbourOutlines() {
-      if (!this.showNeighbours || !this.plot.anchor) return [];
-      return this.neighbourBuildings.map(b => toLocal(b.umriss, this.plot.anchor));
+    /** The outlines in this plot's own metre frame, once they are here. */
+    localNeighbours() {
+      if (!this.plot?.anchor || this.neighboursFor !== this.plot.id) return null;
+      return localBuildings(this.neighbourBuildings, this.plot.anchor);
     },
-    neighbourDepths() {
-      if (!this.neighbourOutlines.length) return null;
-      return neighbourSetbackDepths(this.plot.polygon, this.plot.setbacks, this.neighbourOutlines);
+    /** The analysis per building (lib/neighbourhood.js), with the readings the
+     *  user chose. Memoised there, so a new reading costs nothing. */
+    neighbourhood() {
+      if (!this.localNeighbours) return null;
+      return analyseNeighbourhood(this.plot, this.localNeighbours, { reading: { ...(this.plot.neighbourReadings ?? {}) } });
     },
-    neighbourHint() {
-      return Boolean(this.neighbourDepths)
-        && hasNeighbourHint(this.plot.setbacks, this.neighbourDepths);
+    neighbourhoodList() { return neighbourhoodFindings(this.neighbourhood); },
+    neighbourhoodShown() { return this.sidePane === "neighbourhood" && Boolean(this.neighbourhood); },
+    neighbourMarkers() {
+      return this.neighbourhoodList.filter(f => f.marker)
+        .map(f => ({ marker: f.marker, buildingId: f.buildingId, title: f.title }));
+    },
+    activeBuilding() { return this.pinnedBuilding ?? this.hoveredBuilding; },
+    /** Leaving the tab returns the plan to the plot. */
+    planFrameShown() {
+      if (this.sidePane !== "neighbourhood") return "plot";
+      return this.planFrame === "street" && !this.streetFramePossible ? "neighbours" : this.planFrame;
+    },
+    streetFramePossible() { return Boolean(this.neighbourhood?.band?.houses?.length); },
+    neighbourHighlight() {
+      const open = this.openAnalysis;
+      if (!open) return null;
+      return open.kind === "section" ? { section: open.section } : { boundary: open.boundary };
+    },
+    /** Inside, in a 6-m-Zone, or outside — once the neighbours are known.
+     *  Cheap enough for every drag: a memoised analysis and four edges
+     *  against each zone's outline. */
+    houseCheck() {
+      if (!this.neighbourhood || !this.building) return null;
+      return checkHouse(this.neighbourhood, this.building);
+    },
+    /** The line over the plan: lead in bold, the rest after it. */
+    houseNotice() {
+      const finding = houseCheckFinding(this.houseCheck);
+      if (finding) {
+        const [first, ...rest] = finding.sentences;
+        const tone = { inside: "good", zone: "zone", outside: "error" }[finding.status];
+        if (finding.status === "zone") {
+          const cut = first.indexOf(", reicht aber");
+          return { status: finding.status, tone, lead: `${first.slice(0, cut)},`, rest: [first.slice(cut + 2), ...rest].join(" ") };
+        }
+        return { status: finding.status, tone, lead: first, rest: rest.join(" ") };
+      }
+      const rest = `Geringster Grenzabstand ${metres(this.narrowestSetback)}.`;
+      if (this.violation) {
+        const k = this.outliers;
+        return { status: "outside", tone: "error", rest,
+          lead: `${k} Gebäudeecke${k > 1 ? "n liegen" : " liegt"} außerhalb des Bebauungsfensters.` };
+      }
+      return { status: "inside", tone: "good", lead: "Baukörper liegt im Bebauungsfenster.", rest };
     },
     /** What the house *is*, apart from where it stands. A change to any of it
      *  can leave the house outside a window it was inside a moment ago. */
@@ -823,10 +902,7 @@ export default {
     hasPrevious() { return this.index > 0; },
     hasNext() { return this.index < state.data.plots.length - 1; }
   },
-  /* A plot that was left with the neighbour hint on comes back with it on, so
-     the outlines have to be fetched again — they are not in the document. */
   created() {
-    if (this.showNeighbours) this.loadNeighbours();
     this.routeAutomatically();
   },
   watch: {
@@ -839,9 +915,16 @@ export default {
        watcher — two `"plot.id"` keys in this object once meant the second
        silently replaced the first, and the next plot was never routed. */
     "plot.id"() {
-      this.neighbourBuildings = [];
+      this.neighbourBuildings = markRaw([]);
+      this.neighboursFor = null;
       this.neighboursError = null;
-      if (this.showNeighbours) this.loadNeighbours();
+      this.planningResult = null;
+      this.planningFor = null;
+      this.planningError = null;
+      this.hoveredBuilding = null;
+      this.pinnedBuilding = null;
+      this.openAnalysis = null;
+      if (this.sidePane === "neighbourhood") this.loadNeighbourhood();
       this.routeAutomatically();
       this.siteCheckResult = null;
       this.locationOverlay = "laerm";
@@ -928,7 +1011,10 @@ export default {
       if (!this.noiseChosen) this.locationOverlay = noiseOnPlot(result) === false ? null : "laerm";
     },
 
-    showPane(pane) { this.sidePane = pane; },
+    showPane(pane) {
+      this.sidePane = pane;
+      if (pane === "neighbourhood") this.loadNeighbourhood();
+    },
     startPriceEdit() {
       this.priceDraft = this.hasPrice ? String(this.plot.askingPrice) : "";
       this.priceError = null;
@@ -960,7 +1046,11 @@ export default {
     },
     /** A click on the house opens its tab, a click beside it closes it. */
     selectOnPlan(target) {
-      this.showPane(target === "house" ? "building" : "plot");
+      // Beside the house, the building tab closes; the neighbourhood stays
+      // open, because its markers are on the plan and a click on one is a
+      // click beside the house.
+      if (target === "house") this.showPane("building");
+      else if (this.sidePane === "building") this.showPane("plot");
       // Below 1140 px the column sits under the plan, where the switch happens
       // out of sight. Scrolled only as far as it takes to see the tabs.
       if (target === "house" && window.matchMedia?.("(max-width: 1140px)").matches) {
@@ -1080,27 +1170,68 @@ export default {
       this.plot.house = { cx: next.cx, cy: next.cy, rotation: Math.round(next.rotation * 10) / 10 };
       save();
     },
-    toggleNeighbours() {
-      this.plot.showNeighbours = !this.plot.showNeighbours;
-      save();
-      if (this.plot.showNeighbours) this.loadNeighbours();
+    /** Opening the tab asks both services, once per plot. */
+    loadNeighbourhood() {
+      this.loadNeighbours();
+      this.loadPlanning();
     },
-    /** One question per plot; the backend answers repeats from disk. */
+    /** One question per plot; the backend answers repeats from disk. A failed
+     *  one is asked again the next time the tab opens. */
     async loadNeighbours() {
-      if (!this.plot?.anchor || this.neighbourBuildings.length || this.neighboursBusy) return;
+      const plot = this.plot;
+      if (!plot?.anchor || this.neighboursFor === plot.id || this.neighboursBusy) return;
       this.neighboursBusy = true;
       this.neighboursError = null;
       try {
-        const answer = await fetchNeighbourBuildings(this.plot.anchor.lat, this.plot.anchor.lon);
-        this.neighbourBuildings = answer?.gebaeude ?? [];
+        const answer = await fetchNeighbourBuildings(plot.anchor.lat, plot.anchor.lon);
+        if (this.plot?.id !== plot.id) return;
+        this.neighbourBuildings = markRaw(answer?.gebaeude ?? []);
         this.neighbourSource = /OpenStreetMap|overpass/i.test(answer?.quelle ?? "")
           ? "OpenStreetMap"
           : "dem Liegenschaftskataster";
+        this.neighboursFor = plot.id;
       } catch (error) {
-        this.neighboursError = error.message;
+        if (this.plot?.id === plot.id) this.neighboursError = error.message;
       } finally {
         this.neighboursBusy = false;
       }
+    },
+    /** RAPIS with the parcel outline, the same ring the location checks send. */
+    async loadPlanning() {
+      const plot = this.plot;
+      if (!plot?.anchor || this.planningFor === plot.id || this.planningBusy) return;
+      this.planningBusy = true;
+      this.planningError = null;
+      try {
+        const ring = toWgs84(plot.polygon, plot.anchor);
+        const answer = await fetchPlanning([...ring, ring[0]]);
+        if (this.plot?.id !== plot.id) return;
+        this.planningResult = answer;
+        this.planningFor = plot.id;
+      } catch (error) {
+        if (this.plot?.id === plot.id) this.planningError = error.message;
+      } finally {
+        this.planningBusy = false;
+      }
+    },
+    hoverBuilding(id) { this.hoveredBuilding = id || null; },
+    pinBuilding(id) { this.pinnedBuilding = this.pinnedBuilding === id ? null : id; },
+    /** A pick on the plan also brings the entry into view; a pick in the
+     *  list does not, because the list is where the pointer already is. */
+    pickOnPlan(id) {
+      this.pinBuilding(id);
+      if (this.pinnedBuilding === id) this.$nextTick(() => this.$refs.neighbourhoodPane?.reveal(id));
+    },
+    openNeighbourAnalysis(open) { this.openAnalysis = open; },
+    /** The reading of one Grenzbebauung, stored with the plot like its other
+     *  settings. The analysis re-runs from its cache. */
+    setReading({ buildingId, reading }) {
+      const readings = { ...(this.plot.neighbourReadings ?? {}) };
+      if (reading === READING_SETBACK) delete readings[buildingId];
+      else readings[buildingId] = reading;
+      if (Object.keys(readings).length) this.plot.neighbourReadings = readings;
+      else delete this.plot.neighbourReadings;
+      save();
     },
     toggleConfine() {
       this.plot.confineHouse = !this.confineHouse;
@@ -1225,14 +1356,14 @@ export default {
 
 .side-pane{ display: flex; flex-direction: column; gap: var(--w2b-space-4); min-width: 0; }
 .side-tabs{
-  display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 3px;
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; padding: 3px;
   background: var(--w2b-surface-sunken); border: 1px solid var(--w2b-line); border-radius: var(--w2b-radius-s);
 }
 .side-tabs button{
-  display: flex; align-items: center; justify-content: center; gap: 7px;
-  padding: 9px 8px; border: 0; border-radius: var(--w2b-radius-xs); background: transparent;
-  font-family: var(--w2b-font-display); font-weight: 600; font-size: var(--w2b-text-s);
-  color: var(--w2b-graphite); cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 5px; min-width: 0;
+  padding: 9px 2px; border: 0; border-radius: var(--w2b-radius-xs); background: transparent;
+  font-family: var(--w2b-font-display); font-weight: 600; font-size: 12.5px;
+  color: var(--w2b-graphite); cursor: pointer; white-space: nowrap;
 }
 .side-tabs button:hover{ color: var(--w2b-ink); }
 .side-tabs button[aria-selected="true"]{ background: var(--w2b-surface); color: var(--w2b-ink); box-shadow: var(--w2b-shadow); }
@@ -1241,6 +1372,27 @@ export default {
 .side-tabs__mark{ width: 10px; height: 10px; border-radius: 2px; flex: none; }
 .side-tabs__mark--plot{ border: 1.5px solid var(--w2b-map-boundary); border-radius: 1px; }
 .side-tabs__mark--building{ background: var(--w2b-map-design); border: 1px solid var(--w2b-map-design-edge); }
+.side-tabs__mark--neighbourhood{ background: var(--w2b-map-neighbour-main); border: 1px solid var(--w2b-map-neighbour-main-edge); }
+
+/* The 6-m-Zone is a question, not a violation: the warning tone, never red. */
+.notice--zone{ background: var(--w2b-warning-surface); color: var(--w2b-warning-text); }
+.plan-zoom{
+  position: absolute; right: var(--w2b-space-3); bottom: var(--w2b-space-3);
+  display: flex; overflow: hidden; line-height: 1.2;
+  background: var(--w2b-surface); border: 1px solid var(--w2b-line); border-radius: var(--w2b-radius-s);
+  box-shadow: var(--w2b-shadow);
+}
+.plan-zoom button{
+  border: 0; background: transparent; padding: 6px 10px; cursor: pointer;
+  font-family: var(--w2b-font-display); font-weight: 600; font-size: var(--w2b-text-xs); color: var(--w2b-muted);
+}
+.plan-zoom button + button{ border-left: 1px solid var(--w2b-line); }
+.plan-zoom button[aria-pressed="true"]{ background: var(--w2b-primary); color: var(--w2b-primary-on); }
+.plan-zoom button:disabled{ opacity: .45; cursor: not-allowed; }
+.plan-zoom button:focus-visible{ outline: 2px solid var(--w2b-primary); outline-offset: -2px; }
+/* On a phone the scale bar takes the bottom left; the control moves under
+   the house chip instead. */
+@media (max-width: 520px){ .plan-zoom{ left: var(--w2b-space-3); right: auto; bottom: auto; top: 52px; } }
 
 .plan-stage{ position: relative; }
 .house-chip{
@@ -1277,7 +1429,6 @@ export default {
 .naming__hint{ font-size: var(--w2b-text-xs); color: var(--w2b-secondary-text); }
 .align{ display: flex; flex-direction: column; gap: var(--w2b-space-2); padding: var(--w2b-space-3) var(--w2b-space-4); border-top: 1px solid var(--w2b-line-faint); }
 .custom-size__hint--warn{ color: var(--w2b-warning-text); }
-.neighbour-note{ font-size: var(--w2b-text-xs); }
 .align, .confine{ display: flex; flex-direction: column; align-items: flex-start; gap: var(--w2b-space-2); padding: var(--w2b-space-3) var(--w2b-space-4); border-top: 1px solid var(--w2b-line-faint); }
 
 </style>

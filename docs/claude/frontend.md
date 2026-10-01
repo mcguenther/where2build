@@ -437,3 +437,19 @@ that collapsed at 390 px. None of them threw.
   local compose stack; the container fetched the page fine. A text that reads
   as a bare link now stays a link whatever markup came with it — a whole
   pasted page never reads as one, so no real paste loses its markup.
+
+- **The neighbour answer is held `markRaw`.** 71 outlines of up to a few dozen
+  vertices each went through a deep proxy on every analysis cache-key read;
+  `analyseNeighbourhood` copies them once anyway. The analysis is memoised on
+  the plot and the outlines, `checkHouse` on the analysis and the placement,
+  so a drag costs four edges against each zone's outline and nothing else is
+  recomputed — the neighbour shapes in `SitePlan` depend on the view, never on
+  the house.
+- **The „Nachbarschaft" tab loads when it is opened, and the old switch is
+  gone from the document.** `showNeighbours` is deleted in `validate`, which
+  is the migration every stored and imported document passes through; the
+  readings live in `plot.neighbourReadings` by cadastral building id, only
+  `boundary` or `setback` survive, and an empty map is not written. Its panes
+  print (`v-show`), but the neighbourhood pane carries `no-print` until there
+  is an analysis, so a sheet from a plot nobody opened it on says nothing
+  about neighbours rather than „Nachbargebäude werden geholt".

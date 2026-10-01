@@ -32,7 +32,15 @@
            this drawing that gets a solid colour, and this is a hint. -->
       <pattern :id="`hint-${uid}`" width="7" height="7" patternUnits="userSpaceOnUse"
                patternTransform="rotate(45)">
-        <line x1="0" y1="0" x2="0" y2="7" stroke="var(--w2b-map-neighbour)" stroke-width="1.1" />
+        <line x1="0" y1="0" x2="0" y2="7" stroke="var(--w2b-map-reach)" stroke-width="1.1" />
+      </pattern>
+      <!-- The 6-m-Zone: cross-hatched in the warning tone, so it can lie over
+           the house and still let it show through. -->
+      <pattern :id="`zone-${uid}`" width="6" height="6" patternUnits="userSpaceOnUse"
+               patternTransform="rotate(45)">
+        <rect width="6" height="6" fill="var(--w2b-map-zone-veil)" />
+        <line x1="0" y1="0" x2="0" y2="6" stroke="var(--w2b-map-zone)" stroke-width="1.1" />
+        <line x1="0" y1="0" x2="6" y2="0" stroke="var(--w2b-map-zone)" stroke-width="1.1" />
       </pattern>
     </defs>
 
@@ -64,22 +72,53 @@
                @load="groundLoaded = groundImage.href" @error="groundFailed = groundImage.href" />
       </g>
 
+      <!-- The neighbourhood's ground: every outline the cadastre answered,
+           houses a shade darker than garages and sheds. Our own Bestand is
+           drawn further up, above the boundary. -->
+      <g v-if="neighbourShapes" class="site-plan__neighbours">
+        <polygon v-for="b in neighbourShapes.ground" :key="`g${b.id}`" :points="b.points"
+                 class="nb-building" :class="[`nb-building--${b.kind}`, { 'is-band': b.band, 'is-active': b.active, 'is-marked': b.marked }]"
+                 :data-building="b.id"
+                 @pointerenter="$emit('neighbour-hover', b.marked ? b.id : null)"
+                 @pointerleave="$emit('neighbour-hover', null)"
+                 @click="b.marked && $emit('neighbour-pick', b.id)">
+          <title>{{ b.title }}</title>
+        </polygon>
+      </g>
+
       <polygon :points="path(plot.polygon)" fill="var(--w2b-map-surface)"
                :fill-opacity="hasBackdrop ? 0.42 : 1" />
+
+      <!-- The § 34 band, only in the street frame: where the houses on our
+           side of the street stand, measured square to our street edge. -->
+      <g v-if="bandShapes" class="site-plan__band" aria-hidden="true">
+        <polygon v-if="bandShapes.strip" :points="bandShapes.strip" class="nb-band" />
+        <line v-for="(l, i) in bandShapes.lines" :key="`bl${i}`" :x1="l.x1" :y1="l.y1" :x2="l.x2" :y2="l.y2"
+              :class="l.reference ? 'nb-band-reference' : 'nb-band-line'" />
+      </g>
 
       <!-- The setback strip is what gets colour: marked is what may NOT be built on. -->
       <template v-if="showSetbacks && envelope.length">
         <path :d="setbackRing" fill-rule="evenodd" fill="var(--w2b-map-setback)" />
-        <!-- Where the neighbouring building's own minimum setback would reach
-             onto this plot. A hint, never a finding — see
-             docs/research/abstandsflaechen-nachbargebaeude.md. -->
-        <path v-if="neighbourRing" :d="neighbourRing" fill-rule="evenodd"
-              :fill="`url(#hint-${uid})`" opacity=".75" />
-        <polygon v-if="neighbourEnvelope.length" :points="path(neighbourEnvelope)" fill="none"
-                 stroke="var(--w2b-map-neighbour)" stroke-width="1.1" stroke-dasharray="2 3" />
-        <polygon :points="path(envelope)" fill="none" stroke="var(--w2b-map-envelope)"
-                 stroke-width="1.5" stroke-dasharray="6 4" />
+        <!-- Under the reading „an die Grenze": our strip along the stretch
+             where the neighbour stands, maybe buildable. The envelope itself
+             stays where § 6 puts it. -->
+        <template v-if="neighbourShapes">
+          <polygon v-for="m in neighbourShapes.maybeBuildable" :key="`mb${m.id}`" :points="m.points"
+                   class="nb-maybe" />
+        </template>
       </template>
+      <!-- A neighbour's own 3 m, where it reaches onto this plot. A hint,
+           never a finding — see docs/research/abstandsflaechen-nachbargebaeude.md. -->
+      <g v-if="neighbourShapes" aria-hidden="true">
+        <g v-for="r in neighbourShapes.reach" :key="`r${r.id}`">
+          <path :d="r.d" fill-rule="evenodd" :fill="`url(#hint-${uid})`" />
+          <path :d="r.d" fill-rule="evenodd" class="nb-reach-edge" />
+        </g>
+      </g>
+      <!-- The dashed § 6 envelope never moves: zones and readings lie over it. -->
+      <polygon v-if="showSetbacks && envelope.length" :points="path(envelope)" fill="none"
+               stroke="var(--w2b-map-envelope)" stroke-width="1.5" stroke-dasharray="6 4" />
 
       <line v-if="plot.divisionLine" :x1="p(plot.divisionLine[0]).x" :y1="p(plot.divisionLine[0]).y"
             :x2="p(plot.divisionLine[1]).x" :y2="p(plot.divisionLine[1]).y"
@@ -96,6 +135,35 @@
               fill="var(--w2b-map-halo)" stroke="var(--w2b-map-boundary)" stroke-width="1.4" />
       </template>
 
+      <g v-if="neighbourShapes" class="site-plan__neighbourhood">
+        <!-- What an open analysis points at: a boundary, or a section line. -->
+        <polyline v-if="neighbourShapes.highlightBoundary" :points="neighbourShapes.highlightBoundary"
+                  class="nb-edge-highlight" />
+        <g v-if="neighbourShapes.section" class="nb-section" aria-hidden="true">
+          <line :x1="neighbourShapes.section.a.x" :y1="neighbourShapes.section.a.y"
+                :x2="neighbourShapes.section.b.x" :y2="neighbourShapes.section.b.y" class="nb-section__line" />
+          <g v-for="(end, i) in neighbourShapes.section.ends" :key="`se${i}`">
+            <path :d="end.cap" class="nb-section__cap" />
+            <text :x="end.label.x" :y="end.label.y" class="nb-section__name"
+                  :transform="`rotate(${-rotation}, ${end.label.x}, ${end.label.y})`">{{ neighbourShapes.section.name }}</text>
+          </g>
+        </g>
+        <polygon v-for="b in neighbourShapes.own" :key="`o${b.id}`" :points="b.points"
+                 class="nb-building" :class="[`nb-building--${b.kind}`, { 'is-active': b.active, 'is-marked': b.marked }]"
+                 :data-building="b.id"
+                 @pointerenter="$emit('neighbour-hover', b.marked ? b.id : null)"
+                 @pointerleave="$emit('neighbour-hover', null)"
+                 @click="b.marked && $emit('neighbour-pick', b.id)">
+          <title>{{ b.title }}</title>
+        </polygon>
+        <!-- Grenzbebauung: the stretch of our boundary a wall stands on. -->
+        <g v-for="g in neighbourShapes.built" :key="`gb${g.id}`" aria-hidden="true">
+          <polyline :points="g.points" class="nb-built" />
+          <line v-for="(t, i) in g.ticks" :key="`t${i}`" :x1="t.x1" :y1="t.y1" :x2="t.x2" :y2="t.y2"
+                class="nb-built-tick" />
+        </g>
+      </g>
+
       <!-- The house: brass, because the user designed it -->
       <g v-if="houseVisible" :class="{ 'plan-handle': interactive }" :tabindex="interactive ? 0 : null"
          :role="interactive ? 'button' : null"
@@ -111,10 +179,21 @@
                   fill="var(--w2b-map-halo)" stroke="var(--w2b-map-selection)" stroke-width="1.5" />
         </g>
         <polygon :points="path(houseCorners)" fill="var(--w2b-map-design)" fill-opacity=".85"
-                 :stroke="violation ? 'var(--w2b-map-violation)' : 'var(--w2b-map-design-edge)'"
-                 :stroke-width="violation ? 2.4 : (compact ? 1.2 : 1.7)" />
+                 :stroke="houseStroke"
+                 :stroke-width="violation || inZone ? 2.4 : (compact ? 1.2 : 1.7)"
+                 :data-house-status="violation ? 'outside' : inZone ? 'zone' : 'inside'" />
         <circle v-for="(e, i) in outliers" :key="`a${i}`" :cx="p(e).x" :cy="p(e).y" r="4.5"
                 fill="none" stroke="var(--w2b-map-violation)" stroke-width="1.7" />
+      </g>
+
+      <!-- The zones lie over the house, so the part of it standing in one
+           shows through the hatch. They take no pointer: the house under them
+           must stay draggable. -->
+      <g v-if="neighbourShapes" class="site-plan__zones" pointer-events="none" aria-hidden="true">
+        <g v-for="z in neighbourShapes.zones" :key="`z${z.id}`" :data-zone="z.id">
+          <path :d="z.d" fill-rule="evenodd" :fill="`url(#zone-${uid})`" />
+          <path :d="z.d" fill-rule="evenodd" class="nb-zone-edge" />
+        </g>
       </g>
 
       <!-- Measuring tape: click sets a point, a second click closes the run. -->
@@ -200,6 +279,25 @@
               class="site-plan__choice-label" :class="{ 'is-chosen': parcel.chosen }"
               text-anchor="middle">{{ parcel.number }}</text>
       </g>
+
+      <g v-if="neighbourShapes" class="site-plan__neighbour-labels">
+        <text v-for="(l, i) in neighbourShapes.labels" :key="`nl${i}`" :x="l.x" :y="l.y"
+              :transform="`rotate(${-rotation}, ${l.x}, ${l.y})`"
+              class="nb-label" :class="l.tone && `nb-label--${l.tone}`" text-anchor="middle">{{ l.text }}</text>
+        <!-- The numbers of the findings beside the plan. Hover and focus mark
+             the building in both places; a click pins it. -->
+        <g v-for="m in neighbourShapes.markers" :key="`mk${m.id}`" class="nb-marker"
+           :class="{ 'is-active': m.active }" :data-marker="m.marker" :data-building="m.id"
+           tabindex="0" role="button" :aria-label="`${m.marker}: ${m.title}`" :aria-pressed="String(m.active)"
+           @pointerenter="$emit('neighbour-hover', m.id)" @pointerleave="$emit('neighbour-hover', null)"
+           @focus="$emit('neighbour-hover', m.id)" @blur="$emit('neighbour-hover', null)"
+           @click="$emit('neighbour-pick', m.id)"
+           @keydown.enter.prevent="$emit('neighbour-pick', m.id)"
+           @keydown.space.prevent="$emit('neighbour-pick', m.id)">
+          <circle :cx="m.x" :cy="m.y" r="11" />
+          <text :x="m.x" :y="m.y" :transform="`rotate(${-rotation}, ${m.x}, ${m.y})`">{{ m.marker }}</text>
+        </g>
+      </g>
     </g>
     </g>
 
@@ -230,9 +328,10 @@
 import {
   buildableArea, polygonEdges, rectangleCorners, pointInPolygon,
   closestBoundaryPoint, streetDownRotation, turnedBox, asCounterClockwise,
-  minimumRotatedRectangleCorners, constrainToEnvelope, hasNeighbourHint,
-  polygonCentroid
+  minimumRotatedRectangleCorners, constrainToEnvelope, polygonCentroid
 } from "../lib/geometry.js";
+import { BAND_WINDOW_M, CLASS_BOUNDARY, READING_BOUNDARY } from "../lib/neighbourhood.js";
+import { drawnKind, ringCentre, sliceAlong, shortName } from "../lib/neighbourhoodDrawing.js";
 import { cameraFor, toLocal, toWgs84 } from "../lib/projection.js";
 import { groundBlock } from "../lib/tileGround.js";
 import { outerRing } from "../lib/plots.js";
@@ -291,6 +390,28 @@ const grow = (box, band) => ({
   minY: box.minY - band, maxY: box.maxY + band,
   width: box.width + 2 * band, height: box.height + 2 * band
 });
+
+/** How much ground the „Nachbarn" frame keeps around the plot, and around the
+ *  buildings that face it. */
+const NEIGHBOURS_FRAME_M = 10;
+const FACING_FRAME_M = 3;
+/** The „Straße" frame: across the street in front, and behind the deepest
+ *  house of the § 34 band. */
+const STREET_FRONT_M = 14;
+const STREET_REAR_M = 6;
+/** One change of frame, in milliseconds. */
+const FRAME_TWEEN_MS = 560;
+
+const easeInOut = t => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+const reducedMotion = () => typeof window === "undefined" || typeof window.matchMedia !== "function"
+  || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/** Four corners of a box given in the turned frame, back in local metres. */
+function turnedCorners(box, degrees) {
+  const r = (degrees * Math.PI) / 180, cos = Math.cos(r), sin = Math.sin(r);
+  return [[box.minX, box.minY], [box.maxX, box.minY], [box.maxX, box.maxY], [box.minX, box.maxY]]
+    .map(([x, y]) => ({ x: x * cos - y * sin, y: x * sin + y * cos }));
+}
 
 /** How far the navigable view may depart from the fitted framing. */
 const MIN_ZOOM = 0.25;
@@ -356,9 +477,23 @@ export default {
      *  trackpad pinch arrives as exactly that), and a vertical swipe scrolls
      *  the page instead of panning. */
     cooperative: { type: Boolean, default: false },
-    /** Per-segment depths a neighbouring building's own minimum would ask for.
-     *  Absent, or equal to the statutory ones, and nothing extra is drawn. */
-    neighbourDepths: { type: Array, default: null },
+    /** What `analyseNeighbourhood` found. Given, the plan draws the outlines
+     *  as its ground, the reach, the 6-m-Zones, the strips a reading makes
+     *  maybe buildable and the numbered markers; null draws none of it. The
+     *  § 6 envelope is the same either way. */
+    neighbourhood: { type: Object, default: null },
+    /** `[{ marker, buildingId, title }]`, the numbers of the list beside the plan. */
+    neighbourMarkers: { type: Array, default: () => [] },
+    /** The building the list or the plan is pointing at. */
+    activeBuilding: { type: String, default: null },
+    /** What an open analysis looks at: `{ boundary: "left" }` or `{ section: 0 }`. */
+    neighbourHighlight: { type: Object, default: null },
+    /** „plot", „neighbours" or „street": how much ground the plan frames. */
+    frame: { type: String, default: "plot" },
+    /** The house check's verdict, when there is one: „zone" draws the
+     *  footprint's edge in the warning tone. Outside the envelope the plan
+     *  decides by itself, as it always has. */
+    houseStatus: { type: String, default: null },
     /** Fixed pixels per metre. Without it each plan fits its own frame. */
     scale: { type: Number, default: null },
     /** Measuring mode: clicks add points, the run is measured segment by segment. */
@@ -369,7 +504,7 @@ export default {
   /* `select` carries "house" for a click on the footprint and null for a click
      anywhere else on the plan. A click, not a press: a drag moves the house
      and must not also open or close anything. */
-  emits: ["move", "measured", "choose", "select"],
+  emits: ["move", "measured", "choose", "select", "neighbour-hover", "neighbour-pick"],
   data() {
     return {
       uid: ++instanceCount, dragging: null, mapUnavailable: false, heldFrame: null,
@@ -388,7 +523,9 @@ export default {
       panning: null,
       // The ground image by its href: the one that has arrived, and the one
       // that could not. Keyed by href so a changed frame starts hidden again.
-      groundLoaded: null, groundFailed: null
+      groundLoaded: null, groundFailed: null,
+      /* The fit on its way from one frame to the next; null when at rest. */
+      tweenFit: null
     };
   },
   computed: {
@@ -402,7 +539,9 @@ export default {
       return `Lageplan ${this.plot.name}: ${what}`;
     },
     /** Dimension chains are noise at thumbnail size. */
-    dimensionsVisible() { return this.showDimensions && !this.compact; },
+    /* Chains are read on the plot's own frame; zoomed out to the neighbours
+       they write over the markers and the zones. */
+    dimensionsVisible() { return this.showDimensions && !this.compact && this.frame === "plot"; },
     /* Real outlines arrive already oriented: local +y is north. "Genordet"
        therefore means no rotation, and "straßenparallel" turns the drawing so
        the street front runs left to right along the bottom — the way one
@@ -543,7 +682,54 @@ export default {
 
     /* Frame the plot with a margin, then stretch the box to the frame's aspect
        so the drawing fills the panel instead of floating in it. */
-    fit() {
+    fit() { return this.tweenFit ?? this.targetFit; },
+    /** The box the chosen frame has to show, in the turned frame the drawing
+     *  is rotated into. The plot's own box unless a neighbourhood is drawn. */
+    frameBox() {
+      const plotBox = turnedBox(this.plot.polygon, this.rotation);
+      const analysis = this.neighbourhood;
+      if (this.frame === "plot" || !analysis || analysis.empty) return plotBox;
+      const points = [...turnedCorners(grow(plotBox, NEIGHBOURS_FRAME_M), this.rotation)];
+      if (this.frame === "street" && analysis.band) {
+        const street = this.streetLine;
+        if (street) {
+          const rear = Math.max(analysis.band.plot?.rear ?? 0, analysis.band.rear?.max ?? 0) + STREET_REAR_M;
+          for (const along of [-BAND_WINDOW_M, BAND_WINDOW_M]) {
+            for (const depth of [-STREET_FRONT_M, rear]) points.push(street.at(along, depth));
+          }
+        }
+      } else {
+        const facing = analysis.buildings.filter(b => b.facing);
+        const box = facing.length ? turnedBox(facing.flatMap(b => b.ring), this.rotation) : null;
+        if (box) points.push(...turnedCorners(grow(box, FACING_FRAME_M), this.rotation));
+      }
+      return turnedBox(points, this.rotation);
+    },
+    /** The street edge as a frame of its own: `at(along, depth)` from its
+     *  middle, depth square to it and positive into the plot. */
+    streetLine() {
+      const ring = this.plot.polygon;
+      const i = this.plot.streetEdge ?? 0;
+      const a = ring[i], b = ring[(i + 1) % ring.length];
+      if (!a || !b) return null;
+      const length = Math.hypot(b.x - a.x, b.y - a.y);
+      if (!(length > 0)) return null;
+      const dir = { x: (b.x - a.x) / length, y: (b.y - a.y) / length };
+      let inward = { x: -dir.y, y: dir.x };
+      const c = ringCentre(ring);
+      if ((c.x - a.x) * inward.x + (c.y - a.y) * inward.y < 0) inward = { x: -inward.x, y: -inward.y };
+      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      // Depths are measured from the street edge's line, the way the band is.
+      const offset = (mid.x - a.x) * inward.x + (mid.y - a.y) * inward.y;
+      return {
+        a, dir, inward,
+        at: (along, depth) => ({
+          x: mid.x + dir.x * along + inward.x * (depth - offset),
+          y: mid.y + dir.y * along + inward.y * (depth - offset)
+        })
+      };
+    },
+    targetFit() {
       /* A frame held across a change of plot. It is kept in WGS84, because the
          local metres are measured from the plot's own anchor and the new plot
          has a different one — the same numbers would be a different place. */
@@ -559,7 +745,7 @@ export default {
       /* The box is the one the plot has on screen, turned to its street: the
          drawing rotates about the frame's centre, so that box's centre is the
          point the frame centres on and its size is what has to fit. */
-      const turned = turnedBox(this.plot.polygon, this.rotation);
+      const turned = this.frameBox;
       const box = this.parcels?.length ? grow(turned, CHOICE_BAND_M) : turned;
       /* A caller that hands us a scale is drawing several plots side by side
          and needs them comparable, so its value wins over our own fit. It is
@@ -587,18 +773,170 @@ export default {
       return { width: step * this.view.scale, label: num(step, 0), endLabel: `${num(step * 2, 0)} m` };
     },
     envelope() { return buildableArea(this.plot.polygon, this.plot.setbacks); },
-    /** The envelope as it would be if the neighbours' minimum setbacks counted
-     *  against this plot. Empty unless it is actually deeper than our own. */
-    neighbourEnvelope() {
-      if (!this.neighbourDepths || !this.envelope.length) return [];
-      if (!hasNeighbourHint(this.plot.setbacks, this.neighbourDepths)) return [];
-      return buildableArea(this.plot.polygon, this.neighbourDepths);
+    /** Everything the neighbourhood draws, in screen units. Depends on the
+     *  analysis and the view, never on the house, so a drag redraws none of it. */
+    neighbourShapes() {
+      const analysis = this.neighbourhood;
+      if (!analysis || analysis.empty) return null;
+      const markers = new Map(this.neighbourMarkers.map(m => [m.buildingId, m]));
+      const band = this.frame === "street" && analysis.band
+        ? new Set(analysis.band.houses.map(h => h.buildingId)) : new Set();
+      const shape = b => ({
+        id: b.id, kind: drawnKind(b), points: this.path(b.ring),
+        title: b.address ? `${b.address} · ${b.use ?? "Gebäude"}` : (b.use ?? "Gebäude"),
+        band: band.has(b.id), active: this.activeBuilding === b.id, marked: markers.has(b.id)
+      });
+      const rings = list => list.map(ring => `M${this.path(ring).replace(/ /g, "L")}Z`).join(" ");
+      const reach = analysis.buildings
+        .filter(b => b.reach && (b.reading !== READING_BOUNDARY))
+        .map(b => ({ id: b.id, d: rings(b.reach.rings) }));
+      const zones = (analysis.zones ?? []).map(z => ({ id: z.buildingId, d: rings(z.rings) }));
+      const maybeBuildable = (analysis.maybeBuildable ?? []).map(m => ({ id: m.buildingId, points: this.path(m.ring) }));
+
+      // A wall on the boundary: a brass line just inside it, along the face.
+      const boundaries = new Map((analysis.boundaries ?? []).map(g => [g.kind, g]));
+      const built = analysis.buildings.filter(b => b.class === CLASS_BOUNDARY && b.facing).flatMap(b => {
+        const group = boundaries.get(b.facing.boundary);
+        const piece = group ? sliceAlong(group.points, b.facing.face.from, b.facing.face.to) : [];
+        if (piece.length < 2) return [];
+        const inset = 3.2 * this.metresPerPixel;
+        const tick = 6 * this.metresPerPixel;
+        const centre = ringCentre(analysis.parcel);
+        const a = piece[0], z = piece[piece.length - 1];
+        const len = Math.hypot(z.x - a.x, z.y - a.y) || 1;
+        let n = { x: -(z.y - a.y) / len, y: (z.x - a.x) / len };
+        if ((centre.x - a.x) * n.x + (centre.y - a.y) * n.y < 0) n = { x: -n.x, y: -n.y };
+        const moved = piece.map(q => ({ x: q.x + n.x * inset, y: q.y + n.y * inset }));
+        const ticks = [moved[0], moved[moved.length - 1]].map(q => {
+          const from = this.p({ x: q.x - n.x * tick * 0.6, y: q.y - n.y * tick * 0.6 });
+          const to = this.p({ x: q.x + n.x * tick, y: q.y + n.y * tick });
+          return { x1: from.x, y1: from.y, x2: to.x, y2: to.y };
+        });
+        return [{ id: b.id, points: this.path(moved), ticks }];
+      });
+
+      let highlightBoundary = null;
+      if (this.neighbourHighlight?.boundary) {
+        const group = boundaries.get(this.neighbourHighlight.boundary);
+        if (group) highlightBoundary = this.path(group.points);
+      }
+      let section = null;
+      const cut = Number.isInteger(this.neighbourHighlight?.section)
+        ? analysis.sections?.[this.neighbourHighlight.section] : null;
+      if (cut) {
+        const at = t => this.p({ x: cut.origin.x + cut.direction.x * t, y: cut.origin.y + cut.direction.y * t });
+        const a = at(Math.max(cut.from, -8)), b = at(cut.to);
+        const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+        const d = { x: (b.x - a.x) / len, y: (b.y - a.y) / len };
+        // Caps look along the cut direction's normal: the way the section looks.
+        const n = { x: -d.y, y: d.x };
+        const ends = [a, b].map(q => ({
+          cap: `M${(q.x - d.x * 5).toFixed(1)},${(q.y - d.y * 5).toFixed(1)} L${(q.x + n.x * 9).toFixed(1)},${(q.y + n.y * 9).toFixed(1)} L${(q.x + d.x * 5).toFixed(1)},${(q.y + d.y * 5).toFixed(1)} Z`,
+          label: { x: q.x + n.x * 20, y: q.y + n.y * 20 + 4 }
+        }));
+        section = { a, b, ends, name: String(this.neighbourHighlight.section + 1) };
+      }
+
+      const labels = [];
+      const inFrame = q => q.x > 12 && q.x < this.width - 12 && q.y > 12 && q.y < this.height - 12;
+      for (const b of analysis.buildings) {
+        if (markers.has(b.id) || drawnKind(b) !== "main") continue;
+        const text = shortName(b);
+        if (!text.startsWith("Nr. ")) continue;
+        const q = this.p(ringCentre(b.ring));
+        if (inFrame(q)) labels.push({ x: q.x, y: q.y + 3.5, text: text.slice(4), tone: band.has(b.id) ? "band" : "quiet" });
+      }
+      if (this.frame !== "street") {
+        for (const z of analysis.zones ?? []) {
+          const home = analysis.buildings.find(b => b.id === z.buildingId);
+          const zc = ringCentre(z.rings[0] ?? []), hc = ringCentre(home?.ring ?? []);
+          const q = this.p({ x: zc.x + (hc.x - zc.x) * 0.42, y: zc.y + (hc.y - zc.y) * 0.42 });
+          if (inFrame(q)) labels.push({ x: q.x, y: q.y + 4, text: "6-m-Zone", tone: "zone" });
+        }
+        for (const m of analysis.maybeBuildable ?? []) {
+          const q = this.p(ringCentre(m.ring));
+          if (inFrame(q)) labels.push({ x: q.x, y: q.y + 4, text: "möglicherweise bebaubar", tone: "built" });
+        }
+      }
+      const markerList = this.neighbourMarkers.map(m => {
+        const b = analysis.buildings.find(x => x.id === m.buildingId);
+        if (!b) return null;
+        const q = this.p(ringCentre(b.ring));
+        return { id: b.id, marker: m.marker, title: m.title, x: q.x, y: q.y, active: this.activeBuilding === b.id };
+      }).filter(Boolean);
+
+      /* The band's labels go where they clear the house numbers and the
+         markers already placed, trying each position a label offers; one that
+         fits nowhere is left out, the way the parcel numbers are.
+         „Straßengrenze, verlängert" sat on 50a before. */
+      if (this.frame === "street" && this.bandShapes) {
+        const box = l => ({ x: l.x - l.text.length * LABEL_CHAR_WIDTH / 2, y: l.y - 10,
+          w: l.text.length * LABEL_CHAR_WIDTH, h: 13 });
+        const outline = b => {
+          const q = b.ring.map(v => this.p(v));
+          const xs = q.map(v => v.x), ys = q.map(v => v.y);
+          return { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
+        };
+        const taken = [
+          ...labels.map(box), ...markerList.map(m => ({ x: m.x - 12, y: m.y - 12, w: 24, h: 24 })),
+          // The houses the band is measured from are what the lines point at.
+          ...analysis.buildings.filter(b => band.has(b.id)).map(outline)
+        ];
+        const clash = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+        for (const label of this.bandShapes.labels) {
+          const spot = label.candidates.map(c => ({ ...c, text: label.text }))
+            .find(c => inFrame(c) && !taken.some(t => clash(box(c), t)));
+          if (!spot) continue;
+          taken.push(box(spot));
+          labels.push({ x: spot.x, y: spot.y, text: label.text, tone: label.tone });
+        }
+      }
+
+      return {
+        ground: analysis.buildings.filter(b => b.class !== "own").map(shape),
+        own: analysis.buildings.filter(b => b.class === "own").map(shape),
+        reach, zones, maybeBuildable, built, highlightBoundary, section, labels, markers: markerList
+      };
     },
-    neighbourRing() {
-      if (!this.neighbourEnvelope.length) return null;
-      const outer = this.envelope.map(v => `${this.p(v).x},${this.p(v).y}`).join("L");
-      const inner = this.neighbourEnvelope.map(v => `${this.p(v).x},${this.p(v).y}`).join("L");
-      return `M${outer}Z M${inner}Z`;
+    /** The band's strip and the depths it was measured at, in the street frame. */
+    bandShapes() {
+      const band = this.neighbourhood?.band;
+      if (this.frame !== "street" || !band?.houses?.length || !this.streetLine) return null;
+      const street = this.streetLine;
+      const reach = BAND_WINDOW_M + 4;
+      const line = (depth, reference = false) => {
+        const a = this.p(street.at(-reach, depth)), b = this.p(street.at(reach, depth));
+        return { x1: a.x, y1: a.y, x2: b.x, y2: b.y, reference };
+      };
+      const depths = [band.front.min, band.front.max, band.rear.max];
+      // The deepest line is written at the other end: 37,6 and 45,0 m lie
+      // close enough together that two labels at one end run into each other.
+      // Positions along the street, from the ends inwards: the first that
+      // clears the house numbers, the markers and the band's houses wins.
+      const along = [];
+      for (let a = BAND_WINDOW_M - 6; a >= 0; a -= 6) along.push(a, -a);
+      const at = (a, depth, lift) => { const q = this.p(street.at(a, depth)); return { x: q.x, y: q.y - lift }; };
+      // The deepest line starts at the other end: 37,6 and 45,0 m lie close
+      // enough together that two labels at one end run into each other.
+      const labels = depths.map((depth, i) => ({
+        candidates: (i === 2 ? along.map(a => -a) : along).map(a => at(a, depth, 5)),
+        text: i === 2 ? `bis ${num(depth, 1)} m` : `${num(depth, 1)} m`, tone: "band"
+      }));
+      labels.push({
+        candidates: along.map(a => -a).map(a => at(a, 0, 6)),
+        text: "Straßengrenze, verlängert", tone: "quiet"
+      });
+      return {
+        strip: band.strip ? this.path(band.strip) : null,
+        lines: [line(0, true), ...depths.map(d => line(d))],
+        labels
+      };
+    },
+    /** In a zone: inside the envelope, but nearer a neighbour than 6 m. */
+    inZone() { return !this.violation && this.houseStatus === "zone"; },
+    houseStroke() {
+      if (this.violation) return "var(--w2b-map-violation)";
+      return this.inZone ? "var(--w2b-map-zone)" : "var(--w2b-map-design-edge)";
     },
     setbackRing() {
       const outer = this.plot.polygon.map(v => `${this.p(v).x},${this.p(v).y}`).join("L");
@@ -711,7 +1049,10 @@ export default {
       };
     }
   },
-  created() { this._mapRun = 0; },
+  created() {
+    this._mapRun = 0;
+    this._fitKey = this.fitKey();
+  },
   mounted() {
     this.buildMap();
     this.watchSize();
@@ -722,6 +1063,7 @@ export default {
   beforeUnmount() {
     this._sizeWatcher?.disconnect();
     this._sizeWatcher = null;
+    if (this._tween && typeof cancelAnimationFrame === "function") cancelAnimationFrame(this._tween);
     this.destroyMap();
   },
   watch: {
@@ -754,12 +1096,47 @@ export default {
     },
     navigable(on) { if (!on) this.resetView(); },
     rotation() { this.setCamera(); },
+    /* Another frame is a change of zoom the user asked for, and it is animated
+       so the plot stays recognisable on the way; the same frame refitted — a
+       resize, another reading — just jumps. The neighbourhood arriving counts
+       as a change of frame: until then „Nachbarn" frames the plot alone. */
+    targetFit(next, previous) {
+      const key = this.fitKey();
+      if (key === this._fitKey || !previous) { this._fitKey = key; return; }
+      this._fitKey = key;
+      this.zoomFactor = 1;
+      this.panMetres = { x: 0, y: 0 };
+      this.tweenFrom(this.tweenFit ?? previous);
+    },
     view() {
       this.setCamera();
       this.rememberFrame();
     }
   },
   methods: {
+    fitKey() { return `${this.frame}|${Boolean(this.neighbourhood && !this.neighbourhood.empty)}`; },
+    /** From the fit on screen to `targetFit`, the scale on a log scale so the
+     *  zoom reads even. Under `prefers-reduced-motion` it jumps. */
+    tweenFrom(from) {
+      if (this._tween && typeof cancelAnimationFrame === "function") cancelAnimationFrame(this._tween);
+      this._tween = null;
+      if (reducedMotion() || typeof requestAnimationFrame !== "function") { this.tweenFit = null; return; }
+      const start = typeof performance !== "undefined" ? performance.now() : Date.now();
+      const step = now => {
+        const t = Math.min(1, Math.max(0, (now - start) / FRAME_TWEEN_MS));
+        const e = easeInOut(t);
+        const to = this.targetFit;
+        if (t >= 1) { this.tweenFit = null; this._tween = null; return; }
+        this.tweenFit = {
+          scale: Math.exp(Math.log(from.scale) + (Math.log(to.scale) - Math.log(from.scale)) * e),
+          mx: from.mx + (to.mx - from.mx) * e,
+          my: from.my + (to.my - from.my) * e
+        };
+        this._tween = requestAnimationFrame(step);
+      };
+      this.tweenFit = { ...from };
+      this._tween = requestAnimationFrame(step);
+    },
     /** MapLibre needs WebGL and a network; neither is guaranteed. Any failure
      *  leaves the drawing alone rather than taking the page down with it. */
     rebuildMap() {
@@ -1103,6 +1480,48 @@ export default {
   pointer-events: none; user-select: none;
 }
 .site-plan__choice-label.is-chosen{ opacity: 1; font-weight: 700; }
+
+/* The neighbourhood. Outlines are ground, not subject: they sit under the
+   parcel's fill and take the eye only where a marker or a hover points. */
+.nb-building{ stroke-linejoin: round; }
+.nb-building.is-marked{ cursor: pointer; }
+.nb-building--main{ fill: var(--w2b-map-neighbour-main); stroke: var(--w2b-map-neighbour-main-edge); stroke-width: 1; }
+.nb-building--aux{ fill: var(--w2b-map-neighbour-aux); stroke: var(--w2b-map-neighbour-aux-edge); stroke-width: .8; }
+.nb-building--own{ fill: var(--w2b-map-existing); stroke: var(--w2b-map-boundary); stroke-width: 1; }
+.nb-building--own-aux{ fill: var(--w2b-map-existing); fill-opacity: .55; stroke: var(--w2b-map-boundary); stroke-width: .8; }
+.nb-building.is-band{ stroke: var(--w2b-map-band-line); stroke-width: 2; }
+.nb-building.is-active{ stroke: var(--w2b-map-selection); stroke-width: 2.6; }
+.nb-band{ fill: var(--w2b-map-band-strong); }
+.nb-band-line{ stroke: var(--w2b-map-band-line); stroke-width: 1.2; stroke-dasharray: 5 3; }
+.nb-band-reference{ stroke: var(--w2b-map-boundary); stroke-width: .9; stroke-dasharray: 1.5 3; opacity: .7; }
+.nb-reach-edge{ fill: none; stroke: var(--w2b-map-reach); stroke-width: .8; }
+.nb-zone-edge{ fill: none; stroke: var(--w2b-map-zone); stroke-width: 1.2; stroke-dasharray: 3 2; }
+.nb-maybe{ fill: var(--w2b-map-surface); stroke: var(--w2b-map-boundary-built); stroke-width: 1.4; stroke-dasharray: 1.5 3; stroke-linecap: round; }
+.nb-built{ fill: none; stroke: var(--w2b-map-boundary-built); stroke-width: 4.5; }
+.nb-built-tick{ stroke: var(--w2b-map-boundary-built); stroke-width: 2; }
+.nb-edge-highlight{ fill: none; stroke: var(--w2b-map-selection); stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; opacity: .55; }
+.nb-section__line{ stroke: var(--w2b-ink); stroke-width: 1.6; stroke-dasharray: 10 3 2 3; }
+.nb-section__cap{ fill: var(--w2b-ink); }
+.nb-section__name, .nb-label{
+  paint-order: stroke fill; stroke: var(--w2b-map-halo); stroke-linejoin: round;
+  pointer-events: none; user-select: none;
+}
+.nb-section__name{ font-family: var(--w2b-font-display); font-weight: 700; font-size: 12px; fill: var(--w2b-ink); stroke-width: 3px; text-anchor: middle; }
+.nb-label{ font-family: var(--w2b-font-mono); font-size: 10.5px; font-weight: 500; fill: var(--w2b-map-boundary); stroke-width: 3.4px; }
+.nb-label--quiet{ fill: var(--w2b-muted); font-weight: 400; }
+.nb-label--band{ fill: var(--w2b-map-band-line); }
+.nb-label--zone{ fill: var(--w2b-map-zone); }
+.nb-label--built{ fill: var(--w2b-warning-text); }
+.nb-marker{ cursor: pointer; }
+.nb-marker circle{ fill: var(--w2b-surface); stroke: var(--w2b-ink); stroke-width: 1.5; }
+.nb-marker text{
+  font-family: var(--w2b-font-display); font-weight: 600; font-size: 12px; fill: var(--w2b-ink);
+  text-anchor: middle; dominant-baseline: central; pointer-events: none; user-select: none;
+}
+.nb-marker:focus{ outline: none; }
+.nb-marker:focus-visible circle{ stroke: var(--w2b-primary); stroke-width: 3; }
+.nb-marker.is-active circle{ fill: var(--w2b-primary); stroke: var(--w2b-primary); }
+.nb-marker.is-active text{ fill: var(--w2b-primary-on); }
 
 .site-plan-shell{ position: relative; }
 .site-plan__map{ position: absolute; inset: 0; }

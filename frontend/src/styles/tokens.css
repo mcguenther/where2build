@@ -66,6 +66,21 @@
   --w2b-map-violation:      #A8402C;
   --w2b-map-selection:       #456B52;
   --w2b-map-green:         #DCE4DA;
+  /* The neighbourhood: outlines as the ground, the grey reach of a
+     neighbour's own 3 m, and the 6-m-Zone — a warning tone, never the red of
+     a violation, because it is a question for the Bauaufsicht. */
+  --w2b-map-neighbour-main:      #C3BBAE;
+  --w2b-map-neighbour-main-edge: #7D7468;
+  --w2b-map-neighbour-aux:       #E0DBD2;
+  --w2b-map-neighbour-aux-edge:  #B0A89B;
+  --w2b-map-reach:               #857C70;
+  --w2b-map-zone:                #C0561A;
+  --w2b-map-zone-veil:           rgba(192,86,26,.12);
+  --w2b-map-boundary-built:      #BE8524;
+  --w2b-map-band:                rgba(111,138,108,.13);
+  --w2b-map-band-strong:         rgba(111,138,108,.26);
+  --w2b-map-band-line:           #5E7A5B;
+  --w2b-map-soil:                #E2DDD3;
   /* MapLibre draws its own controls -- zoom buttons, attribution pill -- and
    * ships them light. Their surfaces take the tokens below; the icons are
    * background images with a baked-in dark fill, so the palette can only reach
@@ -160,6 +175,18 @@
     --w2b-map-violation:      #E0705A;
     --w2b-map-selection:       #9BC0A4;
     --w2b-map-green:         #26302A;
+    --w2b-map-neighbour-main:      #4A453E;
+    --w2b-map-neighbour-main-edge: #8E8578;
+    --w2b-map-neighbour-aux:       #2C2925;
+    --w2b-map-neighbour-aux-edge:  #5C564D;
+    --w2b-map-reach:               #A39A8C;
+    --w2b-map-zone:                #F0904A;
+    --w2b-map-zone-veil:           rgba(240,144,74,.14);
+    --w2b-map-boundary-built:      #D8A340;
+    --w2b-map-band:                rgba(143,167,143,.10);
+    --w2b-map-band-strong:         rgba(143,167,143,.22);
+    --w2b-map-band-line:           #9BB59A;
+    --w2b-map-soil:                #2A2621;
     --w2b-map-control-icons: invert(1);
 
     --w2b-shadow:      0 1px 2px rgba(0,0,0,.5), 0 12px 28px -20px rgba(0,0,0,.85);
@@ -217,6 +244,18 @@
   --w2b-map-violation:      #E0705A;
   --w2b-map-selection:       #9BC0A4;
   --w2b-map-green:         #26302A;
+  --w2b-map-neighbour-main:      #4A453E;
+  --w2b-map-neighbour-main-edge: #8E8578;
+  --w2b-map-neighbour-aux:       #2C2925;
+  --w2b-map-neighbour-aux-edge:  #5C564D;
+  --w2b-map-reach:               #A39A8C;
+  --w2b-map-zone:                #F0904A;
+  --w2b-map-zone-veil:           rgba(240,144,74,.14);
+  --w2b-map-boundary-built:      #D8A340;
+  --w2b-map-band:                rgba(143,167,143,.10);
+  --w2b-map-band-strong:         rgba(143,167,143,.22);
+  --w2b-map-band-line:           #9BB59A;
+  --w2b-map-soil:                #2A2621;
   --w2b-map-control-icons: invert(1);
 
   --w2b-shadow:      0 1px 2px rgba(0,0,0,.5), 0 12px 28px -20px rgba(0,0,0,.85);

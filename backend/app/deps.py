@@ -28,6 +28,7 @@ from .services.nearby import NearbyService
 from .services.oidc import Identity, OidcService
 from .services.overpass import OverpassService
 from .services.preview import PreviewService
+from .services.rapis import RapisService
 from .services.lehrbuch import Lehrbuch
 from .services.storage import Storage
 from .services.tiles import TileService
@@ -73,6 +74,12 @@ def boris_service() -> BorisService:
 def luis_service() -> LuisService:
     settings = get_settings()
     return LuisService(settings.luis, settings.app)
+
+
+@lru_cache(maxsize=1)
+def rapis_service() -> RapisService:
+    settings = get_settings()
+    return RapisService(settings.rapis, settings.app)
 
 
 @lru_cache(maxsize=1)
@@ -331,6 +338,7 @@ def reset_services() -> None:
         address_index,
         boris_service,
         luis_service,
+        rapis_service,
         air_quality_service,
         motis_service,
         overpass_service,

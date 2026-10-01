@@ -549,6 +549,171 @@ for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunk
   await ctx.close();
 }
 
+/* The „Nachbarschaft" tab, on a plot of its own rather than the run's
+ * Liebertwolkwitz 85/1: Mölkau 204 (Lessingweg 44) is the plot the approved
+ * mock-up was drawn on, and it carries every class the tab knows: a house on the
+ * boundary, one within 3 m, a shed at the rear and six houses for the § 34
+ * band. It is typed as district key and number, a certain parcel reading, in a
+ * context of its own so the rest of the run keeps one plot. ALKIS answers the
+ * outlines and RAPIS the planning lines, live.
+ *
+ * The house is the mock-up's: ELK All in One 159, read in through the house
+ * type page. That page asks the extraction model, which this run has no key
+ * for, so the one request is answered with the recorded answer of that same
+ * endpoint (frontend/tests/fixtures/housetype-elk.json). The default
+ * 11,4 × 8,5 m footprint fits nowhere in a 7,5 m wide envelope, and every
+ * picture would show the red state. The ratio is the smallest the slider can
+ * set (in steps of 0,01) at which the house fits at an angle the rotation
+ * slider can set (whole degrees, parallel to the side at Nr. 46): the mock-up's
+ * 1 : 1,75 needs the exact angle, and 0,4° off it no longer fits. Where it goes
+ * is computed with the app's own `findPlacement` and `checkHouse` — the seat
+ * nearest Nr. 46 the envelope allows at that angle, which the check has to
+ * report amber — and it is put there by a drag, the way a person moves it.
+ * The run says which house, ratio and angle it used. */
+const ELK = JSON.parse(readFileSync(new URL("../frontend/tests/fixtures/housetype-elk.json", import.meta.url), "utf8"));
+const num2 = v => v.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const lib = {
+  ...(await import("../frontend/src/lib/neighbourhood.js")),
+  ...(await import("../frontend/src/lib/geometry.js"))
+};
+
+/** Where the house has to stand for the amber state, from the stored plot and
+ *  the outlines the backend answers — nothing guessed from the picture. */
+async function amberSeat(plot) {
+  const answer = await (await fetch("http://127.0.0.1:8000/api/neighbours", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ origin: { lat: plot.anchor.lat, lon: plot.anchor.lon }, umkreis_m: 80 })
+  })).json();
+  const analysis = lib.analyseNeighbourhood(plot, lib.localBuildings(answer.gebaeude, plot.anchor));
+  const n46 = analysis.buildings.find(b => b.address === "Lessingweg 46");
+  const left = analysis.boundaries.find(g => g.kind === "left");
+  if (!n46 || !left) return null;
+  const rotation = Math.round(lib.alignmentToEdge(plot.polygon, left.edges[0]));
+  const built = ELK.felder.bebaute_flaeche_m2.wert;
+  for (let step = 100; step <= 220; step++) {
+    const ratio = step / 100;
+    const width = Math.sqrt(built * ratio), depth = built / width;
+    const seat = lib.findPlacement(analysis.envelope.ring, width, depth, { rotation, near: n46.centre, step: 0.1 });
+    if (!seat) continue;
+    const check = lib.checkHouse(analysis, { ...seat, width, depth });
+    return check.status === lib.HOUSE_ZONE ? { ...seat, rotation, ratio, check } : null;
+  }
+  return null;
+}
+
+for (const [mode, width, height, narrow] of [["hell", 1440, 1000, false], ["dunkel", 1440, 1000, false], ["hell", 402, 900, true]]) {
+  const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 2 });
+  const page = await ctx.newPage();
+  countTiles(page);
+  page.on("pageerror", e => problems.push(`nachbarschaft ${mode}/${width}: ${e.message}`));
+  page.on("console", m => {
+    if (m.type() === "error" && !/Failed to load resource/.test(m.text())) problems.push(`nachbarschaft ${mode}/${width}: ${m.text()}`);
+  });
+  await page.route("**/api/housetypes/extract", route => route.fulfill({ json: ELK }));
+  await page.goto(`${address}haustypen`, { waitUntil: "load" });
+  await page.evaluate(() => document.fonts.ready);
+  await page.click(`.theme-switch button:nth-child(${mode === "hell" ? 1 : 2})`);
+  await page.getByRole("button", { name: "Haustyp hinzufügen" }).first().click();
+  await page.fill("#ht-url", ELK.felder.hersteller.quelle_url);
+  await page.getByRole("button", { name: "Haustyp lesen" }).click();
+  await page.waitForSelector(".type-card", { timeout: 10000 });
+
+  await page.goto(address, { waitUntil: "load" });
+  await page.fill(QUERY_FIELD, "145592 204");
+  await page.getByRole("button", { name: "Grundstück finden" }).click();
+  await page.waitForSelector("#q-name", { timeout: 60000 });
+  await page.getByRole("button", { name: "Anlegen und öffnen" }).click();
+  await page.waitForSelector(".plot-page", { timeout: 30000 });
+
+  // The house: the catalogue type, its ratio and angle on their own controls.
+  await page.getByRole("tab", { name: "Bebauung" }).click();
+  await page.$eval("#house-type", el => {
+    el.value = [...el.options].find(o => o.textContent.includes("All in One 159")).value;
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  // The drag below turns metres into pixels on a north-up plan.
+  await page.locator('[aria-label="Kartenausrichtung"]').getByRole("button", { name: "Genordet" }).click();
+  const setRange = (selector, value) => page.$eval(selector, (el, v) => {
+    el.value = String(v);
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  }, value);
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("where2build.v1")));
+  const plot = stored.plots.find(p => (p.flurstuecke ?? []).includes("204")) ?? stored.plots[0];
+  const seat = await amberSeat(plot);
+  if (!seat) {
+    problems.push(`nachbarschaft ${mode}/${width}: keine Lage in der 6-m-Zone zu Nr. 46 gefunden`);
+  } else {
+    await setRange("#ratio", seat.ratio);
+    await page.waitForTimeout(300);
+    await setRange("#rotation", seat.rotation);
+    await page.waitForTimeout(300);
+    /* Metres to screen pixels, read off the plan's own scale bar: its first
+       segment is `label` metres and `width` drawing units wide. */
+    const scale = await page.evaluate(() => {
+      const svg = document.querySelector(".plan-grid svg.site-plan");
+      const bar = [...svg.querySelectorAll("g[transform^='translate(38']")][0];
+      const units = Number(bar.querySelector("rect").getAttribute("width"));
+      const metres = Number(bar.querySelectorAll("text")[1].textContent.replace(",", "."));
+      return units / metres * svg.getBoundingClientRect().width / svg.viewBox.baseVal.width;
+    });
+    const house = page.locator(".plan-grid [data-house] polygon").first();
+    await house.scrollIntoViewIfNeeded();
+    const box = await house.boundingBox();
+    const from = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    const current = await page.evaluate(() => JSON.parse(localStorage.getItem("where2build.v1")));
+    const now = current.plots.find(p => p.id === plot.id).house;
+    const to = { x: from.x + (seat.cx - now.cx) * scale, y: from.y - (seat.cy - now.cy) * scale };
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await page.mouse.move(to.x, to.y, { steps: 12 });
+    await page.mouse.up();
+    await page.waitForTimeout(300);
+    if (mode === "hell" && !narrow) {
+      console.log(`Nachbarschaft: ELK All in One 159, Seitenverhältnis 1 : ${num2(seat.ratio)}, `
+        + `Drehung ${seat.rotation}°, ${seat.check.zones.map(z => `${num2(z.intrusion)} m in die 6-m-Zone zu ${z.address}`).join(", ")}.`);
+    }
+  }
+
+  await page.getByRole("tab", { name: "Nachbarschaft" }).click();
+  try {
+    await page.waitForSelector(".nb-marker", { timeout: 60000 });
+    await page.waitForSelector("#pane-neighbourhood [data-finding=easement]", { timeout: 60000 });
+  } catch {
+    problems.push(`nachbarschaft ${mode}/${width}: der Reiter hat keine Nachbarn gezeichnet`);
+  }
+  if (await page.locator(".house-check").getAttribute("data-house-status") !== "zone") {
+    problems.push(`nachbarschaft ${mode}/${width}: der Baukörper steht nicht in der 6-m-Zone`);
+  }
+  await mapSettled(page, `nachbarschaft ${mode}/${width}`, ".plan-grid");
+  await shotOf(page, ".plan-grid", "grundstueck-nachbarschaft", mode, narrow ? "-schmal" : "");
+  if (!narrow) {
+    const n46 = page.locator("#pane-neighbourhood .befund", { hasText: "Lessingweg 46" }).first();
+    await n46.getByRole("button", { name: "Im Schnitt" }).click();
+    await page.waitForTimeout(300);
+    await shotOf(page, ".plan-grid", "grundstueck-nachbarschaft-schnitt", mode);
+    await n46.getByRole("button", { name: "Schließen" }).click();
+    await page.locator(".plan-zoom").getByRole("button", { name: "Straße" }).click();
+    await page.waitForTimeout(900);
+    await mapSettled(page, `nachbarschaft Straße ${mode}/${width}`, ".plan-grid");
+    await shotOf(page, ".plan-frame", "grundstueck-nachbarschaft-strasse", mode);
+    await page.locator(".plan-zoom").getByRole("button", { name: "Nachbarn" }).click();
+    await page.waitForTimeout(900);
+  }
+  await shotOf(page, "#nachbarschaft", "grundstueck-nachbarschaft-detail", mode, narrow ? "-schmal" : "");
+  if (mode === "hell" && !narrow) {
+    // The other reading: the strip along Nr. 42 that may be buildable.
+    const n42 = page.locator("#pane-neighbourhood .befund", { hasText: "Lessingweg 42" }).first();
+    await n42.getByRole("button", { name: "An die Grenze darf gebaut werden" }).click();
+    await page.waitForTimeout(300);
+    if (!await page.locator(".nb-maybe").count()) {
+      problems.push("nachbarschaft: die Lesart „an die Grenze“ zeichnet keinen Streifen");
+    }
+    await mapSettled(page, "nachbarschaft Lesart", ".plan-grid");
+    await shotOf(page, ".plan-grid", "grundstueck-nachbarschaft-grenze", mode);
+  }
+  await ctx.close();
+}
+
 /* The print rendering, as the browser would lay it out on paper. */
 /* A4 at 96 dpi. At the old 1240 px the shot was 1.76x the real 186 mm column,
    which flattered the layout and hid how tight it actually is. */

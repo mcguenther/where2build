@@ -19,6 +19,15 @@
 
 import { num } from "./format.js";
 
+/* The neighbourhood's templates live beside this file, because they read a
+   geometric analysis rather than one service's answer; they follow the same
+   rules and are re-exported so every finding is reached from here. */
+export {
+  neighbourhoodFindings, houseCheckFinding, bandFinding, clearFinding, wallHeightFinding,
+  boundaryReadingSentences, boundaryHeading, boundaryStatusLabel, clearBoundarySentence, sectionHeading,
+  READING_DEFAULT_REASON, NEIGHBOURHOOD_STATUS_LABELS, HOUSE_STATUS_LABELS
+} from "./neighbourhoodFindings.js";
+
 /** The three states a check can end in. `open` never gets a colour. */
 export const GOOD = "good";
 export const NOTE = "note";
@@ -402,4 +411,148 @@ export function tallyText(counts) {
   if (counts[NOTE]) parts.push(`${counts[NOTE]} zu beachten`);
   if (counts[OPEN]) parts.push(`${counts[OPEN]} offen`);
   return parts.join(" · ");
+}
+
+/* ------------------------------------------------------------------------ */
+/* Bauleitplanung (RAPIS Sachsen) and Baulasten                             */
+/* ------------------------------------------------------------------------ */
+
+/** „2015-05-16" → „16.05.2015", read as the calendar day it is. Going
+ *  through `Date` would move a date-only string by the viewer's time zone. */
+function calendarDay(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value ?? "");
+  return match ? `${match[3]}.${match[2]}.${match[1]}` : null;
+}
+
+/** „der Stadt" for „Stadt Leipzig" or „Leipzig, Stadt", else „der Gemeinde". */
+export function authorityOf(municipality) {
+  return /(^|[\s,])Stadt($|[\s,])/.test(municipality ?? "") ? "der Stadt" : "der Gemeinde";
+}
+
+const isLeipzig = municipality => /\bLeipzig\b/.test(municipality ?? "");
+
+const list = items => (items.length > 1 ? `${items.slice(0, -1).join(", ")} und ${items[items.length - 1]}` : items[0]);
+
+/**
+ * What RAPIS says about the plot, as findings in the shape of the
+ * neighbourhood list: `{ id, status, statusLabel, title, sentences }`.
+ *
+ * An empty list of plans is a statement — RAPIS was asked and knows none — but
+ * RAPIS is not complete, so it is never worded as „kein Bebauungsplan": the
+ * sentence says what the register holds and who answers bindingly. A failed
+ * request never reaches this function; the caller shows the backend's
+ * `detail` instead.
+ */
+export function planningFindings(answer, municipality) {
+  if (!answer || typeof answer !== "object") return [];
+  const authority = authorityOf(municipality);
+  const plans = Array.isArray(answer.bebauungsplaene) ? answer.bebauungsplaene : [];
+  const statutes = Array.isArray(answer.satzungen) ? answer.satzungen : [];
+  const out = [];
+
+  for (const plan of plans) {
+    const inForce = plan.status === "in Kraft";
+    const sentences = inForce
+      ? [`Liegt im Geltungsbereich von ${plan.name} (laut RAPIS Sachsen).`]
+      : [`In RAPIS Sachsen ist hier ${plan.name} im Verfahren verzeichnet`
+          + (plan.verfahrensstand && plan.verfahrensstand !== "im Verfahren"
+            ? `, Verfahrensstand „${plan.verfahrensstand}“.` : ".")];
+    const uses = (plan.art_der_nutzung ?? []).filter(Boolean);
+    if (uses.length) sentences.push(`Art der Nutzung: ${list(uses)}.`);
+    if (!inForce && plan.planstand) sentences.push(`Planstand: ${plan.planstand}.`);
+    const announced = calendarDay(plan.bekanntgemacht_am);
+    if (inForce && announced) sentences.push(`Bekannt gemacht am ${announced}.`);
+    if (plan.info) sentences.push(`RAPIS vermerkt: ${plan.info}.`.replace(/\.\.$/, "."));
+    sentences.push(inForce
+      ? `Was er festsetzt, sagt der Plan selbst; verbindlich ist die städtebauliche Auskunft ${authority}.`
+      : `Ein Plan im Verfahren ist noch nicht in Kraft; verbindlich ist die städtebauliche Auskunft ${authority}.`);
+    out.push({
+      id: `plan-${plan.rok_nr ?? plan.name}`,
+      status: inForce ? "plan" : "procedure",
+      statusLabel: inForce ? "in Kraft" : "im Verfahren",
+      title: "Bebauungsplan",
+      sentences
+    });
+  }
+
+  for (const statute of statutes) {
+    const inForce = statute.status === "in Kraft";
+    const basis = statute.rechtsgrundlage ? ` (${statute.rechtsgrundlage})` : "";
+    out.push({
+      id: `statute-${statute.rok_nr ?? statute.name}`,
+      status: inForce ? "plan" : "procedure",
+      statusLabel: inForce ? "in Kraft" : "im Verfahren",
+      title: "Satzung",
+      sentences: [
+        inForce
+          ? `Liegt im Geltungsbereich der Satzung ${statute.name}${basis} (laut RAPIS Sachsen).`
+          : `In RAPIS Sachsen ist hier die Satzung ${statute.name}${basis} im Verfahren verzeichnet.`
+      ]
+    });
+  }
+
+  if (!plans.length && !statutes.length) {
+    out.push({
+      id: "plan-none",
+      status: "likely34",
+      statusLabel: "wahrscheinlich § 34",
+      title: "Bebauungsplan",
+      sentences: [
+        "In RAPIS kein Bebauungsplan verzeichnet – wahrscheinlich § 34 BauGB. "
+          + `Verbindlich ist die städtebauliche Auskunft ${authority}.`
+      ]
+    });
+  }
+
+  const fnp = Array.isArray(answer.fnp) ? answer.fnp : [];
+  if (fnp.length) {
+    out.push({
+      id: "fnp",
+      status: "fnp",
+      statusLabel: "Darstellung",
+      title: "Flächennutzungsplan",
+      sentences: fnp.map(entry => {
+        const shown = (entry.darstellungen ?? []).filter(Boolean);
+        const announced = calendarDay(entry.bekanntgemacht_am);
+        const when = announced ? `, bekannt gemacht am ${announced}` : "";
+        return shown.length
+          ? `${list(shown)} (${entry.name}${when}).`
+          : `${entry.name}${when}; eine Darstellung für das Grundstück führt RAPIS nicht.`;
+      })
+    });
+  } else {
+    out.push({
+      id: "fnp",
+      status: "open",
+      statusLabel: "offen",
+      title: "Flächennutzungsplan",
+      sentences: ["In RAPIS ist für das Grundstück kein wirksamer Flächennutzungsplan verzeichnet."]
+    });
+  }
+  return out;
+}
+
+/**
+ * Baulasten are in no dataset: not in ALKIS, not in RAPIS. What can be said is
+ * where they are kept and what it costs to ask — for Leipzig from the city's
+ * own service page (docs/research/bebauungsplaene-sachsen.md), elsewhere only
+ * which authority keeps the register.
+ */
+export function easementFinding(municipality) {
+  const where = isLeipzig(municipality)
+    ? "Auskunft gibt die Stadt Leipzig, Amt für Bauordnung und Denkmalpflege, bei berechtigtem Interesse "
+      + "(§ 83 Abs. 5 SächsBO): 22–70 € je Grundstück, etwa vier Wochen."
+    : "Auskunft gibt die untere Bauaufsichtsbehörde, die das Baulastenverzeichnis führt – für "
+      + `${municipality || "das Grundstück"} der Landkreis oder die kreisfreie Stadt –, bei berechtigtem `
+      + "Interesse (§ 83 Abs. 5 SächsBO).";
+  return {
+    id: "easement",
+    status: "open",
+    statusLabel: "nicht öffentlich",
+    title: "Baulasten",
+    sentences: [
+      `Baulasten stehen nicht im Kataster und sind nicht öffentlich. ${where}`,
+      "Eine Abstandsflächen-Baulast (§ 6 Abs. 2 SächsBO) stünde nur dort."
+    ]
+  };
 }

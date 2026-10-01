@@ -238,3 +238,81 @@ describe("the tally that replaces a score", () => {
     expect(f.text).toBe("Für Sachsen liegt kein Dienst vor.");
   });
 });
+
+/* The Bauleitplanung, against what /api/planning answers for the four RAPIS
+   recordings of 30.09.2026 (backend/tests/fixtures/rapis_*.json, run through
+   the backend's own parser): no plan, a plan in force, one in procedure, and
+   an Ergänzungssatzung. */
+import { planningFindings, easementFinding, authorityOf } from "../src/lib/findings.js";
+import planningNone from "./fixtures/planung-moelkau.json";
+import planningE215 from "./fixtures/planung-zweinaundorf-e215.json";
+import planning520 from "./fixtures/planung-moelkau-520.json";
+import planningE276 from "./fixtures/planung-gundorf-e276.json";
+
+describe("Bauleitplanung aus RAPIS", () => {
+  it("sagt ohne Treffer „wahrscheinlich § 34“ und wer verbindlich antwortet", () => {
+    const [plan, fnp] = planningFindings(planningNone, "Stadt Leipzig");
+    expect(plan.statusLabel).toBe("wahrscheinlich § 34");
+    expect(plan.sentences).toEqual(["In RAPIS kein Bebauungsplan verzeichnet – wahrscheinlich § 34 BauGB. "
+      + "Verbindlich ist die städtebauliche Auskunft der Stadt."]);
+    expect(fnp.sentences).toEqual(["Wohnbaufläche (FNP der Stadt Leipzig, Fortschreibung, bekannt gemacht am 16.05.2015)."]);
+  });
+
+  it("nennt einen Plan in Kraft mit der Art der Nutzung", () => {
+    const [plan] = planningFindings(planningE215, "Stadt Leipzig");
+    expect(plan.statusLabel).toBe("in Kraft");
+    expect(plan.sentences[0]).toBe("Liegt im Geltungsbereich von B-Pl. E-215 Wohngebiet Zweinaundf.Str. (laut RAPIS Sachsen).");
+    expect(plan.sentences).toContain("Art der Nutzung: Wohnbaufläche (W).");
+    expect(plan.sentences).toContain("Bekannt gemacht am 05.05.1995.");
+    expect(plan.sentences.join(" ")).not.toContain("§ 34");
+  });
+
+  it("hält einen Plan im Verfahren von einem in Kraft auseinander", () => {
+    const [plan, fnp] = planningFindings(planning520, "Stadt Leipzig");
+    expect(plan.statusLabel).toBe("im Verfahren");
+    expect(plan.sentences[0]).toBe("In RAPIS Sachsen ist hier V-BPlan Nr. 424 Handels- und Dienstleistungszentrum "
+      + "Mölkau-Mitte im Verfahren verzeichnet.");
+    expect(plan.sentences).toContain("Planstand: Vorentwurf.");
+    expect(plan.sentences.join(" ")).toContain("noch nicht in Kraft");
+    expect(plan.sentences.join(" ")).not.toContain("Liegt im Geltungsbereich");
+    // An FNP boundary through the parcel: both designations.
+    expect(fnp.sentences[0]).toMatch(/^Straßenverkehrsfläche und Wohnbaufläche \(/);
+  });
+
+  it("nennt eine Satzung nach § 34 Abs. 4 mit ihrer Rechtsgrundlage", () => {
+    const lines = planningFindings(planningE276, "Stadt Leipzig");
+    expect(lines[0].title).toBe("Satzung");
+    expect(lines[0].sentences[0]).toBe("Liegt im Geltungsbereich der Satzung ErgS Entlang der Schönauer Str. E-276 "
+      + "(§34(4) Nr.3 BauGB) (laut RAPIS Sachsen).");
+    // A statute is a hit: no „kein Bebauungsplan" beside it.
+    expect(lines.map(l => l.id)).not.toContain("plan-none");
+  });
+
+  it("sagt Gemeinde, wo keine Stadt ist", () => {
+    expect(authorityOf("Stadt Leipzig")).toBe("der Stadt");
+    expect(authorityOf("Leipzig, Stadt")).toBe("der Stadt");
+    expect(authorityOf("Großpösna")).toBe("der Gemeinde");
+    expect(planningFindings(planningNone, "Großpösna")[0].sentences[0]).toContain("Auskunft der Gemeinde.");
+  });
+
+  it("antwortet auf nichts mit nichts", () => {
+    expect(planningFindings(null, "Stadt Leipzig")).toEqual([]);
+  });
+});
+
+describe("Baulasten", () => {
+  it("nennt für Leipzig Amt, Kosten und Dauer", () => {
+    const text = easementFinding("Stadt Leipzig").sentences.join(" ");
+    expect(text).toContain("Amt für Bauordnung und Denkmalpflege");
+    expect(text).toContain("22–70 € je Grundstück, etwa vier Wochen");
+    expect(text).toContain("§ 83 Abs. 5 SächsBO");
+  });
+
+  it("nennt anderswo nur, wer das Verzeichnis führt, und keine Leipziger Preise", () => {
+    const text = easementFinding("Moritzburg").sentences.join(" ");
+    expect(text).toContain("untere Bauaufsichtsbehörde");
+    expect(text).toContain("Moritzburg");
+    expect(text).not.toContain("22–70 €");
+    expect(text).not.toContain("Leipzig");
+  });
+});

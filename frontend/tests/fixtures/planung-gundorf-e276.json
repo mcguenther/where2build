@@ -1,0 +1,36 @@
+{
+  "bebauungsplaene": [],
+  "satzungen": [
+    {
+      "name": "ErgS Entlang der Schönauer Str. E-276",
+      "status": "in Kraft",
+      "verfahrensstand": "rechtskräftig",
+      "rechtsgrundlage": "§34(4) Nr.3 BauGB",
+      "plantyp": "SATZ",
+      "gemeinde": "Leipzig, Stadt",
+      "standort": null,
+      "art_der_nutzung": [],
+      "planstand": null,
+      "genehmigt_am": "1998-10-30",
+      "bekanntgemacht_am": "1998-12-17",
+      "info": null,
+      "rok_nr": 3980335
+    }
+  ],
+  "fnp": [
+    {
+      "name": "FNP der Stadt Leipzig, Fortschreibung",
+      "darstellungen": [
+        "Gemischte Baufläche",
+        "Straßenverkehrsfläche"
+      ],
+      "gemeinde": "Leipzig, Stadt",
+      "bekanntgemacht_am": "2015-05-16",
+      "info": "wirksam 16.05.2015, letzte Änd.Verfahren 2023"
+    }
+  ],
+  "datenstand": "2026-09-28",
+  "quelle": "RAPIS Sachsen 09/2026, Landesdirektion Sachsen — dl-de/by-2-0",
+  "quelle_url": "https://rapis.sachsen.de",
+  "hinweis": "RAPIS führt Bauleitpläne und Satzungen nach Kenntnisstand der Landesdirektion Sachsen und ist nachweislich nicht vollständig: ein fehlender Eintrag heißt „kein bekannter Plan“, nicht „kein Plan“. Keine rechtsverbindliche Auskunft — verbindlich ist die städtebauliche Auskunft der Gemeinde."
+}

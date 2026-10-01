@@ -428,3 +428,11 @@ those builds where it serves from.
   zurückfällt. Der Bereich hieß längst „betrieb", der Test bestand trotzdem,
   und er hätte auch bestanden, wenn die Weiche kaputt gewesen wäre. Prüfe auf
   etwas, das es *nur* im gesuchten Bereich gibt.
+
+- **„204 " makes no parcel pill; „145592 204" is a parcel.** `enterParcel`
+  relies on a space after the number turning it into a block, and that only
+  happens for a number with a denominator („85/1 "). A three-digit number
+  alone waits for its district forever. The neighbourhood pictures type the
+  district key and the number, which `queryInput` reads as a certain parcel.
+  They use Mölkau 204, the mock-up's plot, because it carries every class the
+  tab draws (Grenzbebauung, Überdeckung, a shed, Bestand, the § 34 band).

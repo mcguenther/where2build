@@ -35,6 +35,7 @@ from .routers import (
     nearby,
     neighbours,
     parcels,
+    planning,
     reachability,
     search,
     sitechecks,
@@ -557,6 +558,17 @@ def create_app() -> FastAPI:
                     ),
                 ),
                 DienstStatus(
+                    name="rapis",
+                    konfiguriert=bool(current.rapis.base_url),
+                    endpunkt=current.rapis.base_url,
+                    hinweis=(
+                        "Bebauungspläne in Kraft und im Verfahren, Satzungen nach "
+                        "§§ 34/35 BauGB und der wirksame FNP über /api/planning — "
+                        "gefragt wird mit dem Flurstücksumring. Nach Kenntnisstand "
+                        "der Landesdirektion, nicht vollständig."
+                    ),
+                ),
+                DienstStatus(
                     name="luftqualitaet",
                     konfiguriert=bool(current.air_quality.base_url),
                     endpunkt=f"{current.air_quality.base_url}/stations/json",
@@ -668,6 +680,7 @@ def create_app() -> FastAPI:
         geocode,
         reachability,
         sitechecks,
+        planning,
         nearby,
         neighbours,
     ):

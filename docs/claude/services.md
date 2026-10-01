@@ -6,6 +6,7 @@ that cost time when they were not known.
 
 The services are the Saxon cadastre (ALKIS-WFS), the land values (BORIS), the
 GeoSN map layers, the Saxon environmental server (LUIS, ArcGIS REST), the
+state planning register (RAPIS, ArcGIS REST), the
 federal air-quality API (UBA), routing (MOTIS/Transitous), OpenStreetMap by way
 of Overpass or a local extract, the listing portals, and the extraction model.
 
@@ -407,6 +408,57 @@ of Overpass or a local extract, the listing portals, and the extraction model.
   abstract says „keine Flaechen sondern nur Konturen“ — that is the one for an
   orthophoto. Streets and their names come from the WebAtlas as
   `Verkehr,Beschriftung`, transparent at every zoom from 13 to 19.
+
+- **RAPIS (`rapis.ipm-gis.de/arcgis/rest/services`) is where the Bauleitplanung
+  is, and `WMS_BPLAN` is the service — not `WFS_BPLAN`.** The Landesdirektion's
+  open ArcGIS 11.5 server holds the plan *areas* of every Saxon municipality:
+  `WMS_BPLAN/3` in force, `/1` in procedure, `/5` the §§ 34/35 statutes,
+  `/2` and `/0` the Art der Nutzung inside them, `RO_FNP_wirksam/1` the FNP
+  with its Darstellung in `thema_det` on the same layer. `WFS_BPLAN` answers
+  successfully and wrongly: its "in Kraft" layers 2 and 3 return `count: 0`
+  statewide. `/api/planning` (`services/rapis.py`) asks the six layers with
+  the plot ring — clockwise, EPSG:25833, the LUIS rule — and
+  `returnGeometry=false`. Measured 30.09.2026: Mölkau 204 has nothing on any
+  plan layer and FNP „Wohnbaufläche"; the controls are Zweinaundorf 479
+  (Buchenweg 20, inside E-215, in force), Mölkau 520 (V-BPlan Nr. 424, im
+  Verfahren) and Gundorf 36/13 (Ergänzungssatzung E-276). All four are
+  recorded in `backend/tests/fixtures/rapis_*.json`.
+
+- **The REST layer numbers are not the WMS's.** WMS layer "4
+  Satzungsbereiche" is REST layer **5**; REST `/4` answers `404 Layer not
+  found`. The B-Plan layers spell their fields upper case (`NAME`,
+  `DAT_BEKANN`), the FNP layer lower case (`name`, `dat_bekann`), and an empty
+  text field is a single blank, not null.
+
+- **The plan layers carry statutes, and the statute layer carries sub-areas
+  and procedures.** Layer 3 holds 1 427 records with `PLANTYP='SATZ'`; E-276
+  comes back on layer 3 *and* layer 5 for the same parcel. `PLANTYP` does not
+  separate them — "SATZ" also marks § 8 and § 13 plans — so a record is
+  reported as a statute when layer 5 returned its `ROK_NR` too. Layer 5 mixes
+  `rechtskräftig` with „im Verfahren", „genehmigt" and „RO konform …", and
+  one statute arrives as several records (its area plus a „Verkehrsfläche" or
+  an „überbaubare Grundstücksfläche" in it), so records are grouped by
+  `ROK_NR`. Layer 1 is not only „im Verfahren" either: `STATUS` there also
+  reads „genehmigt" and five „RO …" verdicts, which is why the answer carries
+  RAPIS' own `STATUS` as `verfahrensstand` beside the two-valued `status`.
+
+- **RAPIS dates are Saxon midnight; read in UTC they are a day early.** The
+  layers declare `dateFieldsTimeReference: Europe/Berlin`. The FNP shows it:
+  `dat_bekann` 1431727200000 is 15.05.2015 in UTC, and the record's own
+  `info_vg` says „wirksam 16.05.2015". The research note's E-215 dates
+  (07.03. / 04.05.1995) were read in UTC; they are 08.03. and 05.05.1995.
+
+- **RAPIS is not complete, so an empty answer is "no known plan".** Two of
+  the eight plans Leipzig lists for Mölkau (E-211, E-258) are not in it
+  (`docs/research/bebauungsplaene-sachsen.md` § 2.5). The response carries
+  that sentence in `hinweis`, and the credit „RAPIS Sachsen MM/JJJJ" with
+  dl-de/by-2-0 in `quelle`. The month is read from `DAT_RAPIS` on the returned
+  records („LD Sachsen, ROK 28.09.2026, letzter RAPIS-Upload"); it moved from
+  21.09. to 28.09. within five days, so uploads are weekly and the cache holds
+  a week. A layer that fails fails the whole answer — an error must never
+  arrive as an empty `bebauungsplaene` — and an ArcGIS `{"error": …}` with
+  HTTP 200, or an answer without a `features` list, counts as a failure and
+  is not cached.
 
 - **Four providers, two wire formats — and the second one is not a variant of
   the first.** OpenRouter, OpenAI, Ollama and any other OpenAI-compatible host

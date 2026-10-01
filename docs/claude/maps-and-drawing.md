@@ -346,3 +346,64 @@ routines under it.
   the map, so after a click the map's lower edge was usually in view and the
   check passed — while the pan happened in a strip at the top of the screen.
   It scrolls unless 60 % of the map is visible.
+
+- **A neighbour is a building, not an edge.** The first neighbour hint
+  deepened the setback of every boundary edge by `3 − d` for the nearest
+  foreign building, and on Lessingweg 44 (Mölkau 204) the envelope fell from
+  312,9 to 153,7 m²: Lessingweg 42 stands 0,04 m from the boundary along
+  12–28 m of a 47,6 m edge and took the whole edge, a garage 1,3 m behind the
+  rear corner deepened three edges, and garages count for nothing anyway
+  (§ 6 Abs. 8 Nr. 1 SächsBO). Measured on 30.09.2026 against
+  `neighbours-moelkau-alkis.json`. `lib/neighbourhood.js` never touches the
+  envelope; it classifies each outline (`own` by centroid, `accessory` for a
+  non-residential ALKIS function up to 54 m² and 9 m along our boundary,
+  `boundary` under 0,5 m, `overlap` under 3 m, else `clear`), assigns it to the
+  *one* boundary it comes nearest to, and traces what follows only where it
+  stands: its 3 m on our plot (6,1 m² at Nr. 46) and the „6-m-Zone", the part
+  of the envelope within 6 m of it (5,7 m² at Nr. 46; 68,2 m² at Nr. 42 in the
+  cautious reading, which is the default). The round buffers are marching
+  squares at 4 cm with a two-level sweep — the field is 1-Lipschitz, so a block
+  whose corners are all further from zero than its diagonal is filled rather
+  than computed — which brought a cold analysis from 550 ms to about 40 ms; a
+  1 cm trace differs by at most 0,04 m². Depths come from the outlines, not
+  the grid. A house without an ALKIS address is an annex or a rear building,
+  so the § 34 band takes only houses on the plot's own street (by name) and on
+  its side of the street edge's line (geometrically): six on the Lessingweg,
+  5,2–37,6 m behind the street, as deep as 45,0 m.
+
+- **A change of frame is animated through the fit, not through a CSS
+  transform.** The „Nachbarschaft" tab frames the plot with its facing
+  buildings („Nachbarn") or ±60 m of street („Straße"); `SitePlan` interpolates
+  `tweenFit` (scale on a log scale, centre linearly, 560 ms) and everything —
+  drawing and MapLibre camera alike — projects through `view`, so the backdrop
+  follows frame by frame and the outline stays on its parcel (checked on the
+  „Karte" ground on 30.09.2026, both frames). Only a change of *frame key*
+  (frame plus whether an analysis is there) animates; a resize or another
+  reading refits and jumps, and so does everything under
+  `prefers-reduced-motion`. jsdom has no `matchMedia`, which reads as reduced
+  motion, so the view tests see the jump; the tween test stubs both
+  `matchMedia` and `requestAnimationFrame`.
+- **Dimension chains are for the plot frame.** Zoomed out to the neighbours
+  the chains wrote over the markers and the zones, and at ±60 m they were a
+  grey knot; `dimensionsVisible` is false outside `frame === "plot"`.
+- **A marker in the plan is a click beside the house.** `SitePlan` emits
+  `select(null)` for every release off the footprint, and `PlotView` used to
+  answer that with the plot tab — so pinning a finding from the plan closed
+  the list it was pinned in. Only the building tab closes on it now.
+- **A section is cut where the building is nearest, not through the middle
+  of its stretch.** Through the middle the Nr. 46 section read 2,37 m and
+  „0,63 m ins Fenster" right under a finding that said 2,33 and 0,67 — two
+  true numbers for two different places, and they read as a contradiction.
+  `sectionThrough` now cuts at the arc length of the nearest point pair,
+  clamped into the facing stretch; a test holds the section's gap and zone
+  depth to the finding's.
+- **An inline drawing is scaled to its column; only a phone scrolls it.** The
+  strips and sections carry their natural width in `--w` and `max-width:
+  100%` above 520 px, so the 336 px column never cuts „Fenster 7,5 m" or
+  „0,67 m ins Fenster" at its edge. Below that they keep their scale and
+  scroll, and a label beside an interval moves to its other side where it
+  would run off the drawing.
+- **The band's labels are placed, not pinned.** „Straßengrenze, verlängert"
+  sat on house 50a. Each band label offers positions along the street from
+  the ends inwards and takes the first that clears the house numbers, the
+  markers and the band's own houses; one that fits nowhere is left out.

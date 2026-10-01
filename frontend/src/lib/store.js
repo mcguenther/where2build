@@ -358,6 +358,11 @@ export function validate(raw) {
     }
     p.flurstuecke = Array.isArray(p.flurstuecke) ? p.flurstuecke : [];
     p.routes = checkRoutes(p.routes, destinations);
+    const readings = checkReadings(p.neighbourReadings);
+    if (readings) p.neighbourReadings = readings; else delete p.neighbourReadings;
+    /* The old „Nachbarn" switch. The neighbourhood is a tab now and loads
+       when it is opened, so a stored flag would mean nothing. */
+    delete p.showNeighbours;
   });
 
   return {
@@ -367,6 +372,20 @@ export function validate(raw) {
     destinations,
     selection: Array.isArray(input.selection) ? input.selection.filter(id => plots.some(p => p.id === id)) : []
   };
+}
+
+/**
+ * The reading chosen per Grenzbebauung, by the building's cadastral id: the
+ * user's choice, like the other plot settings. Only the two known values
+ * survive a round trip; anything else falls back to the cautious default by
+ * being left out. Null when nothing is left, so a plot nobody chose for
+ * carries no empty field.
+ */
+function checkReadings(readings) {
+  if (!readings || typeof readings !== "object" || Array.isArray(readings)) return null;
+  const kept = Object.fromEntries(Object.entries(readings)
+    .filter(([id, value]) => id && (value === "setback" || value === "boundary")));
+  return Object.keys(kept).length ? kept : null;
 }
 
 /**
