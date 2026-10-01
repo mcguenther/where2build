@@ -84,7 +84,7 @@
                     :neighbour-highlight="neighbourHighlight" :frame="planFrameShown"
                     :house-status="houseCheck ? houseCheck.status : null"
                     @move="moveHouse" @select="selectOnPlan"
-                    @neighbour-hover="hoverBuilding" @neighbour-pick="pinBuilding" />
+                    @neighbour-hover="hoverBuilding" @neighbour-pick="pickOnPlan" />
           <!-- The house is laid on the plot to try it out. Saying which one, on
                the drawing itself, keeps it findable while the column beside
                the plan shows the plot. -->
@@ -412,7 +412,7 @@
              has asked no service. -->
         <div v-show="sidePane === 'neighbourhood'" id="pane-neighbourhood" class="side-pane"
              :class="{ 'no-print': !neighbourhood }" role="tabpanel" aria-labelledby="tab-neighbourhood">
-          <NeighbourhoodPane :analysis="neighbourhood" :findings="neighbourhoodList"
+          <NeighbourhoodPane ref="neighbourhoodPane" :analysis="neighbourhood" :findings="neighbourhoodList"
                              :busy="neighboursBusy" :error="neighboursError" :source="neighbourSource"
                              :has-anchor="hasAnchor" :planning="planningResult"
                              :planning-busy="planningBusy" :planning-error="planningError"
@@ -1216,6 +1216,12 @@ export default {
     },
     hoverBuilding(id) { this.hoveredBuilding = id || null; },
     pinBuilding(id) { this.pinnedBuilding = this.pinnedBuilding === id ? null : id; },
+    /** A pick on the plan also brings the entry into view; a pick in the
+     *  list does not, because the list is where the pointer already is. */
+    pickOnPlan(id) {
+      this.pinBuilding(id);
+      if (this.pinnedBuilding === id) this.$nextTick(() => this.$refs.neighbourhoodPane?.reveal(id));
+    },
     openNeighbourAnalysis(open) { this.openAnalysis = open; },
     /** The reading of one Grenzbebauung, stored with the plot like its other
      *  settings. The analysis re-runs from its cache. */

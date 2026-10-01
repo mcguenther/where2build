@@ -166,6 +166,9 @@ import { findingTargets, STRIP_ORIGINS } from "../lib/neighbourhoodDrawing.js";
 
 /* The chip a status gets. A Grenzbebauung and an Überdeckung want attention,
    not alarm: the red of a violation is for the house leaving the envelope. */
+/** Matches `.plan-grid` in PlotView: one column at 1140 px and below. */
+const SIDE_BY_SIDE = "(min-width: 1141px)";
+
 const CHIPS = {
   boundary: "warn", overlap: "warn", accessory: "unknown", own: "unknown", clear: "good",
   band: "band", heights: "open", plan: "law", procedure: "warn", likely34: "law", fnp: "law", open: "open"
@@ -253,6 +256,15 @@ export default {
       const f = this.numbered.find(x => this.targets(x).boundary === kind);
       this.$emit("open", { kind: "strip", findingId: f?.id ?? null, boundary: kind, section: null });
     },
+    /** A building picked on the plan brings its entry to the top of the
+     *  window, beside the plan, which is sticky. Only where the two stand side
+     *  by side: stacked, the scroll would carry the plan out of sight. */
+    reveal(buildingId) {
+      if (!window.matchMedia?.(SIDE_BY_SIDE).matches) return;
+      const entry = this.$el.querySelector?.(`.befunde [data-building="${CSS.escape(buildingId)}"]`);
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      entry?.scrollIntoView?.({ behavior: reduce ? "auto" : "smooth", block: "start" });
+    },
     toDetail() {
       const target = document.getElementById("nachbarschaft");
       const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -272,6 +284,8 @@ export default {
 .befund{
   display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 4px 10px;
   padding: 12px 14px; border-top: 1px solid var(--w2b-line-faint); position: relative;
+  /* Brought up by a pick on the plan: level with the sticky plan's top. */
+  scroll-margin-top: var(--w2b-space-3);
 }
 .befunde > .befund:first-child{ border-top: 0; }
 .befund.is-active{ background: var(--w2b-primary-veil); }

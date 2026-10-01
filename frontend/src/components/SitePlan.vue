@@ -77,10 +77,11 @@
            drawn further up, above the boundary. -->
       <g v-if="neighbourShapes" class="site-plan__neighbours">
         <polygon v-for="b in neighbourShapes.ground" :key="`g${b.id}`" :points="b.points"
-                 class="nb-building" :class="[`nb-building--${b.kind}`, { 'is-band': b.band, 'is-active': b.active }]"
+                 class="nb-building" :class="[`nb-building--${b.kind}`, { 'is-band': b.band, 'is-active': b.active, 'is-marked': b.marked }]"
                  :data-building="b.id"
                  @pointerenter="$emit('neighbour-hover', b.marked ? b.id : null)"
-                 @pointerleave="$emit('neighbour-hover', null)">
+                 @pointerleave="$emit('neighbour-hover', null)"
+                 @click="b.marked && $emit('neighbour-pick', b.id)">
           <title>{{ b.title }}</title>
         </polygon>
       </g>
@@ -148,10 +149,11 @@
           </g>
         </g>
         <polygon v-for="b in neighbourShapes.own" :key="`o${b.id}`" :points="b.points"
-                 class="nb-building" :class="[`nb-building--${b.kind}`, { 'is-active': b.active }]"
+                 class="nb-building" :class="[`nb-building--${b.kind}`, { 'is-active': b.active, 'is-marked': b.marked }]"
                  :data-building="b.id"
                  @pointerenter="$emit('neighbour-hover', b.marked ? b.id : null)"
-                 @pointerleave="$emit('neighbour-hover', null)">
+                 @pointerleave="$emit('neighbour-hover', null)"
+                 @click="b.marked && $emit('neighbour-pick', b.id)">
           <title>{{ b.title }}</title>
         </polygon>
         <!-- Grenzbebauung: the stretch of our boundary a wall stands on. -->
@@ -1482,6 +1484,7 @@ export default {
 /* The neighbourhood. Outlines are ground, not subject: they sit under the
    parcel's fill and take the eye only where a marker or a hover points. */
 .nb-building{ stroke-linejoin: round; }
+.nb-building.is-marked{ cursor: pointer; }
 .nb-building--main{ fill: var(--w2b-map-neighbour-main); stroke: var(--w2b-map-neighbour-main-edge); stroke-width: 1; }
 .nb-building--aux{ fill: var(--w2b-map-neighbour-aux); stroke: var(--w2b-map-neighbour-aux-edge); stroke-width: .8; }
 .nb-building--own{ fill: var(--w2b-map-existing); stroke: var(--w2b-map-boundary); stroke-width: 1; }

@@ -197,6 +197,42 @@ describe("Befunde und Plan zeigen aufeinander", () => {
     expect(finding(w, "Lessingweg 42").classes()).not.toContain("is-active");
   });
 
+  it("holt den Eintrag neben dem Plan nach oben, wenn im Plan ein Gebäude gewählt wird", async () => {
+    const wide = { matches: true };
+    vi.stubGlobal("matchMedia", query => (query.includes("min-width") ? wide : { matches: false }));
+    const scrolled = [];
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (options) { scrolled.push({ el: this, options }); };
+    try {
+      const w = await openTab(mountPlot());
+      const shed = finding(w, "Nebengebäude");
+      const id = shed.attributes("data-building");
+
+      // A tap on the outline itself, not only on its number.
+      await w.find(`.nb-building[data-building="${id}"]`).trigger("click");
+      await nextTick();
+      expect(shed.classes()).toContain("is-active");
+      expect(scrolled.map(s => s.el)).toEqual([shed.element]);
+      expect(scrolled[0].options.block).toBe("start");
+
+      // Unpinning does not scroll, and neither does a pick in the list.
+      await w.find(`.nb-marker[data-building="${id}"]`).trigger("click");
+      await shed.find(".befund__titel").trigger("click");
+      await nextTick();
+      expect(scrolled).toHaveLength(1);
+
+      // Stacked, the scroll would carry the plan away.
+      await shed.find(".befund__titel").trigger("click");
+      wide.matches = false;
+      await w.find(`.nb-marker[data-building="${id}"]`).trigger("click");
+      await nextTick();
+      expect(scrolled).toHaveLength(1);
+    } finally {
+      Element.prototype.scrollIntoView = original;
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("zeichnet die Umrisse, die Zonen und die Grenzbebauung, das Fenster bleibt", async () => {
     const w = mountPlot();
     const envelopeBefore = w.find('polygon[stroke-dasharray="6 4"]').attributes("points");
