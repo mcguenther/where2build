@@ -84,8 +84,8 @@ workspace "where2build" "Grundstücks-Check Sachsen: Inserat → amtliche Flurst
                         gemarkungen = component "Gemarkungsverzeichnis" "5 339 Gemarkungen aus einer eingecheckten Datei – der WFS wird nie gefragt." "routers/gemarkungen.py, gemarkung_index.py"
                     }
                     group "Inserat und Suche" {
-                        listings = component "Inseratsauswertung" "Portal-Adapter, Feldleser, OCR des Katasterauszugs, Modell als letzter Leser; jeder Modellwert muss das Beleg-Tor passieren." "routers/listings.py, services/portals.py, portal_fields.py, ocr.py, beleg.py, befund.py"
-                        searchEngine = component "Flurstückssuche" "Treppe statt Pipeline: harte Filter entscheiden, Gewichte ordnen. Antwortet als NDJSON." "routers/search.py, search/engine.py, indicia.py, ladder.py, scoring.py, envelope.py"
+                        listings = component "Inseratsauswertung" "Portal-Adapter, Feldleser, OCR des Katasterauszugs, Modell als letzter Leser; jeder Modellwert muss das Beleg-Tor passieren." "routers/listings.py, services/portals.py, services/portal_fields.py, services/ocr.py, services/beleg.py, services/befund.py"
+                        searchEngine = component "Flurstückssuche" "Treppe statt Pipeline: harte Filter entscheiden, Gewichte ordnen. Antwortet als NDJSON." "routers/search.py, search/engine.py, search/blocks.py, search/indicia.py, search/distance.py, search/ladder.py, search/scoring.py, search/envelope.py"
                         llmClient = component "Modell-Client" "Ein Client je Wire-Format: OpenAI-kompatibel oder Anthropic-Adapter. Prompts als Inhalt, nicht im Router." "services/llm.py, services/prompts.py"
                         lehrbuch = component "Lehrbuch" "Protokoll, wo Muster und Modell sich widersprechen; Telefonnummern und Mailadressen geschwärzt." "routers/lehrbuch.py, services/lehrbuch.py"
                         houseTypes = component "Haustypen" "Typenhaus von der Anbieterseite lesen." "routers/housetypes.py"
@@ -98,20 +98,20 @@ workspace "where2build" "Grundstücks-Check Sachsen: Inserat → amtliche Flurst
                     group "Konten und Betrieb" {
                         auth = component "Anmeldung (BFF)" "OIDC mit PKCE auf der Serverseite; der Browser bekommt nur ein signiertes HttpOnly-Cookie." "routers/auth.py, services/oidc.py, session.py"
                         storage = component "Kontospeicher" "Ein Dokument je Grundstück; 200 Grundstücke, 2 MiB je Dokument." "routers/storage.py, services/storage.py"
-                        shares = component "Freigaben" "Geteilte Momentaufnahme per Token, og:-Kopf und 1200×630-Vorschaubild." "routers/shares.py, services/preview.py, sharemeta.py, Pillow"
-                        admin = component "Verwaltung" "Kennzahlen, Sperren, Fehlerlog, Freigaben, Caches, Prüfprotokoll, Jobanfragen." "routers/admin.py, services/admin.py, jobs.py"
+                        shares = component "Freigaben" "Geteilte Momentaufnahme per Token, og:-Kopf und 1200×630-Vorschaubild." "routers/shares.py, services/preview.py, services/sharemeta.py, Pillow"
+                        admin = component "Verwaltung" "Kennzahlen, Sperren, Fehlerlog, Freigaben, Caches, Prüfprotokoll, Jobanfragen." "routers/admin.py, services/admin.py, jobs.py, prices.py"
                     }
                     group "Querschnitt" {
-                        upstream = component "Upstream und Cache" "Ein Ort für ausgehende Anfragen: TTL-Cache im Speicher und auf Platte, Fehler als deutsche HTTP-Antwort." "upstream.py, cache.py, errors.py"
+                        upstream = component "Upstream und Cache" "Ein Ort für ausgehende Anfragen: TTL-Cache im Speicher und auf Platte, Fehler als deutsche HTTP-Antwort. Liest neu gebaute Indizes und die Preisliste ohne Neustart." "upstream.py, cache.py, errors.py, reloading.py"
                         budget = component "Anfragebudget und Telemetrie" "Gleitendes Budget je Konto bzw. Adresse; Zählung als Stundenaggregate, nie je Anfrage." "ratelimit.py, telemetry.py"
                     }
                 }
 
                 db = container "Datenbank" "Konten, Grundstücke, Freigaben, Einstellungen, Abweichungen, Sperren, Nutzungsaggregate, Fehler, Prüfprotokoll, Betriebsansage." "PostgreSQL 16" "Datenbank"
                 cache = container "Plattencache" "Antworten der Ämter, Kacheln, Downloads. Verlust kostet Zeit, nicht Richtigkeit." "Docker-Volume" "Datei"
-                indexes = container "Lokale Indizes" "POI-Index (OSM) und amtliche Hauskoordinaten; beim Start gelesen." "SQLite/Dateien im Volume" "Datei"
+                indexes = container "Lokale Indizes" "POI-Index (OSM) und amtliche Hauskoordinaten; neu gelesen, sobald der Scheduler sie neu gebaut hat." "SQLite/Dateien im Volume" "Datei"
                 motis = container "Router" "Multimodales Routing, Haltestellen und Geocoder auf diesem Rechner." "MOTIS 2.11" "Fremdprodukt"
-                scheduler = container "Scheduler" "Wiederkehrende Jobs aus ops/jobs.json: Cache-Sweep, Freigaben-Sweep, Indizes, Preisliste. Nimmt „Jetzt starten“ als Datei entgegen." "Python, run_jobs.py" "Server"
+                scheduler = container "Scheduler" "Wiederkehrende Jobs aus ops/jobs.json: Cache-Sweep, Freigaben-Sweep, Indizes, Preisliste. Nimmt „Jetzt starten“ als Datei entgegen." "Python, scripts/run_jobs.py" "Server"
                 importer = container "Einmal-Importe" "routing-data, motis-import, indexes: Rohdaten laden, Graph bauen, Indizes anlegen." "Python, MOTIS import" "Server,Einmalig"
                 idp = container "Identitätsanbieter" "Anmeldung und Registrierung, Blueprint aus ops/authentik." "authentik 2025.2" "Fremdprodukt"
                 idpCache = container "IdP-Cache" "Sitzungen und Aufgabenwarteschlange von authentik." "Redis 7" "Fremdprodukt,Datenbank"
@@ -255,7 +255,7 @@ workspace "where2build" "Grundstücks-Check Sachsen: Inserat → amtliche Flurst
                 deploymentNode "motis" "Erster Import ~7 min, 5,6 GiB Spitze" "ghcr.io/motis-project/motis:2.11.2" {
                     containerInstance w2b.motis
                 }
-                deploymentNode "db" "" "postgres:16-alpine" {
+                deploymentNode "db, authentik-db-init" "authentik-db-init legt einmal die Datenbank „authentik“ an" "postgres:16-alpine" {
                     containerInstance w2b.db
                 }
                 deploymentNode "authentik, authentik-worker" "Port 9000" "ghcr.io/goauthentik/server:2025.2.3" {

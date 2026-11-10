@@ -15,6 +15,7 @@ from .errors import AppError, ForbiddenError, RateLimitedError, UnauthorizedErro
 from .gemarkung_index import GemarkungDirectory, load_directory
 from .prices import Prices, load_newest_prices
 from .ratelimit import RateLimiter, client_key, denied_message
+from .reloading import FileBacked
 from .telemetry import recorder, reset_recorder
 from .services.admin import AdminStore
 from .services.airquality import AirQualityService
@@ -54,14 +55,22 @@ def gemarkung_directory() -> GemarkungDirectory | None:
 
 
 @lru_cache(maxsize=1)
-def address_index() -> AddressIndex | None:
-    """The official Hauskoordinaten, read from disk once per process.
+def address_source() -> FileBacked[AddressIndex | None]:
+    """Where the official Hauskoordinaten come from, and when they last changed.
 
     Tens of megabytes of JSON: parsing it per request would cost more than the
-    upstream call it replaces. ``None`` when the file was never built here.
+    upstream call it replaces, so it is read once and again only when the
+    scheduler's quarterly rebuild has replaced the file.
     """
 
-    return load_address_index(get_settings().addresses.index_path)
+    path = get_settings().addresses.index_path
+    return FileBacked([path], lambda: load_address_index(path), name="Address index")
+
+
+def address_index() -> AddressIndex | None:
+    """The official Hauskoordinaten. ``None`` when the file was never built here."""
+
+    return address_source().get()
 
 
 @lru_cache(maxsize=1)
@@ -191,16 +200,25 @@ def current_account(identity: Identity = Depends(signed_in)) -> Identity:
 
 
 @lru_cache(maxsize=1)
-def llm_prices() -> Prices:
-    """The model price list, read from disk once per process.
+def price_source() -> FileBacked[Prices]:
+    """The model price list: the committed file and the monthly job's copy.
 
-    Cached like the indexes: it changes when a job rewrites the file, and the
-    backend is restarted or the cache cleared for a new one to take effect --
-    which is the same rule the Gemarkung and address indexes already follow.
+    Read again when either changes, so neither a ``git pull`` nor the job's
+    run needs a restart to reach the cost column.
     """
 
     settings = get_settings().llm
-    return load_newest_prices(settings.prices_path, settings.prices_update_path)
+    return FileBacked(
+        [settings.prices_path, settings.prices_update_path],
+        lambda: load_newest_prices(settings.prices_path, settings.prices_update_path),
+        name="Price list",
+    )
+
+
+def llm_prices() -> Prices:
+    """The model price list, whichever of the two files is newer."""
+
+    return price_source().get()
 
 
 @lru_cache(maxsize=1)
@@ -336,7 +354,7 @@ def reset_services() -> None:
     for factory in (
         alkis_service,
         gemarkung_directory,
-        address_index,
+        address_source,
         boris_service,
         luis_service,
         rapis_service,
@@ -354,7 +372,7 @@ def reset_services() -> None:
         service_limiter,
         map_limiter,
         admin_store,
-        llm_prices,
+        price_source,
     ):
         factory.cache_clear()
     reset_recorder()
