@@ -9,9 +9,10 @@ import math
 from functools import lru_cache
 from typing import Any
 
+import numpy as np
+import shapely
 from pyproj import Transformer
 from shapely.geometry import mapping, shape
-from shapely.ops import transform as shapely_transform
 
 WGS84 = "EPSG:4326"
 UTM33 = "EPSG:25833"
@@ -42,7 +43,15 @@ def reproject_geometry(geometry: Any, from_crs: str, to_crs: str) -> Any:
     """Reproject a shapely geometry."""
 
     transformer = _transformer(from_crs, to_crs)
-    return shapely_transform(lambda xs, ys: transformer.transform(xs, ys), geometry)
+
+    # shapely.ops.transform is deprecated since Shapely 2.2; the vectorised
+    # API hands over all coordinates of all parts as one (N, 2) or (N, 3)
+    # array. include_z=False would silently flatten a 3D geometry, so the
+    # third column is carried through when there is one.
+    def project(coords: np.ndarray) -> np.ndarray:
+        return np.column_stack(transformer.transform(*coords.T))
+
+    return shapely.transform(geometry, project, include_z=bool(shapely.has_z(geometry)))
 
 
 def to_geojson(geometry: Any) -> dict[str, Any]:

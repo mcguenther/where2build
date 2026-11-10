@@ -283,8 +283,11 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 835 passed, 72 skipped where Tesseract is missing, as measured on
-  10.11.2026 (826 and 60 with it on 30.09.2026, not re-measured since). With `TEST_DATABASE_URL` pointed at a
+- `pytest`: 856 passed, 72 skipped where Tesseract is missing, as measured on
+  10.11.2026 in a fresh venv with Shapely 2.2 and without `-p no:warnings`
+  (826 and 60 with it on 30.09.2026, not re-measured since). Shapely 2.2's
+  deprecation of `shapely.ops.transform` had failed 49 of them there; fixed
+  the same day, see `docs/claude/tooling-and-tests.md`. With `TEST_DATABASE_URL` pointed at a
   real Postgres the account store and the administration area run too; they are
   skipped rather than mocked because what they check is the database's own
   behaviour. Of the rest, one needs pyosmium, which only the index builder

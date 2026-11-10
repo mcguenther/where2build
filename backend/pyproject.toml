@@ -10,7 +10,11 @@ dependencies = [
     "pydantic-settings>=2.4",
     "httpx>=0.27",
     "pyproj>=3.6",
+    # shapely.transform, the vectorised API app/geo.py reprojects with,
+    # exists since 2.0; shapely.ops.transform is deprecated from 2.2.
     "shapely>=2.0",
+    # Already pulled in by Shapely; named because app/geo.py imports it.
+    "numpy>=1.21",
     # The tile proxy scales an oversized WMS render back down to a tile. Not
     # optional any more: without it the cadastral overlay would go to the
     # browser at up to half a megabyte per tile.
