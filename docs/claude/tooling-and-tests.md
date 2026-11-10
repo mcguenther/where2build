@@ -297,6 +297,21 @@ line looks right and does not match.
   versions of the file leaves its container running, and Compose mentions it
   in one line that scrolls past.
 
+- **A fresh venv could fail 49 tests that passed everywhere else — fixed
+  10.11.2026.** `pip install -e "backend[dev]"` pulled Shapely 2.2, which
+  deprecates `shapely.ops.transform` (then used in `app/geo.py`), and
+  `filterwarnings = ["error::DeprecationWarning:app.*"]` turned that into an
+  exception. Only 35 of the failures named the warning; the rest were search
+  runs that caught it and answered „Die Suche ist unterwegs abgebrochen“, so
+  they read like logic bugs. `reproject_geometry` now goes through
+  `shapely.transform` with one (N, 2) array per geometry — (N, 3) when it has
+  a height, which `include_z=False` would otherwise drop silently — and
+  `tests/test_geo.py` pins the vertices, the axis order and the height. In a
+  fresh venv with Shapely 2.2.0: 49 failed before, 839 passed after, also with
+  `-W error::DeprecationWarning`. The lesson stands: when a fresh venv fails
+  where an old one passes, run it once with `-p no:warnings` — if everything
+  passes then, it is a deprecation, not the change.
+
 ## `docker compose` works here now, without a wrapper
 
 **The CA lives in the build context, which is what the proxy's own
