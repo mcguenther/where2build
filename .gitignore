@@ -21,3 +21,6 @@ frontend/ca/*.crt
 
 # The sandbox-only runtime CA override, see docs/claude/tooling-and-tests.md.
 .sandbox-ca.yml
+
+# The Structurizr jars scripts/architecture.mjs fetches through Maven.
+scripts/architecture/lib/

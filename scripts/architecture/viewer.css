@@ -1,0 +1,277 @@
+/* Layout: a plan table -- the drawing fills the sheet, the legend and the
+   details sit in a side panel like the title block of a site plan.
+   Palette from frontend/src/styles/tokens.css: paper, ink, Loden, ochre. */
+:root {
+  --papier: #faf7f1;
+  --blatt: #ffffff;
+  --tinte: #1e1a16;
+  --graphit: #4a443c;
+  --gedaempft: #6f675c;
+  --linie: #dcd3c6;
+  --linie-schwach: #ebe4d9;
+  --loden: #2f4a3a;
+  --loden-schleier: rgba(47, 74, 58, .07);
+  --ocker: #b5813c;
+  --ocker-text: #7c5620;
+  --kante: #7d7468;
+  --kante-an: #b5813c;
+  --rahmen: #6f675c;
+  --rahmen-flaeche: rgba(47, 74, 58, .035);
+  --knoten-flaeche: rgba(30, 26, 22, .028);
+  --fokus: #456b52;
+  --schatten: 0 1px 2px rgba(30, 26, 22, .08), 0 6px 18px rgba(30, 26, 22, .08);
+
+  --schrift: "Public Sans", "Liberation Sans", Arial, Helvetica, system-ui, sans-serif;
+  --schrift-plan: "Liberation Sans", Arial, Helvetica, sans-serif;
+  --schrift-daten: "IBM Plex Mono", "Liberation Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --papier: #161512;
+    --blatt: #1f1d19;
+    --tinte: #ece6dc;
+    --graphit: #cfc7ba;
+    --gedaempft: #a39a8c;
+    --linie: #3a362f;
+    --linie-schwach: #2a2722;
+    --loden: #9db39a;
+    --loden-schleier: rgba(157, 179, 154, .10);
+    --ocker: #d9a55a;
+    --ocker-text: #e3b874;
+    --kante: #8f877b;
+    --kante-an: #e0aa5c;
+    --rahmen: #8f877b;
+    --rahmen-flaeche: rgba(157, 179, 154, .04);
+    --knoten-flaeche: rgba(236, 230, 220, .03);
+    --fokus: #9db39a;
+    --schatten: 0 1px 2px rgba(0, 0, 0, .4), 0 6px 18px rgba(0, 0, 0, .35);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --papier: #161512;
+  --blatt: #1f1d19;
+  --tinte: #ece6dc;
+  --graphit: #cfc7ba;
+  --gedaempft: #a39a8c;
+  --linie: #3a362f;
+  --linie-schwach: #2a2722;
+  --loden: #9db39a;
+  --loden-schleier: rgba(157, 179, 154, .10);
+  --ocker: #d9a55a;
+  --ocker-text: #e3b874;
+  --kante: #8f877b;
+  --kante-an: #e0aa5c;
+  --rahmen: #8f877b;
+  --rahmen-flaeche: rgba(157, 179, 154, .04);
+  --knoten-flaeche: rgba(236, 230, 220, .03);
+  --fokus: #9db39a;
+  --schatten: 0 1px 2px rgba(0, 0, 0, .4), 0 6px 18px rgba(0, 0, 0, .35);
+  color-scheme: dark;
+}
+
+html, body { height: 100%; }
+[hidden] { display: none !important; }
+body {
+  margin: 0;
+  background: var(--papier);
+  color: var(--tinte);
+  font: 14px/1.45 var(--schrift);
+}
+.unsichtbar {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap;
+}
+
+.app { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+
+/* ---- header ---------------------------------------------------------- */
+.kopf {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px;
+  padding-block: 12px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  border-bottom: 1px solid var(--linie);
+  background: var(--blatt);
+}
+.marke { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.marke-name { font-weight: 700; font-size: 16px; letter-spacing: -.01em; color: var(--loden); }
+.marke-zusatz {
+  font: 600 11px/1 var(--schrift); text-transform: uppercase; letter-spacing: .08em; color: var(--gedaempft);
+}
+.sichten {
+  display: flex; gap: 2px; flex: 1 1 auto; min-width: 0; overflow-x: auto;
+  scrollbar-width: thin;
+}
+.sicht {
+  display: grid; gap: 1px; padding: 6px 12px; border: 0; border-radius: 6px;
+  background: transparent; color: var(--graphit); cursor: pointer; text-align: left;
+  font: inherit; white-space: nowrap;
+}
+.sicht small { font: 600 10px/1.2 var(--schrift); letter-spacing: .07em; text-transform: uppercase; color: var(--gedaempft); }
+.sicht span { font-weight: 600; font-size: 13px; }
+.sicht:hover { background: var(--loden-schleier); }
+.sicht[aria-current="true"] { background: var(--loden); color: var(--papier); }
+.sicht[aria-current="true"] small { color: inherit; opacity: .75; }
+
+.werkzeuge { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.suche { position: relative; }
+.suche input {
+  width: 200px; max-width: 60vw; padding: 7px 10px; border: 1px solid var(--linie); border-radius: 6px;
+  background: var(--papier); color: var(--tinte); font: inherit;
+}
+.treffer {
+  position: absolute; z-index: 20; top: calc(100% + 4px); right: 0; width: min(360px, 86vw);
+  max-height: 60vh; overflow-y: auto; margin: 0; padding: 4px; list-style: none;
+  background: var(--blatt); border: 1px solid var(--linie); border-radius: 8px; box-shadow: var(--schatten);
+}
+.treffer button {
+  display: grid; width: 100%; gap: 2px; padding: 7px 9px; border: 0; border-radius: 5px;
+  background: transparent; color: var(--tinte); text-align: left; font: inherit; cursor: pointer;
+}
+.treffer button:hover, .treffer button:focus-visible { background: var(--loden-schleier); }
+.treffer small { color: var(--gedaempft); font-size: 12px; }
+.treffer .leer { padding: 8px 10px; color: var(--gedaempft); }
+
+.schalter { display: inline-flex; align-items: center; gap: 6px; color: var(--graphit); cursor: pointer; user-select: none; }
+.schalter input { accent-color: var(--loden); }
+
+.knopf {
+  min-width: 34px; height: 32px; padding: 0 10px; border: 1px solid var(--linie); border-radius: 6px;
+  background: var(--blatt); color: var(--tinte); font: 600 13px/1 var(--schrift); cursor: pointer;
+}
+.knopf:hover { border-color: var(--rahmen); }
+.knopf[aria-pressed="true"] { background: var(--loden); color: var(--papier); border-color: var(--loden); }
+:is(button, input, a):focus-visible { outline: 2px solid var(--fokus); outline-offset: 2px; }
+
+/* ---- stage ----------------------------------------------------------- */
+.flaeche { flex: 1 1 auto; display: flex; min-height: 0; }
+.buehne { position: relative; flex: 1 1 auto; min-width: 0; overflow: hidden; background: var(--papier); }
+.zeichnung { position: absolute; inset: 0; cursor: grab; touch-action: none; }
+.zeichnung.zieht { cursor: grabbing; }
+.zeichnung > svg { display: block; width: 100%; height: 100%; user-select: none; }
+
+.pfad {
+  position: absolute; z-index: 2; top: 12px; left: 16px; display: flex; flex-wrap: wrap; gap: 4px;
+  margin: 0; padding: 4px 8px; list-style: none; border-radius: 6px;
+  background: color-mix(in srgb, var(--blatt) 88%, transparent); font-size: 12px; color: var(--gedaempft);
+}
+.pfad li + li::before { content: "›"; margin-right: 4px; }
+.pfad button { padding: 0; border: 0; background: none; color: var(--loden); font: inherit; font-weight: 600; cursor: pointer; }
+.pfad [aria-current] { color: var(--tinte); font-weight: 600; }
+
+.zoom, .schritte {
+  position: absolute; z-index: 2; display: flex; gap: 4px; padding: 4px; border-radius: 8px;
+  background: color-mix(in srgb, var(--blatt) 92%, transparent); box-shadow: var(--schatten);
+}
+.zoom { right: 16px; bottom: 16px; }
+.schritte { left: 16px; bottom: 16px; align-items: center; }
+.schritt-stand { min-width: 74px; text-align: center; font: 600 12px/1 var(--schrift-daten); font-variant-numeric: tabular-nums; }
+
+/* ---- side panel ------------------------------------------------------ */
+.tafel {
+  flex: 0 0 340px; min-width: 0; overflow-y: auto;
+  padding: 20px 20px 28px; border-left: 1px solid var(--linie); background: var(--blatt);
+  display: flex; flex-direction: column; gap: 18px;
+}
+.tafel h2 { margin: 0; font-size: 19px; line-height: 1.25; text-wrap: balance; }
+.tafel h3 {
+  margin: 0 0 6px; font: 700 11px/1.2 var(--schrift); text-transform: uppercase; letter-spacing: .08em; color: var(--gedaempft);
+}
+.tafel p { margin: 0; }
+.tafel .art { font: 600 11px/1.3 var(--schrift-daten); color: var(--ocker-text); margin-bottom: 4px; }
+.tafel .technik { font: 12px/1.45 var(--schrift-daten); color: var(--graphit); overflow-wrap: anywhere; }
+.tafel .hinweis { color: var(--gedaempft); font-size: 13px; }
+.etiketten { display: flex; flex-wrap: wrap; gap: 4px; }
+.etikett {
+  padding: 2px 7px; border-radius: 99px; border: 1px solid var(--linie); font-size: 11.5px; color: var(--graphit);
+}
+.aktionen { display: flex; flex-wrap: wrap; gap: 6px; }
+.aktionen .knopf { height: auto; padding: 7px 10px; }
+.aktionen .knopf.haupt { background: var(--loden); color: var(--papier); border-color: var(--loden); }
+
+.beziehungen { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.beziehungen button {
+  display: grid; gap: 1px; width: 100%; padding: 6px 8px; border: 0; border-radius: 6px;
+  background: transparent; color: var(--tinte); text-align: left; font: inherit; font-size: 13px; cursor: pointer;
+}
+.beziehungen button:hover, .beziehungen button[aria-current="true"] { background: var(--loden-schleier); }
+.beziehungen b { font-weight: 600; }
+.beziehungen small { color: var(--gedaempft); font: 11.5px/1.4 var(--schrift-daten); }
+.beziehungen .nr {
+  display: inline-grid; place-items: center; min-width: 20px; height: 20px; margin-right: 6px; border-radius: 99px;
+  background: var(--linie-schwach); font: 700 11px/1 var(--schrift-daten); font-variant-numeric: tabular-nums;
+}
+.beziehungen button[aria-current="true"] .nr { background: var(--kante-an); color: #1e1a16; }
+
+.legende { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: 13px; }
+.legende li { display: flex; align-items: center; gap: 9px; }
+.legende svg { flex: 0 0 auto; }
+.bedienung { margin: 0; padding-left: 18px; color: var(--graphit); font-size: 13px; display: grid; gap: 3px; }
+.fuss { margin-top: auto; font-size: 12px; color: var(--gedaempft); }
+.fuss code { font-family: var(--schrift-daten); font-size: 11.5px; }
+
+/* ---- the drawing ----------------------------------------------------- */
+.c4 { font-family: var(--schrift-plan); }
+.c4 .rahmen rect { fill: var(--rahmen-flaeche); stroke: var(--rahmen); stroke-width: 1.2; stroke-dasharray: 7 5; }
+.c4 .rahmen.group rect { fill: none; stroke-dasharray: 2 4; stroke-width: 1.4; stroke-linecap: round; }
+.c4 .rahmen.node rect { fill: var(--knoten-flaeche); stroke-dasharray: none; }
+.c4 .rahmen .titel { fill: var(--tinte); font-weight: 700; font-size: 13px; }
+.c4 .rahmen.group .titel { fill: var(--gedaempft); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+.c4 .rahmen .unter { fill: var(--gedaempft); font-size: 11px; }
+.c4 .rahmen.zielbar .titel { cursor: pointer; }
+
+.c4 .knoten { cursor: pointer; }
+.c4 .knoten .form { stroke: rgba(0, 0, 0, .18); stroke-width: 1; }
+.c4 .knoten.gestrichelt .form { stroke: var(--tinte); stroke-width: 1.6; stroke-dasharray: 6 4; }
+.c4 .knoten .kontur { fill: none; stroke: var(--kante-an); stroke-width: 3; opacity: 0; }
+.c4 .knoten:hover .kontur, .c4 .knoten.gewaehlt .kontur { opacity: 1; }
+.c4 .knoten .name { font-weight: 700; font-size: 14px; }
+.c4 .knoten .meta { font-size: 11px; opacity: .82; }
+.c4 .knoten .text { font-size: 11.5px; }
+.c4 .knoten .tiefer { fill: rgba(255, 255, 255, .22); stroke: rgba(255, 255, 255, .55); }
+.c4 .knoten .tiefer-zeichen { stroke: currentColor; stroke-width: 1.6; fill: none; }
+
+.c4 .kante .linie { fill: none; stroke: var(--kante); stroke-width: 1.3; }
+.c4 .kante .greif { fill: none; stroke: transparent; stroke-width: 12; cursor: pointer; }
+.c4 .kante .schild rect { fill: var(--papier); opacity: .9; }
+.c4 .kante .schild text { fill: var(--graphit); font-size: 11px; }
+.c4 .kante .schild .tech { fill: var(--gedaempft); font-size: 10px; font-style: italic; }
+.c4 .spitze { fill: var(--kante); }
+.c4 .spitze-an { fill: var(--kante-an); }
+.ohne-text .c4 .kante .schild { display: none; }
+
+.c4 .knoten, .c4 .kante, .c4 .rahmen { transition: opacity .15s ease; }
+.fokus .c4 .knoten:not(.an) { opacity: .22; }
+.fokus .c4 .kante:not(.an) { opacity: .1; }
+.c4 .kante.an .linie { stroke: var(--kante-an); stroke-width: 2.2; }
+.c4 .kante.an .schild text { fill: var(--tinte); }
+.c4 .kante.an .schild rect { opacity: 1; }
+.c4 .knoten.treffer-an .kontur { opacity: 1; stroke: var(--ocker); stroke-dasharray: 4 3; }
+
+/* ---- picture mode: only the drawing, at its own size ----------------- */
+.bild .kopf, .bild .tafel, .bild .zoom, .bild .schritte, .bild .pfad { display: none; }
+.bild .buehne { overflow: visible; }
+.bild .zeichnung { position: static; }
+.bild .zeichnung > svg { width: auto; height: auto; }
+.bild, .bild body { height: auto; }
+
+/* ---- narrow ---------------------------------------------------------- */
+@media (max-width: 820px) {
+  .flaeche { flex-direction: column; }
+  .buehne { flex: 0 0 auto; height: 64vh; min-height: 320px; }
+  .tafel { flex: 0 0 auto; border-left: 0; border-top: 1px solid var(--linie); overflow: visible; }
+  .app { height: auto; }
+  html, body { height: auto; }
+  .tafel {
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .werkzeuge { width: 100%; }
+  .suche { flex: 1 1 160px; }
+  .suche input { width: 100%; max-width: none; }
+  .zoom #einpassen { padding: 0 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .c4 .knoten, .c4 .kante, .c4 .rahmen { transition: none; }
+}

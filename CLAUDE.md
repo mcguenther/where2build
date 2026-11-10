@@ -255,6 +255,10 @@ node scripts/screenshots.mjs
 
 # the bookmarklet's handover, across two real origins (needs the build and :8000)
 node scripts/bookmarklet.mjs
+
+# the C4 diagrams: docs/architektur/workspace.dsl -> JSON, interactive page, PNGs.
+# Change the DSL when docker-compose.yml, a router or a service changes shape.
+node scripts/architecture.mjs
 ```
 
 ## Before calling a change done

@@ -292,6 +292,26 @@ while the user drags, with no round trip; the binding numbers come from ALKIS
 anyway. The backend owns network access, caching and schema validation, and
 nothing else.
 
+## Architecture diagrams
+
+`docs/architektur/` holds the C4 model of the whole thing:
+`workspace.dsl` in the Structurizr DSL is the source, and everything else there
+is generated from it by
+
+```bash
+node scripts/architecture.mjs
+```
+
+which parses the DSL with Structurizr's own parser (Java, fetched through Maven
+on the first run), writes `workspace.json` -- loadable in Structurizr Lite as
+is -- lays every view out with ELK and writes `architektur.html`, one
+self-contained interactive page (pan, zoom, drill down a level, step through the
+listing-to-parcel flow), plus a `c4-*.png` per view, taken from that same page.
+`--no-dsl` starts from the committed `workspace.json` where there is no Java.
+Six views: system context, containers, the components of the backend and of the
+web app, the dynamic view from a listing to its parcel, and the deployment of
+the compose stack.
+
 ## Endpoints
 
 | Method | Path | |

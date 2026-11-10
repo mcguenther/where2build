@@ -8,5 +8,8 @@
     "build:mockup": "node scripts/build-standalone.mjs",
     "test": "npm run build:mockup && node --test \"tests/*.test.mjs\"",
     "shots": "npm run build:mockup && node scripts/screenshots.mjs"
+  },
+  "devDependencies": {
+    "elkjs": "^0.10.0"
   }
 }
