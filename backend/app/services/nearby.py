@@ -29,6 +29,7 @@ from typing import Any, Iterable, Sequence
 
 from ..errors import AppError
 from ..poi_index import POI_CATEGORIES, PoiEntry, PoiIndex, haversine_m, load_index
+from ..reloading import FileBacked
 from ..schemas import (
     KATEGORIE_LABELS,
     Kategorie,
@@ -226,26 +227,26 @@ class NearbyService:
         self.settings = settings
         self.motis = motis
         self.overpass = overpass
-        self._index: PoiIndex | None = None
-        self._index_error: str | None = None
-        self._loaded = False
+        path = settings.poi_index_path
+        self._source: FileBacked[PoiIndex | None] = FileBacked(
+            [path], lambda: load_index(path), name="POI index"
+        )
 
     # -- the index ---------------------------------------------------------
 
     @property
     def index(self) -> PoiIndex | None:
-        """The POI index, loaded once. ``None`` when it was never built here."""
+        """The POI index, read again when the scheduler has rebuilt it.
 
-        if not self._loaded:
-            self._loaded = True
-            try:
-                self._index = load_index(self.settings.poi_index_path)
-            except (OSError, ValueError) as exc:
-                # A broken file must not take the transit half down with it.
-                logger.warning("POI index at %s unusable: %s", self.settings.poi_index_path, exc)
-                self._index = None
-                self._index_error = str(exc)
-        return self._index
+        ``None`` when it was never built here. A broken file is logged and
+        never takes the transit half down with it.
+        """
+
+        return self._source.get()
+
+    @property
+    def _index_error(self) -> str | None:
+        return self._source.error
 
     def index_status(self) -> dict[str, Any]:
         """What ``/api/health`` reports about the six OpenStreetMap categories.

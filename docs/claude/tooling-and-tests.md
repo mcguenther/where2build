@@ -307,8 +307,8 @@ line looks right and does not match.
   `shapely.transform` with one (N, 2) array per geometry — (N, 3) when it has
   a height, which `include_z=False` would otherwise drop silently — and
   `tests/test_geo.py` pins the vertices, the axis order and the height. In a
-  fresh venv with Shapely 2.2.0: 49 failed before, 839 passed after, also with
-  `-W error::DeprecationWarning`. The lesson stands: when a fresh venv fails
+  fresh venv with Shapely 2.2.0: 49 failed before, none after — 856 passed
+  once main was merged in, also with `-W error::DeprecationWarning`. The lesson stands: when a fresh venv fails
   where an old one passes, run it once with `-p no:warnings` — if everything
   passes then, it is a deprecation, not the change.
 

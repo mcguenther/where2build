@@ -1,0 +1,16 @@
+<!-- Only here so `mvn dependency:copy-dependencies` can fetch the Structurizr
+     DSL parser and what it needs into scripts/architecture/lib. Nothing is
+     built from it. -->
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>where2build</groupId>
+  <artifactId>architecture-dsl</artifactId>
+  <version>1</version>
+  <dependencies>
+    <dependency>
+      <groupId>com.structurizr</groupId>
+      <artifactId>structurizr-dsl</artifactId>
+      <version>6.2.4</version>
+    </dependency>
+  </dependencies>
+</project>

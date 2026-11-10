@@ -32,15 +32,20 @@ Keep comments sparse and about *why*, not *what*.
 
 ```
 backend/     FastAPI. Proxy and disk cache in front of ALKIS, BORIS, GeoSN
-             WMS, RAPIS Sachsen (`/api/planning`), MOTIS and the LLM. No
-             database — PostGIS is in the plan, not in the code.
+             WMS, LUIS, RAPIS Sachsen (`/api/planning`), MOTIS and the LLM.
+             Postgres holds accounts, plots, shared links and the
+             administration area's aggregates -- and nothing geographic:
+             PostGIS is in the plan, not in the code.
              `app/search/` is the exception: it asks the cadastre a series of
              narrow questions and answers NDJSON, so the map can grow while it
              runs — and it *measures* what comes back. See below.
 frontend/    Vite + Vue 3, Options API. Owns all geometry the user touches.
 docs/        Spec, service research, screenshots. `strategie/` holds the four
-             interactive strategy pages for parcel identification, and
-             `claude/` the working notes this file points at.
+             interactive strategy pages for parcel identification,
+             `claude/` the working notes this file points at, and
+             `architektur/` the C4 model (`workspace.dsl` is the source;
+             `backend/tests/test_architecture_model.py` fails when a router,
+             a service adapter or a compose service is missing from it).
 mockup/      The approved UI mock. Historical reference, not built.
 ```
 
@@ -255,6 +260,10 @@ node scripts/screenshots.mjs
 
 # the bookmarklet's handover, across two real origins (needs the build and :8000)
 node scripts/bookmarklet.mjs
+
+# the C4 diagrams: docs/architektur/workspace.dsl -> JSON, interactive page, PNGs.
+# Change the DSL when docker-compose.yml, a router or a service changes shape.
+node scripts/architecture.mjs
 ```
 
 ## Before calling a change done
@@ -274,7 +283,7 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 839 passed, 72 skipped where Tesseract is missing, as measured on
+- `pytest`: 856 passed, 72 skipped where Tesseract is missing, as measured on
   10.11.2026 in a fresh venv with Shapely 2.2 and without `-p no:warnings`
   (826 and 60 with it on 30.09.2026, not re-measured since). Shapely 2.2's
   deprecation of `shapely.ops.transform` had failed 49 of them there; fixed
