@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import urllib.request
 import xml.etree.ElementTree as ElementTree
@@ -34,7 +35,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
-DEFAULT_TARGET = BACKEND_DIR.parent / "ops" / "llm-preise.json"
+COMMITTED = BACKEND_DIR.parent / "ops" / "llm-preise.json"
+# A container cannot write the committed file (``./ops`` is mounted read-only
+# there), so a deployment names a writable copy and the backend reads
+# whichever of the two is newer -- see ``app.prices.load_newest_prices``.
+DEFAULT_TARGET = Path(os.environ.get("LLM_PRICES_UPDATE_PATH") or COMMITTED)
 
 MODELS_URL = "https://openrouter.ai/api/v1/models"
 ECB_URL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml"
@@ -119,10 +124,13 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Preise nicht aktualisiert: {error}", file=sys.stderr)
         return 1
 
+    # Compared against the copy being replaced, or -- on the first run into a
+    # fresh copy -- against the committed list, so the report says what moved.
     before = {}
-    if args.target.exists():
+    previous = args.target if args.target.exists() else COMMITTED
+    if previous.exists():
         try:
-            before = json.loads(args.target.read_text(encoding="utf-8")).get("modelle", {})
+            before = json.loads(previous.read_text(encoding="utf-8")).get("modelle", {})
         except (OSError, ValueError):
             before = {}
 

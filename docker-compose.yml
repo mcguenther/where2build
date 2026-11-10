@@ -93,6 +93,13 @@ services:
       # The job list and the price list both live in ops/, mounted below.
       - JOBS_FILE=/ops/jobs.json
       - LLM_PRICES_PATH=/ops/llm-preise.json
+      # The monthly `llm-preise` job cannot write the committed list -- /ops is
+      # read-only -- so it writes here, on the volume shared with the
+      # scheduler, and the backend uses whichever of the two is newer. A
+      # `git pull` and the job both reach the cost column that way. A folder
+      # of its own, because /state/llm-preise.json is the runner's record of
+      # that job and overwrote the list the job had just written.
+      - LLM_PRICES_UPDATE_PATH=/state/preisliste/llm-preise.json
     volumes:
       # Answers from the official services, kept between restarts. Losing it
       # costs time and other people's bandwidth, not correctness.
@@ -375,6 +382,8 @@ services:
       # See the backend: the cache sweep must look where the backend writes.
       - APP_CACHE_DIR=/cache
       - JOBS_FILE=/ops/jobs.json
+      # Where `llm-preise` writes; see the backend.
+      - LLM_PRICES_UPDATE_PATH=/state/preisliste/llm-preise.json
       # The same database as the backend. Without it `freigaben-sweep`
       # answered {"status": "kein-speicher"} every night (measured 10.11.2026)
       # and expired shared links were never removed.

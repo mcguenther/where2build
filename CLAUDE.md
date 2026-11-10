@@ -274,8 +274,8 @@ Chromium is preinstalled at `/opt/pw-browsers`; never run `playwright install`.
 
 ## Test and screenshot counts at last check
 
-- `pytest`: 814 passed, 72 skipped where Tesseract is missing, as measured on
-  30.09.2026 (826 and 60 with it). With `TEST_DATABASE_URL` pointed at a
+- `pytest`: 835 passed, 72 skipped where Tesseract is missing, as measured on
+  10.11.2026 (826 and 60 with it on 30.09.2026, not re-measured since). With `TEST_DATABASE_URL` pointed at a
   real Postgres the account store and the administration area run too; they are
   skipped rather than mocked because what they check is the database's own
   behaviour. Of the rest, one needs pyosmium, which only the index builder

@@ -25,6 +25,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -63,6 +64,39 @@ class Prices:
             tokens_in * entry.get("ein_je_mio_usd", 0.0) + tokens_out * entry.get("aus_je_mio_usd", 0.0)
         ) / PER_MILLION
         return usd / self.usd_per_euro
+
+
+def load_newest_prices(committed: Path | str, refreshed: Path | str | None) -> Prices:
+    """The committed price list or the job's copy, whichever is newer.
+
+    Two files because a container cannot write the committed one: ``./ops`` is
+    mounted read-only, and writing into somebody's checkout from a container is
+    not the job's business anyway. So in the compose stack the monthly job
+    writes into the scheduler's state volume, and a ``git pull`` still updates
+    the committed file -- whichever of the two carries the later ``stand`` is
+    the one that counts. A copy that is missing, broken or undated never
+    displaces a usable list.
+    """
+
+    primary = load_prices(committed)
+    if refreshed is None or not Path(refreshed).is_file():
+        return primary
+    fresh = load_prices(refreshed)
+    if not fresh.usable:
+        return primary if primary.usable else fresh
+    if not primary.usable:
+        return fresh
+    return fresh if _stand(fresh) > _stand(primary) else primary
+
+
+def _stand(prices: Prices) -> datetime:
+    """The list's date; an undated or unreadable one is the oldest there is."""
+
+    try:
+        moment = datetime.fromisoformat(prices.stand or "")
+    except ValueError:
+        return datetime.min.replace(tzinfo=timezone.utc)
+    return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
 
 
 def load_prices(path: Path | str) -> Prices:

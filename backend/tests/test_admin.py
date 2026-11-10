@@ -896,3 +896,69 @@ def test_an_unknown_job_is_refused_rather_than_written(
 
     assert answer.status_code == 404
     assert not (tmp_path / "state" / "erfundener-lauf.angefordert").exists()
+
+
+def _price_file(path, stand, rate=1.1):
+    import json
+
+    path.write_text(
+        json.dumps(
+            {
+                "stand": stand,
+                "usd_je_eur": rate,
+                "kurs_stand": stand[:10],
+                "modelle": {"openai/gpt-4o-mini": {"ein_je_mio_usd": 0.15, "aus_je_mio_usd": 0.6}},
+            }
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
+def test_the_newer_price_list_wins_whichever_file_it_is_in(tmp_path):
+    """The compose job writes a copy; a `git pull` updates the original."""
+
+    from app.prices import load_newest_prices
+
+    committed = _price_file(tmp_path / "ops.json", "2026-10-01T05:10:00+00:00")
+    refreshed = _price_file(tmp_path / "state.json", "2026-11-01T05:10:00+00:00")
+
+    assert load_newest_prices(committed, refreshed).stand == "2026-11-01T05:10:00+00:00"
+
+    _price_file(committed, "2026-12-01T05:10:00+00:00")
+    assert load_newest_prices(committed, refreshed).stand == "2026-12-01T05:10:00+00:00"
+
+
+def test_a_missing_or_broken_copy_never_displaces_the_committed_list(tmp_path):
+    from app.prices import load_newest_prices
+
+    committed = _price_file(tmp_path / "ops.json", "2026-10-01T05:10:00+00:00")
+    broken = tmp_path / "state.json"
+    broken.write_text("{", encoding="utf-8")
+
+    assert load_newest_prices(committed, None).usable
+    assert load_newest_prices(committed, tmp_path / "gibt-es-nicht.json").stand == "2026-10-01T05:10:00+00:00"
+    assert load_newest_prices(committed, broken).stand == "2026-10-01T05:10:00+00:00"
+
+
+def test_the_price_job_writes_where_the_deployment_says(tmp_path, monkeypatch):
+    """In the container ./ops is read-only; the job must not try to write it."""
+
+    import importlib.util
+    from pathlib import Path
+
+    target = tmp_path / "state" / "llm-preise.json"
+    monkeypatch.setenv("LLM_PRICES_UPDATE_PATH", str(target))
+    script = Path(__file__).resolve().parents[1] / "scripts" / "update_llm_prices.py"
+    spec = importlib.util.spec_from_file_location("update_llm_prices_under_test", script)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    monkeypatch.setattr(
+        module,
+        "build",
+        lambda: {"stand": "2026-11-01T05:10:00+00:00", "usd_je_eur": 1.1, "kurs_stand": "2026-11-01", "modelle": {}},
+    )
+
+    assert module.DEFAULT_TARGET == target
+    assert module.main(["--json"]) == 0
+    assert target.is_file()
