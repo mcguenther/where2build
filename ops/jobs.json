@@ -64,7 +64,7 @@
         "scripts/update_llm_prices.py",
         "--json"
       ],
-      "why": "Die Preisliste hinter der Kostenspalte der Verwaltung: Preise je Modell vom Anbieter selbst und der Tageskurs der EZB. Monatlich, weil Preise sich selten und der Kurs sich täglich ändert -- und weil die Datei im Git steht, ist jede Änderung ein Diff, den jemand sieht. Ohne diesen Lauf altert nur die Umrechnung, gezählt wird weiter."
+      "why": "Die Preisliste hinter der Kostenspalte der Verwaltung: Preise je Modell vom Anbieter selbst und der Tageskurs der EZB. Monatlich, weil Preise sich selten und der Kurs sich täglich ändert -- und weil die Datei im Git steht, ist jede Änderung ein Diff, den jemand sieht. Ohne diesen Lauf altert nur die Umrechnung, gezählt wird weiter. Im Container schreibt er nach LLM_PRICES_UPDATE_PATH, weil ./ops dort schreibgeschützt ist; das Backend nimmt die neuere der beiden Listen und liest sie beim Start, muss danach also neu gestartet werden."
     }
   ]
 }

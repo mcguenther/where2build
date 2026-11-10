@@ -13,7 +13,7 @@ from fastapi import Depends, Request
 from .address_index import AddressIndex, load_index as load_address_index
 from .errors import AppError, ForbiddenError, RateLimitedError, UnauthorizedError
 from .gemarkung_index import GemarkungDirectory, load_directory
-from .prices import Prices, load_prices
+from .prices import Prices, load_newest_prices
 from .ratelimit import RateLimiter, client_key, denied_message
 from .telemetry import recorder, reset_recorder
 from .services.admin import AdminStore
@@ -199,7 +199,8 @@ def llm_prices() -> Prices:
     which is the same rule the Gemarkung and address indexes already follow.
     """
 
-    return load_prices(get_settings().llm.prices_path)
+    settings = get_settings().llm
+    return load_newest_prices(settings.prices_path, settings.prices_update_path)
 
 
 @lru_cache(maxsize=1)

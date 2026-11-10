@@ -387,6 +387,28 @@ retry loop got through.
 `mirror.gcr.io/library/<name>` serves the same images without the limit;
 pull from there and `docker tag` it to the Docker Hub name.
 
+**A pinned tag is not a pinned platform.** Measured 10.11.2026 on x86_64: the
+whole stack came up except authentik, whose server and worker restarted
+forever with `exec /ak-root/venv/bin/dumb-init: exec format error`. On ghcr,
+`goauthentik/server:2025.2.4` (and `2025.2`) is a single arm64 manifest, not a
+multi-platform index, so every non-ARM machine pulled an image it cannot run,
+and sign-in was dead. `2025.2.3` is a proper index. Before raising an image
+version, `docker buildx imagetools inspect <ref>` has to list `linux/amd64`.
+
+**Every job in `ops/jobs.json` has to be run once inside the scheduler.** The
+same day: `freigaben-sweep` answered `{"status": "kein-speicher"}` because the
+scheduler had no `DATABASE_URL`, and `llm-preise` failed with `Read-only file
+system: '/ops/llm-preise.json'` because its default target is the read-only
+`./ops` mount. `docker compose exec scheduler python scripts/run_jobs.py run
+<name>` for each one is the check; `list` showing them is not.
+
+The price job now writes to `LLM_PRICES_UPDATE_PATH`, in the stack
+`/state/preisliste/llm-preise.json`, and the backend uses whichever of that and
+the committed list has the later `stand`. **Not `/state/llm-preise.json`**:
+that is the runner's own record of the job (`/state/<name>.json`), and the
+first try had the runner overwrite the 46 kB list with its 103-byte record a
+second after the job wrote it -- the job reported success both times.
+
 **A folded YAML block (`>`) is not a shell script.** The `indexes` one-shot was
 first written as `command: [sh, -c, >…]` with `|| echo …` on a more-indented
 continuation line. Folding keeps the newline before a more-indented line, so

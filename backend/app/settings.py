@@ -501,6 +501,10 @@ class LLMSettings(BaseSettings):
     # a diff. Absent, the tokens are still counted and the money column says
     # so -- never 0,00 €.
     prices_path: Path = Path("ops/llm-preise.json")
+    # Where the monthly job writes when it cannot write the file above -- in
+    # the compose stack ``./ops`` is read-only. The backend uses whichever of
+    # the two is newer; unset, only the committed file counts.
+    prices_update_path: Path | None = None
     timeout_s: int = 120
     max_content_tokens: int = 50000
     # The dated contract the Anthropic API requires on every request. Pinned
