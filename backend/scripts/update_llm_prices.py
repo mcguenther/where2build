@@ -135,7 +135,11 @@ def main(argv: list[str] | None = None) -> int:
             before = {}
 
     args.target.parent.mkdir(parents=True, exist_ok=True)
-    args.target.write_text(json.dumps(fresh, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    # Written beside the target and renamed: the backend re-reads this file
+    # when it changes, and must never catch it half-written.
+    part = args.target.with_name(args.target.name + ".part")
+    part.write_text(json.dumps(fresh, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    part.replace(args.target)
 
     after = fresh["modelle"]
     changed = [name for name, value in after.items() if before.get(name) != value]

@@ -1,0 +1,3257 @@
+{
+  "configuration" : { },
+  "description" : "Grundstücks-Check Sachsen: Inserat → amtliche Flurstücke → Bodenrichtwert, Bebauung, Umfeld und Wege.",
+  "documentation" : { },
+  "id" : 0,
+  "model" : {
+    "deploymentNodes" : [ {
+      "children" : [ {
+        "containerInstances" : [ {
+          "containerId" : "20",
+          "environment" : "Lokaler Stapel",
+          "id" : "202",
+          "instanceId" : 1,
+          "properties" : {
+            "structurizr.dsl.identifier" : "local.c4f15bcd-0432-4a74-bc38-343d045f2f35.6ac3ce67-58d7-4ccb-a86f-a1b9c0463524.ad29bcc1-b65d-47e2-9abd-521d08dc8cc9"
+          },
+          "relationships" : [ {
+            "description" : "Lädt App, ruft /api",
+            "destinationId" : "207",
+            "id" : "208",
+            "linkedRelationshipId" : "76",
+            "sourceId" : "202",
+            "technology" : "HTTPS, JSON/NDJSON"
+          } ],
+          "tags" : "Container Instance"
+        }, {
+          "containerId" : "32",
+          "environment" : "Lokaler Stapel",
+          "id" : "203",
+          "instanceId" : 1,
+          "properties" : {
+            "structurizr.dsl.identifier" : "local.c4f15bcd-0432-4a74-bc38-343d045f2f35.6ac3ce67-58d7-4ccb-a86f-a1b9c0463524.3b7121fa-03c9-4a3d-b8fb-ec0ee561817a"
+          },
+          "relationships" : [ {
+            "description" : "Übergibt die Inseratsseite",
+            "destinationId" : "202",
+            "id" : "204",
+            "linkedRelationshipId" : "75",
+            "sourceId" : "203",
+            "technology" : "postMessage"
+          } ],
+          "tags" : "Container Instance"
+        } ],
+        "environment" : "Lokaler Stapel",
+        "id" : "201",
+        "instances" : "1",
+        "name" : "Browser",
+        "properties" : {
+          "structurizr.dsl.identifier" : "local.c4f15bcd-0432-4a74-bc38-343d045f2f35.6ac3ce67-58d7-4ccb-a86f-a1b9c0463524"
+        },
+        "tags" : "Element,Deployment Node",
+        "technology" : "Chromium, Firefox, Safari"
+      } ],
+      "description" : "Rechner oder Telefon der Nutzer:in",
+      "environment" : "Lokaler Stapel",
+      "id" : "200",
+      "instances" : "1",
+      "name" : "Endgerät",
+      "properties" : {
+        "structurizr.dsl.identifier" : "local.c4f15bcd-0432-4a74-bc38-343d045f2f35"
+      },
+      "tags" : "Element,Deployment Node"
+    }, {
+      "children" : [ {
+        "containerInstances" : [ {
+          "containerId" : "33",
+          "environment" : "Lokaler Stapel",
+          "id" : "207",
+          "instanceId" : 1,
+          "properties" : {
+            "structurizr.dsl.identifier" : "local.cc927f2c-2423-4b2f-bd3c-f04857a92d5f.dbcda499-adca-47c7-aaab-0bea1eb847b0.758076a4-23b7-480d-b14e-16fc07aa1dde"
+          },
+          "relationships" : [ {
+            "description" : "Leitet /api weiter",
+            "destinationId" : "210",
+            "id" : "211",
+            "linkedRelationshipId" : "97",
+            "sourceId" : "207",
+            "technology" : "HTTP, X-Forwarded-For"
+          } ],
+          "tags" : "Container Instance"
+        } ],
+        "description" : "Port 8080 → 80",
+        "environment" : "Lokaler Stapel",
+        "id" : "206",
+        "instances" : "1",
+        "name" : "frontend",
+        "properties" : {
+          "structurizr.dsl.identifier" : "local.cc927f2c-2423-4b2f-bd3c-f04857a92d5f.dbcda499-adca-47c7-aaab-0bea1eb847b0"
+        },
+        "tags" : "Element,Deployment Node",
+        "technology" : "nginx:alpine"
+      }, {
+        "containerInstances" : [ {
+          "containerId" : "34",
+          "environment" : "Lokaler Stapel",
+          "id" : "210",
+          "instanceId" : 1,
+          "properties" : {
+            "structurizr.dsl.identifier" : "local.cc927f2c-2423-4b2f-bd3c-f04857a92d5f.1ed55052-d4cd-466c-8b06-d207ef5b01b8.bdabaa5d-0582-4a9a-bda2-ab49918de01c"
+          },
+          "relationships" : [ {
+            "description" : "Legt Jobanfrage ab",
+            "destinationId" : "213",
+            "id" : "214",
+            "linkedRelationshipId" : "140",
+            "sourceId" : "210",
+            "technology" : "Datei im State-Volume"
+          }, {
+            "description" : "Routen und Geocoding",
+            "destinationId" : "218",
+            "id" : "219",
+            "linkedRelationshipId" : "145",
+            "sourceId" : "210",
+            "technology" : "HTTP, JSON"
+          }, {
+            "description" : "Liest und schreibt Grundstücke",
+            "destinationId" : "222",
+            "id" : "223",
+            "linkedRelationshipId" : "131",
+            "sourceId" : "210",
+            "technology" : "SQL"
+          }, {
+            "description" : "Authorization Code + PKCE, Token-Tausch",
+            "destinationId" : "226",
+            "id" : "227",
+            "linkedRelationshipId" : "147",
+            "sourceId" : "210",
+            "technology" : "OIDC"
+          }, {
+            "description" : "Liest und schreibt Antworten",
+            "destinationId" : "233",
+            "id" : "234",
+            "linkedRelationshipId" : "137",
+            "sourceId" : "210",
+            "technology" : "Dateisystem"
+          }, {
+            "description" : "Liest Hauskoordinaten",
+            "destinationId" : "236",
+            "id" : "237",
+            "linkedRelationshipId" : "142",
+            "sourceId" : "210",
+            "technology" : "Datei"
+          }, {
+            "description" : "Flurstücke per Punkt, Kennzeichen, Gemarkung",
+            "destinationId" : "241",
+            "id" : "242",
+            "linkedRelationshipId" : "156",
+            "sourceId" : "210",
+            "technology" : "WFS 2.0, GML"
+          }, {
+            "description" : "GetFeatureInfo",
+            "destinationId" : "245",
+            "id" : "246",
+            "linkedRelationshipId" : "162",
+            "sourceId" : "210",
+            "technology" : "WMS"
+          }, {
+            "description" : "Lärm, Wasser, Natur, Boden, Radon",
+            "destinationId" : "247",
+            "id" : "248",
+            "linkedRelationshipId" : "165",
+            "sourceId" : "210",
+            "technology" : "ArcGIS REST"
+          }, {
+            "description" : "Bauleitplanung",
+            "destinationId" : "249",
+            "id" : "250",
+            "linkedRelationshipId" : "171",
+            "sourceId" : "210",
+            "technology" : "ArcGIS REST"
+          }, {
+            "description" : "Luftqualität",
+            "destinationId" : "251",
+            "id" : "252",
+            "linkedRelationshipId" : "168",
+            "sourceId" : "210",
+            "technology" : "REST, JSON"
+          }, {
+            "description" : "Style, Vektorkacheln, Glyphen",
+            "destinationId" : "253",
+            "id" : "254",
+            "linkedRelationshipId" : "176",
+            "sourceId" : "210",
+            "technology" : "HTTPS"
+          }, {
+            "description" : "Strukturierte Extraktion",
+            "destinationId" : "255",
+            "id" : "256",
+            "linkedRelationshipId" : "185",
+            "sourceId" : "210",
+            "technology" : "HTTPS, JSON"
+          }, {
+            "description" : "Lädt Inseratsseite",
+            "destinationId" : "258",
+            "id" : "259",
+            "linkedRelationshipId" : "179",
+            "sourceId" : "210",
+            "technology" : "HTTPS"
+          } ],
+          "tags" : "Container Instance"
+        } ],
+        "description" : "Healthcheck /api/health",
+        "environment" : "Lokaler Stapel",
+        "id" : "209",
+        "instances" : "1",
+        "name" : "backend",
+        "properties" : {
+          "structurizr.dsl.identifier" : "local.cc927f2c-2423-4b2f-bd3c-f04857a92d5f.1ed55052-d4cd-466c-8b06-d207ef5b01b8"
+        },
+        "tags" : "Element,Deployment Node",
+        "technology" : "python:slim"
+      }, {
+        "containerInstances" : [ {
+          "containerId" : "59",
+          "environment" : "Lokaler Stapel",
+          "id" : "213",
+          "instanceId" : 1,
+          "properties" : {
+            "structurizr.dsl.identifier" : "local.cc927f2c-2423-4b2f-bd3c-f04857a92d5f.44175ff8-53e4-4297-9f55-025229a59be6.c2696e3a-e485-4a50-bd5d-93f84c528808"
+          },
+          "relationships" : [ {
+            "description" : "Räumt abgelaufene Freigaben",
+            "destinationId" : "222",
+            "id" : "224",
+            "linkedRelationshipId" : "152",
+            "sourceId" : "213",
+            "technology" : "SQL"
+          }, {
+            "description" : "Sweep",
+            "destinationId" : "233",
+            "id" : "235",
+            "linkedRelationshipId" : "150",
+            "sourceId" : "213",
+            "technology" : "Dateisystem"
+          }, {
+            "description" : "Baut Indizes neu",
+            "destinationId" : "236",
+            "id" : "238",
+            "linkedRelationshipId" : "151",
+            "sourceId" : "213",
+            "technology" : "Datei"
+          }, {
+            "description" : "Hauskoordinaten (vierteljährlich)",
+            "destinationId" : "241",
+            "id" : "243",
+            "linkedRelationshipId" : "190",
+            "sourceId" : "213",
+            "technology" : "HTTPS"
+          }, {
+            "description" : "Modellpreise",
+            "destinationId" : "255",
+            "id" : "257",
+            "linkedRelationshipId" : "193",
+            "sourceId" : "213",
+            "technology" : "HTTPS"
+          } ],
+          "tags" : "Container Instance"
+        } ],
+        "environment" : "Lokaler Stapel",
+        "id" : "212",
+        "instances" : "1",
+        "name" : "scheduler",
+        "properties" : {
+          "structurizr.dsl.identifier" : "local.cc927f2c-2423-4b2f-bd3c-f04857a92d5f.44175ff8-53e4-4297-9f55-025229a59be6"
+        },
+        "tags" : "Element,Deployment Node",
+        "technology" : "python:slim"
+      }, {
+        "containerInstances" : [ {
+          "containerId" : "60",
+          "environment" : "Lokaler Stapel",
+          "id" : "216",
+          "instanceId" : 1,
+          "properties" : {
+            "structurizr.dsl.identifier" : "local.cc927f2c-2423-4b2f-bd3c-f04857a92d5f.86d4c872-66ec-4ef0-b341-b6a365f5ae64.6ea68983-3503-4635-85ab-7e4aaf4a6d72"
+          },
+          "relationships" : [ {
+            "description" : "Baut den Routing-Graphen",
+            "destinationId" : "218",
+            "id" : "220",
+            "linkedRelationshipId" : "154",
+            "sourceId" : "216",
+            "technology" : "Volume motis-graph"
+          }, {
+            "description" : "Legt Indizes an",
+            "destinationId" : "236",
+            "id" : "239",
+            "linkedRelationshipId" : "153",
+            "sourceId" : "216",
+            "technology" : "Datei"
+          }, {
+            "description" : "Hauskoordinaten",
+            "destinationId" : "241",
+            "id" : "244",
+            "linkedRelationshipId" : "199",
+            "sourceId" : "216",
+            "technology" : "HTTPS"
+          } ],
+          "tags" : "Container Instance"
+        } ],
+        "description" : "Laufen einmal und beenden sich",
+        "environment" : "Lokaler Stapel",
+        "id" : "215",
+        "instances" : "1",
+        "name" : "routing-data, motis-import, indexes",
+        "properties" : {
+          "structurizr.dsl.identifier" : "local.cc927f2c-2423-4b2f-bd3c-f04857a92d5f.86d4c872-66ec-4ef0-b341-b6a365f5ae64"
+        },
+        "tags" : "Element,Deployment Node",
+        "technology" : "python:slim, motis"
+      }, {
+        "containerInstances" : [ {
+          "containerId" : "58",
+          "environment" : "Lokaler Stapel",
+          "id" : "218",
+          "instanceId" : 1,
+          "properties" : {
+            "structurizr.dsl.identifier" : "local.cc927f2c-2423-4b2f-bd3c-f04857a92d5f.e2a037f0-e714-4381-a1ba-bd1dfa2a2a19.0cb1aef5-91a9-4d8f-9c54-660833f4dd63"
+          },
+          "tags" : "Container Instance"
+        } ],
+        "description" : "Erster Import ~7 min, 5,6 GiB Spitze",
+        "environment" : "Lokaler Stapel",
+        "id" : "217",
+        "instances" : "1",
+        "name" : "motis",
+        "properties" : {
+          "structurizr.dsl.identifier" : "local.cc927f2c-2423-4b2f-bd3c-f04857a92d5f.e2a037f0-e714-4381-a1ba-bd1dfa2a2a19"
+        },
+        "tags" : "Element,Deployment Node",
+        "technology" : "ghcr.io/motis-project/motis:2.11.2"
+      }, {
+        "containerInstances" : [ {
+          "containerId" : "55",
+          "environment" : "Lokaler Stapel",
+          "id" : "222",
+          "instanceId" : 1,
+          "properties" : {
+            "structurizr.dsl.identifier" : "local.cc927f2c-2423-4b2f-bd3c-f04857a92d5f.b88d8650-23c3-45c6-a029-97a36fe72208.0e9803f6-3b9a-46e3-8f57-56d4fd255994"
+          },
+          "tags" : "Container Instance"
+        } ],
+        "description" : "authentik-db-init legt einmal die Datenbank „authentik“ an",
+        "environment" : "Lokaler Stapel",
+        "id" : "221",
+        "instances" : "1",
+        "name" : "db, authentik-db-init",
+        "properties" : {
+          "structurizr.dsl.identifier" : "local.cc927f2c-2423-4b2f-bd3c-f04857a92d5f.b88d8650-23c3-45c6-a029-97a36fe72208"
+        },
+        "tags" : "Element,Deployment Node",
+        "technology" : "postgres:16-alpine"
+      }, {
+        "containerInstances" : [ {
+          "containerId" : "61",
+          "environment" : "Lokaler Stapel",
+          "id" : "226",
+          "instanceId" : 1,
+          "properties" : {
+            "structurizr.dsl.identifier" : "local.cc927f2c-2423-4b2f-bd3c-f04857a92d5f.7d991d69-97e6-43f8-ad2e-a31601ba03f8.6afdad05-84e9-4604-90ec-8196a6bca54b"
+          },
+          "relationships" : [ {
+            "description" : "Eigene Datenbank „authentik“",
+            "destinationId" : "222",
+            "id" : "228",
+            "linkedRelationshipId" : "148",
+            "sourceId" : "226",
+            "technology" : "SQL"
+          }, {
+            "description" : "Sitzungen, Aufgaben",
+            "destinationId" : "230",
+            "id" : "231",
+            "linkedRelationshipId" : "149",
+            "sourceId" : "226",
+            "technology" : "Redis"
+          } ],
+          "tags" : "Container Instance"
+        } ],
+        "description" : "Port 9000",
+        "environment" : "Lokaler Stapel",
+        "id" : "225",
+        "instances" : "1",
+        "name" : "authentik, authentik-worker",
+        "properties" : {
+          "structurizr.dsl.identifier" : "local.cc927f2c-2423-4b2f-bd3c-f04857a92d5f.7d991d69-97e6-43f8-ad2e-a31601ba03f8"
+        },
+        "tags" : "Element,Deployment Node",
+        "technology" : "ghcr.io/goauthentik/server:2025.2.3"
+      }, {
+        "containerInstances" : [ {
+          "containerId" : "62",
+          "environment" : "Lokaler Stapel",
+          "id" : "230",
+          "instanceId" : 1,
+          "properties" : {
+            "structurizr.dsl.identifier" : "local.cc927f2c-2423-4b2f-bd3c-f04857a92d5f.26afe9b5-0e1c-40e4-a604-242afc982b6b.b5bf18dd-4eb8-4964-bb7b-f00bb004f05e"
+          },
+          "tags" : "Container Instance"
+        } ],
+        "environment" : "Lokaler Stapel",
+        "id" : "229",
+        "instances" : "1",
+        "name" : "authentik-cache",
+        "properties" : {
+          "structurizr.dsl.identifier" : "local.cc927f2c-2423-4b2f-bd3c-f04857a92d5f.26afe9b5-0e1c-40e4-a604-242afc982b6b"
+        },
+        "tags" : "Element,Deployment Node",
+        "technology" : "redis:7-alpine"
+      }, {
+        "containerInstances" : [ {
+          "containerId" : "56",
+          "environment" : "Lokaler Stapel",
+          "id" : "233",
+          "instanceId" : 1,
+          "properties" : {
+            "structurizr.dsl.identifier" : "local.cc927f2c-2423-4b2f-bd3c-f04857a92d5f.1ace235e-6aba-4e41-ad6f-708d552e0989.efe8baf0-758b-42d7-bb3a-fda0cc8ea3a0"
+          },
+          "tags" : "Container Instance"
+        }, {
+          "containerId" : "57",
+          "environment" : "Lokaler Stapel",
+          "id" : "236",
+          "instanceId" : 1,
+          "properties" : {
+            "structurizr.dsl.identifier" : "local.cc927f2c-2423-4b2f-bd3c-f04857a92d5f.1ace235e-6aba-4e41-ad6f-708d552e0989.f960c2d6-090b-47c1-95c6-30a7260b3d3c"
+          },
+          "tags" : "Container Instance"
+        } ],
+        "description" : "backend-cache, indexes, scheduler-state, motis-graph, routing-input, db-data",
+        "environment" : "Lokaler Stapel",
+        "id" : "232",
+        "instances" : "1",
+        "name" : "Volumes",
+        "properties" : {
+          "structurizr.dsl.identifier" : "local.cc927f2c-2423-4b2f-bd3c-f04857a92d5f.1ace235e-6aba-4e41-ad6f-708d552e0989"
+        },
+        "tags" : "Element,Deployment Node",
+        "technology" : "Docker-Volumes"
+      } ],
+      "description" : "Ein Rechner mit docker compose; Projektname where2build",
+      "environment" : "Lokaler Stapel",
+      "id" : "205",
+      "instances" : "1",
+      "name" : "Docker-Host",
+      "properties" : {
+        "structurizr.dsl.identifier" : "local.cc927f2c-2423-4b2f-bd3c-f04857a92d5f"
+      },
+      "tags" : "Element,Deployment Node",
+      "technology" : "Docker Compose"
+    }, {
+      "environment" : "Lokaler Stapel",
+      "id" : "240",
+      "instances" : "1",
+      "name" : "Internet",
+      "properties" : {
+        "structurizr.dsl.identifier" : "local.b3d416ed-5c24-479d-8fbe-b067dec72457"
+      },
+      "softwareSystemInstances" : [ {
+        "environment" : "Lokaler Stapel",
+        "id" : "241",
+        "instanceId" : 1,
+        "properties" : {
+          "structurizr.dsl.identifier" : "local.b3d416ed-5c24-479d-8fbe-b067dec72457.dc430e80-95b0-4271-b2c9-6d1846a3a584"
+        },
+        "softwareSystemId" : "4",
+        "tags" : "Software System Instance"
+      }, {
+        "environment" : "Lokaler Stapel",
+        "id" : "245",
+        "instanceId" : 1,
+        "properties" : {
+          "structurizr.dsl.identifier" : "local.b3d416ed-5c24-479d-8fbe-b067dec72457.63877497-d88f-46d7-92a6-7c1c9ac74e9f"
+        },
+        "softwareSystemId" : "5",
+        "tags" : "Software System Instance"
+      }, {
+        "environment" : "Lokaler Stapel",
+        "id" : "247",
+        "instanceId" : 1,
+        "properties" : {
+          "structurizr.dsl.identifier" : "local.b3d416ed-5c24-479d-8fbe-b067dec72457.19a4e9c1-e2d7-4f35-bd17-da9299b6db21"
+        },
+        "softwareSystemId" : "6",
+        "tags" : "Software System Instance"
+      }, {
+        "environment" : "Lokaler Stapel",
+        "id" : "249",
+        "instanceId" : 1,
+        "properties" : {
+          "structurizr.dsl.identifier" : "local.b3d416ed-5c24-479d-8fbe-b067dec72457.14115f74-f9c7-4056-af2f-6597ea23613d"
+        },
+        "softwareSystemId" : "7",
+        "tags" : "Software System Instance"
+      }, {
+        "environment" : "Lokaler Stapel",
+        "id" : "251",
+        "instanceId" : 1,
+        "properties" : {
+          "structurizr.dsl.identifier" : "local.b3d416ed-5c24-479d-8fbe-b067dec72457.0f98706e-9bd2-40c6-8599-558d2cf7388b"
+        },
+        "softwareSystemId" : "8",
+        "tags" : "Software System Instance"
+      }, {
+        "environment" : "Lokaler Stapel",
+        "id" : "253",
+        "instanceId" : 1,
+        "properties" : {
+          "structurizr.dsl.identifier" : "local.b3d416ed-5c24-479d-8fbe-b067dec72457.9cf5159d-eedc-48ae-bb55-8390a8d70b72"
+        },
+        "softwareSystemId" : "9",
+        "tags" : "Software System Instance"
+      }, {
+        "environment" : "Lokaler Stapel",
+        "id" : "255",
+        "instanceId" : 1,
+        "properties" : {
+          "structurizr.dsl.identifier" : "local.b3d416ed-5c24-479d-8fbe-b067dec72457.df6b45fd-12ea-4280-a4a6-33a2746fc8b8"
+        },
+        "softwareSystemId" : "17",
+        "tags" : "Software System Instance"
+      }, {
+        "environment" : "Lokaler Stapel",
+        "id" : "258",
+        "instanceId" : 1,
+        "properties" : {
+          "structurizr.dsl.identifier" : "local.b3d416ed-5c24-479d-8fbe-b067dec72457.920eee44-2016-444b-9d8a-b6249a50791d"
+        },
+        "softwareSystemId" : "15",
+        "tags" : "Software System Instance"
+      } ],
+      "tags" : "Element,Deployment Node"
+    } ],
+    "people" : [ {
+      "description" : "Prüft ein Grundstücksinserat: welche Flurstücke, was sie amtlich kosten, welches Haus darauf passt und wie weit es zu Schule, Arbeit und Haltestelle ist.",
+      "id" : "1",
+      "name" : "Bauinteressent:in",
+      "properties" : {
+        "structurizr.dsl.identifier" : "buyer"
+      },
+      "relationships" : [ {
+        "description" : "Sucht, prüft, plant",
+        "destinationId" : "20",
+        "id" : "63",
+        "sourceId" : "1",
+        "tags" : "Relationship",
+        "technology" : "HTTPS"
+      }, {
+        "description" : "Sucht, prüft, plant",
+        "destinationId" : "19",
+        "id" : "64",
+        "linkedRelationshipId" : "63",
+        "sourceId" : "1",
+        "technology" : "HTTPS"
+      }, {
+        "description" : "Klickt auf der Inseratsseite",
+        "destinationId" : "32",
+        "id" : "65",
+        "sourceId" : "1",
+        "tags" : "Relationship"
+      }, {
+        "description" : "Liest Inserate",
+        "destinationId" : "15",
+        "id" : "66",
+        "sourceId" : "1",
+        "tags" : "Relationship",
+        "technology" : "HTTPS"
+      }, {
+        "description" : "Meldet sich an, legt Konto an",
+        "destinationId" : "61",
+        "id" : "71",
+        "sourceId" : "1",
+        "tags" : "Relationship",
+        "technology" : "HTTPS, Port 9000"
+      } ],
+      "tags" : "Element,Person"
+    }, {
+      "description" : "Öffnet ein geteiltes Grundstück ohne Konto – der Token ist der Zugang.",
+      "id" : "2",
+      "name" : "Empfänger:in eines Links",
+      "properties" : {
+        "structurizr.dsl.identifier" : "recipient"
+      },
+      "relationships" : [ {
+        "description" : "Öffnet /geteilt/…",
+        "destinationId" : "20",
+        "id" : "67",
+        "sourceId" : "2",
+        "tags" : "Relationship",
+        "technology" : "HTTPS"
+      }, {
+        "description" : "Öffnet /geteilt/…",
+        "destinationId" : "19",
+        "id" : "68",
+        "linkedRelationshipId" : "67",
+        "sourceId" : "2",
+        "technology" : "HTTPS"
+      } ],
+      "tags" : "Element,Person"
+    }, {
+      "description" : "Verwaltet Konten, Freigaben, Caches und Jobs im Verwaltungsbereich. Bootstrap über ADMIN_ACCOUNTS.",
+      "id" : "3",
+      "name" : "Betreiber:in",
+      "properties" : {
+        "structurizr.dsl.identifier" : "operator"
+      },
+      "relationships" : [ {
+        "description" : "Verwaltet unter /verwaltung",
+        "destinationId" : "20",
+        "id" : "69",
+        "sourceId" : "3",
+        "tags" : "Relationship",
+        "technology" : "HTTPS"
+      }, {
+        "description" : "Verwaltet unter /verwaltung",
+        "destinationId" : "19",
+        "id" : "70",
+        "linkedRelationshipId" : "69",
+        "sourceId" : "3",
+        "technology" : "HTTPS"
+      } ],
+      "tags" : "Element,Person"
+    } ],
+    "properties" : {
+      "structurizr.groupSeparator" : "/"
+    },
+    "softwareSystems" : [ {
+      "description" : "Landesamt für Geobasisinformation: ALKIS-WFS (Flurstücke, Gebäude), WMS für Luftbild, WebAtlas und Liegenschaftskarte, Download der Hauskoordinaten.",
+      "documentation" : { },
+      "group" : "Freistaat Sachsen",
+      "id" : "4",
+      "name" : "GeoSN Geodienste",
+      "properties" : {
+        "structurizr.dsl.identifier" : "geosn"
+      },
+      "tags" : "Element,Software System,Extern,Amtlich"
+    }, {
+      "description" : "Bodenrichtwerte. Kein WFS – nur WMS GetFeatureInfo.",
+      "documentation" : { },
+      "group" : "Freistaat Sachsen",
+      "id" : "5",
+      "name" : "BORIS Sachsen",
+      "properties" : {
+        "structurizr.dsl.identifier" : "boris"
+      },
+      "tags" : "Element,Software System,Extern,Amtlich"
+    }, {
+      "description" : "ArcGIS-REST des Landesumweltamts: Lärm, Hochwasser, Schutzgebiete, Boden, Radon.",
+      "documentation" : { },
+      "group" : "Freistaat Sachsen",
+      "id" : "6",
+      "name" : "LUIS Sachsen",
+      "properties" : {
+        "structurizr.dsl.identifier" : "luis"
+      },
+      "tags" : "Element,Software System,Extern,Amtlich"
+    }, {
+      "description" : "Raumplanungsinformationssystem: Bauleitpläne und Art der Nutzung.",
+      "documentation" : { },
+      "group" : "Freistaat Sachsen",
+      "id" : "7",
+      "name" : "RAPIS Sachsen",
+      "properties" : {
+        "structurizr.dsl.identifier" : "rapis"
+      },
+      "tags" : "Element,Software System,Extern,Amtlich"
+    }, {
+      "description" : "Messstationen und Luftqualität, bundesweit, ohne Schlüssel.",
+      "documentation" : { },
+      "id" : "8",
+      "name" : "Umweltbundesamt Luftdaten",
+      "properties" : {
+        "structurizr.dsl.identifier" : "uba"
+      },
+      "tags" : "Element,Software System,Extern,Amtlich"
+    }, {
+      "description" : "Vektor-Grundkarte: Style, Kacheln, Glyphen, Sprites.",
+      "documentation" : { },
+      "group" : "Offene Daten und Dienste",
+      "id" : "9",
+      "name" : "OpenFreeMap",
+      "properties" : {
+        "structurizr.dsl.identifier" : "openfreemap"
+      },
+      "tags" : "Element,Software System,Extern"
+    }, {
+      "description" : "Live-Abfragen an OpenStreetMap. Optionaler Ersatz für Nachbargebäude und Ziele.",
+      "documentation" : { },
+      "group" : "Offene Daten und Dienste",
+      "id" : "10",
+      "name" : "Overpass API",
+      "properties" : {
+        "structurizr.dsl.identifier" : "overpass"
+      },
+      "tags" : "Element,Software System,Extern,Optional"
+    }, {
+      "description" : "Öffentliche MOTIS-Instanz. Alternative zum eigenen Router (docker-compose.transitous.yml).",
+      "documentation" : { },
+      "group" : "Offene Daten und Dienste",
+      "id" : "11",
+      "name" : "Transitous",
+      "properties" : {
+        "structurizr.dsl.identifier" : "transitous"
+      },
+      "tags" : "Element,Software System,Extern,Optional"
+    }, {
+      "description" : "OSM-Extrakt Sachsen für Router und POI-Index.",
+      "documentation" : { },
+      "group" : "Offene Daten und Dienste",
+      "id" : "12",
+      "name" : "Geofabrik",
+      "properties" : {
+        "structurizr.dsl.identifier" : "geofabrik"
+      },
+      "tags" : "Element,Software System,Extern"
+    }, {
+      "description" : "Deutschlandweiter Fahrplan, bezogen über Transitous.",
+      "documentation" : { },
+      "group" : "Offene Daten und Dienste",
+      "id" : "13",
+      "name" : "DELFI-GTFS",
+      "properties" : {
+        "structurizr.dsl.identifier" : "gtfs"
+      },
+      "tags" : "Element,Software System,Extern"
+    }, {
+      "description" : "Tageskurs für die Umrechnung der Modellpreise.",
+      "documentation" : { },
+      "group" : "Offene Daten und Dienste",
+      "id" : "14",
+      "name" : "EZB",
+      "properties" : {
+        "structurizr.dsl.identifier" : "ecb"
+      },
+      "tags" : "Element,Software System,Extern"
+    }, {
+      "description" : "kleinanzeigen.de, immowelt.de u. a. ImmoScout24 nur über das Bookmarklet, weil jede Serveranfrage an der WAF scheitert.",
+      "documentation" : { },
+      "group" : "Inserate und Anbieter",
+      "id" : "15",
+      "name" : "Immobilienportale",
+      "properties" : {
+        "structurizr.dsl.identifier" : "portals"
+      },
+      "tags" : "Element,Software System,Extern"
+    }, {
+      "description" : "Typenhäuser: Maße, Grundfläche, Preis. Abruf nur auf der Domain des Anbieters.",
+      "documentation" : { },
+      "group" : "Inserate und Anbieter",
+      "id" : "16",
+      "name" : "Hausanbieter-Websites",
+      "properties" : {
+        "structurizr.dsl.identifier" : "manufacturers"
+      },
+      "tags" : "Element,Software System,Extern"
+    }, {
+      "description" : "OpenRouter, OpenAI, Anthropic, Ollama oder ein anderer OpenAI-kompatibler Host – Wahl der Installation (LLM_ANBIETER).",
+      "documentation" : { },
+      "id" : "17",
+      "name" : "LLM-Anbieter",
+      "properties" : {
+        "structurizr.dsl.identifier" : "llm"
+      },
+      "tags" : "Element,Software System,Extern"
+    }, {
+      "description" : "Messenger und Chats, die og:-Tags und das Vorschaubild eines geteilten Links lesen.",
+      "documentation" : { },
+      "id" : "18",
+      "name" : "Link-Vorschau-Bots",
+      "properties" : {
+        "structurizr.dsl.identifier" : "linkbots"
+      },
+      "relationships" : [ {
+        "description" : "Liest og:-Tags und Vorschaubild",
+        "destinationId" : "33",
+        "id" : "72",
+        "sourceId" : "18",
+        "tags" : "Relationship",
+        "technology" : "HTTPS"
+      }, {
+        "description" : "Liest og:-Tags und Vorschaubild",
+        "destinationId" : "19",
+        "id" : "73",
+        "linkedRelationshipId" : "72",
+        "sourceId" : "18",
+        "technology" : "HTTPS"
+      } ],
+      "tags" : "Element,Software System,Extern"
+    }, {
+      "containers" : [ {
+        "components" : [ {
+          "description" : "Startseite, Aufnahme-Assistent, Grundstück, Vergleich, Haustypen, Ziele, Daten, Konto, geteilte Ansicht.",
+          "documentation" : { },
+          "group" : "Ansichten",
+          "id" : "21",
+          "name" : "Ansichten und Router",
+          "properties" : {
+            "structurizr.dsl.identifier" : "w2b.spa.views"
+          },
+          "relationships" : [ {
+            "description" : "Bettet ein",
+            "destinationId" : "23",
+            "id" : "77",
+            "sourceId" : "21",
+            "tags" : "Relationship"
+          }, {
+            "description" : "Bettet ein",
+            "destinationId" : "26",
+            "id" : "78",
+            "sourceId" : "21",
+            "tags" : "Relationship"
+          }, {
+            "description" : "Bettet ein",
+            "destinationId" : "29",
+            "id" : "79",
+            "sourceId" : "21",
+            "tags" : "Relationship"
+          }, {
+            "description" : "Leitet unter /verwaltung weiter",
+            "destinationId" : "22",
+            "id" : "80",
+            "sourceId" : "21",
+            "tags" : "Relationship"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "vue-router, views/*.vue"
+        }, {
+          "description" : "Kennzahlen, Statistik, Konten, Fehler, Freigaben, Betrieb, Prüfprotokoll.",
+          "documentation" : { },
+          "group" : "Ansichten",
+          "id" : "22",
+          "name" : "Verwaltungsoberfläche",
+          "properties" : {
+            "structurizr.dsl.identifier" : "w2b.spa.adminViews"
+          },
+          "relationships" : [ {
+            "description" : "Ruft /api/verwaltung",
+            "destinationId" : "31",
+            "id" : "95",
+            "sourceId" : "22",
+            "tags" : "Relationship"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "components/admin/*.vue"
+        }, {
+          "description" : "Liest die Eingabe, bevor es nachschlägt: Adresse, Koordinate oder Flurstück – und sagt, wie es gelesen hat.",
+          "documentation" : { },
+          "group" : "Eingabe und Suche",
+          "id" : "23",
+          "name" : "Suchfeld",
+          "properties" : {
+            "structurizr.dsl.identifier" : "w2b.spa.queryBox"
+          },
+          "relationships" : [ {
+            "description" : "Startet Suchlauf",
+            "destinationId" : "25",
+            "id" : "81",
+            "sourceId" : "23",
+            "tags" : "Relationship"
+          }, {
+            "description" : "Fragt Geocoder und Gemarkungen",
+            "destinationId" : "31",
+            "id" : "91",
+            "sourceId" : "23",
+            "tags" : "Relationship"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "QueryBox.vue, lib/queryInput.js"
+        }, {
+          "description" : "Nimmt die vom Bookmarklet übergebene Seite per postMessage entgegen.",
+          "documentation" : { },
+          "group" : "Eingabe und Suche",
+          "id" : "24",
+          "name" : "Übergabe-Empfänger",
+          "properties" : {
+            "structurizr.dsl.identifier" : "w2b.spa.handoff"
+          },
+          "relationships" : [ {
+            "description" : "Reicht Inserat weiter",
+            "destinationId" : "25",
+            "id" : "82",
+            "sourceId" : "24",
+            "tags" : "Relationship"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "lib/handoff.js, lib/bookmarklet.js"
+        }, {
+          "description" : "Liest den NDJSON-Strom der Flurstückssuche und lässt die Karte mitwachsen.",
+          "documentation" : { },
+          "group" : "Eingabe und Suche",
+          "id" : "25",
+          "name" : "Suchlauf-Client",
+          "properties" : {
+            "structurizr.dsl.identifier" : "w2b.spa.searchClient"
+          },
+          "relationships" : [ {
+            "description" : "Legt Grundstück an",
+            "destinationId" : "30",
+            "id" : "86",
+            "sourceId" : "25",
+            "tags" : "Relationship"
+          }, {
+            "description" : "Ruft Suche und Auswertung",
+            "destinationId" : "31",
+            "id" : "90",
+            "sourceId" : "25",
+            "tags" : "Relationship"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "lib/search.js, ParcelSearch.vue, EvidenceMap.vue"
+        }, {
+          "description" : "Flurstücke, Abstandsflächen-Rahmen nach § 6 SächsBO, Hausplatzierung, Kollision.",
+          "documentation" : { },
+          "group" : "Grundstück",
+          "id" : "26",
+          "name" : "Lageplan",
+          "properties" : {
+            "structurizr.dsl.identifier" : "w2b.spa.sitePlan"
+          },
+          "relationships" : [ {
+            "description" : "Zeichnet Nachbarschaft",
+            "destinationId" : "27",
+            "id" : "83",
+            "sourceId" : "26",
+            "tags" : "Relationship"
+          }, {
+            "description" : "Formuliert Befunde",
+            "destinationId" : "28",
+            "id" : "84",
+            "sourceId" : "26",
+            "tags" : "Relationship"
+          }, {
+            "description" : "Liest und schreibt Platzierung",
+            "destinationId" : "30",
+            "id" : "87",
+            "sourceId" : "26",
+            "tags" : "Relationship"
+          }, {
+            "description" : "Lädt Flurstücke, Nachbarn, Kacheln",
+            "destinationId" : "31",
+            "id" : "92",
+            "sourceId" : "26",
+            "tags" : "Relationship"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "SitePlan.vue, lib/geometry.js, lib/projection.js, MapLibre"
+        }, {
+          "description" : "Klassifiziert Nachbargebäude und zeichnet 3-m-Schraffur und 6-m-Zone.",
+          "documentation" : { },
+          "group" : "Grundstück",
+          "id" : "27",
+          "name" : "Nachbarschaft",
+          "properties" : {
+            "structurizr.dsl.identifier" : "w2b.spa.neighbourhood"
+          },
+          "relationships" : [ {
+            "description" : "Formuliert Befunde",
+            "destinationId" : "28",
+            "id" : "85",
+            "sourceId" : "27",
+            "tags" : "Relationship"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "lib/neighbourhood*.js, NeighbourhoodPane.vue"
+        }, {
+          "description" : "Feste deutsche Sätze aus strukturierten Daten – kein Modell schreibt UI-Text.",
+          "documentation" : { },
+          "group" : "Grundstück",
+          "id" : "28",
+          "name" : "Befund-Vorlagen",
+          "properties" : {
+            "structurizr.dsl.identifier" : "w2b.spa.findings"
+          },
+          "relationships" : [ {
+            "description" : "Lädt Bodenrichtwert, Prüfungen, Planung",
+            "destinationId" : "31",
+            "id" : "93",
+            "sourceId" : "28",
+            "tags" : "Relationship"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "lib/findings.js, lib/siteChecks.js, CheckList.vue"
+        }, {
+          "description" : "Reisezeiten, Routen, nächste Ziele.",
+          "documentation" : { },
+          "group" : "Grundstück",
+          "id" : "29",
+          "name" : "Wege und Umfeld",
+          "properties" : {
+            "structurizr.dsl.identifier" : "w2b.spa.routes"
+          },
+          "relationships" : [ {
+            "description" : "Liest Ziele",
+            "destinationId" : "30",
+            "id" : "88",
+            "sourceId" : "29",
+            "tags" : "Relationship"
+          }, {
+            "description" : "Lädt Wege und Ziele",
+            "destinationId" : "31",
+            "id" : "94",
+            "sourceId" : "29",
+            "tags" : "Relationship"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "RouteCards.vue, NearbyPanel.vue, lib/routes.js"
+        }, {
+          "description" : "Reaktiver Zustand, localStorage, Abgleich mit dem Konto.",
+          "documentation" : { },
+          "group" : "Daten",
+          "id" : "30",
+          "name" : "Zustand und Speicher",
+          "properties" : {
+            "structurizr.dsl.identifier" : "w2b.spa.store"
+          },
+          "relationships" : [ {
+            "description" : "Synchronisiert Konto",
+            "destinationId" : "31",
+            "id" : "89",
+            "sourceId" : "30",
+            "tags" : "Relationship"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "lib/store.js, lib/serverStore.js"
+        }, {
+          "description" : "fetch gegen /api; deutsche detail-Meldungen statt Beispieldaten.",
+          "documentation" : { },
+          "group" : "Daten",
+          "id" : "31",
+          "name" : "API-Client",
+          "properties" : {
+            "structurizr.dsl.identifier" : "w2b.spa.apiClient"
+          },
+          "relationships" : [ {
+            "description" : "Ruft /api",
+            "destinationId" : "33",
+            "id" : "96",
+            "sourceId" : "31",
+            "tags" : "Relationship",
+            "technology" : "HTTPS, JSON/NDJSON"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "lib/api.js"
+        } ],
+        "description" : "Die Oberfläche. Hält alle Geometrie, die angefasst wird: Puffern, Drehen, Kollision laufen beim Ziehen. Speichert lokal, synchronisiert mit Konto.",
+        "documentation" : { },
+        "group" : "Im Browser",
+        "id" : "20",
+        "name" : "Web-App",
+        "properties" : {
+          "structurizr.dsl.identifier" : "w2b.spa"
+        },
+        "relationships" : [ {
+          "description" : "Lädt App, ruft /api",
+          "destinationId" : "33",
+          "id" : "76",
+          "sourceId" : "20",
+          "tags" : "Relationship",
+          "technology" : "HTTPS, JSON/NDJSON"
+        } ],
+        "tags" : "Element,Container,Browser",
+        "technology" : "Vue 3 (Options API), Vite, MapLibre GL, localStorage"
+      }, {
+        "description" : "Läuft auf der Seite des Portals, öffnet die App und übergibt document.outerHTML per postMessage – ohne CORS und am CSP des Portals vorbei.",
+        "documentation" : { },
+        "group" : "Im Browser",
+        "id" : "32",
+        "name" : "Bookmarklet",
+        "properties" : {
+          "structurizr.dsl.identifier" : "w2b.bookmarklet"
+        },
+        "relationships" : [ {
+          "description" : "Übergibt die Inseratsseite",
+          "destinationId" : "24",
+          "id" : "74",
+          "sourceId" : "32",
+          "tags" : "Relationship",
+          "technology" : "postMessage"
+        }, {
+          "description" : "Übergibt die Inseratsseite",
+          "destinationId" : "20",
+          "id" : "75",
+          "linkedRelationshipId" : "74",
+          "sourceId" : "32",
+          "technology" : "postMessage"
+        } ],
+        "tags" : "Element,Container,Browser",
+        "technology" : "JavaScript"
+      }, {
+        "description" : "Liefert den Build aus, leitet /api weiter, setzt per SSI die og:-Tags geteilter Links ein.",
+        "documentation" : { },
+        "group" : "Stapel (docker compose)",
+        "id" : "33",
+        "name" : "Webserver",
+        "properties" : {
+          "structurizr.dsl.identifier" : "w2b.webserver"
+        },
+        "relationships" : [ {
+          "description" : "Leitet /api weiter",
+          "destinationId" : "34",
+          "id" : "97",
+          "sourceId" : "33",
+          "tags" : "Relationship",
+          "technology" : "HTTP, X-Forwarded-For"
+        }, {
+          "description" : "Holt og:-Kopf für /geteilt/…",
+          "destinationId" : "51",
+          "id" : "98",
+          "sourceId" : "33",
+          "tags" : "Relationship",
+          "technology" : "SSI-Subrequest"
+        }, {
+          "description" : "/api/parcels/resolve, nearby, streets",
+          "destinationId" : "35",
+          "id" : "99",
+          "sourceId" : "33",
+          "tags" : "Relationship",
+          "technology" : "HTTP"
+        }, {
+          "description" : "/api/parcels/search",
+          "destinationId" : "42",
+          "id" : "100",
+          "sourceId" : "33",
+          "tags" : "Relationship",
+          "technology" : "HTTP, NDJSON"
+        }, {
+          "description" : "/api/listings/extract",
+          "destinationId" : "41",
+          "id" : "101",
+          "sourceId" : "33",
+          "tags" : "Relationship",
+          "technology" : "HTTP"
+        }, {
+          "description" : "/api/housetypes/extract",
+          "destinationId" : "45",
+          "id" : "102",
+          "sourceId" : "33",
+          "tags" : "Relationship",
+          "technology" : "HTTP"
+        }, {
+          "description" : "/api/landvalue",
+          "destinationId" : "36",
+          "id" : "103",
+          "sourceId" : "33",
+          "tags" : "Relationship",
+          "technology" : "HTTP"
+        }, {
+          "description" : "/api/site-checks",
+          "destinationId" : "37",
+          "id" : "104",
+          "sourceId" : "33",
+          "tags" : "Relationship",
+          "technology" : "HTTP"
+        }, {
+          "description" : "/api/planning",
+          "destinationId" : "38",
+          "id" : "105",
+          "sourceId" : "33",
+          "tags" : "Relationship",
+          "technology" : "HTTP"
+        }, {
+          "description" : "/api/neighbours",
+          "destinationId" : "39",
+          "id" : "106",
+          "sourceId" : "33",
+          "tags" : "Relationship",
+          "technology" : "HTTP"
+        }, {
+          "description" : "/api/gemarkungen",
+          "destinationId" : "40",
+          "id" : "107",
+          "sourceId" : "33",
+          "tags" : "Relationship",
+          "technology" : "HTTP"
+        }, {
+          "description" : "/api/reachability, /api/geocode",
+          "destinationId" : "46",
+          "id" : "108",
+          "sourceId" : "33",
+          "tags" : "Relationship",
+          "technology" : "HTTP"
+        }, {
+          "description" : "/api/nearby",
+          "destinationId" : "47",
+          "id" : "109",
+          "sourceId" : "33",
+          "tags" : "Relationship",
+          "technology" : "HTTP"
+        }, {
+          "description" : "/api/tiles, /api/basemap",
+          "destinationId" : "48",
+          "id" : "110",
+          "sourceId" : "33",
+          "tags" : "Relationship",
+          "technology" : "HTTP"
+        }, {
+          "description" : "/api/auth",
+          "destinationId" : "49",
+          "id" : "111",
+          "sourceId" : "33",
+          "tags" : "Relationship",
+          "technology" : "HTTP"
+        }, {
+          "description" : "/api/plots, /api/settings, /api/account",
+          "destinationId" : "50",
+          "id" : "112",
+          "sourceId" : "33",
+          "tags" : "Relationship",
+          "technology" : "HTTP"
+        }, {
+          "description" : "/api/verwaltung",
+          "destinationId" : "52",
+          "id" : "113",
+          "sourceId" : "33",
+          "tags" : "Relationship",
+          "technology" : "HTTP"
+        }, {
+          "description" : "/api/lehrbuch",
+          "destinationId" : "44",
+          "id" : "114",
+          "sourceId" : "33",
+          "tags" : "Relationship",
+          "technology" : "HTTP"
+        } ],
+        "tags" : "Element,Container,Server",
+        "technology" : "nginx"
+      }, {
+        "components" : [ {
+          "description" : "Adresse, Koordinate, Gemarkung + Nummer oder Kennzeichen → GeoJSON mit amtlicher Fläche; Vereinigung mehrerer Flurstücke; Plausibilitätsprüfung.",
+          "documentation" : { },
+          "group" : "Amtliche Daten",
+          "id" : "35",
+          "name" : "Flurstücke",
+          "properties" : {
+            "structurizr.dsl.identifier" : "w2b.api.parcels"
+          },
+          "relationships" : [ {
+            "description" : "Anfragen mit Cache",
+            "destinationId" : "53",
+            "id" : "122",
+            "sourceId" : "35",
+            "tags" : "Relationship"
+          }, {
+            "description" : "Flurstücke per Punkt, Kennzeichen, Gemarkung",
+            "destinationId" : "4",
+            "id" : "155",
+            "sourceId" : "35",
+            "tags" : "Relationship",
+            "technology" : "WFS 2.0, GML"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "routers/parcels.py, services/alkis.py, plausibility.py"
+        }, {
+          "description" : "€/m², Zone, Stichtag, Richtwertgrundstück.",
+          "documentation" : { },
+          "group" : "Amtliche Daten",
+          "id" : "36",
+          "name" : "Bodenrichtwert",
+          "properties" : {
+            "structurizr.dsl.identifier" : "w2b.api.landValue"
+          },
+          "relationships" : [ {
+            "description" : "Anfragen mit Cache",
+            "destinationId" : "53",
+            "id" : "123",
+            "sourceId" : "36",
+            "tags" : "Relationship"
+          }, {
+            "description" : "GetFeatureInfo",
+            "destinationId" : "5",
+            "id" : "161",
+            "sourceId" : "36",
+            "tags" : "Relationship",
+            "technology" : "WMS"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "routers/landvalue.py, services/boris.py"
+        }, {
+          "description" : "Lärm, Hochwasser, Radon, Wasser- und Naturschutz, Hangneigung, Boden, Luft – jede Prüfung mit Daten oder eigenem fehler.",
+          "documentation" : { },
+          "group" : "Amtliche Daten",
+          "id" : "37",
+          "name" : "Standortprüfungen",
+          "properties" : {
+            "structurizr.dsl.identifier" : "w2b.api.siteChecks"
+          },
+          "relationships" : [ {
+            "description" : "Anfragen mit Cache",
+            "destinationId" : "53",
+            "id" : "124",
+            "sourceId" : "37",
+            "tags" : "Relationship"
+          }, {
+            "description" : "Lärm, Wasser, Natur, Boden, Radon",
+            "destinationId" : "6",
+            "id" : "164",
+            "sourceId" : "37",
+            "tags" : "Relationship",
+            "technology" : "ArcGIS REST"
+          }, {
+            "description" : "Luftqualität",
+            "destinationId" : "8",
+            "id" : "167",
+            "sourceId" : "37",
+            "tags" : "Relationship",
+            "technology" : "REST, JSON"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "routers/sitechecks.py, services/luis.py, services/airquality.py"
+        }, {
+          "description" : "Bauleitplan und Art der Nutzung am Grundstück.",
+          "documentation" : { },
+          "group" : "Amtliche Daten",
+          "id" : "38",
+          "name" : "Planungsrecht",
+          "properties" : {
+            "structurizr.dsl.identifier" : "w2b.api.planning"
+          },
+          "relationships" : [ {
+            "description" : "Bauleitplanung",
+            "destinationId" : "7",
+            "id" : "170",
+            "sourceId" : "38",
+            "tags" : "Relationship",
+            "technology" : "ArcGIS REST"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "routers/planning.py, services/rapis.py"
+        }, {
+          "description" : "Gebäudeumrisse aus ALKIS, Overpass als Ersatz.",
+          "documentation" : { },
+          "group" : "Amtliche Daten",
+          "id" : "39",
+          "name" : "Nachbargebäude",
+          "properties" : {
+            "structurizr.dsl.identifier" : "w2b.api.neighbours"
+          },
+          "relationships" : [ {
+            "description" : "Gebäude aus ALKIS",
+            "destinationId" : "35",
+            "id" : "121",
+            "sourceId" : "39",
+            "tags" : "Relationship"
+          }, {
+            "description" : "Gebäude als Ersatz",
+            "destinationId" : "10",
+            "id" : "158",
+            "sourceId" : "39",
+            "tags" : "Relationship",
+            "technology" : "Overpass QL"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "routers/neighbours.py, services/overpass.py"
+        }, {
+          "description" : "5 339 Gemarkungen aus einer eingecheckten Datei – der WFS wird nie gefragt.",
+          "documentation" : { },
+          "group" : "Amtliche Daten",
+          "id" : "40",
+          "name" : "Gemarkungsverzeichnis",
+          "properties" : {
+            "structurizr.dsl.identifier" : "w2b.api.gemarkungen"
+          },
+          "tags" : "Element,Component",
+          "technology" : "routers/gemarkungen.py, gemarkung_index.py"
+        }, {
+          "description" : "Portal-Adapter, Feldleser, OCR des Katasterauszugs, Modell als letzter Leser; jeder Modellwert muss das Beleg-Tor passieren.",
+          "documentation" : { },
+          "group" : "Inserat und Suche",
+          "id" : "41",
+          "name" : "Inseratsauswertung",
+          "properties" : {
+            "structurizr.dsl.identifier" : "w2b.api.listings"
+          },
+          "relationships" : [ {
+            "description" : "Lässt das Modell als letzten Leser lesen",
+            "destinationId" : "43",
+            "id" : "117",
+            "sourceId" : "41",
+            "tags" : "Relationship"
+          }, {
+            "description" : "Schreibt Abweichungen",
+            "destinationId" : "44",
+            "id" : "118",
+            "sourceId" : "41",
+            "tags" : "Relationship"
+          }, {
+            "description" : "Lädt Inseratsseite",
+            "destinationId" : "15",
+            "id" : "178",
+            "sourceId" : "41",
+            "tags" : "Relationship",
+            "technology" : "HTTPS"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "routers/listings.py, services/portals.py, services/portal_fields.py, services/ocr.py, services/beleg.py, services/befund.py"
+        }, {
+          "description" : "Treppe statt Pipeline: harte Filter entscheiden, Gewichte ordnen. Antwortet als NDJSON.",
+          "documentation" : { },
+          "group" : "Inserat und Suche",
+          "id" : "42",
+          "name" : "Flurstückssuche",
+          "properties" : {
+            "structurizr.dsl.identifier" : "w2b.api.searchEngine"
+          },
+          "relationships" : [ {
+            "description" : "Fragt ALKIS in engen Fragen",
+            "destinationId" : "35",
+            "id" : "115",
+            "sourceId" : "42",
+            "tags" : "Relationship"
+          }, {
+            "description" : "Verortet Straßen und Orte",
+            "destinationId" : "46",
+            "id" : "116",
+            "sourceId" : "42",
+            "tags" : "Relationship"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "routers/search.py, search/engine.py, search/blocks.py, search/indicia.py, search/distance.py, search/ladder.py, search/scoring.py, search/envelope.py"
+        }, {
+          "description" : "Ein Client je Wire-Format: OpenAI-kompatibel oder Anthropic-Adapter. Prompts als Inhalt, nicht im Router.",
+          "documentation" : { },
+          "group" : "Inserat und Suche",
+          "id" : "43",
+          "name" : "Modell-Client",
+          "properties" : {
+            "structurizr.dsl.identifier" : "w2b.api.llmClient"
+          },
+          "relationships" : [ {
+            "description" : "Strukturierte Extraktion",
+            "destinationId" : "17",
+            "id" : "184",
+            "sourceId" : "43",
+            "tags" : "Relationship",
+            "technology" : "HTTPS, JSON"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "services/llm.py, services/prompts.py"
+        }, {
+          "description" : "Protokoll, wo Muster und Modell sich widersprechen; Telefonnummern und Mailadressen geschwärzt.",
+          "documentation" : { },
+          "group" : "Inserat und Suche",
+          "id" : "44",
+          "name" : "Lehrbuch",
+          "properties" : {
+            "structurizr.dsl.identifier" : "w2b.api.lehrbuch"
+          },
+          "relationships" : [ {
+            "description" : "Schreibt Abweichungen",
+            "destinationId" : "55",
+            "id" : "134",
+            "sourceId" : "44",
+            "tags" : "Relationship",
+            "technology" : "SQL"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "routers/lehrbuch.py, services/lehrbuch.py"
+        }, {
+          "description" : "Typenhaus von der Anbieterseite lesen.",
+          "documentation" : { },
+          "group" : "Inserat und Suche",
+          "id" : "45",
+          "name" : "Haustypen",
+          "properties" : {
+            "structurizr.dsl.identifier" : "w2b.api.houseTypes"
+          },
+          "relationships" : [ {
+            "description" : "Extrahiert Typenhaus",
+            "destinationId" : "43",
+            "id" : "119",
+            "sourceId" : "45",
+            "tags" : "Relationship"
+          }, {
+            "description" : "Lädt Typenhausseite",
+            "destinationId" : "16",
+            "id" : "181",
+            "sourceId" : "45",
+            "tags" : "Relationship",
+            "technology" : "HTTPS"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "routers/housetypes.py"
+        }, {
+          "description" : "Reisezeiten und Routen; Geocoding aus amtlichen Hauskoordinaten plus MOTIS.",
+          "documentation" : { },
+          "group" : "Wege und Umfeld",
+          "id" : "46",
+          "name" : "Erreichbarkeit und Geocoder",
+          "properties" : {
+            "structurizr.dsl.identifier" : "w2b.api.routing"
+          },
+          "relationships" : [ {
+            "description" : "Liest Hauskoordinaten",
+            "destinationId" : "57",
+            "id" : "141",
+            "sourceId" : "46",
+            "tags" : "Relationship",
+            "technology" : "Datei"
+          }, {
+            "description" : "Routen und Geocoding",
+            "destinationId" : "58",
+            "id" : "144",
+            "sourceId" : "46",
+            "tags" : "Relationship",
+            "technology" : "HTTP, JSON"
+          }, {
+            "description" : "Routen, wenn kein eigener Router läuft",
+            "destinationId" : "11",
+            "id" : "187",
+            "sourceId" : "46",
+            "tags" : "Relationship",
+            "technology" : "HTTP, JSON"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "routers/reachability.py, routers/geocode.py, services/motis.py, address_index.py"
+        }, {
+          "description" : "Schule, Park, Haltestelle … nach Fußweg; Haltestellen aus dem Fahrplan, Rest aus dem POI-Index.",
+          "documentation" : { },
+          "group" : "Wege und Umfeld",
+          "id" : "47",
+          "name" : "Ziele in der Nähe",
+          "properties" : {
+            "structurizr.dsl.identifier" : "w2b.api.nearby"
+          },
+          "relationships" : [ {
+            "description" : "Haltestellen und Linien",
+            "destinationId" : "46",
+            "id" : "120",
+            "sourceId" : "47",
+            "tags" : "Relationship"
+          }, {
+            "description" : "Liest POI-Index",
+            "destinationId" : "57",
+            "id" : "143",
+            "sourceId" : "47",
+            "tags" : "Relationship",
+            "technology" : "Datei"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "routers/nearby.py, services/nearby.py, poi_index.py"
+        }, {
+          "description" : "Rasterkacheln der GeoSN-WMS und der Lärmkarte; Vektor-Grundkarte umgeschrieben, damit MapLibre nie selbst ins Netz geht.",
+          "documentation" : { },
+          "group" : "Wege und Umfeld",
+          "id" : "48",
+          "name" : "Karten-Proxy",
+          "properties" : {
+            "structurizr.dsl.identifier" : "w2b.api.mapProxy"
+          },
+          "relationships" : [ {
+            "description" : "Kacheln mit Cache",
+            "destinationId" : "53",
+            "id" : "125",
+            "sourceId" : "48",
+            "tags" : "Relationship"
+          }, {
+            "description" : "Luftbild, WebAtlas, Liegenschaftskarte",
+            "destinationId" : "4",
+            "id" : "173",
+            "sourceId" : "48",
+            "tags" : "Relationship",
+            "technology" : "WMS"
+          }, {
+            "description" : "Lärmkarte",
+            "destinationId" : "6",
+            "id" : "174",
+            "sourceId" : "48",
+            "tags" : "Relationship",
+            "technology" : "ArcGIS export"
+          }, {
+            "description" : "Style, Vektorkacheln, Glyphen",
+            "destinationId" : "9",
+            "id" : "175",
+            "sourceId" : "48",
+            "tags" : "Relationship",
+            "technology" : "HTTPS"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "routers/tiles.py, routers/basemap.py, services/tiles.py, services/basemap.py"
+        }, {
+          "description" : "OIDC mit PKCE auf der Serverseite; der Browser bekommt nur ein signiertes HttpOnly-Cookie.",
+          "documentation" : { },
+          "group" : "Konten und Betrieb",
+          "id" : "49",
+          "name" : "Anmeldung (BFF)",
+          "properties" : {
+            "structurizr.dsl.identifier" : "w2b.api.auth"
+          },
+          "relationships" : [ {
+            "description" : "Liefert Konto für das Budget",
+            "destinationId" : "54",
+            "id" : "126",
+            "sourceId" : "49",
+            "tags" : "Relationship"
+          }, {
+            "description" : "Authorization Code + PKCE, Token-Tausch",
+            "destinationId" : "61",
+            "id" : "146",
+            "sourceId" : "49",
+            "tags" : "Relationship",
+            "technology" : "OIDC"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "routers/auth.py, services/oidc.py, session.py"
+        }, {
+          "description" : "Ein Dokument je Grundstück; 200 Grundstücke, 2 MiB je Dokument.",
+          "documentation" : { },
+          "group" : "Konten und Betrieb",
+          "id" : "50",
+          "name" : "Kontospeicher",
+          "properties" : {
+            "structurizr.dsl.identifier" : "w2b.api.storage"
+          },
+          "relationships" : [ {
+            "description" : "Prüft Sitzung",
+            "destinationId" : "49",
+            "id" : "127",
+            "sourceId" : "50",
+            "tags" : "Relationship"
+          }, {
+            "description" : "Liest und schreibt Grundstücke",
+            "destinationId" : "55",
+            "id" : "130",
+            "sourceId" : "50",
+            "tags" : "Relationship",
+            "technology" : "SQL"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "routers/storage.py, services/storage.py"
+        }, {
+          "description" : "Geteilte Momentaufnahme per Token, og:-Kopf und 1200×630-Vorschaubild.",
+          "documentation" : { },
+          "group" : "Konten und Betrieb",
+          "id" : "51",
+          "name" : "Freigaben",
+          "properties" : {
+            "structurizr.dsl.identifier" : "w2b.api.shares"
+          },
+          "relationships" : [ {
+            "description" : "Liest Grundstück",
+            "destinationId" : "50",
+            "id" : "128",
+            "sourceId" : "51",
+            "tags" : "Relationship"
+          }, {
+            "description" : "Liest und schreibt Freigaben",
+            "destinationId" : "55",
+            "id" : "132",
+            "sourceId" : "51",
+            "tags" : "Relationship",
+            "technology" : "SQL"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "routers/shares.py, services/preview.py, services/sharemeta.py, Pillow"
+        }, {
+          "description" : "Kennzahlen, Sperren, Fehlerlog, Freigaben, Caches, Prüfprotokoll, Jobanfragen.",
+          "documentation" : { },
+          "group" : "Konten und Betrieb",
+          "id" : "52",
+          "name" : "Verwaltung",
+          "properties" : {
+            "structurizr.dsl.identifier" : "w2b.api.admin"
+          },
+          "relationships" : [ {
+            "description" : "Prüft Administrator",
+            "destinationId" : "49",
+            "id" : "129",
+            "sourceId" : "52",
+            "tags" : "Relationship"
+          }, {
+            "description" : "Kennzahlen, Sperren, Prüfprotokoll",
+            "destinationId" : "55",
+            "id" : "133",
+            "sourceId" : "52",
+            "tags" : "Relationship",
+            "technology" : "SQL"
+          }, {
+            "description" : "Leert Caches",
+            "destinationId" : "56",
+            "id" : "138",
+            "sourceId" : "52",
+            "tags" : "Relationship",
+            "technology" : "Dateisystem"
+          }, {
+            "description" : "Legt Jobanfrage ab",
+            "destinationId" : "59",
+            "id" : "139",
+            "sourceId" : "52",
+            "tags" : "Relationship",
+            "technology" : "Datei im State-Volume"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "routers/admin.py, services/admin.py, jobs.py, prices.py"
+        }, {
+          "description" : "Ein Ort für ausgehende Anfragen: TTL-Cache im Speicher und auf Platte, Fehler als deutsche HTTP-Antwort. Liest neu gebaute Indizes und die Preisliste ohne Neustart.",
+          "documentation" : { },
+          "group" : "Querschnitt",
+          "id" : "53",
+          "name" : "Upstream und Cache",
+          "properties" : {
+            "structurizr.dsl.identifier" : "w2b.api.upstream"
+          },
+          "relationships" : [ {
+            "description" : "Liest und schreibt Antworten",
+            "destinationId" : "56",
+            "id" : "136",
+            "sourceId" : "53",
+            "tags" : "Relationship",
+            "technology" : "Dateisystem"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "upstream.py, cache.py, errors.py, reloading.py"
+        }, {
+          "description" : "Gleitendes Budget je Konto bzw. Adresse; Zählung als Stundenaggregate, nie je Anfrage.",
+          "documentation" : { },
+          "group" : "Querschnitt",
+          "id" : "54",
+          "name" : "Anfragebudget und Telemetrie",
+          "properties" : {
+            "structurizr.dsl.identifier" : "w2b.api.budget"
+          },
+          "relationships" : [ {
+            "description" : "Schreibt Stundenaggregate",
+            "destinationId" : "55",
+            "id" : "135",
+            "sourceId" : "54",
+            "tags" : "Relationship",
+            "technology" : "SQL"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "ratelimit.py, telemetry.py"
+        } ],
+        "description" : "Proxy und Plattencache vor den Ämtern, Flurstückssuche, Inseratsauswertung, Konten, Freigaben, Verwaltung.",
+        "documentation" : { },
+        "group" : "Stapel (docker compose)",
+        "id" : "34",
+        "name" : "API-Backend",
+        "properties" : {
+          "structurizr.dsl.identifier" : "w2b.api"
+        },
+        "relationships" : [ {
+          "description" : "Liest und schreibt Grundstücke",
+          "destinationId" : "55",
+          "id" : "131",
+          "linkedRelationshipId" : "130",
+          "sourceId" : "34",
+          "technology" : "SQL"
+        }, {
+          "description" : "Liest und schreibt Antworten",
+          "destinationId" : "56",
+          "id" : "137",
+          "linkedRelationshipId" : "136",
+          "sourceId" : "34",
+          "technology" : "Dateisystem"
+        }, {
+          "description" : "Legt Jobanfrage ab",
+          "destinationId" : "59",
+          "id" : "140",
+          "linkedRelationshipId" : "139",
+          "sourceId" : "34",
+          "technology" : "Datei im State-Volume"
+        }, {
+          "description" : "Liest Hauskoordinaten",
+          "destinationId" : "57",
+          "id" : "142",
+          "linkedRelationshipId" : "141",
+          "sourceId" : "34",
+          "technology" : "Datei"
+        }, {
+          "description" : "Routen und Geocoding",
+          "destinationId" : "58",
+          "id" : "145",
+          "linkedRelationshipId" : "144",
+          "sourceId" : "34",
+          "technology" : "HTTP, JSON"
+        }, {
+          "description" : "Authorization Code + PKCE, Token-Tausch",
+          "destinationId" : "61",
+          "id" : "147",
+          "linkedRelationshipId" : "146",
+          "sourceId" : "34",
+          "technology" : "OIDC"
+        }, {
+          "description" : "Flurstücke per Punkt, Kennzeichen, Gemarkung",
+          "destinationId" : "4",
+          "id" : "156",
+          "linkedRelationshipId" : "155",
+          "sourceId" : "34",
+          "technology" : "WFS 2.0, GML"
+        }, {
+          "description" : "Gebäude als Ersatz",
+          "destinationId" : "10",
+          "id" : "159",
+          "linkedRelationshipId" : "158",
+          "sourceId" : "34",
+          "technology" : "Overpass QL"
+        }, {
+          "description" : "GetFeatureInfo",
+          "destinationId" : "5",
+          "id" : "162",
+          "linkedRelationshipId" : "161",
+          "sourceId" : "34",
+          "technology" : "WMS"
+        }, {
+          "description" : "Lärm, Wasser, Natur, Boden, Radon",
+          "destinationId" : "6",
+          "id" : "165",
+          "linkedRelationshipId" : "164",
+          "sourceId" : "34",
+          "technology" : "ArcGIS REST"
+        }, {
+          "description" : "Luftqualität",
+          "destinationId" : "8",
+          "id" : "168",
+          "linkedRelationshipId" : "167",
+          "sourceId" : "34",
+          "technology" : "REST, JSON"
+        }, {
+          "description" : "Bauleitplanung",
+          "destinationId" : "7",
+          "id" : "171",
+          "linkedRelationshipId" : "170",
+          "sourceId" : "34",
+          "technology" : "ArcGIS REST"
+        }, {
+          "description" : "Style, Vektorkacheln, Glyphen",
+          "destinationId" : "9",
+          "id" : "176",
+          "linkedRelationshipId" : "175",
+          "sourceId" : "34",
+          "technology" : "HTTPS"
+        }, {
+          "description" : "Lädt Inseratsseite",
+          "destinationId" : "15",
+          "id" : "179",
+          "linkedRelationshipId" : "178",
+          "sourceId" : "34",
+          "technology" : "HTTPS"
+        }, {
+          "description" : "Lädt Typenhausseite",
+          "destinationId" : "16",
+          "id" : "182",
+          "linkedRelationshipId" : "181",
+          "sourceId" : "34",
+          "technology" : "HTTPS"
+        }, {
+          "description" : "Strukturierte Extraktion",
+          "destinationId" : "17",
+          "id" : "185",
+          "linkedRelationshipId" : "184",
+          "sourceId" : "34",
+          "technology" : "HTTPS, JSON"
+        }, {
+          "description" : "Routen, wenn kein eigener Router läuft",
+          "destinationId" : "11",
+          "id" : "188",
+          "linkedRelationshipId" : "187",
+          "sourceId" : "34",
+          "technology" : "HTTP, JSON"
+        } ],
+        "tags" : "Element,Container,Server",
+        "technology" : "Python, FastAPI, httpx, Shapely"
+      }, {
+        "description" : "Konten, Grundstücke, Freigaben, Einstellungen, Abweichungen, Sperren, Nutzungsaggregate, Fehler, Prüfprotokoll, Betriebsansage.",
+        "documentation" : { },
+        "group" : "Stapel (docker compose)",
+        "id" : "55",
+        "name" : "Datenbank",
+        "properties" : {
+          "structurizr.dsl.identifier" : "w2b.db"
+        },
+        "tags" : "Element,Container,Datenbank",
+        "technology" : "PostgreSQL 16"
+      }, {
+        "description" : "Antworten der Ämter, Kacheln, Downloads. Verlust kostet Zeit, nicht Richtigkeit.",
+        "documentation" : { },
+        "group" : "Stapel (docker compose)",
+        "id" : "56",
+        "name" : "Plattencache",
+        "properties" : {
+          "structurizr.dsl.identifier" : "w2b.cache"
+        },
+        "tags" : "Element,Container,Datei",
+        "technology" : "Docker-Volume"
+      }, {
+        "description" : "POI-Index (OSM) und amtliche Hauskoordinaten; neu gelesen, sobald der Scheduler sie neu gebaut hat.",
+        "documentation" : { },
+        "group" : "Stapel (docker compose)",
+        "id" : "57",
+        "name" : "Lokale Indizes",
+        "properties" : {
+          "structurizr.dsl.identifier" : "w2b.indexes"
+        },
+        "tags" : "Element,Container,Datei",
+        "technology" : "SQLite/Dateien im Volume"
+      }, {
+        "description" : "Multimodales Routing, Haltestellen und Geocoder auf diesem Rechner.",
+        "documentation" : { },
+        "group" : "Stapel (docker compose)",
+        "id" : "58",
+        "name" : "Router",
+        "properties" : {
+          "structurizr.dsl.identifier" : "w2b.motis"
+        },
+        "tags" : "Element,Container,Fremdprodukt",
+        "technology" : "MOTIS 2.11"
+      }, {
+        "description" : "Wiederkehrende Jobs aus ops/jobs.json: Cache-Sweep, Freigaben-Sweep, Indizes, Preisliste. Nimmt „Jetzt starten“ als Datei entgegen.",
+        "documentation" : { },
+        "group" : "Stapel (docker compose)",
+        "id" : "59",
+        "name" : "Scheduler",
+        "properties" : {
+          "structurizr.dsl.identifier" : "w2b.scheduler"
+        },
+        "relationships" : [ {
+          "description" : "Sweep",
+          "destinationId" : "56",
+          "id" : "150",
+          "sourceId" : "59",
+          "tags" : "Relationship",
+          "technology" : "Dateisystem"
+        }, {
+          "description" : "Baut Indizes neu",
+          "destinationId" : "57",
+          "id" : "151",
+          "sourceId" : "59",
+          "tags" : "Relationship",
+          "technology" : "Datei"
+        }, {
+          "description" : "Räumt abgelaufene Freigaben",
+          "destinationId" : "55",
+          "id" : "152",
+          "sourceId" : "59",
+          "tags" : "Relationship",
+          "technology" : "SQL"
+        }, {
+          "description" : "Hauskoordinaten (vierteljährlich)",
+          "destinationId" : "4",
+          "id" : "190",
+          "sourceId" : "59",
+          "tags" : "Relationship",
+          "technology" : "HTTPS"
+        }, {
+          "description" : "OSM-Extrakt für den POI-Index",
+          "destinationId" : "12",
+          "id" : "191",
+          "sourceId" : "59",
+          "tags" : "Relationship",
+          "technology" : "HTTPS"
+        }, {
+          "description" : "Modellpreise",
+          "destinationId" : "17",
+          "id" : "193",
+          "sourceId" : "59",
+          "tags" : "Relationship",
+          "technology" : "HTTPS"
+        }, {
+          "description" : "Referenzkurs",
+          "destinationId" : "14",
+          "id" : "194",
+          "sourceId" : "59",
+          "tags" : "Relationship",
+          "technology" : "HTTPS, XML"
+        } ],
+        "tags" : "Element,Container,Server",
+        "technology" : "Python, scripts/run_jobs.py"
+      }, {
+        "description" : "routing-data, motis-import, indexes: Rohdaten laden, Graph bauen, Indizes anlegen.",
+        "documentation" : { },
+        "group" : "Stapel (docker compose)",
+        "id" : "60",
+        "name" : "Einmal-Importe",
+        "properties" : {
+          "structurizr.dsl.identifier" : "w2b.importer"
+        },
+        "relationships" : [ {
+          "description" : "Legt Indizes an",
+          "destinationId" : "57",
+          "id" : "153",
+          "sourceId" : "60",
+          "tags" : "Relationship",
+          "technology" : "Datei"
+        }, {
+          "description" : "Baut den Routing-Graphen",
+          "destinationId" : "58",
+          "id" : "154",
+          "sourceId" : "60",
+          "tags" : "Relationship",
+          "technology" : "Volume motis-graph"
+        }, {
+          "description" : "OSM-Extrakt Sachsen",
+          "destinationId" : "12",
+          "id" : "196",
+          "sourceId" : "60",
+          "tags" : "Relationship",
+          "technology" : "HTTPS"
+        }, {
+          "description" : "Fahrplan",
+          "destinationId" : "13",
+          "id" : "197",
+          "sourceId" : "60",
+          "tags" : "Relationship",
+          "technology" : "HTTPS, GTFS"
+        }, {
+          "description" : "Hauskoordinaten",
+          "destinationId" : "4",
+          "id" : "199",
+          "sourceId" : "60",
+          "tags" : "Relationship",
+          "technology" : "HTTPS"
+        } ],
+        "tags" : "Element,Container,Server,Einmalig",
+        "technology" : "Python, MOTIS import"
+      }, {
+        "description" : "Anmeldung und Registrierung, Blueprint aus ops/authentik.",
+        "documentation" : { },
+        "group" : "Stapel (docker compose)",
+        "id" : "61",
+        "name" : "Identitätsanbieter",
+        "properties" : {
+          "structurizr.dsl.identifier" : "w2b.idp"
+        },
+        "relationships" : [ {
+          "description" : "Eigene Datenbank „authentik“",
+          "destinationId" : "55",
+          "id" : "148",
+          "sourceId" : "61",
+          "tags" : "Relationship",
+          "technology" : "SQL"
+        }, {
+          "description" : "Sitzungen, Aufgaben",
+          "destinationId" : "62",
+          "id" : "149",
+          "sourceId" : "61",
+          "tags" : "Relationship",
+          "technology" : "Redis"
+        } ],
+        "tags" : "Element,Container,Fremdprodukt",
+        "technology" : "authentik 2025.2"
+      }, {
+        "description" : "Sitzungen und Aufgabenwarteschlange von authentik.",
+        "documentation" : { },
+        "group" : "Stapel (docker compose)",
+        "id" : "62",
+        "name" : "IdP-Cache",
+        "properties" : {
+          "structurizr.dsl.identifier" : "w2b.idpCache"
+        },
+        "tags" : "Element,Container,Fremdprodukt,Datenbank",
+        "technology" : "Redis 7"
+      } ],
+      "description" : "Löst ein Inserat in amtliche Flurstücke auf, misst sie, vergleicht den Preis mit dem Bodenrichtwert, platziert ein Typenhaus im Abstandsflächen-Rahmen und berechnet Wege.",
+      "documentation" : { },
+      "id" : "19",
+      "name" : "where2build",
+      "properties" : {
+        "structurizr.dsl.identifier" : "w2b"
+      },
+      "relationships" : [ {
+        "description" : "Flurstücke per Punkt, Kennzeichen, Gemarkung",
+        "destinationId" : "4",
+        "id" : "157",
+        "linkedRelationshipId" : "155",
+        "sourceId" : "19",
+        "technology" : "WFS 2.0, GML"
+      }, {
+        "description" : "Gebäude als Ersatz",
+        "destinationId" : "10",
+        "id" : "160",
+        "linkedRelationshipId" : "158",
+        "sourceId" : "19",
+        "technology" : "Overpass QL"
+      }, {
+        "description" : "GetFeatureInfo",
+        "destinationId" : "5",
+        "id" : "163",
+        "linkedRelationshipId" : "161",
+        "sourceId" : "19",
+        "technology" : "WMS"
+      }, {
+        "description" : "Lärm, Wasser, Natur, Boden, Radon",
+        "destinationId" : "6",
+        "id" : "166",
+        "linkedRelationshipId" : "164",
+        "sourceId" : "19",
+        "technology" : "ArcGIS REST"
+      }, {
+        "description" : "Luftqualität",
+        "destinationId" : "8",
+        "id" : "169",
+        "linkedRelationshipId" : "167",
+        "sourceId" : "19",
+        "technology" : "REST, JSON"
+      }, {
+        "description" : "Bauleitplanung",
+        "destinationId" : "7",
+        "id" : "172",
+        "linkedRelationshipId" : "170",
+        "sourceId" : "19",
+        "technology" : "ArcGIS REST"
+      }, {
+        "description" : "Style, Vektorkacheln, Glyphen",
+        "destinationId" : "9",
+        "id" : "177",
+        "linkedRelationshipId" : "175",
+        "sourceId" : "19",
+        "technology" : "HTTPS"
+      }, {
+        "description" : "Lädt Inseratsseite",
+        "destinationId" : "15",
+        "id" : "180",
+        "linkedRelationshipId" : "178",
+        "sourceId" : "19",
+        "technology" : "HTTPS"
+      }, {
+        "description" : "Lädt Typenhausseite",
+        "destinationId" : "16",
+        "id" : "183",
+        "linkedRelationshipId" : "181",
+        "sourceId" : "19",
+        "technology" : "HTTPS"
+      }, {
+        "description" : "Strukturierte Extraktion",
+        "destinationId" : "17",
+        "id" : "186",
+        "linkedRelationshipId" : "184",
+        "sourceId" : "19",
+        "technology" : "HTTPS, JSON"
+      }, {
+        "description" : "Routen, wenn kein eigener Router läuft",
+        "destinationId" : "11",
+        "id" : "189",
+        "linkedRelationshipId" : "187",
+        "sourceId" : "19",
+        "technology" : "HTTP, JSON"
+      }, {
+        "description" : "OSM-Extrakt für den POI-Index",
+        "destinationId" : "12",
+        "id" : "192",
+        "linkedRelationshipId" : "191",
+        "sourceId" : "19",
+        "technology" : "HTTPS"
+      }, {
+        "description" : "Referenzkurs",
+        "destinationId" : "14",
+        "id" : "195",
+        "linkedRelationshipId" : "194",
+        "sourceId" : "19",
+        "technology" : "HTTPS, XML"
+      }, {
+        "description" : "Fahrplan",
+        "destinationId" : "13",
+        "id" : "198",
+        "linkedRelationshipId" : "197",
+        "sourceId" : "19",
+        "technology" : "HTTPS, GTFS"
+      } ],
+      "tags" : "Element,Software System"
+    } ]
+  },
+  "name" : "where2build",
+  "properties" : {
+    "structurizr.dsl" : "LyoKICogd2hlcmUyYnVpbGQgYXMgYSBDNCBtb2RlbCwgaW4gdGhlIFN0cnVjdHVyaXpyIERTTC4KICoKICogSWRlbnRpZmllcnMgYXJlIEVuZ2xpc2ggbGlrZSB0aGUgY29kZTsgbmFtZXMgYW5kIGRlc2NyaXB0aW9ucyBhcmUgR2VybWFuCiAqIGJlY2F1c2UgdGhleSBhcmUgd2hhdCBhIHJlYWRlciBvZiB0aGUgZGlhZ3JhbXMgc2Vlcy4gVGhlIG1vZGVsIG1pcnJvcnMKICogZG9ja2VyLWNvbXBvc2UueW1sLCBiYWNrZW5kL2FwcC9tYWluLnB5IGFuZCBmcm9udGVuZC9zcmMgLS0gd2hlbiBvbmUgb2YgdGhvc2UKICogY2hhbmdlcyBzaGFwZSwgY2hhbmdlIHRoaXMgZmlsZSBhbmQgcnVuIGBub2RlIHNjcmlwdHMvYXJjaGl0ZWN0dXJlLm1qc2AsCiAqIHdoaWNoIHJlZ2VuZXJhdGVzIHdvcmtzcGFjZS5qc29uLCB0aGUgaW50ZXJhY3RpdmUgcGFnZSBhbmQgdGhlIGltYWdlcy4KICovCndvcmtzcGFjZSAid2hlcmUyYnVpbGQiICJHcnVuZHN0w7xja3MtQ2hlY2sgU2FjaHNlbjogSW5zZXJhdCDihpIgYW10bGljaGUgRmx1cnN0w7xja2Ug4oaSIEJvZGVucmljaHR3ZXJ0LCBCZWJhdXVuZywgVW1mZWxkIHVuZCBXZWdlLiIgewoKICAgICFpZGVudGlmaWVycyBoaWVyYXJjaGljYWwKCiAgICBtb2RlbCB7CiAgICAgICAgcHJvcGVydGllcyB7CiAgICAgICAgICAgICJzdHJ1Y3R1cml6ci5ncm91cFNlcGFyYXRvciIgIi8iCiAgICAgICAgfQoKICAgICAgICBidXllciA9IHBlcnNvbiAiQmF1aW50ZXJlc3NlbnQ6aW4iICJQcsO8ZnQgZWluIEdydW5kc3TDvGNrc2luc2VyYXQ6IHdlbGNoZSBGbHVyc3TDvGNrZSwgd2FzIHNpZSBhbXRsaWNoIGtvc3Rlbiwgd2VsY2hlcyBIYXVzIGRhcmF1ZiBwYXNzdCB1bmQgd2llIHdlaXQgZXMgenUgU2NodWxlLCBBcmJlaXQgdW5kIEhhbHRlc3RlbGxlIGlzdC4iCiAgICAgICAgcmVjaXBpZW50ID0gcGVyc29uICJFbXBmw6RuZ2VyOmluIGVpbmVzIExpbmtzIiAiw5ZmZm5ldCBlaW4gZ2V0ZWlsdGVzIEdydW5kc3TDvGNrIG9obmUgS29udG8g4oCTIGRlciBUb2tlbiBpc3QgZGVyIFp1Z2FuZy4iCiAgICAgICAgb3BlcmF0b3IgPSBwZXJzb24gIkJldHJlaWJlcjppbiIgIlZlcndhbHRldCBLb250ZW4sIEZyZWlnYWJlbiwgQ2FjaGVzIHVuZCBKb2JzIGltIFZlcndhbHR1bmdzYmVyZWljaC4gQm9vdHN0cmFwIMO8YmVyIEFETUlOX0FDQ09VTlRTLiIKCiAgICAgICAgZ3JvdXAgIkZyZWlzdGFhdCBTYWNoc2VuIiB7CiAgICAgICAgICAgIGdlb3NuID0gc29mdHdhcmVTeXN0ZW0gIkdlb1NOIEdlb2RpZW5zdGUiICJMYW5kZXNhbXQgZsO8ciBHZW9iYXNpc2luZm9ybWF0aW9uOiBBTEtJUy1XRlMgKEZsdXJzdMO8Y2tlLCBHZWLDpHVkZSksIFdNUyBmw7xyIEx1ZnRiaWxkLCBXZWJBdGxhcyB1bmQgTGllZ2Vuc2NoYWZ0c2thcnRlLCBEb3dubG9hZCBkZXIgSGF1c2tvb3JkaW5hdGVuLiIgIkV4dGVybixBbXRsaWNoIgogICAgICAgICAgICBib3JpcyA9IHNvZnR3YXJlU3lzdGVtICJCT1JJUyBTYWNoc2VuIiAiQm9kZW5yaWNodHdlcnRlLiBLZWluIFdGUyDigJMgbnVyIFdNUyBHZXRGZWF0dXJlSW5mby4iICJFeHRlcm4sQW10bGljaCIKICAgICAgICAgICAgbHVpcyA9IHNvZnR3YXJlU3lzdGVtICJMVUlTIFNhY2hzZW4iICJBcmNHSVMtUkVTVCBkZXMgTGFuZGVzdW13ZWx0YW10czogTMOkcm0sIEhvY2h3YXNzZXIsIFNjaHV0emdlYmlldGUsIEJvZGVuLCBSYWRvbi4iICJFeHRlcm4sQW10bGljaCIKICAgICAgICAgICAgcmFwaXMgPSBzb2Z0d2FyZVN5c3RlbSAiUkFQSVMgU2FjaHNlbiIgIlJhdW1wbGFudW5nc2luZm9ybWF0aW9uc3N5c3RlbTogQmF1bGVpdHBsw6RuZSB1bmQgQXJ0IGRlciBOdXR6dW5nLiIgIkV4dGVybixBbXRsaWNoIgogICAgICAgIH0KICAgICAgICB1YmEgPSBzb2Z0d2FyZVN5c3RlbSAiVW13ZWx0YnVuZGVzYW10IEx1ZnRkYXRlbiIgIk1lc3NzdGF0aW9uZW4gdW5kIEx1ZnRxdWFsaXTDpHQsIGJ1bmRlc3dlaXQsIG9obmUgU2NobMO8c3NlbC4iICJFeHRlcm4sQW10bGljaCIKCiAgICAgICAgZ3JvdXAgIk9mZmVuZSBEYXRlbiB1bmQgRGllbnN0ZSIgewogICAgICAgICAgICBvcGVuZnJlZW1hcCA9IHNvZnR3YXJlU3lzdGVtICJPcGVuRnJlZU1hcCIgIlZla3Rvci1HcnVuZGthcnRlOiBTdHlsZSwgS2FjaGVsbiwgR2x5cGhlbiwgU3ByaXRlcy4iICJFeHRlcm4iCiAgICAgICAgICAgIG92ZXJwYXNzID0gc29mdHdhcmVTeXN0ZW0gIk92ZXJwYXNzIEFQSSIgIkxpdmUtQWJmcmFnZW4gYW4gT3BlblN0cmVldE1hcC4gT3B0aW9uYWxlciBFcnNhdHogZsO8ciBOYWNoYmFyZ2Viw6R1ZGUgdW5kIFppZWxlLiIgIkV4dGVybixPcHRpb25hbCIKICAgICAgICAgICAgdHJhbnNpdG91cyA9IHNvZnR3YXJlU3lzdGVtICJUcmFuc2l0b3VzIiAiw5ZmZmVudGxpY2hlIE1PVElTLUluc3RhbnouIEFsdGVybmF0aXZlIHp1bSBlaWdlbmVuIFJvdXRlciAoZG9ja2VyLWNvbXBvc2UudHJhbnNpdG91cy55bWwpLiIgIkV4dGVybixPcHRpb25hbCIKICAgICAgICAgICAgZ2VvZmFicmlrID0gc29mdHdhcmVTeXN0ZW0gIkdlb2ZhYnJpayIgIk9TTS1FeHRyYWt0IFNhY2hzZW4gZsO8ciBSb3V0ZXIgdW5kIFBPSS1JbmRleC4iICJFeHRlcm4iCiAgICAgICAgICAgIGd0ZnMgPSBzb2Z0d2FyZVN5c3RlbSAiREVMRkktR1RGUyIgIkRldXRzY2hsYW5kd2VpdGVyIEZhaHJwbGFuLCBiZXpvZ2VuIMO8YmVyIFRyYW5zaXRvdXMuIiAiRXh0ZXJuIgogICAgICAgICAgICBlY2IgPSBzb2Z0d2FyZVN5c3RlbSAiRVpCIiAiVGFnZXNrdXJzIGbDvHIgZGllIFVtcmVjaG51bmcgZGVyIE1vZGVsbHByZWlzZS4iICJFeHRlcm4iCiAgICAgICAgfQoKICAgICAgICBncm91cCAiSW5zZXJhdGUgdW5kIEFuYmlldGVyIiB7CiAgICAgICAgICAgIHBvcnRhbHMgPSBzb2Z0d2FyZVN5c3RlbSAiSW1tb2JpbGllbnBvcnRhbGUiICJrbGVpbmFuemVpZ2VuLmRlLCBpbW1vd2VsdC5kZSB1LiBhLiBJbW1vU2NvdXQyNCBudXIgw7xiZXIgZGFzIEJvb2ttYXJrbGV0LCB3ZWlsIGplZGUgU2VydmVyYW5mcmFnZSBhbiBkZXIgV0FGIHNjaGVpdGVydC4iICJFeHRlcm4iCiAgICAgICAgICAgIG1hbnVmYWN0dXJlcnMgPSBzb2Z0d2FyZVN5c3RlbSAiSGF1c2FuYmlldGVyLVdlYnNpdGVzIiAiVHlwZW5ow6R1c2VyOiBNYcOfZSwgR3J1bmRmbMOkY2hlLCBQcmVpcy4gQWJydWYgbnVyIGF1ZiBkZXIgRG9tYWluIGRlcyBBbmJpZXRlcnMuIiAiRXh0ZXJuIgogICAgICAgIH0KICAgICAgICBsbG0gPSBzb2Z0d2FyZVN5c3RlbSAiTExNLUFuYmlldGVyIiAiT3BlblJvdXRlciwgT3BlbkFJLCBBbnRocm9waWMsIE9sbGFtYSBvZGVyIGVpbiBhbmRlcmVyIE9wZW5BSS1rb21wYXRpYmxlciBIb3N0IOKAkyBXYWhsIGRlciBJbnN0YWxsYXRpb24gKExMTV9BTkJJRVRFUikuIiAiRXh0ZXJuIgogICAgICAgIGxpbmtib3RzID0gc29mdHdhcmVTeXN0ZW0gIkxpbmstVm9yc2NoYXUtQm90cyIgIk1lc3NlbmdlciB1bmQgQ2hhdHMsIGRpZSBvZzotVGFncyB1bmQgZGFzIFZvcnNjaGF1YmlsZCBlaW5lcyBnZXRlaWx0ZW4gTGlua3MgbGVzZW4uIiAiRXh0ZXJuIgoKICAgICAgICB3MmIgPSBzb2Z0d2FyZVN5c3RlbSAid2hlcmUyYnVpbGQiICJMw7ZzdCBlaW4gSW5zZXJhdCBpbiBhbXRsaWNoZSBGbHVyc3TDvGNrZSBhdWYsIG1pc3N0IHNpZSwgdmVyZ2xlaWNodCBkZW4gUHJlaXMgbWl0IGRlbSBCb2RlbnJpY2h0d2VydCwgcGxhdHppZXJ0IGVpbiBUeXBlbmhhdXMgaW0gQWJzdGFuZHNmbMOkY2hlbi1SYWhtZW4gdW5kIGJlcmVjaG5ldCBXZWdlLiIgewoKICAgICAgICAgICAgZ3JvdXAgIkltIEJyb3dzZXIiIHsKICAgICAgICAgICAgICAgIHNwYSA9IGNvbnRhaW5lciAiV2ViLUFwcCIgIkRpZSBPYmVyZmzDpGNoZS4gSMOkbHQgYWxsZSBHZW9tZXRyaWUsIGRpZSBhbmdlZmFzc3Qgd2lyZDogUHVmZmVybiwgRHJlaGVuLCBLb2xsaXNpb24gbGF1ZmVuIGJlaW0gWmllaGVuLiBTcGVpY2hlcnQgbG9rYWwsIHN5bmNocm9uaXNpZXJ0IG1pdCBLb250by4iICJWdWUgMyAoT3B0aW9ucyBBUEkpLCBWaXRlLCBNYXBMaWJyZSBHTCwgbG9jYWxTdG9yYWdlIiAiQnJvd3NlciIgewogICAgICAgICAgICAgICAgICAgIGdyb3VwICJBbnNpY2h0ZW4iIHsKICAgICAgICAgICAgICAgICAgICAgICAgdmlld3MgPSBjb21wb25lbnQgIkFuc2ljaHRlbiB1bmQgUm91dGVyIiAiU3RhcnRzZWl0ZSwgQXVmbmFobWUtQXNzaXN0ZW50LCBHcnVuZHN0w7xjaywgVmVyZ2xlaWNoLCBIYXVzdHlwZW4sIFppZWxlLCBEYXRlbiwgS29udG8sIGdldGVpbHRlIEFuc2ljaHQuIiAidnVlLXJvdXRlciwgdmlld3MvKi52dWUiCiAgICAgICAgICAgICAgICAgICAgICAgIGFkbWluVmlld3MgPSBjb21wb25lbnQgIlZlcndhbHR1bmdzb2JlcmZsw6RjaGUiICJLZW5uemFobGVuLCBTdGF0aXN0aWssIEtvbnRlbiwgRmVobGVyLCBGcmVpZ2FiZW4sIEJldHJpZWIsIFByw7xmcHJvdG9rb2xsLiIgImNvbXBvbmVudHMvYWRtaW4vKi52dWUiCiAgICAgICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgICAgIGdyb3VwICJFaW5nYWJlIHVuZCBTdWNoZSIgewogICAgICAgICAgICAgICAgICAgICAgICBxdWVyeUJveCA9IGNvbXBvbmVudCAiU3VjaGZlbGQiICJMaWVzdCBkaWUgRWluZ2FiZSwgYmV2b3IgZXMgbmFjaHNjaGzDpGd0OiBBZHJlc3NlLCBLb29yZGluYXRlIG9kZXIgRmx1cnN0w7xjayDigJMgdW5kIHNhZ3QsIHdpZSBlcyBnZWxlc2VuIGhhdC4iICJRdWVyeUJveC52dWUsIGxpYi9xdWVyeUlucHV0LmpzIgogICAgICAgICAgICAgICAgICAgICAgICBoYW5kb2ZmID0gY29tcG9uZW50ICLDnGJlcmdhYmUtRW1wZsOkbmdlciIgIk5pbW10IGRpZSB2b20gQm9va21hcmtsZXQgw7xiZXJnZWJlbmUgU2VpdGUgcGVyIHBvc3RNZXNzYWdlIGVudGdlZ2VuLiIgImxpYi9oYW5kb2ZmLmpzLCBsaWIvYm9va21hcmtsZXQuanMiCiAgICAgICAgICAgICAgICAgICAgICAgIHNlYXJjaENsaWVudCA9IGNvbXBvbmVudCAiU3VjaGxhdWYtQ2xpZW50IiAiTGllc3QgZGVuIE5ESlNPTi1TdHJvbSBkZXIgRmx1cnN0w7xja3NzdWNoZSB1bmQgbMOkc3N0IGRpZSBLYXJ0ZSBtaXR3YWNoc2VuLiIgImxpYi9zZWFyY2guanMsIFBhcmNlbFNlYXJjaC52dWUsIEV2aWRlbmNlTWFwLnZ1ZSIKICAgICAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgICAgICAgICAgZ3JvdXAgIkdydW5kc3TDvGNrIiB7CiAgICAgICAgICAgICAgICAgICAgICAgIHNpdGVQbGFuID0gY29tcG9uZW50ICJMYWdlcGxhbiIgIkZsdXJzdMO8Y2tlLCBBYnN0YW5kc2Zsw6RjaGVuLVJhaG1lbiBuYWNoIMKnIDYgU8OkY2hzQk8sIEhhdXNwbGF0emllcnVuZywgS29sbGlzaW9uLiIgIlNpdGVQbGFuLnZ1ZSwgbGliL2dlb21ldHJ5LmpzLCBsaWIvcHJvamVjdGlvbi5qcywgTWFwTGlicmUiCiAgICAgICAgICAgICAgICAgICAgICAgIG5laWdoYm91cmhvb2QgPSBjb21wb25lbnQgIk5hY2hiYXJzY2hhZnQiICJLbGFzc2lmaXppZXJ0IE5hY2hiYXJnZWLDpHVkZSB1bmQgemVpY2huZXQgMy1tLVNjaHJhZmZ1ciB1bmQgNi1tLVpvbmUuIiAibGliL25laWdoYm91cmhvb2QqLmpzLCBOZWlnaGJvdXJob29kUGFuZS52dWUiCiAgICAgICAgICAgICAgICAgICAgICAgIGZpbmRpbmdzID0gY29tcG9uZW50ICJCZWZ1bmQtVm9ybGFnZW4iICJGZXN0ZSBkZXV0c2NoZSBTw6R0emUgYXVzIHN0cnVrdHVyaWVydGVuIERhdGVuIOKAkyBrZWluIE1vZGVsbCBzY2hyZWlidCBVSS1UZXh0LiIgImxpYi9maW5kaW5ncy5qcywgbGliL3NpdGVDaGVja3MuanMsIENoZWNrTGlzdC52dWUiCiAgICAgICAgICAgICAgICAgICAgICAgIHJvdXRlcyA9IGNvbXBvbmVudCAiV2VnZSB1bmQgVW1mZWxkIiAiUmVpc2V6ZWl0ZW4sIFJvdXRlbiwgbsOkY2hzdGUgWmllbGUuIiAiUm91dGVDYXJkcy52dWUsIE5lYXJieVBhbmVsLnZ1ZSwgbGliL3JvdXRlcy5qcyIKICAgICAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgICAgICAgICAgZ3JvdXAgIkRhdGVuIiB7CiAgICAgICAgICAgICAgICAgICAgICAgIHN0b3JlID0gY29tcG9uZW50ICJadXN0YW5kIHVuZCBTcGVpY2hlciIgIlJlYWt0aXZlciBadXN0YW5kLCBsb2NhbFN0b3JhZ2UsIEFiZ2xlaWNoIG1pdCBkZW0gS29udG8uIiAibGliL3N0b3JlLmpzLCBsaWIvc2VydmVyU3RvcmUuanMiCiAgICAgICAgICAgICAgICAgICAgICAgIGFwaUNsaWVudCA9IGNvbXBvbmVudCAiQVBJLUNsaWVudCIgImZldGNoIGdlZ2VuIC9hcGk7IGRldXRzY2hlIGRldGFpbC1NZWxkdW5nZW4gc3RhdHQgQmVpc3BpZWxkYXRlbi4iICJsaWIvYXBpLmpzIgogICAgICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgIGJvb2ttYXJrbGV0ID0gY29udGFpbmVyICJCb29rbWFya2xldCIgIkzDpHVmdCBhdWYgZGVyIFNlaXRlIGRlcyBQb3J0YWxzLCDDtmZmbmV0IGRpZSBBcHAgdW5kIMO8YmVyZ2lidCBkb2N1bWVudC5vdXRlckhUTUwgcGVyIHBvc3RNZXNzYWdlIOKAkyBvaG5lIENPUlMgdW5kIGFtIENTUCBkZXMgUG9ydGFscyB2b3JiZWkuIiAiSmF2YVNjcmlwdCIgIkJyb3dzZXIiCiAgICAgICAgICAgIH0KCiAgICAgICAgICAgIGdyb3VwICJTdGFwZWwgKGRvY2tlciBjb21wb3NlKSIgewogICAgICAgICAgICAgICAgd2Vic2VydmVyID0gY29udGFpbmVyICJXZWJzZXJ2ZXIiICJMaWVmZXJ0IGRlbiBCdWlsZCBhdXMsIGxlaXRldCAvYXBpIHdlaXRlciwgc2V0enQgcGVyIFNTSSBkaWUgb2c6LVRhZ3MgZ2V0ZWlsdGVyIExpbmtzIGVpbi4iICJuZ2lueCIgIlNlcnZlciIKCiAgICAgICAgICAgICAgICBhcGkgPSBjb250YWluZXIgIkFQSS1CYWNrZW5kIiAiUHJveHkgdW5kIFBsYXR0ZW5jYWNoZSB2b3IgZGVuIMOEbXRlcm4sIEZsdXJzdMO8Y2tzc3VjaGUsIEluc2VyYXRzYXVzd2VydHVuZywgS29udGVuLCBGcmVpZ2FiZW4sIFZlcndhbHR1bmcuIiAiUHl0aG9uLCBGYXN0QVBJLCBodHRweCwgU2hhcGVseSIgIlNlcnZlciIgewogICAgICAgICAgICAgICAgICAgIGdyb3VwICJBbXRsaWNoZSBEYXRlbiIgewogICAgICAgICAgICAgICAgICAgICAgICBwYXJjZWxzID0gY29tcG9uZW50ICJGbHVyc3TDvGNrZSIgIkFkcmVzc2UsIEtvb3JkaW5hdGUsIEdlbWFya3VuZyArIE51bW1lciBvZGVyIEtlbm56ZWljaGVuIOKGkiBHZW9KU09OIG1pdCBhbXRsaWNoZXIgRmzDpGNoZTsgVmVyZWluaWd1bmcgbWVocmVyZXIgRmx1cnN0w7xja2U7IFBsYXVzaWJpbGl0w6R0c3Byw7xmdW5nLiIgInJvdXRlcnMvcGFyY2Vscy5weSwgc2VydmljZXMvYWxraXMucHksIHBsYXVzaWJpbGl0eS5weSIKICAgICAgICAgICAgICAgICAgICAgICAgbGFuZFZhbHVlID0gY29tcG9uZW50ICJCb2RlbnJpY2h0d2VydCIgIuKCrC9twrIsIFpvbmUsIFN0aWNodGFnLCBSaWNodHdlcnRncnVuZHN0w7xjay4iICJyb3V0ZXJzL2xhbmR2YWx1ZS5weSwgc2VydmljZXMvYm9yaXMucHkiCiAgICAgICAgICAgICAgICAgICAgICAgIHNpdGVDaGVja3MgPSBjb21wb25lbnQgIlN0YW5kb3J0cHLDvGZ1bmdlbiIgIkzDpHJtLCBIb2Nod2Fzc2VyLCBSYWRvbiwgV2Fzc2VyLSB1bmQgTmF0dXJzY2h1dHosIEhhbmduZWlndW5nLCBCb2RlbiwgTHVmdCDigJMgamVkZSBQcsO8ZnVuZyBtaXQgRGF0ZW4gb2RlciBlaWdlbmVtIGZlaGxlci4iICJyb3V0ZXJzL3NpdGVjaGVja3MucHksIHNlcnZpY2VzL2x1aXMucHksIHNlcnZpY2VzL2FpcnF1YWxpdHkucHkiCiAgICAgICAgICAgICAgICAgICAgICAgIHBsYW5uaW5nID0gY29tcG9uZW50ICJQbGFudW5nc3JlY2h0IiAiQmF1bGVpdHBsYW4gdW5kIEFydCBkZXIgTnV0enVuZyBhbSBHcnVuZHN0w7xjay4iICJyb3V0ZXJzL3BsYW5uaW5nLnB5LCBzZXJ2aWNlcy9yYXBpcy5weSIKICAgICAgICAgICAgICAgICAgICAgICAgbmVpZ2hib3VycyA9IGNvbXBvbmVudCAiTmFjaGJhcmdlYsOkdWRlIiAiR2Viw6R1ZGV1bXJpc3NlIGF1cyBBTEtJUywgT3ZlcnBhc3MgYWxzIEVyc2F0ei4iICJyb3V0ZXJzL25laWdoYm91cnMucHksIHNlcnZpY2VzL292ZXJwYXNzLnB5IgogICAgICAgICAgICAgICAgICAgICAgICBnZW1hcmt1bmdlbiA9IGNvbXBvbmVudCAiR2VtYXJrdW5nc3ZlcnplaWNobmlzIiAiNSAzMzkgR2VtYXJrdW5nZW4gYXVzIGVpbmVyIGVpbmdlY2hlY2t0ZW4gRGF0ZWkg4oCTIGRlciBXRlMgd2lyZCBuaWUgZ2VmcmFndC4iICJyb3V0ZXJzL2dlbWFya3VuZ2VuLnB5LCBnZW1hcmt1bmdfaW5kZXgucHkiCiAgICAgICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgICAgIGdyb3VwICJJbnNlcmF0IHVuZCBTdWNoZSIgewogICAgICAgICAgICAgICAgICAgICAgICBsaXN0aW5ncyA9IGNvbXBvbmVudCAiSW5zZXJhdHNhdXN3ZXJ0dW5nIiAiUG9ydGFsLUFkYXB0ZXIsIEZlbGRsZXNlciwgT0NSIGRlcyBLYXRhc3RlcmF1c3p1Z3MsIE1vZGVsbCBhbHMgbGV0enRlciBMZXNlcjsgamVkZXIgTW9kZWxsd2VydCBtdXNzIGRhcyBCZWxlZy1Ub3IgcGFzc2llcmVuLiIgInJvdXRlcnMvbGlzdGluZ3MucHksIHNlcnZpY2VzL3BvcnRhbHMucHksIHNlcnZpY2VzL3BvcnRhbF9maWVsZHMucHksIHNlcnZpY2VzL29jci5weSwgc2VydmljZXMvYmVsZWcucHksIHNlcnZpY2VzL2JlZnVuZC5weSIKICAgICAgICAgICAgICAgICAgICAgICAgc2VhcmNoRW5naW5lID0gY29tcG9uZW50ICJGbHVyc3TDvGNrc3N1Y2hlIiAiVHJlcHBlIHN0YXR0IFBpcGVsaW5lOiBoYXJ0ZSBGaWx0ZXIgZW50c2NoZWlkZW4sIEdld2ljaHRlIG9yZG5lbi4gQW50d29ydGV0IGFscyBOREpTT04uIiAicm91dGVycy9zZWFyY2gucHksIHNlYXJjaC9lbmdpbmUucHksIHNlYXJjaC9ibG9ja3MucHksIHNlYXJjaC9pbmRpY2lhLnB5LCBzZWFyY2gvZGlzdGFuY2UucHksIHNlYXJjaC9sYWRkZXIucHksIHNlYXJjaC9zY29yaW5nLnB5LCBzZWFyY2gvZW52ZWxvcGUucHkiCiAgICAgICAgICAgICAgICAgICAgICAgIGxsbUNsaWVudCA9IGNvbXBvbmVudCAiTW9kZWxsLUNsaWVudCIgIkVpbiBDbGllbnQgamUgV2lyZS1Gb3JtYXQ6IE9wZW5BSS1rb21wYXRpYmVsIG9kZXIgQW50aHJvcGljLUFkYXB0ZXIuIFByb21wdHMgYWxzIEluaGFsdCwgbmljaHQgaW0gUm91dGVyLiIgInNlcnZpY2VzL2xsbS5weSwgc2VydmljZXMvcHJvbXB0cy5weSIKICAgICAgICAgICAgICAgICAgICAgICAgbGVocmJ1Y2ggPSBjb21wb25lbnQgIkxlaHJidWNoIiAiUHJvdG9rb2xsLCB3byBNdXN0ZXIgdW5kIE1vZGVsbCBzaWNoIHdpZGVyc3ByZWNoZW47IFRlbGVmb25udW1tZXJuIHVuZCBNYWlsYWRyZXNzZW4gZ2VzY2h3w6RyenQuIiAicm91dGVycy9sZWhyYnVjaC5weSwgc2VydmljZXMvbGVocmJ1Y2gucHkiCiAgICAgICAgICAgICAgICAgICAgICAgIGhvdXNlVHlwZXMgPSBjb21wb25lbnQgIkhhdXN0eXBlbiIgIlR5cGVuaGF1cyB2b24gZGVyIEFuYmlldGVyc2VpdGUgbGVzZW4uIiAicm91dGVycy9ob3VzZXR5cGVzLnB5IgogICAgICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgICAgICBncm91cCAiV2VnZSB1bmQgVW1mZWxkIiB7CiAgICAgICAgICAgICAgICAgICAgICAgIHJvdXRpbmcgPSBjb21wb25lbnQgIkVycmVpY2hiYXJrZWl0IHVuZCBHZW9jb2RlciIgIlJlaXNlemVpdGVuIHVuZCBSb3V0ZW47IEdlb2NvZGluZyBhdXMgYW10bGljaGVuIEhhdXNrb29yZGluYXRlbiBwbHVzIE1PVElTLiIgInJvdXRlcnMvcmVhY2hhYmlsaXR5LnB5LCByb3V0ZXJzL2dlb2NvZGUucHksIHNlcnZpY2VzL21vdGlzLnB5LCBhZGRyZXNzX2luZGV4LnB5IgogICAgICAgICAgICAgICAgICAgICAgICBuZWFyYnkgPSBjb21wb25lbnQgIlppZWxlIGluIGRlciBOw6RoZSIgIlNjaHVsZSwgUGFyaywgSGFsdGVzdGVsbGUg4oCmIG5hY2ggRnXDn3dlZzsgSGFsdGVzdGVsbGVuIGF1cyBkZW0gRmFocnBsYW4sIFJlc3QgYXVzIGRlbSBQT0ktSW5kZXguIiAicm91dGVycy9uZWFyYnkucHksIHNlcnZpY2VzL25lYXJieS5weSwgcG9pX2luZGV4LnB5IgogICAgICAgICAgICAgICAgICAgICAgICBtYXBQcm94eSA9IGNvbXBvbmVudCAiS2FydGVuLVByb3h5IiAiUmFzdGVya2FjaGVsbiBkZXIgR2VvU04tV01TIHVuZCBkZXIgTMOkcm1rYXJ0ZTsgVmVrdG9yLUdydW5ka2FydGUgdW1nZXNjaHJpZWJlbiwgZGFtaXQgTWFwTGlicmUgbmllIHNlbGJzdCBpbnMgTmV0eiBnZWh0LiIgInJvdXRlcnMvdGlsZXMucHksIHJvdXRlcnMvYmFzZW1hcC5weSwgc2VydmljZXMvdGlsZXMucHksIHNlcnZpY2VzL2Jhc2VtYXAucHkiCiAgICAgICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgICAgIGdyb3VwICJLb250ZW4gdW5kIEJldHJpZWIiIHsKICAgICAgICAgICAgICAgICAgICAgICAgYXV0aCA9IGNvbXBvbmVudCAiQW5tZWxkdW5nIChCRkYpIiAiT0lEQyBtaXQgUEtDRSBhdWYgZGVyIFNlcnZlcnNlaXRlOyBkZXIgQnJvd3NlciBiZWtvbW10IG51ciBlaW4gc2lnbmllcnRlcyBIdHRwT25seS1Db29raWUuIiAicm91dGVycy9hdXRoLnB5LCBzZXJ2aWNlcy9vaWRjLnB5LCBzZXNzaW9uLnB5IgogICAgICAgICAgICAgICAgICAgICAgICBzdG9yYWdlID0gY29tcG9uZW50ICJLb250b3NwZWljaGVyIiAiRWluIERva3VtZW50IGplIEdydW5kc3TDvGNrOyAyMDAgR3J1bmRzdMO8Y2tlLCAyIE1pQiBqZSBEb2t1bWVudC4iICJyb3V0ZXJzL3N0b3JhZ2UucHksIHNlcnZpY2VzL3N0b3JhZ2UucHkiCiAgICAgICAgICAgICAgICAgICAgICAgIHNoYXJlcyA9IGNvbXBvbmVudCAiRnJlaWdhYmVuIiAiR2V0ZWlsdGUgTW9tZW50YXVmbmFobWUgcGVyIFRva2VuLCBvZzotS29wZiB1bmQgMTIwMMOXNjMwLVZvcnNjaGF1YmlsZC4iICJyb3V0ZXJzL3NoYXJlcy5weSwgc2VydmljZXMvcHJldmlldy5weSwgc2VydmljZXMvc2hhcmVtZXRhLnB5LCBQaWxsb3ciCiAgICAgICAgICAgICAgICAgICAgICAgIGFkbWluID0gY29tcG9uZW50ICJWZXJ3YWx0dW5nIiAiS2VubnphaGxlbiwgU3BlcnJlbiwgRmVobGVybG9nLCBGcmVpZ2FiZW4sIENhY2hlcywgUHLDvGZwcm90b2tvbGwsIEpvYmFuZnJhZ2VuLiIgInJvdXRlcnMvYWRtaW4ucHksIHNlcnZpY2VzL2FkbWluLnB5LCBqb2JzLnB5LCBwcmljZXMucHkiCiAgICAgICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgICAgIGdyb3VwICJRdWVyc2Nobml0dCIgewogICAgICAgICAgICAgICAgICAgICAgICB1cHN0cmVhbSA9IGNvbXBvbmVudCAiVXBzdHJlYW0gdW5kIENhY2hlIiAiRWluIE9ydCBmw7xyIGF1c2dlaGVuZGUgQW5mcmFnZW46IFRUTC1DYWNoZSBpbSBTcGVpY2hlciB1bmQgYXVmIFBsYXR0ZSwgRmVobGVyIGFscyBkZXV0c2NoZSBIVFRQLUFudHdvcnQuIExpZXN0IG5ldSBnZWJhdXRlIEluZGl6ZXMgdW5kIGRpZSBQcmVpc2xpc3RlIG9obmUgTmV1c3RhcnQuIiAidXBzdHJlYW0ucHksIGNhY2hlLnB5LCBlcnJvcnMucHksIHJlbG9hZGluZy5weSIKICAgICAgICAgICAgICAgICAgICAgICAgYnVkZ2V0ID0gY29tcG9uZW50ICJBbmZyYWdlYnVkZ2V0IHVuZCBUZWxlbWV0cmllIiAiR2xlaXRlbmRlcyBCdWRnZXQgamUgS29udG8gYnp3LiBBZHJlc3NlOyBaw6RobHVuZyBhbHMgU3R1bmRlbmFnZ3JlZ2F0ZSwgbmllIGplIEFuZnJhZ2UuIiAicmF0ZWxpbWl0LnB5LCB0ZWxlbWV0cnkucHkiCiAgICAgICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgfQoKICAgICAgICAgICAgICAgIGRiID0gY29udGFpbmVyICJEYXRlbmJhbmsiICJLb250ZW4sIEdydW5kc3TDvGNrZSwgRnJlaWdhYmVuLCBFaW5zdGVsbHVuZ2VuLCBBYndlaWNodW5nZW4sIFNwZXJyZW4sIE51dHp1bmdzYWdncmVnYXRlLCBGZWhsZXIsIFByw7xmcHJvdG9rb2xsLCBCZXRyaWVic2Fuc2FnZS4iICJQb3N0Z3JlU1FMIDE2IiAiRGF0ZW5iYW5rIgogICAgICAgICAgICAgICAgY2FjaGUgPSBjb250YWluZXIgIlBsYXR0ZW5jYWNoZSIgIkFudHdvcnRlbiBkZXIgw4RtdGVyLCBLYWNoZWxuLCBEb3dubG9hZHMuIFZlcmx1c3Qga29zdGV0IFplaXQsIG5pY2h0IFJpY2h0aWdrZWl0LiIgIkRvY2tlci1Wb2x1bWUiICJEYXRlaSIKICAgICAgICAgICAgICAgIGluZGV4ZXMgPSBjb250YWluZXIgIkxva2FsZSBJbmRpemVzIiAiUE9JLUluZGV4IChPU00pIHVuZCBhbXRsaWNoZSBIYXVza29vcmRpbmF0ZW47IG5ldSBnZWxlc2VuLCBzb2JhbGQgZGVyIFNjaGVkdWxlciBzaWUgbmV1IGdlYmF1dCBoYXQuIiAiU1FMaXRlL0RhdGVpZW4gaW0gVm9sdW1lIiAiRGF0ZWkiCiAgICAgICAgICAgICAgICBtb3RpcyA9IGNvbnRhaW5lciAiUm91dGVyIiAiTXVsdGltb2RhbGVzIFJvdXRpbmcsIEhhbHRlc3RlbGxlbiB1bmQgR2VvY29kZXIgYXVmIGRpZXNlbSBSZWNobmVyLiIgIk1PVElTIDIuMTEiICJGcmVtZHByb2R1a3QiCiAgICAgICAgICAgICAgICBzY2hlZHVsZXIgPSBjb250YWluZXIgIlNjaGVkdWxlciIgIldpZWRlcmtlaHJlbmRlIEpvYnMgYXVzIG9wcy9qb2JzLmpzb246IENhY2hlLVN3ZWVwLCBGcmVpZ2FiZW4tU3dlZXAsIEluZGl6ZXMsIFByZWlzbGlzdGUuIE5pbW10IOKAnkpldHp0IHN0YXJ0ZW7igJwgYWxzIERhdGVpIGVudGdlZ2VuLiIgIlB5dGhvbiwgc2NyaXB0cy9ydW5fam9icy5weSIgIlNlcnZlciIKICAgICAgICAgICAgICAgIGltcG9ydGVyID0gY29udGFpbmVyICJFaW5tYWwtSW1wb3J0ZSIgInJvdXRpbmctZGF0YSwgbW90aXMtaW1wb3J0LCBpbmRleGVzOiBSb2hkYXRlbiBsYWRlbiwgR3JhcGggYmF1ZW4sIEluZGl6ZXMgYW5sZWdlbi4iICJQeXRob24sIE1PVElTIGltcG9ydCIgIlNlcnZlcixFaW5tYWxpZyIKICAgICAgICAgICAgICAgIGlkcCA9IGNvbnRhaW5lciAiSWRlbnRpdMOkdHNhbmJpZXRlciIgIkFubWVsZHVuZyB1bmQgUmVnaXN0cmllcnVuZywgQmx1ZXByaW50IGF1cyBvcHMvYXV0aGVudGlrLiIgImF1dGhlbnRpayAyMDI1LjIiICJGcmVtZHByb2R1a3QiCiAgICAgICAgICAgICAgICBpZHBDYWNoZSA9IGNvbnRhaW5lciAiSWRQLUNhY2hlIiAiU2l0enVuZ2VuIHVuZCBBdWZnYWJlbndhcnRlc2NobGFuZ2Ugdm9uIGF1dGhlbnRpay4iICJSZWRpcyA3IiAiRnJlbWRwcm9kdWt0LERhdGVuYmFuayIKICAgICAgICAgICAgfQogICAgICAgIH0KCiAgICAgICAgIyAtLS0gcGVvcGxlIC0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLQogICAgICAgIGJ1eWVyIC0+IHcyYi5zcGEgIlN1Y2h0LCBwcsO8ZnQsIHBsYW50IiAiSFRUUFMiCiAgICAgICAgYnV5ZXIgLT4gdzJiLmJvb2ttYXJrbGV0ICJLbGlja3QgYXVmIGRlciBJbnNlcmF0c3NlaXRlIgogICAgICAgIGJ1eWVyIC0+IHBvcnRhbHMgIkxpZXN0IEluc2VyYXRlIiAiSFRUUFMiCiAgICAgICAgcmVjaXBpZW50IC0+IHcyYi5zcGEgIsOWZmZuZXQgL2dldGVpbHQv4oCmIiAiSFRUUFMiCiAgICAgICAgb3BlcmF0b3IgLT4gdzJiLnNwYSAiVmVyd2FsdGV0IHVudGVyIC92ZXJ3YWx0dW5nIiAiSFRUUFMiCiAgICAgICAgYnV5ZXIgLT4gdzJiLmlkcCAiTWVsZGV0IHNpY2ggYW4sIGxlZ3QgS29udG8gYW4iICJIVFRQUywgUG9ydCA5MDAwIgogICAgICAgIGxpbmtib3RzIC0+IHcyYi53ZWJzZXJ2ZXIgIkxpZXN0IG9nOi1UYWdzIHVuZCBWb3JzY2hhdWJpbGQiICJIVFRQUyIKCiAgICAgICAgIyAtLS0gYnJvd3NlciBzaWRlIC0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLQogICAgICAgIHcyYi5ib29rbWFya2xldCAtPiB3MmIuc3BhLmhhbmRvZmYgIsOcYmVyZ2lidCBkaWUgSW5zZXJhdHNzZWl0ZSIgInBvc3RNZXNzYWdlIgogICAgICAgIHcyYi5zcGEgLT4gdzJiLndlYnNlcnZlciAiTMOkZHQgQXBwLCBydWZ0IC9hcGkiICJIVFRQUywgSlNPTi9OREpTT04iCiAgICAgICAgdzJiLnNwYS52aWV3cyAtPiB3MmIuc3BhLnF1ZXJ5Qm94ICJCZXR0ZXQgZWluIgogICAgICAgIHcyYi5zcGEudmlld3MgLT4gdzJiLnNwYS5zaXRlUGxhbiAiQmV0dGV0IGVpbiIKICAgICAgICB3MmIuc3BhLnZpZXdzIC0+IHcyYi5zcGEucm91dGVzICJCZXR0ZXQgZWluIgogICAgICAgIHcyYi5zcGEudmlld3MgLT4gdzJiLnNwYS5hZG1pblZpZXdzICJMZWl0ZXQgdW50ZXIgL3ZlcndhbHR1bmcgd2VpdGVyIgogICAgICAgIHcyYi5zcGEucXVlcnlCb3ggLT4gdzJiLnNwYS5zZWFyY2hDbGllbnQgIlN0YXJ0ZXQgU3VjaGxhdWYiCiAgICAgICAgdzJiLnNwYS5oYW5kb2ZmIC0+IHcyYi5zcGEuc2VhcmNoQ2xpZW50ICJSZWljaHQgSW5zZXJhdCB3ZWl0ZXIiCiAgICAgICAgdzJiLnNwYS5zaXRlUGxhbiAtPiB3MmIuc3BhLm5laWdoYm91cmhvb2QgIlplaWNobmV0IE5hY2hiYXJzY2hhZnQiCiAgICAgICAgdzJiLnNwYS5zaXRlUGxhbiAtPiB3MmIuc3BhLmZpbmRpbmdzICJGb3JtdWxpZXJ0IEJlZnVuZGUiCiAgICAgICAgdzJiLnNwYS5uZWlnaGJvdXJob29kIC0+IHcyYi5zcGEuZmluZGluZ3MgIkZvcm11bGllcnQgQmVmdW5kZSIKICAgICAgICB3MmIuc3BhLnNlYXJjaENsaWVudCAtPiB3MmIuc3BhLnN0b3JlICJMZWd0IEdydW5kc3TDvGNrIGFuIgogICAgICAgIHcyYi5zcGEuc2l0ZVBsYW4gLT4gdzJiLnNwYS5zdG9yZSAiTGllc3QgdW5kIHNjaHJlaWJ0IFBsYXR6aWVydW5nIgogICAgICAgIHcyYi5zcGEucm91dGVzIC0+IHcyYi5zcGEuc3RvcmUgIkxpZXN0IFppZWxlIgogICAgICAgIHcyYi5zcGEuc3RvcmUgLT4gdzJiLnNwYS5hcGlDbGllbnQgIlN5bmNocm9uaXNpZXJ0IEtvbnRvIgogICAgICAgIHcyYi5zcGEuc2VhcmNoQ2xpZW50IC0+IHcyYi5zcGEuYXBpQ2xpZW50ICJSdWZ0IFN1Y2hlIHVuZCBBdXN3ZXJ0dW5nIgogICAgICAgIHcyYi5zcGEucXVlcnlCb3ggLT4gdzJiLnNwYS5hcGlDbGllbnQgIkZyYWd0IEdlb2NvZGVyIHVuZCBHZW1hcmt1bmdlbiIKICAgICAgICB3MmIuc3BhLnNpdGVQbGFuIC0+IHcyYi5zcGEuYXBpQ2xpZW50ICJMw6RkdCBGbHVyc3TDvGNrZSwgTmFjaGJhcm4sIEthY2hlbG4iCiAgICAgICAgdzJiLnNwYS5maW5kaW5ncyAtPiB3MmIuc3BhLmFwaUNsaWVudCAiTMOkZHQgQm9kZW5yaWNodHdlcnQsIFByw7xmdW5nZW4sIFBsYW51bmciCiAgICAgICAgdzJiLnNwYS5yb3V0ZXMgLT4gdzJiLnNwYS5hcGlDbGllbnQgIkzDpGR0IFdlZ2UgdW5kIFppZWxlIgogICAgICAgIHcyYi5zcGEuYWRtaW5WaWV3cyAtPiB3MmIuc3BhLmFwaUNsaWVudCAiUnVmdCAvYXBpL3ZlcndhbHR1bmciCiAgICAgICAgdzJiLnNwYS5hcGlDbGllbnQgLT4gdzJiLndlYnNlcnZlciAiUnVmdCAvYXBpIiAiSFRUUFMsIEpTT04vTkRKU09OIgoKICAgICAgICAjIC0tLSB3ZWIgc2VydmVyIC0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tCiAgICAgICAgdzJiLndlYnNlcnZlciAtPiB3MmIuYXBpICJMZWl0ZXQgL2FwaSB3ZWl0ZXIiICJIVFRQLCBYLUZvcndhcmRlZC1Gb3IiCiAgICAgICAgdzJiLndlYnNlcnZlciAtPiB3MmIuYXBpLnNoYXJlcyAiSG9sdCBvZzotS29wZiBmw7xyIC9nZXRlaWx0L+KApiIgIlNTSS1TdWJyZXF1ZXN0IgogICAgICAgIHcyYi53ZWJzZXJ2ZXIgLT4gdzJiLmFwaS5wYXJjZWxzICIvYXBpL3BhcmNlbHMvcmVzb2x2ZSwgbmVhcmJ5LCBzdHJlZXRzIiAiSFRUUCIKICAgICAgICB3MmIud2Vic2VydmVyIC0+IHcyYi5hcGkuc2VhcmNoRW5naW5lICIvYXBpL3BhcmNlbHMvc2VhcmNoIiAiSFRUUCwgTkRKU09OIgogICAgICAgIHcyYi53ZWJzZXJ2ZXIgLT4gdzJiLmFwaS5saXN0aW5ncyAiL2FwaS9saXN0aW5ncy9leHRyYWN0IiAiSFRUUCIKICAgICAgICB3MmIud2Vic2VydmVyIC0+IHcyYi5hcGkuaG91c2VUeXBlcyAiL2FwaS9ob3VzZXR5cGVzL2V4dHJhY3QiICJIVFRQIgogICAgICAgIHcyYi53ZWJzZXJ2ZXIgLT4gdzJiLmFwaS5sYW5kVmFsdWUgIi9hcGkvbGFuZHZhbHVlIiAiSFRUUCIKICAgICAgICB3MmIud2Vic2VydmVyIC0+IHcyYi5hcGkuc2l0ZUNoZWNrcyAiL2FwaS9zaXRlLWNoZWNrcyIgIkhUVFAiCiAgICAgICAgdzJiLndlYnNlcnZlciAtPiB3MmIuYXBpLnBsYW5uaW5nICIvYXBpL3BsYW5uaW5nIiAiSFRUUCIKICAgICAgICB3MmIud2Vic2VydmVyIC0+IHcyYi5hcGkubmVpZ2hib3VycyAiL2FwaS9uZWlnaGJvdXJzIiAiSFRUUCIKICAgICAgICB3MmIud2Vic2VydmVyIC0+IHcyYi5hcGkuZ2VtYXJrdW5nZW4gIi9hcGkvZ2VtYXJrdW5nZW4iICJIVFRQIgogICAgICAgIHcyYi53ZWJzZXJ2ZXIgLT4gdzJiLmFwaS5yb3V0aW5nICIvYXBpL3JlYWNoYWJpbGl0eSwgL2FwaS9nZW9jb2RlIiAiSFRUUCIKICAgICAgICB3MmIud2Vic2VydmVyIC0+IHcyYi5hcGkubmVhcmJ5ICIvYXBpL25lYXJieSIgIkhUVFAiCiAgICAgICAgdzJiLndlYnNlcnZlciAtPiB3MmIuYXBpLm1hcFByb3h5ICIvYXBpL3RpbGVzLCAvYXBpL2Jhc2VtYXAiICJIVFRQIgogICAgICAgIHcyYi53ZWJzZXJ2ZXIgLT4gdzJiLmFwaS5hdXRoICIvYXBpL2F1dGgiICJIVFRQIgogICAgICAgIHcyYi53ZWJzZXJ2ZXIgLT4gdzJiLmFwaS5zdG9yYWdlICIvYXBpL3Bsb3RzLCAvYXBpL3NldHRpbmdzLCAvYXBpL2FjY291bnQiICJIVFRQIgogICAgICAgIHcyYi53ZWJzZXJ2ZXIgLT4gdzJiLmFwaS5hZG1pbiAiL2FwaS92ZXJ3YWx0dW5nIiAiSFRUUCIKICAgICAgICB3MmIud2Vic2VydmVyIC0+IHcyYi5hcGkubGVocmJ1Y2ggIi9hcGkvbGVocmJ1Y2giICJIVFRQIgoKICAgICAgICAjIC0tLSBpbnNpZGUgdGhlIEFQSSAtLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tCiAgICAgICAgdzJiLmFwaS5zZWFyY2hFbmdpbmUgLT4gdzJiLmFwaS5wYXJjZWxzICJGcmFndCBBTEtJUyBpbiBlbmdlbiBGcmFnZW4iCiAgICAgICAgdzJiLmFwaS5zZWFyY2hFbmdpbmUgLT4gdzJiLmFwaS5yb3V0aW5nICJWZXJvcnRldCBTdHJhw59lbiB1bmQgT3J0ZSIKICAgICAgICB3MmIuYXBpLmxpc3RpbmdzIC0+IHcyYi5hcGkubGxtQ2xpZW50ICJMw6Rzc3QgZGFzIE1vZGVsbCBhbHMgbGV0enRlbiBMZXNlciBsZXNlbiIKICAgICAgICB3MmIuYXBpLmxpc3RpbmdzIC0+IHcyYi5hcGkubGVocmJ1Y2ggIlNjaHJlaWJ0IEFid2VpY2h1bmdlbiIKICAgICAgICB3MmIuYXBpLmhvdXNlVHlwZXMgLT4gdzJiLmFwaS5sbG1DbGllbnQgIkV4dHJhaGllcnQgVHlwZW5oYXVzIgogICAgICAgIHcyYi5hcGkubmVhcmJ5IC0+IHcyYi5hcGkucm91dGluZyAiSGFsdGVzdGVsbGVuIHVuZCBMaW5pZW4iCiAgICAgICAgdzJiLmFwaS5uZWlnaGJvdXJzIC0+IHcyYi5hcGkucGFyY2VscyAiR2Viw6R1ZGUgYXVzIEFMS0lTIgogICAgICAgIHcyYi5hcGkucGFyY2VscyAtPiB3MmIuYXBpLnVwc3RyZWFtICJBbmZyYWdlbiBtaXQgQ2FjaGUiCiAgICAgICAgdzJiLmFwaS5sYW5kVmFsdWUgLT4gdzJiLmFwaS51cHN0cmVhbSAiQW5mcmFnZW4gbWl0IENhY2hlIgogICAgICAgIHcyYi5hcGkuc2l0ZUNoZWNrcyAtPiB3MmIuYXBpLnVwc3RyZWFtICJBbmZyYWdlbiBtaXQgQ2FjaGUiCiAgICAgICAgdzJiLmFwaS5tYXBQcm94eSAtPiB3MmIuYXBpLnVwc3RyZWFtICJLYWNoZWxuIG1pdCBDYWNoZSIKICAgICAgICB3MmIuYXBpLmF1dGggLT4gdzJiLmFwaS5idWRnZXQgIkxpZWZlcnQgS29udG8gZsO8ciBkYXMgQnVkZ2V0IgogICAgICAgIHcyYi5hcGkuc3RvcmFnZSAtPiB3MmIuYXBpLmF1dGggIlByw7xmdCBTaXR6dW5nIgogICAgICAgIHcyYi5hcGkuc2hhcmVzIC0+IHcyYi5hcGkuc3RvcmFnZSAiTGllc3QgR3J1bmRzdMO8Y2siCiAgICAgICAgdzJiLmFwaS5hZG1pbiAtPiB3MmIuYXBpLmF1dGggIlByw7xmdCBBZG1pbmlzdHJhdG9yIgoKICAgICAgICAjIC0tLSBBUEkgdG8gZGF0YSBhbmQgc2VydmljZXMgaW4gdGhlIHN0YWNrIC0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0KICAgICAgICB3MmIuYXBpLnN0b3JhZ2UgLT4gdzJiLmRiICJMaWVzdCB1bmQgc2NocmVpYnQgR3J1bmRzdMO8Y2tlIiAiU1FMIgogICAgICAgIHcyYi5hcGkuc2hhcmVzIC0+IHcyYi5kYiAiTGllc3QgdW5kIHNjaHJlaWJ0IEZyZWlnYWJlbiIgIlNRTCIKICAgICAgICB3MmIuYXBpLmFkbWluIC0+IHcyYi5kYiAiS2VubnphaGxlbiwgU3BlcnJlbiwgUHLDvGZwcm90b2tvbGwiICJTUUwiCiAgICAgICAgdzJiLmFwaS5sZWhyYnVjaCAtPiB3MmIuZGIgIlNjaHJlaWJ0IEFid2VpY2h1bmdlbiIgIlNRTCIKICAgICAgICB3MmIuYXBpLmJ1ZGdldCAtPiB3MmIuZGIgIlNjaHJlaWJ0IFN0dW5kZW5hZ2dyZWdhdGUiICJTUUwiCiAgICAgICAgdzJiLmFwaS51cHN0cmVhbSAtPiB3MmIuY2FjaGUgIkxpZXN0IHVuZCBzY2hyZWlidCBBbnR3b3J0ZW4iICJEYXRlaXN5c3RlbSIKICAgICAgICB3MmIuYXBpLmFkbWluIC0+IHcyYi5jYWNoZSAiTGVlcnQgQ2FjaGVzIiAiRGF0ZWlzeXN0ZW0iCiAgICAgICAgdzJiLmFwaS5hZG1pbiAtPiB3MmIuc2NoZWR1bGVyICJMZWd0IEpvYmFuZnJhZ2UgYWIiICJEYXRlaSBpbSBTdGF0ZS1Wb2x1bWUiCiAgICAgICAgdzJiLmFwaS5yb3V0aW5nIC0+IHcyYi5pbmRleGVzICJMaWVzdCBIYXVza29vcmRpbmF0ZW4iICJEYXRlaSIKICAgICAgICB3MmIuYXBpLm5lYXJieSAtPiB3MmIuaW5kZXhlcyAiTGllc3QgUE9JLUluZGV4IiAiRGF0ZWkiCiAgICAgICAgdzJiLmFwaS5yb3V0aW5nIC0+IHcyYi5tb3RpcyAiUm91dGVuIHVuZCBHZW9jb2RpbmciICJIVFRQLCBKU09OIgogICAgICAgIHcyYi5hcGkuYXV0aCAtPiB3MmIuaWRwICJBdXRob3JpemF0aW9uIENvZGUgKyBQS0NFLCBUb2tlbi1UYXVzY2giICJPSURDIgogICAgICAgIHcyYi5pZHAgLT4gdzJiLmRiICJFaWdlbmUgRGF0ZW5iYW5rIOKAnmF1dGhlbnRpa+KAnCIgIlNRTCIKICAgICAgICB3MmIuaWRwIC0+IHcyYi5pZHBDYWNoZSAiU2l0enVuZ2VuLCBBdWZnYWJlbiIgIlJlZGlzIgogICAgICAgIHcyYi5zY2hlZHVsZXIgLT4gdzJiLmNhY2hlICJTd2VlcCIgIkRhdGVpc3lzdGVtIgogICAgICAgIHcyYi5zY2hlZHVsZXIgLT4gdzJiLmluZGV4ZXMgIkJhdXQgSW5kaXplcyBuZXUiICJEYXRlaSIKICAgICAgICB3MmIuc2NoZWR1bGVyIC0+IHcyYi5kYiAiUsOkdW10IGFiZ2VsYXVmZW5lIEZyZWlnYWJlbiIgIlNRTCIKICAgICAgICB3MmIuaW1wb3J0ZXIgLT4gdzJiLmluZGV4ZXMgIkxlZ3QgSW5kaXplcyBhbiIgIkRhdGVpIgogICAgICAgIHcyYi5pbXBvcnRlciAtPiB3MmIubW90aXMgIkJhdXQgZGVuIFJvdXRpbmctR3JhcGhlbiIgIlZvbHVtZSBtb3Rpcy1ncmFwaCIKCiAgICAgICAgIyAtLS0gQVBJIHRvIHRoZSBvdXRzaWRlIHdvcmxkIC0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tCiAgICAgICAgdzJiLmFwaS5wYXJjZWxzIC0+IGdlb3NuICJGbHVyc3TDvGNrZSBwZXIgUHVua3QsIEtlbm56ZWljaGVuLCBHZW1hcmt1bmciICJXRlMgMi4wLCBHTUwiCiAgICAgICAgdzJiLmFwaS5uZWlnaGJvdXJzIC0+IG92ZXJwYXNzICJHZWLDpHVkZSBhbHMgRXJzYXR6IiAiT3ZlcnBhc3MgUUwiCiAgICAgICAgdzJiLmFwaS5sYW5kVmFsdWUgLT4gYm9yaXMgIkdldEZlYXR1cmVJbmZvIiAiV01TIgogICAgICAgIHcyYi5hcGkuc2l0ZUNoZWNrcyAtPiBsdWlzICJMw6RybSwgV2Fzc2VyLCBOYXR1ciwgQm9kZW4sIFJhZG9uIiAiQXJjR0lTIFJFU1QiCiAgICAgICAgdzJiLmFwaS5zaXRlQ2hlY2tzIC0+IHViYSAiTHVmdHF1YWxpdMOkdCIgIlJFU1QsIEpTT04iCiAgICAgICAgdzJiLmFwaS5wbGFubmluZyAtPiByYXBpcyAiQmF1bGVpdHBsYW51bmciICJBcmNHSVMgUkVTVCIKICAgICAgICB3MmIuYXBpLm1hcFByb3h5IC0+IGdlb3NuICJMdWZ0YmlsZCwgV2ViQXRsYXMsIExpZWdlbnNjaGFmdHNrYXJ0ZSIgIldNUyIKICAgICAgICB3MmIuYXBpLm1hcFByb3h5IC0+IGx1aXMgIkzDpHJta2FydGUiICJBcmNHSVMgZXhwb3J0IgogICAgICAgIHcyYi5hcGkubWFwUHJveHkgLT4gb3BlbmZyZWVtYXAgIlN0eWxlLCBWZWt0b3JrYWNoZWxuLCBHbHlwaGVuIiAiSFRUUFMiCiAgICAgICAgdzJiLmFwaS5saXN0aW5ncyAtPiBwb3J0YWxzICJMw6RkdCBJbnNlcmF0c3NlaXRlIiAiSFRUUFMiCiAgICAgICAgdzJiLmFwaS5ob3VzZVR5cGVzIC0+IG1hbnVmYWN0dXJlcnMgIkzDpGR0IFR5cGVuaGF1c3NlaXRlIiAiSFRUUFMiCiAgICAgICAgdzJiLmFwaS5sbG1DbGllbnQgLT4gbGxtICJTdHJ1a3R1cmllcnRlIEV4dHJha3Rpb24iICJIVFRQUywgSlNPTiIKICAgICAgICB3MmIuYXBpLnJvdXRpbmcgLT4gdHJhbnNpdG91cyAiUm91dGVuLCB3ZW5uIGtlaW4gZWlnZW5lciBSb3V0ZXIgbMOkdWZ0IiAiSFRUUCwgSlNPTiIKICAgICAgICB3MmIuc2NoZWR1bGVyIC0+IGdlb3NuICJIYXVza29vcmRpbmF0ZW4gKHZpZXJ0ZWxqw6RocmxpY2gpIiAiSFRUUFMiCiAgICAgICAgdzJiLnNjaGVkdWxlciAtPiBnZW9mYWJyaWsgIk9TTS1FeHRyYWt0IGbDvHIgZGVuIFBPSS1JbmRleCIgIkhUVFBTIgogICAgICAgIHcyYi5zY2hlZHVsZXIgLT4gbGxtICJNb2RlbGxwcmVpc2UiICJIVFRQUyIKICAgICAgICB3MmIuc2NoZWR1bGVyIC0+IGVjYiAiUmVmZXJlbnprdXJzIiAiSFRUUFMsIFhNTCIKICAgICAgICB3MmIuaW1wb3J0ZXIgLT4gZ2VvZmFicmlrICJPU00tRXh0cmFrdCBTYWNoc2VuIiAiSFRUUFMiCiAgICAgICAgdzJiLmltcG9ydGVyIC0+IGd0ZnMgIkZhaHJwbGFuIiAiSFRUUFMsIEdURlMiCiAgICAgICAgdzJiLmltcG9ydGVyIC0+IGdlb3NuICJIYXVza29vcmRpbmF0ZW4iICJIVFRQUyIKCiAgICAgICAgIyAtLS0gZGVwbG95bWVudCAtLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLQogICAgICAgIGxvY2FsID0gZGVwbG95bWVudEVudmlyb25tZW50ICJMb2thbGVyIFN0YXBlbCIgewogICAgICAgICAgICBkZXBsb3ltZW50Tm9kZSAiRW5kZ2Vyw6R0IiAiUmVjaG5lciBvZGVyIFRlbGVmb24gZGVyIE51dHplcjppbiIgIiIgewogICAgICAgICAgICAgICAgZGVwbG95bWVudE5vZGUgIkJyb3dzZXIiICIiICJDaHJvbWl1bSwgRmlyZWZveCwgU2FmYXJpIiB7CiAgICAgICAgICAgICAgICAgICAgY29udGFpbmVySW5zdGFuY2UgdzJiLnNwYQogICAgICAgICAgICAgICAgICAgIGNvbnRhaW5lckluc3RhbmNlIHcyYi5ib29rbWFya2xldAogICAgICAgICAgICAgICAgfQogICAgICAgICAgICB9CiAgICAgICAgICAgIGRlcGxveW1lbnROb2RlICJEb2NrZXItSG9zdCIgIkVpbiBSZWNobmVyIG1pdCBkb2NrZXIgY29tcG9zZTsgUHJvamVrdG5hbWUgd2hlcmUyYnVpbGQiICJEb2NrZXIgQ29tcG9zZSIgewogICAgICAgICAgICAgICAgZGVwbG95bWVudE5vZGUgImZyb250ZW5kIiAiUG9ydCA4MDgwIOKGkiA4MCIgIm5naW54OmFscGluZSIgewogICAgICAgICAgICAgICAgICAgIGNvbnRhaW5lckluc3RhbmNlIHcyYi53ZWJzZXJ2ZXIKICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgIGRlcGxveW1lbnROb2RlICJiYWNrZW5kIiAiSGVhbHRoY2hlY2sgL2FwaS9oZWFsdGgiICJweXRob246c2xpbSIgewogICAgICAgICAgICAgICAgICAgIGNvbnRhaW5lckluc3RhbmNlIHcyYi5hcGkKICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgIGRlcGxveW1lbnROb2RlICJzY2hlZHVsZXIiICIiICJweXRob246c2xpbSIgewogICAgICAgICAgICAgICAgICAgIGNvbnRhaW5lckluc3RhbmNlIHcyYi5zY2hlZHVsZXIKICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgIGRlcGxveW1lbnROb2RlICJyb3V0aW5nLWRhdGEsIG1vdGlzLWltcG9ydCwgaW5kZXhlcyIgIkxhdWZlbiBlaW5tYWwgdW5kIGJlZW5kZW4gc2ljaCIgInB5dGhvbjpzbGltLCBtb3RpcyIgewogICAgICAgICAgICAgICAgICAgIGNvbnRhaW5lckluc3RhbmNlIHcyYi5pbXBvcnRlcgogICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgZGVwbG95bWVudE5vZGUgIm1vdGlzIiAiRXJzdGVyIEltcG9ydCB+NyBtaW4sIDUsNiBHaUIgU3BpdHplIiAiZ2hjci5pby9tb3Rpcy1wcm9qZWN0L21vdGlzOjIuMTEuMiIgewogICAgICAgICAgICAgICAgICAgIGNvbnRhaW5lckluc3RhbmNlIHcyYi5tb3RpcwogICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgZGVwbG95bWVudE5vZGUgImRiLCBhdXRoZW50aWstZGItaW5pdCIgImF1dGhlbnRpay1kYi1pbml0IGxlZ3QgZWlubWFsIGRpZSBEYXRlbmJhbmsg4oCeYXV0aGVudGlr4oCcIGFuIiAicG9zdGdyZXM6MTYtYWxwaW5lIiB7CiAgICAgICAgICAgICAgICAgICAgY29udGFpbmVySW5zdGFuY2UgdzJiLmRiCiAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgICAgICBkZXBsb3ltZW50Tm9kZSAiYXV0aGVudGlrLCBhdXRoZW50aWstd29ya2VyIiAiUG9ydCA5MDAwIiAiZ2hjci5pby9nb2F1dGhlbnRpay9zZXJ2ZXI6MjAyNS4yLjMiIHsKICAgICAgICAgICAgICAgICAgICBjb250YWluZXJJbnN0YW5jZSB3MmIuaWRwCiAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgICAgICBkZXBsb3ltZW50Tm9kZSAiYXV0aGVudGlrLWNhY2hlIiAiIiAicmVkaXM6Ny1hbHBpbmUiIHsKICAgICAgICAgICAgICAgICAgICBjb250YWluZXJJbnN0YW5jZSB3MmIuaWRwQ2FjaGUKICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgIGRlcGxveW1lbnROb2RlICJWb2x1bWVzIiAiYmFja2VuZC1jYWNoZSwgaW5kZXhlcywgc2NoZWR1bGVyLXN0YXRlLCBtb3Rpcy1ncmFwaCwgcm91dGluZy1pbnB1dCwgZGItZGF0YSIgIkRvY2tlci1Wb2x1bWVzIiB7CiAgICAgICAgICAgICAgICAgICAgY29udGFpbmVySW5zdGFuY2UgdzJiLmNhY2hlCiAgICAgICAgICAgICAgICAgICAgY29udGFpbmVySW5zdGFuY2UgdzJiLmluZGV4ZXMKICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgfQogICAgICAgICAgICBkZXBsb3ltZW50Tm9kZSAiSW50ZXJuZXQiICIiICIiIHsKICAgICAgICAgICAgICAgIHNvZnR3YXJlU3lzdGVtSW5zdGFuY2UgZ2Vvc24KICAgICAgICAgICAgICAgIHNvZnR3YXJlU3lzdGVtSW5zdGFuY2UgYm9yaXMKICAgICAgICAgICAgICAgIHNvZnR3YXJlU3lzdGVtSW5zdGFuY2UgbHVpcwogICAgICAgICAgICAgICAgc29mdHdhcmVTeXN0ZW1JbnN0YW5jZSByYXBpcwogICAgICAgICAgICAgICAgc29mdHdhcmVTeXN0ZW1JbnN0YW5jZSB1YmEKICAgICAgICAgICAgICAgIHNvZnR3YXJlU3lzdGVtSW5zdGFuY2Ugb3BlbmZyZWVtYXAKICAgICAgICAgICAgICAgIHNvZnR3YXJlU3lzdGVtSW5zdGFuY2UgbGxtCiAgICAgICAgICAgICAgICBzb2Z0d2FyZVN5c3RlbUluc3RhbmNlIHBvcnRhbHMKICAgICAgICAgICAgfQogICAgICAgIH0KICAgIH0KCiAgICB2aWV3cyB7CiAgICAgICAgc3lzdGVtQ29udGV4dCB3MmIgIktvbnRleHQiICJXZXIgd2hlcmUyYnVpbGQgYmVudXR6dCB1bmQgd2VsY2hlIERpZW5zdGUgZXMgZnJhZ3QuIiB7CiAgICAgICAgICAgIGluY2x1ZGUgKgogICAgICAgICAgICBleGNsdWRlIGdlb2ZhYnJpayBndGZzIGVjYgogICAgICAgICAgICBhdXRvTGF5b3V0IGxyCiAgICAgICAgfQoKICAgICAgICBjb250YWluZXIgdzJiICJDb250YWluZXIiICJXYXMgaW0gQnJvd3NlciBsw6R1ZnQsIHdhcyBpbSBTdGFwZWwgbMOkdWZ0LCB1bmQgZGllIERpZW5zdGUgZGFoaW50ZXIuIiB7CiAgICAgICAgICAgIGluY2x1ZGUgKgogICAgICAgICAgICBleGNsdWRlIGJ1eWVyLT5wb3J0YWxzCiAgICAgICAgICAgIGF1dG9MYXlvdXQgbHIKICAgICAgICB9CgogICAgICAgIGNvbXBvbmVudCB3MmIuYXBpICJCYWNrZW5kIiAiRGllIEJhdXN0ZWluZSBkZXMgQVBJLUJhY2tlbmRzLCBuYWNoIEF1ZmdhYmVuIGdydXBwaWVydC4iIHsKICAgICAgICAgICAgaW5jbHVkZSAqCiAgICAgICAgICAgIGV4Y2x1ZGUgdzJiLndlYnNlcnZlci0+dzJiLmFwaS5zaGFyZXMKICAgICAgICAgICAgIyBXaGF0IHRoZSBzaWJsaW5ncyBzYXkgdG8gZWFjaCBvdGhlciBiZWxvbmdzIHRvIHRoZSBjb250YWluZXIgdmlldy4KICAgICAgICAgICAgZXhjbHVkZSAidzJiLmlkcCAtPiAqIiAidzJiLnNjaGVkdWxlciAtPiAqIiAidzJiLmltcG9ydGVyIC0+ICoiCiAgICAgICAgICAgIGF1dG9MYXlvdXQgbHIKICAgICAgICB9CgogICAgICAgIGNvbXBvbmVudCB3MmIuc3BhICJXZWJBcHAiICJEaWUgQmF1c3RlaW5lIGRlciBXZWItQXBwLCBuYWNoIEF1ZmdhYmVuIGdydXBwaWVydC4iIHsKICAgICAgICAgICAgaW5jbHVkZSAqCiAgICAgICAgICAgIGF1dG9MYXlvdXQgbHIKICAgICAgICB9CgogICAgICAgIGR5bmFtaWMgdzJiICJJbnNlcmF0WnVGbHVyc3R1ZWNrIiAiRWluIEluc2VyYXQgd2lyZCDDvGJlcmdlYmVuLCBnZWxlc2VuIHVuZCB6dW0gYW10bGljaGVuIEZsdXJzdMO8Y2sgYXVmZ2Vsw7ZzdC4iIHsKICAgICAgICAgICAgYnV5ZXIgLT4gdzJiLmJvb2ttYXJrbGV0ICJLbGlja3QgYXVmIGRlciBJbnNlcmF0c3NlaXRlIgogICAgICAgICAgICB3MmIuYm9va21hcmtsZXQgLT4gdzJiLnNwYSAiw5xiZXJnaWJ0IGRvY3VtZW50Lm91dGVySFRNTCBwZXIgcG9zdE1lc3NhZ2UiCiAgICAgICAgICAgIHcyYi5zcGEgLT4gdzJiLndlYnNlcnZlciAiUE9TVCAvYXBpL2xpc3RpbmdzL2V4dHJhY3QiCiAgICAgICAgICAgIHcyYi53ZWJzZXJ2ZXIgLT4gdzJiLmFwaSAiTGVpdGV0IHdlaXRlciIKICAgICAgICAgICAgdzJiLmFwaSAtPiBsbG0gIkxpZXN0LCB3YXMgZGllIE11c3RlciBuaWNodCBmYW5kZW4gKG9wdGlvbmFsKSIKICAgICAgICAgICAgdzJiLnNwYSAtPiB3MmIud2Vic2VydmVyICJQT1NUIC9hcGkvcGFyY2Vscy9zZWFyY2giCiAgICAgICAgICAgIHcyYi53ZWJzZXJ2ZXIgLT4gdzJiLmFwaSAiTGVpdGV0IHdlaXRlciwgTkRKU09OLVN0cm9tIHp1csO8Y2siCiAgICAgICAgICAgIHcyYi5hcGkgLT4gZ2Vvc24gIkZsdXJzdMO8Y2tlIHBlciBHZW1hcmt1bmcgdW5kIE51bW1lciwgc29uc3QgRmzDpGNoZW50cmVwcGUiCiAgICAgICAgICAgIHcyYi5hcGkgLT4gdzJiLm1vdGlzICJWZXJvcnRldCBTdHJhw59lIG9kZXIgT3J0IgogICAgICAgICAgICB3MmIuc3BhIC0+IHcyYi53ZWJzZXJ2ZXIgIkdFVCAvYXBpL2xhbmR2YWx1ZSwgUE9TVCAvYXBpL3NpdGUtY2hlY2tzIgogICAgICAgICAgICB3MmIud2Vic2VydmVyIC0+IHcyYi5hcGkgIkxlaXRldCB3ZWl0ZXIiCiAgICAgICAgICAgIHcyYi5hcGkgLT4gYm9yaXMgIkJvZGVucmljaHR3ZXJ0IgogICAgICAgICAgICBhdXRvTGF5b3V0IGxyCiAgICAgICAgfQoKICAgICAgICBkZXBsb3ltZW50IHcyYiBsb2NhbCAiVmVydGVpbHVuZyIgImRvY2tlciBjb21wb3NlIGF1ZiBlaW5lbSBSZWNobmVyOiB3ZWxjaGVyIERpZW5zdCBpbiB3ZWxjaGVtIENvbnRhaW5lciBsw6R1ZnQuIiB7CiAgICAgICAgICAgIGluY2x1ZGUgKgogICAgICAgICAgICBhdXRvTGF5b3V0IGxyCiAgICAgICAgfQoKICAgICAgICBzdHlsZXMgewogICAgICAgICAgICAjIFRoZSBwYWxldHRlIG9mIGZyb250ZW5kL3NyYy9zdHlsZXMvdG9rZW5zLmNzczogTG9kZW4gZm9yIHdoYXQgaXMKICAgICAgICAgICAgIyBvdXJzLCBkYXJrZXIgdGhlIGhpZ2hlciB0aGUgbGV2ZWw7IG9jaHJlIGZvciB0aGUgYXV0aG9yaXRpZXMuCiAgICAgICAgICAgIGVsZW1lbnQgIkVsZW1lbnQiIHsKICAgICAgICAgICAgICAgIGNvbG9yICNmZmZmZmYKICAgICAgICAgICAgICAgIGZvbnRTaXplIDIyCiAgICAgICAgICAgIH0KICAgICAgICAgICAgZWxlbWVudCAiUGVyc29uIiB7CiAgICAgICAgICAgICAgICBzaGFwZSBQZXJzb24KICAgICAgICAgICAgICAgIGJhY2tncm91bmQgIzFjMmUyMwogICAgICAgICAgICB9CiAgICAgICAgICAgIGVsZW1lbnQgIlNvZnR3YXJlIFN5c3RlbSIgewogICAgICAgICAgICAgICAgYmFja2dyb3VuZCAjMmY0YTNhCiAgICAgICAgICAgIH0KICAgICAgICAgICAgZWxlbWVudCAiQ29udGFpbmVyIiB7CiAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kICM0NTZiNTIKICAgICAgICAgICAgfQogICAgICAgICAgICBlbGVtZW50ICJDb21wb25lbnQiIHsKICAgICAgICAgICAgICAgIGJhY2tncm91bmQgIzlkYjM5YQogICAgICAgICAgICAgICAgY29sb3IgIzFlMWExNgogICAgICAgICAgICB9CiAgICAgICAgICAgIGVsZW1lbnQgIkV4dGVybiIgewogICAgICAgICAgICAgICAgYmFja2dyb3VuZCAjNmY2NzVjCiAgICAgICAgICAgIH0KICAgICAgICAgICAgZWxlbWVudCAiQW10bGljaCIgewogICAgICAgICAgICAgICAgYmFja2dyb3VuZCAjN2M1NjIwCiAgICAgICAgICAgIH0KICAgICAgICAgICAgZWxlbWVudCAiT3B0aW9uYWwiIHsKICAgICAgICAgICAgICAgIGJvcmRlciBkYXNoZWQKICAgICAgICAgICAgfQogICAgICAgICAgICBlbGVtZW50ICJCcm93c2VyIiB7CiAgICAgICAgICAgICAgICBzaGFwZSBXZWJCcm93c2VyCiAgICAgICAgICAgIH0KICAgICAgICAgICAgZWxlbWVudCAiRGF0ZW5iYW5rIiB7CiAgICAgICAgICAgICAgICBzaGFwZSBDeWxpbmRlcgogICAgICAgICAgICB9CiAgICAgICAgICAgIGVsZW1lbnQgIkRhdGVpIiB7CiAgICAgICAgICAgICAgICBzaGFwZSBGb2xkZXIKICAgICAgICAgICAgfQogICAgICAgICAgICBlbGVtZW50ICJGcmVtZHByb2R1a3QiIHsKICAgICAgICAgICAgICAgIGJhY2tncm91bmQgIzVjNmY2MgogICAgICAgICAgICB9CiAgICAgICAgICAgIGVsZW1lbnQgIkVpbm1hbGlnIiB7CiAgICAgICAgICAgICAgICBib3JkZXIgZGFzaGVkCiAgICAgICAgICAgIH0KICAgICAgICAgICAgcmVsYXRpb25zaGlwICJSZWxhdGlvbnNoaXAiIHsKICAgICAgICAgICAgICAgIGNvbG9yICM2ZjY3NWMKICAgICAgICAgICAgfQogICAgICAgIH0KICAgIH0KfQ=="
+  },
+  "views" : {
+    "componentViews" : [ {
+      "automaticLayout" : {
+        "edgeSeparation" : 50,
+        "nodeSeparation" : 50,
+        "rankDirection" : "LeftRight",
+        "rankSeparation" : 100,
+        "vertices" : true
+      },
+      "containerId" : "34",
+      "description" : "Die Bausteine des API-Backends, nach Aufgaben gruppiert.",
+      "elements" : [ {
+        "id" : "4",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "5",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "6",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "7",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "8",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "9",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "10",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "11",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "15",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "16",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "17",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "33",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "35",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "36",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "37",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "38",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "39",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "40",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "41",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "42",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "43",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "44",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "45",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "46",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "47",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "48",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "49",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "50",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "51",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "52",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "53",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "54",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "55",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "56",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "57",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "58",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "59",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "61",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "externalContainerBoundariesVisible" : false,
+      "key" : "Backend",
+      "name" : "Component View: where2build - API-Backend",
+      "order" : 3,
+      "relationships" : [ {
+        "id" : "100"
+      }, {
+        "id" : "101"
+      }, {
+        "id" : "102"
+      }, {
+        "id" : "103"
+      }, {
+        "id" : "104"
+      }, {
+        "id" : "105"
+      }, {
+        "id" : "106"
+      }, {
+        "id" : "107"
+      }, {
+        "id" : "108"
+      }, {
+        "id" : "109"
+      }, {
+        "id" : "110"
+      }, {
+        "id" : "111"
+      }, {
+        "id" : "112"
+      }, {
+        "id" : "113"
+      }, {
+        "id" : "114"
+      }, {
+        "id" : "115"
+      }, {
+        "id" : "116"
+      }, {
+        "id" : "117"
+      }, {
+        "id" : "118"
+      }, {
+        "id" : "119"
+      }, {
+        "id" : "120"
+      }, {
+        "id" : "121"
+      }, {
+        "id" : "122"
+      }, {
+        "id" : "123"
+      }, {
+        "id" : "124"
+      }, {
+        "id" : "125"
+      }, {
+        "id" : "126"
+      }, {
+        "id" : "127"
+      }, {
+        "id" : "128"
+      }, {
+        "id" : "129"
+      }, {
+        "id" : "130"
+      }, {
+        "id" : "132"
+      }, {
+        "id" : "133"
+      }, {
+        "id" : "134"
+      }, {
+        "id" : "135"
+      }, {
+        "id" : "136"
+      }, {
+        "id" : "138"
+      }, {
+        "id" : "139"
+      }, {
+        "id" : "141"
+      }, {
+        "id" : "143"
+      }, {
+        "id" : "144"
+      }, {
+        "id" : "146"
+      }, {
+        "id" : "155"
+      }, {
+        "id" : "158"
+      }, {
+        "id" : "161"
+      }, {
+        "id" : "164"
+      }, {
+        "id" : "167"
+      }, {
+        "id" : "170"
+      }, {
+        "id" : "173"
+      }, {
+        "id" : "174"
+      }, {
+        "id" : "175"
+      }, {
+        "id" : "178"
+      }, {
+        "id" : "181"
+      }, {
+        "id" : "184"
+      }, {
+        "id" : "187"
+      }, {
+        "id" : "99"
+      } ]
+    }, {
+      "automaticLayout" : {
+        "edgeSeparation" : 50,
+        "nodeSeparation" : 50,
+        "rankDirection" : "LeftRight",
+        "rankSeparation" : 100,
+        "vertices" : true
+      },
+      "containerId" : "20",
+      "description" : "Die Bausteine der Web-App, nach Aufgaben gruppiert.",
+      "elements" : [ {
+        "id" : "21",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "22",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "23",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "24",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "25",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "26",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "27",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "28",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "29",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "30",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "31",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "32",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "33",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "externalContainerBoundariesVisible" : false,
+      "key" : "WebApp",
+      "name" : "Component View: where2build - Web-App",
+      "order" : 4,
+      "relationships" : [ {
+        "id" : "74"
+      }, {
+        "id" : "77"
+      }, {
+        "id" : "78"
+      }, {
+        "id" : "79"
+      }, {
+        "id" : "80"
+      }, {
+        "id" : "81"
+      }, {
+        "id" : "82"
+      }, {
+        "id" : "83"
+      }, {
+        "id" : "84"
+      }, {
+        "id" : "85"
+      }, {
+        "id" : "86"
+      }, {
+        "id" : "87"
+      }, {
+        "id" : "88"
+      }, {
+        "id" : "89"
+      }, {
+        "id" : "90"
+      }, {
+        "id" : "91"
+      }, {
+        "id" : "92"
+      }, {
+        "id" : "93"
+      }, {
+        "id" : "94"
+      }, {
+        "id" : "95"
+      }, {
+        "id" : "96"
+      } ]
+    } ],
+    "configuration" : {
+      "styles" : {
+        "elements" : [ {
+          "background" : "#7c5620",
+          "tag" : "Amtlich"
+        }, {
+          "shape" : "WebBrowser",
+          "tag" : "Browser"
+        }, {
+          "background" : "#9db39a",
+          "color" : "#1e1a16",
+          "tag" : "Component"
+        }, {
+          "background" : "#456b52",
+          "tag" : "Container"
+        }, {
+          "shape" : "Folder",
+          "tag" : "Datei"
+        }, {
+          "shape" : "Cylinder",
+          "tag" : "Datenbank"
+        }, {
+          "border" : "Dashed",
+          "tag" : "Einmalig"
+        }, {
+          "color" : "#ffffff",
+          "fontSize" : 22,
+          "tag" : "Element"
+        }, {
+          "background" : "#6f675c",
+          "tag" : "Extern"
+        }, {
+          "background" : "#5c6f62",
+          "tag" : "Fremdprodukt"
+        }, {
+          "border" : "Dashed",
+          "tag" : "Optional"
+        }, {
+          "background" : "#1c2e23",
+          "shape" : "Person",
+          "tag" : "Person"
+        }, {
+          "background" : "#2f4a3a",
+          "tag" : "Software System"
+        } ],
+        "relationships" : [ {
+          "color" : "#6f675c",
+          "tag" : "Relationship"
+        } ]
+      },
+      "terminology" : { }
+    },
+    "containerViews" : [ {
+      "automaticLayout" : {
+        "edgeSeparation" : 50,
+        "nodeSeparation" : 50,
+        "rankDirection" : "LeftRight",
+        "rankSeparation" : 100,
+        "vertices" : true
+      },
+      "description" : "Was im Browser läuft, was im Stapel läuft, und die Dienste dahinter.",
+      "elements" : [ {
+        "id" : "1",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "2",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "3",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "4",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "5",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "6",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "7",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "8",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "9",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "10",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "11",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "12",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "13",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "14",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "15",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "16",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "17",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "18",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "20",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "32",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "33",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "34",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "55",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "56",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "57",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "58",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "59",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "60",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "61",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "62",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "externalSoftwareSystemBoundariesVisible" : false,
+      "key" : "Container",
+      "name" : "Container View: where2build",
+      "order" : 2,
+      "relationships" : [ {
+        "id" : "131"
+      }, {
+        "id" : "137"
+      }, {
+        "id" : "140"
+      }, {
+        "id" : "142"
+      }, {
+        "id" : "145"
+      }, {
+        "id" : "147"
+      }, {
+        "id" : "148"
+      }, {
+        "id" : "149"
+      }, {
+        "id" : "150"
+      }, {
+        "id" : "151"
+      }, {
+        "id" : "152"
+      }, {
+        "id" : "153"
+      }, {
+        "id" : "154"
+      }, {
+        "id" : "156"
+      }, {
+        "id" : "159"
+      }, {
+        "id" : "162"
+      }, {
+        "id" : "165"
+      }, {
+        "id" : "168"
+      }, {
+        "id" : "171"
+      }, {
+        "id" : "176"
+      }, {
+        "id" : "179"
+      }, {
+        "id" : "182"
+      }, {
+        "id" : "185"
+      }, {
+        "id" : "188"
+      }, {
+        "id" : "190"
+      }, {
+        "id" : "191"
+      }, {
+        "id" : "193"
+      }, {
+        "id" : "194"
+      }, {
+        "id" : "196"
+      }, {
+        "id" : "197"
+      }, {
+        "id" : "199"
+      }, {
+        "id" : "63"
+      }, {
+        "id" : "65"
+      }, {
+        "id" : "67"
+      }, {
+        "id" : "69"
+      }, {
+        "id" : "71"
+      }, {
+        "id" : "72"
+      }, {
+        "id" : "75"
+      }, {
+        "id" : "76"
+      }, {
+        "id" : "97"
+      } ],
+      "softwareSystemId" : "19"
+    } ],
+    "deploymentViews" : [ {
+      "automaticLayout" : {
+        "edgeSeparation" : 50,
+        "nodeSeparation" : 50,
+        "rankDirection" : "LeftRight",
+        "rankSeparation" : 100,
+        "vertices" : true
+      },
+      "description" : "docker compose auf einem Rechner: welcher Dienst in welchem Container läuft.",
+      "elements" : [ {
+        "id" : "200",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "201",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "202",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "203",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "205",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "206",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "207",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "209",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "210",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "212",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "213",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "215",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "216",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "217",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "218",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "221",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "222",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "225",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "226",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "229",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "230",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "232",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "233",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "236",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "240",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "241",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "245",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "247",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "249",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "251",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "253",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "255",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "258",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "environment" : "Lokaler Stapel",
+      "key" : "Verteilung",
+      "name" : "Deployment View: where2build - Lokaler Stapel",
+      "order" : 6,
+      "relationships" : [ {
+        "id" : "204"
+      }, {
+        "id" : "208"
+      }, {
+        "id" : "211"
+      }, {
+        "id" : "214"
+      }, {
+        "id" : "219"
+      }, {
+        "id" : "220"
+      }, {
+        "id" : "223"
+      }, {
+        "id" : "224"
+      }, {
+        "id" : "227"
+      }, {
+        "id" : "228"
+      }, {
+        "id" : "231"
+      }, {
+        "id" : "234"
+      }, {
+        "id" : "235"
+      }, {
+        "id" : "237"
+      }, {
+        "id" : "238"
+      }, {
+        "id" : "239"
+      }, {
+        "id" : "242"
+      }, {
+        "id" : "243"
+      }, {
+        "id" : "244"
+      }, {
+        "id" : "246"
+      }, {
+        "id" : "248"
+      }, {
+        "id" : "250"
+      }, {
+        "id" : "252"
+      }, {
+        "id" : "254"
+      }, {
+        "id" : "256"
+      }, {
+        "id" : "257"
+      }, {
+        "id" : "259"
+      } ],
+      "softwareSystemId" : "19"
+    } ],
+    "dynamicViews" : [ {
+      "automaticLayout" : {
+        "edgeSeparation" : 50,
+        "nodeSeparation" : 50,
+        "rankDirection" : "LeftRight",
+        "rankSeparation" : 100,
+        "vertices" : true
+      },
+      "description" : "Ein Inserat wird übergeben, gelesen und zum amtlichen Flurstück aufgelöst.",
+      "elementId" : "19",
+      "elements" : [ {
+        "id" : "1",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "4",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "5",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "17",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "20",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "32",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "33",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "34",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "58",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "externalBoundariesVisible" : false,
+      "key" : "InseratZuFlurstueck",
+      "name" : "Dynamic View: where2build",
+      "order" : 5,
+      "relationships" : [ {
+        "description" : "Klickt auf der Inseratsseite",
+        "id" : "65",
+        "order" : "1",
+        "response" : false
+      }, {
+        "description" : "Übergibt document.outerHTML per postMessage",
+        "id" : "75",
+        "order" : "2",
+        "response" : false
+      }, {
+        "description" : "POST /api/listings/extract",
+        "id" : "76",
+        "order" : "3",
+        "response" : false
+      }, {
+        "description" : "Leitet weiter",
+        "id" : "97",
+        "order" : "4",
+        "response" : false
+      }, {
+        "description" : "Liest, was die Muster nicht fanden (optional)",
+        "id" : "185",
+        "order" : "5",
+        "response" : false
+      }, {
+        "description" : "POST /api/parcels/search",
+        "id" : "76",
+        "order" : "6",
+        "response" : false
+      }, {
+        "description" : "Leitet weiter, NDJSON-Strom zurück",
+        "id" : "97",
+        "order" : "7",
+        "response" : false
+      }, {
+        "description" : "Flurstücke per Gemarkung und Nummer, sonst Flächentreppe",
+        "id" : "156",
+        "order" : "8",
+        "response" : false
+      }, {
+        "description" : "Verortet Straße oder Ort",
+        "id" : "145",
+        "order" : "9",
+        "response" : false
+      }, {
+        "description" : "GET /api/landvalue, POST /api/site-checks",
+        "id" : "76",
+        "order" : "10",
+        "response" : false
+      }, {
+        "description" : "Leitet weiter",
+        "id" : "97",
+        "order" : "11",
+        "response" : false
+      }, {
+        "description" : "Bodenrichtwert",
+        "id" : "162",
+        "order" : "12",
+        "response" : false
+      } ]
+    } ],
+    "systemContextViews" : [ {
+      "automaticLayout" : {
+        "edgeSeparation" : 50,
+        "nodeSeparation" : 50,
+        "rankDirection" : "LeftRight",
+        "rankSeparation" : 100,
+        "vertices" : true
+      },
+      "description" : "Wer where2build benutzt und welche Dienste es fragt.",
+      "elements" : [ {
+        "id" : "1",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "2",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "3",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "4",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "5",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "6",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "7",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "8",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "9",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "10",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "11",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "15",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "16",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "17",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "18",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "19",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "enterpriseBoundaryVisible" : true,
+      "key" : "Kontext",
+      "name" : "System Context View: where2build",
+      "order" : 1,
+      "relationships" : [ {
+        "id" : "157"
+      }, {
+        "id" : "160"
+      }, {
+        "id" : "163"
+      }, {
+        "id" : "166"
+      }, {
+        "id" : "169"
+      }, {
+        "id" : "172"
+      }, {
+        "id" : "177"
+      }, {
+        "id" : "180"
+      }, {
+        "id" : "183"
+      }, {
+        "id" : "186"
+      }, {
+        "id" : "189"
+      }, {
+        "id" : "64"
+      }, {
+        "id" : "66"
+      }, {
+        "id" : "68"
+      }, {
+        "id" : "70"
+      }, {
+        "id" : "73"
+      } ],
+      "softwareSystemId" : "19"
+    } ]
+  }
+}

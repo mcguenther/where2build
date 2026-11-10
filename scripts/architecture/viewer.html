@@ -1,0 +1,40 @@
+<div class="app">
+  <header class="kopf">
+    <div class="marke">
+      <span class="marke-name">where2build</span>
+      <span class="marke-zusatz">Architektur nach C4</span>
+    </div>
+    <nav class="sichten" id="sichten" aria-label="Sichten"></nav>
+    <div class="werkzeuge">
+      <div class="suche">
+        <label class="unsichtbar" for="suchfeld">Element suchen</label>
+        <input id="suchfeld" type="search" placeholder="Element suchen …" autocomplete="off">
+        <ul class="treffer" id="treffer" hidden></ul>
+      </div>
+      <label class="schalter" for="beschriftung">
+        <input id="beschriftung" type="checkbox" checked>
+        <span>Beschriftungen</span>
+      </label>
+      <button class="knopf" id="thema" type="button" title="Farbschema wechseln">System</button>
+    </div>
+  </header>
+
+  <main class="flaeche">
+    <section class="buehne" aria-label="Diagramm">
+      <ol class="pfad" id="pfad"></ol>
+      <div class="zeichnung" id="zeichnung"></div>
+      <div class="zoom" role="group" aria-label="Zoom">
+        <button class="knopf" id="zoom-rein" type="button" title="Vergrößern (+)">+</button>
+        <button class="knopf" id="zoom-raus" type="button" title="Verkleinern (−)">−</button>
+        <button class="knopf" id="einpassen" type="button" title="Einpassen (0)">Einpassen</button>
+      </div>
+      <div class="schritte" id="schritte" hidden>
+        <button class="knopf" id="schritt-zurueck" type="button" title="Vorheriger Schritt (←)">‹</button>
+        <span class="schritt-stand" id="schritt-stand"></span>
+        <button class="knopf" id="schritt-vor" type="button" title="Nächster Schritt (→)">›</button>
+        <button class="knopf" id="abspielen" type="button">Abspielen</button>
+      </div>
+    </section>
+    <aside class="tafel" id="tafel" aria-live="polite"></aside>
+  </main>
+</div>

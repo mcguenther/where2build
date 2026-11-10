@@ -44,7 +44,7 @@
         "scripts/build_poi_index.py",
         "--download"
       ],
-      "why": "The OpenStreetMap places behind /api/nearby. Quarterly is the cadence the Overpass policy is content with. The API reads its index at startup, so the backend has to be restarted after a rebuild for the new one to take effect."
+      "why": "The OpenStreetMap places behind /api/nearby. Quarterly is the cadence the Overpass policy is content with. The backend notices the new file within ten seconds and reads it again; no restart."
     },
     {
       "name": "address-index",
@@ -54,7 +54,7 @@
         "scripts/build_address_index.py",
         "--download"
       ],
-      "why": "The official Saxon address coordinates. The GeoSN republishes quarterly. The API reads its index at startup, so the backend has to be restarted after a rebuild for the new one to take effect."
+      "why": "The official Saxon address coordinates. The GeoSN republishes quarterly. The backend notices the new file within ten seconds and reads it again; no restart."
     },
     {
       "name": "llm-preise",
@@ -64,7 +64,7 @@
         "scripts/update_llm_prices.py",
         "--json"
       ],
-      "why": "Die Preisliste hinter der Kostenspalte der Verwaltung: Preise je Modell vom Anbieter selbst und der Tageskurs der EZB. Monatlich, weil Preise sich selten und der Kurs sich täglich ändert -- und weil die Datei im Git steht, ist jede Änderung ein Diff, den jemand sieht. Ohne diesen Lauf altert nur die Umrechnung, gezählt wird weiter. Im Container schreibt er nach LLM_PRICES_UPDATE_PATH, weil ./ops dort schreibgeschützt ist; das Backend nimmt die neuere der beiden Listen und liest sie beim Start, muss danach also neu gestartet werden."
+      "why": "Die Preisliste hinter der Kostenspalte der Verwaltung: Preise je Modell vom Anbieter selbst und der Tageskurs der EZB. Monatlich, weil Preise sich selten und der Kurs sich täglich ändert -- und weil die Datei im Git steht, ist jede Änderung ein Diff, den jemand sieht. Ohne diesen Lauf altert nur die Umrechnung, gezählt wird weiter. Im Container schreibt er nach LLM_PRICES_UPDATE_PATH, weil ./ops dort schreibgeschützt ist; das Backend nimmt die neuere der beiden Listen und liest sie neu, sobald sich eine ändert -- ohne Neustart."
     }
   ]
 }

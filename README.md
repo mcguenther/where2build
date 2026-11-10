@@ -146,7 +146,7 @@ if you want it separately.
 |---|---|
 | **Port** | `WHERE2BUILD_PORT=8081 docker compose up` to serve somewhere other than 8080 (not 9000: that is authentik's, and `WHERE2BUILD_AUTH_PORT` moves it). Signing in names `localhost:8080` and `localhost:9000` in three places — `OIDC_PUBLIC_BASE_URL` and `OIDC_ISSUER` in `docker-compose.yml`, the redirect URI in `ops/authentik/where2build.yaml` — so a moved port has to be changed there too, or the provider refuses the callback. |
 | **Cache** | The named volume `backend-cache` holds what the official services answered. Losing it costs time and their bandwidth, not correctness. |
-| **POI and address indexes** | Built on the first start into the volume `indexes` — the POI index from the same OSM extract the router uses, the address index from the GeoSN's Hauskoordinaten — and rebuilt quarterly by the scheduler. A failed build does not stop the stack: `/api/nearby` and `/api/geocode` then say what is missing instead of answering with an empty list. The backend reads both at startup, so restart it after a rebuild. See [Reach of the POI index](#reach-of-the-poi-index). |
+| **POI and address indexes** | Built on the first start into the volume `indexes` — the POI index from the same OSM extract the router uses, the address index from the GeoSN's Hauskoordinaten — and rebuilt quarterly by the scheduler. A failed build does not stop the stack: `/api/nearby` and `/api/geocode` then say what is missing instead of answering with an empty list. The backend notices a rebuilt file within ten seconds and reads it again, without a restart. See [Reach of the POI index](#reach-of-the-poi-index). |
 | **Extraction** | Without `LLM_API_KEY` in `backend/.env`, reading a listing page stays switched off. Everything else works. |
 | **Contact address** | Set `APP_CONTACT` before any real use: the Transitous usage policy requires one. |
 | **Router** | MOTIS runs in the stack; `docker-compose.transitous.yml` switches to the public Transitous instead. See [Routing](#routing). |
@@ -173,8 +173,11 @@ failures, and the next scheduled run is the retry.
 The scheduler runs from the backend image and touches only the shared volumes,
 so it needs no Docker socket — mounting that would hand a container root on the
 host for the sake of a few timed commands. Rebuilding an index writes into the
-`indexes` volume, and the API reads its indexes at startup, so the backend has
-to be restarted afterwards for a new one to take effect.
+`indexes` volume. The backend looks at the files' modification time at most
+every ten seconds and reads a changed one again, so a rebuilt index or price
+list takes effect without a restart -- while the new file is read, requests
+keep getting the old one, and a broken file never replaces a working one
+(`backend/app/reloading.py`).
 
 **The timetable refresh is deliberately not one of these jobs.** It stops the
 router while the graph is rebuilt, which is a host-side operation, so it stays
@@ -275,22 +278,55 @@ arrived. Look at the images: tests do not catch a collapsed layout.
 ## Layout
 
 ```
-backend/          FastAPI. Proxy, cache and schema validation. Owns no geometry.
-  app/services/   alkis, boris, llm, motis, tiles
+backend/          FastAPI. Proxy and disk cache in front of the official
+                  services, the parcel search, listing extraction, accounts.
   app/routers/    one per endpoint group
+  app/services/   one adapter per external service (alkis, boris, luis, rapis,
+                  motis, llm, portals, ...) plus storage, oidc, admin, preview
+  app/search/     the parcel search: indicia, tolerance ladder, scoring
+  scripts/        index builders, the job runner, the price list update
 frontend/
-  src/lib/        geometry, projection, routes, store, api, formatting
-  src/components/ SitePlan (the drawing), PlotCard, RouteCards
-  src/views/      Plots, Plot, Wizard, Compare, HouseTypes, Destinations, Data
+  src/lib/        geometry, projection, routes, store, api, findings, formatting
+  src/components/ SitePlan (the drawing), PlotCard, RouteCards, QueryBox, ...
+  src/views/      Plots, Plot, Wizard, Compare, HouseTypes, Destinations, Data,
+                  Account, Admin, SharedPlot
   src/styles/     tokens, base, print
-docs/             Spec, service research, screenshots
+docs/             Spec, service research, screenshots, the C4 model
+ops/              job list, model price list, the authentik blueprint
 mockup/           The approved UI mock. Reference, not built.
 ```
 
-**All geometry runs in the browser.** Buffering, rotation and collision happen
-while the user drags, with no round trip; the binding numbers come from ALKIS
-anyway. The backend owns network access, caching and schema validation, and
-nothing else.
+**Geometry the user touches runs in the browser.** Buffering, rotation and
+collision happen while the user drags, with no round trip; the binding numbers
+come from ALKIS anyway. **Geometry the search uses runs in the backend**:
+`app/search/` unions outlines, fits a rotated rectangle against the dimensions
+a listing states and measures a front width, because it ranks a candidate list
+streamed as NDJSON that cannot wait for a browser. Postgres holds what a
+signed-in person stores -- plots, settings, shared links -- plus the
+administration area's hourly aggregates; the backend works without it, and
+then there are no accounts.
+
+The diagrams below show all of it.
+
+## Architecture diagrams
+
+`docs/architektur/` holds the C4 model of the whole thing:
+`workspace.dsl` in the Structurizr DSL is the source, and everything else there
+is generated from it by
+
+```bash
+node scripts/architecture.mjs
+```
+
+which parses the DSL with Structurizr's own parser (Java, fetched through Maven
+on the first run), writes `workspace.json` -- loadable in Structurizr Lite as
+is -- lays every view out with ELK and writes `architektur.html`, one
+self-contained interactive page (pan, zoom, drill down a level, step through the
+listing-to-parcel flow), plus a `c4-*.png` per view, taken from that same page.
+`--no-dsl` starts from the committed `workspace.json` where there is no Java.
+Six views: system context, containers, the components of the backend and of the
+web app, the dynamic view from a listing to its parcel, and the deployment of
+the compose stack.
 
 ## Endpoints
 
