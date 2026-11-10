@@ -188,7 +188,13 @@ services:
   # The browser reaches it as http://localhost:9000, the backend as
   # http://authentik:9000 -- see OIDC_INTERNAL_BASE_URL above.
   authentik: &authentik
-    image: ghcr.io/goauthentik/server:2025.2.4
+    # 2025.2.3, not 2025.2.4: on ghcr the 2025.2.4 tag (and with it 2025.2) is
+    # a single arm64 manifest, not a multi-platform index. On an x86 machine
+    # both containers died with `exec /ak-root/venv/bin/dumb-init: exec format
+    # error` and restarted forever, so no one could sign in (measured
+    # 10.11.2026). Check `docker buildx imagetools inspect <tag>` lists
+    # linux/amd64 before raising this.
+    image: ghcr.io/goauthentik/server:2025.2.3
     command: server
     environment: &authentik-env
       # Signs authentik's own sessions. Committed on purpose, like everything
@@ -369,6 +375,13 @@ services:
       # See the backend: the cache sweep must look where the backend writes.
       - APP_CACHE_DIR=/cache
       - JOBS_FILE=/ops/jobs.json
+      # The same database as the backend. Without it `freigaben-sweep`
+      # answered {"status": "kein-speicher"} every night (measured 10.11.2026)
+      # and expired shared links were never removed.
+      - DATABASE_URL=postgresql://where2build:where2build@db:5432/where2build
+    depends_on:
+      db:
+        condition: service_healthy
     volumes:
       - backend-cache:/cache
       # Writable, unlike the backend's mount: rebuilding an index is the job.

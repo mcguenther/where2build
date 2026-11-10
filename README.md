@@ -144,13 +144,13 @@ if you want it separately.
 
 | | |
 |---|---|
-| **Port** | `WHERE2BUILD_PORT=9000 docker compose up` to serve somewhere other than 8080. |
+| **Port** | `WHERE2BUILD_PORT=8081 docker compose up` to serve somewhere other than 8080 (not 9000: that is authentik's, and `WHERE2BUILD_AUTH_PORT` moves it). Signing in names `localhost:8080` and `localhost:9000` in three places — `OIDC_PUBLIC_BASE_URL` and `OIDC_ISSUER` in `docker-compose.yml`, the redirect URI in `ops/authentik/where2build.yaml` — so a moved port has to be changed there too, or the provider refuses the callback. |
 | **Cache** | The named volume `backend-cache` holds what the official services answered. Losing it costs time and their bandwidth, not correctness. |
 | **POI and address indexes** | Built on the first start into the volume `indexes` — the POI index from the same OSM extract the router uses, the address index from the GeoSN's Hauskoordinaten — and rebuilt quarterly by the scheduler. A failed build does not stop the stack: `/api/nearby` and `/api/geocode` then say what is missing instead of answering with an empty list. The backend reads both at startup, so restart it after a rebuild. See [Reach of the POI index](#reach-of-the-poi-index). |
 | **Extraction** | Without `LLM_API_KEY` in `backend/.env`, reading a listing page stays switched off. Everything else works. |
 | **Contact address** | Set `APP_CONTACT` before any real use: the Transitous usage policy requires one. |
 | **Router** | MOTIS runs in the stack; `docker-compose.transitous.yml` switches to the public Transitous instead. See [Routing](#routing). |
-| **Accounts** | `docker compose down -v` throws the database away with the volume `db-data`. Point `DATABASE_URL` at your own Postgres and the `OIDC_*` variables at your own provider to deploy this for real, and drop the `db` and `auth` services. |
+| **Accounts** | `docker compose down -v` throws the database away with the volume `db-data`. Point `DATABASE_URL` at your own Postgres and the `OIDC_*` variables at your own provider to deploy this for real, and drop the `db` service and the four `authentik*` ones. |
 
 `backend/.env` is read if it exists and skipped if it does not, so the stack
 comes up either way.
